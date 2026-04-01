@@ -1,0 +1,127 @@
+title: "13-F Ownership Research"
+description: "Institutional ownership database built from SEC 13-F filings (2025 Q1–Q4)"
+
+databases:
+  13f:
+    tables:
+      holdings:
+        label_column: issuer_name
+        sortable_columns:
+          - market_value_usd
+          - shares
+          - pct_of_portfolio
+          - pct_of_float
+          - market_value_live
+      managers:
+        label_column: manager_name
+      securities:
+        label_column: ticker
+      market_data:
+        label_column: ticker
+      adv_managers:
+        label_column: firm_name
+
+    queries:
+      shareholder-register:
+        title: "Query 1: Shareholder Register"
+        description: "Current institutional holders grouped by parent, valued at live price"
+        sql: |
+          SELECT
+              COALESCE(h.inst_parent_name, h.manager_name) as parent_name,
+              h.manager_name as fund_name,
+              COALESCE(h.manager_type, 'unknown') as type,
+              h.shares,
+              h.market_value_live,
+              h.pct_of_portfolio,
+              h.pct_of_float
+          FROM holdings h
+          WHERE h.quarter = '2025Q4' AND h.ticker = :ticker
+          ORDER BY h.market_value_live DESC NULLS LAST
+          LIMIT 100
+
+      ownership-change:
+        title: "Query 2: Ownership Change (Q1 vs Q4)"
+        description: "4-quarter share changes at fund level"
+        sql: |
+          WITH q1 AS (
+              SELECT cik, manager_name, shares as q1_shares
+              FROM holdings WHERE quarter = '2025Q1' AND ticker = :ticker
+          ),
+          q4 AS (
+              SELECT cik, manager_name, manager_type, shares as q4_shares
+              FROM holdings WHERE quarter = '2025Q4' AND ticker = :ticker
+          )
+          SELECT
+              COALESCE(q4.manager_name, q1.manager_name) as fund,
+              COALESCE(q4.manager_type, '') as type,
+              q1.q1_shares,
+              q4.q4_shares,
+              COALESCE(q4.q4_shares, 0) - COALESCE(q1.q1_shares, 0) as change,
+              CASE WHEN q1.q1_shares > 0
+                   THEN ROUND((COALESCE(q4.q4_shares,0) - q1.q1_shares) * 100.0 / q1.q1_shares, 1)
+                   ELSE NULL END as change_pct
+          FROM q4 FULL OUTER JOIN q1 ON q4.cik = q1.cik
+          ORDER BY ABS(COALESCE(q4.q4_shares,0) - COALESCE(q1.q1_shares,0)) DESC
+          LIMIT 100
+
+      active-holders:
+        title: "Query 3: Active Holder Analysis"
+        description: "Top active holders with portfolio context"
+        sql: |
+          SELECT
+              h.manager_name,
+              h.manager_type,
+              h.shares,
+              h.market_value_live as position_value,
+              h.pct_of_portfolio,
+              h.pct_of_float
+          FROM holdings h
+          WHERE h.quarter = '2025Q4'
+            AND h.ticker = :ticker
+            AND h.manager_type IN ('active', 'hedge_fund', 'activist', 'quantitative')
+          ORDER BY h.market_value_live DESC NULLS LAST
+          LIMIT 50
+
+      manager-portfolio:
+        title: "Query 7: Manager Portfolio"
+        description: "Full portfolio for a given CIK"
+        sql: |
+          SELECT
+              h.ticker, h.issuer_name, h.shares,
+              h.market_value_live, h.pct_of_portfolio, h.pct_of_float
+          FROM holdings h
+          WHERE h.cik = :cik AND h.quarter = '2025Q4'
+          ORDER BY h.market_value_live DESC NULLS LAST
+          LIMIT 100
+
+      energy-rotation:
+        title: "Query 13: Energy Sector Rotation"
+        description: "Active manager flows into/out of energy stocks"
+        sql: |
+          WITH energy_moves AS (
+              SELECT
+                  h4.ticker, h4.issuer_name,
+                  COUNT(DISTINCT CASE WHEN h4.shares > COALESCE(h1.shares, 0) THEN h4.cik END) as buyers,
+                  COUNT(DISTINCT CASE WHEN h4.shares < COALESCE(h1.shares, 0) THEN h4.cik END) as sellers,
+                  SUM(h4.market_value_live) as q4_value
+              FROM holdings h4
+              INNER JOIN securities s ON h4.cusip = s.cusip AND s.is_energy = true
+              LEFT JOIN holdings h1 ON h4.cik = h1.cik AND h4.ticker = h1.ticker AND h1.quarter = '2025Q1'
+              WHERE h4.quarter = '2025Q4' AND h4.manager_type IN ('active', 'hedge_fund', 'activist')
+              GROUP BY h4.ticker, h4.issuer_name
+          )
+          SELECT *, buyers - sellers as net_flow
+          FROM energy_moves
+          WHERE buyers + sellers >= 5
+          ORDER BY net_flow DESC LIMIT 30
+
+      database-stats:
+        title: "Query 15: Database Statistics"
+        description: "Summary counts for all tables"
+        sql: |
+          SELECT 'holdings' as tbl, COUNT(*) as rows FROM holdings
+          UNION ALL SELECT 'managers', COUNT(*) FROM managers
+          UNION ALL SELECT 'securities', COUNT(*) FROM securities
+          UNION ALL SELECT 'market_data', COUNT(*) FROM market_data
+          UNION ALL SELECT 'adv_managers', COUNT(*) FROM adv_managers
+          UNION ALL SELECT 'filings', COUNT(*) FROM filings

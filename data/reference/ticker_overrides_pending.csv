@@ -1,0 +1,6 @@
+cusip,issuer_name,wrong_ticker,candidate_ticker,method,confidence_score,filed_value,reason_flagged
+68376D104,Oportun Financial Corp.,,OPRT,sec_json,82.92682926829268,174628116000.0,Fuzzy score 82.92682926829268 below auto-apply threshold (92)
+644465106,NEW GERMANY FUND,,GF,sec_json,87.5,117279435000.0,Fuzzy score 87.5 below auto-apply threshold (92)
+35472T101,Franklin Ltd Duration Income Trust,,FTF,sec_json,86.66666666666667,89356285000.0,Fuzzy score 86.66666666666667 below auto-apply threshold (92)
+439038100,Hooker Furnishings Corp,,HOFT,sec_json,83.72093023255813,83167437000.0,Fuzzy score 83.72093023255813 below auto-apply threshold (92)
+02927U208,American Resources Corp,,AREC,sec_json,83.72093023255813,52689666000.0,Fuzzy score 83.72093023255813 below auto-apply threshold (92)

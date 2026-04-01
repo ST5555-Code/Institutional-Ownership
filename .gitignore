@@ -1,0 +1,26 @@
+# Database and raw data — too large for Git
+data/13f.duckdb
+data/13f.duckdb.wal
+data/raw/
+data/extracted/
+data/market/
+data/nport_raw/
+
+# Outputs — generated files
+outputs/
+
+# Logs
+logs/
+
+# Auto-resolve log — regenerated on each run
+data/reference/auto_resolve_log.csv
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+.env
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
