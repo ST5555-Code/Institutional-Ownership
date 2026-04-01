@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>13F Institutional Ownership Research</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <h1 class="header-title">Institutional Ownership Research</h1>
+            <div class="search-bar">
+                <div class="search-input-wrap">
+                    <input type="text" id="ticker-input" placeholder="Ticker or company name..." autocomplete="off">
+                    <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                </div>
+                <button id="load-btn" class="btn btn-primary">Load</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Summary Card -->
+    <div id="summary-card" class="summary-card hidden">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span class="summary-label">Company</span>
+                <span class="summary-value" id="sum-company">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Latest Quarter</span>
+                <span class="summary-value" id="sum-quarter">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Inst. Holdings</span>
+                <span class="summary-value" id="sum-holdings">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">% Float Held</span>
+                <span class="summary-value" id="sum-float">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Holders</span>
+                <span class="summary-value" id="sum-holders">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Active / Passive</span>
+                <span class="summary-value" id="sum-split">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Market Cap</span>
+                <span class="summary-value" id="sum-mktcap">—</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Price</span>
+                <span class="summary-value" id="sum-price">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div id="tab-container" class="tab-container hidden">
+        <div class="tab-bar">
+            <button class="tab active" data-query="1">Register</button>
+            <button class="tab" data-query="2">4Q Change</button>
+            <button class="tab" data-query="3">Active Analysis</button>
+            <button class="tab" data-query="4">Passive/Active</button>
+            <button class="tab" data-query="5">Trend</button>
+            <button class="tab" data-query="6">Activist</button>
+            <button class="tab" data-query="7">Fund Portfolio</button>
+            <button class="tab" data-query="8">Cross-Ownership</button>
+            <button class="tab" data-query="9">Sector Rotation</button>
+            <button class="tab" data-query="10">New Positions</button>
+            <button class="tab" data-query="11">Exits</button>
+            <button class="tab" data-query="12">Concentration</button>
+            <button class="tab" data-query="13">Energy Rotation</button>
+            <button class="tab" data-query="14">AUM vs Position</button>
+            <button class="tab" data-query="15">DB Statistics</button>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="action-bar">
+            <button id="copy-btn" class="btn btn-secondary">Copy</button>
+            <button id="export-btn" class="btn btn-secondary">Export Excel</button>
+        </div>
+
+        <!-- Results area -->
+        <div id="results-area" class="results-area">
+            <div id="loading-spinner" class="spinner hidden">
+                <div class="spinner-ring"></div>
+                <span>Loading...</span>
+            </div>
+            <div id="results-table-wrap"></div>
+            <div id="error-msg" class="error-msg hidden"></div>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state">
+        <p>Enter a ticker above to begin.</p>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

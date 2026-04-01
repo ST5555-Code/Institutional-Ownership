@@ -69,13 +69,23 @@ The notebook has 15 query cells. Change the `TICKER` variable at the top of each
 14. Manager AUM vs position size
 15. Database statistics
 
-## Web Dashboard
+## Web Interface
+
+Start the research app:
 
 ```bash
-python3 -m datasette data/13f.duckdb --metadata web/datasette_config.yaml --port 8001
+./scripts/start_app.sh
 ```
 
-Open http://localhost:8001. See `web/README_deploy.md` for Render.com deployment.
+Open http://localhost:8001. The app provides a browser-based interface with all 15
+ownership queries, ticker autocomplete, sortable tables, copy-to-clipboard, and
+Excel export. See `web/README_deploy.md` for Render.com deployment.
+
+### Legacy Datasette Dashboard
+
+```bash
+python3 -m datasette data/13f.duckdb --metadata web/datasette_config.yaml --port 8002
+```
 
 ## Ticker Overrides
 
