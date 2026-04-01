@@ -27,12 +27,15 @@ const tableWrap     = document.getElementById('results-table-wrap');
 const errorMsg      = document.getElementById('error-msg');
 const copyBtn       = document.getElementById('copy-btn');
 const exportBtn     = document.getElementById('export-btn');
+const managerSelector = document.getElementById('manager-selector');
+const managerDropdown = document.getElementById('manager-dropdown');
+const loadPortfolioBtn = document.getElementById('load-portfolio-btn');
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
 function fmtDollars(val) {
-    if (val == null || val === 0) return '$0';
+    if (val == null || val === 0) return '\u2014';
     const abs = Math.abs(val);
     const sign = val < 0 ? '-' : '';
     if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(1) + 'T';
@@ -43,7 +46,7 @@ function fmtDollars(val) {
 }
 
 function fmtShares(val) {
-    if (val == null || val === 0) return '0';
+    if (val == null || val === 0) return '\u2014';
     const abs = Math.abs(val);
     const sign = val < 0 ? '-' : '';
     if (abs >= 1e9) return sign + (abs / 1e9).toFixed(1) + 'B';
@@ -53,13 +56,16 @@ function fmtShares(val) {
 }
 
 function fmtPct(val) {
-    if (val == null) return '\u2014';
+    if (val == null || val === 0) return '\u2014';
     return val.toFixed(2) + '%';
 }
 
 function fmtNum(val) {
     if (val == null) return '\u2014';
-    if (typeof val === 'number') return val.toLocaleString('en-US', {maximumFractionDigits: 2});
+    if (typeof val === 'number') {
+        if (val === 0) return '\u2014';
+        return val.toLocaleString('en-US', {maximumFractionDigits: 2});
+    }
     return String(val);
 }
 
@@ -201,7 +207,13 @@ async function loadTicker() {
     }
 
     // Load current tab
-    loadQuery(currentQuery);
+    if (currentQuery === 7) {
+        managerSelector.classList.remove('hidden');
+        loadManagerDropdown();
+    } else {
+        managerSelector.classList.add('hidden');
+        loadQuery(currentQuery);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -214,20 +226,30 @@ document.querySelectorAll('.tab').forEach(tab => {
         currentQuery = parseInt(tab.dataset.query);
         sortCol = null;
         sortDir = 'asc';
-        loadQuery(currentQuery);
+        // Show/hide manager selector for Q7
+        if (currentQuery === 7) {
+            managerSelector.classList.remove('hidden');
+            loadManagerDropdown();
+        } else {
+            managerSelector.classList.add('hidden');
+            loadQuery(currentQuery);
+        }
     });
 });
 
 // ---------------------------------------------------------------------------
 // Load query data
 // ---------------------------------------------------------------------------
-async function loadQuery(qnum) {
+async function loadQuery(qnum, extraParams) {
     showSpinner();
     clearError();
     tableWrap.innerHTML = '';
 
     const params = new URLSearchParams();
     if (currentTicker) params.set('ticker', currentTicker);
+    if (extraParams) {
+        for (const [k, v] of Object.entries(extraParams)) params.set(k, v);
+    }
     const url = `/api/query${qnum}?${params}`;
 
     try {
@@ -236,13 +258,19 @@ async function loadQuery(qnum) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || `HTTP ${res.status}`);
         }
-        currentData = await res.json();
+        const raw = await res.json();
         hideSpinner();
 
         if (qnum === 15) {
-            renderStats(currentData);
+            currentData = raw;
+            renderStats(raw);
+        } else if (qnum === 7) {
+            // Q7 returns {stats, positions}
+            currentData = raw.positions || [];
+            renderQuery7(raw);
         } else {
-            renderTable(currentData, qnum);
+            currentData = raw;
+            renderTable(raw, qnum);
         }
     } catch (e) {
         hideSpinner();
@@ -254,125 +282,211 @@ async function loadQuery(qnum) {
 // Table rendering
 // ---------------------------------------------------------------------------
 
-// Column definitions per query
+// Column definitions per query — only key, label, type (data format).
+// Width, alignment, and visual role are auto-inferred from key+label names.
 const QUERY_COLUMNS = {
     1: [
-        {key: 'rank', label: '#', type: 'num'},
-        {key: 'institution', label: 'Institution', type: 'text'},
-        {key: 'value_live', label: 'Value (Live)', type: 'dollar'},
-        {key: 'shares', label: 'Shares', type: 'shares'},
-        {key: 'pct_float', label: '% Float', type: 'pct'},
-        {key: 'type', label: 'Type', type: 'text'},
+        {key: 'rank',        label: '#',            type: 'num'},
+        {key: 'institution', label: 'Institution',  type: 'text'},
+        {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
+        {key: 'shares',      label: 'Shares',       type: 'shares'},
+        {key: 'pct_float',   label: '% Float',      type: 'pct'},
+        {key: 'type',        label: 'Type',         type: 'text'},
     ],
     2: [
-        {key: 'fund_name', label: 'Institution / Fund', type: 'text'},
-        {key: 'q1_shares', label: 'Q1 Shares', type: 'shares'},
-        {key: 'q4_shares', label: 'Q4 Shares', type: 'shares'},
-        {key: 'change_shares', label: 'Change', type: 'shares'},
-        {key: 'change_pct', label: 'Chg%', type: 'pct'},
-        {key: 'type', label: 'Type', type: 'text'},
+        {key: 'fund_name',     label: 'Institution / Fund', type: 'text'},
+        {key: 'q1_shares',     label: 'Q1 Shares',          type: 'shares'},
+        {key: 'q4_shares',     label: 'Q4 Shares',          type: 'shares'},
+        {key: 'change_shares', label: 'Change',             type: 'shares'},
+        {key: 'change_pct',    label: 'Chg%',               type: 'pct'},
+        {key: 'type',          label: 'Type',               type: 'text'},
     ],
     3: [
-        {key: 'manager_name', label: 'Active Holder', type: 'text'},
-        {key: 'position_value', label: 'Position Value', type: 'dollar'},
-        {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-        {key: 'pct_of_float', label: '% Float', type: 'pct'},
+        {key: 'manager_name',      label: 'Active Holder',  type: 'text'},
+        {key: 'position_value',    label: 'Position Value', type: 'dollar'},
+        {key: 'pct_of_portfolio',  label: '% Portfolio',    type: 'pct'},
+        {key: 'pct_of_float',     label: '% Float',         type: 'pct'},
         {key: 'mktcap_percentile', label: 'MktCap Pctile', type: 'pct'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'source', label: 'Source', type: 'text'},
+        {key: 'manager_type',     label: 'Type',            type: 'text'},
+        {key: 'source',           label: 'Source',          type: 'text'},
     ],
     4: [
-        {key: 'category', label: 'Category', type: 'text'},
-        {key: 'num_holders', label: 'Holders', type: 'num'},
-        {key: 'total_shares', label: 'Total Shares', type: 'shares'},
-        {key: 'total_value', label: 'Total Value', type: 'dollar'},
-        {key: 'total_pct_float', label: '% Float', type: 'pct'},
-        {key: 'pct_of_inst', label: '% of Inst.', type: 'pct'},
+        {key: 'category',        label: 'Category',     type: 'text'},
+        {key: 'num_holders',     label: 'Holders',      type: 'num'},
+        {key: 'total_shares',    label: 'Total Shares', type: 'shares'},
+        {key: 'total_value',     label: 'Total Value',  type: 'dollar'},
+        {key: 'total_pct_float', label: '% Float',      type: 'pct'},
+        {key: 'pct_of_inst',    label: '% of Inst.',     type: 'pct'},
     ],
     5: [
-        {key: 'holder', label: 'Holder', type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'q1_shares', label: 'Q1', type: 'shares'},
-        {key: 'q2_shares', label: 'Q2', type: 'shares'},
-        {key: 'q3_shares', label: 'Q3', type: 'shares'},
-        {key: 'q4_shares', label: 'Q4', type: 'shares'},
-        {key: 'q1_to_q2', label: 'Q1\u2192Q2', type: 'shares'},
-        {key: 'q2_to_q3', label: 'Q2\u2192Q3', type: 'shares'},
-        {key: 'q3_to_q4', label: 'Q3\u2192Q4', type: 'shares'},
-        {key: 'full_year_change', label: 'Full Yr', type: 'shares'},
+        {key: 'holder',            label: 'Holder',     type: 'text'},
+        {key: 'manager_type',      label: 'Type',       type: 'text'},
+        {key: 'q1_shares',         label: 'Q1',         type: 'shares'},
+        {key: 'q2_shares',         label: 'Q2',         type: 'shares'},
+        {key: 'q3_shares',         label: 'Q3',         type: 'shares'},
+        {key: 'q4_shares',         label: 'Q4',         type: 'shares'},
+        {key: 'q1_to_q2',          label: 'Q1\u2192Q2', type: 'shares'},
+        {key: 'q2_to_q3',          label: 'Q2\u2192Q3', type: 'shares'},
+        {key: 'q3_to_q4',          label: 'Q3\u2192Q4', type: 'shares'},
+        {key: 'full_year_change',   label: 'Full Yr',   type: 'shares'},
     ],
     6: [
-        {key: 'manager_name', label: 'Manager', type: 'text'},
-        {key: 'quarter', label: 'Quarter', type: 'text'},
-        {key: 'shares', label: 'Shares', type: 'shares'},
-        {key: 'market_value_usd', label: 'Value (Filed)', type: 'dollar'},
-        {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
-        {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-        {key: 'pct_of_float', label: '% Float', type: 'pct'},
+        {key: 'manager_name',      label: 'Manager',       type: 'text'},
+        {key: 'quarter',           label: 'Quarter',       type: 'text'},
+        {key: 'shares',            label: 'Shares',        type: 'shares'},
+        {key: 'market_value_usd',  label: 'Value (Filed)', type: 'dollar'},
+        {key: 'market_value_live', label: 'Value (Live)',  type: 'dollar'},
+        {key: 'pct_of_portfolio',  label: '% Portfolio',   type: 'pct'},
+        {key: 'pct_of_float',     label: '% Float',        type: 'pct'},
     ],
     7: [
-        {key: 'ticker', label: 'Ticker', type: 'text'},
-        {key: 'issuer_name', label: 'Issuer', type: 'text'},
-        {key: 'shares', label: 'Shares', type: 'shares'},
-        {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
-        {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-        {key: 'pct_of_float', label: '% Float', type: 'pct'},
-        {key: 'market_cap', label: 'Market Cap', type: 'dollar'},
+        {key: 'rank',              label: '#',             type: 'num'},
+        {key: 'ticker',            label: 'Ticker',        type: 'text'},
+        {key: 'issuer_name',       label: 'Issuer',        type: 'text'},
+        {key: 'sector',            label: 'Sector',        type: 'text'},
+        {key: 'shares',            label: 'Shares',        type: 'shares'},
+        {key: 'market_value_live', label: 'Value (Live)',  type: 'dollar'},
+        {key: 'pct_of_portfolio',  label: '% Portfolio',   type: 'pct'},
+        {key: 'pct_of_float',     label: '% Float',        type: 'pct'},
+        {key: 'market_cap',       label: 'Market Cap',      type: 'dollar'},
     ],
     8: [
-        {key: 'ticker', label: 'Ticker', type: 'text'},
-        {key: 'issuer_name', label: 'Issuer', type: 'text'},
+        {key: 'ticker',         label: 'Ticker',         type: 'text'},
+        {key: 'issuer_name',    label: 'Issuer',         type: 'text'},
         {key: 'shared_holders', label: 'Shared Holders', type: 'num'},
-        {key: 'overlap_pct', label: 'Overlap %', type: 'pct'},
-        {key: 'total_value', label: 'Total Value', type: 'dollar'},
+        {key: 'overlap_pct',    label: 'Overlap %',      type: 'pct'},
+        {key: 'total_value',    label: 'Total Value',    type: 'dollar'},
     ],
     9: [
-        {key: 'sector', label: 'Sector', type: 'text'},
-        {key: 'num_stocks', label: 'Stocks', type: 'num'},
+        {key: 'sector',       label: 'Sector',       type: 'text'},
+        {key: 'num_stocks',   label: 'Stocks',       type: 'num'},
         {key: 'sector_value', label: 'Sector Value', type: 'dollar'},
-        {key: 'pct_of_total', label: '% of Total', type: 'pct'},
+        {key: 'pct_of_total', label: '% of Total',   type: 'pct'},
     ],
     10: [
-        {key: 'manager_name', label: 'Manager', type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'shares', label: 'Shares', type: 'shares'},
+        {key: 'manager_name',      label: 'Manager',      type: 'text'},
+        {key: 'manager_type',      label: 'Type',         type: 'text'},
+        {key: 'shares',            label: 'Shares',       type: 'shares'},
         {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
-        {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-        {key: 'pct_of_float', label: '% Float', type: 'pct'},
+        {key: 'pct_of_portfolio',  label: '% Portfolio',  type: 'pct'},
+        {key: 'pct_of_float',     label: '% Float',       type: 'pct'},
     ],
     11: [
-        {key: 'manager_name', label: 'Manager', type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'q3_shares', label: 'Q3 Shares', type: 'shares'},
-        {key: 'q3_value', label: 'Q3 Value', type: 'dollar'},
-        {key: 'q3_pct', label: '% Portfolio (Q3)', type: 'pct'},
+        {key: 'manager_name', label: 'Manager',          type: 'text'},
+        {key: 'manager_type', label: 'Type',             type: 'text'},
+        {key: 'q3_shares',    label: 'Q3 Shares',        type: 'shares'},
+        {key: 'q3_value',     label: 'Q3 Value',         type: 'dollar'},
+        {key: 'q3_pct',       label: '% Portfolio (Q3)', type: 'pct'},
     ],
     12: [
-        {key: 'rank', label: '#', type: 'num'},
-        {key: 'holder', label: 'Holder', type: 'text'},
-        {key: 'total_pct_float', label: '% Float', type: 'pct'},
-        {key: 'cumulative_pct', label: 'Cumulative %', type: 'pct'},
-        {key: 'total_shares', label: 'Shares', type: 'shares'},
+        {key: 'rank',            label: '#',            type: 'num'},
+        {key: 'holder',          label: 'Holder',       type: 'text'},
+        {key: 'total_pct_float', label: '% Float',      type: 'pct'},
+        {key: 'cumulative_pct',  label: 'Cumulative %', type: 'pct'},
+        {key: 'total_shares',    label: 'Shares',       type: 'shares'},
     ],
     13: [
-        {key: 'ticker', label: 'Ticker', type: 'text'},
-        {key: 'issuer_name', label: 'Issuer', type: 'text'},
-        {key: 'buyers', label: 'Buyers', type: 'num'},
-        {key: 'sellers', label: 'Sellers', type: 'num'},
-        {key: 'new_positions', label: 'New', type: 'num'},
-        {key: 'net_flow', label: 'Net', type: 'num'},
-        {key: 'buy_pct', label: 'Buy%', type: 'pct'},
+        {key: 'ticker',         label: 'Ticker',   type: 'text'},
+        {key: 'issuer_name',    label: 'Issuer',   type: 'text'},
+        {key: 'buyers',         label: 'Buyers',   type: 'num'},
+        {key: 'sellers',        label: 'Sellers',  type: 'num'},
+        {key: 'new_positions',  label: 'New',      type: 'num'},
+        {key: 'net_flow',       label: 'Net',      type: 'num'},
+        {key: 'buy_pct',        label: 'Buy%',     type: 'pct'},
         {key: 'q4_total_value', label: 'Q4 Value', type: 'dollar'},
     ],
     14: [
-        {key: 'manager_name', label: 'Manager', type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'manager_aum_bn', label: 'AUM ($B)', type: 'num'},
-        {key: 'position_mm', label: 'Position ($M)', type: 'num'},
-        {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-        {key: 'is_activist', label: 'Activist', type: 'text'},
+        {key: 'manager_name',    label: 'Manager',       type: 'text'},
+        {key: 'manager_type',    label: 'Type',          type: 'text'},
+        {key: 'manager_aum_bn',  label: 'AUM ($B)',      type: 'num'},
+        {key: 'position_mm',     label: 'Position ($M)', type: 'num'},
+        {key: 'pct_of_portfolio', label: '% Portfolio',  type: 'pct'},
+        {key: 'is_activist',     label: 'Activist',      type: 'text'},
     ],
 };
+
+// ---------------------------------------------------------------------------
+// Auto-detect column visual role from key and label names
+// ---------------------------------------------------------------------------
+const _inferCache = {};
+
+function inferColMeta(col) {
+    const cacheKey = col.key + '|' + col.label + '|' + col.type;
+    if (_inferCache[cacheKey]) return _inferCache[cacheKey];
+
+    const k = (col.key || '').toLowerCase();
+    const l = (col.label || '').toLowerCase();
+    let result;
+
+    // 1. Explicit type from column definition takes highest priority
+    if (col.type === 'dollar')
+        result = {w: '130px', align: 'right', visual: 'dollar'};
+    else if (col.type === 'shares')
+        result = {w: '100px', align: 'right', visual: 'shares'};
+    else if (col.type === 'pct')
+        result = {w: '95px', align: 'right', visual: 'pct'};
+
+    // 2. Pattern matching on key and label for text/num columns
+    else if (/^(#|rank|rn)$/.test(l) || /^rank$/.test(k))
+        result = {w: '50px', align: 'right', visual: 'rank'};
+    else if (/^ticker$/.test(k) && !/name|issuer|holder/.test(k))
+        result = {w: '70px', align: 'left', visual: 'ticker'};
+    else if (/^(type|manager_type|is_activist)$/.test(k) || /^(type|activist|strategy)$/.test(l))
+        result = {w: '100px', align: 'center', visual: 'type'};
+    else if (/^source$/.test(k) || /^source$/.test(l))
+        result = {w: '110px', align: 'center', visual: 'source'};
+    else if (/^quarter$/.test(k) || /^(quarter|date|period)$/.test(l))
+        result = {w: '90px', align: 'center', visual: 'quarter'};
+    else if (/^(category)$/.test(k) || /^(category)$/.test(l))
+        result = {w: '200px', align: 'left', visual: 'name'};
+    // Dollar detection by label/key pattern — but skip pre-scaled columns with unit in label like ($B), ($M)
+    else if (/\(\$[bBmMkK]\)/.test(col.label))
+        result = {w: '120px', align: 'right', visual: 'num'};
+    else if (/(value|market.?cap|aum|assets|holdings)/.test(l) ||
+             /(value|market_cap|aum|assets)/.test(k))
+        result = {w: '130px', align: 'right', visual: 'dollar'};
+    // Count columns
+    else if (/^(num_|count|shared_)/.test(k) || /^(stocks|funds|holders|count|buyers|sellers|new)$/i.test(l))
+        result = {w: '80px', align: 'center', visual: 'num'};
+    // Change/delta columns
+    else if (/(change|delta)/.test(k))
+        result = {w: '100px', align: 'right', visual: 'change'};
+    // Name/institution columns — widest, flex
+    else if (/(name|institution|fund|holder|company|issuer|sector)/.test(k) ||
+             /(institution|fund|holder|issuer|sector|manager|active holder)/.test(l))
+        result = {w: null, align: 'left', visual: 'name'};
+    // Percentage by label pattern
+    else if (/(%|pct|float|weight|percentile|nav|chg|buy%)/.test(l) || /pct/.test(k))
+        result = {w: '95px', align: 'right', visual: 'pct'};
+    else if (col.type === 'num')
+        result = {w: '80px', align: 'right', visual: 'num'};
+    else
+        result = {w: '120px', align: 'left', visual: 'default'};
+
+    _inferCache[cacheKey] = result;
+    return result;
+}
+
+/** Is this column a change/delta column that should get red/green coloring? */
+function isChangeCol(col) {
+    const k = (col.key || '').toLowerCase();
+    const l = (col.label || '').toLowerCase();
+    return /(change|delta|chg|net_flow|full_year|_to_)/.test(k) ||
+           /(change|delta|chg|net|\u2192)/.test(l);
+}
+
+/** Does this query have a Type column? (for legend display) */
+function queryHasType(qnum) {
+    const cols = QUERY_COLUMNS[qnum];
+    if (!cols) return false;
+    return cols.some(c => inferColMeta(c).visual === 'type');
+}
+
+/** Find the first 'name' column key for hierarchy indent. */
+function findNameKey(cols) {
+    const nameCol = cols.find(c => inferColMeta(c).visual === 'name');
+    return nameCol ? nameCol.key : null;
+}
 
 function renderTable(data, qnum) {
     if (!data || !data.length) {
@@ -382,22 +496,49 @@ function renderTable(data, qnum) {
 
     const cols = QUERY_COLUMNS[qnum];
     if (!cols) {
-        // Fallback: auto-generate columns from data keys
         const keys = Object.keys(data[0]).filter(k => !k.startsWith('_'));
         return renderTableFromKeys(data, keys);
     }
 
-    // Handle Q2 sections
-    if (qnum === 2) return renderQuery2Table(data, cols);
+    // Detect hierarchy: data has level/is_parent fields
+    const hasHierarchy = data.some(r => r.level === 1 || r.is_parent === true);
+    // Detect sections (Query 2 entries/exits)
+    const hasSections = data.some(r => r.section != null);
 
+    renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections);
+}
+
+/**
+ * Single reusable renderer for ALL tables — flat and hierarchical.
+ * Auto-infers column widths and alignment from key/label names.
+ * Applies: fixed layout, colgroup widths, header alignment, name ellipsis
+ * with tooltip, hierarchy indent, change/delta red/green coloring, and
+ * color-coding legend on tabs with a Type column.
+ */
+function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
+    const showLegend = queryHasType(qnum);
+    const nameKey = findNameKey(cols);
+
+    // --- Table + colgroup ---
     const table = document.createElement('table');
     table.className = 'data-table';
 
-    // Header
+    const colgroup = document.createElement('colgroup');
+    cols.forEach(col => {
+        const cg = document.createElement('col');
+        const meta = inferColMeta(col);
+        if (meta.w) cg.style.width = meta.w;
+        colgroup.appendChild(cg);
+    });
+    table.appendChild(colgroup);
+
+    // --- Header ---
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     cols.forEach((col, ci) => {
         const th = document.createElement('th');
+        const meta = inferColMeta(col);
+        th.classList.add('col-' + meta.align);
         th.textContent = col.label;
         th.dataset.colIdx = ci;
         const arrow = document.createElement('span');
@@ -409,76 +550,24 @@ function renderTable(data, qnum) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // Body
-    const tbody = document.createElement('tbody');
-    data.forEach(row => {
-        const tr = document.createElement('tr');
-        // Hierarchy
-        if (row.level === 1) tr.classList.add('level-1');
-        if (row.is_parent) tr.classList.add('parent-row');
-        // Type tint
-        const rtype = row.type || row.manager_type || '';
-        if (rtype) tr.classList.add('type-' + rtype.replace(/[^a-z_]/gi, '').toLowerCase());
-
-        cols.forEach(col => {
-            const td = document.createElement('td');
-            const val = row[col.key];
-            td.className = (col.type === 'text') ? 'text' : 'num';
-
-            if (col.key === 'institution' && row.level === 1) {
-                td.textContent = '\u21B3 ' + (val || '');
-            } else {
-                td.textContent = formatCell(val, col.type);
-            }
-            tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-
-    tableWrap.innerHTML = '';
-    tableWrap.appendChild(table);
-}
-
-function renderQuery2Table(data, cols) {
-    const table = document.createElement('table');
-    table.className = 'data-table';
-
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    cols.forEach((col, ci) => {
-        const th = document.createElement('th');
-        th.textContent = col.label;
-        th.dataset.colIdx = ci;
-        const arrow = document.createElement('span');
-        arrow.className = 'sort-arrow';
-        th.appendChild(arrow);
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
+    // --- Body ---
     const tbody = document.createElement('tbody');
     let lastSection = null;
 
     data.forEach(row => {
-        // Section headers
-        if (row.section !== lastSection) {
+        // Section headers (Query 2 entries/exits)
+        if (hasSections && row.section !== lastSection) {
             lastSection = row.section;
-            if (row.section === 'entries') {
+            const sectionLabels = {
+                'entries': 'NEW ENTRIES (>100K shares)',
+                'exits': 'FULL EXITS (>100K shares)',
+            };
+            if (sectionLabels[row.section]) {
                 const sectionTr = document.createElement('tr');
                 sectionTr.className = 'section-header';
                 const td = document.createElement('td');
                 td.colSpan = cols.length;
-                td.textContent = 'NEW ENTRIES (>100K shares)';
-                sectionTr.appendChild(td);
-                tbody.appendChild(sectionTr);
-            } else if (row.section === 'exits') {
-                const sectionTr = document.createElement('tr');
-                sectionTr.className = 'section-header';
-                const td = document.createElement('td');
-                td.colSpan = cols.length;
-                td.textContent = 'FULL EXITS (>100K shares)';
+                td.textContent = sectionLabels[row.section];
                 sectionTr.appendChild(td);
                 tbody.appendChild(sectionTr);
             }
@@ -487,22 +576,47 @@ function renderQuery2Table(data, cols) {
         const tr = document.createElement('tr');
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
-        const rtype = row.type || '';
-        if (rtype) tr.classList.add('type-' + rtype.replace(/[^a-z_]/gi, '').toLowerCase());
+
+        // Type tint
+        const rtype = row.type || row.manager_type || '';
+        if (rtype && rtype !== 'unknown') {
+            tr.classList.add('type-' + rtype.replace(/[^a-z_]/gi, '').toLowerCase());
+        }
 
         cols.forEach(col => {
             const td = document.createElement('td');
-            const val = row[col.key];
-            td.className = (col.type === 'text') ? 'text' : 'num';
+            const meta = inferColMeta(col);
+            td.classList.add('col-' + meta.align);
+            let val = row[col.key];
 
-            if (col.key === 'fund_name' && row.level === 1 && !row.is_parent) {
-                const prefix = (rtype && rtype !== 'passive' && rtype !== 'unknown') ? '* ' : '';
-                td.textContent = '\u21B3 ' + prefix + (val || '');
-            } else if (col.key === 'fund_name' && row.is_parent) {
-                td.textContent = row.institution || val || '';
-                td.classList.add('text');
-            } else {
-                td.textContent = formatCell(val, col.type);
+            // --- Name columns: ellipsis + tooltip + hierarchy ---
+            if (meta.visual === 'name') {
+                td.classList.add('col-text-overflow');
+                let displayVal;
+                if (hasHierarchy && col.key === nameKey) {
+                    if (row.is_parent) {
+                        displayVal = row.institution || val || '';
+                    } else if (row.level === 1) {
+                        td.classList.add('col-indent');
+                        const prefix = (rtype && rtype !== 'passive' && rtype !== 'unknown') ? '* ' : '';
+                        displayVal = '\u21B3 ' + prefix + (val || '');
+                    } else {
+                        displayVal = val != null ? String(val) : '';
+                    }
+                } else {
+                    displayVal = val != null ? String(val) : '';
+                }
+                td.textContent = displayVal;
+                td.title = displayVal.replace(/^\u21B3 \*? ?/, '');
+            }
+            // --- Change/delta columns: red/green coloring ---
+            else if (isChangeCol(col) && typeof val === 'number' && val !== 0) {
+                td.textContent = formatCell(val, fmtType(col));
+                td.style.color = val < 0 ? '#C0392B' : '#27AE60';
+            }
+            // --- All other columns ---
+            else {
+                td.textContent = formatCell(val, fmtType(col));
             }
             tr.appendChild(td);
         });
@@ -510,55 +624,181 @@ function renderQuery2Table(data, cols) {
     });
     table.appendChild(tbody);
 
+    // --- Assemble ---
     tableWrap.innerHTML = '';
+    if (showLegend) tableWrap.appendChild(buildLegend());
     tableWrap.appendChild(table);
 }
 
+/** Build the color-coding legend bar. */
+function buildLegend() {
+    const legend = document.createElement('div');
+    legend.className = 'color-legend';
+    [
+        ['sw-passive',      'Passive'],
+        ['sw-active',       'Active'],
+        ['sw-quantitative', 'Quantitative'],
+        ['sw-activist',     'Activist'],
+        ['sw-mixed',        'Mixed'],
+        ['sw-unknown',      'Unknown'],
+    ].forEach(([cls, label]) => {
+        const item = document.createElement('span');
+        item.className = 'legend-item';
+        item.innerHTML = `<span class="legend-swatch ${cls}"></span>${label}`;
+        legend.appendChild(item);
+    });
+    return legend;
+}
+
+/** Fallback renderer for unknown query structures — also uses inferColMeta. */
 function renderTableFromKeys(data, keys) {
-    const table = document.createElement('table');
-    table.className = 'data-table';
-    const thead = document.createElement('thead');
-    const hr = document.createElement('tr');
-    keys.forEach(k => {
-        const th = document.createElement('th');
-        th.textContent = k;
-        hr.appendChild(th);
-    });
-    thead.appendChild(hr);
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    data.forEach(row => {
-        const tr = document.createElement('tr');
-        keys.forEach(k => {
-            const td = document.createElement('td');
-            td.textContent = formatCellAuto(row[k]);
-            tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    tableWrap.innerHTML = '';
-    tableWrap.appendChild(table);
+    const cols = keys.map(k => ({key: k, label: k, type: 'text'}));
+    renderHierarchicalTable(data, cols, 0, false, false);
 }
 
+// ---------------------------------------------------------------------------
+// Query 7 — Fund Portfolio (manager selector + custom rendering)
+// ---------------------------------------------------------------------------
+
+// Store the manager list so we can look up by index — avoids JSON in HTML attributes
+let _managerList = [];
+
+async function loadManagerDropdown() {
+    if (!currentTicker) return;
+    _managerList = [];
+    managerDropdown.innerHTML = '<option value="">Loading...</option>';
+    try {
+        const res = await fetch(`/api/fund_portfolio_managers?ticker=${currentTicker}`);
+        const managers = await res.json();
+        if (!managers.length || managers.error) {
+            managerDropdown.innerHTML = '<option value="">No non-passive managers found</option>';
+            return;
+        }
+        _managerList = managers;
+        managerDropdown.innerHTML = managers.map((m, i) => {
+            const val = fmtDollars(m.position_value);
+            const fundName = m.fund_name || '';
+            const label = `${fundName} \u2014 ${val} | ${m.manager_type || 'unknown'}`;
+            return `<option value="${i}">${label}</option>`;
+        }).join('');
+        // Auto-load the first fund
+        loadPortfolioFromIndex(0);
+    } catch (e) {
+        managerDropdown.innerHTML = '<option value="">Error loading managers</option>';
+    }
+}
+
+function loadPortfolioFromIndex(idx) {
+    const m = _managerList[idx];
+    if (!m) return;
+    loadQuery(7, {cik: m.cik, fund_name: m.fund_name});
+}
+
+loadPortfolioBtn.addEventListener('click', () => {
+    const idx = parseInt(managerDropdown.value);
+    if (!isNaN(idx)) loadPortfolioFromIndex(idx);
+});
+
+managerDropdown.addEventListener('change', () => {
+    const idx = parseInt(managerDropdown.value);
+    if (!isNaN(idx)) loadPortfolioFromIndex(idx);
+});
+
+function renderQuery7(data) {
+    const stats = data.stats || {};
+    const positions = data.positions || [];
+    const cols = QUERY_COLUMNS[7];
+
+    tableWrap.innerHTML = '';
+
+    // Stats sub-header
+    if (stats.manager_name) {
+        const sh = document.createElement('div');
+        sh.className = 'portfolio-stats';
+        const items = [
+            ['Manager', stats.manager_name],
+            ['Type', stats.manager_type || 'unknown'],
+            ['Portfolio Value', fmtDollars(stats.total_value)],
+            ['Positions', stats.num_positions != null ? stats.num_positions.toLocaleString() : '\u2014'],
+            ['Top 10 Concentration', stats.top10_concentration_pct != null ? stats.top10_concentration_pct.toFixed(1) + '%' : '\u2014'],
+        ];
+        items.forEach(([label, value]) => {
+            const item = document.createElement('span');
+            item.className = 'ps-item';
+            item.innerHTML = `<span class="ps-label">${label}:</span><span class="ps-value">${value}</span>`;
+            sh.appendChild(item);
+        });
+        tableWrap.appendChild(sh);
+    }
+
+    // Render table using shared function, then highlight current ticker row
+    currentData = positions;
+    renderHierarchicalTable(positions, cols, 7, false, false);
+
+    // Move the table into tableWrap (renderHierarchicalTable replaces innerHTML)
+    // Re-add stats header before table
+    const table = tableWrap.querySelector('.data-table');
+    const legend = tableWrap.querySelector('.color-legend');
+    tableWrap.innerHTML = '';
+    if (stats.manager_name) {
+        const sh = document.createElement('div');
+        sh.className = 'portfolio-stats';
+        const items = [
+            ['Manager', stats.manager_name],
+            ['Type', stats.manager_type || 'unknown'],
+            ['Portfolio Value', fmtDollars(stats.total_value)],
+            ['Positions', stats.num_positions != null ? stats.num_positions.toLocaleString() : '\u2014'],
+            ['Top 10 Concentration', stats.top10_concentration_pct != null ? stats.top10_concentration_pct.toFixed(1) + '%' : '\u2014'],
+        ];
+        items.forEach(([label, value]) => {
+            const item = document.createElement('span');
+            item.className = 'ps-item';
+            item.innerHTML = `<span class="ps-label">${label}:</span><span class="ps-value">${value}</span>`;
+            sh.appendChild(item);
+        });
+        tableWrap.appendChild(sh);
+    }
+    if (legend) tableWrap.appendChild(legend);
+    if (table) {
+        tableWrap.appendChild(table);
+        // Highlight current ticker row
+        if (currentTicker) {
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const tickerCell = tr.querySelector('td:nth-child(2)');
+                if (tickerCell && tickerCell.textContent.trim().toUpperCase() === currentTicker) {
+                    tr.classList.add('highlight-ticker');
+                }
+            });
+        }
+    }
+}
+
+/**
+ * Format a cell value. Accepts either a col.type ('dollar','shares','pct','num')
+ * or a visual type from inferColMeta ('dollar','shares','pct','num','change','rank').
+ */
 function formatCell(val, type) {
     if (val == null) return '\u2014';
     switch (type) {
-        case 'dollar': return fmtDollars(val);
-        case 'shares': return fmtShares(val);
-        case 'pct':    return fmtPct(val);
-        case 'num':    return fmtNum(val);
-        default:       return String(val);
+        case 'dollar':  return fmtDollars(val);
+        case 'shares':  return fmtShares(val);
+        case 'pct':     return fmtPct(val);
+        case 'change':  return (typeof val === 'number') ? fmtShares(val) : String(val);
+        case 'num':
+        case 'rank':    return fmtNum(val);
+        default:        return String(val);
     }
 }
 
-function formatCellAuto(val) {
-    if (val == null) return '\u2014';
-    if (typeof val === 'number') {
-        if (Math.abs(val) > 1e6) return fmtDollars(val);
-        return fmtNum(val);
+/** Resolve the best format type for a column — prefers visual over col.type. */
+function fmtType(col) {
+    const meta = inferColMeta(col);
+    // Visual types that map directly to formatters
+    if (['dollar','shares','pct','change','num','rank'].includes(meta.visual)) {
+        return meta.visual;
     }
-    return String(val);
+    // Fall back to the declared data type
+    return col.type;
 }
 
 // ---------------------------------------------------------------------------
@@ -634,8 +874,6 @@ function sortTable(data, cols, colIdx, qnum) {
         sortDir = 'asc';
     }
 
-    // Filter out section headers for Q2
-    const sortable = data.filter(r => !r.is_parent || qnum !== 2);
     data.sort((a, b) => {
         let va = a[col.key];
         let vb = b[col.key];

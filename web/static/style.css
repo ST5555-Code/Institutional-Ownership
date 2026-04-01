@@ -15,6 +15,7 @@
     --tint-quantitative: #F3EBFB;
     --tint-activist: #FBEBEB;
     --tint-hedge: #EBF7ED;
+    --tint-mixed: #FFF8EB;
 }
 
 /* === Reset === */
@@ -247,6 +248,99 @@ body {
     padding: 12px 0;
 }
 
+/* === Manager Selector (Query 7) === */
+.manager-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    font-size: 13px;
+}
+
+.manager-selector label {
+    font-weight: 600;
+    color: var(--oxford-blue);
+    white-space: nowrap;
+}
+
+.manager-selector select {
+    flex: 1;
+    max-width: 500px;
+    padding: 6px 10px;
+    border: 1px solid var(--mid-grey);
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    background: var(--white);
+}
+
+/* === Portfolio Stats Sub-header === */
+.portfolio-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 12px 14px;
+    background: var(--light-grey);
+    border-bottom: 1px solid var(--mid-grey);
+    font-size: 12px;
+    border-radius: 6px 6px 0 0;
+}
+
+.portfolio-stats .ps-item {
+    display: flex;
+    gap: 5px;
+}
+
+.portfolio-stats .ps-label {
+    color: var(--text-secondary);
+}
+
+.portfolio-stats .ps-value {
+    font-weight: 700;
+    color: var(--oxford-blue);
+}
+
+/* Highlight row for current ticker */
+.data-table tr.highlight-ticker td {
+    background-color: #FFF3CD !important;
+    border-top: 2px solid var(--sandstone);
+    border-bottom: 2px solid var(--sandstone);
+}
+
+/* === Color Legend === */
+.color-legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--mid-grey);
+    background: var(--white);
+    border-radius: 6px 6px 0 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-swatch.sw-passive       { background: var(--tint-passive); }
+.legend-swatch.sw-active        { background: var(--tint-active); }
+.legend-swatch.sw-quantitative  { background: var(--tint-quantitative); }
+.legend-swatch.sw-activist      { background: var(--tint-activist); }
+.legend-swatch.sw-mixed         { background: var(--tint-mixed); }
+.legend-swatch.sw-unknown       { background: var(--white); border: 1px solid var(--mid-grey); }
+
 /* === Results === */
 .results-area {
     background: var(--white);
@@ -262,15 +356,21 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
+    table-layout: fixed;
+}
+
+.data-table th,
+.data-table td {
+    padding: 6px 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .data-table th {
     background: var(--oxford-blue);
     color: var(--white);
-    padding: 8px 10px;
-    text-align: left;
-    font-weight: 600;
-    white-space: nowrap;
+    font-weight: 500;
     cursor: pointer;
     user-select: none;
     position: sticky;
@@ -292,9 +392,7 @@ body {
 .data-table th.sorted-desc .sort-arrow::after { content: ' \25BC'; opacity: 1; }
 
 .data-table td {
-    padding: 6px 10px;
     border-bottom: 1px solid var(--light-grey);
-    white-space: nowrap;
 }
 
 .data-table tr:nth-child(even) td {
@@ -305,18 +403,25 @@ body {
     background: #E8EDF2;
 }
 
-/* Alignment */
-.data-table td.num {
-    text-align: right;
+/* Column alignment classes — applied to both th and td */
+.col-right  { text-align: right; }
+.col-left   { text-align: left; }
+.col-center { text-align: center; }
+
+/* Tabular nums for any numeric cell */
+.col-right {
     font-variant-numeric: tabular-nums;
 }
 
-.data-table td.text {
-    text-align: left;
+/* Text columns: ellipsis + tooltip on hover */
+.col-text-overflow {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Hierarchy indentation */
-.data-table tr.level-1 td:first-child {
+/* Hierarchy indentation — applies to the primary text td */
+.data-table tr.level-1 .col-indent {
     padding-left: 28px;
 }
 
@@ -325,18 +430,20 @@ body {
 }
 
 /* Manager type row tints */
-.data-table tr.type-passive td { background-color: var(--tint-passive); }
+.data-table tr.type-passive td       { background-color: var(--tint-passive); }
 .data-table tr.type-active td,
-.data-table tr.type-hedge_fund td { background-color: var(--tint-active); }
-.data-table tr.type-quantitative td { background-color: var(--tint-quantitative); }
-.data-table tr.type-activist td { background-color: var(--tint-activist); }
+.data-table tr.type-hedge_fund td    { background-color: var(--tint-active); }
+.data-table tr.type-quantitative td  { background-color: var(--tint-quantitative); }
+.data-table tr.type-activist td      { background-color: var(--tint-activist); }
+.data-table tr.type-mixed td         { background-color: var(--tint-mixed); }
 
 /* Even-row tints (slightly darker) */
-.data-table tr.type-passive:nth-child(even) td { background-color: #DDEAF6; }
+.data-table tr.type-passive:nth-child(even) td       { background-color: #DDEAF6; }
 .data-table tr.type-active:nth-child(even) td,
-.data-table tr.type-hedge_fund:nth-child(even) td { background-color: #DDEEE1; }
-.data-table tr.type-quantitative:nth-child(even) td { background-color: #E6DDF6; }
-.data-table tr.type-activist:nth-child(even) td { background-color: #F2DDDD; }
+.data-table tr.type-hedge_fund:nth-child(even) td    { background-color: #DDEEE1; }
+.data-table tr.type-quantitative:nth-child(even) td  { background-color: #E6DDF6; }
+.data-table tr.type-activist:nth-child(even) td      { background-color: #F2DDDD; }
+.data-table tr.type-mixed:nth-child(even) td         { background-color: #F5EDDA; }
 
 /* Section headers in Q2 */
 .section-header td {

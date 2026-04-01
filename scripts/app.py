@@ -94,9 +94,47 @@ def get_cusip(con, ticker):
     return row[0] if row else ''
 
 
+def _clean_val(v):
+    """Replace NaN/Inf with None; convert numpy types to native Python."""
+    if v is None:
+        return None
+    if isinstance(v, float):
+        import math
+        if math.isnan(v) or math.isinf(v):
+            return None
+    # numpy scalar types — convert to native Python
+    try:
+        import numpy as np
+        if isinstance(v, (np.integer,)):
+            return int(v)
+        if isinstance(v, (np.floating,)):
+            import math
+            if math.isnan(v) or math.isinf(v):
+                return None
+            return float(v)
+        if isinstance(v, np.bool_):
+            return bool(v)
+    except ImportError:
+        pass
+    return v
+
+
+def clean_for_json(data):
+    """Recursively clean NaN/Inf/numpy types from dicts and lists."""
+    if isinstance(data, list):
+        return [{k: _clean_val(v) for k, v in row.items()} if isinstance(row, dict) else row
+                for row in data]
+    if isinstance(data, dict):
+        return {k: clean_for_json(v) if isinstance(v, (dict, list))
+                else _clean_val(v)
+                for k, v in data.items()}
+    return _clean_val(data)
+
+
 def df_to_records(df):
-    """Convert DataFrame to list of dicts with NaN replaced by None."""
-    return df.where(df.notna(), None).to_dict(orient='records')
+    """Convert DataFrame to list of dicts with NaN/Inf replaced by None."""
+    records = df.to_dict(orient='records')
+    return clean_for_json(records)
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +146,7 @@ def query1(ticker):
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
-        # Parent-level
+        # Parent-level with distinct fund count
         parents = con.execute("""
             WITH by_fund AS (
                 SELECT
@@ -129,7 +167,7 @@ def query1(ticker):
                 SUM(market_value_live) as total_value_live,
                 SUM(shares) as total_shares,
                 SUM(pct_of_float) as pct_float,
-                COUNT(*) as num_funds
+                COUNT(DISTINCT fund_name) as child_count
             FROM by_fund
             GROUP BY parent_name
             ORDER BY total_value_live DESC NULLS LAST
@@ -139,6 +177,7 @@ def query1(ticker):
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
+            child_count = int(parent['child_count'])
             results.append({
                 'rank': rank,
                 'institution': pname,
@@ -146,10 +185,13 @@ def query1(ticker):
                 'shares': parent['total_shares'],
                 'pct_float': parent['pct_float'],
                 'type': parent['type'],
-                'is_parent': True,
+                'is_parent': child_count >= 2,
+                'child_count': child_count,
                 'level': 0,
             })
-            # Fund-level holdings under this parent
+            # Only show child rows if 2+ distinct funds
+            if child_count < 2:
+                continue
             safe_name = str(pname).replace("'", "''") if pname else ''
             subs = con.execute(f"""
                 SELECT
@@ -175,6 +217,7 @@ def query1(ticker):
                     'pct_float': sub['pct_of_float'],
                     'type': sub['type'],
                     'is_parent': False,
+                    'child_count': 0,
                     'level': 1,
                 })
         return results
@@ -244,39 +287,67 @@ def query2(ticker):
         results = []
         # Main holdings (top parents, not entries/exits)
         q2_top = q2[q2['parent_name'].isin(top_parents) & ~q2['is_entry'] & ~q2['is_exit']]
+
+        # Count distinct funds per parent
+        parent_child_counts = q2_top.groupby('parent_name')['fund_name'].nunique()
+
         current_parent = None
         for _, row in q2_top.iterrows():
             if row['parent_name'] != current_parent:
                 current_parent = row['parent_name']
                 parent_rows = q2_top[q2_top['parent_name'] == current_parent]
+                child_count = int(parent_child_counts.get(current_parent, 1))
                 p_q1 = parent_rows['q1_shares'].sum()
                 p_q4 = parent_rows['q4_shares'].sum()
                 p_chg = p_q4 - p_q1
                 p_pct = (p_chg / p_q1 * 100) if p_q1 > 0 else None
+
+                if child_count < 2:
+                    # Collapse: single flat row with parent name and consolidated data
+                    results.append({
+                        'institution': current_parent,
+                        'fund_name': current_parent,
+                        'q1_shares': p_q1,
+                        'q4_shares': p_q4,
+                        'change_shares': p_chg,
+                        'change_pct': p_pct,
+                        'type': row['type'],
+                        'is_parent': False,
+                        'child_count': 1,
+                        'section': 'holders',
+                        'level': 0,
+                    })
+                else:
+                    # Expand: parent summary row + child rows below
+                    results.append({
+                        'institution': current_parent,
+                        'fund_name': '(parent total)',
+                        'q1_shares': p_q1,
+                        'q4_shares': p_q4,
+                        'change_shares': p_chg,
+                        'change_pct': p_pct,
+                        'type': None,
+                        'is_parent': True,
+                        'child_count': child_count,
+                        'section': 'holders',
+                        'level': 0,
+                    })
+            # Only emit child rows if parent has 2+ children
+            child_count = int(parent_child_counts.get(row['parent_name'], 1))
+            if child_count >= 2:
                 results.append({
-                    'institution': current_parent,
-                    'fund_name': '(parent total)',
-                    'q1_shares': p_q1,
-                    'q4_shares': p_q4,
-                    'change_shares': p_chg,
-                    'change_pct': p_pct,
-                    'type': None,
-                    'is_parent': True,
+                    'institution': row['parent_name'],
+                    'fund_name': row['fund_name'],
+                    'q1_shares': row['q1_shares'],
+                    'q4_shares': row['q4_shares'],
+                    'change_shares': row['change_shares'],
+                    'change_pct': row['change_pct'],
+                    'type': row['type'],
+                    'is_parent': False,
+                    'child_count': 0,
                     'section': 'holders',
-                    'level': 0,
+                    'level': 1,
                 })
-            results.append({
-                'institution': row['parent_name'],
-                'fund_name': row['fund_name'],
-                'q1_shares': row['q1_shares'],
-                'q4_shares': row['q4_shares'],
-                'change_shares': row['change_shares'],
-                'change_pct': row['change_pct'],
-                'type': row['type'],
-                'is_parent': False,
-                'section': 'holders',
-                'level': 1,
-            })
 
         # Entries (new in Q4, >100K shares)
         entries = q2[q2['is_entry'] & (q2['q4_shares'] >= 100000)].sort_values(
@@ -292,6 +363,7 @@ def query2(ticker):
                 'change_pct': None,
                 'type': e['type'],
                 'is_parent': False,
+                'child_count': 0,
                 'section': 'entries',
                 'level': 0,
             })
@@ -310,6 +382,7 @@ def query2(ticker):
                 'change_pct': -100.0,
                 'type': e['type'],
                 'is_parent': False,
+                'child_count': 0,
                 'section': 'exits',
                 'level': 0,
             })
@@ -468,50 +541,90 @@ def query6(ticker):
         con.close()
 
 
-def query7(ticker, cik=None):
-    """Full portfolio for a given manager (by CIK or top holder of ticker)."""
+def query7(ticker, cik=None, fund_name=None):
+    """Single fund portfolio — aggregated by ticker, with stats header."""
     con = get_db()
     try:
         if not cik:
-            # Use top holder of the given ticker
+            # Default to top non-passive holder of the ticker
             row = con.execute("""
-                SELECT cik FROM holdings
+                SELECT cik, fund_name FROM holdings
                 WHERE ticker = ? AND quarter = '2025Q4'
+                  AND manager_type NOT IN ('passive')
                 ORDER BY market_value_live DESC NULLS LAST
                 LIMIT 1
             """, [ticker]).fetchone()
-            cik = row[0] if row else None
-            if not cik:
-                return []
+            if not row:
+                return {'stats': {}, 'positions': []}
+            cik = row[0]
+            fund_name = fund_name or row[1]
 
-        mgr_row = con.execute(
-            "SELECT manager_name FROM filings_deduped WHERE cik = ? LIMIT 1", [cik]
-        ).fetchone()
-        mgr_name = mgr_row[0] if mgr_row else cik
+        # Build the WHERE filter — cik always, fund_name when provided
+        where = "h.cik = ? AND h.quarter = '2025Q4'"
+        params = [cik]
+        if fund_name:
+            where += " AND h.fund_name = ?"
+            params.append(fund_name)
 
-        df = con.execute("""
+        # Fund metadata
+        meta_where = "cik = ? AND quarter = '2025Q4'"
+        meta_params = [cik]
+        if fund_name:
+            meta_where += " AND fund_name = ?"
+            meta_params.append(fund_name)
+        mgr_row = con.execute(f"""
+            SELECT fund_name, MAX(manager_type) as manager_type
+            FROM holdings WHERE {meta_where}
+            GROUP BY fund_name LIMIT 1
+        """, meta_params).fetchone()
+        display_name = mgr_row[0] if mgr_row else cik
+        mgr_type = mgr_row[1] if mgr_row else 'unknown'
+
+        # Aggregated portfolio by ticker
+        df = con.execute(f"""
             SELECT
                 h.ticker,
-                h.issuer_name,
-                h.cusip,
-                h.shares,
-                h.market_value_usd,
-                h.market_value_live,
-                h.pct_of_portfolio,
-                h.pct_of_float,
-                m.market_cap
+                MAX(h.issuer_name) as issuer_name,
+                MAX(s.sector) as sector,
+                SUM(h.shares) as shares,
+                SUM(h.market_value_live) as market_value_live,
+                MAX(h.pct_of_portfolio) as pct_of_portfolio,
+                SUM(h.pct_of_float) as pct_of_float,
+                MAX(m.market_cap) as market_cap
             FROM holdings h
             LEFT JOIN market_data m ON h.ticker = m.ticker
-            WHERE h.cik = ? AND h.quarter = '2025Q4'
-            ORDER BY h.market_value_live DESC NULLS LAST
-            LIMIT 30
-        """, [cik]).fetchdf()
+            LEFT JOIN (
+                SELECT cusip, MAX(sector) as sector
+                FROM securities WHERE sector IS NOT NULL AND sector != ''
+                GROUP BY cusip
+            ) s ON h.cusip = s.cusip
+            WHERE {where}
+            GROUP BY h.ticker
+            ORDER BY market_value_live DESC NULLS LAST
+        """, params).fetchdf()
+
         records = df_to_records(df)
-        # Add manager name to each record for display
-        for r in records:
-            r['_manager_name'] = mgr_name
-            r['_cik'] = cik
-        return records
+
+        # Add rank
+        for i, r in enumerate(records, 1):
+            r['rank'] = i
+
+        # Portfolio stats
+        total_value = df['market_value_live'].sum()
+        num_positions = len(df)
+        top10_value = df.head(10)['market_value_live'].sum()
+        top10_pct = (top10_value / total_value * 100) if total_value > 0 else 0
+
+        stats = {
+            'manager_name': display_name,
+            'cik': cik,
+            'manager_type': mgr_type,
+            'total_value': total_value,
+            'num_positions': num_positions,
+            'top10_concentration_pct': round(top10_pct, 2),
+        }
+
+        return clean_for_json({'stats': stats, 'positions': records})
     finally:
         con.close()
 
@@ -750,7 +863,7 @@ def query15(ticker=None):
             'live_value_pct': round(coverage[3] / total * 100, 1),
             'float_pct_pct': round(coverage[4] / total * 100, 1),
         }
-        return [stats]
+        return clean_for_json([stats])
     finally:
         con.close()
 
@@ -783,9 +896,9 @@ def get_summary(ticker):
         if not cusip:
             return None
 
-        # Company name from securities — pick the longest to avoid truncated records
+        # Company name — use most common issuer_name from filings (avoids CUSIP cross-contamination)
         name_row = con.execute(
-            "SELECT ARG_MAX(issuer_name, LENGTH(issuer_name)) FROM securities WHERE ticker = ?",
+            "SELECT MODE(issuer_name) FROM holdings WHERE ticker = ? AND quarter = '2025Q4'",
             [ticker]
         ).fetchone()
         company_name = name_row[0] if name_row else ticker
@@ -837,6 +950,7 @@ def get_summary(ticker):
             'market_cap': mkt[1] if mkt else None,
             'shares_float': mkt[2] if mkt else None,
         }
+        return clean_for_json(result)
     finally:
         con.close()
 
@@ -944,13 +1058,41 @@ def api_tickers():
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
         df = con.execute("""
-            SELECT s.ticker,
-                   ARG_MAX(s.issuer_name, LENGTH(s.issuer_name)) as name
-            FROM securities s
-            WHERE s.ticker IS NOT NULL AND s.ticker != ''
-            GROUP BY s.ticker
-            ORDER BY s.ticker
+            SELECT ticker, MODE(issuer_name) as name
+            FROM holdings
+            WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '2025Q4'
+            GROUP BY ticker
+            ORDER BY ticker
         """).fetchdf()
+        return jsonify(df_to_records(df))
+    finally:
+        con.close()
+
+
+@app.route('/api/fund_portfolio_managers')
+def api_fund_portfolio_managers():
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        df = con.execute("""
+            SELECT
+                cik,
+                fund_name,
+                MAX(COALESCE(inst_parent_name, manager_name)) as inst_parent_name,
+                SUM(market_value_live) as position_value,
+                MAX(manager_type) as manager_type
+            FROM holdings
+            WHERE ticker = ? AND quarter = '2025Q4'
+              AND manager_type NOT IN ('passive')
+            GROUP BY cik, fund_name
+            ORDER BY position_value DESC NULLS LAST
+            LIMIT 50
+        """, [ticker]).fetchdf()
         return jsonify(df_to_records(df))
     finally:
         con.close()
@@ -980,8 +1122,13 @@ def api_query(qnum):
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
-        if qnum == 7 and cik:
-            data = fn(ticker or 'AR', cik=cik)
+        if qnum == 7:
+            fund_name = request.args.get('fund_name', '').strip() or None
+            data = fn(ticker, cik=cik or None, fund_name=fund_name)
+            # query7 returns {stats, positions} dict
+            if not data.get('positions'):
+                return jsonify({'error': f'No holdings found for CIK {cik}'}), 404
+            return jsonify(data)
         elif qnum in (13, 15):
             data = fn(ticker or None)
         else:
