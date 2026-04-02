@@ -30,7 +30,7 @@ from lxml import etree
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
@@ -802,7 +802,7 @@ def main():
     filing_index = build_filing_index()
 
     # Connect to DuckDB
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     create_tables(con)
 
     target_quarters = None

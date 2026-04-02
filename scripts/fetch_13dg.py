@@ -25,8 +25,8 @@ import requests
 from rapidfuzz import fuzz
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+from db import get_db_path, set_test_mode, assert_write_safe
 os.makedirs(LOG_DIR, exist_ok=True)
 
 edgar.set_identity("serge.tismen@gmail.com")
@@ -159,6 +159,7 @@ def get_existing(con):
     except Exception: return set()
 
 def batch_insert(con, records):
+    assert_write_safe(con)
     now = datetime.now().isoformat()
     rows = [[r["accession_number"], r["filer_cik"], r["filer_name"],
              r.get("subject_cusip"), r.get("subject_ticker"), r.get("subject_name"),
@@ -175,6 +176,7 @@ def batch_insert(con, records):
              group_members,manager_cik,loaded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
 
 def rebuild_current(con):
+    assert_write_safe(con)
     con.execute("DROP TABLE IF EXISTS beneficial_ownership_current")
     con.execute("""CREATE TABLE beneficial_ownership_current AS
         WITH ranked AS (
@@ -426,7 +428,7 @@ def post_process(con, new_count, check_tickers=None):
 # ---------------------------------------------------------------------------
 
 def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     create_tables(con)
     error_log = init_error_log()
     existing = get_existing(con)
@@ -569,7 +571,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
 # ---------------------------------------------------------------------------
 
 def run_update():
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     create_tables(con)
     error_log = init_error_log()
     existing = get_existing(con)
@@ -671,14 +673,39 @@ def run_update():
 # CLI
 # ---------------------------------------------------------------------------
 
+def _seed_test_db():
+    """Copy read-only reference tables from production to test DB."""
+    import shutil
+    from db import PROD_DB, TEST_DB
+    if os.path.exists(TEST_DB):
+        os.remove(TEST_DB)
+    # Create test DB and copy reference tables from production
+    prod = duckdb.connect(PROD_DB, read_only=True)
+    test = duckdb.connect(TEST_DB)
+    for table in ["holdings", "securities", "managers", "market_data", "filings",
+                   "fund_holdings", "fund_universe"]:
+        try:
+            df = prod.execute(f"SELECT * FROM {table}").fetchdf()
+            test.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
+        except Exception:
+            pass
+    prod.close()
+    test.close()
+    print(f"  Test DB seeded: {TEST_DB}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch 13D/G beneficial ownership filings")
     parser.add_argument("--tickers", type=str, help="Comma-separated tickers")
-    parser.add_argument("--test", action="store_true", help="Test mode (5 tickers)")
+    parser.add_argument("--test", action="store_true", help="Test mode (5 tickers, separate DB)")
     parser.add_argument("--update", action="store_true", help="Incremental since last filing date")
     parser.add_argument("--workers", type=int, default=MAX_WORKERS,
                         help=f"Parallel threads (default {MAX_WORKERS})")
     args = parser.parse_args()
+
+    if args.test:
+        set_test_mode(True)
+        _seed_test_db()
 
     if args.update:
         run_update()

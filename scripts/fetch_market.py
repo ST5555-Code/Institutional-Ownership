@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path
 
 from config import QUARTER_SNAPSHOT_DATES as SNAPSHOT_DATES
 
@@ -241,7 +241,7 @@ def main():
     print("SCRIPT 5 — fetch_market.py")
     print("=" * 60)
 
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     # Step 1: Get tickers
     print("\nGetting tickers from holdings...")

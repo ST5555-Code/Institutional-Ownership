@@ -18,7 +18,7 @@ from datetime import datetime
 import duckdb
 import pandas as pd
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', '13f.duckdb')
+from db import get_db_path
 
 PERIODS = [
     ('4Q', '2025Q1', '2025Q4'),
@@ -237,8 +237,8 @@ def compute_ticker_flows(con, ticker, market_cap):
 
 
 def main():
-    con = duckdb.connect(DB_PATH)
-    print(f"Database: {DB_PATH}")
+    con = duckdb.connect(get_db_path())
+    print(f"Database: {get_db_path()}")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     create_tables(con)

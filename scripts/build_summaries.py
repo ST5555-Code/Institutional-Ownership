@@ -17,7 +17,7 @@ from datetime import datetime
 import duckdb
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path
 
 try:
     from config import QUARTERS, LATEST_QUARTER
@@ -130,7 +130,7 @@ def main():
     parser.add_argument("--rebuild", action="store_true", help="Rebuild all quarters")
     args = parser.parse_args()
 
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     quarters = QUARTERS if args.rebuild else [LATEST_QUARTER]
     print(f"Building summaries for: {quarters}")

@@ -25,3 +25,4 @@ __pycache__/
 # Jupyter checkpoints
 .ipynb_checkpoints/
 data/13f_readonly.duckdb
+13f_test.duckdb

@@ -31,7 +31,7 @@ from tqdm import tqdm
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path, set_test_mode, assert_write_safe
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
 FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -166,7 +166,7 @@ def batch_insert(con, all_rows):
 # ---------------------------------------------------------------------------
 
 def run(days=30, update_mode=False, test_mode=False):
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     create_tables(con)
 
     loaded_dates = get_loaded_dates(con)
@@ -257,4 +257,6 @@ if __name__ == "__main__":
     parser.add_argument("--update", action="store_true", help="Only fetch since last loaded date")
     parser.add_argument("--test", action="store_true", help="Test mode (5 days)")
     args = parser.parse_args()
+    if args.test:
+        set_test_mode(True)
     run(days=args.days, update_mode=args.update, test_mode=args.test)

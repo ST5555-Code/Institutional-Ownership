@@ -17,11 +17,11 @@ from datetime import datetime
 import duckdb
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path
 
 
 def run():
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     # Check if ncen_adviser_map exists for adviser CIK linking
     tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]

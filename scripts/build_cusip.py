@@ -43,7 +43,7 @@ import duckdb
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path
 REF_DIR = os.path.join(BASE_DIR, "data", "reference")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -299,7 +299,7 @@ def main():
     print("SCRIPT 6 — build_cusip.py")
     print("=" * 60)
 
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     # Step 1: Get unique CUSIPs
     print("\nGetting unique CUSIPs from holdings...")
