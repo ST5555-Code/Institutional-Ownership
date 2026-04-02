@@ -209,6 +209,162 @@ def get_nport_coverage(ticker, quarter, con):
     return {'nport_total_value': None, 'nport_fund_count': 0}
 
 
+# ---------------------------------------------------------------------------
+# Subadviser notes — explains why some managers show 13F instead of N-PORT
+# ---------------------------------------------------------------------------
+
+SUBADVISER_NOTES = {
+    'wellington': 'Subadviser \u2014 fund-level holdings filed under client fund companies (Hartford, Vanguard Windsor, John Hancock, MassMutual)',
+    'dodge': 'Primarily manages separate accounts \u2014 limited registered fund filings',
+    'capital group': 'American Funds filed under separate CIKs \u2014 may not match via family name',
+    'causeway': 'Subadviser \u2014 files under client fund companies',
+    'harris': 'Oakmark funds filed under Harris Associates \u2014 check Oakmark family',
+    'southeastern': 'Longleaf Partners \u2014 filed under Southeastern Asset Management',
+    'grantham': 'GMO \u2014 primarily institutional separate accounts, limited N-PORT',
+    'pzena': 'Primarily separate accounts \u2014 limited registered fund filings',
+    'hotchkis': 'Primarily separate accounts \u2014 limited registered fund filings',
+    'sanders': 'Primarily separate accounts',
+    'numeric': 'Subadviser \u2014 quantitative, files under client fund companies',
+    'intech': 'Subadviser \u2014 files under client fund companies',
+    'acadian': 'Primarily separate accounts and subadvised mandates',
+    'epoch': 'Subadviser \u2014 files under client fund companies',
+    'martin currie': 'Subadviser \u2014 files under client fund companies',
+    'manning': 'Primarily separate accounts',
+}
+
+
+def get_subadviser_note(inst_parent_name):
+    """Return explanatory note for managers that show 13F instead of N-PORT."""
+    if not inst_parent_name:
+        return None
+    name_lower = inst_parent_name.lower()
+    for key, note in SUBADVISER_NOTES.items():
+        if key in name_lower:
+            return note
+    return None
+
+
+def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
+    """Get top fund series from fund_holdings for a parent institution.
+
+    Returns list of child row dicts or None if no N-PORT data.
+    """
+    patterns = match_nport_family(inst_parent_name)
+    if not patterns:
+        return None
+    try:
+        conds = ' OR '.join(
+            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in patterns
+        )
+        df = con.execute(f"""
+            SELECT
+                fund_name,
+                SUM(market_value_usd) as value,
+                SUM(shares_or_principal) as shares,
+                AVG(pct_of_nav) as pct_of_nav,
+                series_id
+            FROM fund_holdings
+            WHERE ({conds})
+              AND ticker = ?
+              AND quarter = ?
+            GROUP BY fund_name, series_id
+            ORDER BY value DESC NULLS LAST
+            LIMIT {int(limit)}
+        """, [ticker, quarter]).fetchdf()
+        rows = df_to_records(df)
+        if not rows:
+            return None
+        return [{'institution': r.get('fund_name'), 'value_live': r.get('value'),
+                 'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
+                 'source': 'N-PORT'} for r in rows]
+    except Exception:
+        return None
+
+
+def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
+    """Get N-PORT fund series with Q1 vs Q4 share comparison for Holder Changes."""
+    patterns = match_nport_family(inst_parent_name)
+    if not patterns:
+        return None
+    try:
+        conds = ' OR '.join(
+            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in patterns
+        )
+        df = con.execute(f"""
+            SELECT
+                fund_name,
+                SUM(CASE WHEN quarter = '2025Q1' THEN shares_or_principal END) as q1_shares,
+                SUM(CASE WHEN quarter = '2025Q4' THEN shares_or_principal END) as q4_shares,
+                SUM(CASE WHEN quarter = '2025Q4' THEN market_value_usd END) as q4_value,
+                series_id
+            FROM fund_holdings
+            WHERE ({conds})
+              AND ticker = ?
+              AND quarter IN ('2025Q1', '2025Q4')
+            GROUP BY fund_name, series_id
+            HAVING SUM(CASE WHEN quarter = '2025Q4' THEN shares_or_principal END) IS NOT NULL
+                OR SUM(CASE WHEN quarter = '2025Q1' THEN shares_or_principal END) IS NOT NULL
+            ORDER BY q4_value DESC NULLS LAST
+            LIMIT {int(limit)}
+        """, [ticker]).fetchdf()
+        rows = df_to_records(df)
+        if not rows:
+            return None
+        result = []
+        for r in rows:
+            q1 = r.get('q1_shares') or 0
+            q4 = r.get('q4_shares') or 0
+            chg = q4 - q1
+            pct = round(chg / q1 * 100, 1) if q1 > 0 else None
+            result.append({
+                'fund_name': r.get('fund_name'),
+                'q1_shares': r.get('q1_shares'),
+                'q4_shares': r.get('q4_shares'),
+                'change_shares': chg if chg != 0 else None,
+                'change_pct': pct,
+                'source': 'N-PORT',
+            })
+        return result
+    except Exception:
+        return None
+
+
+def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
+    """Get 13F filing entity child rows as fallback."""
+    safe_name = str(inst_parent_name).replace("'", "''") if inst_parent_name else ''
+    df = con.execute(f"""
+        SELECT
+            h.fund_name as institution,
+            COALESCE(h.manager_type, 'unknown') as type,
+            SUM(h.market_value_live) as value_live,
+            SUM(h.shares) as shares,
+            SUM(h.pct_of_float) as pct_float
+        FROM holdings h
+        WHERE h.quarter = '{quarter}'
+          AND (h.ticker = ? OR h.cusip = ?)
+          AND COALESCE(h.inst_parent_name, h.manager_name) = '{safe_name}'
+        GROUP BY h.fund_name, type
+        ORDER BY value_live DESC NULLS LAST
+        LIMIT {int(limit)}
+    """, [ticker, cusip]).fetchdf()
+    rows = df_to_records(df)
+    return [{'institution': r.get('institution'), 'value_live': r.get('value_live'),
+             'shares': r.get('shares'), 'pct_float': r.get('pct_float'),
+             'type': r.get('type'), 'source': '13F'} for r in rows]
+
+
+def get_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
+    """Get child rows: N-PORT fund series first, 13F entity fallback.
+
+    Returns (children_list, source_type) where source_type is 'N-PORT' or '13F'.
+    """
+    nport = get_nport_children(inst_parent_name, ticker, quarter, con, limit)
+    if nport and len(nport) >= 1:
+        return nport, 'N-PORT'
+    fallback = get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit)
+    return fallback, '13F'
+
+
 def _clean_val(v):
     """Replace NaN/Inf with None; convert numpy types to native Python."""
     if v is None:
@@ -292,11 +448,9 @@ def query1(ticker):
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
-            child_count = int(parent['child_count'])
-            # N-PORT enrichment
-            nport = get_nport_position(match_nport_family(pname), ticker, '2025Q4', con)
-            nport_confirmed = nport is not None
-            nport_value = nport['nport_value'] if nport else None
+            children, src = get_children(pname, ticker, cusip, '2025Q4', con, limit=5)
+            effective_children = len(children)
+
             results.append({
                 'rank': rank,
                 'institution': pname,
@@ -304,42 +458,29 @@ def query1(ticker):
                 'shares': parent['total_shares'],
                 'pct_float': parent['pct_float'],
                 'type': parent['type'],
-                'is_parent': child_count >= 2,
-                'child_count': child_count,
+                'is_parent': effective_children >= 2,
+                'child_count': effective_children,
                 'level': 0,
-                'nport_confirmed': nport_confirmed,
-                'nport_value': nport_value,
+                'nport_confirmed': src == 'N-PORT',
+                'nport_value': sum(c.get('value_live') or 0 for c in children) if src == 'N-PORT' else None,
+                'source': src,
+                'subadviser_note': get_subadviser_note(pname) if src != 'N-PORT' else None,
             })
-            # Only show child rows if 2+ distinct funds
-            if child_count < 2:
+
+            if effective_children < 2:
                 continue
-            safe_name = str(pname).replace("'", "''") if pname else ''
-            subs = con.execute(f"""
-                SELECT
-                    h.fund_name,
-                    COALESCE(h.manager_type, 'unknown') as type,
-                    SUM(h.market_value_live) as value_live,
-                    SUM(h.shares) as shares,
-                    SUM(h.pct_of_float) as pct_of_float
-                FROM holdings h
-                WHERE h.quarter = '2025Q4'
-                  AND (h.ticker = ? OR h.cusip = ?)
-                  AND COALESCE(h.inst_parent_name, h.manager_name) = '{safe_name}'
-                GROUP BY h.fund_name, type
-                ORDER BY value_live DESC NULLS LAST
-                LIMIT 5
-            """, [ticker, cusip]).fetchdf()
-            for _, sub in subs.iterrows():
+            for c in children:
                 results.append({
                     'rank': None,
-                    'institution': sub['fund_name'],
-                    'value_live': sub['value_live'],
-                    'shares': sub['shares'],
-                    'pct_float': sub['pct_of_float'],
-                    'type': sub['type'],
+                    'institution': c.get('institution'),
+                    'value_live': c.get('value_live'),
+                    'shares': c.get('shares'),
+                    'pct_float': c.get('pct_float'),
+                    'type': c.get('type', parent['type']),
                     'is_parent': False,
                     'child_count': 0,
                     'level': 1,
+                    'source': c.get('source', src),
                 })
         return results
     finally:
@@ -412,63 +553,75 @@ def query2(ticker):
         # Count distinct funds per parent
         parent_child_counts = q2_top.groupby('parent_name')['fund_name'].nunique()
 
-        current_parent = None
+        # Process parents: try N-PORT children with Q1/Q4 comparison, fall back to 13F
+        seen_parents = set()
         for _, row in q2_top.iterrows():
-            if row['parent_name'] != current_parent:
-                current_parent = row['parent_name']
-                parent_rows = q2_top[q2_top['parent_name'] == current_parent]
-                child_count = int(parent_child_counts.get(current_parent, 1))
-                p_q1 = parent_rows['q1_shares'].sum()
-                p_q4 = parent_rows['q4_shares'].sum()
-                p_chg = p_q4 - p_q1
-                p_pct = (p_chg / p_q1 * 100) if p_q1 > 0 else None
+            pname = row['parent_name']
+            if pname in seen_parents:
+                continue
+            seen_parents.add(pname)
 
-                if child_count < 2:
-                    # Collapse: single flat row with parent name and consolidated data
-                    results.append({
-                        'institution': current_parent,
-                        'fund_name': current_parent,
-                        'q1_shares': p_q1,
-                        'q4_shares': p_q4,
-                        'change_shares': p_chg,
-                        'change_pct': p_pct,
-                        'type': row['type'],
-                        'is_parent': False,
-                        'child_count': 1,
-                        'section': 'holders',
-                        'level': 0,
+            parent_rows = q2_top[q2_top['parent_name'] == pname]
+            p_q1 = parent_rows['q1_shares'].sum()
+            p_q4 = parent_rows['q4_shares'].sum()
+            p_chg = p_q4 - p_q1
+            p_pct = (p_chg / p_q1 * 100) if p_q1 > 0 else None
+
+            # Try N-PORT children with Q1/Q4 comparison
+            nport_kids = get_nport_children_q2(pname, ticker, con, limit=5)
+            if nport_kids and len(nport_kids) >= 2:
+                src = 'N-PORT'
+                child_list = nport_kids
+            else:
+                src = '13F'
+                # 13F fallback: use the existing q2_top rows for this parent
+                child_list = []
+                for _, cr in parent_rows.iterrows():
+                    child_list.append({
+                        'fund_name': cr['fund_name'],
+                        'q1_shares': cr['q1_shares'],
+                        'q4_shares': cr['q4_shares'],
+                        'change_shares': cr['change_shares'],
+                        'change_pct': cr['change_pct'],
+                        'source': '13F',
                     })
-                else:
-                    # Expand: parent summary row + child rows below
-                    results.append({
-                        'institution': current_parent,
-                        'fund_name': '(parent total)',
-                        'q1_shares': p_q1,
-                        'q4_shares': p_q4,
-                        'change_shares': p_chg,
-                        'change_pct': p_pct,
-                        'type': None,
-                        'is_parent': True,
-                        'child_count': child_count,
-                        'section': 'holders',
-                        'level': 0,
-                    })
-            # Only emit child rows if parent has 2+ children
-            child_count = int(parent_child_counts.get(row['parent_name'], 1))
-            if child_count >= 2:
+
+            effective_count = len(child_list)
+
+            sa_note = get_subadviser_note(pname) if src != 'N-PORT' else None
+            if effective_count < 2:
+                # Flat row
                 results.append({
-                    'institution': row['parent_name'],
-                    'fund_name': row['fund_name'],
-                    'q1_shares': row['q1_shares'],
-                    'q4_shares': row['q4_shares'],
-                    'change_shares': row['change_shares'],
-                    'change_pct': row['change_pct'],
-                    'type': row['type'],
-                    'is_parent': False,
-                    'child_count': 0,
-                    'section': 'holders',
-                    'level': 1,
+                    'institution': pname, 'fund_name': pname,
+                    'q1_shares': p_q1, 'q4_shares': p_q4,
+                    'change_shares': p_chg, 'change_pct': p_pct,
+                    'type': row['type'], 'is_parent': False,
+                    'child_count': 1, 'section': 'holders', 'level': 0,
+                    'source': src, 'subadviser_note': sa_note,
                 })
+            else:
+                # Parent summary + children
+                results.append({
+                    'institution': pname, 'fund_name': '(parent total)',
+                    'q1_shares': p_q1, 'q4_shares': p_q4,
+                    'change_shares': p_chg, 'change_pct': p_pct,
+                    'type': None, 'is_parent': True,
+                    'child_count': effective_count, 'section': 'holders', 'level': 0,
+                    'source': src, 'subadviser_note': sa_note,
+                })
+                for c in child_list:
+                    results.append({
+                        'institution': pname,
+                        'fund_name': c.get('fund_name'),
+                        'q1_shares': c.get('q1_shares'),
+                        'q4_shares': c.get('q4_shares'),
+                        'change_shares': c.get('change_shares'),
+                        'change_pct': c.get('change_pct'),
+                        'type': row['type'] if src == '13F' else None,
+                        'is_parent': False, 'child_count': 0,
+                        'section': 'holders', 'level': 1,
+                        'source': c.get('source', src),
+                    })
 
         # Entries (new in Q4, >100K shares)
         entries = q2[q2['is_entry'] & (q2['q4_shares'] >= 100000)].sort_values(
@@ -587,6 +740,9 @@ def query3(ticker):
                 row['source'] = 'N-PORT'
                 row['nport_value'] = nport['nport_value']
                 row['nport_fund_count'] = nport['fund_count']
+                row['subadviser_note'] = None
+            else:
+                row['subadviser_note'] = get_subadviser_note(parent)
         return records
     finally:
         con.close()
@@ -1120,7 +1276,11 @@ def cohort_analysis(ticker):
 
 
 def flow_analysis(ticker):
-    """Comprehensive flow analysis: net flows, intensity, momentum, churn."""
+    """Comprehensive flow analysis: net flows, intensity, momentum, churn.
+
+    TODO: Add expandable N-PORT fund series children to Net Flows rows
+    using get_children() utility. Currently shows flat parent-level rows.
+    """
     con = get_db()
     try:
         mkt_row = con.execute(

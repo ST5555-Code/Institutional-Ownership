@@ -318,8 +318,9 @@ const QUERY_COLUMNS = {
         {key: 'institution', label: 'Institution',  type: 'text'},
         {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
         {key: 'shares',      label: 'Shares',       type: 'shares'},
-        {key: 'pct_float',   label: '% Float',      type: 'pct'},
+        {key: 'pct_float',   label: '% Float / NAV', type: 'pct'},
         {key: 'type',        label: 'Type',         type: 'text'},
+        {key: 'source',      label: 'Source',       type: 'text'},
     ],
     2: [
         {key: 'fund_name',     label: 'Institution / Fund', type: 'text'},
@@ -328,6 +329,7 @@ const QUERY_COLUMNS = {
         {key: 'change_shares', label: 'Change',             type: 'shares'},
         {key: 'change_pct',    label: 'Chg%',               type: 'pct'},
         {key: 'type',          label: 'Type',               type: 'text'},
+        {key: 'source',        label: 'Source',             type: 'text'},
     ],
     3: [
         {key: 'manager_name',      label: 'Active Holder',  type: 'text'},
@@ -670,6 +672,33 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
             else if (isChangeCol(col) && typeof val === 'number' && val !== 0) {
                 td.textContent = formatCell(val, fmtType(col));
                 td.style.color = val < 0 ? '#C0392B' : '#27AE60';
+            }
+            // --- Source column: render as badge with optional tooltip ---
+            else if (col.key === 'source' && val) {
+                const note = row.subadviser_note;
+                if (val !== 'N-PORT' && note) {
+                    // 13F badge with subadviser tooltip
+                    const wrapper = document.createElement('span');
+                    wrapper.className = 'tooltip-wrapper';
+                    const badge = document.createElement('span');
+                    badge.className = 'badge badge-13f';
+                    badge.textContent = val;
+                    wrapper.appendChild(badge);
+                    const icon = document.createElement('span');
+                    icon.className = 'tooltip-icon';
+                    icon.textContent = 'i';
+                    wrapper.appendChild(icon);
+                    const tip = document.createElement('span');
+                    tip.className = 'tooltip-text';
+                    tip.textContent = note;
+                    wrapper.appendChild(tip);
+                    td.appendChild(wrapper);
+                } else {
+                    const badge = document.createElement('span');
+                    badge.className = val === 'N-PORT' ? 'badge badge-nport' : 'badge badge-13f';
+                    badge.textContent = val;
+                    td.appendChild(badge);
+                }
             }
             // --- All other columns ---
             else {

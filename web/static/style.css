@@ -552,6 +552,84 @@ body {
 .matrix-table tr.type-activist td:not(.sticky-col) { background-color: var(--tint-activist); }
 .matrix-table tr.type-mixed td:not(.sticky-col) { background-color: var(--tint-mixed); }
 
+/* === Source badges === */
+.badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.badge-nport {
+    background: #EBF7ED;
+    color: #27AE60;
+}
+
+.badge-13f {
+    background: var(--light-grey);
+    color: var(--text-secondary);
+}
+
+/* Subadviser tooltip */
+.tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.tooltip-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--mid-grey);
+    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    cursor: help;
+}
+
+.tooltip-wrapper .tooltip-text {
+    visibility: hidden;
+    background: var(--oxford-blue);
+    color: var(--white);
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 6px 10px;
+    border-radius: 4px;
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: normal;
+    width: 280px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.tooltip-wrapper .tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -4px;
+    border-width: 4px;
+    border-style: solid;
+    border-color: var(--oxford-blue) transparent transparent transparent;
+}
+
+.tooltip-wrapper:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
 /* === Sub-view bar (used by Ownership Trend, New/Exits) === */
 .sub-view-bar {
     display: flex;
