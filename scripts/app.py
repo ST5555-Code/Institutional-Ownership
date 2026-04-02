@@ -94,6 +94,121 @@ def get_cusip(con, ticker):
     return row[0] if row else ''
 
 
+# ---------------------------------------------------------------------------
+# N-PORT family name matching utility
+# ---------------------------------------------------------------------------
+
+def get_nport_family_patterns():
+    """Map inst_parent_name keywords to N-PORT fund_holdings family_name search patterns."""
+    return {
+        'fidelity': ['Fidelity', 'FMR', 'Puritan', 'Rutland'],
+        'vanguard': ['Vanguard'],
+        'blackrock': ['BlackRock', 'iShares', 'BGFA'],
+        'wellington': ['Wellington'],
+        't. rowe': ['T. Rowe', 'Price Associates'],
+        'dimensional': ['DFA', 'Dimensional'],
+        'mfs': ['MFS', 'Massachusetts Financial'],
+        'neuberger': ['Neuberger Berman'],
+        'aqr': ['AQR'],
+        'loomis': ['Loomis Sayles'],
+        'victory': ['Victory Capital'],
+        'american century': ['American Century'],
+        'dodge': ['Dodge & Cox'],
+        'putnam': ['Putnam'],
+        'columbia': ['Columbia'],
+        'invesco': ['Invesco', 'AIM'],
+        'jpmorgan': ['JPMorgan', 'J.P. Morgan'],
+        'goldman': ['Goldman Sachs'],
+        'morgan stanley': ['Morgan Stanley', 'Eaton Vance'],
+        'nuveen': ['Nuveen', 'TIAA'],
+        'northern trust': ['Northern Trust'],
+        'state street': ['State Street', 'SSGA'],
+        'pimco': ['PIMCO', 'Pacific Investment'],
+        'franklin': ['Franklin', 'Templeton'],
+        'affiliated managers': ['AMG', 'Affiliated Managers'],
+        'harbor': ['Harbor'],
+        'carillon': ['Carillon'],
+        'calvert': ['Calvert'],
+        'baird': ['Baird'],
+        'principal': ['Principal'],
+        'lord abbett': ['Lord Abbett'],
+        'alliancebernstein': ['AllianceBernstein', 'AB Funds'],
+        'lazard': ['Lazard'],
+        'royce': ['Royce'],
+        'gabelli': ['Gabelli'],
+        'oakmark': ['Oakmark', 'Harris Associates'],
+        'artisan': ['Artisan'],
+        'brown advisory': ['Brown Advisory'],
+        'wasatch': ['Wasatch'],
+        'william blair': ['William Blair'],
+        'parnassus': ['Parnassus'],
+        'calamos': ['Calamos'],
+    }
+
+
+def match_nport_family(inst_parent_name):
+    """Return list of search patterns for N-PORT family_name matching."""
+    if not inst_parent_name:
+        return []
+    name_lower = inst_parent_name.lower()
+    patterns = get_nport_family_patterns()
+    for key, search_terms in patterns.items():
+        # Match on key substring OR any search term substring in the parent name
+        if key in name_lower or any(t.lower() in name_lower for t in search_terms):
+            return search_terms
+    # Fallback: use first word of the parent name
+    first_word = inst_parent_name.split('/')[0].split('(')[0].strip()
+    return [first_word] if first_word and len(first_word) > 2 else []
+
+
+def get_nport_position(family_patterns, ticker, quarter, con):
+    """Query fund_holdings for a family's position in a ticker."""
+    if not family_patterns:
+        return None
+    try:
+        conditions = ' OR '.join(
+            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in family_patterns
+        )
+        result = con.execute(f"""
+            SELECT
+                SUM(market_value_usd) as total_value,
+                SUM(shares_or_principal) as total_shares,
+                AVG(pct_of_nav) as avg_pct_nav,
+                COUNT(DISTINCT series_id) as fund_count
+            FROM fund_holdings
+            WHERE ({conditions})
+            AND ticker = ?
+            AND quarter = ?
+        """, [ticker, quarter]).fetchone()
+        if result and result[0]:
+            return {
+                'nport_value': float(result[0]),
+                'nport_shares': float(result[1]) if result[1] else None,
+                'nport_pct_nav': float(result[2]) if result[2] else None,
+                'fund_count': int(result[3]),
+                'source': 'N-PORT',
+            }
+    except Exception:
+        pass
+    return None
+
+
+def get_nport_coverage(ticker, quarter, con):
+    """Get overall N-PORT coverage stats for a ticker."""
+    try:
+        result = con.execute("""
+            SELECT SUM(market_value_usd) as total_value,
+                   COUNT(DISTINCT series_id) as fund_count
+            FROM fund_holdings
+            WHERE ticker = ? AND quarter = ?
+        """, [ticker, quarter]).fetchone()
+        if result and result[0]:
+            return {'nport_total_value': float(result[0]), 'nport_fund_count': int(result[1])}
+    except Exception:
+        pass
+    return {'nport_total_value': None, 'nport_fund_count': 0}
+
+
 def _clean_val(v):
     """Replace NaN/Inf with None; convert numpy types to native Python."""
     if v is None:
@@ -171,13 +286,17 @@ def query1(ticker):
             FROM by_fund
             GROUP BY parent_name
             ORDER BY total_value_live DESC NULLS LAST
-            LIMIT 15
+            LIMIT 25
         """, [ticker, cusip]).fetchdf()
 
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
             child_count = int(parent['child_count'])
+            # N-PORT enrichment
+            nport = get_nport_position(match_nport_family(pname), ticker, '2025Q4', con)
+            nport_confirmed = nport is not None
+            nport_value = nport['nport_value'] if nport else None
             results.append({
                 'rank': rank,
                 'institution': pname,
@@ -188,6 +307,8 @@ def query1(ticker):
                 'is_parent': child_count >= 2,
                 'child_count': child_count,
                 'level': 0,
+                'nport_confirmed': nport_confirmed,
+                'nport_value': nport_value,
             })
             # Only show child rows if 2+ distinct funds
             if child_count < 2:
@@ -238,7 +359,7 @@ def query2(ticker):
             WHERE quarter = '2025Q4' AND (ticker = ? OR cusip = ?)
             GROUP BY parent_name
             ORDER BY parent_val DESC NULLS LAST
-            LIMIT 15
+            LIMIT 25
         """, [ticker, cusip]).fetchdf()['parent_name'].tolist()
 
         q2 = con.execute("""
@@ -406,6 +527,7 @@ def query3(ticker):
                 SELECT
                     h.cik,
                     MAX(h.manager_name) as manager_name,
+                    MAX(COALESCE(h.inst_parent_name, h.manager_name)) as parent_name,
                     MAX(h.manager_type) as manager_type,
                     SUM(h.market_value_live) as position_value,
                     SUM(h.shares) as shares,
@@ -443,6 +565,7 @@ def query3(ticker):
             )
             SELECT
                 manager_name,
+                parent_name,
                 position_value,
                 pct_of_portfolio,
                 pct_of_float,
@@ -454,7 +577,17 @@ def query3(ticker):
             FROM with_percentile
             ORDER BY position_value DESC NULLS LAST
         """, [ticker, cusip]).fetchdf()
-        return df_to_records(df)
+
+        records = df_to_records(df)
+        # N-PORT enrichment: upgrade source from '13F estimate' to 'N-PORT' where available
+        for row in records:
+            parent = row.get('parent_name') or row.get('manager_name')
+            nport = get_nport_position(match_nport_family(parent), ticker, '2025Q4', con)
+            if nport:
+                row['source'] = 'N-PORT'
+                row['nport_value'] = nport['nport_value']
+                row['nport_fund_count'] = nport['fund_count']
+        return records
     finally:
         con.close()
 
@@ -1077,8 +1210,22 @@ def flow_analysis(ticker):
 
         momentum = []
         for row in df_to_records(mom_df):
-            f4q = ((row.get('q4s') or 0) - (row.get('q1s') or 0)) * price if price else 0
-            f2q = ((row.get('q4s') or 0) - (row.get('q3s') or 0)) * price if price else 0
+            q1s = row.get('q1s') or 0
+            q3s = row.get('q3s') or 0
+            q4s = row.get('q4s') or 0
+
+            # Skip institutions with no Q1 position — they are new entries, not momentum candidates
+            if q1s == 0:
+                # Only include if they also have a Q4 position (NEW entry)
+                if q4s > 0:
+                    f4q = q4s * price if price else 0
+                    f2q = (q4s - q3s) * price if price else 0
+                    momentum.append({'investor': row.get('investor'), 'type': row.get('type'),
+                                    'flow_4q': f4q, 'flow_2q': f2q, 'momentum': None, 'signal': 'NEW'})
+                continue
+
+            f4q = (q4s - q1s) * price if price else 0
+            f2q = (q4s - q3s) * price if price else 0
             m = f2q / f4q if f4q != 0 else None
             sig = None
             if m is not None:
@@ -1112,7 +1259,7 @@ def flow_analysis(ticker):
         active_c = _churn({i for i in q1a if q1a[i] != 'passive'}, {i for i in q4a if q4a.get(i) != 'passive'}, 'active')
         passive_c = _churn({i for i in q1a if q1a[i] == 'passive'}, {i for i in q4a if q4a.get(i) == 'passive'}, 'passive')
         rate = overall['churn_rate']
-        stability = 'LOW' if rate < 10 else ('MODERATE' if rate < 20 else ('HIGH' if rate < 30 else 'ELEVATED'))
+        stability = 'LOW' if rate < 20 else ('MODERATE' if rate < 40 else ('HIGH' if rate < 60 else 'ELEVATED'))
 
         return clean_for_json({
             'net_flows': net_flows_out, 'flow_intensity': flow_intensity,
@@ -1189,7 +1336,13 @@ def get_summary(ticker):
             [ticker]
         ).fetchone()
 
-        return {
+        # N-PORT coverage
+        nport = get_nport_coverage(ticker, '2025Q4', con)
+        total_value = totals[0] if totals else 0
+        nport_val = nport.get('nport_total_value') or 0
+        nport_pct = round(nport_val / total_value * 100, 1) if total_value and total_value > 0 else None
+
+        result = {
             'company_name': company_name,
             'ticker': ticker,
             'latest_quarter': latest_quarter,
@@ -1202,6 +1355,8 @@ def get_summary(ticker):
             'price': mkt[0] if mkt else None,
             'market_cap': mkt[1] if mkt else None,
             'shares_float': mkt[2] if mkt else None,
+            'nport_coverage': nport_pct,
+            'nport_funds': nport.get('nport_fund_count', 0),
         }
         return clean_for_json(result)
     finally:

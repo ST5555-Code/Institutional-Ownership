@@ -194,6 +194,9 @@ async function loadTicker() {
         document.getElementById('sum-holders').textContent = s.num_holders != null ? s.num_holders.toLocaleString() : '\u2014';
         document.getElementById('sum-mktcap').textContent = fmtDollars(s.market_cap);
         document.getElementById('sum-price').textContent = s.price != null ? '$' + s.price.toFixed(2) : '\u2014';
+        document.getElementById('sum-nport').textContent = s.nport_coverage != null
+            ? s.nport_coverage + '% (' + s.nport_funds + ' funds)'
+            : '\u2014';
 
         // Active/Passive split
         const activeVal = s.active_value || 0;
@@ -207,7 +210,7 @@ async function loadTicker() {
         }
     } catch (e) {
         document.getElementById('sum-company').textContent = ticker;
-        ['sum-quarter','sum-holdings','sum-float','sum-holders','sum-split','sum-mktcap','sum-price']
+        ['sum-quarter','sum-holdings','sum-float','sum-holders','sum-split','sum-mktcap','sum-price','sum-nport']
             .forEach(id => document.getElementById(id).textContent = '\u2014');
     }
 
