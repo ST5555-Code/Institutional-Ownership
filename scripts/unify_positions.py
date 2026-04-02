@@ -53,6 +53,7 @@ def run():
             h.manager_type,
             h.is_passive,
             h.quarter,
+            CAST(NULL AS VARCHAR) as report_month,
             TRY_CAST(h.report_date AS DATE) as report_date,
             CURRENT_TIMESTAMP as loaded_at
         FROM holdings h
@@ -91,6 +92,7 @@ def run():
             'active' as manager_type,
             FALSE as is_passive,
             fh.quarter,
+            fh.report_month,
             fh.report_date,
             CURRENT_TIMESTAMP as loaded_at
         FROM fund_holdings fh

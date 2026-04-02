@@ -38,13 +38,23 @@ SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.2  # seconds between requests
 NS = {"n": "http://www.sec.gov/edgar/nport"}
 
-# Quarter mapping: our label → N-PORT report period target month
-# The user spec: Dec 2024→2025Q1, Mar 2025→2025Q2, Jun 2025→2025Q3, Sep 2025→2025Q4
+# Quarter mapping: our label → N-PORT report period target months
+# Each quarter has 3 months. The third month is the quarter-end.
+# Dec 2024→2025Q1, Mar 2025→2025Q2, Jun 2025→2025Q3, Sep 2025→2025Q4
 QUARTER_TARGETS = {
-    "2025Q1": (2024, 12),  # report period ending ~Dec 2024
-    "2025Q2": (2025, 3),   # report period ending ~Mar 2025
-    "2025Q3": (2025, 6),   # report period ending ~Jun 2025
-    "2025Q4": (2025, 9),   # report period ending ~Sep 2025
+    "2025Q1": (2024, 12),  # report period ending ~Dec 2024 (quarter-end)
+    "2025Q2": (2025, 3),   # report period ending ~Mar 2025 (quarter-end)
+    "2025Q3": (2025, 6),   # report period ending ~Jun 2025 (quarter-end)
+    "2025Q4": (2025, 9),   # report period ending ~Sep 2025 (quarter-end)
+}
+
+# Monthly targets: all 3 months per quarter
+# SEC releases months 1 & 2 after the quarter ends
+MONTHLY_TARGETS = {
+    "2025Q1": [(2024, 10), (2024, 11), (2024, 12)],
+    "2025Q2": [(2025, 1), (2025, 2), (2025, 3)],
+    "2025Q3": [(2025, 4), (2025, 5), (2025, 6)],
+    "2025Q4": [(2025, 7), (2025, 8), (2025, 9)],
 }
 
 # EDGAR quarters to search for filings (filing dates, not report dates)
@@ -111,36 +121,56 @@ def build_filing_index():
 def map_report_period_to_quarter(rep_pd_end_str):
     """Map an N-PORT report period end date to our quarter label.
 
-    Finds the closest target quarter. Returns (quarter_label, report_date) or (None, None).
+    Finds the closest target quarter using all monthly targets.
+    Returns (quarter_label, report_date, report_month) or (None, None, None).
     """
     if not rep_pd_end_str:
-        return None, None
+        return None, None, None
 
     try:
         rep_date = datetime.strptime(rep_pd_end_str, "%Y-%m-%d")
     except ValueError:
-        return None, None
+        return None, None, None
 
+    report_month = rep_date.strftime("%Y-%m")
     best_quarter = None
     best_diff = timedelta(days=999)
 
-    for qlabel, (year, month) in QUARTER_TARGETS.items():
-        # Build target date (last day of target month)
-        if month == 12:
-            target = datetime(year, 12, 31)
-        elif month in (1, 3, 5, 7, 8, 10):
-            target = datetime(year, month, 31)
-        elif month in (4, 6, 9, 11):
-            target = datetime(year, month, 30)
-        elif month == 2:
-            target = datetime(year, month, 28)
+    # Check all monthly targets for best match
+    for qlabel, months in MONTHLY_TARGETS.items():
+        for year, month in months:
+            if month == 12:
+                target = datetime(year, 12, 31)
+            elif month in (1, 3, 5, 7, 8, 10):
+                target = datetime(year, month, 31)
+            elif month in (4, 6, 9, 11):
+                target = datetime(year, month, 30)
+            elif month == 2:
+                target = datetime(year, month, 28)
 
-        diff = abs(rep_date - target)
-        if diff < best_diff and diff <= timedelta(days=45):
-            best_diff = diff
-            best_quarter = qlabel
+            diff = abs(rep_date - target)
+            if diff < best_diff and diff <= timedelta(days=15):
+                best_diff = diff
+                best_quarter = qlabel
 
-    return best_quarter, rep_pd_end_str
+    # Fallback to old quarter-only matching (wider tolerance)
+    if not best_quarter:
+        for qlabel, (year, month) in QUARTER_TARGETS.items():
+            if month == 12:
+                target = datetime(year, 12, 31)
+            elif month in (1, 3, 5, 7, 8, 10):
+                target = datetime(year, month, 31)
+            elif month in (4, 6, 9, 11):
+                target = datetime(year, month, 30)
+            elif month == 2:
+                target = datetime(year, month, 28)
+
+            diff = abs(rep_date - target)
+            if diff < best_diff and diff <= timedelta(days=45):
+                best_diff = diff
+                best_quarter = qlabel
+
+    return best_quarter, rep_pd_end_str, report_month
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +370,7 @@ def create_tables(con):
             family_name VARCHAR,
             series_id VARCHAR,
             quarter VARCHAR,
+            report_month VARCHAR,
             report_date DATE,
             cusip VARCHAR,
             isin VARCHAR,
@@ -370,8 +401,18 @@ def create_tables(con):
             pass
 
 
-def is_already_loaded(con, series_id, quarter):
-    """Check if a fund-quarter combination is already in fund_holdings."""
+def is_already_loaded(con, series_id, quarter, report_month=None):
+    """Check if a fund-quarter(-month) combination is already in fund_holdings."""
+    if report_month:
+        # Check month-level granularity
+        try:
+            result = con.execute(
+                "SELECT COUNT(*) FROM fund_holdings WHERE series_id = ? AND report_month = ?",
+                [series_id, report_month],
+            ).fetchone()
+            return result[0] > 0
+        except Exception:
+            pass  # report_month column may not exist yet
     result = con.execute(
         "SELECT COUNT(*) FROM fund_holdings WHERE series_id = ? AND quarter = ?",
         [series_id, quarter],
@@ -379,7 +420,7 @@ def is_already_loaded(con, series_id, quarter):
     return result[0] > 0
 
 
-def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date):
+def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, report_month=None):
     """Insert parsed holdings into fund_holdings table."""
     series_id = metadata.get("series_id") or "UNKNOWN"
     fund_cik = (metadata.get("reg_cik") or "").lstrip("0").zfill(10)
@@ -395,6 +436,7 @@ def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date):
             family_name,
             series_id,
             quarter_label,
+            report_month,
             report_date,
             h.get("cusip"),
             h.get("isin") or None,
@@ -412,7 +454,7 @@ def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date):
 
     if rows:
         con.executemany(
-            """INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             rows,
         )
 
@@ -525,7 +567,7 @@ def process_filing(con, cik, accession_number, company_name, target_quarters=Non
 
     # Map report period to our quarter (use repPdDate — the actual quarter end,
     # not repPdEnd which is the fiscal year end)
-    quarter_label, report_date = map_report_period_to_quarter(
+    quarter_label, report_date, report_month = map_report_period_to_quarter(
         metadata.get("rep_pd_date") or metadata.get("rep_pd_end")
     )
     if quarter_label is None:
@@ -537,8 +579,8 @@ def process_filing(con, cik, accession_number, company_name, target_quarters=Non
 
     series_id = metadata.get("series_id") or "UNKNOWN"
 
-    # Skip if already loaded
-    if is_already_loaded(con, series_id, quarter_label):
+    # Skip if already loaded (check at month level for monthly data)
+    if is_already_loaded(con, series_id, quarter_label, report_month):
         return []
 
     # Classify
@@ -547,7 +589,7 @@ def process_filing(con, cik, accession_number, company_name, target_quarters=Non
         return []
 
     # Load holdings
-    count = load_holdings_to_db(con, metadata, holdings, quarter_label, report_date)
+    count = load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, report_month)
 
     # Update universe
     update_fund_universe(con, metadata, holdings, category)
