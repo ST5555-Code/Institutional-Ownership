@@ -906,14 +906,71 @@ def query5(ticker):
 
 
 def query6(ticker):
-    """Activist ownership tracker."""
+    """Activist & beneficial ownership tracker — combines 13D/G and 13F data."""
     con = get_db()
     try:
-        df = con.execute("""
+        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+        has_bo = 'beneficial_ownership_current' in tables
+
+        sections = {}
+
+        # Section 1: 13D filers (activist intent, ≥5% threshold)
+        if has_bo:
+            df_13d = con.execute("""
+                SELECT
+                    filer_name,
+                    pct_owned,
+                    shares_owned,
+                    latest_filing_date AS filing_date,
+                    latest_filing_type AS filing_type,
+                    days_since_filing,
+                    is_current
+                FROM beneficial_ownership_current
+                WHERE subject_ticker = ? AND intent = 'activist'
+                ORDER BY latest_filing_date DESC
+            """, [ticker]).fetchdf()
+            sections['activist_13d'] = df_to_records(df_13d)
+
+        # Section 2: 13G filers (passive ≥5%)
+        if has_bo:
+            df_13g = con.execute("""
+                SELECT
+                    filer_name,
+                    pct_owned,
+                    shares_owned,
+                    latest_filing_date AS filing_date,
+                    latest_filing_type AS filing_type,
+                    days_since_filing,
+                    is_current
+                FROM beneficial_ownership_current
+                WHERE subject_ticker = ? AND intent = 'passive'
+                ORDER BY pct_owned DESC NULLS LAST
+            """, [ticker]).fetchdf()
+            sections['passive_5pct'] = df_to_records(df_13g)
+
+        # Section 3: Historical timeline
+        if has_bo:
+            df_hist = con.execute("""
+                SELECT
+                    filer_name,
+                    filing_type,
+                    filing_date,
+                    pct_owned,
+                    shares_owned,
+                    intent,
+                    purpose_text
+                FROM beneficial_ownership
+                WHERE subject_ticker = ?
+                ORDER BY filing_date DESC
+            """, [ticker]).fetchdf()
+            sections['history'] = df_to_records(df_hist)
+
+        # Section 4: Legacy 13F activist holdings (from holdings table)
+        df_legacy = con.execute("""
             SELECT
-                manager_name,
+                manager_name AS filer_name,
                 quarter,
-                shares,
+                shares AS shares_owned,
                 market_value_usd,
                 market_value_live,
                 pct_of_portfolio,
@@ -922,7 +979,9 @@ def query6(ticker):
             WHERE ticker = ? AND is_activist = true
             ORDER BY manager_name, quarter
         """, [ticker]).fetchdf()
-        return df_to_records(df)
+        sections['activist_13f'] = df_to_records(df_legacy)
+
+        return sections
     finally:
         con.close()
 

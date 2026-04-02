@@ -232,7 +232,7 @@ async function loadTicker() {
 // ---------------------------------------------------------------------------
 // Tab ID → legacy query number mapping (for endpoints that use /api/queryN)
 const TAB_QUERY_MAP = {
-    'register': 1, 'conviction': 3, 'activist': 6,
+    'register': 1, 'conviction': 3,
     'fund-portfolio': 7, 'cross-ownership': 8,
     'sector-rotation': 9, 'aum': 14,
 };
@@ -259,6 +259,8 @@ function switchTab(tabId) {
         loadFlowAnalysis();
     } else if (tabId === 'new-exits') {
         loadNewExits();
+    } else if (tabId === 'activist') {
+        loadActivistTab();
     } else if (tabId === 'crowding' || tabId === 'smart-money' || tabId === 'peer-matrix') {
         renderPlaceholder(tabId);
     } else if (currentQuery > 0) {
@@ -933,6 +935,138 @@ function renderCohort(data) {
 // ---------------------------------------------------------------------------
 // Flow Analysis tab — period selector, 4 sections, charts
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Activist / Beneficial Ownership tab
+// ---------------------------------------------------------------------------
+async function loadActivistTab() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    const params = new URLSearchParams({ticker: currentTicker});
+    try {
+        const res = await fetch(`/api/query6?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+
+        const wrap = tableWrap;
+
+        // Section 1: 13D Activist Filers
+        if (data.activist_13d && data.activist_13d.length > 0) {
+            wrap.appendChild(sectionHeader('13D Activist Filers (≥5% with intent)'));
+            const t1 = buildSimpleTable(data.activist_13d, [
+                {key: 'filer_name', label: 'Filer', type: 'text'},
+                {key: 'pct_owned', label: '% Owned', type: 'pct'},
+                {key: 'shares_owned', label: 'Shares', type: 'shares'},
+                {key: 'filing_date', label: 'Filed', type: 'text'},
+                {key: 'filing_type', label: 'Form', type: 'text'},
+                {key: 'days_since_filing', label: 'Days Ago', type: 'num'},
+                {key: 'is_current', label: 'Current', type: 'text'},
+            ]);
+            wrap.appendChild(t1);
+        }
+
+        // Section 2: 13G Passive ≥5%
+        if (data.passive_5pct && data.passive_5pct.length > 0) {
+            wrap.appendChild(sectionHeader('13G Passive Holders (≥5%)'));
+            const t2 = buildSimpleTable(data.passive_5pct, [
+                {key: 'filer_name', label: 'Filer', type: 'text'},
+                {key: 'pct_owned', label: '% Owned', type: 'pct'},
+                {key: 'shares_owned', label: 'Shares', type: 'shares'},
+                {key: 'filing_date', label: 'Filed', type: 'text'},
+                {key: 'filing_type', label: 'Form', type: 'text'},
+                {key: 'days_since_filing', label: 'Days Ago', type: 'num'},
+            ]);
+            wrap.appendChild(t2);
+        }
+
+        // Section 3: Filing History
+        if (data.history && data.history.length > 0) {
+            wrap.appendChild(sectionHeader('Filing History'));
+            const t3 = buildSimpleTable(data.history, [
+                {key: 'filer_name', label: 'Filer', type: 'text'},
+                {key: 'filing_type', label: 'Form', type: 'text'},
+                {key: 'filing_date', label: 'Filed', type: 'text'},
+                {key: 'pct_owned', label: '% Owned', type: 'pct'},
+                {key: 'shares_owned', label: 'Shares', type: 'shares'},
+                {key: 'intent', label: 'Intent', type: 'text'},
+                {key: 'purpose_text', label: 'Purpose', type: 'text'},
+            ]);
+            wrap.appendChild(t3);
+        }
+
+        // Section 4: 13F Activist Holdings (legacy)
+        if (data.activist_13f && data.activist_13f.length > 0) {
+            wrap.appendChild(sectionHeader('13F Activist Holdings'));
+            const t4 = buildSimpleTable(data.activist_13f, [
+                {key: 'filer_name', label: 'Manager', type: 'text'},
+                {key: 'quarter', label: 'Quarter', type: 'text'},
+                {key: 'shares_owned', label: 'Shares', type: 'shares'},
+                {key: 'market_value_usd', label: 'Value (USD)', type: 'dollar'},
+                {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
+                {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
+                {key: 'pct_of_float', label: '% Float', type: 'pct'},
+            ]);
+            wrap.appendChild(t4);
+        }
+
+        // Empty state
+        const allEmpty = (!data.activist_13d || !data.activist_13d.length) &&
+                         (!data.passive_5pct || !data.passive_5pct.length) &&
+                         (!data.history || !data.history.length) &&
+                         (!data.activist_13f || !data.activist_13f.length);
+        if (allEmpty) {
+            wrap.innerHTML = '<div class="empty-state"><p>No 13D/G or activist data found for this ticker.</p></div>';
+        }
+    } catch (e) {
+        hideSpinner(); showError(e.message);
+    }
+}
+
+function sectionHeader(text) {
+    const h = document.createElement('h3');
+    h.style.cssText = 'margin:24px 0 8px 0;color:#002147;font-size:14px;border-bottom:1px solid #ddd;padding-bottom:4px;';
+    h.textContent = text;
+    return h;
+}
+
+function buildSimpleTable(data, cols) {
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    // Header
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    cols.forEach(c => {
+        const th = document.createElement('th');
+        th.textContent = c.label;
+        th.style.textAlign = (c.type === 'num' || c.type === 'dollar' || c.type === 'pct' || c.type === 'shares') ? 'right' : 'left';
+        hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    // Body
+    const tbody = document.createElement('tbody');
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            const val = row[c.key];
+            td.style.textAlign = (c.type === 'num' || c.type === 'dollar' || c.type === 'pct' || c.type === 'shares') ? 'right' : 'left';
+            if (val == null || val === '') td.textContent = '—';
+            else if (c.type === 'dollar') td.textContent = fmtDollars(val);
+            else if (c.type === 'shares') td.textContent = fmtShares(val);
+            else if (c.type === 'pct') td.textContent = fmtPct(val);
+            else if (c.type === 'num') td.textContent = fmtNum(val);
+            else {
+                const s = String(val);
+                td.textContent = s.length > 120 ? s.slice(0, 120) + '…' : s;
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+}
+
 let _flowPeriod = '4Q';
 
 async function loadFlowAnalysis() {
