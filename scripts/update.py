@@ -56,27 +56,39 @@ def main():
             sys.exit(1)
 
     # Auto-resolve new ticker gaps
-    print(f"\n{'=' * 60}")
-    print("Running auto_resolve.py...")
-    print(f"{'=' * 60}")
-    subprocess.run([sys.executable, os.path.join(SCRIPTS_DIR, "auto_resolve.py")], cwd=BASE_DIR)
+    if not run_script("auto_resolve.py"):
+        print("\nPipeline stopped at auto_resolve.py.")
+        sys.exit(1)
 
     # Fetch N-PORT mutual fund holdings for latest quarter
-    latest_quarter = steps_quarters[-1] if 'steps_quarters' in dir() else "2025Q4"
+    import duckdb
+    db_path = os.path.join(BASE_DIR, "data", "13f.duckdb")
+    try:
+        con = duckdb.connect(db_path, read_only=True)
+        latest_quarter = con.execute("SELECT MAX(quarter) FROM holdings").fetchone()[0]
+        con.close()
+    except Exception:
+        latest_quarter = None
+    if not latest_quarter:
+        print("\nERROR: Could not determine latest quarter from holdings table.")
+        sys.exit(1)
+
     print(f"\n{'=' * 60}")
     print(f"Running fetch_nport.py --quarter {latest_quarter}...")
     print(f"{'=' * 60}")
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, os.path.join(SCRIPTS_DIR, "fetch_nport.py"),
          "--quarter", latest_quarter],
         cwd=BASE_DIR,
     )
+    if result.returncode != 0:
+        print(f"\nPipeline stopped at fetch_nport.py (exit {result.returncode}).")
+        sys.exit(1)
 
     # Unify positions table (merges 13F + N-PORT)
-    print(f"\n{'=' * 60}")
-    print("Running unify_positions.py...")
-    print(f"{'=' * 60}")
-    subprocess.run([sys.executable, os.path.join(SCRIPTS_DIR, "unify_positions.py")], cwd=BASE_DIR)
+    if not run_script("unify_positions.py"):
+        print("\nPipeline stopped at unify_positions.py.")
+        sys.exit(1)
 
     # Notify if pending overrides exist
     import pandas as pd

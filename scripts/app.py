@@ -603,7 +603,7 @@ def query2(ticker):
                     CASE WHEN q1.q1_shares IS NULL THEN true ELSE false END as is_entry,
                     CASE WHEN q4.q4_shares IS NULL THEN true ELSE false END as is_exit
                 FROM q4_agg q4
-                FULL OUTER JOIN q1_agg q1 ON q4.cik = q1.cik
+                FULL OUTER JOIN q1_agg q1 ON q4.cik = q1.cik AND q4.manager_name = q1.manager_name
             )
             SELECT * FROM combined
             ORDER BY parent_name, ABS(change_shares) DESC
