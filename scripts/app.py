@@ -868,6 +868,260 @@ def query15(ticker=None):
         con.close()
 
 
+# ---------------------------------------------------------------------------
+# New query functions — Ownership Trend, Cohort Analysis, Flow Analysis
+# ---------------------------------------------------------------------------
+
+def ownership_trend_summary(ticker):
+    """Aggregated institutional ownership trend across all quarters."""
+    con = get_db()
+    try:
+        float_row = con.execute(
+            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        float_shares = float_row[0] if float_row and float_row[0] else None
+
+        df = con.execute("""
+            SELECT quarter,
+                   SUM(shares) as total_inst_shares,
+                   SUM(market_value_usd) as total_inst_value,
+                   COUNT(DISTINCT COALESCE(inst_parent_name, manager_name)) as holder_count,
+                   SUM(CASE WHEN manager_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
+                   SUM(CASE WHEN manager_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
+            FROM holdings WHERE ticker = ? GROUP BY quarter ORDER BY quarter
+        """, [ticker]).fetchdf()
+
+        rows = df_to_records(df)
+        prev_shares = None
+        for row in rows:
+            total_shares = row.get('total_inst_shares') or 0
+            total_value = row.get('total_inst_value') or 0
+            row['pct_float'] = round(total_shares / float_shares * 100, 2) if float_shares and float_shares > 0 else None
+            active_val = row.get('active_value') or 0
+            row['active_pct'] = round(active_val / total_value * 100, 2) if total_value > 0 else None
+            row['passive_pct'] = round((total_value - active_val) / total_value * 100, 2) if total_value > 0 else None
+            if prev_shares is not None:
+                net_change = total_shares - prev_shares
+                row['net_shares_change'] = net_change
+                pct_change = net_change / prev_shares if prev_shares > 0 else 0
+                row['signal'] = '\u2191' if pct_change > 0.005 else ('\u2193' if pct_change < -0.005 else '\u2192')
+            else:
+                row['net_shares_change'] = None
+                row['signal'] = None
+            prev_shares = total_shares
+
+        summary = {}
+        if len(rows) >= 2:
+            first, last = rows[0], rows[-1]
+            fs = first.get('total_inst_shares') or 0
+            ls = last.get('total_inst_shares') or 0
+            total_added = ls - fs
+            total_flow = (last.get('total_inst_value') or 0) - (first.get('total_inst_value') or 0)
+            net_new = (last.get('holder_count') or 0) - (first.get('holder_count') or 0)
+            pct = total_added / fs if fs > 0 else 0
+            trend = '\u2191 Accumulating' if pct > 0.005 else ('\u2193 Distributing' if pct < -0.005 else '\u2192 Stable')
+            summary = {'trend': trend, 'total_shares_added': total_added, 'total_dollar_flow': total_flow, 'net_new_holders': net_new}
+
+        return {'quarters': rows, 'summary': summary}
+    finally:
+        con.close()
+
+
+def cohort_analysis(ticker):
+    """Cohort retention analysis: Q1 vs Q4 holders."""
+    con = get_db()
+    try:
+        q1_df = con.execute("""
+            SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                   SUM(shares) as shares, SUM(market_value_usd) as value
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
+        """, [ticker]).fetchdf()
+        q4_df = con.execute("""
+            SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                   SUM(shares) as shares, SUM(market_value_usd) as value
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
+        """, [ticker]).fetchdf()
+
+        q1_map = {r['investor']: r for r in df_to_records(q1_df)}
+        q4_map = {r['investor']: r for r in df_to_records(q4_df)}
+        q1_set, q4_set = set(q1_map.keys()), set(q4_map.keys())
+        retained = q1_set & q4_set
+        new_entries_set = q4_set - q1_set
+        exits_set = q1_set - q4_set
+
+        increased, decreased, unchanged = [], [], []
+        for inv in retained:
+            s1 = q1_map[inv].get('shares') or 0
+            s4 = q4_map[inv].get('shares') or 0
+            (increased if s4 > s1 else decreased if s4 < s1 else unchanged).append(inv)
+
+        def _stats(investors, src):
+            c = len(investors)
+            s = sum((src[i].get('shares') or 0) for i in investors)
+            v = sum((src[i].get('value') or 0) for i in investors)
+            return {'holders': c, 'shares': s, 'value': v, 'avg_position': round(v / c, 2) if c > 0 else 0}
+
+        detail = [
+            {'category': 'Retained \u2014 increased', **_stats(increased, q4_map)},
+            {'category': 'Retained \u2014 decreased', **_stats(decreased, q4_map)},
+            {'category': 'Retained \u2014 unchanged', **_stats(unchanged, q4_map)},
+            {'category': 'New entries', **_stats(list(new_entries_set), q4_map)},
+            {'category': 'Exits', **_stats(list(exits_set), q1_map)},
+        ]
+
+        total_q1 = len(q1_set)
+        summary = {
+            'retention_rate': round(len(retained) / total_q1 * 100, 2) if total_q1 > 0 else 0,
+            'new_entries_count': len(new_entries_set),
+            'new_entries_shares': sum((q4_map[i].get('shares') or 0) for i in new_entries_set),
+            'exits_count': len(exits_set),
+            'exits_shares': sum((q1_map[i].get('shares') or 0) for i in exits_set),
+            'net_adds_count': len(increased),
+            'net_adds_value': sum(((q4_map[i].get('value') or 0) - (q1_map[i].get('value') or 0)) for i in increased),
+            'net_trims_count': len(decreased),
+            'net_trims_value': sum(((q4_map[i].get('value') or 0) - (q1_map[i].get('value') or 0)) for i in decreased),
+        }
+        return {'summary': summary, 'detail': detail}
+    finally:
+        con.close()
+
+
+def flow_analysis(ticker):
+    """Comprehensive flow analysis: net flows, intensity, momentum, churn."""
+    con = get_db()
+    try:
+        mkt_row = con.execute(
+            "SELECT price_live, market_cap FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        price = mkt_row[0] if mkt_row and mkt_row[0] else None
+        market_cap = mkt_row[1] if mkt_row and mkt_row[1] else None
+
+        # Section 1 — Net Flows
+        flows_df = con.execute("""
+            WITH q1 AS (
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       MAX(manager_type) as type, SUM(shares) as shares, SUM(market_value_usd) as value
+                FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
+            ),
+            q4 AS (
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       MAX(manager_type) as type, SUM(shares) as shares, SUM(market_value_usd) as value
+                FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
+            )
+            SELECT COALESCE(q4.investor, q1.investor) as investor,
+                   COALESCE(q4.type, q1.type) as type,
+                   COALESCE(q4.shares, 0) - COALESCE(q1.shares, 0) as net_shares,
+                   q1.value as q1_value, q4.value as q4_value
+            FROM q4 FULL OUTER JOIN q1 ON q4.investor = q1.investor
+            ORDER BY net_shares DESC
+        """, [ticker, ticker]).fetchdf()
+
+        flows = df_to_records(flows_df)
+        net_flows = []
+        all_paf = []
+        for row in flows:
+            ns = row.get('net_shares') or 0
+            q1v = row.get('q1_value') or 0
+            q4v = row.get('q4_value') or 0
+            paf = ns * price if price else None
+            raw = q4v - q1v
+            entry = {
+                'investor': row.get('investor'), 'type': row.get('type'),
+                'net_shares': ns, 'price_adj_flow': paf, 'raw_flow': raw,
+                'price_effect': (raw - paf) if paf is not None else None,
+                'direction': 'BUY' if ns > 0 else ('SELL' if ns < 0 else 'HOLD'),
+            }
+            net_flows.append(entry)
+            all_paf.append({'type': row.get('type'), 'paf': paf or 0})
+
+        buyers = [r for r in net_flows if r['direction'] == 'BUY'][:25]
+        sellers = [r for r in net_flows if r['direction'] == 'SELL'][-25:]
+        net_flows_out = buyers + sellers
+
+        # Section 2 — Flow Intensity
+        total_paf = sum(r['paf'] for r in all_paf)
+        active_paf = sum(r['paf'] for r in all_paf if r.get('type') != 'passive')
+        passive_paf = sum(r['paf'] for r in all_paf if r.get('type') == 'passive')
+        if market_cap and market_cap > 0:
+            flow_intensity = {
+                'total_flow_intensity': round(total_paf / market_cap * 100, 4),
+                'active_flow_intensity': round(active_paf / market_cap * 100, 4),
+                'passive_flow_intensity': round(passive_paf / market_cap * 100, 4),
+            }
+        else:
+            flow_intensity = {'total_flow_intensity': None, 'active_flow_intensity': None, 'passive_flow_intensity': None}
+
+        # Section 3 — Momentum
+        mom_df = con.execute("""
+            WITH q1 AS (
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       MAX(manager_type) as type, SUM(shares) as shares
+                FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
+            ),
+            q3 AS (
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       MAX(manager_type) as type, SUM(shares) as shares
+                FROM holdings WHERE ticker = ? AND quarter = '2025Q3' GROUP BY investor
+            ),
+            q4 AS (
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       MAX(manager_type) as type, SUM(shares) as shares
+                FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
+            )
+            SELECT COALESCE(q4.investor, COALESCE(q3.investor, q1.investor)) as investor,
+                   COALESCE(q4.type, COALESCE(q3.type, q1.type)) as type,
+                   COALESCE(q4.shares, 0) as q4s, COALESCE(q3.shares, 0) as q3s, COALESCE(q1.shares, 0) as q1s
+            FROM q4 FULL OUTER JOIN q3 ON q4.investor = q3.investor
+            FULL OUTER JOIN q1 ON COALESCE(q4.investor, q3.investor) = q1.investor
+        """, [ticker, ticker, ticker]).fetchdf()
+
+        momentum = []
+        for row in df_to_records(mom_df):
+            f4q = ((row.get('q4s') or 0) - (row.get('q1s') or 0)) * price if price else 0
+            f2q = ((row.get('q4s') or 0) - (row.get('q3s') or 0)) * price if price else 0
+            m = f2q / f4q if f4q != 0 else None
+            sig = None
+            if m is not None:
+                sig = 'ACCEL' if m > 1.2 else ('BUILD' if m >= 0.8 else ('STEADY' if m >= 0.3 else ('FADING' if m >= 0 else 'REVERSING')))
+            momentum.append({'investor': row.get('investor'), 'type': row.get('type'),
+                            'flow_4q': f4q, 'flow_2q': f2q,
+                            'momentum': round(m, 4) if m is not None else None, 'signal': sig})
+        momentum.sort(key=lambda x: abs(x.get('flow_4q') or 0), reverse=True)
+
+        # Section 4 — Churn
+        q1h = con.execute("""
+            SELECT COALESCE(inst_parent_name, manager_name) as investor, MAX(manager_type) as type
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
+        """, [ticker]).fetchdf()
+        q4h = con.execute("""
+            SELECT COALESCE(inst_parent_name, manager_name) as investor, MAX(manager_type) as type
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
+        """, [ticker]).fetchdf()
+
+        q1a = {r['investor']: r['type'] for r in df_to_records(q1h)}
+        q4a = {r['investor']: r['type'] for r in df_to_records(q4h)}
+
+        def _churn(s1, s4, label):
+            c1, c4 = len(s1), len(s4)
+            ne, ex = s4 - s1, s1 - s4
+            avg = (c1 + c4) / 2 if (c1 + c4) > 0 else 1
+            return {'label': label, 'q1_holders': c1, 'q4_holders': c4,
+                    'new_entries': len(ne), 'exits': len(ex), 'churn_rate': round((len(ne) + len(ex)) / avg * 100, 2)}
+
+        overall = _churn(set(q1a), set(q4a), 'overall')
+        active_c = _churn({i for i in q1a if q1a[i] != 'passive'}, {i for i in q4a if q4a.get(i) != 'passive'}, 'active')
+        passive_c = _churn({i for i in q1a if q1a[i] == 'passive'}, {i for i in q4a if q4a.get(i) == 'passive'}, 'passive')
+        rate = overall['churn_rate']
+        stability = 'LOW' if rate < 10 else ('MODERATE' if rate < 20 else ('HIGH' if rate < 30 else 'ELEVATED'))
+
+        return clean_for_json({
+            'net_flows': net_flows_out, 'flow_intensity': flow_intensity,
+            'momentum': momentum[:25], 'churn': {'overall': overall, 'active': active_c, 'passive': passive_c, 'stability_signal': stability},
+        })
+    finally:
+        con.close()
+
+
 # Map query number to function
 QUERY_FUNCTIONS = {
     1: query1, 2: query2, 3: query3, 4: query4, 5: query5,
@@ -876,10 +1130,9 @@ QUERY_FUNCTIONS = {
 }
 
 QUERY_NAMES = {
-    1: 'Register', 2: '4Q Change', 3: 'Active Analysis', 4: 'Passive/Active Split',
-    5: 'Quarterly Trend', 6: 'Activist Tracker', 7: 'Fund Portfolio',
-    8: 'Cross-Ownership', 9: 'Sector Rotation', 10: 'New Positions',
-    11: 'Exits', 12: 'Concentration', 13: 'Energy Rotation',
+    1: 'Register', 2: 'Holder Changes', 3: 'Conviction',
+    6: 'Activist', 7: 'Fund Portfolio', 8: 'Cross-Ownership',
+    9: 'Sector Rotation', 10: 'New Positions', 11: 'Exits',
     14: 'AUM vs Position', 15: 'DB Statistics',
 }
 
@@ -1094,6 +1347,176 @@ def api_fund_portfolio_managers():
             LIMIT 50
         """, [ticker]).fetchdf()
         return jsonify(df_to_records(df))
+    finally:
+        con.close()
+
+
+@app.route('/api/ownership_trend_summary')
+def api_ownership_trend_summary():
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = ownership_trend_summary(ticker)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/cohort_analysis')
+def api_cohort_analysis():
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = cohort_analysis(ticker)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/flow_analysis')
+def api_flow_analysis():
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = flow_analysis(ticker)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=25):
+    """Shared logic for cross-ownership matrix.
+
+    If anchor is set: rows = top holders of that ticker, ordered by anchor holding.
+    If anchor is None: rows = top holders by total across all tickers.
+    """
+    # Company names
+    placeholders = ','.join(['?'] * len(tickers))
+    names_df = con.execute(f"""
+        SELECT ticker, MODE(issuer_name) as name
+        FROM holdings
+        WHERE ticker IN ({placeholders}) AND quarter = '2025Q4'
+        GROUP BY ticker
+    """, tickers).fetchdf()
+    companies = {r['ticker']: r['name'] for _, r in names_df.iterrows()}
+
+    type_filter = "AND h.manager_type NOT IN ('passive')" if active_only else ""
+    all_tickers_ph = ','.join(['?'] * len(tickers))
+
+    pivot_cols = ', '.join(
+        "SUM(CASE WHEN ph.ticker = '{}' THEN ph.holding_value END) AS \"{}\"".format(t, t)
+        for t in tickers
+    )
+    total_expr = ' + '.join('COALESCE("{}", 0)'.format(t) for t in tickers)
+
+    if anchor and anchor in tickers:
+        order_clause = 'COALESCE("{}", 0) DESC'.format(anchor)
+    else:
+        order_clause = '({}) DESC'.format(total_expr)
+
+    df = con.execute(f"""
+        WITH parent_holdings AS (
+            SELECT
+                COALESCE(h.inst_parent_name, h.manager_name) as investor,
+                MAX(h.manager_type) as type,
+                h.ticker,
+                SUM(h.market_value_live) as holding_value
+            FROM holdings h
+            WHERE h.ticker IN ({all_tickers_ph})
+              AND h.quarter = '2025Q4'
+              {type_filter}
+            GROUP BY investor, h.ticker
+        ),
+        portfolio_totals AS (
+            SELECT
+                COALESCE(h.inst_parent_name, h.manager_name) as investor,
+                SUM(h.market_value_live) as total_portfolio
+            FROM holdings h
+            WHERE h.quarter = '2025Q4'
+            GROUP BY investor
+        )
+        SELECT
+            ph.investor,
+            MAX(ph.type) as type,
+            pt.total_portfolio,
+            {pivot_cols}
+        FROM parent_holdings ph
+        LEFT JOIN portfolio_totals pt ON ph.investor = pt.investor
+        GROUP BY ph.investor, pt.total_portfolio
+        ORDER BY {order_clause}
+        LIMIT {int(limit)}
+    """, tickers).fetchdf()
+
+    investors = []
+    for _, row in df.iterrows():
+        holdings = {}
+        total_across = 0
+        for t in tickers:
+            val = row[t]
+            if pd.notna(val) and val != 0:
+                holdings[t] = float(val)
+                total_across += float(val)
+            else:
+                holdings[t] = None
+        total_port = float(row['total_portfolio']) if pd.notna(row['total_portfolio']) and row['total_portfolio'] > 0 else None
+        pct = round(total_across / total_port * 100, 4) if total_port else None
+        investors.append({
+            'investor': row['investor'],
+            'type': row['type'],
+            'holdings': holdings,
+            'total_across': total_across if total_across > 0 else None,
+            'pct_of_portfolio': pct,
+        })
+
+    return clean_for_json({
+        'tickers': tickers,
+        'companies': companies,
+        'investors': investors,
+    })
+
+
+@app.route('/api/cross_ownership')
+def api_cross_ownership():
+    """View 1: top holders of anchor company with cross-holdings in other tickers."""
+    tickers_raw = request.args.get('tickers', '').upper().strip()
+    anchor = request.args.get('anchor', '').upper().strip()
+    active_only = request.args.get('active_only', 'false').lower() == 'true'
+    limit = int(request.args.get('limit', 25))
+    if not tickers_raw:
+        return jsonify({'error': 'Missing tickers parameter'}), 400
+    tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
+    if not anchor:
+        anchor = tickers[0]
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        return jsonify(_cross_ownership_query(con, tickers, anchor=anchor,
+                                              active_only=active_only, limit=limit))
+    finally:
+        con.close()
+
+
+@app.route('/api/cross_ownership_top')
+def api_cross_ownership_top():
+    """View 2: top investors by total exposure across all selected tickers."""
+    tickers_raw = request.args.get('tickers', '').upper().strip()
+    active_only = request.args.get('active_only', 'false').lower() == 'true'
+    limit = int(request.args.get('limit', 25))
+    if not tickers_raw:
+        return jsonify({'error': 'Missing tickers parameter'}), 400
+    tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        return jsonify(_cross_ownership_query(con, tickers, anchor=None,
+                                              active_only=active_only, limit=limit))
     finally:
         con.close()
 

@@ -7,7 +7,8 @@
 // ---------------------------------------------------------------------------
 let tickerList = [];          // [{ticker, name}]
 let currentTicker = '';
-let currentQuery = 1;
+let currentTab = 'register';  // tab ID string
+let currentQuery = 1;         // legacy query number for old endpoints
 let currentData = [];         // raw JSON from last query
 let sortCol = null;
 let sortDir = 'asc';
@@ -27,6 +28,10 @@ const tableWrap     = document.getElementById('results-table-wrap');
 const errorMsg      = document.getElementById('error-msg');
 const copyBtn       = document.getElementById('copy-btn');
 const exportBtn     = document.getElementById('export-btn');
+const coPanel       = document.getElementById('cross-ownership-panel');
+const coAnalyzeBtn  = document.getElementById('co-analyze-btn');
+const coActiveToggle = document.getElementById('co-active-toggle');
+const coToggleLabel = document.getElementById('co-toggle-label');
 const managerSelector = document.getElementById('manager-selector');
 const managerDropdown = document.getElementById('manager-dropdown');
 const loadPortfolioBtn = document.getElementById('load-portfolio-btn');
@@ -207,33 +212,53 @@ async function loadTicker() {
     }
 
     // Load current tab
-    if (currentQuery === 7) {
-        managerSelector.classList.remove('hidden');
-        loadManagerDropdown();
-    } else {
-        managerSelector.classList.add('hidden');
-        loadQuery(currentQuery);
-    }
+    switchTab(currentTab);
 }
 
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
+// Tab ID → legacy query number mapping (for endpoints that use /api/queryN)
+const TAB_QUERY_MAP = {
+    'register': 1, 'conviction': 3, 'activist': 6,
+    'fund-portfolio': 7, 'cross-ownership': 8,
+    'sector-rotation': 9, 'aum': 14,
+};
+
+function switchTab(tabId) {
+    currentTab = tabId;
+    currentQuery = TAB_QUERY_MAP[tabId] || 0;
+    sortCol = null;
+    sortDir = 'asc';
+    // Hide all special panels
+    managerSelector.classList.add('hidden');
+    coPanel.classList.add('hidden');
+
+    // Route to the right loader
+    if (tabId === 'fund-portfolio') {
+        managerSelector.classList.remove('hidden');
+        loadManagerDropdown();
+    } else if (tabId === 'cross-ownership') {
+        coPanel.classList.remove('hidden');
+        initCrossOwnership();
+    } else if (tabId === 'ownership-trend') {
+        loadOwnershipTrend();
+    } else if (tabId === 'flow-analysis') {
+        loadFlowAnalysis();
+    } else if (tabId === 'new-exits') {
+        loadNewExits();
+    } else if (tabId === 'crowding' || tabId === 'smart-money' || tabId === 'peer-matrix') {
+        renderPlaceholder(tabId);
+    } else if (currentQuery > 0) {
+        loadQuery(currentQuery);
+    }
+}
+
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        currentQuery = parseInt(tab.dataset.query);
-        sortCol = null;
-        sortDir = 'asc';
-        // Show/hide manager selector for Q7
-        if (currentQuery === 7) {
-            managerSelector.classList.remove('hidden');
-            loadManagerDropdown();
-        } else {
-            managerSelector.classList.add('hidden');
-            loadQuery(currentQuery);
-        }
+        switchTab(tab.dataset.tab);
     });
 });
 
@@ -504,8 +529,10 @@ function renderTable(data, qnum) {
     const hasHierarchy = data.some(r => r.level === 1 || r.is_parent === true);
     // Detect sections (Query 2 entries/exits)
     const hasSections = data.some(r => r.section != null);
+    // Collapsible hierarchy for Q1 and Q2
+    const collapsible = hasHierarchy && (qnum === 1 || qnum === 2);
 
-    renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections);
+    renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, collapsible);
 }
 
 /**
@@ -515,7 +542,7 @@ function renderTable(data, qnum) {
  * with tooltip, hierarchy indent, change/delta red/green coloring, and
  * color-coding legend on tabs with a Type column.
  */
-function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
+function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, collapsible) {
     const showLegend = queryHasType(qnum);
     const nameKey = findNameKey(cols);
 
@@ -553,6 +580,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
     // --- Body ---
     const tbody = document.createElement('tbody');
     let lastSection = null;
+    let parentIdx = 0;  // unique ID for collapsible groups
 
     data.forEach(row => {
         // Section headers (Query 2 entries/exits)
@@ -574,6 +602,17 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
         }
 
         const tr = document.createElement('tr');
+
+        // Track parent ID for collapsible grouping
+        if (collapsible && row.is_parent) {
+            parentIdx++;
+            tr.dataset.parentId = 'p' + parentIdx;
+            tr.classList.add('collapsible-parent');
+        } else if (collapsible && row.level === 1) {
+            tr.dataset.childOf = 'p' + parentIdx;
+            tr.classList.add('child-row');  // hidden by default via CSS
+        }
+
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
 
@@ -595,7 +634,18 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
                 let displayVal;
                 if (hasHierarchy && col.key === nameKey) {
                     if (row.is_parent) {
-                        displayVal = row.institution || val || '';
+                        const name = row.institution || val || '';
+                        // Add toggle arrow for collapsible parents
+                        if (collapsible) {
+                            const arrow = document.createElement('span');
+                            arrow.className = 'toggle-arrow';
+                            arrow.textContent = '\u25B6';  // ▶
+                            td.appendChild(arrow);
+                            td.appendChild(document.createTextNode(' ' + name));
+                        } else {
+                            td.textContent = name;
+                        }
+                        displayVal = null; // already set via DOM
                     } else if (row.level === 1) {
                         td.classList.add('col-indent');
                         const prefix = (rtype && rtype !== 'passive' && rtype !== 'unknown') ? '* ' : '';
@@ -606,8 +656,12 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
                 } else {
                     displayVal = val != null ? String(val) : '';
                 }
-                td.textContent = displayVal;
-                td.title = displayVal.replace(/^\u21B3 \*? ?/, '');
+                if (displayVal !== null) {
+                    td.textContent = displayVal;
+                }
+                // Tooltip: clean name without arrow/prefix
+                const tooltipText = (row.institution || val || '').replace(/^\u21B3 \*? ?/, '');
+                td.title = tooltipText;
             }
             // --- Change/delta columns: red/green coloring ---
             else if (isChangeCol(col) && typeof val === 'number' && val !== 0) {
@@ -623,6 +677,20 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections) {
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+
+    // --- Collapsible click handlers ---
+    if (collapsible) {
+        tbody.addEventListener('click', (e) => {
+            const parentRow = e.target.closest('tr.collapsible-parent');
+            if (!parentRow) return;
+            const pid = parentRow.dataset.parentId;
+            const isExpanded = parentRow.classList.toggle('expanded');
+            // Toggle all child rows for this parent
+            tbody.querySelectorAll(`tr[data-child-of="${pid}"]`).forEach(child => {
+                child.classList.toggle('visible', isExpanded);
+            });
+        });
+    }
 
     // --- Assemble ---
     tableWrap.innerHTML = '';
@@ -654,6 +722,322 @@ function buildLegend() {
 function renderTableFromKeys(data, keys) {
     const cols = keys.map(k => ({key: k, label: k, type: 'text'}));
     renderHierarchicalTable(data, cols, 0, false, false);
+}
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Placeholder tabs
+// ---------------------------------------------------------------------------
+function renderPlaceholder(tabId) {
+    hideSpinner();
+    clearError();
+    const names = {'crowding': 'Crowding', 'smart-money': 'Smart Money', 'peer-matrix': 'Peer Matrix'};
+    tableWrap.innerHTML = `<div class="empty-state" style="padding:48px"><p>${names[tabId] || tabId} — Coming soon, building in next session.</p></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Ownership Trend tab (3 sub-views)
+// ---------------------------------------------------------------------------
+let _otSubView = 'summary';  // 'summary' | 'changes' | 'cohort'
+
+async function loadOwnershipTrend() {
+    clearError(); tableWrap.innerHTML = '';
+    // Render sub-view selector
+    const bar = document.createElement('div');
+    bar.className = 'sub-view-bar';
+    ['summary', 'changes', 'cohort'].forEach(v => {
+        const btn = document.createElement('button');
+        btn.className = 'co-view-btn' + (v === _otSubView ? ' active' : '');
+        btn.textContent = v === 'summary' ? 'Quarterly Summary' : (v === 'changes' ? 'Holder Changes' : 'Cohort Analysis');
+        btn.addEventListener('click', () => { _otSubView = v; loadOwnershipTrend(); });
+        bar.appendChild(btn);
+    });
+    tableWrap.appendChild(bar);
+
+    if (_otSubView === 'summary') {
+        await loadOTSummary();
+    } else if (_otSubView === 'changes') {
+        // Reuse existing query2 — fetch and render inline
+        showSpinner();
+        try {
+            const res = await fetch(`/api/query2?ticker=${currentTicker}`);
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+            currentData = await res.json();
+            currentQuery = 2;
+            hideSpinner();
+            // renderTable clears tableWrap — we need to preserve the bar
+            const savedBar = tableWrap.querySelector('.sub-view-bar');
+            renderTable(currentData, 2);
+            if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+        } catch (e) { hideSpinner(); showError(e.message); }
+    } else {
+        await loadOTCohort();
+    }
+}
+
+async function loadOTSummary() {
+    showSpinner();
+    try {
+        const res = await fetch(`/api/ownership_trend_summary?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        const data = await res.json();
+        hideSpinner();
+        const savedBar = tableWrap.querySelector('.sub-view-bar');
+        renderOTSummary(data);
+        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function renderOTSummary(data) {
+    const {quarters, summary} = data;
+    // Signal card
+    const card = document.createElement('div');
+    card.className = 'portfolio-stats';
+    if (summary && summary.trend) {
+        [
+            ['Trend', summary.trend],
+            ['Shares Added', fmtShares(summary.total_shares_added)],
+            ['Dollar Flow', fmtDollars(summary.total_dollar_flow)],
+            ['Net New Holders', summary.net_new_holders != null ? (summary.net_new_holders > 0 ? '+' : '') + summary.net_new_holders : '\u2014'],
+        ].forEach(([l, v]) => {
+            const s = document.createElement('span');
+            s.className = 'ps-item';
+            s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
+            card.appendChild(s);
+        });
+    }
+    // Keep sub-view bar that was already added
+    tableWrap.appendChild(card);
+
+    // Table
+    const cols = [
+        {key: 'quarter', label: 'Quarter', type: 'text'},
+        {key: 'total_inst_shares', label: 'Inst Shares', type: 'shares'},
+        {key: 'total_inst_value', label: 'Inst Value', type: 'dollar'},
+        {key: 'pct_float', label: '% Float', type: 'pct'},
+        {key: 'active_pct', label: 'Active %', type: 'pct'},
+        {key: 'passive_pct', label: 'Passive %', type: 'pct'},
+        {key: 'holder_count', label: 'Holders', type: 'num'},
+        {key: 'net_shares_change', label: 'QoQ Change', type: 'shares'},
+        {key: 'signal', label: 'Signal', type: 'text'},
+    ];
+    currentData = quarters;
+    renderHierarchicalTable(quarters, cols, 0, false, false, false);
+}
+
+async function loadOTCohort() {
+    showSpinner();
+    try {
+        const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        const data = await res.json();
+        hideSpinner();
+        const savedBar = tableWrap.querySelector('.sub-view-bar');
+        renderCohort(data);
+        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function renderCohort(data) {
+    const {summary, detail} = data;
+    // Summary cards
+    const cards = document.createElement('div');
+    cards.className = 'portfolio-stats';
+    [
+        ['Retention Rate', summary.retention_rate != null ? summary.retention_rate + '%' : '\u2014'],
+        ['New Entries', `${summary.new_entries_count} holders, +${fmtShares(summary.new_entries_shares)}`],
+        ['Exits', `${summary.exits_count} holders, -${fmtShares(summary.exits_shares)}`],
+        ['Net Adds', `${summary.net_adds_count} increased, +${fmtDollars(summary.net_adds_value)}`],
+        ['Net Trims', `${summary.net_trims_count} decreased, ${fmtDollars(summary.net_trims_value)}`],
+    ].forEach(([l, v]) => {
+        const s = document.createElement('span');
+        s.className = 'ps-item';
+        s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
+        cards.appendChild(s);
+    });
+    tableWrap.appendChild(cards);
+
+    // Detail table
+    const cols = [
+        {key: 'category', label: 'Category', type: 'text'},
+        {key: 'holders', label: 'Holders', type: 'num'},
+        {key: 'shares', label: 'Shares', type: 'shares'},
+        {key: 'value', label: 'Value', type: 'dollar'},
+        {key: 'avg_position', label: 'Avg Position', type: 'dollar'},
+    ];
+    currentData = detail;
+    renderHierarchicalTable(detail, cols, 0, false, false, false);
+}
+
+// ---------------------------------------------------------------------------
+// Flow Analysis tab
+// ---------------------------------------------------------------------------
+async function loadFlowAnalysis() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch(`/api/flow_analysis?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        const data = await res.json();
+        hideSpinner();
+        renderFlowAnalysis(data);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function _buildSimpleTable(rows, cols) {
+    /** Build a data-table element without clearing tableWrap. */
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.tableLayout = 'auto';
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    cols.forEach(c => {
+        const th = document.createElement('th');
+        th.textContent = c.label;
+        th.style.textAlign = (c.type === 'text') ? 'left' : 'right';
+        hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach(row => {
+        const tr = document.createElement('tr');
+        // Direction / type color coding
+        if (row.direction === 'BUY') tr.style.color = '#27AE60';
+        if (row.direction === 'SELL') tr.style.color = '#C0392B';
+        const rtype = (row.type || '').toLowerCase();
+        if (rtype && rtype !== 'unknown') tr.classList.add('type-' + rtype.replace(/[^a-z_]/g, ''));
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
+            const val = row[c.key];
+            td.textContent = formatCell(val, fmtType(c));
+            if (c.key === 'signal' && row.signal) {
+                const clr = {ACCEL: '#27AE60', BUILD: '#27AE60', STEADY: '#666', FADING: '#C0392B', REVERSING: '#C0392B'};
+                td.style.color = clr[row.signal] || '';
+                td.style.fontWeight = '600';
+            }
+            if (c.key === 'direction') {
+                td.style.fontWeight = '600';
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+}
+
+function renderFlowAnalysis(data) {
+    currentData = data.net_flows || [];
+
+    // Section 1 — Net Flows
+    const h1 = document.createElement('h3');
+    h1.style.cssText = 'padding:12px 14px 6px;color:var(--oxford-blue);font-size:14px';
+    h1.textContent = 'Price-Adjusted Net Flows';
+    tableWrap.appendChild(h1);
+
+    const cols1 = [
+        {key: 'investor', label: 'Institution', type: 'text'},
+        {key: 'type', label: 'Type', type: 'text'},
+        {key: 'net_shares', label: 'Net Shares', type: 'shares'},
+        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
+        {key: 'raw_flow', label: 'Raw Flow', type: 'dollar'},
+        {key: 'price_effect', label: 'Price Effect', type: 'dollar'},
+        {key: 'direction', label: 'Direction', type: 'text'},
+    ];
+    tableWrap.appendChild(buildLegend());
+    tableWrap.appendChild(_buildSimpleTable(data.net_flows || [], cols1));
+
+    // Section 2 — Flow Intensity
+    const fi = data.flow_intensity || {};
+    const h2 = document.createElement('h3');
+    h2.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
+    h2.textContent = 'Flow Intensity (% of Market Cap)';
+    tableWrap.appendChild(h2);
+    const fiCard = document.createElement('div');
+    fiCard.className = 'portfolio-stats';
+    [
+        ['Total', fi.total_flow_intensity != null ? fi.total_flow_intensity.toFixed(2) + '%' : '\u2014'],
+        ['Active', fi.active_flow_intensity != null ? fi.active_flow_intensity.toFixed(2) + '%' : '\u2014'],
+        ['Passive', fi.passive_flow_intensity != null ? fi.passive_flow_intensity.toFixed(2) + '%' : '\u2014'],
+    ].forEach(([l, v]) => {
+        const s = document.createElement('span');
+        s.className = 'ps-item';
+        s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
+        fiCard.appendChild(s);
+    });
+    tableWrap.appendChild(fiCard);
+
+    // Section 3 — Momentum
+    if (data.momentum && data.momentum.length) {
+        const h3 = document.createElement('h3');
+        h3.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
+        h3.textContent = 'Momentum (Recent vs Full Period)';
+        tableWrap.appendChild(h3);
+        const momCols = [
+            {key: 'investor', label: 'Institution', type: 'text'},
+            {key: 'type', label: 'Type', type: 'text'},
+            {key: 'flow_4q', label: '4Q Flow', type: 'dollar'},
+            {key: 'flow_2q', label: '2Q Flow', type: 'dollar'},
+            {key: 'momentum', label: 'Momentum', type: 'num'},
+            {key: 'signal', label: 'Signal', type: 'text'},
+        ];
+        tableWrap.appendChild(_buildSimpleTable(data.momentum, momCols));
+    }
+
+    // Section 4 — Churn
+    const ch = data.churn || {};
+    if (ch.overall) {
+        const h4 = document.createElement('h3');
+        h4.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
+        h4.textContent = 'Holder Churn';
+        tableWrap.appendChild(h4);
+        const chCard = document.createElement('div');
+        chCard.className = 'portfolio-stats';
+        [
+            ['Overall Churn', ch.overall.churn_rate + '%'],
+            ['Active Churn', ch.active ? ch.active.churn_rate + '%' : '\u2014'],
+            ['Passive Churn', ch.passive ? ch.passive.churn_rate + '%' : '\u2014'],
+            ['Stability', ch.stability_signal || '\u2014'],
+        ].forEach(([l, v]) => {
+            const s = document.createElement('span');
+            s.className = 'ps-item';
+            s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
+            chCard.appendChild(s);
+        });
+        tableWrap.appendChild(chCard);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// New/Exits tab (two sub-views reusing existing queries 10 and 11)
+// ---------------------------------------------------------------------------
+let _neSubView = 'new';
+
+async function loadNewExits() {
+    clearError(); tableWrap.innerHTML = '';
+    const bar = document.createElement('div');
+    bar.className = 'sub-view-bar';
+    ['new', 'exits'].forEach(v => {
+        const btn = document.createElement('button');
+        btn.className = 'co-view-btn' + (v === _neSubView ? ' active' : '');
+        btn.textContent = v === 'new' ? 'New Positions' : 'Exits';
+        btn.addEventListener('click', () => { _neSubView = v; loadNewExits(); });
+        bar.appendChild(btn);
+    });
+    tableWrap.appendChild(bar);
+    const qnum = _neSubView === 'new' ? 10 : 11;
+    currentQuery = qnum;
+    showSpinner();
+    try {
+        const res = await fetch(`/api/query${qnum}?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        currentData = await res.json();
+        hideSpinner();
+        const savedBar = tableWrap.querySelector('.sub-view-bar');
+        renderTable(currentData, qnum);
+        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+    } catch (e) { hideSpinner(); showError(e.message); }
 }
 
 // ---------------------------------------------------------------------------
@@ -861,6 +1245,333 @@ function renderStats(data) {
     html += '</div>';
     tableWrap.innerHTML = html;
 }
+
+// ---------------------------------------------------------------------------
+// Query 8 — Cross-Ownership Matrix (two views)
+// ---------------------------------------------------------------------------
+
+let _coView = 'anchor';  // 'anchor' or 'top'
+let _coAnchor = '';       // currently selected anchor ticker
+const coAnchorBar = document.getElementById('co-anchor-bar');
+const coAnchorSelect = document.getElementById('co-anchor-select');
+
+function initCrossOwnership() {
+    const input0 = document.getElementById('co-ticker-0');
+    if (input0) input0.value = currentTicker;
+    const input1 = coPanel.querySelector('.co-ticker-input[data-idx="1"]');
+    if (input1 && !input1.value && currentTicker === 'AR') input1.value = 'AM';
+    _coAnchor = currentTicker;
+    updateAnchorDropdown();
+    loadCO();
+}
+
+function getCOTickers() {
+    const tickers = [currentTicker];
+    coPanel.querySelectorAll('.co-ticker-input[data-idx]').forEach(inp => {
+        const val = inp.value.trim().toUpperCase();
+        if (val && !tickers.includes(val)) tickers.push(val);
+    });
+    return tickers;
+}
+
+function updateAnchorDropdown() {
+    const tickers = getCOTickers();
+    coAnchorSelect.innerHTML = tickers.map(t =>
+        `<option value="${t}"${t === _coAnchor ? ' selected' : ''}>${t}</option>`
+    ).join('');
+}
+
+async function loadCO() {
+    const tickers = getCOTickers();
+    if (!tickers.length) return;
+    showSpinner();
+    clearError();
+    tableWrap.innerHTML = '';
+    const activeOnly = coActiveToggle.checked;
+    let url;
+    if (_coView === 'anchor') {
+        const anchor = _coAnchor || tickers[0];
+        url = `/api/cross_ownership?tickers=${tickers.join(',')}&anchor=${anchor}&active_only=${activeOnly}&limit=25`;
+    } else {
+        url = `/api/cross_ownership_top?tickers=${tickers.join(',')}&active_only=${activeOnly}&limit=25`;
+    }
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        hideSpinner();
+        renderCOMatrix(data);
+    } catch (e) {
+        hideSpinner();
+        showError(e.message);
+    }
+}
+
+function renderCOMatrix(data) {
+    const {tickers, companies, investors} = data;
+    if (!investors || !investors.length) {
+        tableWrap.innerHTML = '<div class="error-msg">No cross-ownership data found.</div>';
+        return;
+    }
+
+    currentData = investors;
+
+    // Reorder tickers: anchor first for View 1, original order for View 2
+    let orderedTickers = [...tickers];
+    if (_coView === 'anchor' && _coAnchor && tickers.includes(_coAnchor)) {
+        orderedTickers = [_coAnchor, ...tickers.filter(t => t !== _coAnchor)];
+    }
+
+    const investorW = 220;
+    const typeW = 80;
+    const totalW = 130;
+    const pctW = 100;
+    const fixedW = investorW + typeW + totalW + pctW;
+    const tickerColW = Math.max(100, Math.min(130, Math.floor((1200 - fixedW) / orderedTickers.length)));
+    const showRank = _coView === 'top';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'matrix-wrap';
+    const table = document.createElement('table');
+    table.className = 'matrix-table';
+
+    // Colgroup
+    const cg = document.createElement('colgroup');
+    if (showRank) cg.innerHTML += '<col style="width:40px">';
+    cg.innerHTML += `<col style="width:${investorW}px"><col style="width:${typeW}px">`;
+    orderedTickers.forEach(() => { cg.innerHTML += `<col style="width:${tickerColW}px">`; });
+    cg.innerHTML += `<col style="width:${totalW}px"><col style="width:${pctW}px">`;
+    table.appendChild(cg);
+
+    // Header
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    if (showRank) {
+        const thR = document.createElement('th');
+        thR.textContent = '#';
+        thR.style.textAlign = 'right';
+        hr.appendChild(thR);
+    }
+    const thInv = document.createElement('th');
+    thInv.textContent = 'Investor';
+    thInv.style.textAlign = 'left';
+    thInv.classList.add('sticky-col');
+    thInv.style.left = showRank ? '40px' : '0px';
+    hr.appendChild(thInv);
+    const thType = document.createElement('th');
+    thType.textContent = 'Type';
+    thType.style.textAlign = 'center';
+    thType.classList.add('sticky-col');
+    thType.style.left = (showRank ? 40 : 0) + investorW + 'px';
+    hr.appendChild(thType);
+    orderedTickers.forEach((t, i) => {
+        const th = document.createElement('th');
+        th.textContent = t;
+        th.style.textAlign = 'right';
+        th.title = companies[t] || t;
+        if (i === 0 && _coView === 'anchor') th.style.fontWeight = '700';
+        hr.appendChild(th);
+    });
+    const thTotal = document.createElement('th');
+    thTotal.textContent = 'Total Across';
+    thTotal.style.textAlign = 'right';
+    hr.appendChild(thTotal);
+    const thPct = document.createElement('th');
+    thPct.textContent = '% Portfolio';
+    thPct.style.textAlign = 'right';
+    hr.appendChild(thPct);
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement('tbody');
+    const colTotals = {};
+    orderedTickers.forEach(t => { colTotals[t] = 0; });
+    let grandTotal = 0;
+
+    investors.forEach((inv, idx) => {
+        const tr = document.createElement('tr');
+        const rtype = (inv.type || '').toLowerCase();
+        if (rtype && rtype !== 'unknown') {
+            tr.classList.add('type-' + rtype.replace(/[^a-z_]/g, ''));
+        }
+
+        if (showRank) {
+            const tdR = document.createElement('td');
+            tdR.style.textAlign = 'right';
+            tdR.textContent = idx + 1;
+            tr.appendChild(tdR);
+        }
+
+        const tdInv = document.createElement('td');
+        tdInv.classList.add('sticky-col', 'col-text-overflow');
+        tdInv.style.left = showRank ? '40px' : '0px';
+        tdInv.textContent = inv.investor || '';
+        tdInv.title = inv.investor || '';
+        tr.appendChild(tdInv);
+
+        const tdType = document.createElement('td');
+        tdType.classList.add('sticky-col');
+        tdType.style.left = (showRank ? 40 : 0) + investorW + 'px';
+        tdType.style.textAlign = 'center';
+        tdType.textContent = inv.type || '';
+        tr.appendChild(tdType);
+
+        orderedTickers.forEach(t => {
+            const td = document.createElement('td');
+            td.style.textAlign = 'right';
+            const val = inv.holdings[t];
+            if (val != null) {
+                td.textContent = fmtDollars(val);
+                td.classList.add('cell-held');
+                colTotals[t] += val;
+            } else {
+                td.textContent = '\u2014';
+                td.classList.add('cell-empty');
+            }
+            tr.appendChild(td);
+        });
+
+        const tdTotal = document.createElement('td');
+        tdTotal.style.textAlign = 'right';
+        tdTotal.classList.add('col-total');
+        tdTotal.textContent = fmtDollars(inv.total_across);
+        grandTotal += (inv.total_across || 0);
+        tr.appendChild(tdTotal);
+
+        const tdPct = document.createElement('td');
+        tdPct.style.textAlign = 'right';
+        tdPct.textContent = inv.pct_of_portfolio != null ? inv.pct_of_portfolio.toFixed(2) + '%' : '\u2014';
+        tr.appendChild(tdPct);
+
+        tbody.appendChild(tr);
+    });
+
+    // Totals row
+    const totalsRow = document.createElement('tr');
+    totalsRow.className = 'totals-row';
+    if (showRank) totalsRow.appendChild(document.createElement('td'));
+    const tdTotLabel = document.createElement('td');
+    tdTotLabel.classList.add('sticky-col');
+    tdTotLabel.style.left = showRank ? '40px' : '0px';
+    tdTotLabel.textContent = 'Total (Top 25)';
+    totalsRow.appendChild(tdTotLabel);
+    const tdTotType = document.createElement('td');
+    tdTotType.classList.add('sticky-col');
+    tdTotType.style.left = (showRank ? 40 : 0) + investorW + 'px';
+    totalsRow.appendChild(tdTotType);
+    orderedTickers.forEach(t => {
+        const td = document.createElement('td');
+        td.style.textAlign = 'right';
+        td.textContent = fmtDollars(colTotals[t]);
+        totalsRow.appendChild(td);
+    });
+    const tdGrand = document.createElement('td');
+    tdGrand.style.textAlign = 'right';
+    tdGrand.textContent = fmtDollars(grandTotal);
+    totalsRow.appendChild(tdGrand);
+    totalsRow.appendChild(document.createElement('td'));
+    tbody.appendChild(totalsRow);
+
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+
+    tableWrap.innerHTML = '';
+    tableWrap.appendChild(buildLegend());
+    tableWrap.appendChild(wrap);
+}
+
+// --- Event listeners ---
+
+coAnalyzeBtn.addEventListener('click', () => {
+    updateAnchorDropdown();
+    loadCO();
+});
+
+// Active/All toggle
+coActiveToggle.addEventListener('change', () => {
+    coToggleLabel.textContent = coActiveToggle.checked ? 'Active Only' : 'All Institutions';
+    loadCO();
+});
+
+// View toggle buttons
+coPanel.querySelectorAll('.co-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        coPanel.querySelectorAll('.co-view-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _coView = btn.dataset.view;
+        coAnchorBar.classList.toggle('hidden', _coView !== 'anchor');
+        loadCO();
+    });
+});
+
+// Anchor company dropdown
+coAnchorSelect.addEventListener('change', () => {
+    _coAnchor = coAnchorSelect.value;
+    loadCO();
+});
+
+// Cross-ownership autocomplete on each ticker input
+coPanel.querySelectorAll('.co-ticker-input[data-idx]').forEach(input => {
+    const item = input.closest('.co-ticker-item');
+    let dropdown = item.querySelector('.co-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.className = 'co-dropdown';
+        item.style.position = 'relative';
+        item.appendChild(dropdown);
+    }
+    let selIdx = -1;
+
+    input.addEventListener('input', () => {
+        const val = input.value.trim();
+        selIdx = -1;
+        if (val.length < 2) { dropdown.classList.remove('visible'); dropdown.innerHTML = ''; return; }
+        const matches = filterTickers(val);
+        if (!matches.length) { dropdown.classList.remove('visible'); return; }
+        dropdown.innerHTML = matches.map((t, i) =>
+            `<div class="autocomplete-item" data-ticker="${t.ticker}">
+                <span class="ticker">${t.ticker}</span>
+                <span class="name">${t.name || ''}</span>
+            </div>`
+        ).join('');
+        dropdown.classList.add('visible');
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        if (!items.length && e.key === 'Enter') { e.preventDefault(); updateAnchorDropdown(); loadCO(); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); selIdx = Math.min(selIdx + 1, items.length - 1); items.forEach((el,i) => el.classList.toggle('selected', i === selIdx)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); selIdx = Math.max(selIdx - 1, 0); items.forEach((el,i) => el.classList.toggle('selected', i === selIdx)); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selIdx >= 0 && selIdx < items.length) input.value = items[selIdx].dataset.ticker;
+            dropdown.classList.remove('visible');
+            updateAnchorDropdown();
+            loadCO();
+        }
+        else if (e.key === 'Escape') { dropdown.classList.remove('visible'); }
+    });
+
+    dropdown.addEventListener('click', (e) => {
+        const acItem = e.target.closest('.autocomplete-item');
+        if (acItem) { input.value = acItem.dataset.ticker; dropdown.classList.remove('visible'); updateAnchorDropdown(); loadCO(); }
+    });
+
+    input.addEventListener('blur', () => { setTimeout(() => dropdown.classList.remove('visible'), 150); });
+});
+
+// Clear buttons
+coPanel.querySelectorAll('.co-clear').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const idx = btn.dataset.idx;
+        const input = coPanel.querySelector(`.co-ticker-input[data-idx="${idx}"]`);
+        if (input) { input.value = ''; updateAnchorDropdown(); loadCO(); }
+    });
+});
 
 // ---------------------------------------------------------------------------
 // Sorting

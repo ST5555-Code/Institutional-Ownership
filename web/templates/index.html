@@ -62,27 +62,60 @@
     <!-- Tab Bar -->
     <div id="tab-container" class="tab-container hidden">
         <div class="tab-bar">
-            <button class="tab active" data-query="1">Register</button>
-            <button class="tab" data-query="2">4Q Change</button>
-            <button class="tab" data-query="3">Active Analysis</button>
-            <button class="tab" data-query="4">Passive/Active</button>
-            <button class="tab" data-query="5">Trend</button>
-            <button class="tab" data-query="6">Activist</button>
-            <button class="tab" data-query="7">Fund Portfolio</button>
-            <button class="tab" data-query="8">Cross-Ownership</button>
-            <button class="tab" data-query="9">Sector Rotation</button>
-            <button class="tab" data-query="10">New Positions</button>
-            <button class="tab" data-query="11">Exits</button>
-            <button class="tab" data-query="12">Concentration</button>
-            <button class="tab" data-query="13">Energy Rotation</button>
-            <button class="tab" data-query="14">AUM vs Position</button>
-            <button class="tab" data-query="15">DB Statistics</button>
+            <button class="tab active" data-tab="register">Register</button>
+            <button class="tab" data-tab="ownership-trend">Ownership Trend</button>
+            <button class="tab" data-tab="flow-analysis">Flow Analysis</button>
+            <button class="tab" data-tab="conviction">Conviction</button>
+            <button class="tab" data-tab="crowding">Crowding</button>
+            <button class="tab" data-tab="smart-money">Smart Money</button>
+            <button class="tab" data-tab="activist">Activist</button>
+            <button class="tab" data-tab="fund-portfolio">Fund Portfolio</button>
+            <button class="tab" data-tab="cross-ownership">Cross-Ownership</button>
+            <button class="tab" data-tab="peer-matrix">Peer Matrix</button>
+            <button class="tab" data-tab="sector-rotation">Sector Rotation</button>
+            <button class="tab" data-tab="new-exits">New/Exits</button>
+            <button class="tab" data-tab="aum">AUM</button>
         </div>
 
         <!-- Action buttons -->
         <div class="action-bar">
             <button id="copy-btn" class="btn btn-secondary">Copy</button>
             <button id="export-btn" class="btn btn-secondary">Export Excel</button>
+        </div>
+
+        <!-- Cross-Ownership controls (Query 8 only) -->
+        <div id="cross-ownership-panel" class="cross-ownership-panel hidden">
+            <div class="co-header">
+                <span class="co-label">Companies (up to 10):</span>
+                <div class="co-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="co-active-toggle">
+                        <span class="toggle-label" id="co-toggle-label">All Institutions</span>
+                    </label>
+                </div>
+            </div>
+            <div class="co-ticker-grid">
+                <div class="co-ticker-item co-primary">
+                    <input type="text" id="co-ticker-0" class="co-ticker-input" readonly>
+                </div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="1" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="1">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="2" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="2">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="3" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="3">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="4" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="4">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="5" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="5">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="6" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="6">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="7" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="7">&times;</button></div></div>
+                <div class="co-ticker-item"><div class="co-input-wrap"><input type="text" class="co-ticker-input" data-idx="8" placeholder="Ticker..." autocomplete="off"><button class="co-clear" data-idx="8">&times;</button></div></div>
+            </div>
+            <button id="co-analyze-btn" class="btn btn-primary">Analyze</button>
+            <div class="co-views">
+                <button class="co-view-btn active" data-view="anchor">Top Holders by Company</button>
+                <button class="co-view-btn" data-view="top">Top Investors Across Group</button>
+            </div>
+            <div id="co-anchor-bar" class="co-anchor-bar">
+                <span>Viewing top 25 holders of:</span>
+                <select id="co-anchor-select"></select>
+            </div>
         </div>
 
         <!-- Manager selector (Query 7 only) -->

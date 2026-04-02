@@ -307,6 +307,260 @@ body {
     border-bottom: 2px solid var(--sandstone);
 }
 
+/* === Cross-Ownership Panel === */
+.cross-ownership-panel {
+    padding: 12px 0;
+}
+
+.co-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.co-label {
+    font-weight: 600;
+    color: var(--oxford-blue);
+    font-size: 13px;
+}
+
+.co-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.toggle-switch input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.co-ticker-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.co-ticker-item {
+    position: relative;
+}
+
+.co-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.co-ticker-input {
+    width: 110px;
+    padding: 5px 8px;
+    border: 1px solid var(--mid-grey);
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    background: var(--white);
+}
+
+.co-ticker-input:focus {
+    border-color: var(--glacier-blue);
+    outline: none;
+}
+
+.co-primary .co-ticker-input {
+    background: var(--light-grey);
+    font-weight: 700;
+    color: var(--oxford-blue);
+    width: 110px;
+}
+
+.co-clear {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.co-clear:hover {
+    color: #C0392B;
+}
+
+/* View toggle buttons */
+.co-views {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.co-view-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--mid-grey);
+    background: var(--white);
+    color: var(--text-secondary);
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.co-view-btn.active {
+    background: var(--oxford-blue);
+    color: var(--white);
+    border-color: var(--oxford-blue);
+}
+
+.co-view-btn:hover:not(.active) {
+    background: var(--light-grey);
+}
+
+/* Anchor company selector */
+.co-anchor-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.co-anchor-bar select {
+    padding: 4px 8px;
+    border: 1px solid var(--mid-grey);
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--oxford-blue);
+}
+
+/* Cross-ownership autocomplete dropdown */
+.co-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 250px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--white);
+    border: 1px solid var(--mid-grey);
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 200;
+    display: none;
+    font-size: 12px;
+}
+
+.co-dropdown.visible { display: block; }
+
+.co-dropdown .autocomplete-item {
+    padding: 5px 8px;
+}
+
+/* Matrix table — sticky first 2 columns */
+.matrix-wrap {
+    overflow-x: auto;
+    position: relative;
+}
+
+.matrix-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+}
+
+.matrix-table th,
+.matrix-table td {
+    padding: 5px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid var(--light-grey);
+}
+
+.matrix-table th {
+    background: var(--oxford-blue);
+    color: var(--white);
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.matrix-table th.sticky-col {
+    position: sticky;
+    z-index: 20;
+}
+
+.matrix-table td.sticky-col {
+    position: sticky;
+    background: var(--white);
+    z-index: 5;
+}
+
+.matrix-table tr:nth-child(even) td {
+    background: var(--light-grey);
+}
+
+.matrix-table tr:nth-child(even) td.sticky-col {
+    background: var(--light-grey);
+}
+
+.matrix-table tr:hover td {
+    background: #E8EDF2;
+}
+
+.matrix-table td.cell-held {
+    /* has a holding */
+}
+
+.matrix-table td.cell-empty {
+    color: #CCC;
+}
+
+.matrix-table td.col-total {
+    font-weight: 700;
+}
+
+.matrix-table tr.totals-row td {
+    font-weight: 700;
+    border-top: 2px solid var(--oxford-blue);
+    background: var(--light-grey);
+}
+
+/* Type tints for matrix rows */
+.matrix-table tr.type-passive td:not(.sticky-col) { background-color: var(--tint-passive); }
+.matrix-table tr.type-active td:not(.sticky-col) { background-color: var(--tint-active); }
+.matrix-table tr.type-quantitative td:not(.sticky-col) { background-color: var(--tint-quantitative); }
+.matrix-table tr.type-activist td:not(.sticky-col) { background-color: var(--tint-activist); }
+.matrix-table tr.type-mixed td:not(.sticky-col) { background-color: var(--tint-mixed); }
+
+/* === Sub-view bar (used by Ownership Trend, New/Exits) === */
+.sub-view-bar {
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--mid-grey);
+    background: var(--white);
+}
+
 /* === Color Legend === */
 .color-legend {
     display: flex;
@@ -427,6 +681,54 @@ body {
 
 .data-table tr.parent-row td {
     font-weight: 700;
+}
+
+/* === Collapsible hierarchy === */
+.data-table tr.collapsible-parent {
+    cursor: pointer;
+}
+
+.data-table tr.collapsible-parent:hover td {
+    background-color: #DCE4ED;
+}
+
+.data-table tr.collapsible-parent.expanded td {
+    background-color: #E8EDF2;
+}
+
+/* Toggle arrow in the name cell */
+.toggle-arrow {
+    display: inline-block;
+    width: 14px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+    transform: rotate(0deg);
+}
+
+.collapsible-parent.expanded .toggle-arrow {
+    transform: rotate(90deg);
+}
+
+/* Child rows: hidden by default, animate in */
+.data-table tr.child-row {
+    display: none;
+}
+
+.data-table tr.child-row.visible {
+    display: table-row;
+    animation: slideIn 0.15s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Manager type row tints */
