@@ -353,9 +353,52 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
              'type': r.get('type'), 'source': '13F'} for r in rows]
 
 
+def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
+    """Get N-PORT fund series via N-CEN adviser mapping (direct join, no fuzzy).
+
+    Uses ncen_adviser_map to find all series managed/subadvised by an adviser
+    whose name fuzzy-matches the 13F parent institution.
+    Returns list of child row dicts or None.
+    """
+    tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+    if 'ncen_adviser_map' not in tables:
+        return None
+
+    try:
+        # Find adviser name in ncen_adviser_map matching this parent
+        safe_name = inst_parent_name.replace("'", "''")
+        df = con.execute(f"""
+            SELECT DISTINCT
+                fh.fund_name,
+                SUM(fh.market_value_usd) as value,
+                SUM(fh.shares_or_principal) as shares,
+                AVG(fh.pct_of_nav) as pct_of_nav,
+                fh.series_id,
+                MAX(nam.role) as role
+            FROM ncen_adviser_map nam
+            JOIN fund_holdings fh ON nam.series_id = fh.series_id
+            WHERE nam.adviser_name ILIKE '%{safe_name}%'
+              AND fh.ticker = ?
+              AND fh.quarter = ?
+            GROUP BY fh.fund_name, fh.series_id
+            ORDER BY value DESC NULLS LAST
+            LIMIT ?
+        """, [ticker, quarter, limit]).fetchdf()
+
+        rows = df_to_records(df)
+        if not rows:
+            return None
+
+        return [{'institution': r.get('fund_name'), 'value_live': r.get('value'),
+                 'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
+                 'source': f"N-PORT ({r.get('role', 'adviser')})"} for r in rows]
+    except Exception:
+        return None
+
+
 def get_children(inst_parent_name, ticker, cusip, quarter, con,
                   limit=5, parent_shares=None):
-    """Get child rows: N-PORT fund series first, 13F entity fallback.
+    """Get child rows: N-CEN → N-PORT fuzzy → 13F entity fallback.
 
     Only uses N-PORT children if they cover at least 10% of the parent's
     13F-reported shares. This prevents showing tiny niche funds when the
@@ -363,6 +406,12 @@ def get_children(inst_parent_name, ticker, cusip, quarter, con,
 
     Returns (children_list, source_type) where source_type is 'N-PORT' or '13F'.
     """
+    # Try N-CEN direct join first (most accurate for subadvisers)
+    ncen_result = get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit)
+    if ncen_result and len(ncen_result) >= 1:
+        return ncen_result, 'N-PORT'
+
+    # Fallback to fuzzy family matching
     nport = get_nport_children(inst_parent_name, ticker, quarter, con, limit)
     if nport and len(nport) >= 1:
         # Coverage check: do N-PORT children represent a meaningful fraction?
