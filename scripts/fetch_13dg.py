@@ -427,7 +427,8 @@ def post_process(con, new_count, check_tickers=None):
 # run() — full build, ticker by ticker
 # ---------------------------------------------------------------------------
 
-def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
+def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
+    """Phase 1: List filings per ticker, persist to listed_filings_13dg."""
     con = duckdb.connect(get_db_path())
     create_tables(con)
     error_log = init_error_log()
@@ -442,7 +443,6 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
         target = get_target_tickers(con)
     print(f"Target tickers: {len(target)}")
 
-    # Checkpoint: skip already-fetched tickers
     try:
         fetched = {r[0] for r in con.execute("SELECT ticker FROM fetched_tickers_13dg").fetchall()}
     except Exception:
@@ -452,12 +452,9 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
         print(f"  Skipping {len(target) - len(to_process)} already-fetched (checkpoint)")
     print(f"  Processing: {len(to_process)}, Workers: {max_workers}")
 
-    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
-
-    # --- Phase 1: List filings per ticker, persist to listed_filings_13dg ---
     print(f"\n--- Phase 1: Listing filings ({max_workers} workers) ---")
     phase1_new = 0
-    filing_cache = {}  # accession → Filing object (for fast Phase 2)
+    filing_cache = {}
     done = [0]
     checkpoint_buf = []
     listing_buf = []
@@ -508,9 +505,22 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
                         [(t, now) for t in checkpoint_buf])
     _flush_listings()
     con.execute("CHECKPOINT")
-    print(f"  Phase 1 listed {phase1_new} new filings")
 
-    # --- Phase 2: Parse all unparsed filings from listed_filings_13dg ---
+    listed = con.execute("SELECT COUNT(*) FROM listed_filings_13dg").fetchone()[0]
+    print(f"  Phase 1 complete: {phase1_new} new, {listed} total listed")
+    con.close()
+    return filing_cache
+
+
+def run_phase2(max_workers=MAX_WORKERS, filing_cache=None, test_mode=False):
+    """Phase 2: Parse all unparsed filings from listed_filings_13dg."""
+    con = duckdb.connect(get_db_path())
+    create_tables(con)
+    error_log = init_error_log()
+    filing_cache = filing_cache or {}
+
+    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
+
     unparsed = con.execute("""
         SELECT l.accession_number, l.ticker, l.form, l.filing_date, l.filer_cik,
                l.subject_name, l.subject_cik
@@ -520,12 +530,9 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
 
     if not unparsed:
         print("  No unparsed filings — all up to date.")
-        post_process(con, phase1_new > 0, TEST_TICKERS if test_mode else tickers)
         con.close()
-        print("\nDone.")
         return
 
-    # Split: use cached Filing objects when available (fast), edgar.find for rest
     cached = [(acc, tk) for acc, tk, *_ in unparsed if acc in filing_cache]
     uncached = [(acc, tk, fm, fd, fc, sn, sc) for acc, tk, fm, fd, fc, sn, sc in unparsed if acc not in filing_cache]
     if cached:
@@ -535,7 +542,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
 
     print(f"\n--- Phase 2: Parsing {len(unparsed)} filings ({max_workers} workers) ---")
     all_records = []
-    done[0] = 0
+    done = [0]
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {}
@@ -562,8 +569,25 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
         batch_insert(con, all_records)
     con.execute("CHECKPOINT")
 
+    total = con.execute("SELECT COUNT(*) FROM beneficial_ownership").fetchone()[0]
+    print(f"  Phase 2 complete: {total} total filings in DB")
+    con.close()
+
+
+def run_phase3(test_mode=False, tickers=None):
+    """Phase 3: Post-processing — rebuild current view, fuzzy match, update flags."""
+    con = duckdb.connect(get_db_path())
+    create_tables(con)
     post_process(con, True, TEST_TICKERS if test_mode else tickers)
     con.close()
+    print("\nPhase 3 complete.")
+
+
+def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
+    """Full pipeline: Phase 1 → Phase 2 → Phase 3."""
+    filing_cache = run_phase1(tickers=tickers, test_mode=test_mode, max_workers=max_workers)
+    run_phase2(max_workers=max_workers, filing_cache=filing_cache, test_mode=test_mode)
+    run_phase3(test_mode=test_mode, tickers=tickers)
     print("\nDone.")
 
 # ---------------------------------------------------------------------------
@@ -700,17 +724,28 @@ if __name__ == "__main__":
     parser.add_argument("--update", action="store_true", help="Incremental since last filing date")
     parser.add_argument("--workers", type=int, default=MAX_WORKERS,
                         help=f"Parallel threads (default {MAX_WORKERS})")
+    parser.add_argument("--phase1-only", action="store_true", help="Run Phase 1 only (list filings)")
+    parser.add_argument("--phase2-only", action="store_true", help="Run Phase 2 only (parse filings)")
+    parser.add_argument("--phase3-only", action="store_true", help="Run Phase 3 only (post-process)")
     args = parser.parse_args()
 
     if args.test:
         set_test_mode(True)
-        _seed_test_db()
+        # Only seed test DB on Phase 1 or full run (not Phase 2/3 which read prior state)
+        if not args.phase2_only and not args.phase3_only:
+            _seed_test_db()
 
     def _main():
+        t = args.tickers.split(",") if args.tickers else None
         if args.update:
             run_update()
+        elif args.phase1_only:
+            run_phase1(tickers=t, test_mode=args.test, max_workers=args.workers)
+        elif args.phase2_only:
+            run_phase2(max_workers=args.workers, test_mode=args.test)
+        elif args.phase3_only:
+            run_phase3(test_mode=args.test, tickers=t)
         else:
-            t = args.tickers.split(",") if args.tickers else None
             run(tickers=t, test_mode=args.test, max_workers=args.workers)
 
     crash_handler("fetch_13dg")(_main)
