@@ -1622,6 +1622,44 @@ function initCrossOwnership() {
     if (input1 && !input1.value && currentTicker === 'AR') input1.value = 'AM';
     _coAnchor = currentTicker;
     updateAnchorDropdown();
+    loadPeerGroups();
+    loadCO();
+}
+
+async function loadPeerGroups() {
+    const select = document.getElementById('co-peer-select');
+    if (!select || select.options.length > 1) return;  // already loaded
+    try {
+        const res = await fetch('/api/peer_groups');
+        if (!res.ok) return;
+        const groups = await res.json();
+        groups.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.group_id;
+            opt.textContent = `${g.group_name} (${g.tickers.length})`;
+            opt.dataset.tickers = JSON.stringify(g.tickers.map(t => t.ticker));
+            select.appendChild(opt);
+        });
+        select.addEventListener('change', () => {
+            if (!select.value) return;
+            const opt = select.options[select.selectedIndex];
+            const tickers = JSON.parse(opt.dataset.tickers || '[]');
+            applyPeerGroup(tickers);
+        });
+    } catch (e) { /* ignore */ }
+}
+
+function applyPeerGroup(tickers) {
+    // Set first ticker as primary if current ticker is in the group
+    const inputs = coPanel.querySelectorAll('.co-ticker-input[data-idx]');
+    // Clear all
+    inputs.forEach(inp => { inp.value = ''; });
+    // Fill with peer group tickers (skip current ticker — it's already in slot 0)
+    const others = tickers.filter(t => t !== currentTicker);
+    others.forEach((t, i) => {
+        if (i < inputs.length) inputs[i].value = t;
+    });
+    updateAnchorDropdown();
     loadCO();
 }
 

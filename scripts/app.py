@@ -2001,6 +2001,55 @@ def api_cross_ownership_top():
         con.close()
 
 
+@app.route('/api/peer_groups')
+def api_peer_groups():
+    """Return all peer groups."""
+    con = get_db()
+    try:
+        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+        if 'peer_groups' not in tables:
+            return jsonify([])
+        df = con.execute("""
+            SELECT group_id, group_name, ticker, company_name, is_primary
+            FROM peer_groups
+            ORDER BY group_name, is_primary DESC, ticker
+        """).fetchdf()
+        # Group by group_id
+        groups = {}
+        for _, row in df.iterrows():
+            gid = row['group_id']
+            if gid not in groups:
+                groups[gid] = {
+                    'group_id': gid,
+                    'group_name': row['group_name'],
+                    'tickers': [],
+                }
+            groups[gid]['tickers'].append({
+                'ticker': row['ticker'],
+                'company_name': row['company_name'],
+                'is_primary': bool(row['is_primary']),
+            })
+        return jsonify(list(groups.values()))
+    finally:
+        con.close()
+
+
+@app.route('/api/peer_groups/<group_id>')
+def api_peer_group_detail(group_id):
+    """Return tickers in a specific peer group."""
+    con = get_db()
+    try:
+        df = con.execute("""
+            SELECT ticker, company_name, is_primary
+            FROM peer_groups
+            WHERE group_id = ?
+            ORDER BY is_primary DESC, ticker
+        """, [group_id]).fetchdf()
+        return jsonify(df_to_records(df))
+    finally:
+        con.close()
+
+
 @app.route('/api/summary')
 def api_summary():
     ticker = request.args.get('ticker', '').upper().strip()
