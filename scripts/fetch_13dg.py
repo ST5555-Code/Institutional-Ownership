@@ -135,6 +135,10 @@ def _extract_fields(text, filing_type):
 def create_tables(con):
     con.execute("""CREATE TABLE IF NOT EXISTS fetched_tickers_13dg (
         ticker VARCHAR PRIMARY KEY, fetched_at TIMESTAMP)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS listed_filings_13dg (
+        accession_number VARCHAR PRIMARY KEY, ticker VARCHAR, form VARCHAR,
+        filing_date VARCHAR, filer_cik VARCHAR, subject_name VARCHAR,
+        subject_cik VARCHAR, listed_at TIMESTAMP)""")
     con.execute("""CREATE TABLE IF NOT EXISTS beneficial_ownership (
         accession_number VARCHAR PRIMARY KEY, filer_cik VARCHAR, filer_name VARCHAR,
         subject_cusip VARCHAR, subject_ticker VARCHAR, subject_name VARCHAR,
@@ -245,8 +249,9 @@ def log_error(path, ticker, acc, error):
 # ---------------------------------------------------------------------------
 
 def list_ticker_filings(ticker, existing, error_log):
-    """List new 13D/G filing metadata for a ticker. No document downloads.
-    Returns list of (accession_no, form, filing_date, filer_cik) tuples."""
+    """List new 13D/G filings for a ticker. Returns Filing objects for Phase 2.
+    Returns list of (Filing, ticker) tuples — Filing objects carry cached data
+    so Phase 2 can call f.text() without an extra HTTP round-trip."""
     time.sleep(SEC_DELAY)
     try:
         company = _retry_edgar(lambda: edgar.Company(ticker), f"Company({ticker})")
@@ -268,25 +273,18 @@ def list_ticker_filings(ticker, existing, error_log):
                 break
             if f.accession_no in existing:
                 continue
-            filer_cik = f.accession_no.split("-")[0]
-            results.append((f.accession_no, f.form, str(f.filing_date), filer_cik))
+            results.append(f)
     return results
 
 
-def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error_log):
-    """Download and parse a single filing by accession number. Returns record dict or None."""
-    time.sleep(SEC_DELAY)
-    try:
-        f = _retry_edgar(lambda: edgar.find(acc), f"find({acc})")
-    except Exception as e:
-        log_error(error_log, ticker, acc, e)
-        return None
-    if not f:
-        log_error(error_log, ticker, acc, "edgar.find returned None")
-        return None
+def parse_one_filing(filing, ticker, cusip_map, error_log):
+    """Parse a Filing object (from Phase 1). No edgar.find() — uses the object directly."""
+    acc = filing.accession_no
+    form = filing.form
+    filer_cik = acc.split("-")[0]
 
     try:
-        raw_text = _retry_edgar(lambda: f.text(), f"text({acc})")
+        raw_text = _retry_edgar(lambda: filing.text(), f"text({acc})")
     except Exception as e:
         log_error(error_log, ticker, acc, e)
         return None
@@ -297,10 +295,10 @@ def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error
     text = _clean_text(raw_text)
     fields = _extract_fields(text, form)
 
-    # Filer name from header
+    # Filer name from header (cached on the Filing object — no extra HTTP)
     filer_name = "UNKNOWN"
     try:
-        h = f.header
+        h = filing.header
         if h.filers:
             filer_name = h.filers[0].company_information.name or "UNKNOWN"
     except Exception as e:
@@ -308,12 +306,7 @@ def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error
     if filer_name in FILING_AGENTS and fields.get("reporting_person"):
         filer_name = fields["reporting_person"]
 
-    subject_name = ""
-    try:
-        if f.header.subject_companies:
-            subject_name = f.header.subject_companies[0].company_information.name or ""
-    except Exception:
-        pass
+    subject_name = str(filing.company) if hasattr(filing, "company") else ""
 
     return {
         "accession_number": acc,
@@ -323,7 +316,7 @@ def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error
         "subject_ticker": ticker,
         "subject_name": subject_name,
         "filing_type": form,
-        "filing_date": filing_date,
+        "filing_date": str(filing.filing_date),
         "report_date": fields.get("report_date"),
         "pct_owned": fields.get("pct_owned"),
         "shares_owned": fields.get("shares_owned"),
@@ -335,6 +328,20 @@ def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error
         "group_members": None,
         "manager_cik": None,
     }
+
+def parse_one_filing_by_acc(acc, ticker, form, filing_date, filer_cik,
+                            subject_name, subject_cik, cusip_map, error_log):
+    """Parse a filing by accession number (resume path — uses edgar.find)."""
+    try:
+        f = _retry_edgar(lambda: edgar.find(acc), f"find({acc})")
+    except Exception as e:
+        log_error(error_log, ticker, acc, e)
+        return None
+    if not f:
+        log_error(error_log, ticker, acc, "edgar.find returned None")
+        return None
+    return parse_one_filing(f, ticker, cusip_map, error_log)
+
 
 # ---------------------------------------------------------------------------
 # Post-processing and summary (shared by run/run_update)
@@ -389,11 +396,24 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
 
     cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
 
-    # --- Phase 1: List filings per ticker (fast — no document downloads) ---
+    # --- Phase 1: List filings per ticker, persist to listed_filings_13dg ---
     print(f"\n--- Phase 1: Listing filings ({max_workers} workers) ---")
-    all_new = []  # (ticker, accession, form, filing_date, filer_cik)
+    phase1_new = 0
+    filing_cache = {}  # accession → Filing object (for fast Phase 2)
     done = [0]
     checkpoint_buf = []
+    listing_buf = []
+
+    def _flush_listings():
+        nonlocal listing_buf
+        if not listing_buf:
+            return
+        batch = listing_buf
+        listing_buf = []
+        now = datetime.now().isoformat()
+        con.executemany(
+            "INSERT OR IGNORE INTO listed_filings_13dg VALUES (?,?,?,?,?,?,?,?)",
+            [(acc, tk, fm, fd, fc, sn, sc, now) for acc, tk, fm, fd, fc, sn, sc in batch])
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(list_ticker_filings, t, existing, error_log): t for t in to_process}
@@ -403,9 +423,17 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
             if done[0] % 200 == 0 or done[0] <= 3 or done[0] == len(to_process):
                 print(f"  [{done[0]}/{len(to_process)}] {ticker}...", flush=True)
             try:
-                for acc, form, fdate, fcik in fut.result():
-                    all_new.append((ticker, acc, form, fdate, fcik))
+                for filing in fut.result():
+                    acc = filing.accession_no
                     existing.add(acc)
+                    filing_cache[acc] = filing
+                    listing_buf.append((
+                        acc, ticker, filing.form, str(filing.filing_date),
+                        acc.split("-")[0],
+                        str(filing.company) if hasattr(filing, "company") else "",
+                        str(filing.cik) if hasattr(filing, "cik") else "",
+                    ))
+                    phase1_new += 1
             except Exception as e:
                 log_error(error_log, ticker, "", e)
             checkpoint_buf.append(ticker)
@@ -414,31 +442,53 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
                 con.executemany("INSERT OR REPLACE INTO fetched_tickers_13dg VALUES (?,?)",
                                 [(t, now) for t in checkpoint_buf])
                 checkpoint_buf.clear()
+                _flush_listings()
 
     if checkpoint_buf:
         now = datetime.now().isoformat()
         con.executemany("INSERT OR REPLACE INTO fetched_tickers_13dg VALUES (?,?)",
                         [(t, now) for t in checkpoint_buf])
-    print(f"  Found {len(all_new)} new filings")
+    _flush_listings()
+    con.execute("CHECKPOINT")
+    print(f"  Phase 1 listed {phase1_new} new filings")
 
-    if not all_new:
-        post_process(con, False, TEST_TICKERS if test_mode else tickers)
+    # --- Phase 2: Parse all unparsed filings from listed_filings_13dg ---
+    unparsed = con.execute("""
+        SELECT l.accession_number, l.ticker, l.form, l.filing_date, l.filer_cik,
+               l.subject_name, l.subject_cik
+        FROM listed_filings_13dg l
+        WHERE l.accession_number NOT IN (SELECT accession_number FROM beneficial_ownership)
+    """).fetchall()
+
+    if not unparsed:
+        print("  No unparsed filings — all up to date.")
+        post_process(con, phase1_new > 0, TEST_TICKERS if test_mode else tickers)
         con.close()
         print("\nDone.")
         return
 
-    # --- Phase 2: Download and parse each new filing ---
-    print(f"\n--- Phase 2: Parsing {len(all_new)} filings ({max_workers} workers) ---")
+    # Split: use cached Filing objects when available (fast), edgar.find for rest
+    cached = [(acc, tk) for acc, tk, *_ in unparsed if acc in filing_cache]
+    uncached = [(acc, tk, fm, fd, fc, sn, sc) for acc, tk, fm, fd, fc, sn, sc in unparsed if acc not in filing_cache]
+    if cached:
+        print(f"    {len(cached)} from this session (cached), {len(uncached)} from prior session (will re-fetch)")
+    else:
+        print(f"    {len(uncached)} from prior session (will re-fetch)")
+
+    print(f"\n--- Phase 2: Parsing {len(unparsed)} filings ({max_workers} workers) ---")
     all_records = []
     done[0] = 0
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(parse_one_filing, t, acc, form, fdate, fcik, cusip_map, error_log): acc
-                   for t, acc, form, fdate, fcik in all_new}
+        futures = {}
+        for acc, tk in cached:
+            futures[pool.submit(parse_one_filing, filing_cache[acc], tk, cusip_map, error_log)] = acc
+        for acc, tk, fm, fd, fc, sn, sc in uncached:
+            futures[pool.submit(parse_one_filing_by_acc, acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)] = acc
         for fut in as_completed(futures):
             done[0] += 1
-            if done[0] % 200 == 0 or done[0] == len(all_new):
-                print(f"  [{done[0]}/{len(all_new)}] parsed", flush=True)
+            if done[0] % 200 == 0 or done[0] == len(unparsed):
+                print(f"  [{done[0]}/{len(unparsed)}] parsed", flush=True)
             try:
                 rec = fut.result()
                 if rec:
