@@ -2,759 +2,482 @@
 """
 fetch_13dg.py — Download and parse SC 13D/G beneficial ownership filings from EDGAR.
 
+Uses the `edgar` Python library for all EDGAR access.
+
 Builds:
   - beneficial_ownership table: all parsed 13D/G filings
   - beneficial_ownership_current table: latest filing per filer+subject
   - Updates managers.has_13dg flag
 
-Run: python3 scripts/fetch_13dg.py                          # Full build (all target tickers)
+Run: python3 scripts/fetch_13dg.py                          # Full build
+     python3 scripts/fetch_13dg.py --update                 # Incremental since last filing date
      python3 scripts/fetch_13dg.py --tickers AR,DVN,CVX     # Specific tickers
-     python3 scripts/fetch_13dg.py --test                   # Test on 5 tickers
+     python3 scripts/fetch_13dg.py --test                   # 5 test tickers
 """
 
-import argparse
-import csv
-import os
-import re
-import sys
-import time
+import argparse, csv, os, re, sys, threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import duckdb
-import requests
+import edgar
 from rapidfuzz import fuzz
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
-SEC_DELAY = 0.5  # seconds between requests
-MIN_DATE = "2022-01-01"
-
-TARGET_FORMS = {"SC 13D", "SC 13D/A", "SC 13G", "SC 13G/A"}
-
-TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
-
 os.makedirs(LOG_DIR, exist_ok=True)
 
+edgar.set_identity("serge.tismen@gmail.com")
+
+TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
+MAX_WORKERS = 4
+_db_lock = threading.Lock()
+MIN_DATE = "2022-01-01"
+FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
+                 "ADVISER COMPLIANCE ASSOCIATES LLC"}
 
 # ---------------------------------------------------------------------------
-# SEC API helpers
+# Filing text parser (regex extraction from filing text)
 # ---------------------------------------------------------------------------
 
-def sec_get(url, max_retries=3):
-    """GET with rate limiting and retry."""
-    for attempt in range(max_retries):
-        try:
-            resp = requests.get(url, headers=SEC_HEADERS, timeout=30)
-            if resp.status_code == 200:
-                return resp
-            if resp.status_code == 429:
-                wait = 10 * (attempt + 1)
-                print(f"  Rate limited, waiting {wait}s...")
-                time.sleep(wait)
-                continue
-            if resp.status_code == 404:
-                return None
-            print(f"  HTTP {resp.status_code} for {url}")
-            time.sleep(2)
-        except requests.RequestException as e:
-            print(f"  Request error: {e}")
-            time.sleep(5)
-    return None
+def parse_filing(f, filing_type):
+    """Parse an edgar Filing object. Returns a record dict or None."""
+    try:
+        raw_text = f.text() or ""
+    except Exception:
+        return None
+    if not raw_text:
+        return None
+    if len(raw_text) > 2_000_000:
+        raw_text = raw_text[:2_000_000]
 
-
-def get_ticker_to_company_cik():
-    """Download SEC ticker→CIK mapping."""
-    print("Downloading SEC company tickers mapping...")
-    resp = sec_get("https://www.sec.gov/files/company_tickers.json")
-    if not resp:
-        print("ERROR: Could not download company tickers")
-        sys.exit(1)
-    data = resp.json()
-    mapping = {}
-    for entry in data.values():
-        mapping[entry["ticker"]] = str(entry["cik_str"]).zfill(10)
-    print(f"  {len(mapping)} tickers mapped")
-    return mapping
-
-
-def get_company_filings_13dg(company_cik):
-    """Get list of 13D/G filings for a company CIK from EDGAR submissions JSON."""
-    url = f"https://data.sec.gov/submissions/CIK{company_cik}.json"
-    resp = sec_get(url)
-    if not resp:
-        return []
-
-    data = resp.json()
-    company_name = data.get("name", "")
-    recent = data["filings"]["recent"]
-    forms = recent["form"]
-    dates = recent["filingDate"]
-    accessions = recent["accessionNumber"]
-    primary_docs = recent["primaryDocument"]
-
-    results = []
-    for i, form in enumerate(forms):
-        if form in TARGET_FORMS and dates[i] >= MIN_DATE:
-            filer_cik = accessions[i].split("-")[0]
-            results.append({
-                "accession_number": accessions[i],
-                "filing_type": form,
-                "filing_date": dates[i],
-                "filer_cik": filer_cik,
-                "subject_cik": company_cik,
-                "subject_name": company_name,
-                "primary_doc": primary_docs[i],
-            })
-
-    # Check older filings if they exist
-    for old_file in data["filings"].get("files", []):
-        old_url = f"https://data.sec.gov/submissions/{old_file['name']}"
-        old_resp = sec_get(old_url)
-        if not old_resp:
-            continue
-        time.sleep(SEC_DELAY)
-        old_data = old_resp.json()
-        for i, form in enumerate(old_data["form"]):
-            if form in TARGET_FORMS and old_data["filingDate"][i] >= MIN_DATE:
-                filer_cik = old_data["accessionNumber"][i].split("-")[0]
-                results.append({
-                    "accession_number": old_data["accessionNumber"][i],
-                    "filing_type": form,
-                    "filing_date": old_data["filingDate"][i],
-                    "filer_cik": filer_cik,
-                    "subject_cik": company_cik,
-                    "subject_name": old_data.get("name", company_name),
-                    "primary_doc": old_data["primaryDocument"][i],
-                })
-
-    return results
-
-
-_filer_name_cache = {}
-
-
-def get_filer_name(filer_cik):
-    """Look up filer name from CIK via EDGAR JSON. Cached."""
-    if filer_cik in _filer_name_cache:
-        return _filer_name_cache[filer_cik]
-    url = f"https://data.sec.gov/submissions/CIK{filer_cik}.json"
-    resp = sec_get(url)
-    name = "UNKNOWN"
-    if resp:
-        try:
-            name = resp.json().get("name", "UNKNOWN")
-        except Exception:
-            pass
-    _filer_name_cache[filer_cik] = name
-    time.sleep(SEC_DELAY)
-    return name
-
-
-# ---------------------------------------------------------------------------
-# Filing text parser
-# ---------------------------------------------------------------------------
-
-def parse_filing_text(filing_info):
-    """Download and parse a 13D/G filing's primary document for ownership data."""
-    acc = filing_info["accession_number"]
-    acc_path = acc.replace("-", "")
-    subject_cik_raw = filing_info["subject_cik"].lstrip("0") or "0"
-    filer_cik_raw = filing_info["filer_cik"].lstrip("0") or "0"
-    primary_doc = filing_info["primary_doc"]
-
-    # 13D/G filings are stored under subject company CIK on EDGAR
-    url = f"https://www.sec.gov/Archives/edgar/data/{subject_cik_raw}/{acc_path}/{primary_doc}"
-    resp = sec_get(url)
-    if not resp:
-        # Fallback: try filer CIK path
-        url = f"https://www.sec.gov/Archives/edgar/data/{filer_cik_raw}/{acc_path}/{primary_doc}"
-        resp = sec_get(url)
-        if not resp:
-            return None
-
-    raw_text = resp.text
-
-    # Strip HTML tags and entities for parsing
+    # Strip HTML entities
     text = re.sub(r"<[^>]+>", " ", raw_text)
-    text = re.sub(r"&nbsp;|&#160;|&#xa0;", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"&amp;|&#38;", "&", text)
-    text = re.sub(r"&lt;|&#60;", "<", text)
-    text = re.sub(r"&gt;|&#62;", ">", text)
-    text = re.sub(r"&ldquo;|&rdquo;|&#8220;|&#8221;", '"', text)
-    text = re.sub(r"&lsquo;|&rsquo;|&#8216;|&#8217;", "'", text)
-    text = re.sub(r"&#\d+;", " ", text)  # remaining numeric entities
-    text = re.sub(r"&\w+;", " ", text)   # remaining named entities
+    for old, new in [("&nbsp;", " "), ("&#160;", " "), ("&#xa0;", " "),
+                     ("&amp;", "&"), ("&#38;", "&"), ("&lt;", "<"), ("&gt;", ">"),
+                     ("&ldquo;", '"'), ("&rdquo;", '"'), ("&lsquo;", "'"), ("&rsquo;", "'")]:
+        text = text.replace(old, new)
+    text = re.sub(r"&#\d+;", " ", text)
+    text = re.sub(r"&\w+;", " ", text)
     text = re.sub(r"\s+", " ", text)
 
-    result = {
-        "cusip": None,
-        "pct_owned": None,
-        "shares_owned": None,
+    # Extract filer info from header
+    h = f.header
+    filer_name, filer_cik = "UNKNOWN", ""
+    if h.filers:
+        ci = h.filers[0].company_information
+        filer_name = ci.name or "UNKNOWN"
+        filer_cik = (ci.cik or "").zfill(10)
+    subject_name, subject_cik = "", ""
+    if h.subject_companies:
+        sci = h.subject_companies[0].company_information
+        subject_name = sci.name or ""
+        subject_cik = (sci.cik or "").zfill(10)
+
+    result = {"cusip": None, "pct_owned": None, "shares_owned": None,
+              "purpose_text": None, "group_members": None, "report_date": None}
+
+    # CUSIP
+    m = re.search(r"CUSIP\s*(?:No\.?|Number|#)?\s*[:\s]*([A-Z0-9]{6,9})", text, re.I)
+    if m:
+        result["cusip"] = m.group(1).strip()
+
+    # Percentage (Item 11 / cover page)
+    for pat in [r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?9[\)]?\s+(\d+[\.,]?\d*)\s*%",
+                r"Item\s*11[\s.:]+(\d+[\.,]?\d*)\s*%",
+                r"Percent\s+of\s+Class[:\s]+(\d+[\.,]?\d*)\s*%",
+                r"PERCENT\s+OF\s+CLASS[\s.:]*(\d+[\.,]?\d*)\s*%"]:
+        m = re.search(pat, text, re.I)
+        if m:
+            try: result["pct_owned"] = float(m.group(1).replace(",", ""))
+            except ValueError: pass
+            break
+
+    # Shares (Item 9)
+    for pat in [r"(?:Item\s*9|AGGREGATE\s+AMOUNT\s+BENEFICIALLY\s+OWNED)[\s.:]*(?:BY\s+EACH\s+REPORTING\s+PERSON)?\s*([\d,]+)",
+                r"Amount\s+Beneficially\s+Owned[:\s]*([\d,]+)",
+                r"Item\s+9[:\s]+([\d,]+)"]:
+        m = re.search(pat, text, re.I)
+        if m:
+            try: result["shares_owned"] = int(m.group(1).replace(",", ""))
+            except ValueError: pass
+            break
+
+    # Report date
+    for pat in [r"Date\s+of\s+Event\s+Which\s+Requires\s+Filing[^)]*\)\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4})",
+                r"Date\s+of\s+Event[:\s]*(\d{1,2}/\d{1,2}/\d{4})",
+                r"Date\s+of\s+Event[:\s]*(\d{4}-\d{2}-\d{2})"]:
+        m = re.search(pat, text, re.I)
+        if m:
+            ds = m.group(1).strip()
+            for fmt in ["%B %d, %Y", "%B %d %Y", "%m/%d/%Y", "%Y-%m-%d"]:
+                try: result["report_date"] = datetime.strptime(ds, fmt).strftime("%Y-%m-%d"); break
+                except ValueError: pass
+            break
+
+    # Purpose (Item 4, 13D only)
+    if "13D" in filing_type:
+        m4 = re.search(r"Item\s*4\.?\s*(?:Purpose\s+of\s+Transaction|Purpose)[.\s]*", text, re.I)
+        if m4:
+            after = text[m4.end():m4.end() + 3000]
+            m5 = re.search(r"Item\s*5", after, re.I)
+            purpose = after[:m5.start()] if m5 else after[:600]
+            result["purpose_text"] = re.sub(r"\s+", " ", purpose).strip()[:500] or None
+
+    # Reporting person fallback for filing agents
+    if filer_name in FILING_AGENTS:
+        for pat in [r"Item\s*1[:\s]+Reporting\s+Person\s*[-–—]\s*([\w\s.,&'/-]+?)(?=\s*(?:Item\s*2|CHECK|\n))",
+                    r"NAMES?\s+OF\s+REPORTING\s+PERSONS?\s+((?:[A-Z][A-Za-z.'&,\s-]+){1,5}?)(?=\s*(?:CHECK|2\.|Item\s*2))"]:
+            m = re.search(pat, text[:5000], re.I)
+            if m:
+                name = m.group(1).strip()
+                if 3 < len(name) < 100 and name[0].isalpha() and "I.R.S." not in name:
+                    filer_name = name
+                    break
+
+    intent = "activist" if "13D" in filing_type else "passive"
+    return {
+        "accession_number": f.accession_no,
+        "filer_cik": filer_cik,
+        "filer_name": filer_name,
+        "subject_cusip": result["cusip"],
+        "subject_ticker": None,  # filled by caller
+        "subject_name": subject_name,
+        "filing_type": filing_type,
+        "filing_date": str(f.filing_date),
+        "report_date": result["report_date"],
+        "pct_owned": result["pct_owned"],
+        "shares_owned": result["shares_owned"],
         "aggregate_value": None,
-        "purpose_text": None,
+        "intent": intent,
+        "is_amendment": "/A" in filing_type,
+        "prior_accession": None,
+        "purpose_text": result["purpose_text"],
         "group_members": None,
-        "report_date": None,
-        "reporting_person": None,
+        "manager_cik": None,
     }
 
-    # --- Reporting Person (Item 1 on cover page) ---
-    rp_patterns = [
-        # "Item 1: Reporting Person - Name"
-        r"Item\s*1[:\s]+Reporting\s+Person\s*[-–—]\s*([\w\s.,&'/-]+?)(?=\s*(?:Item\s*2|CHECK|\n))",
-        # "NAMES OF REPORTING PERSONS   Name"
-        r"NAMES?\s+OF\s+REPORTING\s+PERSONS?\s+((?:[A-Z][A-Za-z.'&,\s-]+){1,5}?)(?=\s*(?:CHECK|2\.|Item\s*2))",
-        # "Name of Person Filing: Name"
-        r"Name\s+of\s+Person\s+Filing[:\s]+([\w\s.,&'/-]+?)(?=\s*(?:Item|Address|\n))",
-    ]
-    for pat in rp_patterns:
-        rp_match = re.search(pat, text, re.IGNORECASE)
-        if rp_match:
-            name = rp_match.group(1).strip()
-            # Filter out junk: must start with a letter, no "I.R.S.", no numbers at start
-            if (3 < len(name) < 100
-                    and name[0].isalpha()
-                    and "I.R.S." not in name
-                    and "CUSIP" not in name.upper()):
-                result["reporting_person"] = name
-                break
-
-    # --- CUSIP ---
-    cusip_match = re.search(
-        r"CUSIP\s*(?:No\.?|Number|#)?\s*[:\s]*([A-Z0-9]{6,9})", text, re.IGNORECASE
-    )
-    if cusip_match:
-        result["cusip"] = cusip_match.group(1).strip()
-
-    # --- Percentage of class (Item 11 on cover page or Item 4(b)) ---
-    pct_patterns = [
-        # Cover page: PERCENT OF CLASS ... ROW 9 ... X%
-        r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?9[\)]?\s+(\d+[\.,]?\d*)\s*%",
-        # Item 11 on cover page (various formats)
-        r"Item\s*11[\s.:]+(\d+[\.,]?\d*)\s*%",
-        # Item 4(b) in body
-        r"Percent\s+of\s+Class[:\s]+(\d+[\.,]?\d*)\s*%",
-        # PERCENT OF CLASS without ROW 9 reference
-        r"PERCENT\s+OF\s+CLASS[\s.:]*(\d+[\.,]?\d*)\s*%",
-        # Generic percentage pattern near "percent"
-        r"(\d{1,3}\.\d{1,3})\s*%\s*(?:of\s+(?:class|outstanding))",
-    ]
-    for pat in pct_patterns:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            try:
-                result["pct_owned"] = float(m.group(1).replace(",", ""))
-            except ValueError:
-                pass
-            break
-
-    # --- Shares (Item 9 on cover page or Item 4(a)) ---
-    shares_patterns = [
-        # Item 9 on cover page
-        r"(?:Item\s*9|AGGREGATE\s+AMOUNT\s+BENEFICIALLY\s+OWNED)[\s.:]*(?:BY\s+EACH\s+REPORTING\s+PERSON)?\s*([\d,]+)",
-        # Item 4(a)
-        r"Amount\s+Beneficially\s+Owned[:\s]*([\d,]+)",
-        # Cover page Item 9 simple format
-        r"Item\s+9[:\s]+([\d,]+)",
-    ]
-    for pat in shares_patterns:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            try:
-                result["shares_owned"] = int(m.group(1).replace(",", ""))
-            except ValueError:
-                pass
-            break
-
-    # --- Report date (Date of Event) ---
-    date_patterns = [
-        r"Date\s+of\s+Event\s+Which\s+Requires\s+Filing[^)]*\)\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4})",
-        r"Date\s+of\s+Event[:\s]*(\d{1,2}/\d{1,2}/\d{4})",
-        r"Date\s+of\s+Event[:\s]*(\d{4}-\d{2}-\d{2})",
-    ]
-    for pat in date_patterns:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            date_str = m.group(1).strip()
-            try:
-                for fmt in ["%B %d, %Y", "%B %d %Y", "%m/%d/%Y", "%Y-%m-%d"]:
-                    try:
-                        result["report_date"] = datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
-                        break
-                    except ValueError:
-                        continue
-            except Exception:
-                pass
-            break
-
-    # --- Purpose of Transaction (Item 4 for 13D) ---
-    if "13D" in filing_info["filing_type"].upper():
-        purpose_match = re.search(
-            r"Item\s*4\.?\s*(?:Purpose\s+of\s+Transaction|Purpose)[.\s]*(.*?)(?=Item\s*5|$)",
-            text,
-            re.IGNORECASE | re.DOTALL,
-        )
-        if purpose_match:
-            purpose = purpose_match.group(1).strip()
-            # Clean up and truncate
-            purpose = re.sub(r"\s+", " ", purpose)
-            result["purpose_text"] = purpose[:500] if purpose else None
-
-    # --- Group members (from cover page or Item 2) ---
-    # Look for multiple reporting persons
-    reporting_persons = re.findall(
-        r"(?:Item\s*1[:\s]*|NAMES?\s+OF\s+REPORTING\s+PERSONS?[:\s]*)\s*([A-Z][A-Za-z\s.,&'-]+?)(?=\s*(?:Item|CHECK|SEC\s+USE|\d\.))",
-        text,
-        re.IGNORECASE,
-    )
-    if len(reporting_persons) > 1:
-        # Clean up names
-        members = []
-        for p in reporting_persons:
-            name = p.strip()
-            if len(name) > 3 and len(name) < 100:
-                members.append(name)
-        if len(members) > 1:
-            result["group_members"] = "; ".join(members[:5])
-
-    return result
-
-
 # ---------------------------------------------------------------------------
-# Database operations
+# Database
 # ---------------------------------------------------------------------------
 
 def create_tables(con):
-    """Create beneficial ownership tables."""
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS beneficial_ownership (
-            accession_number VARCHAR PRIMARY KEY,
-            filer_cik VARCHAR,
-            filer_name VARCHAR,
-            subject_cusip VARCHAR,
-            subject_ticker VARCHAR,
-            subject_name VARCHAR,
-            filing_type VARCHAR,
-            filing_date DATE,
-            report_date DATE,
-            pct_owned DOUBLE,
-            shares_owned BIGINT,
-            aggregate_value DOUBLE,
-            intent VARCHAR,
-            is_amendment BOOLEAN,
-            prior_accession VARCHAR,
-            purpose_text VARCHAR,
-            group_members VARCHAR,
-            manager_cik VARCHAR,
-            loaded_at TIMESTAMP
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS beneficial_ownership_current (
-            filer_cik VARCHAR,
-            filer_name VARCHAR,
-            subject_ticker VARCHAR,
-            subject_cusip VARCHAR,
-            latest_filing_type VARCHAR,
-            latest_filing_date DATE,
-            pct_owned DOUBLE,
-            shares_owned BIGINT,
-            intent VARCHAR,
-            crossing_date DATE,
-            days_since_filing INTEGER,
-            is_current BOOLEAN,
-            accession_number VARCHAR
-        )
-    """)
+    con.execute("""CREATE TABLE IF NOT EXISTS fetched_tickers_13dg (
+        ticker VARCHAR PRIMARY KEY, fetched_at TIMESTAMP)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS beneficial_ownership (
+        accession_number VARCHAR PRIMARY KEY, filer_cik VARCHAR, filer_name VARCHAR,
+        subject_cusip VARCHAR, subject_ticker VARCHAR, subject_name VARCHAR,
+        filing_type VARCHAR, filing_date DATE, report_date DATE, pct_owned DOUBLE,
+        shares_owned BIGINT, aggregate_value DOUBLE, intent VARCHAR,
+        is_amendment BOOLEAN, prior_accession VARCHAR, purpose_text VARCHAR,
+        group_members VARCHAR, manager_cik VARCHAR, loaded_at TIMESTAMP)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS beneficial_ownership_current (
+        filer_cik VARCHAR, filer_name VARCHAR, subject_ticker VARCHAR,
+        subject_cusip VARCHAR, latest_filing_type VARCHAR, latest_filing_date DATE,
+        pct_owned DOUBLE, shares_owned BIGINT, intent VARCHAR, crossing_date DATE,
+        days_since_filing INTEGER, is_current BOOLEAN, accession_number VARCHAR)""")
 
+def get_existing(con):
+    try: return {r[0] for r in con.execute("SELECT accession_number FROM beneficial_ownership").fetchall()}
+    except Exception: return set()
 
-def get_existing_accessions(con):
-    """Get set of already-loaded accession numbers."""
-    try:
-        rows = con.execute(
-            "SELECT accession_number FROM beneficial_ownership"
-        ).fetchall()
-        return {r[0] for r in rows}
-    except Exception:
-        return set()
+def batch_insert(con, records):
+    now = datetime.now().isoformat()
+    rows = [[r["accession_number"], r["filer_cik"], r["filer_name"],
+             r.get("subject_cusip"), r.get("subject_ticker"), r.get("subject_name"),
+             r["filing_type"], r["filing_date"], r.get("report_date"),
+             r.get("pct_owned"), r.get("shares_owned"), r.get("aggregate_value"),
+             r["intent"], r["is_amendment"], r.get("prior_accession"),
+             r.get("purpose_text"), r.get("group_members"), r.get("manager_cik"), now]
+            for r in records]
+    if rows:
+        con.executemany("""INSERT OR REPLACE INTO beneficial_ownership
+            (accession_number,filer_cik,filer_name,subject_cusip,subject_ticker,
+             subject_name,filing_type,filing_date,report_date,pct_owned,shares_owned,
+             aggregate_value,intent,is_amendment,prior_accession,purpose_text,
+             group_members,manager_cik,loaded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
 
-
-def insert_filing(con, record):
-    """Insert a single filing record into beneficial_ownership."""
-    con.execute("""
-        INSERT OR REPLACE INTO beneficial_ownership
-        (accession_number, filer_cik, filer_name, subject_cusip, subject_ticker,
-         subject_name, filing_type, filing_date, report_date, pct_owned,
-         shares_owned, aggregate_value, intent, is_amendment, prior_accession,
-         purpose_text, group_members, manager_cik, loaded_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, [
-        record["accession_number"],
-        record["filer_cik"],
-        record["filer_name"],
-        record.get("subject_cusip"),
-        record.get("subject_ticker"),
-        record.get("subject_name"),
-        record["filing_type"],
-        record["filing_date"],
-        record.get("report_date"),
-        record.get("pct_owned"),
-        record.get("shares_owned"),
-        record.get("aggregate_value"),
-        record["intent"],
-        record["is_amendment"],
-        record.get("prior_accession"),
-        record.get("purpose_text"),
-        record.get("group_members"),
-        record.get("manager_cik"),
-        datetime.now().isoformat(),
-    ])
-
-
-def rebuild_current_view(con):
-    """Rebuild beneficial_ownership_current from beneficial_ownership."""
+def rebuild_current(con):
     con.execute("DROP TABLE IF EXISTS beneficial_ownership_current")
-    con.execute("""
-        CREATE TABLE beneficial_ownership_current AS
+    con.execute("""CREATE TABLE beneficial_ownership_current AS
         WITH ranked AS (
-            SELECT *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY filer_cik, subject_ticker
-                    ORDER BY filing_date DESC
-                ) as rn
-            FROM beneficial_ownership
-            WHERE subject_ticker IS NOT NULL
-        )
-        SELECT
-            filer_cik,
-            filer_name,
-            subject_ticker,
-            subject_cusip,
-            filing_type AS latest_filing_type,
-            filing_date AS latest_filing_date,
-            pct_owned,
-            shares_owned,
-            intent,
-            report_date AS crossing_date,
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY filer_cik, subject_ticker ORDER BY filing_date DESC) as rn
+            FROM beneficial_ownership WHERE subject_ticker IS NOT NULL)
+        SELECT filer_cik, filer_name, subject_ticker, subject_cusip,
+            filing_type AS latest_filing_type, filing_date AS latest_filing_date,
+            pct_owned, shares_owned, intent, report_date AS crossing_date,
             CAST(CURRENT_DATE - filing_date AS INTEGER) AS days_since_filing,
             CASE WHEN filing_date >= CURRENT_DATE - INTERVAL '2 years' THEN TRUE ELSE FALSE END AS is_current,
             accession_number
-        FROM ranked
-        WHERE rn = 1
-    """)
-    count = con.execute("SELECT COUNT(*) FROM beneficial_ownership_current").fetchone()[0]
-    print(f"\n  beneficial_ownership_current rebuilt: {count} rows")
-
+        FROM ranked WHERE rn = 1""")
+    cnt = con.execute("SELECT COUNT(*) FROM beneficial_ownership_current").fetchone()[0]
+    print(f"\n  beneficial_ownership_current rebuilt: {cnt} rows")
 
 def fuzzy_match_managers(con):
-    """Match filer_name to managers.manager_name using fuzzy matching."""
     print("\nFuzzy-matching filers to managers table...")
-
-    # Get distinct filer CIKs and names
-    filers = con.execute("""
-        SELECT DISTINCT filer_cik, filer_name
-        FROM beneficial_ownership
-        WHERE filer_name IS NOT NULL AND filer_name != 'UNKNOWN'
-    """).fetchall()
-
-    # Get managers
-    managers = con.execute("""
-        SELECT cik, manager_name FROM managers
-    """).fetchall()
-
-    # First: direct CIK match
-    manager_ciks = {m[0]: m[1] for m in managers}
-    matched = 0
-    fuzzy_matched = 0
-
-    for filer_cik, filer_name in filers:
-        # Direct CIK match
-        if filer_cik in manager_ciks:
-            con.execute("""
-                UPDATE beneficial_ownership
-                SET manager_cik = ?
-                WHERE filer_cik = ? AND manager_cik IS NULL
-            """, [filer_cik, filer_cik])
+    filers = con.execute("SELECT DISTINCT filer_cik, filer_name FROM beneficial_ownership WHERE filer_name IS NOT NULL AND filer_name != 'UNKNOWN'").fetchall()
+    managers = con.execute("SELECT cik, manager_name FROM managers").fetchall()
+    mgr_map = {m[0]: m[1] for m in managers}
+    matched = fuzzy = 0
+    for fc, fn in filers:
+        if fc in mgr_map:
+            con.execute("UPDATE beneficial_ownership SET manager_cik=? WHERE filer_cik=? AND manager_cik IS NULL", [fc, fc])
             matched += 1
-            continue
+        else:
+            best, best_cik = 0, None
+            for mc, mn in managers:
+                s = fuzz.token_sort_ratio(fn.upper(), mn.upper())
+                if s > best: best, best_cik = s, mc
+            if best >= 85:
+                con.execute("UPDATE beneficial_ownership SET manager_cik=? WHERE filer_cik=? AND manager_cik IS NULL", [best_cik, fc])
+                fuzzy += 1
+    print(f"  Direct: {matched}, Fuzzy: {fuzzy}, Unmatched: {len(filers)-matched-fuzzy}")
 
-        # Fuzzy match on name
-        best_score = 0
-        best_cik = None
-        for mgr_cik, mgr_name in managers:
-            score = fuzz.token_sort_ratio(filer_name.upper(), mgr_name.upper())
-            if score > best_score:
-                best_score = score
-                best_cik = mgr_cik
+def update_has_13dg(con):
+    try: con.execute("ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN DEFAULT FALSE")
+    except Exception: pass
+    con.execute("UPDATE managers SET has_13dg=TRUE WHERE cik IN (SELECT DISTINCT filer_cik FROM beneficial_ownership)")
+    cnt = con.execute("SELECT COUNT(*) FROM managers WHERE has_13dg=TRUE").fetchone()[0]
+    print(f"  managers.has_13dg set for {cnt}")
 
-        if best_score >= 85:
-            con.execute("""
-                UPDATE beneficial_ownership
-                SET manager_cik = ?
-                WHERE filer_cik = ? AND manager_cik IS NULL
-            """, [best_cik, filer_cik])
-            fuzzy_matched += 1
-
-    print(f"  Direct CIK matches: {matched}")
-    print(f"  Fuzzy name matches (≥85): {fuzzy_matched}")
-    print(f"  Unmatched: {len(filers) - matched - fuzzy_matched}")
-
-
-def update_managers_has_13dg(con):
-    """Add has_13dg flag to managers table."""
-    # Add column if not exists
-    try:
-        con.execute("ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN DEFAULT FALSE")
-    except Exception:
-        pass  # column already exists
-
-    con.execute("""
-        UPDATE managers
-        SET has_13dg = TRUE
-        WHERE cik IN (
-            SELECT DISTINCT filer_cik FROM beneficial_ownership
-        )
-    """)
-    count = con.execute("SELECT COUNT(*) FROM managers WHERE has_13dg = TRUE").fetchone()[0]
-    print(f"\n  managers.has_13dg set for {count} managers")
-
+def get_target_tickers(con):
+    return [r[0] for r in con.execute("""SELECT ticker FROM holdings
+        WHERE quarter=(SELECT MAX(quarter) FROM holdings) AND ticker IS NOT NULL AND ticker!=''
+        GROUP BY ticker HAVING SUM(market_value_usd)>500000000
+        ORDER BY SUM(market_value_usd) DESC""").fetchall()]
 
 # ---------------------------------------------------------------------------
-# Error logging
+# Error log
 # ---------------------------------------------------------------------------
 
 def init_error_log():
-    """Initialize error CSV log."""
-    log_path = os.path.join(LOG_DIR, "fetch_13dg_errors.csv")
-    if not os.path.exists(log_path):
-        with open(log_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["timestamp", "ticker", "accession", "error"])
-    return log_path
+    path = os.path.join(LOG_DIR, "fetch_13dg_errors.csv")
+    if not os.path.exists(path):
+        with open(path, "w", newline="") as f:
+            csv.writer(f).writerow(["timestamp", "ticker", "accession", "error"])
+    return path
 
-
-def log_error(log_path, ticker, accession, error):
-    """Append error to log."""
-    with open(log_path, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([datetime.now().isoformat(), ticker, accession, str(error)])
-
+def log_error(path, ticker, acc, err):
+    with open(path, "a", newline="") as f:
+        csv.writer(f).writerow([datetime.now().isoformat(), ticker, acc, str(err)])
 
 # ---------------------------------------------------------------------------
-# Main pipeline
+# Core: list and parse filings for one ticker
 # ---------------------------------------------------------------------------
 
-def get_target_tickers(con):
-    """Get tickers with >$500M institutional value in latest quarter."""
-    rows = con.execute("""
-        SELECT ticker
-        FROM holdings
-        WHERE quarter = (SELECT MAX(quarter) FROM holdings)
-          AND ticker IS NOT NULL AND ticker != ''
-        GROUP BY ticker
-        HAVING SUM(market_value_usd) > 500000000
-        ORDER BY SUM(market_value_usd) DESC
-    """).fetchall()
-    return [r[0] for r in rows]
+def process_ticker(ticker, existing, cusip_map, error_log):
+    """List all 13D/G filings for a ticker via edgar library, parse new ones.
+    Returns list of record dicts."""
+    records = []
+    try:
+        company = edgar.Company(ticker)
+    except Exception as e:
+        log_error(error_log, ticker, "", str(e))
+        return records
 
+    for form in ["SC 13D", "SC 13G"]:
+        try:
+            filings = company.get_filings(form=form)
+        except Exception:
+            continue
+        if not filings:
+            continue
+        for f in filings:
+            if str(f.filing_date) < MIN_DATE:
+                break  # filings are sorted desc by date
+            if f.accession_no in existing:
+                continue
+            try:
+                rec = parse_filing(f, f.form)
+                if rec:
+                    rec["subject_ticker"] = ticker
+                    rec["subject_cusip"] = cusip_map.get(ticker)
+                    records.append(rec)
+            except Exception as e:
+                log_error(error_log, ticker, f.accession_no, str(e))
+    return records
 
-def run(tickers=None, test_mode=False):
-    """Main entry point."""
+# ---------------------------------------------------------------------------
+# Post-processing and summary (shared by run/run_update)
+# ---------------------------------------------------------------------------
+
+def post_process(con, new_count, check_tickers=None):
+    if new_count > 0:
+        fuzzy_match_managers(con)
+        update_has_13dg(con)
+    rebuild_current(con)
+
+    total = con.execute("SELECT COUNT(*) FROM beneficial_ownership").fetchone()[0]
+    by_type = con.execute("SELECT filing_type, COUNT(*) FROM beneficial_ownership GROUP BY filing_type ORDER BY COUNT(*) DESC").fetchall()
+    print(f"\n{'='*50}\nSUMMARY\n{'='*50}")
+    print(f"Total: {total}")
+    for ft, cnt in by_type:
+        print(f"  {ft}: {cnt}")
+    if check_tickers:
+        print("\nPer-ticker:")
+        for t in check_tickers:
+            r = con.execute("SELECT COUNT(*) FILTER (WHERE intent='activist'), COUNT(*) FILTER (WHERE intent='passive') FROM beneficial_ownership WHERE subject_ticker=?", [t]).fetchone()
+            print(f"  {t}: 13D={r[0]}, 13G={r[1]}")
+
+# ---------------------------------------------------------------------------
+# run() — full build, ticker by ticker
+# ---------------------------------------------------------------------------
+
+def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
     con = duckdb.connect(DB_PATH)
     create_tables(con)
     error_log = init_error_log()
-
-    existing = get_existing_accessions(con)
+    existing = get_existing(con)
     print(f"Already loaded: {len(existing)} filings")
 
-    # Get target tickers
     if test_mode:
-        target_tickers = TEST_TICKERS
+        target = TEST_TICKERS
     elif tickers:
-        target_tickers = [t.strip().upper() for t in tickers]
+        target = [t.strip().upper() for t in tickers]
     else:
-        target_tickers = get_target_tickers(con)
+        target = get_target_tickers(con)
+    print(f"Target tickers: {len(target)}")
 
-    print(f"Target tickers: {len(target_tickers)}")
+    # Checkpoint: skip already-fetched tickers
+    try:
+        fetched = {r[0] for r in con.execute("SELECT ticker FROM fetched_tickers_13dg").fetchall()}
+    except Exception:
+        fetched = set()
+    to_process = [t for t in target if t not in fetched]
+    if len(target) - len(to_process) > 0:
+        print(f"  Skipping {len(target) - len(to_process)} already-fetched (checkpoint)")
+    print(f"  Processing: {len(to_process)}, Workers: {max_workers}")
 
-    # Get ticker → company CIK mapping
-    ticker_cik_map = get_ticker_to_company_cik()
-    time.sleep(SEC_DELAY)
+    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
 
-    # Also get CUSIP mapping from securities table
-    ticker_cusip = {}
-    rows = con.execute("""
-        SELECT ticker, cusip FROM securities
-        WHERE ticker IS NOT NULL
-    """).fetchall()
-    for ticker, cusip in rows:
-        ticker_cusip[ticker] = cusip
+    # Workers call edgar (pure I/O, no DB). Main thread collects and writes.
+    all_records = []
+    checkpoint_buf = []
+    done = [0]
 
-    # Phase 1: Collect all filing metadata
-    print("\n--- Phase 1: Listing 13D/G filings ---")
-    all_filings = []
-    skipped_no_cik = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(process_ticker, t, existing, cusip_map, error_log): t
+                   for t in to_process}
+        for fut in as_completed(futures):
+            ticker = futures[fut]
+            done[0] += 1
+            if done[0] % 200 == 0 or done[0] <= 3 or done[0] == len(to_process):
+                print(f"  [{done[0]}/{len(to_process)}] {ticker}...", flush=True)
 
-    for i, ticker in enumerate(target_tickers):
-        company_cik = ticker_cik_map.get(ticker)
-        if not company_cik:
-            skipped_no_cik += 1
-            continue
+            try:
+                records = fut.result()
+            except Exception as e:
+                log_error(error_log, ticker, "", str(e))
+                records = []
 
-        if (i + 1) % 100 == 0 or i < 5:
-            print(f"  [{i+1}/{len(target_tickers)}] {ticker} (CIK {company_cik})...")
+            all_records.extend(records)
+            for r in records:
+                existing.add(r["accession_number"])
+            checkpoint_buf.append(ticker)
 
-        try:
-            filings = get_company_filings_13dg(company_cik)
-            for f in filings:
-                if f["accession_number"] not in existing:
-                    f["subject_ticker"] = ticker
-                    f["subject_cusip"] = ticker_cusip.get(ticker)
-                    all_filings.append(f)
-        except Exception as e:
-            log_error(error_log, ticker, "", str(e))
+            # Periodic DB flush from main thread only
+            if len(checkpoint_buf) >= 50:
+                now = datetime.now().isoformat()
+                with _db_lock:
+                    con.executemany("INSERT OR REPLACE INTO fetched_tickers_13dg VALUES (?,?)",
+                                    [(t, now) for t in checkpoint_buf])
+                checkpoint_buf.clear()
+            if len(all_records) >= 500:
+                with _db_lock:
+                    batch_insert(con, all_records)
+                    con.execute("CHECKPOINT")
+                all_records.clear()
 
-        time.sleep(SEC_DELAY)
-
-    print(f"\n  Found {len(all_filings)} new filings to download")
-    print(f"  Skipped {skipped_no_cik} tickers (no company CIK)")
-
-    if not all_filings:
-        print("No new filings to process.")
-        rebuild_current_view(con)
-        con.close()
-        return
-
-    # Phase 2: Get filer names (cached, deduplicated)
-    print("\n--- Phase 2: Resolving filer names ---")
-    unique_filer_ciks = set(f["filer_cik"] for f in all_filings)
-    print(f"  {len(unique_filer_ciks)} unique filers to look up")
-
-    for i, cik in enumerate(unique_filer_ciks):
-        if (i + 1) % 50 == 0:
-            print(f"    [{i+1}/{len(unique_filer_ciks)}] resolving filer names...")
-        get_filer_name(cik)  # populates cache
-
-    # Phase 3: Download and parse each filing
-    print(f"\n--- Phase 3: Downloading & parsing {len(all_filings)} filings ---")
-    success = 0
-    errors = 0
-    batch_size = 50
-
-    for i, filing_info in enumerate(all_filings):
-        if (i + 1) % 25 == 0:
-            print(f"  [{i+1}/{len(all_filings)}] parsed {success} OK, {errors} errors")
-
-        acc = filing_info["accession_number"]
-        ticker = filing_info["subject_ticker"]
-
-        try:
-            # Get filer name from cache (filing agent CIKs may return UNKNOWN)
-            filer_name = _filer_name_cache.get(filing_info["filer_cik"], "UNKNOWN")
-
-            # Parse filing text
-            parsed = parse_filing_text(filing_info)
-            if parsed is None:
-                log_error(error_log, ticker, acc, "Could not download filing")
-                errors += 1
-                time.sleep(SEC_DELAY)
-                continue
-
-            # Determine intent
-            form = filing_info["filing_type"]
-            intent = "activist" if "13D" in form else "passive"
-            is_amendment = "/A" in form
-
-            # Use reporting person name when filer is unknown or a filing agent
-            filing_agents = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
-                             "ADVISER COMPLIANCE ASSOCIATES LLC"}
-            if filer_name in filing_agents and parsed.get("reporting_person"):
-                filer_name = parsed["reporting_person"]
-
-            # Build record
-            record = {
-                "accession_number": acc,
-                "filer_cik": filing_info["filer_cik"],
-                "filer_name": filer_name,
-                "subject_cusip": parsed.get("cusip") or filing_info.get("subject_cusip"),
-                "subject_ticker": ticker,
-                "subject_name": filing_info.get("subject_name"),
-                "filing_type": form,
-                "filing_date": filing_info["filing_date"],
-                "report_date": parsed.get("report_date"),
-                "pct_owned": parsed.get("pct_owned"),
-                "shares_owned": parsed.get("shares_owned"),
-                "aggregate_value": parsed.get("aggregate_value"),
-                "intent": intent,
-                "is_amendment": is_amendment,
-                "prior_accession": None,
-                "purpose_text": parsed.get("purpose_text"),
-                "group_members": parsed.get("group_members"),
-                "manager_cik": None,
-            }
-
-            insert_filing(con, record)
-            success += 1
-
-        except Exception as e:
-            log_error(error_log, ticker, acc, str(e))
-            errors += 1
-
-        time.sleep(SEC_DELAY)
-
-        # Periodic commit
-        if (i + 1) % batch_size == 0:
-            con.execute("CHECKPOINT")
-
+    # Flush remaining
+    if checkpoint_buf:
+        now = datetime.now().isoformat()
+        con.executemany("INSERT OR REPLACE INTO fetched_tickers_13dg VALUES (?,?)",
+                        [(t, now) for t in checkpoint_buf])
+    if all_records:
+        batch_insert(con, all_records)
     con.execute("CHECKPOINT")
-    print(f"\n  Phase 3 complete: {success} inserted, {errors} errors")
 
-    # Phase 4: Cross-reference with managers
-    fuzzy_match_managers(con)
-
-    # Phase 5: Update managers.has_13dg
-    update_managers_has_13dg(con)
-
-    # Phase 6: Rebuild current view
-    rebuild_current_view(con)
-
-    # Final summary
-    total = con.execute("SELECT COUNT(*) FROM beneficial_ownership").fetchone()[0]
-    by_type = con.execute("""
-        SELECT filing_type, COUNT(*) as cnt
-        FROM beneficial_ownership
-        GROUP BY filing_type
-        ORDER BY cnt DESC
-    """).fetchall()
-
-    print(f"\n{'='*60}")
-    print(f"SUMMARY")
-    print(f"{'='*60}")
-    print(f"Total beneficial_ownership rows: {total}")
-    for ft, cnt in by_type:
-        print(f"  {ft}: {cnt}")
-
-    if test_mode or tickers:
-        check_tickers = TEST_TICKERS if test_mode else [t.strip().upper() for t in tickers] if isinstance(tickers, list) else TEST_TICKERS
-        print(f"\nPer-ticker counts:")
-        for t in check_tickers:
-            row = con.execute("""
-                SELECT
-                    COUNT(*) FILTER (WHERE intent = 'activist') as n_13d,
-                    COUNT(*) FILTER (WHERE intent = 'passive') as n_13g
-                FROM beneficial_ownership
-                WHERE subject_ticker = ?
-            """, [t]).fetchone()
-            print(f"  {t}: 13D={row[0]}, 13G={row[1]}")
-
+    total_now = con.execute("SELECT COUNT(*) FROM beneficial_ownership").fetchone()[0]
+    post_process(con, total_now > 0, TEST_TICKERS if test_mode else tickers)
     con.close()
     print("\nDone.")
 
+# ---------------------------------------------------------------------------
+# run_update() — incremental via EDGAR full-index
+# ---------------------------------------------------------------------------
+
+def run_update():
+    con = duckdb.connect(DB_PATH)
+    create_tables(con)
+    error_log = init_error_log()
+    existing = get_existing(con)
+    print(f"Already loaded: {len(existing)} filings")
+
+    row = con.execute("SELECT MAX(filing_date) FROM beneficial_ownership").fetchone()
+    last_date = str(row[0]) if row and row[0] else None
+    if not last_date:
+        print("No existing data — run full build first.")
+        con.close()
+        return
+    print(f"Latest filing: {last_date}")
+
+    # Get tickers we care about
+    target_set = set(get_target_tickers(con))
+    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
+
+    # Use edgar.get_filings to scan recent filings globally
+    from datetime import date
+    last = datetime.strptime(last_date[:10], "%Y-%m-%d").date()
+    today = date.today()
+    years = list(range(last.year, today.year + 1))
+
+    all_records = []
+    for form in ["SC 13D", "SC 13G"]:
+        print(f"\n  Scanning {form}...")
+        for yr in years:
+            for qtr in range(1, 5):
+                try:
+                    filings = edgar.get_filings(year=yr, quarter=qtr, form=form)
+                except Exception:
+                    continue
+                if not filings:
+                    continue
+                count = 0
+                for f in filings:
+                    if str(f.filing_date) < last_date:
+                        continue
+                    if f.accession_no in existing:
+                        continue
+                    # Check if this is about one of our target tickers
+                    try:
+                        h = f.header
+                        if h.subject_companies:
+                            subj_name = h.subject_companies[0].company_information.name or ""
+                        else:
+                            continue
+                    except Exception:
+                        continue
+                    # Parse it
+                    try:
+                        rec = parse_filing(f, f.form)
+                        if rec:
+                            all_records.append(rec)
+                            existing.add(f.accession_no)
+                            count += 1
+                    except Exception as e:
+                        log_error(error_log, "", f.accession_no, str(e))
+                if count:
+                    print(f"    {yr}Q{qtr} {form}: {count} new", flush=True)
+
+    print(f"\n  Total new filings: {len(all_records)}")
+    if all_records:
+        batch_insert(con, all_records)
+        con.execute("CHECKPOINT")
+
+    post_process(con, len(all_records), None)
+    con.close()
+    print("\nDone.")
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -763,8 +486,14 @@ def run(tickers=None, test_mode=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch 13D/G beneficial ownership filings")
     parser.add_argument("--tickers", type=str, help="Comma-separated tickers")
-    parser.add_argument("--test", action="store_true", help="Test mode (5 tickers only)")
+    parser.add_argument("--test", action="store_true", help="Test mode (5 tickers)")
+    parser.add_argument("--update", action="store_true", help="Incremental since last filing date")
+    parser.add_argument("--workers", type=int, default=MAX_WORKERS,
+                        help=f"Parallel threads (default {MAX_WORKERS})")
     args = parser.parse_args()
 
-    tickers = args.tickers.split(",") if args.tickers else None
-    run(tickers=tickers, test_mode=args.test)
+    if args.update:
+        run_update()
+    else:
+        t = args.tickers.split(",") if args.tickers else None
+        run(tickers=t, test_mode=args.test, max_workers=args.workers)

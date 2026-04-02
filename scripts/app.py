@@ -1829,6 +1829,59 @@ def api_fund_portfolio_managers():
         con.close()
 
 
+@app.route('/api/nport_shorts')
+def api_nport_shorts():
+    """N-PORT negative balance positions — fund short positions from filings."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    con = get_db()
+    try:
+        where = "AND fh.ticker = ?" if ticker else ""
+        params = [ticker] if ticker else []
+        df = con.execute(f"""
+            SELECT
+                fh.fund_name,
+                fh.ticker,
+                fh.issuer_name,
+                fh.shares_or_principal AS shares_short,
+                fh.market_value_usd AS short_value,
+                fh.pct_of_nav,
+                fh.quarter,
+                fh.family_name
+            FROM fund_holdings fh
+            WHERE fh.shares_or_principal < 0
+              AND fh.asset_category IN ('EC', 'EP')
+              {where}
+            ORDER BY fh.market_value_usd ASC
+            LIMIT 200
+        """, params).fetchdf()
+        return jsonify(df_to_records(df))
+    finally:
+        con.close()
+
+
+@app.route('/api/short_volume')
+def api_short_volume():
+    """FINRA daily short sale volume for a ticker."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    con = get_db()
+    try:
+        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+        if 'short_interest' not in tables:
+            return jsonify({'error': 'short_interest table not loaded — run fetch_finra_short.py'}), 404
+        df = con.execute("""
+            SELECT report_date, short_volume, total_volume, short_pct
+            FROM short_interest
+            WHERE ticker = ?
+            ORDER BY report_date DESC
+            LIMIT 60
+        """, [ticker]).fetchdf()
+        return jsonify(df_to_records(df))
+    finally:
+        con.close()
+
+
 @app.route('/api/fund_behavioral_profile')
 def api_fund_behavioral_profile():
     """Behavioral profile for a fund by LEI or series_id — analyzes historical positions."""
