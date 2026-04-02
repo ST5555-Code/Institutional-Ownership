@@ -746,18 +746,101 @@ def query3(ticker):
         """, [ticker, cusip]).fetchdf()
 
         records = df_to_records(df)
-        # N-PORT enrichment: upgrade source from '13F estimate' to 'N-PORT' where available
+
+        # Check if investor_flows table exists
+        has_flows = 'investor_flows' in [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+
+        results = []
         for row in records:
             parent = row.get('parent_name') or row.get('manager_name')
-            nport = get_nport_position(match_nport_family(parent), ticker, '2025Q4', con)
-            if nport:
+
+            # Enhancement 1 — Position history (Since + Held)
+            history = con.execute("""
+                SELECT quarter, SUM(shares) as shares
+                FROM holdings
+                WHERE COALESCE(inst_parent_name, manager_name) = ?
+                  AND ticker = ? AND shares > 0
+                GROUP BY quarter ORDER BY quarter
+            """, [parent, ticker]).fetchall()
+            quarters_held = [r[0] for r in history if r[1] and r[1] > 0]
+            since_raw = quarters_held[0] if quarters_held else None
+            held_count = len(quarters_held)
+            # Format: '2025Q1' → 'Q1 2025'
+            since = (since_raw[4:] + ' ' + since_raw[:4]) if since_raw else None
+            row['since'] = since
+            row['held_count'] = held_count
+            row['held_label'] = '{}/{}'.format(held_count, 4)
+
+            # Enhancement 2 — Direction from investor_flows
+            if has_flows:
+                flow = con.execute("""
+                    SELECT net_shares, pct_change, price_adj_flow, momentum_signal,
+                           is_new_entry, is_exit
+                    FROM investor_flows
+                    WHERE ticker = ? AND inst_parent_name = ?
+                      AND quarter_from = '2025Q1' AND quarter_to = '2025Q4'
+                """, [ticker, parent]).fetchone()
+                if flow:
+                    pct_chg = float(flow[1]) if flow[1] is not None else None
+                    if flow[4]:  # is_new_entry
+                        direction = 'NEW'
+                    elif flow[5]:  # is_exit
+                        direction = 'EXIT'
+                    elif pct_chg is None:
+                        direction = None
+                    elif pct_chg > 0.05:
+                        direction = 'ADDING'
+                    elif pct_chg < -0.05:
+                        direction = 'TRIMMING'
+                    else:
+                        direction = 'STABLE'
+                    row['direction'] = direction
+                    row['pct_change'] = pct_chg
+                    row['price_adj_flow'] = float(flow[2]) if flow[2] is not None else None
+                else:
+                    row['direction'] = None
+                    row['pct_change'] = None
+                    row['price_adj_flow'] = None
+            else:
+                row['direction'] = None
+                row['pct_change'] = None
+                row['price_adj_flow'] = None
+
+            # N-PORT enrichment + children (Enhancement 3)
+            cusip = get_cusip(con, ticker)
+            children, src = get_children(parent, ticker, cusip, '2025Q4', con, limit=5,
+                                         parent_shares=row.get('shares'))
+            if src == 'N-PORT':
                 row['source'] = 'N-PORT'
-                row['nport_value'] = nport['nport_value']
-                row['nport_fund_count'] = nport['fund_count']
                 row['subadviser_note'] = None
             else:
+                row['source'] = '13F estimate'
                 row['subadviser_note'] = get_subadviser_note(parent)
-        return records
+
+            effective_children = len(children)
+            row['is_parent'] = effective_children >= 2
+            row['child_count'] = effective_children
+            row['level'] = 0
+            row['institution'] = parent  # for hierarchy rendering
+            results.append(row)
+
+            if effective_children >= 2:
+                for c in children:
+                    results.append({
+                        'manager_name': c.get('institution'),
+                        'institution': c.get('institution'),
+                        'position_value': c.get('value_live'),
+                        'pct_of_portfolio': None,
+                        'pct_of_float': c.get('pct_float'),
+                        'mktcap_percentile': None,
+                        'manager_type': row.get('manager_type'),
+                        'source': c.get('source', src),
+                        'direction': None, 'since': None, 'held_label': None,
+                        'is_parent': False, 'child_count': 0, 'level': 1,
+                        'subadviser_note': None,
+                    })
+
+        return results
     finally:
         con.close()
 
@@ -1371,7 +1454,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
         for t in chart_tickers:
             stat = con.execute("""
                 SELECT flow_intensity_total, flow_intensity_active, flow_intensity_passive,
-                       churn_overall, churn_active, churn_passive
+                       churn_nonpassive, churn_active
                 FROM ticker_flow_stats
                 WHERE ticker = ? AND quarter_from = ?
             """, [t, quarter_from]).fetchone()
@@ -1380,7 +1463,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
                     'ticker': t,
                     'flow_intensity_total': stat[0], 'flow_intensity_active': stat[1],
                     'flow_intensity_passive': stat[2],
-                    'churn_overall': stat[3], 'churn_active': stat[4], 'churn_passive': stat[5],
+                    'churn_nonpassive': stat[3], 'churn_active': stat[4],
                 })
 
         return clean_for_json({

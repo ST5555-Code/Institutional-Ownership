@@ -73,9 +73,8 @@ def create_tables(con):
             flow_intensity_total DOUBLE,
             flow_intensity_active DOUBLE,
             flow_intensity_passive DOUBLE,
-            churn_overall DOUBLE,
+            churn_nonpassive DOUBLE,
             churn_active DOUBLE,
-            churn_passive DOUBLE,
             computed_at TIMESTAMP
         )
     """)
@@ -214,34 +213,27 @@ def compute_ticker_flows(con, ticker, market_cap):
         fi_active = active_paf / market_cap if market_cap and market_cap > 0 else None
         fi_passive = passive_paf / market_cap if market_cap and market_cap > 0 else None
 
-        # Churn
-        from_investors = {r['inst_parent_name'] for r in period_rows if r['from_shares'] and r['from_shares'] > 0}
-        to_investors = {r['inst_parent_name'] for r in period_rows if r['to_shares'] and r['to_shares'] > 0}
-        new_entries = to_investors - from_investors
-        exits = from_investors - to_investors
-        avg_holders = (len(from_investors) + len(to_investors)) / 2 if (len(from_investors) + len(to_investors)) > 0 else 1
-        churn = (len(new_entries) + len(exits)) / avg_holders
+        # Value-weighted churn — non-passive managers only
+        def _value_churn(rows, type_filter):
+            """Value-weighted churn: (value of entries + exits) / avg(from_value, to_value)."""
+            filtered = [r for r in rows if type_filter(r.get('manager_type'))]
+            q1_val = sum(r.get('from_value') or 0 for r in filtered if not r.get('is_new_entry'))
+            q4_val = sum(r.get('to_value') or 0 for r in filtered if not r.get('is_exit'))
+            ne_val = sum(r.get('to_value') or 0 for r in filtered if r.get('is_new_entry'))
+            ex_val = sum(r.get('from_value') or 0 for r in filtered if r.get('is_exit'))
+            avg_val = (q1_val + q4_val) / 2 if (q1_val + q4_val) > 0 else 1
+            return (ne_val + ex_val) / avg_val
 
-        # Active churn
-        from_active = {r['inst_parent_name'] for r in period_rows if r['from_shares'] and r['from_shares'] > 0 and r['manager_type'] != 'passive'}
-        to_active = {r['inst_parent_name'] for r in period_rows if r['to_shares'] and r['to_shares'] > 0 and r['manager_type'] != 'passive'}
-        ne_a = to_active - from_active
-        ex_a = from_active - to_active
-        avg_a = (len(from_active) + len(to_active)) / 2 if (len(from_active) + len(to_active)) > 0 else 1
-        churn_active = (len(ne_a) + len(ex_a)) / avg_a
+        is_nonpassive = lambda t: t != 'passive'
+        is_active_only = lambda t: t in ('active',)
 
-        # Passive churn
-        from_passive = {r['inst_parent_name'] for r in period_rows if r['from_shares'] and r['from_shares'] > 0 and r['manager_type'] == 'passive'}
-        to_passive = {r['inst_parent_name'] for r in period_rows if r['to_shares'] and r['to_shares'] > 0 and r['manager_type'] == 'passive'}
-        ne_p = to_passive - from_passive
-        ex_p = from_passive - to_passive
-        avg_p = (len(from_passive) + len(to_passive)) / 2 if (len(from_passive) + len(to_passive)) > 0 else 1
-        churn_passive = (len(ne_p) + len(ex_p)) / avg_p
+        churn_np = _value_churn(period_rows, is_nonpassive)
+        churn_act = _value_churn(period_rows, is_active_only)
 
         con.execute("""
-            INSERT INTO ticker_flow_stats VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO ticker_flow_stats VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [ticker, q_from, q_to, fi_total, fi_active, fi_passive,
-              churn, churn_active, churn_passive, datetime.now()])
+              churn_np, churn_act, datetime.now()])
 
 
 def main():

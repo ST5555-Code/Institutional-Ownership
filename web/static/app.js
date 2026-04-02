@@ -347,6 +347,9 @@ const QUERY_COLUMNS = {
         {key: 'pct_of_float',     label: '% Float',         type: 'pct'},
         {key: 'mktcap_percentile', label: 'MktCap Pctile', type: 'pct'},
         {key: 'manager_type',     label: 'Type',            type: 'text'},
+        {key: 'direction',        label: 'Direction',       type: 'text'},
+        {key: 'since',            label: 'Since',           type: 'text'},
+        {key: 'held_label',       label: 'Held',            type: 'text'},
         {key: 'source',           label: 'Source',          type: 'text'},
     ],
     4: [
@@ -544,7 +547,7 @@ function renderTable(data, qnum) {
     // Detect sections (Query 2 entries/exits)
     const hasSections = data.some(r => r.section != null);
     // Collapsible hierarchy for Q1 and Q2
-    const collapsible = hasHierarchy && (qnum === 1 || qnum === 2);
+    const collapsible = hasHierarchy && (qnum === 1 || qnum === 2 || qnum === 3);
 
     renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, collapsible);
 }
@@ -681,6 +684,23 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
             else if (isChangeCol(col) && typeof val === 'number' && val !== 0) {
                 td.innerHTML = formatCell(val, fmtType(col));
                 td.style.color = val < 0 ? '#C0392B' : '#27AE60';
+            }
+            // --- Direction column: colored badge ---
+            else if (col.key === 'direction') {
+                if (!val) { td.innerHTML = '\u2014'; }
+                else if (val === 'ADDING') td.innerHTML = '<span class="positive">\u2191 Adding</span>';
+                else if (val === 'TRIMMING') td.innerHTML = '<span class="negative">\u2193 Trimming</span>';
+                else if (val === 'STABLE') td.innerHTML = '<span style="color:#666">\u2192 Stable</span>';
+                else if (val === 'NEW') td.innerHTML = '<span class="badge-new">NEW</span>';
+                else if (val === 'EXIT') td.innerHTML = '<span class="badge-exit">EXIT</span>';
+                else td.innerHTML = '\u2014';
+            }
+            // --- Held column: color-coded ---
+            else if (col.key === 'held_label' && val) {
+                const count = parseInt(val);
+                const color = count >= 4 ? '#1A8A4A' : (count >= 3 ? '#27AE60' : (count >= 2 ? '#E67E22' : '#999'));
+                const weight = count >= 4 ? '700' : '400';
+                td.innerHTML = '<span style="color:' + color + ';font-weight:' + weight + '">' + val + '</span>';
             }
             // --- Source column: render as badge with optional tooltip ---
             else if (col.key === 'source' && val) {
@@ -918,19 +938,23 @@ let _flowPeriod = '4Q';
 async function loadFlowAnalysis() {
     clearError(); tableWrap.innerHTML = '';
 
-    // Period selector
+    // Period selector — "Compare from: [Q1 2025] [Q2 2025] [Q3 2025] → to Q4 2025"
     const pbar = document.createElement('div');
     pbar.className = 'period-selector';
     const label = document.createElement('span');
-    label.textContent = 'Period:';
+    label.textContent = 'Compare from:';
     pbar.appendChild(label);
-    ['4Q', '2Q', '1Q'].forEach(p => {
+    [['4Q', 'Q1 2025'], ['2Q', 'Q2 2025'], ['1Q', 'Q3 2025']].forEach(([p, lbl]) => {
         const btn = document.createElement('button');
         btn.className = 'period-btn' + (p === _flowPeriod ? ' active' : '');
-        btn.textContent = p;
+        btn.textContent = lbl;
         btn.addEventListener('click', () => { _flowPeriod = p; loadFlowAnalysis(); });
         pbar.appendChild(btn);
     });
+    const arrow = document.createElement('span');
+    arrow.textContent = '\u2192 to Q4 2025 (latest)';
+    arrow.style.marginLeft = '6px';
+    pbar.appendChild(arrow);
     tableWrap.appendChild(pbar);
 
     showSpinner();
@@ -1017,53 +1041,135 @@ function renderFlowAnalysis(data) {
         tableWrap.appendChild(fn);
     }
 
-    // Charts section (flow intensity + churn)
+    // Charts section (flow intensity + churn) — using Chart.js
     const chartData = (data.charts && data.charts.flow_intensity) || [];
-    if (chartData.length > 0) {
+    if (chartData.length > 0 && typeof Chart !== 'undefined') {
         const row = document.createElement('div');
         row.className = 'charts-row';
-        // Flow intensity summary
+
+        // Flow intensity chart
         const fiCard = document.createElement('div');
         fiCard.className = 'chart-card';
         fiCard.innerHTML = '<h3>Flow Intensity \u2014 Net Buying as % of Market Cap</h3>';
-        const fiTable = document.createElement('table');
-        fiTable.className = 'data-table';
-        fiTable.style.tableLayout = 'auto';
-        fiTable.innerHTML = '<thead><tr><th style="text-align:left">Ticker</th><th style="text-align:right">Total</th><th style="text-align:right">Active</th><th style="text-align:right">Passive</th></tr></thead>';
-        const ftb = document.createElement('tbody');
+        const fiCanvas = document.createElement('canvas');
+        fiCanvas.style.height = '250px';
+        fiCanvas.style.maxHeight = '250px';
+        fiCard.appendChild(fiCanvas);
+        row.appendChild(fiCard);
+
+        // Churn chart
+        const chCard = document.createElement('div');
+        chCard.className = 'chart-card';
+        chCard.innerHTML = '<h3 title="Measures dollar value of non-passive positions that entered or exited as % of average non-passive institutional value">Value-Weighted Holder Churn \u2014 Non-Passive Managers</h3>';
+        const chCanvas = document.createElement('canvas');
+        chCanvas.style.height = '250px';
+        chCanvas.style.maxHeight = '250px';
+        chCard.appendChild(chCanvas);
+        row.appendChild(chCard);
+
+        tableWrap.appendChild(row);
+
+        // Render charts after DOM insertion
+        const labels = chartData.map(d => d.ticker);
+
+        // Destroy old charts
+        if (window._fiChart) { window._fiChart.destroy(); window._fiChart = null; }
+        if (window._chChart) { window._chChart.destroy(); window._chChart = null; }
+
+        // Flow intensity bar chart
+        window._fiChart = new Chart(fiCanvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Total',
+                        data: chartData.map(d => d.flow_intensity_total ? (d.flow_intensity_total * 100) : 0),
+                        backgroundColor: chartData.map(d =>
+                            (d.flow_intensity_total || 0) >= 0 ? '#27AE60' : '#C0392B'
+                        ),
+                    },
+                    {
+                        label: 'Active Only',
+                        data: chartData.map(d => d.flow_intensity_active ? (d.flow_intensity_active * 100) : 0),
+                        backgroundColor: chartData.map(d =>
+                            (d.flow_intensity_active || 0) >= 0 ? '#52BE80' : '#E74C3C'
+                        ),
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    y: {
+                        title: { display: true, text: '% of Market Cap' },
+                        ticks: { callback: v => v.toFixed(1) + '%' },
+                    },
+                },
+            },
+        });
+
+        // Churn bar chart — non-passive and active only
+        window._chChart = new Chart(chCanvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Non-Passive',
+                        data: chartData.map(d => d.churn_nonpassive ? (d.churn_nonpassive * 100) : 0),
+                        backgroundColor: chartData.map(d => {
+                            const v = d.churn_nonpassive || 0;
+                            return v < 0.10 ? '#27AE60' : (v < 0.20 ? '#F39C12' : '#C0392B');
+                        }),
+                    },
+                    {
+                        label: 'Active Only',
+                        data: chartData.map(d => d.churn_active ? (d.churn_active * 100) : 0),
+                        backgroundColor: chartData.map(d => {
+                            const v = d.churn_active || 0;
+                            return v < 0.10 ? '#52BE80' : (v < 0.20 ? '#F5B041' : '#E74C3C');
+                        }),
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    y: {
+                        title: { display: true, text: 'Churn Rate %' },
+                        ticks: { callback: v => v.toFixed(0) + '%' },
+                    },
+                },
+            },
+        });
+
+    } else if (chartData.length > 0) {
+        // Fallback if Chart.js not loaded — show as table
+        const row = document.createElement('div');
+        row.className = 'charts-row';
+        const card = document.createElement('div');
+        card.className = 'chart-card';
+        card.innerHTML = '<h3>Flow Intensity &amp; Churn</h3>';
+        const t = document.createElement('table');
+        t.className = 'data-table';
+        t.style.tableLayout = 'auto';
+        t.innerHTML = '<thead><tr><th>Ticker</th><th style="text-align:right">Flow Intensity</th><th style="text-align:right">Non-Passive Churn</th></tr></thead>';
+        const tb = document.createElement('tbody');
         chartData.forEach(d => {
             const tr = document.createElement('tr');
             tr.innerHTML = '<td>' + d.ticker + '</td>'
                 + '<td style="text-align:right">' + fmtPct(d.flow_intensity_total ? d.flow_intensity_total * 100 : null) + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_active ? d.flow_intensity_active * 100 : null) + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_passive ? d.flow_intensity_passive * 100 : null) + '</td>';
-            ftb.appendChild(tr);
+                + '<td style="text-align:right">' + fmtPct(d.churn_nonpassive ? d.churn_nonpassive * 100 : null) + '</td>';
+            tb.appendChild(tr);
         });
-        fiTable.appendChild(ftb);
-        fiCard.appendChild(fiTable);
-        row.appendChild(fiCard);
-
-        // Churn summary
-        const chCard = document.createElement('div');
-        chCard.className = 'chart-card';
-        chCard.innerHTML = '<h3>Holder Churn Rate</h3>';
-        const chTable = document.createElement('table');
-        chTable.className = 'data-table';
-        chTable.style.tableLayout = 'auto';
-        chTable.innerHTML = '<thead><tr><th style="text-align:left">Ticker</th><th style="text-align:right">Overall</th><th style="text-align:right">Active</th><th style="text-align:right">Passive</th></tr></thead>';
-        const ctb = document.createElement('tbody');
-        chartData.forEach(d => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + d.ticker + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.churn_overall ? d.churn_overall * 100 : null) + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.churn_active ? d.churn_active * 100 : null) + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.churn_passive ? d.churn_passive * 100 : null) + '</td>';
-            ctb.appendChild(tr);
-        });
-        chTable.appendChild(ctb);
-        chCard.appendChild(chTable);
-        row.appendChild(chCard);
-
+        t.appendChild(tb);
+        card.appendChild(t);
+        row.appendChild(card);
         tableWrap.appendChild(row);
     }
 
