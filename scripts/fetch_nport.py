@@ -30,7 +30,7 @@ from lxml import etree
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import get_db_path, crash_handler
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
@@ -850,4 +850,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    crash_handler("fetch_nport")(main)

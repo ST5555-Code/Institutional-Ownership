@@ -23,6 +23,7 @@ SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5
 
 from config import QUARTER_URLS as QUARTERS
+from db import crash_handler
 
 
 def download_quarter(quarter, url):
@@ -124,4 +125,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    crash_handler("fetch_13f")(main)

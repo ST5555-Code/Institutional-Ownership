@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import get_db_path, crash_handler
 
 from config import QUARTER_SNAPSHOT_DATES as SNAPSHOT_DATES
 
@@ -281,4 +281,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    crash_handler("fetch_market")(main)

@@ -22,7 +22,8 @@ import duckdb
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 REF_DIR = os.path.join(DATA_DIR, "reference")
-DB_PATH = os.path.join(DATA_DIR, "13f.duckdb")
+from db import get_db_path, crash_handler
+DB_PATH = get_db_path()
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5  # seconds between SEC requests
@@ -297,4 +298,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    crash_handler("fetch_adv")(main)

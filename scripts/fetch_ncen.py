@@ -29,7 +29,7 @@ from rapidfuzz import fuzz
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import get_db_path, crash_handler
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -390,4 +390,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch N-CEN adviser mappings")
     parser.add_argument("--test", action="store_true", help="Test on 10 fund CIKs")
     args = parser.parse_args()
-    run(test_mode=args.test)
+    crash_handler("fetch_ncen")(lambda: run(test_mode=args.test))

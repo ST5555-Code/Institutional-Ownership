@@ -26,7 +26,7 @@ from rapidfuzz import fuzz
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-from db import get_db_path, set_test_mode, assert_write_safe
+from db import get_db_path, set_test_mode, assert_write_safe, crash_handler
 os.makedirs(LOG_DIR, exist_ok=True)
 
 edgar.set_identity("serge.tismen@gmail.com")
@@ -707,8 +707,11 @@ if __name__ == "__main__":
         set_test_mode(True)
         _seed_test_db()
 
-    if args.update:
-        run_update()
-    else:
-        t = args.tickers.split(",") if args.tickers else None
-        run(tickers=t, test_mode=args.test, max_workers=args.workers)
+    def _main():
+        if args.update:
+            run_update()
+        else:
+            t = args.tickers.split(",") if args.tickers else None
+            run(tickers=t, test_mode=args.test, max_workers=args.workers)
+
+    crash_handler("fetch_13dg")(_main)

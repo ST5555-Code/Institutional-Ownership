@@ -31,7 +31,7 @@ from tqdm import tqdm
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, set_test_mode, assert_write_safe
+from db import get_db_path, set_test_mode, assert_write_safe, crash_handler
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
 FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -259,4 +259,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.test:
         set_test_mode(True)
-    run(days=args.days, update_mode=args.update, test_mode=args.test)
+    crash_handler("fetch_finra_short")(
+        lambda: run(days=args.days, update_mode=args.update, test_mode=args.test))
