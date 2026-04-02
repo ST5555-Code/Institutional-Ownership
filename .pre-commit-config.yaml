@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        args: [--max-line-length=120, --ignore=E501,W503,E402]
+        files: ^scripts/
+
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v3.3.6
+    hooks:
+      - id: pylint
+        args: [--disable=C,R,W0611,W0612,W0613,W0621,W0622,W0702,W0718, --max-line-length=120]
+        files: ^scripts/
+        additional_dependencies: [duckdb, requests, rapidfuzz, flask, openpyxl, pandas, lxml]
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: [-r, --skip=B101,B608]
+        files: ^scripts/
