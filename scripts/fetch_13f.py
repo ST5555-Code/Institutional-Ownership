@@ -6,10 +6,8 @@ Run: python3 scripts/fetch_13f.py
 """
 
 import os
-import sys
 import time
 import zipfile
-import io
 import requests
 
 # ---------------------------------------------------------------------------
@@ -73,7 +71,7 @@ def verify_and_extract(quarter, zip_path):
             raise zipfile.BadZipFile(f"Corrupt file in ZIP: {bad}")
     except zipfile.BadZipFile as e:
         print(f"  {quarter}: ZIP verification FAILED — {e}")
-        print(f"    Deleting corrupt file, will need re-download")
+        print("    Deleting corrupt file, will need re-download")
         os.remove(zip_path)
         return None
 

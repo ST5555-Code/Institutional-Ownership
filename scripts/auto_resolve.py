@@ -10,11 +10,8 @@ Run: python3 scripts/auto_resolve.py
 """
 
 import os
-import sys
 import re
 import time
-import json
-import csv
 from datetime import datetime
 
 import requests

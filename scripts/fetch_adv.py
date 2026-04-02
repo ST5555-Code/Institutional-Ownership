@@ -7,11 +7,9 @@ Run: python3 scripts/fetch_adv.py
 """
 
 import os
-import sys
 import time
 import zipfile
 import io
-import re
 import requests
 import pandas as pd
 import duckdb
@@ -77,7 +75,7 @@ PE_KEYWORDS = ["PRIVATE EQUITY", "BUYOUT", "VENTURE", "GROWTH EQUITY"]
 
 def download_adv_zip():
     """Download the most recent ADV bulk ZIP from SEC."""
-    print(f"Downloading ADV data from SEC...")
+    print("Downloading ADV data from SEC...")
     print(f"  URL: {ADV_ZIP_URL}")
     r = requests.get(ADV_ZIP_URL, headers=SEC_HEADERS, timeout=120)
     r.raise_for_status()

@@ -15,7 +15,7 @@ Run: python3 scripts/fetch_13dg.py                          # Full build
      python3 scripts/fetch_13dg.py --test                   # 5 test tickers
 """
 
-import argparse, csv, os, re, sys, time, threading
+import argparse, csv, os, re, time, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -675,7 +675,6 @@ def run_update():
 
 def _seed_test_db():
     """Copy read-only reference tables from production to test DB."""
-    import shutil
     from db import PROD_DB, TEST_DB
     if os.path.exists(TEST_DB):
         os.remove(TEST_DB)

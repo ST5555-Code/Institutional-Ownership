@@ -8,12 +8,11 @@ Run: python3 scripts/fetch_market.py
 """
 
 import os
-import sys
 import time
 import pandas as pd
 import duckdb
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # ---------------------------------------------------------------------------
 # Config
@@ -102,7 +101,7 @@ def fetch_market_data(tickers):
 
                     records.append(record)
 
-                except Exception as e:
+                except Exception:
                     failed.append(tkr_str)
 
         except Exception as e:
@@ -127,7 +126,7 @@ def fetch_market_data(tickers):
 
 
 def save_market_data(con, df_market):
-    """Upsert market_data table — insert new, update existing."""
+    """Upsert market_data table — never drops existing data."""
     print("\nSaving market_data table...")
 
     try:
@@ -138,10 +137,10 @@ def save_market_data(con, df_market):
 
     if not table_exists:
         con.execute("CREATE TABLE market_data AS SELECT * FROM df_market")
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_market_ticker ON market_data(ticker)")
     else:
-        # Delete existing rows for tickers we're updating, then insert
-        tickers = df_market["ticker"].tolist()
-        if tickers:
+        # Upsert: delete-then-insert for tickers in this batch only
+        if len(df_market) > 0:
             con.execute("DELETE FROM market_data WHERE ticker IN (SELECT ticker FROM df_market)")
             con.execute("INSERT INTO market_data SELECT * FROM df_market")
 

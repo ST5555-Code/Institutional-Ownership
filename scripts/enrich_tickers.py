@@ -11,9 +11,7 @@ Run: python3 scripts/enrich_tickers.py
 """
 
 import os
-import sys
 import time
-import json
 import re
 import requests
 import pandas as pd

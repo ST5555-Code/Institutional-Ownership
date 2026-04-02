@@ -7,7 +7,6 @@ Run: python3 scripts/load_13f.py
 """
 
 import os
-import sys
 import duckdb
 import time
 
@@ -18,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXTRACT_DIR = os.path.join(BASE_DIR, "data", "extracted")
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 
-from config import QUARTERS, QUARTER_REPORT_DATES
+from config import QUARTERS
 
 
 def load_quarter(con, quarter):

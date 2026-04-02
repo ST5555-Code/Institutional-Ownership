@@ -15,8 +15,6 @@ Run: python3 scripts/fetch_ncen.py                  # Full build
 
 import argparse
 import os
-import re
-import sys
 import time
 from datetime import datetime
 
@@ -55,7 +53,7 @@ def sec_get(url, max_retries=3):
                 continue
             if resp.status_code == 404:
                 return None
-        except requests.RequestException as e:
+        except requests.RequestException:
             if attempt < max_retries - 1:
                 time.sleep(5)
     return None
@@ -362,7 +360,7 @@ def run(test_mode=False):
     """).fetchone()[0]
 
     print(f"\n{'='*60}")
-    print(f"SUMMARY")
+    print("SUMMARY")
     print(f"{'='*60}")
     print(f"Total ncen_adviser_map rows: {total}")
     for role, cnt in roles:

@@ -10,7 +10,6 @@ Usage:
     python3 scripts/compute_flows.py
 """
 
-import os
 import sys
 import time
 from datetime import datetime
@@ -19,21 +18,10 @@ import duckdb
 import pandas as pd
 
 from db import get_db_path
+from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, FLOW_PERIODS
 
-PERIODS = [
-    ('4Q', '2025Q1', '2025Q4'),
-    ('2Q', '2025Q3', '2025Q4'),
-    ('1Q', '2025Q3', '2025Q4'),  # 1Q = most recent quarter only
-]
-
-# For 2Q period, Q from is actually Q2 not Q3 — fix:
-PERIODS = [
-    ('4Q', '2025Q1', '2025Q4'),
-    ('2Q', '2025Q2', '2025Q4'),
-    ('1Q', '2025Q3', '2025Q4'),
-]
-
-LATEST_Q = '2025Q4'
+PERIODS = FLOW_PERIODS
+LATEST_Q = LATEST_QUARTER
 
 
 def create_tables(con):
@@ -83,7 +71,7 @@ def create_tables(con):
 def compute_ticker_flows(con, ticker, market_cap):
     """Compute all flow metrics for a single ticker."""
     # Get parent-level holdings for each quarter
-    quarters = ['2025Q1', '2025Q2', '2025Q3', '2025Q4']
+    quarters = QUARTERS
     qdata = {}
     for q in quarters:
         df = con.execute("""
@@ -244,11 +232,11 @@ def main():
     create_tables(con)
 
     # Get all tickers with Q4 holdings + market cap
-    tickers = con.execute("""
+    tickers = con.execute(f"""
         SELECT DISTINCT h.ticker, m.market_cap
         FROM holdings h
         LEFT JOIN market_data m ON h.ticker = m.ticker
-        WHERE h.quarter = '2025Q4' AND h.ticker IS NOT NULL AND h.ticker != ''
+        WHERE h.quarter = '{LATEST_Q}' AND h.ticker IS NOT NULL AND h.ticker != ''
     """).fetchdf()
 
     total = len(tickers)

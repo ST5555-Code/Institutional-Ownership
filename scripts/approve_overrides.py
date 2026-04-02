@@ -6,7 +6,6 @@ Run: python3 scripts/approve_overrides.py
 """
 
 import os
-import sys
 import time
 from datetime import datetime
 
@@ -120,7 +119,7 @@ def fetch_market_for_tickers(tickers, con):
                     "price_2025Q3": None, "price_2025Q4": None,
                 }
                 df = pd.DataFrame([rec])
-                con.execute("INSERT INTO market_data SELECT * FROM df")
+                con.execute("INSERT INTO market_data SELECT * FROM d")
                 mc = f"${info['marketCap']/1e9:.0f}B" if info.get("marketCap") else "N/A"
                 print(f"  {tkr_str}: ${info['regularMarketPrice']:.2f}, mktcap {mc}")
         except Exception as e:
@@ -129,12 +128,12 @@ def fetch_market_for_tickers(tickers, con):
 
     # Update holdings
     tickers_str = ",".join(f"'{t}'" for t in tickers)
-    con.execute(f"""
+    con.execute("""
         UPDATE holdings h SET market_value_live = h.shares * m.price_live
         FROM market_data m WHERE h.ticker = m.ticker AND h.ticker IN ({tickers_str})
           AND h.market_value_live IS NULL
     """)
-    con.execute(f"""
+    con.execute("""
         UPDATE holdings h SET pct_of_float = ROUND(h.shares * 100.0 / m.float_shares, 4)
         FROM market_data m WHERE h.ticker = m.ticker AND m.float_shares > 0
           AND h.ticker IN ({tickers_str}) AND h.pct_of_float IS NULL
@@ -225,7 +224,7 @@ def main():
                 existing_log = pd.read_csv(LOG_PATH, dtype=str)
                 log_row = pd.concat([existing_log, log_row], ignore_index=True)
             log_row.to_csv(LOG_PATH, index=False)
-            print(f"  → Rejected\n")
+            print("  → Rejected\n")
 
     # Save remaining to pending file
     if remaining:

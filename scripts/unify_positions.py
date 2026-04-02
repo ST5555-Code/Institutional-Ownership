@@ -10,9 +10,6 @@ Run: python3 scripts/unify_positions.py
 """
 
 import os
-import sys
-import time
-from datetime import datetime
 
 import duckdb
 

@@ -12,7 +12,6 @@ Run: python3 scripts/build_summaries.py              # incremental (latest quart
 
 import argparse
 import os
-from datetime import datetime
 
 import duckdb
 

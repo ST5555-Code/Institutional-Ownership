@@ -198,7 +198,7 @@ def download_xml(cik, accession_number, quarter_label):
             f.write(r.content)
         time.sleep(SEC_DELAY)
         return r.content
-    except Exception as e:
+    except Exception:
         # Some filings use different XML filenames — try index page
         try:
             idx_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_fmt}/{accession_number}-index.htm"
@@ -316,8 +316,6 @@ def classify_fund(metadata, holdings):
         return False, "empty", False
 
     equity_count = cats.get("EC", 0) + cats.get("EP", 0)
-    debt_count = cats.get("DBT", 0) + cats.get("ABS-MBS", 0) + cats.get("ABS-O", 0)
-    equity_pct = equity_count / total if total > 0 else 0
 
     # Compute value-weighted equity percentage
     total_val = sum(float(h.get("val_usd") or 0) for h in holdings)
@@ -514,7 +512,7 @@ def update_fund_universe(con, metadata, holdings, fund_category):
 
 def enrich_tickers(con):
     """Join fund_holdings to securities table to fill missing tickers."""
-    result = con.execute("""
+    con.execute("""
         UPDATE fund_holdings
         SET ticker = s.ticker
         FROM securities s
@@ -705,7 +703,7 @@ def run_test(con, filing_index):
         FROM fund_holdings
         GROUP BY quarter ORDER BY quarter
     """).fetchdf()
-    print(f"\nHoldings by quarter:")
+    print("\nHoldings by quarter:")
     print(q_counts.to_string(index=False))
 
     # Top 5 holdings by value for each test fund (latest quarter)
@@ -713,7 +711,7 @@ def run_test(con, filing_index):
     for _, fund_row in funds.iterrows():
         sid = fund_row["series_id"]
         fname = fund_row["fund_name"]
-        top5 = con.execute(f"""
+        top5 = con.execute("""
             SELECT issuer_name, cusip, ticker,
                    ROUND(market_value_usd / 1e6, 1) as value_mm,
                    ROUND(pct_of_nav, 2) as pct_nav,
@@ -840,7 +838,7 @@ def main():
             SELECT quarter, COUNT(DISTINCT series_id) as funds, COUNT(*) as holdings
             FROM fund_holdings GROUP BY quarter ORDER BY quarter
         """).fetchdf()
-        print(f"\n  By quarter:")
+        print("\n  By quarter:")
         print(q_summary.to_string(index=False))
     except Exception:
         pass

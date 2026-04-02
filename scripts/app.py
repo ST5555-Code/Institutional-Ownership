@@ -7,7 +7,6 @@ import argparse
 import io
 import os
 import shutil
-import sys
 from datetime import datetime
 
 import duckdb
@@ -21,7 +20,7 @@ LQ = LATEST_QUARTER   # latest quarter for all queries (e.g. '{LQ}')
 FQ = FIRST_QUARTER    # first quarter for comparisons (e.g. '{FQ}')
 PQ = PREV_QUARTER     # previous quarter (e.g. '{PQ}')
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill, numbers
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
@@ -73,12 +72,67 @@ def _resolve_db_path():
 
 # Resolved once at import/startup; updated if needed
 _active_db_path = None
+_switchback_running = False
+_available_tables = set()
+
+
+def _start_switchback_monitor():
+    """Background thread: check every 60s if primary DB is available again."""
+    import threading
+    global _switchback_running
+    if _switchback_running:
+        return
+    _switchback_running = True
+
+    def _monitor():
+        global _active_db_path, _switchback_running
+        import time as _time
+        while True:
+            _time.sleep(60)
+            if _active_db_path == DB_PATH:
+                _switchback_running = False
+                return
+            try:
+                con = duckdb.connect(DB_PATH, read_only=True)
+                con.close()
+                _active_db_path = DB_PATH
+                _refresh_table_list()
+                app.logger.info("[switchback] Primary DB available — switched back from snapshot")
+                _switchback_running = False
+                return
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_monitor, daemon=True)
+    t.start()
+
+
+def _refresh_table_list():
+    """Cache available table names."""
+    global _available_tables
+    try:
+        path = _active_db_path or _resolve_db_path()
+        con = duckdb.connect(path, read_only=True)
+        _available_tables = {t[0] for t in con.execute("SHOW TABLES").fetchall()}
+        con.close()
+    except Exception:
+        pass
+
+
+def has_table(name):
+    """Check if a table exists (cached, no per-request query)."""
+    if not _available_tables:
+        _refresh_table_list()
+    return name in _available_tables
 
 
 def _init_db_path():
     """Resolve the database path at startup."""
     global _active_db_path
     _active_db_path = _resolve_db_path()
+    _refresh_table_list()
+    if _active_db_path != DB_PATH:
+        _start_switchback_monitor()
 
 
 def get_db():
@@ -86,12 +140,17 @@ def get_db():
     global _active_db_path
     if _active_db_path is None:
         _active_db_path = _resolve_db_path()
+        _refresh_table_list()
+        if _active_db_path != DB_PATH:
+            _start_switchback_monitor()
     try:
         return duckdb.connect(_active_db_path, read_only=True)
     except Exception as e:
         app.logger.warning(f"[get_db] Connection stale, re-resolving: {e}")
-        # The previously resolved path may have become stale; re-resolve
         _active_db_path = _resolve_db_path()
+        _refresh_table_list()
+        if _active_db_path != DB_PATH:
+            _start_switchback_monitor()
         return duckdb.connect(_active_db_path, read_only=True)
 
 
@@ -371,8 +430,7 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
     whose name fuzzy-matches the 13F parent institution.
     Returns list of child row dicts or None.
     """
-    tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-    if 'ncen_adviser_map' not in tables:
+    if not has_table('ncen_adviser_map'):
         return None
 
     try:
@@ -809,7 +867,7 @@ def query3(ticker):
         records = df_to_records(df)
 
         # Check if investor_flows table exists
-        has_flows = 'investor_flows' in [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+        has_flows = has_table('investor_flows')
 
         results = []
         for row in records:
@@ -970,8 +1028,7 @@ def query6(ticker):
     """Activist & beneficial ownership tracker — combines 13D/G and 13F data."""
     con = get_db()
     try:
-        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-        has_bo = 'beneficial_ownership_current' in tables
+        has_bo = has_table('beneficial_ownership_current')
 
         sections = {}
 
@@ -1504,8 +1561,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
     con = get_db()
     try:
         # Check if pre-computed tables exist
-        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-        has_precomputed = 'investor_flows' in tables and 'ticker_flow_stats' in tables
+        has_precomputed = has_table('investor_flows') and has_table('ticker_flow_stats')
 
         if not has_precomputed:
             # Fallback: return empty with message
@@ -1879,8 +1935,7 @@ def api_short_volume():
         return jsonify({'error': 'Missing ticker parameter'}), 400
     con = get_db()
     try:
-        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-        if 'short_interest' not in tables:
+        if not has_table('short_interest'):
             return jsonify({'error': 'short_interest table not loaded — run fetch_finra_short.py'}), 404
         df = con.execute("""
             SELECT report_date, short_volume, total_volume, short_pct
@@ -2155,8 +2210,7 @@ def api_peer_groups():
     """Return all peer groups."""
     con = get_db()
     try:
-        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-        if 'peer_groups' not in tables:
+        if not has_table('peer_groups'):
             return jsonify([])
         df = con.execute("""
             SELECT group_id, group_name, ticker, company_name, is_primary

@@ -17,7 +17,6 @@ Run: python3 scripts/fetch_finra_short.py                     # Last 30 trading 
 
 import argparse
 import os
-import sys
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -31,7 +30,7 @@ from tqdm import tqdm
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, set_test_mode, assert_write_safe, crash_handler
+from db import get_db_path, set_test_mode, crash_handler
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
 FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -220,7 +219,7 @@ def run(days=30, update_mode=False, test_mode=False):
         chunk = 50_000
         for i in range(0, len(all_rows), chunk):
             batch_insert(con, all_rows[i:i + chunk])
-        print(f"  Done.")
+        print("  Done.")
     else:
         print("\n  No new data to insert.")
 

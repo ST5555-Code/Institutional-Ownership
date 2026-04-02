@@ -10,7 +10,6 @@ Run: python3 scripts/build_fund_classes.py
 
 import glob
 import os
-import sys
 from datetime import datetime
 
 import duckdb
@@ -158,7 +157,7 @@ def run():
     unique_series = con.execute("SELECT COUNT(DISTINCT series_id) FROM fund_classes").fetchone()[0]
 
     print(f"\n{'='*60}")
-    print(f"SUMMARY")
+    print("SUMMARY")
     print(f"{'='*60}")
     print(f"Fund classes: {total_classes} (new: {classes_added})")
     print(f"Unique series with classes: {unique_series}")

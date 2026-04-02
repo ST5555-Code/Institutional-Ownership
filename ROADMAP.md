@@ -58,14 +58,18 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| 19 | Centralize quarter config — one shared module imported by all scripts | High | Eliminates update risk; every rollover currently requires touching 4+ files |
-| 20 | Incremental market data refresh — only fetch missing/stale tickers in `fetch_market.py` | High | Cuts runtime from hours to minutes on update runs |
-| 21 | Materialized summary tables for Flask — keyed by (quarter, ticker) and (quarter, parent_name) | High | Fixes app responsiveness; most-used queries hit 12M row holdings table on every request |
-| 22 | Replace broad `except Exception: return None` with logged exceptions in `app.py` | High | One-line change per instance; makes production debugging possible |
+| 19 | Centralize quarter config | Done | `config.py` created, imported by fetch_13f, load_13f, fetch_market, build_summaries, compute_flows. app.py SQL quarters need dedicated pass (60+ queries) |
+| 20 | Incremental market data refresh | Done | `get_stale_tickers()` skips tickers fetched <7 days. `save_market_data()` upserts, never drops |
+| 21 | Materialized summary tables | Done | `build_summaries.py` creates `summary_by_ticker` + `summary_by_parent`. --rebuild flag |
+| 22 | Logged exceptions in app.py | Done | All bare `except Exception:` replaced with `as e` + `app.logger.error()` in endpoint handlers |
 | 23 | Incremental `load_13f.py` — append + rebuild latest quarter only | Medium | Grows in importance as dataset expands; not urgent at current size |
 | 24 | OpenFIGI + yfinance persistent cache in `build_cusip.py` | Medium | Currently does 5,000 OpenFIGI lookups from scratch every run |
-| 25 | Readonly snapshot auto-refresh after full build | Medium | Add to `start_app.sh` or post-fetch script |
+| 25 | Readonly snapshot auto-refresh after full build | Medium | Add to `start_app.sh` or post-fetch script. Bug 7 switchback monitor added |
 | 26 | Benchmark script — time each pipeline stage | Low | Nice to have; not urgent |
+| 27 | app.py quarter centralization — convert 60+ SQL strings to use config.py vars | Medium | Requires f-string conversion of triple-quoted SQL; deferred for dedicated pass |
+| 28 | Pyflakes cleanup — unused imports removed from 17 scripts | Done | 31 unused imports fixed |
+| 29 | SHOW TABLES removed from Flask endpoints — cached via `has_table()` | Done | 6 per-request queries replaced with startup-time cache |
+| 30 | Snapshot switchback monitor — background thread auto-recovers from snapshot | Done | 60s polling, logs switchover |
 
 ---
 

@@ -9,7 +9,6 @@ Run: python3 scripts/build_managers.py
 """
 
 import os
-import sys
 import duckdb
 import pandas as pd
 from rapidfuzz import fuzz, process
