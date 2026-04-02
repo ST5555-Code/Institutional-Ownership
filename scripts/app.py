@@ -353,13 +353,26 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
              'type': r.get('type'), 'source': '13F'} for r in rows]
 
 
-def get_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
+def get_children(inst_parent_name, ticker, cusip, quarter, con,
+                  limit=5, parent_shares=None):
     """Get child rows: N-PORT fund series first, 13F entity fallback.
+
+    Only uses N-PORT children if they cover at least 10% of the parent's
+    13F-reported shares. This prevents showing tiny niche funds when the
+    bulk of the position is in large index funds not in our N-PORT data.
 
     Returns (children_list, source_type) where source_type is 'N-PORT' or '13F'.
     """
     nport = get_nport_children(inst_parent_name, ticker, quarter, con, limit)
     if nport and len(nport) >= 1:
+        # Coverage check: do N-PORT children represent a meaningful fraction?
+        nport_shares = sum(c.get('shares') or 0 for c in nport)
+        if parent_shares and parent_shares > 0 and nport_shares > 0:
+            coverage = nport_shares / parent_shares
+            if coverage < 0.10:
+                # N-PORT covers less than 10% — misleading, fall back to 13F
+                fallback = get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit)
+                return fallback, '13F'
         return nport, 'N-PORT'
     fallback = get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit)
     return fallback, '13F'
@@ -448,7 +461,8 @@ def query1(ticker):
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
-            children, src = get_children(pname, ticker, cusip, '2025Q4', con, limit=5)
+            children, src = get_children(pname, ticker, cusip, '2025Q4', con, limit=5,
+                                        parent_shares=parent['total_shares'])
             effective_children = len(children)
 
             results.append({
@@ -1275,155 +1289,113 @@ def cohort_analysis(ticker):
         con.close()
 
 
-def flow_analysis(ticker):
-    """Comprehensive flow analysis: net flows, intensity, momentum, churn.
+def flow_analysis(ticker, period='4Q', peers=None):
+    """Flow analysis using pre-computed investor_flows and ticker_flow_stats tables.
 
-    TODO: Add expandable N-PORT fund series children to Net Flows rows
-    using get_children() utility. Currently shows flat parent-level rows.
+    Falls back to live computation if pre-computed tables do not exist.
     """
+    period_map = {'4Q': '2025Q1', '2Q': '2025Q2', '1Q': '2025Q3'}
+    quarter_from = period_map.get(period, '2025Q1')
+    quarter_to = '2025Q4'
+
     con = get_db()
     try:
-        mkt_row = con.execute(
-            "SELECT price_live, market_cap FROM market_data WHERE ticker = ?", [ticker]
-        ).fetchone()
-        price = mkt_row[0] if mkt_row and mkt_row[0] else None
-        market_cap = mkt_row[1] if mkt_row and mkt_row[1] else None
+        # Check if pre-computed tables exist
+        tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
+        has_precomputed = 'investor_flows' in tables and 'ticker_flow_stats' in tables
 
-        # Section 1 — Net Flows
-        flows_df = con.execute("""
-            WITH q1 AS (
-                SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                       MAX(manager_type) as type, SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
-            ),
-            q4 AS (
-                SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                       MAX(manager_type) as type, SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
-            )
-            SELECT COALESCE(q4.investor, q1.investor) as investor,
-                   COALESCE(q4.type, q1.type) as type,
-                   COALESCE(q4.shares, 0) - COALESCE(q1.shares, 0) as net_shares,
-                   q1.value as q1_value, q4.value as q4_value
-            FROM q4 FULL OUTER JOIN q1 ON q4.investor = q1.investor
-            ORDER BY net_shares DESC
-        """, [ticker, ticker]).fetchdf()
+        if not has_precomputed:
+            # Fallback: return empty with message
+            return {'error': 'Flow data not yet computed. Run scripts/compute_flows.py first.',
+                    'buyers': [], 'sellers': [], 'new_entries': [], 'exits': [],
+                    'charts': {'flow_intensity': [], 'churn': []}}
 
-        flows = df_to_records(flows_df)
-        net_flows = []
-        all_paf = []
-        for row in flows:
-            ns = row.get('net_shares') or 0
-            q1v = row.get('q1_value') or 0
-            q4v = row.get('q4_value') or 0
-            paf = ns * price if price else None
-            raw = q4v - q1v
-            entry = {
-                'investor': row.get('investor'), 'type': row.get('type'),
-                'net_shares': ns, 'price_adj_flow': paf, 'raw_flow': raw,
-                'price_effect': (raw - paf) if paf is not None else None,
-                'direction': 'BUY' if ns > 0 else ('SELL' if ns < 0 else 'HOLD'),
-            }
-            net_flows.append(entry)
-            all_paf.append({'type': row.get('type'), 'paf': paf or 0})
+        # Check if this ticker has data
+        cnt = con.execute(
+            "SELECT COUNT(*) FROM investor_flows WHERE ticker = ? AND quarter_from = ?",
+            [ticker, quarter_from]
+        ).fetchone()[0]
+        if cnt == 0:
+            return {'error': 'No flow data for this ticker/period.',
+                    'buyers': [], 'sellers': [], 'new_entries': [], 'exits': [],
+                    'charts': {'flow_intensity': [], 'churn': []}}
 
-        buyers = [r for r in net_flows if r['direction'] == 'BUY'][:25]
-        sellers = [r for r in net_flows if r['direction'] == 'SELL'][-25:]
-        net_flows_out = buyers + sellers
+        # Implied prices
+        ip = con.execute("""
+            SELECT SUM(market_value_usd) / 1000.0 / NULLIF(SUM(shares), 0)
+            FROM holdings WHERE ticker = ? AND quarter = ? AND shares > 0
+        """, [ticker, quarter_from]).fetchone()
+        implied_from = ip[0] if ip and ip[0] else None
+        ip2 = con.execute("""
+            SELECT SUM(market_value_usd) / 1000.0 / NULLIF(SUM(shares), 0)
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q4' AND shares > 0
+        """, [ticker]).fetchone()
+        implied_to = ip2[0] if ip2 and ip2[0] else None
 
-        # Section 2 — Flow Intensity
-        total_paf = sum(r['paf'] for r in all_paf)
-        active_paf = sum(r['paf'] for r in all_paf if r.get('type') != 'passive')
-        passive_paf = sum(r['paf'] for r in all_paf if r.get('type') == 'passive')
-        if market_cap and market_cap > 0:
-            flow_intensity = {
-                'total_flow_intensity': round(total_paf / market_cap * 100, 4),
-                'active_flow_intensity': round(active_paf / market_cap * 100, 4),
-                'passive_flow_intensity': round(passive_paf / market_cap * 100, 4),
-            }
-        else:
-            flow_intensity = {'total_flow_intensity': None, 'active_flow_intensity': None, 'passive_flow_intensity': None}
+        # Fetch flows for this period
+        df = con.execute("""
+            SELECT inst_parent_name, manager_type, from_shares, to_shares, net_shares,
+                   pct_change, from_value, to_value, from_price,
+                   price_adj_flow, raw_flow, price_effect,
+                   is_new_entry, is_exit, flow_4q, flow_2q,
+                   momentum_ratio, momentum_signal
+            FROM investor_flows
+            WHERE ticker = ? AND quarter_from = ?
+            ORDER BY price_adj_flow DESC NULLS LAST
+        """, [ticker, quarter_from]).fetchdf()
+        rows = df_to_records(df)
 
-        # Section 3 — Momentum
-        mom_df = con.execute("""
-            WITH q1 AS (
-                SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                       MAX(manager_type) as type, SUM(shares) as shares
-                FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
-            ),
-            q3 AS (
-                SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                       MAX(manager_type) as type, SUM(shares) as shares
-                FROM holdings WHERE ticker = ? AND quarter = '2025Q3' GROUP BY investor
-            ),
-            q4 AS (
-                SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                       MAX(manager_type) as type, SUM(shares) as shares
-                FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
-            )
-            SELECT COALESCE(q4.investor, COALESCE(q3.investor, q1.investor)) as investor,
-                   COALESCE(q4.type, COALESCE(q3.type, q1.type)) as type,
-                   COALESCE(q4.shares, 0) as q4s, COALESCE(q3.shares, 0) as q3s, COALESCE(q1.shares, 0) as q1s
-            FROM q4 FULL OUTER JOIN q3 ON q4.investor = q3.investor
-            FULL OUTER JOIN q1 ON COALESCE(q4.investor, q3.investor) = q1.investor
-        """, [ticker, ticker, ticker]).fetchdf()
+        # Add subadviser notes
+        for r in rows:
+            r['subadviser_note'] = get_subadviser_note(r.get('inst_parent_name'))
 
-        momentum = []
-        for row in df_to_records(mom_df):
-            q1s = row.get('q1s') or 0
-            q3s = row.get('q3s') or 0
-            q4s = row.get('q4s') or 0
+        # Split into categories
+        buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
+                  and r.get('price_adj_flow') is not None and r['price_adj_flow'] > 0][:25]
+        sellers_all = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
+                       and r.get('price_adj_flow') is not None and r['price_adj_flow'] < 0]
+        sellers = sellers_all[-25:] if len(sellers_all) > 25 else sellers_all
+        new_entries = [r for r in rows if r.get('is_new_entry')]
+        new_entries.sort(key=lambda x: x.get('to_value') or 0, reverse=True)
+        new_entries = new_entries[:25]
+        exits = [r for r in rows if r.get('is_exit')]
+        exits.sort(key=lambda x: x.get('from_value') or 0, reverse=True)
+        exits = exits[:25]
 
-            # Skip institutions with no Q1 position — they are new entries, not momentum candidates
-            if q1s == 0:
-                # Only include if they also have a Q4 position (NEW entry)
-                if q4s > 0:
-                    f4q = q4s * price if price else 0
-                    f2q = (q4s - q3s) * price if price else 0
-                    momentum.append({'investor': row.get('investor'), 'type': row.get('type'),
-                                    'flow_4q': f4q, 'flow_2q': f2q, 'momentum': None, 'signal': 'NEW'})
-                continue
+        # Charts: flow intensity and churn for ticker + peers
+        chart_tickers = [ticker]
+        if peers:
+            chart_tickers += [t.strip() for t in peers.split(',') if t.strip()]
 
-            f4q = (q4s - q1s) * price if price else 0
-            f2q = (q4s - q3s) * price if price else 0
-            m = f2q / f4q if f4q != 0 else None
-            sig = None
-            if m is not None:
-                sig = 'ACCEL' if m > 1.2 else ('BUILD' if m >= 0.8 else ('STEADY' if m >= 0.3 else ('FADING' if m >= 0 else 'REVERSING')))
-            momentum.append({'investor': row.get('investor'), 'type': row.get('type'),
-                            'flow_4q': f4q, 'flow_2q': f2q,
-                            'momentum': round(m, 4) if m is not None else None, 'signal': sig})
-        momentum.sort(key=lambda x: abs(x.get('flow_4q') or 0), reverse=True)
-
-        # Section 4 — Churn
-        q1h = con.execute("""
-            SELECT COALESCE(inst_parent_name, manager_name) as investor, MAX(manager_type) as type
-            FROM holdings WHERE ticker = ? AND quarter = '2025Q1' GROUP BY investor
-        """, [ticker]).fetchdf()
-        q4h = con.execute("""
-            SELECT COALESCE(inst_parent_name, manager_name) as investor, MAX(manager_type) as type
-            FROM holdings WHERE ticker = ? AND quarter = '2025Q4' GROUP BY investor
-        """, [ticker]).fetchdf()
-
-        q1a = {r['investor']: r['type'] for r in df_to_records(q1h)}
-        q4a = {r['investor']: r['type'] for r in df_to_records(q4h)}
-
-        def _churn(s1, s4, label):
-            c1, c4 = len(s1), len(s4)
-            ne, ex = s4 - s1, s1 - s4
-            avg = (c1 + c4) / 2 if (c1 + c4) > 0 else 1
-            return {'label': label, 'q1_holders': c1, 'q4_holders': c4,
-                    'new_entries': len(ne), 'exits': len(ex), 'churn_rate': round((len(ne) + len(ex)) / avg * 100, 2)}
-
-        overall = _churn(set(q1a), set(q4a), 'overall')
-        active_c = _churn({i for i in q1a if q1a[i] != 'passive'}, {i for i in q4a if q4a.get(i) != 'passive'}, 'active')
-        passive_c = _churn({i for i in q1a if q1a[i] == 'passive'}, {i for i in q4a if q4a.get(i) == 'passive'}, 'passive')
-        rate = overall['churn_rate']
-        stability = 'LOW' if rate < 20 else ('MODERATE' if rate < 40 else ('HIGH' if rate < 60 else 'ELEVATED'))
+        chart_data = []
+        for t in chart_tickers:
+            stat = con.execute("""
+                SELECT flow_intensity_total, flow_intensity_active, flow_intensity_passive,
+                       churn_overall, churn_active, churn_passive
+                FROM ticker_flow_stats
+                WHERE ticker = ? AND quarter_from = ?
+            """, [t, quarter_from]).fetchone()
+            if stat:
+                chart_data.append({
+                    'ticker': t,
+                    'flow_intensity_total': stat[0], 'flow_intensity_active': stat[1],
+                    'flow_intensity_passive': stat[2],
+                    'churn_overall': stat[3], 'churn_active': stat[4], 'churn_passive': stat[5],
+                })
 
         return clean_for_json({
-            'net_flows': net_flows_out, 'flow_intensity': flow_intensity,
-            'momentum': momentum[:25], 'churn': {'overall': overall, 'active': active_c, 'passive': passive_c, 'stability_signal': stability},
+            'period': period,
+            'quarter_from': quarter_from,
+            'quarter_to': quarter_to,
+            'implied_prices': {quarter_from: implied_from, quarter_to: implied_to},
+            'buyers': buyers,
+            'sellers': sellers,
+            'new_entries': new_entries,
+            'exits': exits,
+            'charts': {
+                'flow_intensity': chart_data,
+                'churn': chart_data,
+            },
         })
     finally:
         con.close()
@@ -1693,10 +1665,12 @@ def api_cohort_analysis():
 @app.route('/api/flow_analysis')
 def api_flow_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
+    period = request.args.get('period', '4Q').upper().strip()
+    peers = request.args.get('peers', '').upper().strip() or None
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = flow_analysis(ticker)
+        result = flow_analysis(ticker, period=period, peers=peers)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -630,6 +630,94 @@ body {
     opacity: 1;
 }
 
+/* === Negative/positive number formatting === */
+.negative { color: #C0392B; }
+.positive { color: #27AE60; }
+
+/* Momentum signal badges */
+.badge-new { background: #EBF7ED; color: #27AE60; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; }
+.badge-exit { background: #FBEBEB; color: #C0392B; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; }
+.badge-accel { background: #EBF7ED; color: #1A8A4A; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-steady { background: #F5F5F5; color: #666; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-fading { background: #FFF8EB; color: #E67E22; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-reversing { background: #FBEBEB; color: #C0392B; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-minimal { background: #F5F5F5; color: #999; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+
+/* Flow Analysis sections */
+.flow-section {
+    margin-bottom: 16px;
+}
+
+.flow-section-header {
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--oxford-blue);
+    border-bottom: 1px solid var(--mid-grey);
+}
+
+.flow-footnote {
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Period selector */
+.period-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.period-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--mid-grey);
+    background: var(--white);
+    color: var(--text-secondary);
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.period-btn.active {
+    background: var(--oxford-blue);
+    color: var(--white);
+    border-color: var(--oxford-blue);
+}
+
+/* Chart cards */
+.charts-row {
+    display: flex;
+    gap: 16px;
+    padding: 12px 14px;
+}
+
+.chart-card {
+    flex: 1;
+    min-width: 0;
+    background: var(--white);
+    border: 1px solid var(--mid-grey);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.chart-card h3 {
+    font-size: 13px;
+    color: var(--oxford-blue);
+    margin-bottom: 8px;
+}
+
+/* Row tints for flow sections */
+.row-buyer td { background-color: #F0FBF4 !important; }
+.row-seller td { background-color: #FDF0F0 !important; }
+.row-new-entry td { background-color: #EBF3FB !important; }
+
 /* === Sub-view bar (used by Ownership Trend, New/Exits) === */
 .sub-view-bar {
     display: flex;

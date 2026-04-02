@@ -39,37 +39,46 @@ const loadPortfolioBtn = document.getElementById('load-portfolio-btn');
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
+function _negWrap(formatted, val) {
+    // Wrap negative values in span with class for red coloring
+    if (val < 0) return '<span class="negative">(' + formatted + ')</span>';
+    return formatted;
+}
+
 function fmtDollars(val) {
     if (val == null || val === 0) return '\u2014';
     const abs = Math.abs(val);
-    const sign = val < 0 ? '-' : '';
-    if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(1) + 'T';
-    if (abs >= 1e9)  return sign + '$' + (abs / 1e9).toFixed(1) + 'B';
-    if (abs >= 1e6)  return sign + '$' + (abs / 1e6).toFixed(0) + 'M';
-    if (abs >= 1e3)  return sign + '$' + (abs / 1e3).toFixed(0) + 'K';
-    return sign + '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    let s;
+    if (abs >= 1e12) s = '$' + (abs / 1e12).toFixed(1) + 'T';
+    else if (abs >= 1e9) s = '$' + (abs / 1e9).toFixed(1) + 'B';
+    else if (abs >= 1e6) s = '$' + (abs / 1e6).toFixed(0) + 'M';
+    else if (abs >= 1e3) s = '$' + (abs / 1e3).toFixed(0) + 'K';
+    else s = '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    return _negWrap(s, val);
 }
 
 function fmtShares(val) {
     if (val == null || val === 0) return '\u2014';
     const abs = Math.abs(val);
-    const sign = val < 0 ? '-' : '';
-    if (abs >= 1e9) return sign + (abs / 1e9).toFixed(1) + 'B';
-    if (abs >= 1e6) return sign + (abs / 1e6).toFixed(1) + 'M';
-    if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + 'K';
-    return sign + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    let s;
+    if (abs >= 1e9) s = (abs / 1e9).toFixed(1) + 'B';
+    else if (abs >= 1e6) s = (abs / 1e6).toFixed(1) + 'M';
+    else if (abs >= 1e3) s = (abs / 1e3).toFixed(1) + 'K';
+    else s = abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    return _negWrap(s, val);
 }
 
 function fmtPct(val) {
     if (val == null || val === 0) return '\u2014';
-    return val.toFixed(2) + '%';
+    const abs = Math.abs(val);
+    return _negWrap(abs.toFixed(2) + '%', val);
 }
 
 function fmtNum(val) {
     if (val == null) return '\u2014';
     if (typeof val === 'number') {
         if (val === 0) return '\u2014';
-        return val.toLocaleString('en-US', {maximumFractionDigits: 2});
+        return _negWrap(Math.abs(val).toLocaleString('en-US', {maximumFractionDigits: 2}), val);
     }
     return String(val);
 }
@@ -670,7 +679,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
             }
             // --- Change/delta columns: red/green coloring ---
             else if (isChangeCol(col) && typeof val === 'number' && val !== 0) {
-                td.textContent = formatCell(val, fmtType(col));
+                td.innerHTML = formatCell(val, fmtType(col));
                 td.style.color = val < 0 ? '#C0392B' : '#27AE60';
             }
             // --- Source column: render as badge with optional tooltip ---
@@ -702,7 +711,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
             }
             // --- All other columns ---
             else {
-                td.textContent = formatCell(val, fmtType(col));
+                td.innerHTML = formatCell(val, fmtType(col));
             }
             tr.appendChild(td);
         });
@@ -902,21 +911,55 @@ function renderCohort(data) {
 }
 
 // ---------------------------------------------------------------------------
-// Flow Analysis tab
+// Flow Analysis tab — period selector, 4 sections, charts
 // ---------------------------------------------------------------------------
+let _flowPeriod = '4Q';
+
 async function loadFlowAnalysis() {
-    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    clearError(); tableWrap.innerHTML = '';
+
+    // Period selector
+    const pbar = document.createElement('div');
+    pbar.className = 'period-selector';
+    const label = document.createElement('span');
+    label.textContent = 'Period:';
+    pbar.appendChild(label);
+    ['4Q', '2Q', '1Q'].forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'period-btn' + (p === _flowPeriod ? ' active' : '');
+        btn.textContent = p;
+        btn.addEventListener('click', () => { _flowPeriod = p; loadFlowAnalysis(); });
+        pbar.appendChild(btn);
+    });
+    tableWrap.appendChild(pbar);
+
+    showSpinner();
+    // Get peers from cross-ownership if available
+    const peers = getCOTickers().filter(t => t !== currentTicker).join(',');
+    const url = `/api/flow_analysis?ticker=${currentTicker}&period=${_flowPeriod}&peers=${peers}`;
     try {
-        const res = await fetch(`/api/flow_analysis?ticker=${currentTicker}`);
+        const res = await fetch(url);
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
         const data = await res.json();
         hideSpinner();
+        const savedBar = tableWrap.querySelector('.period-selector');
         renderFlowAnalysis(data);
+        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
     } catch (e) { hideSpinner(); showError(e.message); }
 }
 
-function _buildSimpleTable(rows, cols) {
-    /** Build a data-table element without clearing tableWrap. */
+function _signalBadge(signal) {
+    if (!signal) return '\u2014';
+    const map = {
+        NEW: 'badge-new', EXIT: 'badge-exit', ACCEL: 'badge-accel',
+        STEADY: 'badge-steady', FADING: 'badge-fading',
+        REVERSING: 'badge-reversing', MINIMAL: 'badge-minimal',
+    };
+    const cls = map[signal] || 'badge-steady';
+    return '<span class="' + cls + '">' + signal + '</span>';
+}
+
+function _flowTable(rows, cols, rowClass) {
     const table = document.createElement('table');
     table.className = 'data-table';
     table.style.tableLayout = 'auto';
@@ -933,23 +976,24 @@ function _buildSimpleTable(rows, cols) {
     const tbody = document.createElement('tbody');
     rows.forEach(row => {
         const tr = document.createElement('tr');
-        // Direction / type color coding
-        if (row.direction === 'BUY') tr.style.color = '#27AE60';
-        if (row.direction === 'SELL') tr.style.color = '#C0392B';
-        const rtype = (row.type || '').toLowerCase();
-        if (rtype && rtype !== 'unknown') tr.classList.add('type-' + rtype.replace(/[^a-z_]/g, ''));
+        if (rowClass) tr.classList.add(rowClass);
         cols.forEach(c => {
             const td = document.createElement('td');
             td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
             const val = row[c.key];
-            td.textContent = formatCell(val, fmtType(c));
-            if (c.key === 'signal' && row.signal) {
-                const clr = {ACCEL: '#27AE60', BUILD: '#27AE60', STEADY: '#666', FADING: '#C0392B', REVERSING: '#C0392B'};
-                td.style.color = clr[row.signal] || '';
-                td.style.fontWeight = '600';
-            }
-            if (c.key === 'direction') {
-                td.style.fontWeight = '600';
+            if (c.key === 'momentum_signal') {
+                td.innerHTML = _signalBadge(val);
+            } else if (c.key === 'pct_change') {
+                if (val == null) {
+                    td.innerHTML = row.is_new_entry ? _signalBadge('NEW') : (row.is_exit ? _signalBadge('EXIT') : '\u2014');
+                } else {
+                    const pct = (val * 100).toFixed(1);
+                    td.innerHTML = val > 0
+                        ? '<span class="positive">+' + pct + '%</span>'
+                        : '<span class="negative">(' + Math.abs(pct) + '%)</span>';
+                }
+            } else {
+                td.innerHTML = formatCell(val, fmtType(c));
             }
             tr.appendChild(td);
         });
@@ -960,84 +1004,128 @@ function _buildSimpleTable(rows, cols) {
 }
 
 function renderFlowAnalysis(data) {
-    currentData = data.net_flows || [];
+    currentData = data.buyers || [];
 
-    // Section 1 — Net Flows
-    const h1 = document.createElement('h3');
-    h1.style.cssText = 'padding:12px 14px 6px;color:var(--oxford-blue);font-size:14px';
-    h1.textContent = 'Price-Adjusted Net Flows';
-    tableWrap.appendChild(h1);
-
-    const cols1 = [
-        {key: 'investor', label: 'Institution', type: 'text'},
-        {key: 'type', label: 'Type', type: 'text'},
-        {key: 'net_shares', label: 'Net Shares', type: 'shares'},
-        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
-        {key: 'raw_flow', label: 'Raw Flow', type: 'dollar'},
-        {key: 'price_effect', label: 'Price Effect', type: 'dollar'},
-        {key: 'direction', label: 'Direction', type: 'text'},
-    ];
-    tableWrap.appendChild(buildLegend());
-    tableWrap.appendChild(_buildSimpleTable(data.net_flows || [], cols1));
-
-    // Section 2 — Flow Intensity
-    const fi = data.flow_intensity || {};
-    const h2 = document.createElement('h3');
-    h2.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
-    h2.textContent = 'Flow Intensity (% of Market Cap)';
-    tableWrap.appendChild(h2);
-    const fiCard = document.createElement('div');
-    fiCard.className = 'portfolio-stats';
-    [
-        ['Total', fi.total_flow_intensity != null ? fi.total_flow_intensity.toFixed(2) + '%' : '\u2014'],
-        ['Active', fi.active_flow_intensity != null ? fi.active_flow_intensity.toFixed(2) + '%' : '\u2014'],
-        ['Passive', fi.passive_flow_intensity != null ? fi.passive_flow_intensity.toFixed(2) + '%' : '\u2014'],
-    ].forEach(([l, v]) => {
-        const s = document.createElement('span');
-        s.className = 'ps-item';
-        s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
-        fiCard.appendChild(s);
-    });
-    tableWrap.appendChild(fiCard);
-
-    // Section 3 — Momentum
-    if (data.momentum && data.momentum.length) {
-        const h3 = document.createElement('h3');
-        h3.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
-        h3.textContent = 'Momentum (Recent vs Full Period)';
-        tableWrap.appendChild(h3);
-        const momCols = [
-            {key: 'investor', label: 'Institution', type: 'text'},
-            {key: 'type', label: 'Type', type: 'text'},
-            {key: 'flow_4q', label: '4Q Flow', type: 'dollar'},
-            {key: 'flow_2q', label: '2Q Flow', type: 'dollar'},
-            {key: 'momentum', label: 'Momentum', type: 'num'},
-            {key: 'signal', label: 'Signal', type: 'text'},
-        ];
-        tableWrap.appendChild(_buildSimpleTable(data.momentum, momCols));
+    // Footnote
+    const ip = data.implied_prices || {};
+    const qf = data.quarter_from || '';
+    const ipVal = ip[qf];
+    if (ipVal) {
+        const fn = document.createElement('div');
+        fn.className = 'flow-footnote';
+        fn.textContent = 'Price-adjusted flows use implied ' + qf + ' price of $' + ipVal.toFixed(2) + ' derived from 13F reported market values as of quarter-end';
+        tableWrap.appendChild(fn);
     }
 
-    // Section 4 — Churn
-    const ch = data.churn || {};
-    if (ch.overall) {
-        const h4 = document.createElement('h3');
-        h4.style.cssText = 'padding:16px 14px 6px;color:var(--oxford-blue);font-size:14px';
-        h4.textContent = 'Holder Churn';
-        tableWrap.appendChild(h4);
-        const chCard = document.createElement('div');
-        chCard.className = 'portfolio-stats';
-        [
-            ['Overall Churn', ch.overall.churn_rate + '%'],
-            ['Active Churn', ch.active ? ch.active.churn_rate + '%' : '\u2014'],
-            ['Passive Churn', ch.passive ? ch.passive.churn_rate + '%' : '\u2014'],
-            ['Stability', ch.stability_signal || '\u2014'],
-        ].forEach(([l, v]) => {
-            const s = document.createElement('span');
-            s.className = 'ps-item';
-            s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
-            chCard.appendChild(s);
+    // Charts section (flow intensity + churn)
+    const chartData = (data.charts && data.charts.flow_intensity) || [];
+    if (chartData.length > 0) {
+        const row = document.createElement('div');
+        row.className = 'charts-row';
+        // Flow intensity summary
+        const fiCard = document.createElement('div');
+        fiCard.className = 'chart-card';
+        fiCard.innerHTML = '<h3>Flow Intensity \u2014 Net Buying as % of Market Cap</h3>';
+        const fiTable = document.createElement('table');
+        fiTable.className = 'data-table';
+        fiTable.style.tableLayout = 'auto';
+        fiTable.innerHTML = '<thead><tr><th style="text-align:left">Ticker</th><th style="text-align:right">Total</th><th style="text-align:right">Active</th><th style="text-align:right">Passive</th></tr></thead>';
+        const ftb = document.createElement('tbody');
+        chartData.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + d.ticker + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_total ? d.flow_intensity_total * 100 : null) + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_active ? d.flow_intensity_active * 100 : null) + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_passive ? d.flow_intensity_passive * 100 : null) + '</td>';
+            ftb.appendChild(tr);
         });
-        tableWrap.appendChild(chCard);
+        fiTable.appendChild(ftb);
+        fiCard.appendChild(fiTable);
+        row.appendChild(fiCard);
+
+        // Churn summary
+        const chCard = document.createElement('div');
+        chCard.className = 'chart-card';
+        chCard.innerHTML = '<h3>Holder Churn Rate</h3>';
+        const chTable = document.createElement('table');
+        chTable.className = 'data-table';
+        chTable.style.tableLayout = 'auto';
+        chTable.innerHTML = '<thead><tr><th style="text-align:left">Ticker</th><th style="text-align:right">Overall</th><th style="text-align:right">Active</th><th style="text-align:right">Passive</th></tr></thead>';
+        const ctb = document.createElement('tbody');
+        chartData.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + d.ticker + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.churn_overall ? d.churn_overall * 100 : null) + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.churn_active ? d.churn_active * 100 : null) + '</td>'
+                + '<td style="text-align:right">' + fmtPct(d.churn_passive ? d.churn_passive * 100 : null) + '</td>';
+            ctb.appendChild(tr);
+        });
+        chTable.appendChild(ctb);
+        chCard.appendChild(chTable);
+        row.appendChild(chCard);
+
+        tableWrap.appendChild(row);
+    }
+
+    // Buyers
+    const buyerCols = [
+        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+        {key: 'manager_type', label: 'Type', type: 'text'},
+        {key: 'from_shares', label: 'From Shares', type: 'shares'},
+        {key: 'to_shares', label: 'To Shares', type: 'shares'},
+        {key: 'net_shares', label: 'Net Shares', type: 'shares'},
+        {key: 'pct_change', label: '% Change', type: 'pct'},
+        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
+        {key: 'momentum_signal', label: 'Signal', type: 'text'},
+    ];
+    if (data.buyers && data.buyers.length) {
+        const h = document.createElement('div');
+        h.className = 'flow-section-header';
+        h.innerHTML = '\u25B2 Buyers \u2014 Top 25 by Price-Adjusted Flow';
+        tableWrap.appendChild(h);
+        tableWrap.appendChild(_flowTable(data.buyers, buyerCols, 'row-buyer'));
+    }
+
+    // Sellers
+    if (data.sellers && data.sellers.length) {
+        const h = document.createElement('div');
+        h.className = 'flow-section-header';
+        h.innerHTML = '\u25BC Sellers \u2014 Top 25 by Price-Adjusted Flow';
+        tableWrap.appendChild(h);
+        tableWrap.appendChild(_flowTable(data.sellers, buyerCols, 'row-seller'));
+    }
+
+    // New Entries
+    const neCols = [
+        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+        {key: 'manager_type', label: 'Type', type: 'text'},
+        {key: 'to_shares', label: 'Shares', type: 'shares'},
+        {key: 'to_value', label: 'Value', type: 'dollar'},
+        {key: 'momentum_signal', label: 'Signal', type: 'text'},
+    ];
+    if (data.new_entries && data.new_entries.length) {
+        const h = document.createElement('div');
+        h.className = 'flow-section-header';
+        h.innerHTML = '\u2605 New Entries \u2014 Initiated Positions';
+        tableWrap.appendChild(h);
+        tableWrap.appendChild(_flowTable(data.new_entries, neCols, 'row-new-entry'));
+    }
+
+    // Exits
+    const exCols = [
+        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+        {key: 'manager_type', label: 'Type', type: 'text'},
+        {key: 'from_shares', label: 'Shares Sold', type: 'shares'},
+        {key: 'from_value', label: 'Value Exited', type: 'dollar'},
+        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
+        {key: 'momentum_signal', label: 'Signal', type: 'text'},
+    ];
+    if (data.exits && data.exits.length) {
+        const h = document.createElement('div');
+        h.className = 'flow-section-header';
+        h.innerHTML = '\u2715 Exits \u2014 Closed Positions';
+        tableWrap.appendChild(h);
+        tableWrap.appendChild(_flowTable(data.exits, exCols, 'row-seller'));
     }
 }
 
