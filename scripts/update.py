@@ -72,6 +72,12 @@ def main():
         cwd=BASE_DIR,
     )
 
+    # Unify positions table (merges 13F + N-PORT)
+    print(f"\n{'=' * 60}")
+    print("Running unify_positions.py...")
+    print(f"{'=' * 60}")
+    subprocess.run([sys.executable, os.path.join(SCRIPTS_DIR, "unify_positions.py")], cwd=BASE_DIR)
+
     # Notify if pending overrides exist
     import pandas as pd
     pending_path = os.path.join(BASE_DIR, "data", "reference", "ticker_overrides_pending.csv")
