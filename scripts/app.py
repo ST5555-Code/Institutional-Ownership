@@ -1829,6 +1829,90 @@ def api_fund_portfolio_managers():
         con.close()
 
 
+@app.route('/api/fund_behavioral_profile')
+def api_fund_behavioral_profile():
+    """Behavioral profile for a fund by LEI or series_id — analyzes historical positions."""
+    lei = request.args.get('lei', '').strip()
+    series_id = request.args.get('series_id', '').strip()
+    if not lei and not series_id:
+        return jsonify({'error': 'Missing lei or series_id parameter'}), 400
+
+    con = get_db()
+    try:
+        # Find matching fund
+        if lei:
+            where = "lei = ?"
+            param = lei
+        else:
+            where = "series_id = ?"
+            param = series_id
+
+        # Fund identity
+        fund_info = con.execute(f"""
+            SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
+            FROM fund_holdings WHERE {where}
+            GROUP BY fund_name, series_id, lei, family_name
+            LIMIT 1
+        """, [param]).fetchone()
+        if not fund_info:
+            return jsonify({'error': 'Fund not found'}), 404
+
+        fund_name, sid, fund_lei, family, quarters = fund_info
+
+        # Position size distribution (avg % of NAV)
+        size_stats = con.execute(f"""
+            SELECT
+                AVG(pct_of_nav) as avg_pct_nav,
+                MEDIAN(pct_of_nav) as median_pct_nav,
+                MAX(pct_of_nav) as max_pct_nav,
+                COUNT(DISTINCT ticker) as unique_holdings,
+                COUNT(DISTINCT quarter) as quarters_held
+            FROM fund_holdings
+            WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0
+        """, [param]).fetchone()
+
+        # Sector concentration
+        sector_where = f"fh.lei = ?" if lei else f"fh.series_id = ?"
+        sectors = con.execute(f"""
+            SELECT s.sector, SUM(fh.market_value_usd) as sector_value
+            FROM fund_holdings fh
+            JOIN securities s ON fh.cusip = s.cusip
+            WHERE {sector_where}
+              AND fh.quarter = '2025Q4'
+              AND s.sector IS NOT NULL AND s.sector != ''
+            GROUP BY s.sector
+            ORDER BY sector_value DESC
+            LIMIT 10
+        """, [param]).fetchdf()
+
+        # Top holdings
+        top = con.execute(f"""
+            SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
+            FROM fund_holdings
+            WHERE {where} AND quarter = '2025Q4'
+            ORDER BY market_value_usd DESC NULLS LAST
+            LIMIT 10
+        """, [param]).fetchdf()
+
+        return jsonify(clean_for_json({
+            'fund_name': fund_name,
+            'series_id': sid,
+            'lei': fund_lei,
+            'family': family,
+            'quarters_covered': quarters,
+            'stats': {
+                'avg_position_pct': size_stats[0] if size_stats else None,
+                'median_position_pct': size_stats[1] if size_stats else None,
+                'max_position_pct': size_stats[2] if size_stats else None,
+                'unique_holdings': size_stats[3] if size_stats else 0,
+            },
+            'sector_breakdown': df_to_records(sectors),
+            'top_holdings': df_to_records(top),
+        }))
+    finally:
+        con.close()
+
+
 @app.route('/api/ownership_trend_summary')
 def api_ownership_trend_summary():
     ticker = request.args.get('ticker', '').upper().strip()

@@ -55,6 +55,7 @@ def run():
             h.quarter,
             CAST(NULL AS VARCHAR) as report_month,
             TRY_CAST(h.report_date AS DATE) as report_date,
+            CAST(NULL AS VARCHAR) as lei,
             CURRENT_TIMESTAMP as loaded_at
         FROM holdings h
     """)
@@ -94,6 +95,7 @@ def run():
             fh.quarter,
             fh.report_month,
             fh.report_date,
+            fh.lei,
             CURRENT_TIMESTAMP as loaded_at
         FROM fund_holdings fh
         {ncen_join}
