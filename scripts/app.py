@@ -2254,8 +2254,9 @@ def api_export(qnum):
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
-        if qnum == 7 and cik:
-            data = fn(ticker or 'AR', cik=cik)
+        if qnum == 7:
+            fund_name = request.args.get('fund_name', '').strip() or None
+            data = fn(ticker, cik=cik or None, fund_name=fund_name)
         elif qnum in (13, 15):
             data = fn(ticker or None)
         else:
@@ -2264,9 +2265,11 @@ def api_export(qnum):
         if not data:
             return jsonify({'error': f'No data found for ticker {ticker}'}), 404
 
+        # Q7 returns {stats, positions} — export the positions list
+        export_data = data.get('positions', data) if isinstance(data, dict) and 'positions' in data else data
         qname = QUERY_NAMES.get(qnum, f'Query{qnum}')
         sheet_name = f"{qname} - {ticker or 'ALL'}"
-        buf = build_excel(data, sheet_name=sheet_name)
+        buf = build_excel(export_data, sheet_name=sheet_name)
 
         filename = f"query{qnum}_{ticker or 'ALL'}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         return send_file(

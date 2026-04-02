@@ -255,12 +255,14 @@ def main():
     print(f"Tickers to process: {total}")
 
     t0 = time.time()
+    failed_tickers = []
     for i, (_, row) in enumerate(tickers.iterrows()):
         ticker = row['ticker']
         mktcap = float(row['market_cap']) if pd.notna(row['market_cap']) else None
         try:
             compute_ticker_flows(con, ticker, mktcap)
         except Exception as e:
+            failed_tickers.append((ticker, str(e)))
             print(f"ERROR {ticker}: {e}")
 
         if (i + 1) % 500 == 0:
@@ -278,7 +280,17 @@ def main():
     print(f"investor_flows: {cnt:,} rows")
     print(f"ticker_flow_stats: {cnt2:,} rows")
 
+    if failed_tickers:
+        print(f"\nFAILED TICKERS ({len(failed_tickers)}):")
+        for tk, err in failed_tickers[:20]:
+            print(f"  {tk}: {err}")
+        if len(failed_tickers) > 20:
+            print(f"  ... and {len(failed_tickers) - 20} more")
+
     con.close()
+
+    if failed_tickers:
+        sys.exit(1)
 
 
 if __name__ == '__main__':

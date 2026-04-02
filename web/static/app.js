@@ -279,10 +279,13 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ---------------------------------------------------------------------------
 // Load query data
 // ---------------------------------------------------------------------------
+let _lastExtraParams = {};
+
 async function loadQuery(qnum, extraParams) {
     showSpinner();
     clearError();
     tableWrap.innerHTML = '';
+    _lastExtraParams = extraParams || {};
 
     const params = new URLSearchParams();
     if (currentTicker) params.set('ticker', currentTicker);
@@ -2050,6 +2053,8 @@ exportBtn.addEventListener('click', () => {
     if (!currentTicker && currentQuery !== 13 && currentQuery !== 15) return;
     const params = new URLSearchParams();
     if (currentTicker) params.set('ticker', currentTicker);
+    // Include extra params (cik, fund_name for Query 7 Fund Portfolio)
+    for (const [k, v] of Object.entries(_lastExtraParams)) params.set(k, v);
     window.location.href = `/api/export/query${currentQuery}?${params}`;
 });
 

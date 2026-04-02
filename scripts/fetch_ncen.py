@@ -264,19 +264,19 @@ def update_managers_adviser_cik(con):
     matched = 0
     for adv_name, adv_crd in advisers:
         best_score = 0
-        best_cik = None
+        best_mgr_cik = None
         for mgr_cik, mgr_name in managers:
             score = fuzz.token_sort_ratio(adv_name.upper(), mgr_name.upper())
             if score > best_score:
                 best_score = score
-                best_cik = mgr_cik
+                best_mgr_cik = mgr_cik
 
-        if best_score >= 85:
+        if best_score >= 85 and adv_crd:
             con.execute("""
                 UPDATE managers
                 SET adviser_cik = ?
                 WHERE cik = ? AND adviser_cik IS NULL
-            """, [best_cik, best_cik])
+            """, [adv_crd, best_mgr_cik])
             matched += 1
 
     print(f"  Matched {matched} advisers to managers (fuzzy ≥85)")
