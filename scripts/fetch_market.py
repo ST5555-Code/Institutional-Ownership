@@ -21,13 +21,7 @@ from datetime import datetime, timedelta
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 
-# Quarterly snapshot dates
-SNAPSHOT_DATES = {
-    "2025Q1": "2025-05-31",
-    "2025Q2": "2025-08-31",
-    "2025Q3": "2025-11-30",
-    "2025Q4": "2025-12-31",
-}
+from config import QUARTER_SNAPSHOT_DATES as SNAPSHOT_DATES
 
 
 def get_tickers(con):
@@ -133,11 +127,23 @@ def fetch_market_data(tickers):
 
 
 def save_market_data(con, df_market):
-    """Save market_data table to DuckDB."""
+    """Upsert market_data table — insert new, update existing."""
     print("\nSaving market_data table...")
 
-    con.execute("DROP TABLE IF EXISTS market_data")
-    con.execute("CREATE TABLE market_data AS SELECT * FROM df_market")
+    try:
+        con.execute("SELECT 1 FROM market_data LIMIT 1")
+        table_exists = True
+    except Exception:
+        table_exists = False
+
+    if not table_exists:
+        con.execute("CREATE TABLE market_data AS SELECT * FROM df_market")
+    else:
+        # Delete existing rows for tickers we're updating, then insert
+        tickers = df_market["ticker"].tolist()
+        if tickers:
+            con.execute("DELETE FROM market_data WHERE ticker IN (SELECT ticker FROM df_market)")
+            con.execute("INSERT INTO market_data SELECT * FROM df_market")
 
     count = con.execute("SELECT COUNT(*) FROM market_data").fetchone()[0]
     print(f"  market_data: {count:,} rows")
@@ -213,6 +219,23 @@ def print_summary(con):
     print(ar_holders.to_string(index=False))
 
 
+def get_stale_tickers(con, all_tickers, max_age_days=7):
+    """Return tickers missing from market_data or fetched more than max_age_days ago."""
+    try:
+        cols = [c[0] for c in con.execute("DESCRIBE market_data").fetchall()]
+        if "fetch_date" not in cols:
+            return all_tickers  # no timestamp column — fetch all
+        fresh = con.execute(f"""
+            SELECT ticker FROM market_data
+            WHERE fetch_date >= CURRENT_DATE - INTERVAL '{max_age_days}' DAY
+        """).fetchdf()["ticker"].tolist()
+        fresh_set = set(fresh)
+        stale = [t for t in all_tickers if t not in fresh_set]
+        return stale
+    except Exception:
+        return all_tickers  # table doesn't exist — fetch all
+
+
 def main():
     print("=" * 60)
     print("SCRIPT 5 — fetch_market.py")
@@ -222,7 +245,14 @@ def main():
 
     # Step 1: Get tickers
     print("\nGetting tickers from holdings...")
-    tickers = get_tickers(con)
+    all_tickers = get_tickers(con)
+
+    # Step 1b: Skip tickers already fetched within 7 days
+    tickers = get_stale_tickers(con, all_tickers)
+    skipped = len(all_tickers) - len(tickers)
+    if skipped > 0:
+        print(f"  Skipping {skipped:,} tickers fetched within 7 days")
+    print(f"  Fetching: {len(tickers):,} tickers")
 
     if not tickers:
         print("No tickers found. Run build_cusip.py first.")

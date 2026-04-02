@@ -18,15 +18,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXTRACT_DIR = os.path.join(BASE_DIR, "data", "extracted")
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 
-QUARTERS = ["2025Q1", "2025Q2", "2025Q3", "2025Q4"]
-
-# Map quarter label to expected report date
-QUARTER_REPORT_DATES = {
-    "2025Q1": "2025-03-31",
-    "2025Q2": "2025-06-30",
-    "2025Q3": "2025-09-30",
-    "2025Q4": "2025-12-31",
-}
+from config import QUARTERS, QUARTER_REPORT_DATES
 
 
 def load_quarter(con, quarter):

@@ -22,12 +22,7 @@ EXTRACT_DIR = os.path.join(BASE_DIR, "data", "extracted")
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5
 
-QUARTERS = {
-    "2025Q1": "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01mar2025-31may2025_form13f.zip",
-    "2025Q2": "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01jun2025-31aug2025_form13f.zip",
-    "2025Q3": "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01sep2025-30nov2025_form13f.zip",
-    "2025Q4": "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01dec2025-28feb2026_form13f.zip",
-}
+from config import QUARTER_URLS as QUARTERS
 
 
 def download_quarter(quarter, url):
