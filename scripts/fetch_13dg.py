@@ -21,6 +21,7 @@ from datetime import datetime
 
 import duckdb
 import edgar
+import requests
 from rapidfuzz import fuzz
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,9 +33,10 @@ edgar.set_identity("serge.tismen@gmail.com")
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
 MAX_WORKERS = 4
-SEC_DELAY = 0.1  # seconds between edgar API calls per worker
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
+_thread_local = threading.local()
+SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
@@ -252,7 +254,7 @@ def list_ticker_filings(ticker, existing, error_log):
     """List new 13D/G filings for a ticker. Returns Filing objects for Phase 2.
     Returns list of (Filing, ticker) tuples — Filing objects carry cached data
     so Phase 2 can call f.text() without an extra HTTP round-trip."""
-    time.sleep(SEC_DELAY)
+    time.sleep(0.1)
     try:
         company = _retry_edgar(lambda: edgar.Company(ticker), f"Company({ticker})")
     except Exception as e:
@@ -329,18 +331,72 @@ def parse_one_filing(filing, ticker, cusip_map, error_log):
         "manager_cik": None,
     }
 
+def _get_session():
+    """Per-thread requests.Session for connection reuse."""
+    if not hasattr(_thread_local, "session"):
+        s = requests.Session()
+        s.headers.update(SEC_HEADERS)
+        _thread_local.session = s
+    return _thread_local.session
+
+
+def _download_filing_text(acc, subject_cik):
+    """Download filing text via direct URL (1 HTTP call, no edgar.find)."""
+    cik_raw = subject_cik.lstrip("0") or "0"
+    acc_path = acc.replace("-", "")
+    session = _get_session()
+    # Try subject CIK path first (where 13D/G filings live)
+    for base_cik in [cik_raw, acc.split("-")[0].lstrip("0") or "0"]:
+        url = f"https://www.sec.gov/Archives/edgar/data/{base_cik}/{acc_path}/{acc}.txt"
+        for attempt in range(3):
+            try:
+                resp = session.get(url, timeout=15)
+                if resp.status_code == 200:
+                    return resp.text
+                if resp.status_code == 429:
+                    time.sleep(min(10 * (2 ** attempt), 60))
+                    continue
+                break  # 404 or other — try next CIK
+            except requests.RequestException:
+                time.sleep(2)
+    return None
+
+
 def parse_one_filing_by_acc(acc, ticker, form, filing_date, filer_cik,
                             subject_name, subject_cik, cusip_map, error_log):
-    """Parse a filing by accession number (resume path — uses edgar.find)."""
-    try:
-        f = _retry_edgar(lambda: edgar.find(acc), f"find({acc})")
-    except Exception as e:
-        log_error(error_log, ticker, acc, e)
+    """Parse a filing by direct URL download (resume path — no edgar.find)."""
+    raw_text = _download_filing_text(acc, subject_cik)
+    if not raw_text:
+        log_error(error_log, ticker, acc, "could not download filing text")
         return None
-    if not f:
-        log_error(error_log, ticker, acc, "edgar.find returned None")
-        return None
-    return parse_one_filing(f, ticker, cusip_map, error_log)
+
+    text = _clean_text(raw_text)
+    fields = _extract_fields(text, form)
+
+    filer_name = filer_cik  # fallback — no header available in direct download
+    if fields.get("reporting_person"):
+        filer_name = fields["reporting_person"]
+
+    return {
+        "accession_number": acc,
+        "filer_cik": filer_cik,
+        "filer_name": filer_name,
+        "subject_cusip": fields.get("cusip") or cusip_map.get(ticker),
+        "subject_ticker": ticker,
+        "subject_name": subject_name,
+        "filing_type": form,
+        "filing_date": filing_date,
+        "report_date": fields.get("report_date"),
+        "pct_owned": fields.get("pct_owned"),
+        "shares_owned": fields.get("shares_owned"),
+        "aggregate_value": None,
+        "intent": "activist" if "13D" in form else "passive",
+        "is_amendment": "/A" in form,
+        "prior_accession": None,
+        "purpose_text": fields.get("purpose_text"),
+        "group_members": None,
+        "manager_cik": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -598,7 +654,7 @@ def run_update():
                     all_records.append(rec)
                     existing.add(acc)
                     count += 1
-                    time.sleep(SEC_DELAY)
+                    time.sleep(0.1)
                 if count:
                     print(f"    {yr}Q{qtr} {form}: {count} new", flush=True)
 
