@@ -15,7 +15,7 @@ Run: python3 scripts/fetch_13dg.py                          # Full build
      python3 scripts/fetch_13dg.py --test                   # 5 test tickers
 """
 
-import argparse, csv, os, re, sys, threading
+import argparse, csv, os, re, sys, time, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -32,10 +32,26 @@ edgar.set_identity("serge.tismen@gmail.com")
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
 MAX_WORKERS = 4
+SEC_DELAY = 0.1  # seconds between edgar API calls per worker
 _db_lock = threading.Lock()
+_error_log_lock = threading.Lock()
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
+
+
+def _retry_edgar(fn, label="", max_retries=5):
+    """Call fn() with exponential backoff on 403/429/network errors."""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            err_str = str(e).lower()
+            retryable = any(code in err_str for code in ["403", "429", "rate", "limit", "timeout", "connection"])
+            if not retryable or attempt == max_retries - 1:
+                raise
+            wait = min(10 * (2 ** attempt), 120)
+            time.sleep(wait)
 
 # ---------------------------------------------------------------------------
 # Filing text parser (regex extraction from filing text)
@@ -209,30 +225,41 @@ def init_error_log():
     path = os.path.join(LOG_DIR, "fetch_13dg_errors.csv")
     if not os.path.exists(path):
         with open(path, "w", newline="") as f:
-            csv.writer(f).writerow(["timestamp", "ticker", "accession", "error"])
+            csv.writer(f).writerow(["timestamp", "ticker", "accession", "error_type", "error_message"])
     return path
 
-def log_error(path, ticker, acc, err):
-    with open(path, "a", newline="") as f:
-        csv.writer(f).writerow([datetime.now().isoformat(), ticker, acc, str(err)])
+def log_error(path, ticker, acc, error):
+    """Thread-safe error logging with exception type."""
+    if isinstance(error, Exception):
+        err_type = type(error).__name__
+        err_msg = str(error)
+    else:
+        err_type = "Error"
+        err_msg = str(error)
+    with _error_log_lock:
+        with open(path, "a", newline="") as f:
+            csv.writer(f).writerow([datetime.now().isoformat(), ticker, acc, err_type, err_msg])
 
 # ---------------------------------------------------------------------------
 # Core: list and parse filings for one ticker
 # ---------------------------------------------------------------------------
 
-def list_ticker_filings(ticker, existing):
+def list_ticker_filings(ticker, existing, error_log):
     """List new 13D/G filing metadata for a ticker. No document downloads.
     Returns list of (accession_no, form, filing_date, filer_cik) tuples."""
+    time.sleep(SEC_DELAY)
     try:
-        company = edgar.Company(ticker)
-    except Exception:
+        company = _retry_edgar(lambda: edgar.Company(ticker), f"Company({ticker})")
+    except Exception as e:
+        log_error(error_log, ticker, "", e)
         return []
 
     results = []
     for form in ["SC 13D", "SC 13G"]:
         try:
-            filings = company.get_filings(form=form)
-        except Exception:
+            filings = _retry_edgar(lambda f=form: company.get_filings(form=f), f"get_filings({form})")
+        except Exception as e:
+            log_error(error_log, ticker, "", e)
             continue
         if not filings:
             continue
@@ -248,33 +275,36 @@ def list_ticker_filings(ticker, existing):
 
 def parse_one_filing(ticker, acc, form, filing_date, filer_cik, cusip_map, error_log):
     """Download and parse a single filing by accession number. Returns record dict or None."""
+    time.sleep(SEC_DELAY)
     try:
-        f = edgar.find(acc)
+        f = _retry_edgar(lambda: edgar.find(acc), f"find({acc})")
     except Exception as e:
-        log_error(error_log, ticker, acc, str(e))
+        log_error(error_log, ticker, acc, e)
         return None
     if not f:
+        log_error(error_log, ticker, acc, "edgar.find returned None")
         return None
 
     try:
-        raw_text = f.text() or ""
+        raw_text = _retry_edgar(lambda: f.text(), f"text({acc})")
     except Exception as e:
-        log_error(error_log, ticker, acc, str(e))
+        log_error(error_log, ticker, acc, e)
         return None
     if not raw_text:
+        log_error(error_log, ticker, acc, "empty filing text")
         return None
 
     text = _clean_text(raw_text)
     fields = _extract_fields(text, form)
 
-    # Filer name from header (cached — no extra HTTP)
+    # Filer name from header
     filer_name = "UNKNOWN"
     try:
         h = f.header
         if h.filers:
             filer_name = h.filers[0].company_information.name or "UNKNOWN"
-    except Exception:
-        pass
+    except Exception as e:
+        log_error(error_log, ticker, acc, Exception(f"header parse: {e}"))
     if filer_name in FILING_AGENTS and fields.get("reporting_person"):
         filer_name = fields["reporting_person"]
 
@@ -366,7 +396,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
     checkpoint_buf = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(list_ticker_filings, t, existing): t for t in to_process}
+        futures = {pool.submit(list_ticker_filings, t, existing, error_log): t for t in to_process}
         for fut in as_completed(futures):
             ticker = futures[fut]
             done[0] += 1
@@ -377,7 +407,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
                     all_new.append((ticker, acc, form, fdate, fcik))
                     existing.add(acc)
             except Exception as e:
-                log_error(error_log, ticker, "", str(e))
+                log_error(error_log, ticker, "", e)
             checkpoint_buf.append(ticker)
             if len(checkpoint_buf) >= 50:
                 now = datetime.now().isoformat()
@@ -414,7 +444,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
                 if rec:
                     all_records.append(rec)
             except Exception as e:
-                log_error(error_log, "", futures[fut], str(e))
+                log_error(error_log, "", futures[fut], e)
             if len(all_records) >= 500:
                 batch_insert(con, all_records)
                 con.execute("CHECKPOINT")
@@ -463,8 +493,10 @@ def run_update():
         for yr in years:
             for qtr in range(1, 5):
                 try:
-                    filings = edgar.get_filings(year=yr, quarter=qtr, form=form)
-                except Exception:
+                    filings = _retry_edgar(
+                        lambda y=yr, q=qtr, fm=form: edgar.get_filings(year=y, quarter=q, form=fm))
+                except Exception as e:
+                    log_error(error_log, "", f"{yr}Q{qtr}", e)
                     continue
                 if not filings:
                     continue
@@ -474,24 +506,49 @@ def run_update():
                         continue
                     if f.accession_no in existing:
                         continue
-                    # Check if this is about one of our target tickers
+                    acc = f.accession_no
+                    filer_cik = acc.split("-")[0]
+                    try:
+                        raw_text = _retry_edgar(lambda: f.text(), f"text({acc})")
+                        if not raw_text:
+                            log_error(error_log, "", acc, "empty filing text")
+                            continue
+                        text = _clean_text(raw_text)
+                        fields = _extract_fields(text, f.form)
+                    except Exception as e:
+                        log_error(error_log, "", acc, e)
+                        continue
+                    filer_name = "UNKNOWN"
+                    subject_name = ""
                     try:
                         h = f.header
+                        if h.filers:
+                            filer_name = h.filers[0].company_information.name or "UNKNOWN"
                         if h.subject_companies:
-                            subj_name = h.subject_companies[0].company_information.name or ""
-                        else:
-                            continue
-                    except Exception:
-                        continue
-                    # Parse it
-                    try:
-                        rec = parse_filing(f, f.form)
-                        if rec:
-                            all_records.append(rec)
-                            existing.add(f.accession_no)
-                            count += 1
+                            subject_name = h.subject_companies[0].company_information.name or ""
                     except Exception as e:
-                        log_error(error_log, "", f.accession_no, str(e))
+                        log_error(error_log, "", acc, Exception(f"header parse: {e}"))
+                    if filer_name in FILING_AGENTS and fields.get("reporting_person"):
+                        filer_name = fields["reporting_person"]
+                    rec = {
+                        "accession_number": acc, "filer_cik": filer_cik,
+                        "filer_name": filer_name,
+                        "subject_cusip": fields.get("cusip"),
+                        "subject_ticker": None, "subject_name": subject_name,
+                        "filing_type": f.form, "filing_date": str(f.filing_date),
+                        "report_date": fields.get("report_date"),
+                        "pct_owned": fields.get("pct_owned"),
+                        "shares_owned": fields.get("shares_owned"),
+                        "aggregate_value": None,
+                        "intent": "activist" if "13D" in f.form else "passive",
+                        "is_amendment": "/A" in f.form, "prior_accession": None,
+                        "purpose_text": fields.get("purpose_text"),
+                        "group_members": None, "manager_cik": None,
+                    }
+                    all_records.append(rec)
+                    existing.add(acc)
+                    count += 1
+                    time.sleep(SEC_DELAY)
                 if count:
                     print(f"    {yr}Q{qtr} {form}: {count} new", flush=True)
 
