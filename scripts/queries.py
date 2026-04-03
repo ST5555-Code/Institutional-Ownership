@@ -542,28 +542,78 @@ def query1(ticker):
             ORDER BY parent_name, value_live DESC NULLS LAST
         """, [ticker, cusip] + parent_names).fetchdf()
 
-        # Group children by parent
+        # Group 13F children by parent + add footnotes for known entities
         children_by_parent = {}
         for _, row in all_children_df.iterrows():
             pname = row['parent_name']
             if pname not in children_by_parent:
                 children_by_parent[pname] = []
-            if len(children_by_parent[pname]) < 5:
+            if len(children_by_parent[pname]) < 8:
+                note = _13f_entity_footnote(row['institution'])
                 children_by_parent[pname].append({
                     'institution': row['institution'],
                     'value_live': row['value_live'],
                     'shares': row['shares'],
                     'pct_float': row['pct_float'],
                     'type': row['type'],
-                    'source': '13F',
+                    'source': '13F entity' if note else '13F',
+                    'subadviser_note': note,
                 })
 
-        # Build results
+        # N-PORT fund series lookup (same as query3)
+        nport_by_parent = {}
+        if has_table('fund_holdings') and has_table('fund_universe'):
+            try:
+                for pname in parent_names:
+                    mp = match_nport_family(pname)
+                    if not mp:
+                        continue
+                    for pat in mp:
+                        like_pat = '%' + pat + '%'
+                        kids = con.execute(f"""
+                            SELECT fh.fund_name, SUM(fh.shares_or_principal) as shares,
+                                   SUM(fh.market_value_usd) as value
+                            FROM fund_holdings fh
+                            JOIN fund_universe fu ON fh.series_id = fu.series_id
+                            WHERE fu.family_name ILIKE ? AND fh.ticker = ? AND fh.quarter = '{LQ}'
+                            GROUP BY fh.fund_name ORDER BY value DESC NULLS LAST LIMIT 5
+                        """, [like_pat, ticker]).fetchall()
+                        if kids:
+                            if pname not in nport_by_parent:
+                                nport_by_parent[pname] = []
+                            seen = {c['institution'] for c in nport_by_parent[pname]}
+                            for k in kids:
+                                if k[0] not in seen:
+                                    nport_by_parent[pname].append({
+                                        'institution': k[0], 'value_live': k[2],
+                                        'shares': k[1], 'pct_float': None,
+                                        'type': 'active', 'source': 'N-PORT',
+                                        'subadviser_note': None,
+                                    })
+                                    seen.add(k[0])
+            except Exception:
+                pass
+
+        # Build results — prefer N-PORT children, supplement with 13F entities
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
-            children = children_by_parent.get(pname, [])
-            effective_children = len(children)
+            nport_kids = nport_by_parent.get(pname, [])
+            f13_kids = children_by_parent.get(pname, [])
+
+            # Merge: N-PORT funds first, then 13F entities not covered by N-PORT
+            merged = list(nport_kids)
+            nport_names = {c['institution'].lower() for c in nport_kids}
+            for c in f13_kids:
+                if c['institution'].lower() not in nport_names and c.get('subadviser_note'):
+                    merged.append(c)
+
+            # If no N-PORT, use 13F children as-is
+            if not nport_kids:
+                merged = f13_kids
+
+            effective_children = len(merged)
+            source = 'N-PORT' if nport_kids else '13F'
 
             results.append({
                 'rank': rank,
@@ -575,12 +625,12 @@ def query1(ticker):
                 'is_parent': effective_children >= 2,
                 'child_count': effective_children,
                 'level': 0,
-                'source': '13F',
-                'subadviser_note': get_subadviser_note(pname),
+                'source': source,
+                'subadviser_note': get_subadviser_note(pname) if not nport_kids else None,
             })
 
             if effective_children >= 2:
-                for c in children:
+                for c in merged:
                     results.append({
                         'rank': None,
                         'institution': c.get('institution'),
@@ -591,7 +641,8 @@ def query1(ticker):
                         'is_parent': False,
                         'child_count': 0,
                         'level': 1,
-                        'source': '13F',
+                        'source': c.get('source', '13F'),
+                        'subadviser_note': c.get('subadviser_note'),
                     })
         return results
     finally:
