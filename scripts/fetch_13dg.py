@@ -347,20 +347,19 @@ def _download_filing_text(acc, subject_cik):
     cik_raw = subject_cik.lstrip("0") or "0"
     acc_path = acc.replace("-", "")
     session = _get_session()
-    # Try subject CIK path first (where 13D/G filings live)
     for base_cik in [cik_raw, acc.split("-")[0].lstrip("0") or "0"]:
         url = f"https://www.sec.gov/Archives/edgar/data/{base_cik}/{acc_path}/{acc}.txt"
-        for attempt in range(3):
+        for attempt in range(2):
             try:
-                resp = session.get(url, timeout=15)
+                resp = session.get(url, timeout=10)
                 if resp.status_code == 200:
                     return resp.text
                 if resp.status_code == 429:
-                    time.sleep(min(10 * (2 ** attempt), 60))
+                    time.sleep(min(5 * (attempt + 1), 15))
                     continue
                 break  # 404 or other — try next CIK
             except requests.RequestException:
-                time.sleep(2)
+                time.sleep(1)
     return None
 
 
@@ -542,7 +541,9 @@ def run_phase2(max_workers=MAX_WORKERS, filing_cache=None, test_mode=False):
 
     print(f"\n--- Phase 2: Parsing {len(unparsed)} filings ({max_workers} workers) ---")
     all_records = []
+    errors = 0
     done = [0]
+    t_start = time.time()
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {}
@@ -550,20 +551,28 @@ def run_phase2(max_workers=MAX_WORKERS, filing_cache=None, test_mode=False):
             futures[pool.submit(parse_one_filing, filing_cache[acc], tk, cusip_map, error_log)] = acc
         for acc, tk, fm, fd, fc, sn, sc in uncached:
             futures[pool.submit(parse_one_filing_by_acc, acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)] = acc
+        print(f"  Submitted {len(futures)} futures", flush=True)
         for fut in as_completed(futures):
             done[0] += 1
-            if done[0] % 200 == 0 or done[0] == len(unparsed):
-                print(f"  [{done[0]}/{len(unparsed)}] parsed", flush=True)
             try:
-                rec = fut.result()
+                rec = fut.result(timeout=60)
                 if rec:
                     all_records.append(rec)
+                else:
+                    errors += 1
             except Exception as e:
                 log_error(error_log, "", futures[fut], e)
+                errors += 1
+            if done[0] % 100 == 0 or done[0] == len(unparsed):
+                elapsed = time.time() - t_start
+                rate = done[0] / elapsed * 60 if elapsed > 0 else 0
+                print(f"  [{done[0]}/{len(unparsed)}] ok={done[0]-errors} err={errors} {rate:.0f}/min", flush=True)
             if len(all_records) >= 500:
+                print(f"  Flushing {len(all_records)} records...", flush=True)
                 batch_insert(con, all_records)
                 con.execute("CHECKPOINT")
                 all_records.clear()
+                print(f"  Flush complete", flush=True)
 
     if all_records:
         batch_insert(con, all_records)
