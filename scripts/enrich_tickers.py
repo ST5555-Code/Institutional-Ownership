@@ -22,7 +22,7 @@ from rapidfuzz import fuzz, process
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path, set_staging_mode
 REF_DIR = os.path.join(BASE_DIR, "data", "reference")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -414,7 +414,7 @@ def main():
     print("ENRICH TICKERS — Improve CUSIP-to-ticker coverage")
     print("=" * 60)
 
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     # Baseline
     print("\n--- BEFORE ---")
@@ -470,4 +470,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Enrich CUSIP-to-ticker coverage")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
+    from db import crash_handler
+    crash_handler("enrich_tickers")(main)

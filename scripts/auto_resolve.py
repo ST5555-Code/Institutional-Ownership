@@ -23,7 +23,7 @@ from rapidfuzz import fuzz
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+from db import get_db_path, set_staging_mode
 REF_DIR = os.path.join(BASE_DIR, "data", "reference")
 
 OVERRIDES_PATH = os.path.join(REF_DIR, "ticker_overrides.csv")
@@ -520,7 +520,7 @@ def main():
     print("AUTO-RESOLVE — Ticker gap resolution")
     print("=" * 60)
 
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
 
     # Step 1
     print("\nStep 1 — Finding gaps...")
@@ -587,4 +587,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Auto-resolve ticker gaps")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
+    from db import crash_handler
+    crash_handler("auto_resolve")(main)
