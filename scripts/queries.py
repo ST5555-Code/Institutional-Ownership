@@ -843,6 +843,45 @@ def query3(ticker):
         # Check if investor_flows table exists
         has_flows = has_table('investor_flows')
 
+        # Batch N-PORT fund series for all parents (single query)
+        parent_names = [r.get('parent_name') or r.get('manager_name') for r in records]
+        nport_by_parent = {}
+        if parent_names and has_table('fund_holdings') and has_table('fund_universe'):
+            try:
+                patterns = []
+                for p in parent_names:
+                    mp = match_nport_family(p)
+                    if mp:
+                        for pat in mp:
+                            patterns.append((p, '%' + pat + '%'))
+
+                if patterns:
+                    # Build a batch query for all parents' fund children
+                    for parent_name, like_pat in patterns:
+                        kids = con.execute(f"""
+                            SELECT fh.fund_name, SUM(fh.shares_or_principal) as shares,
+                                   SUM(fh.market_value_usd) as value, AVG(fh.pct_of_nav) as pct_of_nav
+                            FROM fund_holdings fh
+                            JOIN fund_universe fu ON fh.series_id = fu.series_id
+                            WHERE fu.family_name ILIKE ? AND fh.ticker = ? AND fh.quarter = '{LQ}'
+                            GROUP BY fh.fund_name
+                            ORDER BY value DESC NULLS LAST
+                            LIMIT 8
+                        """, [like_pat, ticker]).fetchall()
+                        if kids:
+                            if parent_name not in nport_by_parent:
+                                nport_by_parent[parent_name] = []
+                            seen = {c['fund_name'] for c in nport_by_parent[parent_name]}
+                            for k in kids:
+                                if k[0] not in seen:
+                                    nport_by_parent[parent_name].append({
+                                        'fund_name': k[0], 'shares': k[1],
+                                        'value': k[2], 'pct_of_nav': k[3],
+                                    })
+                                    seen.add(k[0])
+            except Exception as e:
+                logger.error(f"[query3 nport batch] {e}", exc_info=True)
+
         results = []
         for row in records:
             parent = row.get('parent_name') or row.get('manager_name')
@@ -854,7 +893,7 @@ def query3(ticker):
                 WHERE COALESCE(inst_parent_name, manager_name) = ?
                   AND ticker = ? AND shares > 0
                 GROUP BY quarter ORDER BY quarter
-            f""", [parent, ticker]).fetchall()
+            """, [parent, ticker]).fetchall()
             quarters_held = [r[0] for r in history if r[1] and r[1] > 0]
             since_raw = quarters_held[0] if quarters_held else None
             held_count = len(quarters_held)
@@ -872,7 +911,7 @@ def query3(ticker):
                     FROM investor_flows
                     WHERE ticker = ? AND inst_parent_name = ?
                       AND quarter_from = '{FQ}' AND quarter_to = '{LQ}'
-                f""", [ticker, parent]).fetchone()
+                """, [ticker, parent]).fetchone()
                 if flow:
                     pct_chg = float(flow[1]) if flow[1] is not None else None
                     if flow[4]:  # is_new_entry
@@ -899,39 +938,38 @@ def query3(ticker):
                 row['pct_change'] = None
                 row['price_adj_flow'] = None
 
-            # N-PORT enrichment + children (Enhancement 3)
-            cusip = get_cusip(con, ticker)
-            children, src = get_children(parent, ticker, cusip, '{LQ}', con, limit=5,
-                                         parent_shares=row.get('shares'))
-            if src == 'N-PORT':
+            # N-PORT fund-level children: show individual fund series under parent
+            nport_children = nport_by_parent.get(parent, [])
+            if nport_children:
                 row['source'] = 'N-PORT'
                 row['subadviser_note'] = None
+                row['is_parent'] = True
+                row['child_count'] = len(nport_children)
             else:
                 row['source'] = '13F estimate'
                 row['subadviser_note'] = get_subadviser_note(parent)
+                row['is_parent'] = False
+                row['child_count'] = 0
 
-            effective_children = len(children)
-            row['is_parent'] = effective_children >= 2
-            row['child_count'] = effective_children
             row['level'] = 0
-            row['institution'] = parent  # for hierarchy rendering
+            row['institution'] = parent
             results.append(row)
 
-            if effective_children >= 2:
-                for c in children:
-                    results.append({
-                        'manager_name': c.get('institution'),
-                        'institution': c.get('institution'),
-                        'position_value': c.get('value_live'),
-                        'pct_of_portfolio': None,
-                        'pct_of_float': c.get('pct_float'),
-                        'mktcap_percentile': None,
-                        'manager_type': row.get('manager_type'),
-                        'source': c.get('source', src),
-                        'direction': None, 'since': None, 'held_label': None,
-                        'is_parent': False, 'child_count': 0, 'level': 1,
-                        'subadviser_note': None,
-                    })
+            for c in nport_children:
+                results.append({
+                    'manager_name': c['fund_name'],
+                    'institution': c['fund_name'],
+                    'position_value': c['value'],
+                    'shares': c['shares'],
+                    'pct_of_portfolio': c['pct_of_nav'],
+                    'pct_of_float': None,
+                    'mktcap_percentile': None,
+                    'manager_type': row.get('manager_type'),
+                    'source': 'N-PORT',
+                    'direction': None, 'since': None, 'held_label': None,
+                    'is_parent': False, 'child_count': 0, 'level': 1,
+                    'subadviser_note': None,
+                })
 
         # Item 14: Add short interest summary for this ticker
         if has_table('short_interest') and results:
@@ -1125,7 +1163,7 @@ def query7(ticker, cik=None, fund_name=None):
                   AND manager_type NOT IN ('passive')
                 ORDER BY market_value_live DESC NULLS LAST
                 LIMIT 1
-            f""", [ticker]).fetchone()
+            """, [ticker]).fetchone()
             if not row:
                 return {'stats': {}, 'positions': []}
             cik = row[0]
