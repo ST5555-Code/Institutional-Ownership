@@ -189,8 +189,8 @@ _Last updated: April 3, 2026_
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | N1 | N-PORT index/ETF fund download | Done | Merged 1.6M new rows (4.2M→5.8M). 6,306 series, 98.4% mapped to advisers. Vanguard 30→96, BlackRock 132→243, Fidelity 281→449 |
-| N2 | Short squeeze UI tab | Medium | Frontend tab to display `/api/short_squeeze` candidates. Sortable by squeeze score, short %, inst ownership |
-| N3 | Short vs long UI integration | Medium | Add long/short comparison section to Smart Money tab. Show net exposure per manager |
+| N2 | Short squeeze UI tab | Done | Frontend tab with `/api/short_squeeze`. Shows candidates >15% short, squeeze score, inst % float |
+| N3 | Short vs long UI integration | Done | Long/short comparison in Smart Money tab via `/api/short_long`. Shows managers both long+short, short-only funds |
 | N4 | Ownership concentration heatmap | Medium | Cross-tab visualization: top N managers × top N tickers. Color by pct_of_float |
 | N5 | Historical flow trend charts | Medium | Multi-quarter flow intensity time series per ticker. Requires compute_flows across all period pairs |
 | N6 | Manager profile page | Low | Dedicated view per institution: all holdings, flow history, sector allocation, conviction positions |
@@ -199,7 +199,8 @@ _Last updated: April 3, 2026_
 | N9 | 13F-HR amendment reconciliation | Low | Track 13F-HR/A amendments and reconcile position changes within same quarter |
 | N10 | Multi-quarter position timeline | Medium | Sparkline or mini-chart in Register tab showing shares held across all quarters per holder |
 | N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→90.0% resolved, 10% filing agents marked. `resolve_agent_names.py` extracts reporting person from filing text |
-| N12 | Investor name standardization | High | Normalize casing across all tables: Title Case for all investor/manager names (no ALL CAPS unless actual legal name like "FMR LLC"). Audit and fix: manager_name, inst_parent_name in holdings; filer_name in beneficial_ownership; adviser_name in ncen_adviser_map. Ensure consistent display across Register, Conviction, Activist, Flow Analysis, and Smart Money tabs. Deduplicate near-matches (e.g., "BLACKROCK ADVISORS LLC" vs "BlackRock Advisors, LLC") |
+| N12 | Investor name standardization | Done | `normalize_names.py`: smart Title Case for 8.6M rows, 8 table/columns. Handles acronyms, canonical names, dotted abbrevs. ALL CAPS 27%→0% |
+| N13 | N-PORT series-level deduplication | High | Fix double-counting in ALL N-PORT rollup queries. Multiple sub-advisers (Fidelity HK/Japan/UK, Geode) inflate totals when the same series_id is counted per-adviser. Fix: SUM shares by unique series_id first, then roll up to parent. Affects: N-PORT coverage calc, Conviction tab children, Register tab N-PORT totals, Fund Portfolio tab. Test with NVDA across Fidelity, BlackRock, Vanguard, JPMorgan |
 
 ---
 
@@ -209,9 +210,10 @@ _Last updated: April 3, 2026_
 2. ~~Data quality fixes (market_value, manager_type, flows, pct_of_float)~~ Done
 3. ~~FINRA short interest refresh + enrich_tickers~~ Done
 4. **Retry `fetch_market.py --staging`** when Yahoo rate limit resets (fills snapshot prices + 420 missing tickers)
-5. **N12 — Investor name standardization** (Title Case, dedup, consistency audit)
-6. N2 — Short squeeze UI tab
-7. N3 — Short vs long UI integration
+5. ~~N12 — Investor name standardization~~ Done
+6. ~~N2 — Short squeeze UI tab~~ Done
+7. ~~N3 — Short vs long UI integration~~ Done
+8. **N13 — N-PORT series-level deduplication** (fix double-counting across all rollup queries)
 4. Refresh readonly snapshot
 5. Build Short Squeeze UI tab (N2)
 6. Add short/long comparison to Smart Money tab (N3)
