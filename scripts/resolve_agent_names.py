@@ -98,8 +98,9 @@ def download_filing(acc, subject_cik, filer_cik):
         url = f"https://www.sec.gov/Archives/edgar/data/{cik_raw}/{acc_path}/{acc}.txt"
         try:
             result = subprocess.run(
-                ["curl", "-s", "-f", "-m", "10", "-H", f"User-Agent: {SEC_UA}", url],
-                capture_output=True, text=True, timeout=15,
+                ["curl", "-s", "-f", "-m", "8", "--connect-timeout", "5",
+                 "-H", f"User-Agent: {SEC_UA}", url],
+                capture_output=True, text=True, timeout=12,
                 check=False
             )
             if result.returncode == 0 and len(result.stdout) > 100:
