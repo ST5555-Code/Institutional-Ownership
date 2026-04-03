@@ -83,6 +83,77 @@ PARENT_SEEDS = [
     ("Starboard Value", "activist", ["STARBOARD"]),
     ("Engine No. 1", "activist", ["ENGINE NO"]),
     ("Corvex Management", "activist", ["CORVEX"]),
+
+    # --- Extended seeds (Tier 2) ---
+    # Active
+    ("Janus Henderson", "active", ["JANUS HENDERSON", "JANUS CAPITAL"]),
+    ("Columbia Threadneedle", "active", ["COLUMBIA THREADNEEDLE", "COLUMBIA MANAGEMENT"]),
+    ("Hartford Funds", "active", ["HARTFORD"]),
+    ("Principal Financial", "active", ["PRINCIPAL FINANCIAL", "PRINCIPAL GLOBAL"]),
+    ("Neuberger Berman", "active", ["NEUBERGER BERMAN"]),
+    ("Lord Abbett", "active", ["LORD ABBETT"]),
+    ("AllianceBernstein", "active", ["ALLIANCEBERNSTEIN", "AB FUNDS", "SANFORD BERNSTEIN"]),
+    ("Lazard Asset Management", "active", ["LAZARD"]),
+    ("Artisan Partners", "active", ["ARTISAN"]),
+    ("Brown Advisory", "active", ["BROWN ADVISORY"]),
+    ("Wasatch Global", "active", ["WASATCH"]),
+    ("Parnassus Investments", "active", ["PARNASSUS"]),
+    ("Calamos Investments", "active", ["CALAMOS"]),
+    ("Oakmark / Harris", "active", ["OAKMARK", "HARRIS ASSOCIATES"]),
+    ("Royce Investment Partners", "active", ["ROYCE"]),
+    ("Sands Capital", "active", ["SANDS CAPITAL"]),
+    ("Fred Alger", "active", ["FRED ALGER", "ALGER"]),
+    ("Loomis Sayles", "active", ["LOOMIS SAYLES"]),
+    ("Victory Capital", "active", ["VICTORY CAPITAL"]),
+    ("Ariel Investments", "active", ["ARIEL INVESTMENTS"]),
+    ("Harding Loevner", "active", ["HARDING LOEVNER"]),
+    ("William Blair", "active", ["WILLIAM BLAIR"]),
+    ("Baird", "active", ["BAIRD"]),
+    ("Harbor Capital", "active", ["HARBOR CAPITAL"]),
+    ("Calvert Research", "active", ["CALVERT"]),
+    ("Carillon Tower", "active", ["CARILLON"]),
+    ("PGIM", "active", ["PGIM", "PRUDENTIAL FINANCIAL"]),
+
+    # Mixed / Banks
+    ("Bank of America / Merrill", "mixed", ["BANK OF AMERICA", "MERRILL LYNCH"]),
+    ("Wells Fargo", "mixed", ["WELLS FARGO"]),
+    ("Citigroup", "mixed", ["CITIGROUP", "CITIBANK"]),
+    ("HSBC", "mixed", ["HSBC"]),
+    ("Barclays", "mixed", ["BARCLAYS"]),
+    ("Credit Suisse", "mixed", ["CREDIT SUISSE"]),
+    ("BMO Financial", "mixed", ["BMO FINANCIAL", "BMO CAPITAL"]),
+    ("RBC Global", "mixed", ["RBC ", "ROYAL BANK OF CANADA"]),
+    ("TD Asset Management", "mixed", ["TD ASSET", "TD SECURITIES"]),
+    ("Nomura", "mixed", ["NOMURA"]),
+    ("Susquehanna", "mixed", ["SUSQUEHANNA"]),
+
+    # Passive / Index
+    ("Geode Capital Management", "passive", ["GEODE CAPITAL"]),
+    ("Parametric Portfolio", "passive", ["PARAMETRIC"]),
+    ("Norges Bank", "passive", ["NORGES BANK"]),
+
+    # Hedge fund
+    ("Soros Fund Management", "hedge_fund", ["SOROS"]),
+    ("Appaloosa Management", "hedge_fund", ["APPALOOSA"]),
+    ("Lone Pine Capital", "hedge_fund", ["LONE PINE"]),
+    ("Viking Global", "hedge_fund", ["VIKING GLOBAL"]),
+    ("Tiger Global", "hedge_fund", ["TIGER GLOBAL"]),
+    ("Coatue Management", "hedge_fund", ["COATUE"]),
+    ("Dragoneer Investment", "hedge_fund", ["DRAGONEER"]),
+    ("Baupost Group", "hedge_fund", ["BAUPOST"]),
+    ("Greenlight Capital", "hedge_fund", ["GREENLIGHT"]),
+    ("Tudor Investment", "hedge_fund", ["TUDOR"]),
+    ("Och-Ziff / Sculptor", "hedge_fund", ["OCH-ZIFF", "SCULPTOR"]),
+    ("Marshall Wace", "hedge_fund", ["MARSHALL WACE"]),
+    ("Farallon Capital", "hedge_fund", ["FARALLON"]),
+    ("Maverick Capital", "hedge_fund", ["MAVERICK CAPITAL"]),
+    ("Anchorage Capital", "hedge_fund", ["ANCHORAGE"]),
+
+    # Activist (additional)
+    ("Trian Fund Management", "activist", ["TRIAN"]),
+    ("Sachem Head", "activist", ["SACHEM HEAD"]),
+    ("Cevian Capital", "activist", ["CEVIAN"]),
+    ("Land & Buildings", "activist", ["LAND & BUILDINGS"]),
 ]
 
 
@@ -255,11 +326,52 @@ def build_managers_table(con):
             p.parent_name,
             COALESCE(
                 CASE WHEN p.strategy_type != 'unknown' THEN p.strategy_type END,
-                a.strategy_inferred
+                a.strategy_inferred,
+                -- Keyword-based fallback classification
+                CASE
+                    WHEN UPPER(f.manager_name) LIKE '%INDEX%'
+                      OR UPPER(f.manager_name) LIKE '%ETF%'
+                      OR UPPER(f.manager_name) LIKE '%SPDR%'
+                      OR UPPER(f.manager_name) LIKE '%PASSIVE%'
+                      THEN 'passive'
+                    WHEN UPPER(f.manager_name) LIKE '%HEDGE%'
+                      OR UPPER(f.manager_name) LIKE '%CAPITAL PARTNERS%'
+                      OR UPPER(f.manager_name) LIKE '%MASTER FUND%'
+                      OR UPPER(f.manager_name) LIKE '%OFFSHORE%'
+                      THEN 'hedge_fund'
+                    WHEN UPPER(f.manager_name) LIKE '%PRIVATE EQUITY%'
+                      OR UPPER(f.manager_name) LIKE '%BUYOUT%'
+                      OR UPPER(f.manager_name) LIKE '%VENTURE CAPITAL%'
+                      OR UPPER(f.manager_name) LIKE '%VENTURES%'
+                      THEN 'private_equity'
+                    WHEN UPPER(f.manager_name) LIKE '%BANK%'
+                      OR UPPER(f.manager_name) LIKE '%TRUST CO%'
+                      OR UPPER(f.manager_name) LIKE '%WEALTH MANAGEMENT%'
+                      OR UPPER(f.manager_name) LIKE '%FINANCIAL GROUP%'
+                      THEN 'mixed'
+                    WHEN UPPER(f.manager_name) LIKE '%QUANT%'
+                      OR UPPER(f.manager_name) LIKE '%ALGORITHMIC%'
+                      OR UPPER(f.manager_name) LIKE '%SYSTEMATIC%'
+                      THEN 'quantitative'
+                    WHEN UPPER(f.manager_name) LIKE '%ADVISORS%'
+                      OR UPPER(f.manager_name) LIKE '%ADVISERS%'
+                      OR UPPER(f.manager_name) LIKE '%ASSET MANAGEMENT%'
+                      OR UPPER(f.manager_name) LIKE '%INVESTMENT MANAGEMENT%'
+                      OR UPPER(f.manager_name) LIKE '%CAPITAL MANAGEMENT%'
+                      THEN 'active'
+                    ELSE NULL
+                END
             ) as strategy_type,
             COALESCE(p.is_activist, a.is_activist, false) as is_activist,
             CASE
-                WHEN COALESCE(p.strategy_type, a.strategy_inferred) = 'passive' THEN true
+                WHEN COALESCE(
+                    CASE WHEN p.strategy_type != 'unknown' THEN p.strategy_type END,
+                    a.strategy_inferred
+                ) = 'passive'
+                OR UPPER(f.manager_name) LIKE '%INDEX%'
+                OR UPPER(f.manager_name) LIKE '%ETF%'
+                OR UPPER(f.manager_name) LIKE '%SPDR%'
+                THEN true
                 ELSE false
             END as is_passive,
             a.adv_5f_raum as aum_total,

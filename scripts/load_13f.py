@@ -234,7 +234,7 @@ def build_holdings(con):
                 NULL as ticker,
                 i.issuer_name,
                 i.title_of_class as security_type,
-                i.value * 1000 as market_value_usd,
+                i.value as market_value_usd,
                 i.shares,
                 i.discretion,
                 i.vote_sole,

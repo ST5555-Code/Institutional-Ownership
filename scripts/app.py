@@ -563,7 +563,7 @@ def api_admin_merger_signals():
                 FROM holdings WHERE quarter = '{PREV_QUARTER}'
                   AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
                 GROUP BY cik, manager_name
-                HAVING SUM(market_value_usd) > 1000000000
+                HAVING SUM(market_value_usd) > 1000000
             )
             SELECT * FROM gone ORDER BY prev_value DESC LIMIT 20
         """).fetchdf()

@@ -1641,7 +1641,7 @@ def query15(ticker=None):
         qstats = con.execute("""
             SELECT quarter, COUNT(*) as rows, COUNT(DISTINCT cik) as filers,
                    COUNT(DISTINCT cusip) as securities,
-                   SUM(market_value_usd) / 1e12 as total_value_tn
+                   SUM(market_value_usd) / 1e9 as total_value_bn
             FROM holdings GROUP BY quarter ORDER BY quarter
         """).fetchdf()
         stats['quarters'] = df_to_records(qstats)
@@ -1822,12 +1822,12 @@ def flow_analysis(ticker, period='4Q', peers=None):
 
         # Implied prices
         ip = con.execute("""
-            SELECT SUM(market_value_usd) / 1000.0 / NULLIF(SUM(shares), 0)
+            SELECT SUM(market_value_usd) / NULLIF(SUM(shares), 0)
             FROM holdings WHERE ticker = ? AND quarter = ? AND shares > 0
         """, [ticker, quarter_from]).fetchone()
         implied_from = ip[0] if ip and ip[0] else None
         ip2 = con.execute(f"""
-            SELECT SUM(market_value_usd) / 1000.0 / NULLIF(SUM(shares), 0)
+            SELECT SUM(market_value_usd) / NULLIF(SUM(shares), 0)
             FROM holdings WHERE ticker = ? AND quarter = '{LQ}' AND shares > 0
         """, [ticker]).fetchone()
         implied_to = ip2[0] if ip2 and ip2[0] else None
@@ -1919,7 +1919,7 @@ def get_short_long_comparison(ticker):
         longs = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as manager,
                    SUM(shares) as long_shares,
-                   SUM(market_value_usd) / 1000.0 as long_value_k,
+                   SUM(market_value_usd) as long_value,
                    manager_type
             FROM holdings
             WHERE ticker = ? AND quarter = '{LQ}' AND shares > 0
@@ -2004,7 +2004,7 @@ def get_short_squeeze_candidates():
                 SELECT ticker,
                        COUNT(DISTINCT cik) as num_holders,
                        SUM(shares) as total_shares,
-                       SUM(market_value_usd) / 1000.0 as total_value_k
+                       SUM(market_value_usd) as total_value
                 FROM holdings
                 WHERE quarter = '{LQ}'
                 GROUP BY ticker

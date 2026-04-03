@@ -37,8 +37,11 @@ QUARTER_SNAPSHOT_DATES = {
 
 # Flow analysis comparison periods: (label, from_quarter, to_quarter)
 FLOW_PERIODS = [
-    ("4Q", FIRST_QUARTER, LATEST_QUARTER),
-    ("2Q", QUARTERS[-2], LATEST_QUARTER) if len(QUARTERS) >= 2 else None,
-    ("1Q", QUARTERS[-2], LATEST_QUARTER) if len(QUARTERS) >= 2 else None,
+    ("4Q", QUARTERS[0], QUARTERS[-1]),
 ]
-FLOW_PERIODS = [p for p in FLOW_PERIODS if p is not None]
+if len(QUARTERS) >= 4:
+    FLOW_PERIODS.append(("3Q", QUARTERS[-4], QUARTERS[-1]))
+if len(QUARTERS) >= 3:
+    FLOW_PERIODS.append(("2Q", QUARTERS[-3], QUARTERS[-1]))
+if len(QUARTERS) >= 2:
+    FLOW_PERIODS.append(("1Q", QUARTERS[-2], QUARTERS[-1]))

@@ -66,7 +66,7 @@ def compute_period_flows(con, period_label, q_from, q_to):
                    COALESCE(inst_parent_name, manager_name) as investor,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares,
-                   SUM(market_value_usd) / 1000.0 as value
+                   SUM(market_value_usd) as value
             FROM holdings WHERE quarter = '{q_from}'
             GROUP BY ticker, investor
         ),
@@ -75,7 +75,7 @@ def compute_period_flows(con, period_label, q_from, q_to):
                    COALESCE(inst_parent_name, manager_name) as investor,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares,
-                   SUM(market_value_usd) / 1000.0 as value
+                   SUM(market_value_usd) as value
             FROM holdings WHERE quarter = '{q_to}'
             GROUP BY ticker, investor
         ),
