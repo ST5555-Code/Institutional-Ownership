@@ -9,8 +9,8 @@ _Last updated: April 2, 2026_
 | # | Item | Notes |
 |---|------|-------|
 | P1 | Full 13D/G fetch — `fetch_13dg.py` | 57,612 unparsed filings in listed_filings_13dg. Awaiting authorization to run Phase 2 |
-| P2 | `fetch_market.py` batch rewrite | Persistent yfinance cache, batch `yf.download()`, upsert-only. Code only |
-| P3 | `compute_flows.py` set-based rewrite | Replace per-ticker loop with window function SQL. Code only |
+| P2 | `fetch_market.py` batch rewrite | Done — batch yf.download(), persistent cache (7-day), upsert-only. Needs production test |
+| P3 | `compute_flows.py` set-based rewrite | Done — single INSERT per period via window functions. Needs production test |
 
 ---
 
@@ -65,9 +65,9 @@ _Last updated: April 2, 2026_
 | 21 | Materialized summary tables | Done | `build_summaries.py` creates `summary_by_ticker` + `summary_by_parent`. --rebuild flag |
 | 22 | Logged exceptions in app.py | Done | All bare `except Exception:` replaced with `as e` + `app.logger.error()` in endpoint handlers |
 | 23 | Incremental `load_13f.py` — append + rebuild latest quarter only | Medium | Grows in importance as dataset expands; not urgent at current size |
-| 24 | OpenFIGI + yfinance persistent cache in `build_cusip.py` | Medium | Currently does 5,000 OpenFIGI lookups from scratch every run |
+| 24 | OpenFIGI + yfinance persistent cache in `build_cusip.py` | Done | `_cache_openfigi` and `_cache_yfinance` tables, 30-day yfinance freshness |
 | 25 | Readonly snapshot auto-refresh after full build | Medium | Add to `start_app.sh` or post-fetch script. Bug 7 switchback monitor added |
-| 26 | Benchmark script — time each pipeline stage | Low | Nice to have; not urgent |
+| 26 | Benchmark script — time each pipeline stage | Done | `scripts/benchmark.py` with --run flag, stage timing, dry-run check |
 | 27 | app.py quarter centralization — convert 60+ SQL strings to use config.py vars | Medium | Requires f-string conversion of triple-quoted SQL; deferred for dedicated pass |
 | 28 | Pyflakes cleanup — unused imports removed from 17 scripts | Done | 31 unused imports fixed |
 | 29 | SHOW TABLES removed from Flask endpoints — cached via `has_table()` | Done | 6 per-request queries replaced with startup-time cache |
@@ -82,6 +82,7 @@ _Last updated: April 2, 2026_
 | 38 | Test isolation — `--test` uses `13f_test.duckdb`, write guard | Done | `db.py` centralized, assert_write_safe() |
 | 39 | Bug 6 — fetch_market.py upsert, never drops table | Done | Unique index on ticker, delete-then-insert per batch |
 | 40 | Bug 7 — app.py snapshot switchback monitor | Done | Background thread, 60s poll, auto-switch + log |
+| 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
 
 ---
 

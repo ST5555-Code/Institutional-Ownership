@@ -1206,7 +1206,8 @@ function renderFlowAnalysis(data) {
 
         tableWrap.appendChild(row);
 
-        // Render charts after DOM insertion
+        // Render charts after DOM insertion — setTimeout lets the browser lay out the canvas
+        setTimeout(() => {
         const labels = chartData.map(d => d.ticker);
 
         // Destroy old charts
@@ -1284,6 +1285,7 @@ function renderFlowAnalysis(data) {
                 },
             },
         });
+        }, 100);  // end setTimeout — let DOM render before chart init
 
     } else if (chartData.length > 0) {
         // Fallback if Chart.js not loaded — show as table

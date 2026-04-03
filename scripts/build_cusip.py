@@ -53,6 +53,61 @@ MEDIA_SICS = {4833, 4832, 4813, 4899, 7812, 7922, 2711, 2721}
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
 OPENFIGI_RATE_LIMIT = 25  # requests per minute
+YFINANCE_CACHE_DAYS = 30  # skip yfinance enrichment if cached within this many days
+
+
+def create_caches(con):
+    """Create persistent cache tables for OpenFIGI and yfinance lookups."""
+    con.execute("""CREATE TABLE IF NOT EXISTS _cache_openfigi (
+        cusip VARCHAR PRIMARY KEY, ticker VARCHAR, exchange VARCHAR,
+        security_type VARCHAR, cached_at TIMESTAMP)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS _cache_yfinance (
+        ticker VARCHAR PRIMARY KEY, sector VARCHAR, industry VARCHAR,
+        exchange VARCHAR, market_cap DOUBLE, cached_at TIMESTAMP)""")
+
+
+def get_cached_figi(con, cusips):
+    """Return dict of cusip→ticker from cache. Remove already-cached from input list."""
+    try:
+        rows = con.execute(
+            "SELECT cusip, ticker FROM _cache_openfigi WHERE cusip IN (SELECT UNNEST(?))", [cusips]
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
+    except Exception:
+        return {}
+
+
+def save_figi_cache(con, results):
+    """Persist OpenFIGI results to cache."""
+    if not results:
+        return
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    rows = [(cusip, ticker, None, None, now) for cusip, ticker in results.items()]
+    con.executemany("INSERT OR REPLACE INTO _cache_openfigi VALUES (?,?,?,?,?)", rows)
+
+
+def get_cached_yfinance(con, tickers):
+    """Return set of tickers already cached within YFINANCE_CACHE_DAYS."""
+    try:
+        rows = con.execute(f"""
+            SELECT ticker FROM _cache_yfinance
+            WHERE cached_at >= CURRENT_TIMESTAMP - INTERVAL '{YFINANCE_CACHE_DAYS}' DAY
+        """).fetchall()
+        return {r[0] for r in rows}
+    except Exception:
+        return set()
+
+
+def save_yfinance_cache(con, results):
+    """Persist yfinance enrichment results to cache."""
+    if not results:
+        return
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    rows = [(t, d.get("sector",""), d.get("industry",""), d.get("exchange",""),
+             d.get("market_cap",0), now) for t, d in results.items()]
+    con.executemany("INSERT OR REPLACE INTO _cache_yfinance VALUES (?,?,?,?,?,?)", rows)
 OPENFIGI_BATCH_SIZE = 10  # CUSIPs per request
 
 
@@ -298,13 +353,26 @@ def main():
     print("=" * 60)
 
     con = duckdb.connect(get_db_path())
+    create_caches(con)
 
     # Step 1: Get unique CUSIPs
     print("\nGetting unique CUSIPs from holdings...")
     df_cusips = get_unique_cusips(con)
 
-    # Step 2: OpenFIGI lookup
-    figi_results = enrich_with_openfigi(df_cusips)
+    # Step 2: OpenFIGI lookup (with cache)
+    cusips_to_lookup = df_cusips["cusip"].tolist()[:5000]
+    cached_figi = get_cached_figi(con, cusips_to_lookup)
+    uncached = [c for c in cusips_to_lookup if c not in cached_figi]
+    print(f"  OpenFIGI cache: {len(cached_figi):,} cached, {len(uncached):,} to look up")
+
+    if uncached:
+        # Create a filtered df for uncached CUSIPs only
+        df_uncached = df_cusips[df_cusips["cusip"].isin(uncached)]
+        new_results = enrich_with_openfigi(df_uncached)
+        save_figi_cache(con, new_results)
+        cached_figi.update(new_results)
+
+    figi_results = cached_figi
 
     # Step 3: Build and save securities table
     build_securities_table(con, df_cusips, figi_results)

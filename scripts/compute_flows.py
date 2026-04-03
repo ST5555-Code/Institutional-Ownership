@@ -1,13 +1,11 @@
+#!/usr/bin/env python3
 """
-Compute institutional flow analytics: investor_flows and ticker_flow_stats.
+compute_flows.py — Compute institutional investor flow analytics.
 
-Processes all tickers with Q4 holdings. For each ticker, computes:
-- Per-investor flow metrics for 3 periods (Q1→Q4, Q2→Q4, Q3→Q4)
-- Momentum signals (always based on 4Q comparison)
-- Aggregate stats (flow intensity, churn)
+Set-based SQL approach: bulk INSERT per period using window functions.
+No per-ticker loop — all tickers processed in a single pass per period.
 
-Usage:
-    python3 scripts/compute_flows.py
+Usage: python3 scripts/compute_flows.py
 """
 
 import sys
@@ -28,258 +26,223 @@ def create_tables(con):
     con.execute("DROP TABLE IF EXISTS investor_flows")
     con.execute("""
         CREATE TABLE investor_flows (
-            ticker VARCHAR,
-            period VARCHAR,
-            quarter_from VARCHAR,
-            quarter_to VARCHAR,
-            inst_parent_name VARCHAR,
-            manager_type VARCHAR,
-            from_shares DOUBLE,
-            to_shares DOUBLE,
-            net_shares DOUBLE,
-            pct_change DOUBLE,
-            from_value DOUBLE,
-            to_value DOUBLE,
-            from_price DOUBLE,
-            price_adj_flow DOUBLE,
-            raw_flow DOUBLE,
-            price_effect DOUBLE,
-            is_new_entry BOOLEAN,
-            is_exit BOOLEAN,
-            flow_4q DOUBLE,
-            flow_2q DOUBLE,
-            momentum_ratio DOUBLE,
-            momentum_signal VARCHAR
+            ticker VARCHAR, period VARCHAR, quarter_from VARCHAR, quarter_to VARCHAR,
+            inst_parent_name VARCHAR, manager_type VARCHAR,
+            from_shares DOUBLE, to_shares DOUBLE, net_shares DOUBLE, pct_change DOUBLE,
+            from_value DOUBLE, to_value DOUBLE, from_price DOUBLE,
+            price_adj_flow DOUBLE, raw_flow DOUBLE, price_effect DOUBLE,
+            is_new_entry BOOLEAN, is_exit BOOLEAN,
+            flow_4q DOUBLE, flow_2q DOUBLE, momentum_ratio DOUBLE, momentum_signal VARCHAR
         )
     """)
     con.execute("DROP TABLE IF EXISTS ticker_flow_stats")
     con.execute("""
         CREATE TABLE ticker_flow_stats (
-            ticker VARCHAR,
-            quarter_from VARCHAR,
-            quarter_to VARCHAR,
-            flow_intensity_total DOUBLE,
-            flow_intensity_active DOUBLE,
+            ticker VARCHAR, quarter_from VARCHAR, quarter_to VARCHAR,
+            flow_intensity_total DOUBLE, flow_intensity_active DOUBLE,
             flow_intensity_passive DOUBLE,
-            churn_nonpassive DOUBLE,
-            churn_active DOUBLE,
-            computed_at TIMESTAMP
+            churn_nonpassive DOUBLE, churn_active DOUBLE, computed_at TIMESTAMP
         )
     """)
 
 
-def compute_ticker_flows(con, ticker, market_cap):
-    """Compute all flow metrics for a single ticker."""
-    # Get parent-level holdings for each quarter
-    quarters = QUARTERS
-    qdata = {}
-    for q in quarters:
-        df = con.execute("""
+def compute_period_flows(con, period_label, q_from, q_to):
+    """Compute all investor flows for a single period using set-based SQL."""
+    print(f"  Computing {period_label} ({q_from} → {q_to})...", flush=True)
+    t0 = time.time()
+
+    con.execute(f"""
+        INSERT INTO investor_flows (
+            ticker, period, quarter_from, quarter_to,
+            inst_parent_name, manager_type,
+            from_shares, to_shares, net_shares, pct_change,
+            from_value, to_value, from_price,
+            price_adj_flow, raw_flow, price_effect,
+            is_new_entry, is_exit,
+            flow_4q, flow_2q, momentum_ratio, momentum_signal
+        )
+        WITH q_from AS (
+            SELECT ticker,
+                   COALESCE(inst_parent_name, manager_name) as investor,
+                   MAX(manager_type) as manager_type,
+                   SUM(shares) as shares,
+                   SUM(market_value_usd) / 1000.0 as value
+            FROM holdings WHERE quarter = '{q_from}'
+            GROUP BY ticker, investor
+        ),
+        q_to AS (
+            SELECT ticker,
+                   COALESCE(inst_parent_name, manager_name) as investor,
+                   MAX(manager_type) as manager_type,
+                   SUM(shares) as shares,
+                   SUM(market_value_usd) / 1000.0 as value
+            FROM holdings WHERE quarter = '{q_to}'
+            GROUP BY ticker, investor
+        ),
+        combined AS (
             SELECT
-                COALESCE(inst_parent_name, manager_name) as investor,
-                MAX(manager_type) as manager_type,
-                SUM(shares) as shares,
-                SUM(market_value_usd) / 1000.0 as value
-            FROM holdings
-            WHERE ticker = ? AND quarter = ?
-            GROUP BY investor
-        """, [ticker, q]).fetchdf()
-        qdata[q] = {row['investor']: row for _, row in df.iterrows()}
+                COALESCE(t.ticker, f.ticker) as ticker,
+                COALESCE(t.investor, f.investor) as investor,
+                COALESCE(t.manager_type, f.manager_type) as manager_type,
+                COALESCE(f.shares, 0) as from_shares,
+                COALESCE(t.shares, 0) as to_shares,
+                COALESCE(f.value, 0) as from_value,
+                COALESCE(t.value, 0) as to_value
+            FROM q_to t
+            FULL OUTER JOIN q_from f ON t.ticker = f.ticker AND t.investor = f.investor
+        ),
+        flows AS (
+            SELECT *,
+                to_shares - from_shares as net_shares,
+                CASE WHEN from_shares > 0 THEN (to_shares - from_shares) / from_shares ELSE NULL END as pct_change,
+                from_shares = 0 AND to_shares > 0 as is_new_entry,
+                from_shares > 0 AND to_shares = 0 as is_exit,
+                CASE WHEN from_shares > 0 AND from_value > 0 THEN from_value / from_shares ELSE NULL END as from_price,
+                CASE WHEN from_shares > 0 AND from_value > 0
+                    THEN (to_shares - from_shares) * (from_value / from_shares)
+                    ELSE NULL END as price_adj_flow,
+                to_value - from_value as raw_flow,
+                CASE WHEN from_shares > 0 AND from_value > 0
+                    THEN (to_value - from_value) - ((to_shares - from_shares) * (from_value / from_shares))
+                    ELSE NULL END as price_effect
+            FROM combined
+            WHERE from_shares > 0 OR to_shares > 0
+        )
+        SELECT
+            ticker, '{period_label}', '{q_from}', '{q_to}',
+            investor, manager_type,
+            CASE WHEN from_shares > 0 THEN from_shares ELSE NULL END,
+            CASE WHEN to_shares > 0 THEN to_shares ELSE NULL END,
+            CASE WHEN net_shares != 0 THEN net_shares ELSE NULL END,
+            pct_change,
+            CASE WHEN from_value > 0 THEN from_value ELSE NULL END,
+            CASE WHEN to_value > 0 THEN to_value ELSE NULL END,
+            from_price, price_adj_flow,
+            CASE WHEN raw_flow != 0 THEN raw_flow ELSE NULL END,
+            price_effect,
+            is_new_entry, is_exit,
+            NULL, NULL, NULL, NULL  -- momentum fields filled in next pass
+        FROM flows
+    """)
 
-    # Compute implied prices per quarter (aggregate)
-    implied_prices = {}
-    for q in quarters:
-        total_shares = sum(r['shares'] for r in qdata[q].values() if r['shares'] and r['shares'] > 0)
-        total_value = sum(r['value'] for r in qdata[q].values() if r['value'])
-        implied_prices[q] = total_value / total_shares if total_shares > 0 else None
+    count = con.execute(f"""
+        SELECT COUNT(*) FROM investor_flows WHERE period = '{period_label}'
+    """).fetchone()[0]
+    elapsed = time.time() - t0
+    print(f"    {count:,} flow rows in {elapsed:.1f}s", flush=True)
 
-    # Compute flows for each period
-    all_rows = []
-    momentum_cache = {}  # investor -> {flow_4q, flow_2q}
 
-    for period_label, q_from, q_to in PERIODS:
-        from_map = qdata.get(q_from, {})
-        to_map = qdata.get(q_to, {})
-        all_investors = set(from_map.keys()) | set(to_map.keys())
-        from_price = implied_prices.get(q_from)
+def compute_momentum(con):
+    """Fill momentum fields using 4Q and 1Q flow data."""
+    print("  Computing momentum signals...", flush=True)
+    con.execute("""
+        UPDATE investor_flows f
+        SET flow_4q = m4.price_adj_flow
+        FROM investor_flows m4
+        WHERE f.ticker = m4.ticker AND f.inst_parent_name = m4.inst_parent_name
+          AND m4.period = '4Q'
+          AND f.flow_4q IS NULL
+    """)
+    con.execute("""
+        UPDATE investor_flows f
+        SET flow_2q = m1.price_adj_flow
+        FROM investor_flows m1
+        WHERE f.ticker = m1.ticker AND f.inst_parent_name = m1.inst_parent_name
+          AND m1.period = '1Q'
+          AND f.flow_2q IS NULL
+    """)
+    con.execute("""
+        UPDATE investor_flows
+        SET momentum_ratio = CASE WHEN flow_4q != 0 AND flow_2q IS NOT NULL
+                                  THEN flow_2q / flow_4q ELSE NULL END
+    """)
+    con.execute("""
+        UPDATE investor_flows
+        SET momentum_signal = CASE
+            WHEN manager_type = 'passive' THEN NULL
+            WHEN is_new_entry THEN 'NEW'
+            WHEN is_exit THEN 'EXIT'
+            WHEN momentum_ratio IS NULL THEN NULL
+            WHEN momentum_ratio > 0.65 THEN 'ACCEL'
+            WHEN momentum_ratio >= 0.35 THEN 'STEADY'
+            WHEN momentum_ratio >= 0.10 THEN 'FADING'
+            WHEN momentum_ratio >= 0 THEN 'MINIMAL'
+            ELSE 'REVERSING'
+        END
+    """)
 
-        for inv in all_investors:
-            fr = from_map.get(inv)
-            to = to_map.get(inv)
-            from_shares = float(fr['shares']) if fr is not None and pd.notna(fr['shares']) else 0
-            to_shares = float(to['shares']) if to is not None and pd.notna(to['shares']) else 0
-            from_val = float(fr['value']) if fr is not None and pd.notna(fr['value']) else 0
-            to_val = float(to['value']) if to is not None and pd.notna(to['value']) else 0
-            mtype = (to['manager_type'] if to is not None else fr['manager_type']) if fr is not None or to is not None else None
 
-            net = to_shares - from_shares
-            pct_change = net / from_shares if from_shares > 0 else None
-            is_new = from_shares == 0 and to_shares > 0
-            is_exit = from_shares > 0 and to_shares == 0
-
-            # Use investor's own implied price for price-adj flow
-            inv_from_price = from_val / from_shares if from_shares > 0 and from_val > 0 else from_price
-            paf = net * inv_from_price if inv_from_price and not is_new else None
-            raw = to_val - from_val
-            pe = (raw - paf) if paf is not None else None
-
-            row = {
-                'ticker': ticker, 'period': period_label,
-                'quarter_from': q_from, 'quarter_to': q_to,
-                'inst_parent_name': inv, 'manager_type': mtype,
-                'from_shares': from_shares if from_shares > 0 else None,
-                'to_shares': to_shares if to_shares > 0 else None,
-                'net_shares': net if net != 0 else None,
-                'pct_change': pct_change,
-                'from_value': from_val if from_val > 0 else None,
-                'to_value': to_val if to_val > 0 else None,
-                'from_price': inv_from_price,
-                'price_adj_flow': paf, 'raw_flow': raw if raw != 0 else None,
-                'price_effect': pe,
-                'is_new_entry': is_new, 'is_exit': is_exit,
-            }
-            all_rows.append(row)
-
-            # Cache 4Q and 1Q flows for momentum
-            if period_label == '4Q':
-                momentum_cache.setdefault(inv, {})['flow_4q'] = paf
-            elif period_label == '1Q':
-                momentum_cache.setdefault(inv, {})['flow_2q'] = paf
-
-    # Compute momentum and apply to all rows
-    for row in all_rows:
-        inv = row['inst_parent_name']
-        mc = momentum_cache.get(inv, {})
-        f4q = mc.get('flow_4q')
-        f2q = mc.get('flow_2q')
-        row['flow_4q'] = f4q
-        row['flow_2q'] = f2q
-
-        if f4q and f4q != 0 and f2q is not None:
-            ratio = f2q / f4q
-        else:
-            ratio = None
-        row['momentum_ratio'] = ratio
-
-        # Signal
-        mtype = row.get('manager_type')
-        if mtype == 'passive':
-            row['momentum_signal'] = None
-        elif row['is_new_entry']:
-            row['momentum_signal'] = 'NEW'
-        elif row['is_exit']:
-            row['momentum_signal'] = 'EXIT'
-        elif ratio is not None:
-            if ratio > 0.65:
-                row['momentum_signal'] = 'ACCEL'
-            elif ratio >= 0.35:
-                row['momentum_signal'] = 'STEADY'
-            elif ratio >= 0.10:
-                row['momentum_signal'] = 'FADING'
-            elif ratio >= 0:
-                row['momentum_signal'] = 'MINIMAL'
-            else:
-                row['momentum_signal'] = 'REVERSING'
-        else:
-            row['momentum_signal'] = None
-
-    # Insert flow rows
-    if all_rows:
-        df = pd.DataFrame(all_rows)
-        con.execute("INSERT INTO investor_flows SELECT * FROM df")
-
-    # Compute ticker-level stats
-    for period_label, q_from, q_to in PERIODS:
-        period_rows = [r for r in all_rows if r['period'] == period_label]
-        # Flow intensity
-        existing = [r for r in period_rows if not r['is_new_entry'] and not r['is_exit']]
-        total_paf = sum(r['price_adj_flow'] or 0 for r in existing)
-        active_paf = sum(r['price_adj_flow'] or 0 for r in existing if r['manager_type'] != 'passive')
-        passive_paf = sum(r['price_adj_flow'] or 0 for r in existing if r['manager_type'] == 'passive')
-
-        fi_total = total_paf / market_cap if market_cap and market_cap > 0 else None
-        fi_active = active_paf / market_cap if market_cap and market_cap > 0 else None
-        fi_passive = passive_paf / market_cap if market_cap and market_cap > 0 else None
-
-        # Value-weighted churn — non-passive managers only
-        def _value_churn(rows, type_filter):
-            """Value-weighted churn: (value of entries + exits) / avg(from_value, to_value)."""
-            filtered = [r for r in rows if type_filter(r.get('manager_type'))]
-            q1_val = sum(r.get('from_value') or 0 for r in filtered if not r.get('is_new_entry'))
-            q4_val = sum(r.get('to_value') or 0 for r in filtered if not r.get('is_exit'))
-            ne_val = sum(r.get('to_value') or 0 for r in filtered if r.get('is_new_entry'))
-            ex_val = sum(r.get('from_value') or 0 for r in filtered if r.get('is_exit'))
-            avg_val = (q1_val + q4_val) / 2 if (q1_val + q4_val) > 0 else 1
-            return (ne_val + ex_val) / avg_val
-
-        is_nonpassive = lambda t: t != 'passive'
-        is_active_only = lambda t: t in ('active',)
-
-        churn_np = _value_churn(period_rows, is_nonpassive)
-        churn_act = _value_churn(period_rows, is_active_only)
-
-        con.execute("""
-            INSERT INTO ticker_flow_stats VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, [ticker, q_from, q_to, fi_total, fi_active, fi_passive,
-              churn_np, churn_act, datetime.now()])
+def compute_ticker_stats(con):
+    """Compute aggregate flow intensity and churn per ticker per period."""
+    print("  Computing ticker-level stats...", flush=True)
+    con.execute(f"""
+        INSERT INTO ticker_flow_stats
+        SELECT
+            ticker, quarter_from, quarter_to,
+            -- Flow intensity = sum(price_adj_flow) / market_cap
+            SUM(price_adj_flow) / NULLIF(MAX(m.market_cap), 0) as fi_total,
+            SUM(CASE WHEN manager_type != 'passive' THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) as fi_active,
+            SUM(CASE WHEN manager_type = 'passive' THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) as fi_passive,
+            -- Churn: (entry_value + exit_value) / avg_value for non-passive
+            (SUM(CASE WHEN is_new_entry AND manager_type != 'passive' THEN to_value ELSE 0 END)
+             + SUM(CASE WHEN is_exit AND manager_type != 'passive' THEN from_value ELSE 0 END))
+            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type != 'passive' THEN from_value ELSE 0 END)
+                      + SUM(CASE WHEN NOT is_exit AND manager_type != 'passive' THEN to_value ELSE 0 END)) / 2, 0)
+            as churn_np,
+            -- Churn active only
+            (SUM(CASE WHEN is_new_entry AND manager_type = 'active' THEN to_value ELSE 0 END)
+             + SUM(CASE WHEN is_exit AND manager_type = 'active' THEN from_value ELSE 0 END))
+            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type = 'active' THEN from_value ELSE 0 END)
+                      + SUM(CASE WHEN NOT is_exit AND manager_type = 'active' THEN to_value ELSE 0 END)) / 2, 0)
+            as churn_active,
+            CURRENT_TIMESTAMP
+        FROM investor_flows f
+        LEFT JOIN market_data m ON f.ticker = m.ticker
+        WHERE NOT is_new_entry AND NOT is_exit  -- exclude entries/exits from flow intensity
+        GROUP BY ticker, quarter_from, quarter_to
+    """)
+    count = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
+    print(f"    {count:,} ticker stats rows")
 
 
 def main():
     con = duckdb.connect(get_db_path())
     print(f"Database: {get_db_path()}")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    t_start = time.time()
 
     create_tables(con)
 
-    # Get all tickers with Q4 holdings + market cap
-    tickers = con.execute(f"""
-        SELECT DISTINCT h.ticker, m.market_cap
-        FROM holdings h
-        LEFT JOIN market_data m ON h.ticker = m.ticker
-        WHERE h.quarter = '{LATEST_Q}' AND h.ticker IS NOT NULL AND h.ticker != ''
-    """).fetchdf()
+    # Compute flows for each period — single SQL pass per period
+    for period_label, q_from, q_to in PERIODS:
+        compute_period_flows(con, period_label, q_from, q_to)
 
-    total = len(tickers)
-    print(f"Tickers to process: {total}")
+    # Momentum signals
+    compute_momentum(con)
 
-    t0 = time.time()
-    failed_tickers = []
-    for i, (_, row) in enumerate(tickers.iterrows()):
-        ticker = row['ticker']
-        mktcap = float(row['market_cap']) if pd.notna(row['market_cap']) else None
-        try:
-            compute_ticker_flows(con, ticker, mktcap)
-        except Exception as e:
-            failed_tickers.append((ticker, str(e)))
-            print(f"ERROR {ticker}: {e}")
+    # Ticker-level aggregate stats
+    compute_ticker_stats(con)
 
-        if (i + 1) % 500 == 0:
-            elapsed = time.time() - t0
-            rate = (i + 1) / elapsed
-            eta = (total - i - 1) / rate / 60
-            print(f"  [{i+1}/{total}] {elapsed:.0f}s elapsed, {rate:.1f} tickers/s, ETA {eta:.1f}m")
+    con.execute("CHECKPOINT")
 
-    elapsed = time.time() - t0
-    print(f"\nCompleted: {total} tickers in {elapsed:.0f}s ({total/elapsed:.1f} tickers/s)")
+    # Summary
+    total_flows = con.execute("SELECT COUNT(*) FROM investor_flows").fetchone()[0]
+    total_stats = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
+    elapsed = time.time() - t_start
 
-    # Verify
-    cnt = con.execute("SELECT COUNT(*) FROM investor_flows").fetchone()[0]
-    cnt2 = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
-    print(f"investor_flows: {cnt:,} rows")
-    print(f"ticker_flow_stats: {cnt2:,} rows")
-
-    if failed_tickers:
-        print(f"\nFAILED TICKERS ({len(failed_tickers)}):")
-        for tk, err in failed_tickers[:20]:
-            print(f"  {tk}: {err}")
-        if len(failed_tickers) > 20:
-            print(f"  ... and {len(failed_tickers) - 20} more")
+    print(f"\nCompleted in {elapsed:.0f}s")
+    print(f"  investor_flows: {total_flows:,} rows")
+    print(f"  ticker_flow_stats: {total_stats:,} rows")
 
     con.close()
 
-    if failed_tickers:
+    if total_flows == 0:
+        print("\nWARNING: No flows computed — check that holdings table has data.")
         sys.exit(1)
 
 
 if __name__ == '__main__':
-    main()
+    from db import crash_handler
+    crash_handler("compute_flows")(main)
