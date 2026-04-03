@@ -179,11 +179,14 @@ def compute_ticker_stats(con):
         INSERT INTO ticker_flow_stats
         SELECT
             f.ticker, quarter_from, quarter_to,
-            -- Flow intensity = sum(price_adj_flow) / market_cap
-            SUM(price_adj_flow) / NULLIF(MAX(m.market_cap), 0) as fi_total,
-            SUM(CASE WHEN manager_type != 'passive' THEN price_adj_flow ELSE 0 END)
+            -- Flow intensity = sum(price_adj_flow) / market_cap (existing holders only)
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) as fi_total,
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit AND manager_type != 'passive'
+                THEN price_adj_flow ELSE 0 END)
                 / NULLIF(MAX(m.market_cap), 0) as fi_active,
-            SUM(CASE WHEN manager_type = 'passive' THEN price_adj_flow ELSE 0 END)
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit AND manager_type = 'passive'
+                THEN price_adj_flow ELSE 0 END)
                 / NULLIF(MAX(m.market_cap), 0) as fi_passive,
             -- Churn: (entry_value + exit_value) / avg_value for non-passive
             (SUM(CASE WHEN is_new_entry AND manager_type != 'passive' THEN to_value ELSE 0 END)
@@ -200,7 +203,6 @@ def compute_ticker_stats(con):
             CURRENT_TIMESTAMP
         FROM investor_flows f
         LEFT JOIN market_data m ON f.ticker = m.ticker
-        WHERE NOT is_new_entry AND NOT is_exit  -- exclude entries/exits from flow intensity
         GROUP BY f.ticker, quarter_from, quarter_to
     """)
     count = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
