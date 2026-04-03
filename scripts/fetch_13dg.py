@@ -135,12 +135,24 @@ def _extract_fields(text, filing_type):
             purpose = after[:m5.start()] if m5 else after[:600]
             result["purpose_text"] = re.sub(r"\s+", " ", purpose).strip()[:500] or None
 
-    for pat in [r"Item\s*1[:\s]+Reporting\s+Person\s*[-–—]\s*([\w\s.,&'/-]+?)(?=\s*(?:Item\s*2|CHECK|\n))",
-                r"NAMES?\s+OF\s+REPORTING\s+PERSONS?\s+((?:[A-Z][A-Za-z.'&,\s-]+){1,5}?)(?=\s*(?:CHECK|2\.|Item\s*2))"]:
-        m = re.search(pat, text[:5000], re.I)
+    for pat in [
+        # "1 NAME OF REPORTING PERSONS Vanguard Group Inc 2 CHECK"
+        r"(?:1\s+)?NAMES?\s+OF\s+REPORTING\s+PERSONS?\s*[:\s]*((?:[A-Z][A-Za-z.'&,\s/-]+?){1,6}?)(?=\s*(?:\d\s|CHECK|2\s|Item\s*2|SEC\s+USE))",
+        # "Item 1: Reporting Person — Vanguard Group Inc"
+        r"Item\s*1[:\s]+Reporting\s+Person\s*[-\u2013\u2014:\s]*([\w\s.,&'/-]+?)(?=\s*(?:Item\s*2|CHECK|\n|2\.))",
+        # Name after I.R.S. identification line
+        r"NAMES?\s+OF\s+REPORTING\s+PERSONS?\s+I\.?R\.?S\.?[^A-Z]{0,50}([A-Z][A-Za-z.'&,\s/-]{3,80}?)(?=\s*(?:\d\s|CHECK|2\s))",
+        # "NAME OF REPORTING PERSON\n\nJohn Smith\n\n2."
+        r"NAME\s+OF\s+REPORTING\s+PERSON[^A-Z]{0,30}([A-Z][A-Za-z.'&,\(\)\s/-]{3,80}?)(?=\s*(?:\d\s|CHECK|2\s|Item|SEC))",
+    ]:
+        m = re.search(pat, text[:8000], re.I)
         if m:
             name = m.group(1).strip()
-            if 3 < len(name) < 100 and name[0].isalpha() and "I.R.S." not in name:
+            name = re.sub(r"\s+(I\.?R\.?S|S\.?S\.?|Check|CHECK).*$", "", name).strip()
+            if (3 < len(name) < 100
+                    and name[0].isalpha()
+                    and "I.R.S." not in name
+                    and "CHECK" not in name.upper()):
                 result["reporting_person"] = name
                 break
 
