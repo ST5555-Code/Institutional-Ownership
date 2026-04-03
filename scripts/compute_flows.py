@@ -178,7 +178,7 @@ def compute_ticker_stats(con):
     con.execute(f"""
         INSERT INTO ticker_flow_stats
         SELECT
-            ticker, quarter_from, quarter_to,
+            f.ticker, quarter_from, quarter_to,
             -- Flow intensity = sum(price_adj_flow) / market_cap
             SUM(price_adj_flow) / NULLIF(MAX(m.market_cap), 0) as fi_total,
             SUM(CASE WHEN manager_type != 'passive' THEN price_adj_flow ELSE 0 END)
@@ -201,7 +201,7 @@ def compute_ticker_stats(con):
         FROM investor_flows f
         LEFT JOIN market_data m ON f.ticker = m.ticker
         WHERE NOT is_new_entry AND NOT is_exit  -- exclude entries/exits from flow intensity
-        GROUP BY ticker, quarter_from, quarter_to
+        GROUP BY f.ticker, quarter_from, quarter_to
     """)
     count = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
     print(f"    {count:,} ticker stats rows")
