@@ -20,16 +20,24 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import duckdb
-import edgar
-import requests
 from rapidfuzz import fuzz
+
+# edgar imported lazily in Phase 1 only — its background httpx threads
+# interfere with subprocess/socket operations in Phase 2 after ~30 iterations.
+edgar = None
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 from db import get_db_path, set_test_mode, assert_write_safe, crash_handler
 os.makedirs(LOG_DIR, exist_ok=True)
 
-edgar.set_identity("serge.tismen@gmail.com")
+def _init_edgar():
+    """Lazy-init edgar library — only needed for Phase 1."""
+    global edgar
+    if edgar is None:
+        import edgar as _edgar
+        _edgar.set_identity("serge.tismen@gmail.com")
+        edgar = _edgar
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
 MAX_WORKERS_PHASE1 = 4
@@ -282,6 +290,7 @@ def log_error(path, ticker, acc, error):
 
 def list_ticker_filings(ticker, existing, error_log):
     """List new 13D/G filings for a ticker. Returns Filing objects for Phase 2.
+    Requires edgar library — call _init_edgar() before using.
     Returns list of (Filing, ticker) tuples — Filing objects carry cached data
     so Phase 2 can call f.text() without an extra HTTP round-trip."""
     time.sleep(0.1)
@@ -361,13 +370,6 @@ def parse_one_filing(filing, ticker, cusip_map, error_log):
         "manager_cik": None,
     }
 
-def _get_session():
-    """Per-thread requests.Session for connection reuse."""
-    if not hasattr(_thread_local, "session"):
-        s = requests.Session()
-        s.headers.update(SEC_HEADERS)
-        _thread_local.session = s
-    return _thread_local.session
 
 
 def _rate_limit():
@@ -382,41 +384,26 @@ def _rate_limit():
 
 
 def _download_filing_text(acc, subject_cik):
-    """Download filing text via direct URL. Rate-limited, Retry-After aware."""
+    """Download filing text via curl subprocess. Avoids Python SSL/urllib3 connection
+    pool bugs that cause hangs after ~30 sequential requests on macOS/LibreSSL."""
+    import subprocess as sp
     cik_raw = subject_cik.lstrip("0") or "0"
     acc_path = acc.replace("-", "")
-    session = _get_session()
+    ua = SEC_HEADERS["User-Agent"]
     for base_cik in [cik_raw, acc.split("-")[0].lstrip("0") or "0"]:
         url = f"https://www.sec.gov/Archives/edgar/data/{base_cik}/{acc_path}/{acc}.txt"
-        for attempt in range(2):
-            _rate_limit()
-            try:
-                resp = session.get(url, timeout=10)
-                if resp.status_code == 200:
-                    return resp.text
-                if resp.status_code == 429:
-                    retry_after = resp.headers.get("Retry-After")
-                    if retry_after:
-                        try:
-                            wait = min(int(retry_after), 30)
-                        except ValueError:
-                            wait = 10
-                    else:
-                        wait = 10
-                    ts = datetime.now().strftime("%H:%M:%S")
-                    print(f"  429 at {ts} acc={acc[:20]} attempt={attempt+1} wait={wait}s", flush=True)
-                    time.sleep(wait)
-                    continue
-                if resp.status_code == 403:
-                    ts = datetime.now().strftime("%H:%M:%S")
-                    print(f"  403 at {ts} acc={acc[:20]} — backing off 15s", flush=True)
-                    time.sleep(15)
-                    continue
-                break  # 404 or other — try next CIK
-            except requests.RequestException as e:
-                ts = datetime.now().strftime("%H:%M:%S")
-                print(f"  NET ERR at {ts} acc={acc[:20]}: {e}", flush=True)
-                time.sleep(2)
+        time.sleep(1.0)
+        try:
+            result = sp.run(
+                ["curl", "-s", "-f", "-m", "10", "-H", f"User-Agent: {ua}", url],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode == 0 and len(result.stdout) > 100:
+                return result.stdout
+        except sp.TimeoutExpired:
+            print(f"  CURL TIMEOUT {acc[:20]}", flush=True)
+        except Exception as e:
+            print(f"  CURL ERR {acc[:20]}: {e}", flush=True)
     return None
 
 
@@ -429,7 +416,22 @@ def parse_one_filing_by_acc(acc, ticker, form, filing_date, filer_cik,
         return None
 
     text = _clean_text(raw_text)
-    fields = _extract_fields(text, form)
+
+    # Timeout guard: skip filings where regex takes >5s (catastrophic backtracking)
+    import signal
+    def _timeout(s, f): raise TimeoutError()
+    old_handler = signal.signal(signal.SIGALRM, _timeout)
+    signal.alarm(5)
+    try:
+        fields = _extract_fields(text, form)
+    except TimeoutError:
+        log_error(error_log, ticker, acc, "regex timeout >5s — skipped")
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+        return None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
     filer_name = filer_cik  # fallback — no header available in direct download
     if fields.get("reporting_person"):
@@ -485,6 +487,7 @@ def post_process(con, new_count, check_tickers=None):
 
 def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS_PHASE1):
     """Phase 1: List filings per ticker, persist to listed_filings_13dg."""
+    _init_edgar()
     con = duckdb.connect(get_db_path())
     create_tables(con)
     error_log = init_error_log()
@@ -597,18 +600,24 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
         print(f"    {len(uncached)} from prior session (will re-fetch)")
 
     total = len(unparsed)
-    print(f"\n--- Phase 2: Parsing {total} filings (sequential, {SEC_MAX_RPS} req/s) ---", flush=True)
+    print(f"\n--- Phase 2: Parsing {total} filings (sequential, 1 req/s) ---", flush=True)
+
+    # Close DuckDB during download loop — re-open only for batch inserts.
+    # DuckDB's native library holds the GIL during WAL operations, which blocks
+    # urllib3 socket reads after ~30 iterations when the connection is open.
+    con.close()
+
     all_records = []
     errors = 0
     done_count = 0
     t_start = time.time()
+    FLUSH_SIZE = 200
 
-    # Process sequentially — avoids thread contention and SEC rate limiting
     work_items = [(acc, tk, fm, fd, fc, sn, sc) for acc, tk, fm, fd, fc, sn, sc in uncached]
-    # Prepend cached items
     for acc, tk in cached:
         work_items.insert(0, (acc, tk, None, None, None, None, None))
 
+    print(f"  Processing {len(work_items)} filings...", flush=True)
     for item in work_items:
         acc, tk = item[0], item[1]
         done_count += 1
@@ -626,19 +635,34 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
             log_error(error_log, tk, acc, e)
             errors += 1
 
-        if done_count % 50 == 0 or done_count == total:
+        if done_count % 10 == 0 or done_count == total:
             elapsed = time.time() - t_start
             rate = done_count / elapsed * 60 if elapsed > 0 else 0
-            print(f"  [{done_count}/{total}] ok={done_count-errors} err={errors} {rate:.0f}/min", flush=True)
+            msg = f"  [{done_count}/{total}] ok={done_count-errors} err={errors} {rate:.0f}/min"
+            print(msg, flush=True)
+            try:
+                with open(os.path.join(LOG_DIR, "phase2_progress.txt"), "w") as pf:
+                    pf.write(f"{msg}\n{datetime.now().isoformat()}\n")
+            except Exception:
+                pass
 
-        if len(all_records) >= 200:
+        if len(all_records) >= FLUSH_SIZE:
+            # Re-open DB, insert batch, close
+            con = duckdb.connect(get_db_path())
             batch_insert(con, all_records)
             con.execute("CHECKPOINT")
+            con.close()
             all_records.clear()
 
+    # Final flush
     if all_records:
+        con = duckdb.connect(get_db_path())
         batch_insert(con, all_records)
-    con.execute("CHECKPOINT")
+        con.execute("CHECKPOINT")
+        con.close()
+
+    # Re-open for summary
+    con = duckdb.connect(get_db_path())
 
     total = con.execute("SELECT COUNT(*) FROM beneficial_ownership").fetchone()[0]
     print(f"  Phase 2 complete: {total} total filings in DB")
@@ -666,6 +690,7 @@ def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS_PHASE1):
 # ---------------------------------------------------------------------------
 
 def run_update():
+    _init_edgar()
     con = duckdb.connect(get_db_path())
     create_tables(con)
     error_log = init_error_log()
