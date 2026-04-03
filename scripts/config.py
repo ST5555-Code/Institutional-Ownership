@@ -53,6 +53,10 @@ if len(QUARTERS) >= 2:
 # its own 13F — don't count Geode-managed shares under Fidelity).
 # Add new entries here without code changes.
 SUBADVISER_EXCLUSIONS = {
+    # Geode subadvises Fidelity index funds but files its own 13F.
+    # International affiliates (HK, Japan, UK) are kept — they manage
+    # separate fund series whose shares are already consolidated in FMR's
+    # 13F, so N-PORT coverage may exceed 100% for Fidelity. This is expected.
     'fidelity': ['Geode Capital Management'],
     'fmr': ['Geode Capital Management'],
 }
