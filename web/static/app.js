@@ -270,6 +270,8 @@ function switchTab(tabId) {
         loadCrowding();
     } else if (tabId === 'smart-money') {
         loadSmartMoney();
+    } else if (tabId === 'short-squeeze') {
+        loadShortSqueeze();
     } else if (tabId === 'peer-matrix') {
         renderPlaceholder(tabId);
     } else if (currentQuery > 0) {
@@ -927,6 +929,64 @@ async function loadSmartMoney() {
                 {key: 'short_value', label: 'Short Value', type: 'dollar'},
                 {key: 'quarter', label: 'Quarter', type: 'text'},
             ]));
+        }
+        // Long vs Short comparison
+        try {
+            const slRes = await fetch(`/api/short_long?ticker=${currentTicker}`);
+            if (slRes.ok) {
+                const slData = await slRes.json();
+                if (slData.long_short_managers && slData.long_short_managers.length) {
+                    wrap.appendChild(sectionHeader('Managers Both Long (13F) and Short (N-PORT)'));
+                    wrap.appendChild(buildSimpleTable(slData.long_short_managers, [
+                        {key: 'manager', label: 'Manager', type: 'text'},
+                        {key: 'fund_name', label: 'Short Fund', type: 'text'},
+                        {key: 'long_shares', label: 'Long Shares', type: 'shares'},
+                        {key: 'long_value_k', label: 'Long Value', type: 'dollar'},
+                        {key: 'short_shares', label: 'Short Shares', type: 'shares'},
+                        {key: 'net_shares', label: 'Net Shares', type: 'shares'},
+                    ]));
+                }
+                if (slData.short_only_funds && slData.short_only_funds.length) {
+                    wrap.appendChild(sectionHeader('Short-Only Funds (No 13F Long Position)'));
+                    wrap.appendChild(buildSimpleTable(slData.short_only_funds, [
+                        {key: 'fund_name', label: 'Fund', type: 'text'},
+                        {key: 'adviser', label: 'Adviser', type: 'text'},
+                        {key: 'short_shares', label: 'Short Shares', type: 'shares'},
+                        {key: 'short_value', label: 'Short Value', type: 'dollar'},
+                    ]));
+                }
+            }
+        } catch (e2) { /* short_long is optional */ }
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+// ---------------------------------------------------------------------------
+// Short Squeeze tab — shows candidates with high short + high inst ownership
+// ---------------------------------------------------------------------------
+async function loadShortSqueeze() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch('/api/short_squeeze');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+        const wrap = tableWrap;
+        if (data.candidates && data.candidates.length) {
+            const info = document.createElement('div');
+            info.style.cssText = 'padding:12px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;margin-bottom:16px;font-size:13px;';
+            info.innerHTML = '<b>Short Squeeze Candidates:</b> Tickers with high short interest (>15%) and high institutional ownership. Squeeze Score = Short% x Institutional/Float ratio.';
+            wrap.appendChild(info);
+            wrap.appendChild(buildSimpleTable(data.candidates, [
+                {key: 'ticker', label: 'Ticker', type: 'text'},
+                {key: 'max_short_pct', label: 'Short %', type: 'pct'},
+                {key: 'inst_pct_float', label: 'Inst % Float', type: 'pct'},
+                {key: 'squeeze_score', label: 'Squeeze Score', type: 'num'},
+                {key: 'num_holders', label: 'Holders', type: 'num'},
+                {key: 'total_value', label: 'Inst Value', type: 'dollar'},
+                {key: 'market_cap', label: 'Market Cap', type: 'dollar'},
+            ]));
+        } else {
+            wrap.innerHTML = '<div class="no-data">No short squeeze candidates found (requires short_interest data with >15% short).</div>';
         }
     } catch (e) { hideSpinner(); showError(e.message); }
 }
