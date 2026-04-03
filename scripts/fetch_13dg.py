@@ -33,14 +33,15 @@ edgar.set_identity("serge.tismen@gmail.com")
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
 MAX_WORKERS_PHASE1 = 4
-MAX_WORKERS_PHASE2 = 2  # SEC per-IP rate limit — 2 concurrent downloaders
+MAX_WORKERS_PHASE2 = 1  # Sequential — avoids SEC rate limiting entirely
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
 _thread_local = threading.local()
 _rate_lock = threading.Lock()
 _last_request_time = [0.0]
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
-SEC_MAX_RPS = 2  # max requests/second across all workers
+SEC_MAX_RPS = 1  # max requests/second across all workers — SEC rate limit safe
+_last_completion_time = [0.0]  # watchdog: track when last filing completed
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
@@ -402,11 +403,20 @@ def _download_filing_text(acc, subject_cik):
                             wait = 10
                     else:
                         wait = 10
+                    ts = datetime.now().strftime("%H:%M:%S")
+                    print(f"  429 at {ts} acc={acc[:20]} attempt={attempt+1} wait={wait}s", flush=True)
                     time.sleep(wait)
                     continue
+                if resp.status_code == 403:
+                    ts = datetime.now().strftime("%H:%M:%S")
+                    print(f"  403 at {ts} acc={acc[:20]} — backing off 15s", flush=True)
+                    time.sleep(15)
+                    continue
                 break  # 404 or other — try next CIK
-            except requests.RequestException:
-                time.sleep(1)
+            except requests.RequestException as e:
+                ts = datetime.now().strftime("%H:%M:%S")
+                print(f"  NET ERR at {ts} acc={acc[:20]}: {e}", flush=True)
+                time.sleep(2)
     return None
 
 
@@ -586,40 +596,45 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
     else:
         print(f"    {len(uncached)} from prior session (will re-fetch)")
 
-    print(f"\n--- Phase 2: Parsing {len(unparsed)} filings ({max_workers} workers) ---")
+    total = len(unparsed)
+    print(f"\n--- Phase 2: Parsing {total} filings (sequential, {SEC_MAX_RPS} req/s) ---", flush=True)
     all_records = []
     errors = 0
-    done = [0]
+    done_count = 0
     t_start = time.time()
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {}
-        for acc, tk in cached:
-            futures[pool.submit(parse_one_filing, filing_cache[acc], tk, cusip_map, error_log)] = acc
-        for acc, tk, fm, fd, fc, sn, sc in uncached:
-            futures[pool.submit(parse_one_filing_by_acc, acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)] = acc
-        print(f"  Submitted {len(futures)} futures", flush=True)
-        for fut in as_completed(futures):
-            done[0] += 1
-            try:
-                rec = fut.result(timeout=60)
-                if rec:
-                    all_records.append(rec)
-                else:
-                    errors += 1
-            except Exception as e:
-                log_error(error_log, "", futures[fut], e)
+    # Process sequentially — avoids thread contention and SEC rate limiting
+    work_items = [(acc, tk, fm, fd, fc, sn, sc) for acc, tk, fm, fd, fc, sn, sc in uncached]
+    # Prepend cached items
+    for acc, tk in cached:
+        work_items.insert(0, (acc, tk, None, None, None, None, None))
+
+    for item in work_items:
+        acc, tk = item[0], item[1]
+        done_count += 1
+        try:
+            if acc in filing_cache:
+                rec = parse_one_filing(filing_cache[acc], tk, cusip_map, error_log)
+            else:
+                _, _, fm, fd, fc, sn, sc = item
+                rec = parse_one_filing_by_acc(acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)
+            if rec:
+                all_records.append(rec)
+            else:
                 errors += 1
-            if done[0] % 100 == 0 or done[0] == len(unparsed):
-                elapsed = time.time() - t_start
-                rate = done[0] / elapsed * 60 if elapsed > 0 else 0
-                print(f"  [{done[0]}/{len(unparsed)}] ok={done[0]-errors} err={errors} {rate:.0f}/min", flush=True)
-            if len(all_records) >= 500:
-                print(f"  Flushing {len(all_records)} records...", flush=True)
-                batch_insert(con, all_records)
-                con.execute("CHECKPOINT")
-                all_records.clear()
-                print(f"  Flush complete", flush=True)
+        except Exception as e:
+            log_error(error_log, tk, acc, e)
+            errors += 1
+
+        if done_count % 50 == 0 or done_count == total:
+            elapsed = time.time() - t_start
+            rate = done_count / elapsed * 60 if elapsed > 0 else 0
+            print(f"  [{done_count}/{total}] ok={done_count-errors} err={errors} {rate:.0f}/min", flush=True)
+
+        if len(all_records) >= 200:
+            batch_insert(con, all_records)
+            con.execute("CHECKPOINT")
+            all_records.clear()
 
     if all_records:
         batch_insert(con, all_records)
