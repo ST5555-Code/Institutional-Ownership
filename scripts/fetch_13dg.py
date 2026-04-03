@@ -32,11 +32,15 @@ os.makedirs(LOG_DIR, exist_ok=True)
 edgar.set_identity("serge.tismen@gmail.com")
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
-MAX_WORKERS = 4
+MAX_WORKERS_PHASE1 = 4
+MAX_WORKERS_PHASE2 = 2  # SEC per-IP rate limit — 2 concurrent downloaders
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
 _thread_local = threading.local()
+_rate_lock = threading.Lock()
+_last_request_time = [0.0]
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
+SEC_MAX_RPS = 2  # max requests/second across all workers
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
@@ -342,20 +346,40 @@ def _get_session():
     return _thread_local.session
 
 
+def _rate_limit():
+    """Global rate limiter — enforces SEC_MAX_RPS across all threads."""
+    min_interval = 1.0 / SEC_MAX_RPS
+    with _rate_lock:
+        now = time.time()
+        elapsed = now - _last_request_time[0]
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+        _last_request_time[0] = time.time()
+
+
 def _download_filing_text(acc, subject_cik):
-    """Download filing text via direct URL (1 HTTP call, no edgar.find)."""
+    """Download filing text via direct URL. Rate-limited, Retry-After aware."""
     cik_raw = subject_cik.lstrip("0") or "0"
     acc_path = acc.replace("-", "")
     session = _get_session()
     for base_cik in [cik_raw, acc.split("-")[0].lstrip("0") or "0"]:
         url = f"https://www.sec.gov/Archives/edgar/data/{base_cik}/{acc_path}/{acc}.txt"
         for attempt in range(2):
+            _rate_limit()
             try:
                 resp = session.get(url, timeout=10)
                 if resp.status_code == 200:
                     return resp.text
                 if resp.status_code == 429:
-                    time.sleep(min(5 * (attempt + 1), 15))
+                    retry_after = resp.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait = min(int(retry_after), 30)
+                        except ValueError:
+                            wait = 10
+                    else:
+                        wait = 10
+                    time.sleep(wait)
                     continue
                 break  # 404 or other — try next CIK
             except requests.RequestException:
@@ -426,7 +450,7 @@ def post_process(con, new_count, check_tickers=None):
 # run() — full build, ticker by ticker
 # ---------------------------------------------------------------------------
 
-def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
+def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS_PHASE1):
     """Phase 1: List filings per ticker, persist to listed_filings_13dg."""
     con = duckdb.connect(get_db_path())
     create_tables(con)
@@ -511,7 +535,7 @@ def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
     return filing_cache
 
 
-def run_phase2(max_workers=MAX_WORKERS, filing_cache=None, test_mode=False):
+def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=False):
     """Phase 2: Parse all unparsed filings from listed_filings_13dg."""
     con = duckdb.connect(get_db_path())
     create_tables(con)
@@ -592,7 +616,7 @@ def run_phase3(test_mode=False, tickers=None):
     print("\nPhase 3 complete.")
 
 
-def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS):
+def run(tickers=None, test_mode=False, max_workers=MAX_WORKERS_PHASE1):
     """Full pipeline: Phase 1 → Phase 2 → Phase 3."""
     filing_cache = run_phase1(tickers=tickers, test_mode=test_mode, max_workers=max_workers)
     run_phase2(max_workers=max_workers, filing_cache=filing_cache, test_mode=test_mode)
@@ -731,8 +755,8 @@ if __name__ == "__main__":
     parser.add_argument("--tickers", type=str, help="Comma-separated tickers")
     parser.add_argument("--test", action="store_true", help="Test mode (5 tickers, separate DB)")
     parser.add_argument("--update", action="store_true", help="Incremental since last filing date")
-    parser.add_argument("--workers", type=int, default=MAX_WORKERS,
-                        help=f"Parallel threads (default {MAX_WORKERS})")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="Override thread count (default: 4 phase1, 2 phase2)")
     parser.add_argument("--phase1-only", action="store_true", help="Run Phase 1 only (list filings)")
     parser.add_argument("--phase2-only", action="store_true", help="Run Phase 2 only (parse filings)")
     parser.add_argument("--phase3-only", action="store_true", help="Run Phase 3 only (post-process)")
@@ -746,15 +770,17 @@ if __name__ == "__main__":
 
     def _main():
         t = args.tickers.split(",") if args.tickers else None
+        w1 = args.workers or MAX_WORKERS_PHASE1
+        w2 = args.workers or MAX_WORKERS_PHASE2
         if args.update:
             run_update()
         elif args.phase1_only:
-            run_phase1(tickers=t, test_mode=args.test, max_workers=args.workers)
+            run_phase1(tickers=t, test_mode=args.test, max_workers=w1)
         elif args.phase2_only:
-            run_phase2(max_workers=args.workers, test_mode=args.test)
+            run_phase2(max_workers=w2, test_mode=args.test)
         elif args.phase3_only:
             run_phase3(test_mode=args.test, tickers=t)
         else:
-            run(tickers=t, test_mode=args.test, max_workers=args.workers)
+            run(tickers=t, test_mode=args.test, max_workers=w1)
 
     crash_handler("fetch_13dg")(_main)
