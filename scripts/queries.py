@@ -1168,19 +1168,26 @@ def query6(ticker):
         if has_bo:
             df_13d = con.execute("""
                 SELECT
-                    filer_name,
-                    pct_owned,
-                    shares_owned,
-                    latest_filing_date AS filing_date,
-                    latest_filing_type AS filing_type,
-                    days_since_filing,
-                    is_current,
-                    crossed_5pct,
-                    prior_intent,
-                    amendment_count
-                FROM beneficial_ownership_current
-                WHERE subject_ticker = ? AND intent = 'activist'
-                ORDER BY latest_filing_date DESC
+                    CASE WHEN b.filer_name LIKE 'Unknown%'
+                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
+                         THEN COALESCE(h.resolved_name, b.filer_name)
+                         ELSE b.filer_name END AS filer_name,
+                    b.pct_owned,
+                    b.shares_owned,
+                    b.latest_filing_date AS filing_date,
+                    b.latest_filing_type AS filing_type,
+                    b.days_since_filing,
+                    b.is_current,
+                    b.crossed_5pct,
+                    b.prior_intent,
+                    b.amendment_count
+                FROM beneficial_ownership_current b
+                LEFT JOIN (
+                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
+                    FROM holdings GROUP BY cik, resolved_name
+                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
+                WHERE b.subject_ticker = ? AND b.intent = 'activist'
+                ORDER BY b.latest_filing_date DESC
             """, [ticker]).fetchdf()
             sections['activist_13d'] = df_to_records(df_13d)
 
@@ -1188,19 +1195,26 @@ def query6(ticker):
         if has_bo:
             df_13g = con.execute("""
                 SELECT
-                    filer_name,
-                    pct_owned,
-                    shares_owned,
-                    latest_filing_date AS filing_date,
-                    latest_filing_type AS filing_type,
-                    days_since_filing,
-                    is_current,
-                    crossed_5pct,
-                    prior_intent,
-                    amendment_count
-                FROM beneficial_ownership_current
-                WHERE subject_ticker = ? AND intent = 'passive'
-                ORDER BY pct_owned DESC NULLS LAST
+                    CASE WHEN b.filer_name LIKE 'Unknown%'
+                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
+                         THEN COALESCE(h.resolved_name, b.filer_name)
+                         ELSE b.filer_name END AS filer_name,
+                    b.pct_owned,
+                    b.shares_owned,
+                    b.latest_filing_date AS filing_date,
+                    b.latest_filing_type AS filing_type,
+                    b.days_since_filing,
+                    b.is_current,
+                    b.crossed_5pct,
+                    b.prior_intent,
+                    b.amendment_count
+                FROM beneficial_ownership_current b
+                LEFT JOIN (
+                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
+                    FROM holdings GROUP BY cik, resolved_name
+                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
+                WHERE b.subject_ticker = ? AND b.intent = 'passive'
+                ORDER BY b.pct_owned DESC NULLS LAST
             """, [ticker]).fetchdf()
             sections['passive_5pct'] = df_to_records(df_13g)
 
@@ -1208,16 +1222,23 @@ def query6(ticker):
         if has_bo:
             df_hist = con.execute("""
                 SELECT
-                    filer_name,
-                    filing_type,
-                    filing_date,
-                    pct_owned,
-                    shares_owned,
-                    intent,
-                    purpose_text
-                FROM beneficial_ownership
-                WHERE subject_ticker = ?
-                ORDER BY filing_date DESC
+                    CASE WHEN b.filer_name LIKE 'Unknown%'
+                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
+                         THEN COALESCE(h.resolved_name, b.filer_name)
+                         ELSE b.filer_name END AS filer_name,
+                    b.filing_type,
+                    b.filing_date,
+                    b.pct_owned,
+                    b.shares_owned,
+                    b.intent,
+                    b.purpose_text
+                FROM beneficial_ownership b
+                LEFT JOIN (
+                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
+                    FROM holdings GROUP BY cik, resolved_name
+                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
+                WHERE b.subject_ticker = ?
+                ORDER BY b.filing_date DESC
             """, [ticker]).fetchdf()
             sections['history'] = df_to_records(df_hist)
 
@@ -1821,6 +1842,155 @@ def flow_analysis(ticker, period='4Q', peers=None):
         })
     finally:
         pass  # connection managed by thread-local cache
+
+
+# ---------------------------------------------------------------------------
+# Short vs Long comparison (Item 9)
+# ---------------------------------------------------------------------------
+
+
+def get_short_long_comparison(ticker):
+    """Find managers who are long (13F) AND short (N-PORT) the same ticker."""
+    con = get_db()
+    try:
+        result = {'ticker': ticker, 'long_short_managers': [], 'short_only_funds': []}
+
+        if not _has_table('fund_holdings'):
+            return result
+
+        # Managers with 13F long positions
+        longs = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as manager,
+                   SUM(shares) as long_shares,
+                   SUM(market_value_usd) / 1000.0 as long_value_k,
+                   manager_type
+            FROM holdings
+            WHERE ticker = ? AND quarter = '{LQ}' AND shares > 0
+            GROUP BY manager, manager_type
+        """, [ticker]).fetchdf()
+
+        # N-PORT short positions (negative shares = short)
+        shorts = con.execute(f"""
+            SELECT fh.fund_name,
+                   nam.adviser_name,
+                   ABS(fh.shares_or_principal) as short_shares,
+                   ABS(fh.market_value_usd) as short_value,
+                   fh.quarter
+            FROM fund_holdings fh
+            LEFT JOIN ncen_adviser_map nam ON fh.series_id = nam.series_id
+            WHERE fh.ticker = ? AND fh.shares_or_principal < 0
+              AND fh.asset_category IN ('EC', 'EP')
+            ORDER BY ABS(fh.shares_or_principal) DESC
+        """, [ticker]).fetchdf()
+
+        if shorts.empty:
+            return result
+
+        # Match short fund advisers to long 13F parents
+        long_managers = set(longs['manager'].str.upper().tolist()) if not longs.empty else set()
+
+        for _, row in shorts.iterrows():
+            adviser = (row.get('adviser_name') or '').upper()
+            fund_name = row.get('fund_name', '')
+            short_shares = row.get('short_shares', 0)
+            short_value = row.get('short_value', 0)
+
+            # Check if adviser matches any long parent
+            matched_long = None
+            for lm in long_managers:
+                # Fuzzy match: check if key words overlap
+                adviser_words = set(adviser.split())
+                lm_words = set(lm.split())
+                if adviser_words & lm_words - {'INC', 'LLC', 'LP', 'CORP', 'GROUP', 'CO', 'THE', 'OF', 'AND', '&'}:
+                    matched_long = lm
+                    break
+
+            if matched_long:
+                long_row = longs[longs['manager'].str.upper() == matched_long].iloc[0]
+                result['long_short_managers'].append({
+                    'manager': matched_long,
+                    'fund_name': fund_name,
+                    'long_shares': int(long_row['long_shares']),
+                    'long_value_k': float(long_row['long_value_k']),
+                    'short_shares': int(short_shares),
+                    'short_value': float(short_value),
+                    'net_shares': int(long_row['long_shares']) - int(short_shares),
+                    'manager_type': long_row.get('manager_type'),
+                })
+            else:
+                result['short_only_funds'].append({
+                    'fund_name': fund_name,
+                    'adviser': row.get('adviser_name'),
+                    'short_shares': int(short_shares),
+                    'short_value': float(short_value),
+                })
+
+        return clean_for_json(result)
+    finally:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Short squeeze signal (Item 10)
+# ---------------------------------------------------------------------------
+
+
+def get_short_squeeze_candidates():
+    """Flag tickers with high institutional crowding + high short interest."""
+    con = get_db()
+    try:
+        if not _has_table('short_interest'):
+            return []
+
+        df = con.execute(f"""
+            WITH crowd AS (
+                SELECT ticker,
+                       COUNT(DISTINCT cik) as num_holders,
+                       SUM(shares) as total_shares,
+                       SUM(market_value_usd) / 1000.0 as total_value_k
+                FROM holdings
+                WHERE quarter = '{LQ}'
+                GROUP BY ticker
+            ),
+            si AS (
+                SELECT ticker,
+                       MAX(short_pct) as max_short_pct,
+                       MAX(short_volume) as latest_short_vol,
+                       MAX(report_date) as latest_date
+                FROM short_interest
+                GROUP BY ticker
+            ),
+            mkt AS (
+                SELECT ticker, market_cap, float_shares
+                FROM market_data
+                WHERE market_cap > 0
+            )
+            SELECT c.ticker,
+                   c.num_holders,
+                   c.total_value_k,
+                   si.max_short_pct,
+                   si.latest_short_vol,
+                   m.market_cap,
+                   m.float_shares,
+                   -- Crowding score: institutional ownership concentration
+                   CASE WHEN m.float_shares > 0
+                        THEN c.total_shares * 100.0 / m.float_shares
+                        ELSE NULL END as inst_pct_float,
+                   -- Squeeze score: high short + high institutional = potential squeeze
+                   CASE WHEN m.float_shares > 0 AND si.max_short_pct > 0
+                        THEN si.max_short_pct * (c.total_shares * 1.0 / m.float_shares)
+                        ELSE NULL END as squeeze_score
+            FROM crowd c
+            JOIN si ON c.ticker = si.ticker
+            LEFT JOIN mkt m ON c.ticker = m.ticker
+            WHERE si.max_short_pct >= 15  -- at least 15% short
+            ORDER BY squeeze_score DESC NULLS LAST
+            LIMIT 50
+        """).fetchdf()
+
+        return df_to_records(df)
+    finally:
+        pass
 
 
 # Map query number to function

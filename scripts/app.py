@@ -495,7 +495,7 @@ def api_admin_parent_health():
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
             FROM holdings
-            WHERE quarter = '2025Q4' AND inst_parent_name IS NULL
+            WHERE quarter = '{LQ}' AND inst_parent_name IS NULL
             GROUP BY cik, manager_name, manager_type
             ORDER BY total_value DESC NULLS LAST
             LIMIT 20
@@ -504,7 +504,7 @@ def api_admin_parent_health():
         top_parents = con.execute(f"""
             SELECT inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
-            FROM holdings WHERE quarter = '2025Q4' AND inst_parent_name IS NOT NULL
+            FROM holdings WHERE quarter = '{LQ}' AND inst_parent_name IS NOT NULL
             GROUP BY inst_parent_name
             ORDER BY total_value DESC NULLS LAST LIMIT 20
         """).fetchdf()
@@ -539,7 +539,7 @@ def api_admin_stale_data():
                 SELECT cik, manager_name, MAX(quarter) as last_quarter
                 FROM holdings
                 GROUP BY cik, manager_name
-                HAVING MAX(quarter) < '2025Q3'
+                HAVING MAX(quarter) < '{PQ}'
                 ORDER BY last_quarter DESC LIMIT 20
             """).fetchdf()
             result['inactive_managers'] = df_to_records(inactive)
@@ -618,7 +618,7 @@ def api_admin_data_quality():
                     COUNT(ticker) as with_ticker,
                     COUNT(market_value_live) as with_live_value,
                     COUNT(pct_of_float) as with_float_pct
-                FROM holdings WHERE quarter = '2025Q4'
+                FROM holdings WHERE quarter = '{LQ}'
             """).fetchone()
             result['holdings'] = {
                 'total': r[0], 'with_ticker': r[1],
@@ -634,14 +634,28 @@ def api_admin_data_quality():
                 SELECT COUNT(*) as total,
                     COUNT(pct_owned) as with_pct,
                     COUNT(shares_owned) as with_shares,
-                    COUNT(CASE WHEN filer_name = 'UNKNOWN' OR filer_name IS NULL THEN 1 END) as unknown_filers
+                    COUNT(CASE WHEN filer_name IS NULL OR filer_name = ''
+                               OR regexp_matches(filer_name, '^\\d{7,10}$') THEN 1 END) as unknown_filers
                 FROM beneficial_ownership
             """).fetchone()
-            result['beneficial_ownership'] = {
+            bo_stats = {
                 'total': r[0], 'with_pct': r[1], 'with_shares': r[2],
                 'unknown_filers': r[3],
                 'pct_coverage': round(r[1] / r[0] * 100, 1) if r[0] else 0,
             }
+            # Name resolution stats if column exists
+            try:
+                nr = con.execute("""
+                    SELECT COUNT(CASE WHEN name_resolved THEN 1 END) as resolved,
+                           COUNT(CASE WHEN NOT name_resolved OR name_resolved IS NULL THEN 1 END) as unresolved
+                    FROM beneficial_ownership
+                """).fetchone()
+                bo_stats['name_resolved'] = nr[0]
+                bo_stats['name_unresolved'] = nr[1]
+                bo_stats['name_resolution_pct'] = round(nr[0] / (nr[0] + nr[1]) * 100, 1) if (nr[0] + nr[1]) else 0
+            except Exception:
+                pass
+            result['beneficial_ownership'] = bo_stats
         except Exception:
             result['beneficial_ownership'] = {}
         # Error log stats
@@ -1043,7 +1057,7 @@ def api_crowding():
             SELECT COALESCE(inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_float) as pct_float,
                    SUM(market_value_live) as value
-            FROM holdings WHERE ticker = ? AND quarter = '2025Q4'
+            FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY holder, manager_type
             ORDER BY pct_float DESC NULLS LAST LIMIT 20
         """, [ticker]).fetchdf()
@@ -1073,7 +1087,7 @@ def api_smart_money():
         longs = con.execute(f"""
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
-            FROM holdings WHERE ticker = ? AND quarter = '2025Q4'
+            FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
         """, [ticker]).fetchdf()
         result = {'long_by_type': df_to_records(longs)}
@@ -1102,6 +1116,33 @@ def api_smart_money():
         return jsonify(clean_for_json(result))
     finally:
         con.close()
+
+
+@app.route('/api/short_long')
+def api_short_long():
+    """Short vs Long comparison: managers long via 13F and short via N-PORT."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        from queries import get_short_long_comparison
+        result = get_short_long_comparison(ticker)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"short_long error for {ticker}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/short_squeeze')
+def api_short_squeeze():
+    """Short squeeze candidates: high crowding + high short interest."""
+    try:
+        from queries import get_short_squeeze_candidates
+        result = get_short_squeeze_candidates()
+        return jsonify({'candidates': result})
+    except Exception as e:
+        app.logger.error(f"short_squeeze error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/summary')

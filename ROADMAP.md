@@ -1,6 +1,6 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 2, 2026_
+_Last updated: April 3, 2026_
 
 ---
 
@@ -21,7 +21,7 @@ _Last updated: April 2, 2026_
 | 1 | Amendment tracking | Done | `rebuild_current` uses ROW_NUMBER by filing_date DESC + amendment_count column |
 | 3 | Crossed 5% threshold flag | Done | `crossed_5pct` boolean in beneficial_ownership_current via first_13g CTE |
 | 4 | Intent change tracking | Done | `prior_intent` column via LAG() window function |
-| 5 | `pct_owned` null improvement — tune regex for null cases | Low | Run after full fetch; needs large sample to pattern-match |
+| 5 | `pct_owned` null improvement — tune regex for null cases | Done | Added 4 new patterns for 13D cover page format (Row 11, multi-line). 13G: 95.7% hit rate. 13D: structural gap (cover page layout) — new patterns improve coverage |
 
 ---
 
@@ -29,8 +29,8 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| 9 | Short vs long comparison — same manager long 13F and short FINRA | Medium | Surface in Smart Money and Activist tabs |
-| 10 | Short squeeze signal — high crowding + high short interest flag | Low | Requires both Pipeline 1 and Pipeline 8 complete |
+| 9 | Short vs long comparison — same manager long 13F and short N-PORT | Done | `get_short_long_comparison()` in queries.py, `/api/short_long` endpoint. Matches 13F long parents to N-PORT short fund advisers |
+| 10 | Short squeeze signal — high crowding + high short interest flag | Done | `get_short_squeeze_candidates()` in queries.py, `/api/short_squeeze` endpoint. Flags tickers with ≥15% short + high institutional ownership. Squeeze score = short_pct × inst/float |
 
 ---
 
@@ -64,11 +64,11 @@ _Last updated: April 2, 2026_
 | 20 | Incremental market data refresh | Done | `get_stale_tickers()` skips tickers fetched <7 days. `save_market_data()` upserts, never drops |
 | 21 | Materialized summary tables | Done | `build_summaries.py` creates `summary_by_ticker` + `summary_by_parent`. --rebuild flag |
 | 22 | Logged exceptions in app.py | Done | All bare `except Exception:` replaced with `as e` + `app.logger.error()` in endpoint handlers |
-| 23 | Incremental `load_13f.py` — append + rebuild latest quarter only | Medium | Grows in importance as dataset expands; not urgent at current size |
+| 23 | Incremental `load_13f.py` — append + rebuild latest quarter only | Done | `--quarter 2025Q4` flag deletes+reloads single quarter from staging tables, then rebuilds filings+holdings from all data. Also added `--staging` and crash handler |
 | 24 | OpenFIGI + yfinance persistent cache in `build_cusip.py` | Done | `_cache_openfigi` and `_cache_yfinance` tables, 30-day yfinance freshness |
 | 25 | Readonly snapshot auto-refresh | Done | `scripts/refresh_snapshot.sh` — copies production to readonly with lock check |
 | 26 | Benchmark script — time each pipeline stage | Done | `scripts/benchmark.py` with --run flag, stage timing, dry-run check |
-| 27 | app.py quarter centralization — convert 60+ SQL strings to use config.py vars | Medium | Requires f-string conversion of triple-quoted SQL; deferred for dedicated pass |
+| 27 | app.py quarter centralization — convert SQL strings to use config.py vars | Done | All 6 hardcoded quarter strings replaced with `{LQ}` / `{PQ}` variables. Zero hardcoded quarters remain in app.py |
 | 28 | Pyflakes cleanup — unused imports removed from 17 scripts | Done | 31 unused imports fixed |
 | 29 | SHOW TABLES removed from Flask endpoints — cached via `has_table()` | Done | 6 per-request queries replaced with startup-time cache |
 | 30 | Snapshot switchback monitor — background thread auto-recovers from snapshot | Done | 60s polling, logs switchover |
@@ -124,6 +124,12 @@ _Last updated: April 2, 2026_
 | 2026-04-02 | Pyflakes cleanup | 31 unused imports removed across 17 scripts |
 | 2026-04-02 | SHOW TABLES cached | 6 per-request queries replaced with `has_table()` at startup |
 | 2026-04-02 | Ruff + pre-commit config | Replaced flake8 with ruff, documented semgrep status |
+| 2026-04-03 | Item 5 — pct_owned regex tuning | 4 new patterns for 13D cover page format. 13G null rate: 4.5%. 13D structural gap addressed |
+| 2026-04-03 | Item 9 — Short vs long comparison | `get_short_long_comparison()` + `/api/short_long` endpoint. Matches 13F longs to N-PORT shorts by adviser name |
+| 2026-04-03 | Item 10 — Short squeeze signal | `get_short_squeeze_candidates()` + `/api/short_squeeze` endpoint. Squeeze score = short_pct × inst/float ratio |
+| 2026-04-03 | Item 23 — Incremental load_13f.py | `--quarter` flag for single-quarter reload, `--staging` support, crash handler |
+| 2026-04-03 | Item 27 — app.py quarter centralization | All 6 hardcoded quarter strings replaced with config.py variables (LQ/PQ) |
+| 2026-04-03 | N11 — Filer name resolution | `resolve_names.py` 3-pass pipeline: holdings (219 CIKs/12K rows), EDGAR API (353 CIKs/25K rows), 98 filing agents marked. `name_resolved` column added. query6 fallback JOIN. Data quality endpoint updated |
 
 ---
 
@@ -169,11 +175,30 @@ _Last updated: April 2, 2026_
 
 ---
 
+## FUTURE — New Features & Enhancements
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| N1 | N-PORT index/ETF fund download | High | `fetch_nport.py --include-index` — adds index funds, ETFs currently excluded. Significantly increases Vanguard/BlackRock coverage |
+| N2 | Short squeeze UI tab | Medium | Frontend tab to display `/api/short_squeeze` candidates. Sortable by squeeze score, short %, inst ownership |
+| N3 | Short vs long UI integration | Medium | Add long/short comparison section to Smart Money tab. Show net exposure per manager |
+| N4 | Ownership concentration heatmap | Medium | Cross-tab visualization: top N managers × top N tickers. Color by pct_of_float |
+| N5 | Historical flow trend charts | Medium | Multi-quarter flow intensity time series per ticker. Requires compute_flows across all period pairs |
+| N6 | Manager profile page | Low | Dedicated view per institution: all holdings, flow history, sector allocation, conviction positions |
+| N7 | Export improvements — PDF reports | Low | Generate per-ticker ownership report PDFs with charts, flow analysis, activist summary |
+| N8 | Webhook/alert system | Low | Configurable alerts: new 13D filing, >5% ownership change, short squeeze threshold crossed |
+| N9 | 13F-HR amendment reconciliation | Low | Track 13F-HR/A amendments and reconcile position changes within same quarter |
+| N10 | Multi-quarter position timeline | Medium | Sparkline or mini-chart in Register tab showing shares held across all quarters per holder |
+| N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→78.3% resolved, 21.7% filing agents marked. query6 fallback JOINs holdings for display |
+
+---
+
 ## SEQUENCE — NEXT STEPS
 
-1. Phase 2 running (41K filings at 230/min, ETA ~2.4 hours)
-2. Run `python3 scripts/compute_flows.py`
-3. `cp data/13f.duckdb data/13f_readonly.duckdb`
-4. Restart app — test Flow Analysis charts
-5. Items 9, 10 (short vs long comparison, short squeeze signal)
-6. Admin UI (items F1-F7)
+1. N-PORT index/ETF download running (`fetch_nport.py --staging --include-index`)
+2. Merge N-PORT staging data → production (`merge_staging.py`)
+3. Re-run `compute_flows.py` after merge
+4. Refresh readonly snapshot
+5. Build Short Squeeze UI tab (N2)
+6. Add short/long comparison to Smart Money tab (N3)
+7. Items N4-N10 as capacity allows

@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 """
-load_13f.py — Load SUBMISSION, INFOTABLE, and COVERPAGE TSVs from all four quarters
-              into DuckDB. Create filings and holdings tables.
+load_13f.py — Load SUBMISSION, INFOTABLE, and COVERPAGE TSVs from quarterly
+              SEC EDGAR bulk data into DuckDB. Create filings and holdings tables.
 
-Run: python3 scripts/load_13f.py
+Usage:
+    python3 scripts/load_13f.py              # full reload (all quarters)
+    python3 scripts/load_13f.py --quarter 2025Q4   # incremental: reload one quarter only
+    python3 scripts/load_13f.py --staging    # write to staging DB
 """
 
+import argparse
 import os
-import duckdb
 import time
+
+import duckdb
+
+from config import QUARTERS, LATEST_QUARTER
+from db import get_db_path, set_staging_mode
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXTRACT_DIR = os.path.join(BASE_DIR, "data", "extracted")
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
-
-from config import QUARTERS
 
 
 def load_quarter(con, quarter):
@@ -33,20 +38,6 @@ def load_quarter(con, quarter):
             return 0, 0
 
     # Load SUBMISSION
-    sub_count = con.execute(f"""
-        INSERT INTO raw_submissions
-        SELECT
-            ACCESSION_NUMBER,
-            FILING_DATE,
-            SUBMISSIONTYPE,
-            CAST(CIK AS VARCHAR) as CIK,
-            PERIODOFREPORT,
-            '{quarter}' as quarter
-        FROM read_csv_auto('{sub_path}', delim='\t', header=true,
-                           all_varchar=true, ignore_errors=true)
-    """).fetchone()[0] if False else None
-
-    # Use INSERT INTO ... SELECT for count
     con.execute(f"""
         INSERT INTO raw_submissions
         SELECT
@@ -165,6 +156,25 @@ def create_staging_tables(con):
             quarter VARCHAR
         )
     """)
+
+
+def prepare_incremental(con, quarter):
+    """For incremental mode: preserve existing staging tables, delete target quarter only."""
+    # Ensure staging tables exist
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+        try:
+            con.execute(f"SELECT 1 FROM {tbl} LIMIT 0")
+        except Exception:
+            # Table doesn't exist — need full create
+            create_staging_tables(con)
+            return
+
+    # Delete only the target quarter's data from staging tables
+    print(f"  Removing existing {quarter} data from staging tables...")
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+        deleted = con.execute(f"DELETE FROM {tbl} WHERE quarter = '{quarter}'").fetchone()
+        if deleted:
+            print(f"    {tbl}: removed {deleted[0]:,} rows")
 
 
 def build_filings(con):
@@ -297,66 +307,55 @@ def print_summary(con):
     """).fetchdf()
     print(qcounts.to_string(index=False))
 
-    print("\n--- Top 10 Filers by Position Count (Q4 2025) ---")
-    top = con.execute("""
-        SELECT manager_name, cik, COUNT(*) as positions,
-               SUM(market_value_usd) / 1e9 as total_value_bn
-        FROM holdings
-        WHERE quarter = '2025Q4'
-        GROUP BY manager_name, cik
-        ORDER BY total_value_bn DESC
-        LIMIT 10
-    """).fetchdf()
-    print(top.to_string(index=False))
-
-    print("\n--- Sample Holdings for AR (Antero Resources) ---")
-    ar = con.execute("""
-        SELECT manager_name, quarter, shares, market_value_usd / 1e6 as value_mm,
-               pct_of_portfolio
-        FROM holdings
-        WHERE cusip = '00130H105' AND quarter = '2025Q4'
-        ORDER BY market_value_usd DESC
-        LIMIT 10
-    """).fetchdf()
-    if len(ar) > 0:
-        print(ar.to_string(index=False))
-    else:
-        print("  No AR holdings found (CUSIP 00130H105)")
-
 
 def main():
     print("=" * 60)
     print("SCRIPT 4 — load_13f.py")
     print("=" * 60)
 
-    con = duckdb.connect(DB_PATH)
+    print(f"\nDatabase: {get_db_path()}")
+    con = duckdb.connect(get_db_path())
 
-    # Step 1: Create staging tables
-    print("\nCreating staging tables...")
-    create_staging_tables(con)
+    if args.quarter:
+        # Incremental mode: reload only the specified quarter
+        quarter = args.quarter
+        if quarter not in QUARTERS:
+            print(f"WARNING: {quarter} not in QUARTERS list {QUARTERS}. Proceeding anyway.")
+        print(f"\nIncremental mode: reloading {quarter} only")
 
-    # Step 2: Load all quarters
-    print("\nLoading quarterly data...")
-    total_subs = 0
-    total_info = 0
-    for quarter in QUARTERS:
+        # Preserve other quarters, delete+reload target quarter
+        prepare_incremental(con, quarter)
+
+        # Load only the target quarter
+        print(f"\nLoading {quarter}...")
         s, i = load_quarter(con, quarter)
-        total_subs += s
-        total_info += i
-    print(f"\n  Total: {total_subs:,} submissions, {total_info:,} info table rows")
+        print(f"  Loaded: {s:,} submissions, {i:,} info table rows")
+    else:
+        # Full mode: drop and recreate everything
+        print("\nFull reload: all quarters")
+        print("\nCreating staging tables...")
+        create_staging_tables(con)
 
-    # Step 3: Build filings
+        print("\nLoading quarterly data...")
+        total_subs = 0
+        total_info = 0
+        for quarter in QUARTERS:
+            s, i = load_quarter(con, quarter)
+            total_subs += s
+            total_info += i
+        print(f"\n  Total: {total_subs:,} submissions, {total_info:,} info table rows")
+
+    # Rebuild filings + holdings from all raw data (all quarters present)
     print("\nBuilding filings table...")
     build_filings(con)
 
-    # Step 4: Build holdings
     print("\nBuilding holdings table...")
     t0 = time.time()
     holdings_count = build_holdings(con)
     elapsed = time.time() - t0
     print(f"  holdings: {holdings_count:,} rows (built in {elapsed:.1f}s)")
 
-    # Step 5: Summary
+    # Summary
     print_summary(con)
 
     con.close()
@@ -364,4 +363,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Load 13F data from SEC bulk TSVs")
+    parser.add_argument("--quarter", type=str, help=f"Load only this quarter (e.g. {LATEST_QUARTER})")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
+    from db import crash_handler
+    crash_handler("load_13f")(main)

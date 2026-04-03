@@ -92,7 +92,15 @@ def _extract_fields(text, filing_type):
     for pat in [r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?9[\)]?\s+(\d+[\.,]?\d*)\s*%",
                 r"Item\s*11[\s.:]+(\d+[\.,]?\d*)\s*%",
                 r"Percent\s+of\s+Class[:\s]+(\d+[\.,]?\d*)\s*%",
-                r"PERCENT\s+OF\s+CLASS[\s.:]*(\d+[\.,]?\d*)\s*%"]:
+                r"PERCENT\s+OF\s+CLASS[\s.:]*(\d+[\.,]?\d*)\s*%",
+                # 13D cover page: Row 11 value on next line or after whitespace
+                r"(?:11|Row\s*11)[.\s]*PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?(?:9|11)[\)]?[^%\d]{0,40}(\d+[\.,]?\d*)\s*%",
+                # 13D cover page: "11" row with just the percentage value nearby
+                r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?(?:9|11)[\)]?\D{0,60}?(\d{1,3}[\.,]?\d*)\s*%",
+                # Bare "Percent of Class" followed by number (possibly multi-line)
+                r"Percent\s+of\s+Class\D{0,30}?(\d{1,3}[\.,]\d+)\s*%",
+                # SC 13D/A XML-style or table: percentage near "percent" keyword
+                r"(?:percent|pct|%)\s+(?:of\s+)?class\D{0,40}?(\d{1,3}[\.,]\d+)\s*%"]:
         m = re.search(pat, text, re.I)
         if m:
             try: result["pct_owned"] = float(m.group(1).replace(",", ""))
