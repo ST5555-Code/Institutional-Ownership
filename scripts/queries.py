@@ -69,6 +69,99 @@ def get_cusip(con, ticker):
 
 
 # ---------------------------------------------------------------------------
+# Filer name → institutional parent resolution
+# ---------------------------------------------------------------------------
+
+# Known filing agent CIKs — these are not real beneficial owners
+_FILING_AGENT_CIKS = {
+    '0001104659', '0001193125', '0000902664', '0001445546', '0001213900',
+    '0001493152', '0001567619', '0001062993', '0001214659', '0001398344',
+    '0001072613', '0001178913', '0001193805', '0001532155', '0000929638',
+    '0000950142', '0001140361', '0001564590', '0000950170', '0000950103',
+    '0001437749', '0001628280',
+}
+
+# Name fragments → canonical parent name
+_NAME_TO_PARENT = {
+    'blackrock': 'BlackRock, Inc.',
+    'ishares': 'BlackRock, Inc.',
+    'bgfa': 'BlackRock, Inc.',
+    'vanguard': 'Vanguard Group Inc',
+    'fidelity': 'FMR LLC',
+    'fmr': 'FMR LLC',
+    'strategic advisers': 'FMR LLC',
+    'state street': 'State Street Corp',
+    'ssga': 'State Street Corp',
+    'jpmorgan': 'JPMorgan Chase & Co',
+    'j.p. morgan': 'JPMorgan Chase & Co',
+    'goldman sachs': 'Goldman Sachs Group Inc',
+    'morgan stanley': 'Morgan Stanley',
+    'wellington': 'Wellington Management Group LLP',
+    'dimensional': 'Dimensional Fund Advisors LP',
+    't. rowe price': 'T. Rowe Price Associates',
+    'price t rowe': 'T. Rowe Price Associates',
+    'price associates': 'T. Rowe Price Associates',
+    'capital research': 'Capital Group Companies Inc',
+    'capital world': 'Capital Group Companies Inc',
+    'american funds': 'Capital Group Companies Inc',
+    'invesco': 'Invesco Ltd.',
+    'franklin': 'Franklin Resources Inc',
+    'templeton': 'Franklin Resources Inc',
+    'northern trust': 'Northern Trust Corp',
+    'geode': 'Geode Capital Management, LLC',
+    'citadel': 'Citadel Advisors LLC',
+    'renaissance': 'Renaissance Technologies LLC',
+    'ubs': 'UBS Group AG',
+    'pimco': 'PIMCO',
+    'schwab': 'Charles Schwab Corp',
+    'nuveen': 'Nuveen / TIAA',
+}
+
+# Known filing agent entity names
+_FILING_AGENT_NAMES = {
+    'toppan merrill', 'edgarfilings', 'edgar filing', 'edgar agents',
+    'advisor consultant network', 'adviser compliance associates',
+    'seward & kissel', 'shartsis friese', 'olshan frome',
+}
+
+
+def resolve_filer_to_parent(filer_name, filer_cik=None):
+    """Map a filer_name to its institutional parent.
+    Returns the parent name, or the original name if no mapping found."""
+    if not filer_name:
+        return filer_name
+
+    # Filing agent detection
+    if filer_cik and filer_cik in _FILING_AGENT_CIKS:
+        # For filing agents, the filer_name might be the actual owner (if resolved)
+        # or the agent name itself (if not resolved)
+        pass
+
+    name_lower = filer_name.lower()
+
+    # Skip if it's a known filing agent name
+    for agent in _FILING_AGENT_NAMES:
+        if agent in name_lower:
+            return filer_name  # can't resolve further
+
+    # Try parent mapping
+    for fragment, parent in _NAME_TO_PARENT.items():
+        if fragment in name_lower:
+            return parent
+
+    return filer_name
+
+
+def resolve_filer_names_in_records(records):
+    """Post-process query results to apply parent rollup to filer_name."""
+    for r in records:
+        raw_name = r.get('filer_name', '')
+        if raw_name:
+            r['filer_name'] = resolve_filer_to_parent(raw_name)
+    return records
+
+
+# ---------------------------------------------------------------------------
 # N-PORT family name matching utility
 # ---------------------------------------------------------------------------
 
@@ -1170,80 +1263,41 @@ def query6(ticker):
         # Section 1: 13D filers (activist intent, ≥5% threshold)
         if has_bo:
             df_13d = con.execute("""
-                SELECT
-                    CASE WHEN b.filer_name LIKE 'Unknown%'
-                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
-                         THEN COALESCE(h.resolved_name, b.filer_name)
-                         ELSE b.filer_name END AS filer_name,
-                    b.pct_owned,
-                    b.shares_owned,
-                    b.latest_filing_date AS filing_date,
-                    b.latest_filing_type AS filing_type,
-                    b.days_since_filing,
-                    b.is_current,
-                    b.crossed_5pct,
-                    b.prior_intent,
-                    b.amendment_count
-                FROM beneficial_ownership_current b
-                LEFT JOIN (
-                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
-                    FROM holdings GROUP BY cik, resolved_name
-                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
-                WHERE b.subject_ticker = ? AND b.intent = 'activist'
-                ORDER BY b.latest_filing_date DESC
+                SELECT filer_name, pct_owned, shares_owned,
+                    latest_filing_date AS filing_date,
+                    latest_filing_type AS filing_type,
+                    days_since_filing, is_current, crossed_5pct,
+                    prior_intent, amendment_count
+                FROM beneficial_ownership_current
+                WHERE subject_ticker = ? AND intent = 'activist'
+                ORDER BY latest_filing_date DESC
             """, [ticker]).fetchdf()
-            sections['activist_13d'] = df_to_records(df_13d)
+            sections['activist_13d'] = resolve_filer_names_in_records(df_to_records(df_13d))
 
         # Section 2: 13G filers (passive ≥5%)
         if has_bo:
             df_13g = con.execute("""
-                SELECT
-                    CASE WHEN b.filer_name LIKE 'Unknown%'
-                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
-                         THEN COALESCE(h.resolved_name, b.filer_name)
-                         ELSE b.filer_name END AS filer_name,
-                    b.pct_owned,
-                    b.shares_owned,
-                    b.latest_filing_date AS filing_date,
-                    b.latest_filing_type AS filing_type,
-                    b.days_since_filing,
-                    b.is_current,
-                    b.crossed_5pct,
-                    b.prior_intent,
-                    b.amendment_count
-                FROM beneficial_ownership_current b
-                LEFT JOIN (
-                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
-                    FROM holdings GROUP BY cik, resolved_name
-                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
-                WHERE b.subject_ticker = ? AND b.intent = 'passive'
-                ORDER BY b.pct_owned DESC NULLS LAST
+                SELECT filer_name, pct_owned, shares_owned,
+                    latest_filing_date AS filing_date,
+                    latest_filing_type AS filing_type,
+                    days_since_filing, is_current, crossed_5pct,
+                    prior_intent, amendment_count
+                FROM beneficial_ownership_current
+                WHERE subject_ticker = ? AND intent = 'passive'
+                ORDER BY pct_owned DESC NULLS LAST
             """, [ticker]).fetchdf()
-            sections['passive_5pct'] = df_to_records(df_13g)
+            sections['passive_5pct'] = resolve_filer_names_in_records(df_to_records(df_13g))
 
         # Section 3: Historical timeline
         if has_bo:
             df_hist = con.execute("""
-                SELECT
-                    CASE WHEN b.filer_name LIKE 'Unknown%'
-                              OR regexp_matches(b.filer_name, '^\d{7,10}$')
-                         THEN COALESCE(h.resolved_name, b.filer_name)
-                         ELSE b.filer_name END AS filer_name,
-                    b.filing_type,
-                    b.filing_date,
-                    b.pct_owned,
-                    b.shares_owned,
-                    b.intent,
-                    b.purpose_text
-                FROM beneficial_ownership b
-                LEFT JOIN (
-                    SELECT cik, COALESCE(inst_parent_name, manager_name) as resolved_name
-                    FROM holdings GROUP BY cik, resolved_name
-                ) h ON LPAD(b.filer_cik, 10, '0') = h.cik
-                WHERE b.subject_ticker = ?
-                ORDER BY b.filing_date DESC
+                SELECT filer_name, filing_type, filing_date,
+                    pct_owned, shares_owned, intent, purpose_text
+                FROM beneficial_ownership
+                WHERE subject_ticker = ?
+                ORDER BY filing_date DESC
             """, [ticker]).fetchdf()
-            sections['history'] = df_to_records(df_hist)
+            sections['history'] = resolve_filer_names_in_records(df_to_records(df_hist))
 
         # Section 4: Legacy 13F activist holdings (from holdings table)
         df_legacy = con.execute("""
