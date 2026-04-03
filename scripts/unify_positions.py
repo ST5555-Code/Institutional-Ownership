@@ -14,7 +14,7 @@ import os
 import duckdb
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import set_staging_mode, get_db_path
 
 
 def run():
@@ -150,4 +150,10 @@ def run():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Unify 13F + N-PORT positions")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
     run()

@@ -38,11 +38,33 @@ def is_staging_mode():
 
 
 def get_db_path():
+    """Path for the write DB (staging when active, test when testing, else prod)."""
     if _test_mode:
         return TEST_DB
     if _staging_mode:
         return STAGING_DB
     return PROD_DB
+
+
+def get_read_db_path():
+    """Path for read-only lookups — always production (or test DB in test mode).
+    In staging mode, reference data (holdings, securities, managers) lives in prod.
+    New/updated data is written to staging via get_db_path()."""
+    if _test_mode:
+        return TEST_DB
+    return PROD_DB
+
+
+def connect_read():
+    """Open a read-only connection to the reference DB."""
+    import duckdb
+    return duckdb.connect(get_read_db_path(), read_only=True)
+
+
+def connect_write():
+    """Open a read-write connection to the write DB (staging or prod)."""
+    import duckdb
+    return duckdb.connect(get_db_path())
 
 
 def assert_write_safe(con):
@@ -55,6 +77,40 @@ def assert_write_safe(con):
 
 
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+
+# Reference tables that staging needs read access to (copied from production)
+REFERENCE_TABLES = [
+    "holdings", "securities", "managers", "market_data", "filings",
+    "fund_holdings", "fund_universe", "adv_managers", "parent_bridge",
+]
+
+
+def seed_staging():
+    """Copy reference tables from production to staging DB for read access.
+    Only copies tables that don't already exist in staging."""
+    import duckdb
+    if not _staging_mode:
+        return
+    os.makedirs(os.path.dirname(STAGING_DB), exist_ok=True)
+    prod = duckdb.connect(PROD_DB, read_only=True)
+    staging = duckdb.connect(STAGING_DB)
+    copied = 0
+    for table in REFERENCE_TABLES:
+        try:
+            staging.execute(f"SELECT 1 FROM {table} LIMIT 1")
+            continue  # already exists in staging
+        except Exception:
+            pass
+        try:
+            df = prod.execute(f"SELECT * FROM {table}").fetchdf()
+            staging.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
+            copied += 1
+        except Exception:
+            pass
+    prod.close()
+    staging.close()
+    if copied:
+        print(f"  Staging seeded: {copied} reference tables copied from production", flush=True)
 
 
 def crash_handler(script_name):

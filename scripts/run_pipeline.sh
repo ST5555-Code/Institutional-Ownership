@@ -31,6 +31,10 @@ echo "============================================================"
 echo "  All writes go to staging DB. Production stays unlocked."
 echo ""
 
+phase_start "Seed staging with reference tables"
+python3 -c "import sys; sys.path.insert(0, 'scripts'); from db import set_staging_mode, seed_staging; set_staging_mode(True); seed_staging()"
+phase_end "Seed staging"
+
 phase_start "Phase 1: Listing filings"
 python3 -u scripts/fetch_13dg.py --staging --phase1-only "$@" 2>&1 | tee logs/phase1.log
 phase_end "Phase 1"

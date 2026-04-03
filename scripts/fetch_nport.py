@@ -30,7 +30,7 @@ from lxml import etree
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, crash_handler
+from db import get_db_path, set_staging_mode, crash_handler
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
@@ -785,7 +785,11 @@ def main():
     parser.add_argument("--quarter", help="Single quarter to fetch (e.g., 2025Q4)")
     parser.add_argument("--fund", help="Single fund by name or CIK")
     parser.add_argument("--test", action="store_true", help="Test mode: 5 funds only")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
     args = parser.parse_args()
+
+    if args.staging:
+        set_staging_mode(True)
 
     print("=" * 60)
     print("FETCH N-PORT — Mutual Fund Holdings")

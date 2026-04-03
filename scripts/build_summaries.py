@@ -16,7 +16,7 @@ import os
 import duckdb
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import set_staging_mode, get_db_path
 
 try:
     from config import QUARTERS, LATEST_QUARTER
@@ -127,7 +127,11 @@ def build_summary_by_parent(con, quarters=None):
 def main():
     parser = argparse.ArgumentParser(description="Build materialized summary tables")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild all quarters")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
     args = parser.parse_args()
+
+    if hasattr(args, 'staging') and args.staging:
+        set_staging_mode(True)
 
     con = duckdb.connect(get_db_path())
 

@@ -30,7 +30,7 @@ from tqdm import tqdm
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, set_test_mode, crash_handler
+from db import set_staging_mode, get_db_path, set_test_mode, crash_handler
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
 FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -255,7 +255,11 @@ if __name__ == "__main__":
     parser.add_argument("--days", type=int, default=30, help="Number of trading days to fetch")
     parser.add_argument("--update", action="store_true", help="Only fetch since last loaded date")
     parser.add_argument("--test", action="store_true", help="Test mode (5 days)")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
     args = parser.parse_args()
+
+    if hasattr(args, 'staging') and args.staging:
+        set_staging_mode(True)
     if args.test:
         set_test_mode(True)
     crash_handler("fetch_finra_short")(

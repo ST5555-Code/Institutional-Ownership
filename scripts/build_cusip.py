@@ -41,7 +41,7 @@ import duckdb
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path
+from db import set_staging_mode, get_db_path
 REF_DIR = os.path.join(BASE_DIR, "data", "reference")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -382,4 +382,10 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Build securities table from CUSIPs")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
     main()

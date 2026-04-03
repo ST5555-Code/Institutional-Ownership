@@ -19,7 +19,7 @@ import yfinance as yf
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, crash_handler
+from db import set_staging_mode, get_db_path, crash_handler
 from config import QUARTER_SNAPSHOT_DATES as SNAPSHOT_DATES, LATEST_QUARTER
 
 
@@ -251,4 +251,10 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Fetch market data from yfinance")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
     crash_handler("fetch_market")(main)

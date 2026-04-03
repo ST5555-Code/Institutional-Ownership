@@ -15,7 +15,7 @@ from datetime import datetime
 import duckdb
 import pandas as pd
 
-from db import get_db_path
+from db import set_staging_mode, get_db_path
 from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, FLOW_PERIODS
 
 PERIODS = FLOW_PERIODS
@@ -244,5 +244,11 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description="Compute investor flow analytics")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    args = parser.parse_args()
+    if args.staging:
+        set_staging_mode(True)
     from db import crash_handler
     crash_handler("compute_flows")(main)

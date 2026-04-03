@@ -27,7 +27,7 @@ from rapidfuzz import fuzz
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, crash_handler
+from db import set_staging_mode, get_db_path, crash_handler
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -387,5 +387,9 @@ def run(test_mode=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch N-CEN adviser mappings")
     parser.add_argument("--test", action="store_true", help="Test on 10 fund CIKs")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
     args = parser.parse_args()
+
+    if hasattr(args, 'staging') and args.staging:
+        set_staging_mode(True)
     crash_handler("fetch_ncen")(lambda: run(test_mode=args.test))
