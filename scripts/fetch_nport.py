@@ -451,10 +451,25 @@ def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, rep
         ))
 
     if rows:
-        con.executemany(
-            """INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            rows,
-        )
+        try:
+            con.executemany(
+                """INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rows,
+            )
+        except Exception as e:
+            # Batch failed — try row by row to identify bad rows
+            inserted = 0
+            for row in rows:
+                try:
+                    con.execute(
+                        "INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        row,
+                    )
+                    inserted += 1
+                except Exception:
+                    pass  # skip bad row silently
+            if inserted < len(rows):
+                print(f"    WARNING: {len(rows) - inserted}/{len(rows)} rows failed to insert: {e}", flush=True)
 
     return len(rows)
 

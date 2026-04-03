@@ -193,8 +193,175 @@ queries._setup(get_db, has_table)
 
 
 # ---------------------------------------------------------------------------
-# Summary endpoint
+# On-demand ticker add
 # ---------------------------------------------------------------------------
+
+@app.route('/api/add_ticker', methods=['POST'])
+def api_add_ticker():
+    """Add a single ticker on-demand: fetch CUSIP, market data, 13D/G filings."""
+    ticker = request.json.get('ticker', '').upper().strip() if request.json else ''
+    if not ticker:
+        return jsonify({'error': 'Missing ticker'}), 400
+
+    from db import PROD_DB
+    results = {'ticker': ticker, 'steps': []}
+
+    try:
+        # Step 1: Resolve CUSIP via OpenFIGI
+        import requests as req
+        figi_resp = req.post(
+            "https://api.openfigi.com/v3/mapping",
+            json=[{"idType": "TICKER", "idValue": ticker}],
+            timeout=10,
+        )
+        cusip = None
+        if figi_resp.status_code == 200:
+            data = figi_resp.json()
+            if data and data[0].get('data'):
+                cusip = data[0]['data'][0].get('figi')
+                results['cusip'] = cusip
+                results['steps'].append('OpenFIGI: resolved')
+            else:
+                results['steps'].append('OpenFIGI: no match')
+        else:
+            results['steps'].append(f'OpenFIGI: HTTP {figi_resp.status_code}')
+
+        # Step 2: Fetch market data via yfinance
+        import yfinance as yf
+        tkr = yf.Ticker(ticker)
+        info = tkr.info or {}
+        if info.get('regularMarketPrice'):
+            con = duckdb.connect(PROD_DB)
+            from datetime import datetime
+            now = datetime.now().strftime('%Y-%m-%d')
+            con.execute("""
+                INSERT OR REPLACE INTO market_data (ticker, price_live, market_cap,
+                    float_shares, shares_outstanding, sector, industry, exchange, fetch_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [ticker, info.get('regularMarketPrice'), info.get('marketCap'),
+                  info.get('floatShares'), info.get('sharesOutstanding'),
+                  info.get('sector'), info.get('industry'), info.get('exchange'), now])
+            con.execute("CHECKPOINT")
+            con.close()
+            results['market_cap'] = info.get('marketCap')
+            results['price'] = info.get('regularMarketPrice')
+            results['sector'] = info.get('sector')
+            results['steps'].append('Market data: added')
+        else:
+            results['steps'].append('Market data: yfinance returned no price')
+
+        # Step 3: Fetch 13D/G filings
+        try:
+            import edgar
+            edgar.set_identity("serge.tismen@gmail.com")
+            company = edgar.Company(ticker)
+            filing_count = 0
+            for form in ['SC 13D', 'SC 13G']:
+                filings = company.get_filings(form=form)
+                if filings:
+                    for f in filings:
+                        if str(f.filing_date) >= '2022-01-01':
+                            filing_count += 1
+            results['filings_found'] = filing_count
+            results['steps'].append(f'13D/G: {filing_count} filings found (not parsed — run Phase 2)')
+        except Exception as e:
+            results['steps'].append(f'13D/G: {e}')
+
+        results['status'] = 'ok'
+        return jsonify(results)
+
+    except Exception as e:
+        results['status'] = 'error'
+        results['error'] = str(e)
+        return jsonify(results), 500
+
+
+# ---------------------------------------------------------------------------
+# Admin endpoints
+# ---------------------------------------------------------------------------
+
+@app.route('/admin')
+def admin_page():
+    from flask import render_template
+    return render_template('admin.html')
+
+
+@app.route('/api/admin/stats')
+def api_admin_stats():
+    """Database row counts for admin dashboard."""
+    con = get_db()
+    try:
+        stats = {}
+        for table, key in [('holdings', 'holdings'), ('managers', 'managers'),
+                           ('beneficial_ownership', 'beneficial_ownership'),
+                           ('fund_holdings', 'fund_holdings')]:
+            try:
+                stats[key] = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            except Exception:
+                stats[key] = 0
+        try:
+            stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings WHERE ticker IS NOT NULL").fetchone()[0]
+        except Exception:
+            stats['tickers'] = 0
+        try:
+            stats['short_interest_days'] = con.execute("SELECT COUNT(DISTINCT report_date) FROM short_interest").fetchone()[0]
+        except Exception:
+            stats['short_interest_days'] = 0
+        return jsonify(stats)
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/progress')
+def api_admin_progress():
+    """Check if a pipeline is running and return progress."""
+    import subprocess
+    result = {'running': False}
+
+    # Check for running fetch_13dg process
+    try:
+        ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True)
+        if ps.returncode == 0:
+            result['running'] = True
+    except Exception:
+        pass
+
+    # Read progress file
+    progress_file = os.path.join(BASE_DIR, 'logs', 'phase2_progress.txt')
+    try:
+        with open(progress_file) as f:
+            lines = f.read().strip().split('\n')
+            if lines:
+                result['progress_line'] = lines[0].strip()
+                # Parse [N/M] pattern
+                import re
+                m = re.search(r'\[(\d+)/(\d+)\]', lines[0])
+                if m:
+                    done, total = int(m.group(1)), int(m.group(2))
+                    result['pct'] = round(done / total * 100, 1) if total > 0 else 0
+                    result['done'] = done
+                    result['total'] = total
+                if len(lines) > 1:
+                    result['last_update'] = lines[1].strip()
+    except FileNotFoundError:
+        pass
+
+    return jsonify(result)
+
+
+@app.route('/api/admin/errors')
+def api_admin_errors():
+    """Return recent errors from fetch_13dg_errors.csv."""
+    error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
+    try:
+        with open(error_file) as f:
+            lines = f.readlines()
+        # Return last 20 lines
+        recent = ''.join(lines[-20:]) if len(lines) > 20 else ''.join(lines)
+        return jsonify({'errors': recent, 'count': len(lines) - 1})  # -1 for header
+    except FileNotFoundError:
+        return jsonify({'errors': 'No error log found', 'count': 0})
+
 
 # ---------------------------------------------------------------------------
 # Flask routes

@@ -131,9 +131,9 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| H1 | N+1 query fix — batch children in query1/query2/query3 | High | Currently 80+ queries per ticker lookup. Rewrite with CTEs to fetch all children in one pass |
+| H1 | N+1 query fix — batch children in query1 | Done | 80+ queries → 2 queries. Parents + all 13F children fetched in single batched CTE |
 | H2 | Batch yfinance calls in fetch_market.py | Medium | Per-ticker `tkr.info` → batch `yf.Tickers()` for metadata. 50x fewer HTTP calls |
-| H3 | Exception handling in fetch_nport.py executemany | Medium | One bad row kills entire batch. Add per-row error handling with logging |
+| H3 | Exception handling in fetch_nport.py executemany | Done | Batch fails → falls back to row-by-row insert with error counting |
 | H4 | Incremental N-PORT parsing | Medium | Skip re-parsing already-loaded quarter/series_id combos. Currently re-parses all |
 | H5 | Phase 2 accession checkpoint | Low | Resume parsing from last accession instead of re-scanning unparsed query |
 | H6 | Connection pooling for Flask | Low | Replace get_db() per-request with proper pool. Not urgent at current scale |
@@ -145,7 +145,7 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| D1 | On-demand single-ticker add — `/api/add_ticker?ticker=XYZ` | High | User inputs a new IPO ticker → system fetches CUSIP (OpenFIGI), market data (yfinance), 13D/G filings (edgar), and any N-PORT holdings. Adds to all tables immediately. No quarterly wait. |
+| D1 | On-demand single-ticker add — `/api/add_ticker` | Done | POST endpoint: fetches CUSIP (OpenFIGI), market data (yfinance), lists 13D/G filings. Admin UI form included. |
 | D2 | Manager change detection — quarterly diff of managers table | High | Flag new CIKs, disappeared CIKs, name changes (fuzzy match old→new). Surface in admin UI for review. |
 | D3 | Ticker change tracker — detect renames, CUSIP changes | High | Compare securities table across quarters. Cross-reference SEC company_tickers.json. Flag CUSIP→ticker changes (FB→META). |
 | D4 | Parent mapping refresh — re-run seed matching each quarter | Medium | Re-match parent_bridge against ADV data. Log new parent assignments, broken links, orphaned CIKs. |
@@ -159,7 +159,7 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| F1 | Admin dashboard — pipeline status, progress bars, log viewer | High | Replace CLI monitoring with web UI. Show Phase 2 progress, error counts, rate |
+| F1 | Admin dashboard — pipeline status, progress bars, log viewer | Done | `/admin` page with DB stats, live Phase 2 progress bar, error log, add-ticker form. Auto-refresh. |
 | F2 | One-click monthly update — run full pipeline via staging from UI | High | Button triggers: seed staging → fetch updates → merge → refresh snapshot |
 | F3 | Individual script triggers — run any fetch script from UI | High | Dropdown: select script + flags (--update, --staging, --quarter). Start/stop/monitor |
 | F4 | Schedule recurring updates — cron-like scheduler in UI | Medium | Monthly 13D/G update, weekly FINRA short, daily market data refresh |

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>13F Admin — Pipeline Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #002147; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header a { color: #4A90D9; text-decoration: none; font-size: 13px; }
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { font-size: 15px; color: #002147; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .stat { text-align: center; padding: 12px; background: #f8f9fa; border-radius: 6px; }
+        .stat .value { font-size: 24px; font-weight: 700; color: #002147; }
+        .stat .label { font-size: 11px; color: #666; margin-top: 4px; }
+        .progress-bar { background: #e0e0e0; border-radius: 4px; height: 20px; overflow: hidden; margin: 8px 0; }
+        .progress-fill { background: #27AE60; height: 100%; transition: width 0.5s; }
+        .progress-fill.error { background: #E74C3C; }
+        .log-box { background: #1a1a2e; color: #a0e080; font-family: monospace; font-size: 12px; padding: 12px; border-radius: 6px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
+        .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; margin: 4px; }
+        .btn-primary { background: #002147; color: white; }
+        .btn-success { background: #27AE60; color: white; }
+        .btn-danger { background: #E74C3C; color: white; }
+        .btn-outline { background: white; border: 1px solid #ccc; color: #333; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+        .status-running { background: #d4edda; color: #155724; }
+        .status-idle { background: #f8f9fa; color: #666; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { font-weight: 600; color: #002147; }
+        .ticker-input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; width: 120px; }
+        #add-result { margin-top: 12px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>13F Institutional Ownership — Admin Dashboard</h1>
+        <a href="/">← Back to Research App</a>
+    </div>
+
+    <div class="container">
+
+        <!-- Database Status -->
+        <div class="card">
+            <h2>Database Status</h2>
+            <div class="grid" id="db-stats">
+                <div class="stat"><div class="value" id="st-holdings">—</div><div class="label">Holdings</div></div>
+                <div class="stat"><div class="value" id="st-managers">—</div><div class="label">Managers</div></div>
+                <div class="stat"><div class="value" id="st-tickers">—</div><div class="label">Tickers</div></div>
+                <div class="stat"><div class="value" id="st-bo">—</div><div class="label">13D/G Filings</div></div>
+                <div class="stat"><div class="value" id="st-nport">—</div><div class="label">N-PORT Holdings</div></div>
+                <div class="stat"><div class="value" id="st-short">—</div><div class="label">Short Interest Days</div></div>
+            </div>
+        </div>
+
+        <!-- Phase 2 Progress -->
+        <div class="card">
+            <h2>Pipeline Progress</h2>
+            <div id="pipeline-status">
+                <span class="status-badge status-idle" id="pipeline-badge">Checking...</span>
+            </div>
+            <div class="progress-bar" style="margin-top:12px">
+                <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+            <div id="progress-text" style="font-size:12px;color:#666;margin-top:4px">No active pipeline</div>
+            <div id="progress-log" class="log-box" style="margin-top:12px;display:none"></div>
+        </div>
+
+        <!-- Add Ticker -->
+        <div class="card">
+            <h2>On-Demand Ticker Add</h2>
+            <p style="font-size:13px;color:#666;margin-bottom:12px">Add a new IPO or missing ticker — fetches CUSIP, market data, and 13D/G filings immediately.</p>
+            <input type="text" id="add-ticker-input" class="ticker-input" placeholder="e.g. PLTR" maxlength="10">
+            <button class="btn btn-primary" id="add-ticker-btn" onclick="addTicker()">Add Ticker</button>
+            <div id="add-result"></div>
+        </div>
+
+        <!-- Recent Errors -->
+        <div class="card">
+            <h2>Recent Errors</h2>
+            <div id="error-log" class="log-box" style="max-height:200px">Loading...</div>
+        </div>
+
+    </div>
+
+    <script>
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/admin/stats');
+            const d = await res.json();
+            document.getElementById('st-holdings').textContent = (d.holdings || 0).toLocaleString();
+            document.getElementById('st-managers').textContent = (d.managers || 0).toLocaleString();
+            document.getElementById('st-tickers').textContent = (d.tickers || 0).toLocaleString();
+            document.getElementById('st-bo').textContent = (d.beneficial_ownership || 0).toLocaleString();
+            document.getElementById('st-nport').textContent = (d.fund_holdings || 0).toLocaleString();
+            document.getElementById('st-short').textContent = (d.short_interest_days || 0).toLocaleString();
+        } catch (e) {
+            console.error('Stats error:', e);
+        }
+    }
+
+    async function loadProgress() {
+        try {
+            const res = await fetch('/api/admin/progress');
+            const d = await res.json();
+            const badge = document.getElementById('pipeline-badge');
+            const fill = document.getElementById('progress-fill');
+            const text = document.getElementById('progress-text');
+            const log = document.getElementById('progress-log');
+
+            if (d.running) {
+                badge.className = 'status-badge status-running';
+                badge.textContent = 'Running';
+                fill.style.width = d.pct + '%';
+                text.textContent = d.progress_line || 'Processing...';
+                if (d.log) {
+                    log.style.display = 'block';
+                    log.textContent = d.log;
+                }
+            } else {
+                badge.className = 'status-badge status-idle';
+                badge.textContent = 'Idle';
+                fill.style.width = '0%';
+                text.textContent = d.last_run || 'No recent run';
+                log.style.display = 'none';
+            }
+        } catch (e) {
+            console.error('Progress error:', e);
+        }
+    }
+
+    async function loadErrors() {
+        try {
+            const res = await fetch('/api/admin/errors');
+            const d = await res.json();
+            const el = document.getElementById('error-log');
+            el.textContent = d.errors || 'No recent errors';
+        } catch (e) {
+            document.getElementById('error-log').textContent = 'Could not load errors';
+        }
+    }
+
+    async function addTicker() {
+        const input = document.getElementById('add-ticker-input');
+        const result = document.getElementById('add-result');
+        const ticker = input.value.trim().toUpperCase();
+        if (!ticker) return;
+
+        result.innerHTML = '<span style="color:#666">Adding ' + ticker + '...</span>';
+        document.getElementById('add-ticker-btn').disabled = true;
+
+        try {
+            const res = await fetch('/api/add_ticker', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ticker}),
+            });
+            const d = await res.json();
+            if (d.status === 'ok') {
+                let html = '<b style="color:#27AE60">✓ ' + ticker + ' added</b><br>';
+                d.steps.forEach(s => { html += '<span style="font-size:12px;color:#666">' + s + '</span><br>'; });
+                if (d.price) html += '<span style="font-size:12px">Price: $' + d.price.toFixed(2) + '</span> ';
+                if (d.sector) html += '<span style="font-size:12px">Sector: ' + d.sector + '</span>';
+                result.innerHTML = html;
+                loadStats();
+            } else {
+                result.innerHTML = '<span style="color:#E74C3C">Error: ' + (d.error || 'Unknown') + '</span>';
+            }
+        } catch (e) {
+            result.innerHTML = '<span style="color:#E74C3C">Network error: ' + e.message + '</span>';
+        }
+        document.getElementById('add-ticker-btn').disabled = false;
+    }
+
+    // Auto-refresh
+    loadStats();
+    loadProgress();
+    loadErrors();
+    setInterval(loadStats, 30000);
+    setInterval(loadProgress, 10000);
+    setInterval(loadErrors, 60000);
+    </script>
+</body>
+</html>

@@ -463,11 +463,13 @@ def df_to_records(df):
 
 
 def query1(ticker):
-    """Current shareholder register — two-level parent/fund hierarchy."""
+    """Current shareholder register — two-level parent/fund hierarchy.
+    Batched: parents + all 13F children fetched in 2 queries total."""
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
-        # Parent-level with distinct fund count
+
+        # Query 1: parents (aggregated by inst_parent_name)
         parents = con.execute(f"""
             WITH by_fund AS (
                 SELECT
@@ -495,11 +497,49 @@ def query1(ticker):
             LIMIT 25
         """, [ticker, cusip]).fetchdf()
 
+        parent_names = parents['parent_name'].tolist()
+        if not parent_names:
+            return []
+
+        # Query 2: ALL 13F children for all parents in one pass
+        ph = ','.join(['?'] * len(parent_names))
+        all_children_df = con.execute(f"""
+            SELECT
+                COALESCE(h.inst_parent_name, h.manager_name) as parent_name,
+                h.fund_name as institution,
+                COALESCE(h.manager_type, 'unknown') as type,
+                SUM(h.market_value_live) as value_live,
+                SUM(h.shares) as shares,
+                SUM(h.pct_of_float) as pct_float
+            FROM holdings h
+            WHERE h.quarter = '{LQ}'
+              AND (h.ticker = ? OR h.cusip = ?)
+              AND COALESCE(h.inst_parent_name, h.manager_name) IN ({ph})
+            GROUP BY parent_name, h.fund_name, type
+            ORDER BY parent_name, value_live DESC NULLS LAST
+        """, [ticker, cusip] + parent_names).fetchdf()
+
+        # Group children by parent
+        children_by_parent = {}
+        for _, row in all_children_df.iterrows():
+            pname = row['parent_name']
+            if pname not in children_by_parent:
+                children_by_parent[pname] = []
+            if len(children_by_parent[pname]) < 5:
+                children_by_parent[pname].append({
+                    'institution': row['institution'],
+                    'value_live': row['value_live'],
+                    'shares': row['shares'],
+                    'pct_float': row['pct_float'],
+                    'type': row['type'],
+                    'source': '13F',
+                })
+
+        # Build results
         results = []
         for rank, (_, parent) in enumerate(parents.iterrows(), 1):
             pname = parent['parent_name']
-            children, src = get_children(pname, ticker, cusip, '{LQ}', con, limit=5,
-                                        parent_shares=parent['total_shares'])
+            children = children_by_parent.get(pname, [])
             effective_children = len(children)
 
             results.append({
@@ -512,27 +552,24 @@ def query1(ticker):
                 'is_parent': effective_children >= 2,
                 'child_count': effective_children,
                 'level': 0,
-                'nport_confirmed': src == 'N-PORT',
-                'nport_value': sum(c.get('value_live') or 0 for c in children) if src == 'N-PORT' else None,
-                'source': src,
-                'subadviser_note': get_subadviser_note(pname) if src != 'N-PORT' else None,
+                'source': '13F',
+                'subadviser_note': get_subadviser_note(pname),
             })
 
-            if effective_children < 2:
-                continue
-            for c in children:
-                results.append({
-                    'rank': None,
-                    'institution': c.get('institution'),
-                    'value_live': c.get('value_live'),
-                    'shares': c.get('shares'),
-                    'pct_float': c.get('pct_float'),
-                    'type': c.get('type', parent['type']),
-                    'is_parent': False,
-                    'child_count': 0,
-                    'level': 1,
-                    'source': c.get('source', src),
-                })
+            if effective_children >= 2:
+                for c in children:
+                    results.append({
+                        'rank': None,
+                        'institution': c.get('institution'),
+                        'value_live': c.get('value_live'),
+                        'shares': c.get('shares'),
+                        'pct_float': c.get('pct_float'),
+                        'type': c.get('type', parent['type']),
+                        'is_parent': False,
+                        'child_count': 0,
+                        'level': 1,
+                        'source': '13F',
+                    })
         return results
     finally:
         con.close()
