@@ -41,7 +41,7 @@ def _init_edgar():
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
 MAX_WORKERS_PHASE1 = 4
-MAX_WORKERS_PHASE2 = 1  # Sequential — avoids SEC rate limiting entirely
+MAX_WORKERS_PHASE2 = 2  # curl subprocess — no connection pool issues
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
 _thread_local = threading.local()
@@ -392,7 +392,7 @@ def _download_filing_text(acc, subject_cik):
     ua = SEC_HEADERS["User-Agent"]
     for base_cik in [cik_raw, acc.split("-")[0].lstrip("0") or "0"]:
         url = f"https://www.sec.gov/Archives/edgar/data/{base_cik}/{acc_path}/{acc}.txt"
-        time.sleep(1.0)
+        time.sleep(0.2)
         try:
             result = sp.run(
                 ["curl", "-s", "-f", "-m", "10", "-H", f"User-Agent: {ua}", url],
@@ -417,21 +417,13 @@ def parse_one_filing_by_acc(acc, ticker, form, filing_date, filer_cik,
 
     text = _clean_text(raw_text)
 
-    # Timeout guard: skip filings where regex takes >5s (catastrophic backtracking)
-    import signal
-    def _timeout(s, f): raise TimeoutError()
-    old_handler = signal.signal(signal.SIGALRM, _timeout)
-    signal.alarm(5)
-    try:
-        fields = _extract_fields(text, form)
-    except TimeoutError:
-        log_error(error_log, ticker, acc, "regex timeout >5s — skipped")
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
+    # Guard: skip empty text and truncate very long filings to prevent regex hangs
+    if len(text) < 50:
         return None
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
+    if len(text) > 500_000:
+        text = text[:500_000]
+
+    fields = _extract_fields(text, form)
 
     filer_name = filer_cik  # fallback — no header available in direct download
     if fields.get("reporting_person"):
@@ -600,11 +592,9 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
         print(f"    {len(uncached)} from prior session (will re-fetch)")
 
     total = len(unparsed)
-    print(f"\n--- Phase 2: Parsing {total} filings (sequential, 1 req/s) ---", flush=True)
+    print(f"\n--- Phase 2: Parsing {total} filings ({max_workers} workers, curl) ---", flush=True)
 
-    # Close DuckDB during download loop — re-open only for batch inserts.
-    # DuckDB's native library holds the GIL during WAL operations, which blocks
-    # urllib3 socket reads after ~30 iterations when the connection is open.
+    # Close DuckDB during download loop — edgar/DuckDB GIL conflict
     con.close()
 
     all_records = []
@@ -618,41 +608,47 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
         work_items.insert(0, (acc, tk, None, None, None, None, None))
 
     print(f"  Processing {len(work_items)} filings...", flush=True)
-    for item in work_items:
-        acc, tk = item[0], item[1]
-        done_count += 1
-        try:
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {}
+        for item in work_items:
+            acc, tk = item[0], item[1]
             if acc in filing_cache:
-                rec = parse_one_filing(filing_cache[acc], tk, cusip_map, error_log)
+                fut = pool.submit(parse_one_filing, filing_cache[acc], tk, cusip_map, error_log)
             else:
                 _, _, fm, fd, fc, sn, sc = item
-                rec = parse_one_filing_by_acc(acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)
-            if rec:
-                all_records.append(rec)
-            else:
-                errors += 1
-        except Exception as e:
-            log_error(error_log, tk, acc, e)
-            errors += 1
+                fut = pool.submit(parse_one_filing_by_acc, acc, tk, fm, fd, fc, sn, sc, cusip_map, error_log)
+            futures[fut] = acc
 
-        if done_count % 10 == 0 or done_count == total:
-            elapsed = time.time() - t_start
-            rate = done_count / elapsed * 60 if elapsed > 0 else 0
-            msg = f"  [{done_count}/{total}] ok={done_count-errors} err={errors} {rate:.0f}/min"
-            print(msg, flush=True)
+        for fut in as_completed(futures):
+            done_count += 1
             try:
-                with open(os.path.join(LOG_DIR, "phase2_progress.txt"), "w") as pf:
-                    pf.write(f"{msg}\n{datetime.now().isoformat()}\n")
-            except Exception:
-                pass
+                rec = fut.result(timeout=30)
+                if rec:
+                    all_records.append(rec)
+                else:
+                    errors += 1
+            except Exception as e:
+                log_error(error_log, "", futures[fut], e)
+                errors += 1
 
-        if len(all_records) >= FLUSH_SIZE:
-            # Re-open DB, insert batch, close
-            con = duckdb.connect(get_db_path())
-            batch_insert(con, all_records)
-            con.execute("CHECKPOINT")
-            con.close()
-            all_records.clear()
+            if done_count % 50 == 0 or done_count == total:
+                elapsed = time.time() - t_start
+                rate = done_count / elapsed * 60 if elapsed > 0 else 0
+                msg = f"  [{done_count}/{total}] ok={done_count-errors} err={errors} {rate:.0f}/min"
+                print(msg, flush=True)
+                try:
+                    with open(os.path.join(LOG_DIR, "phase2_progress.txt"), "w") as pf:
+                        pf.write(f"{msg}\n{datetime.now().isoformat()}\n")
+                except Exception:
+                    pass
+
+            if len(all_records) >= FLUSH_SIZE:
+                con = duckdb.connect(get_db_path())
+                batch_insert(con, all_records)
+                con.execute("CHECKPOINT")
+                con.close()
+                all_records.clear()
 
     # Final flush
     if all_records:
