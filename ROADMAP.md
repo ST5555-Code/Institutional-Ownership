@@ -201,6 +201,7 @@ _Last updated: April 3, 2026_
 | N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→90.0% resolved, 10% filing agents marked. `resolve_agent_names.py` extracts reporting person from filing text |
 | N12 | Investor name standardization | Done | `normalize_names.py`: smart Title Case for 8.6M rows, 8 table/columns. Handles acronyms, canonical names, dotted abbrevs. ALL CAPS 27%→0% |
 | N13 | N-PORT series-level deduplication | High | Fix double-counting in ALL N-PORT rollup queries. Multiple sub-advisers (Fidelity HK/Japan/UK, Geode) inflate totals when the same series_id is counted per-adviser. Fix: SUM shares by unique series_id first, then roll up to parent. Affects: N-PORT coverage calc, Conviction tab children, Register tab N-PORT totals, Fund Portfolio tab. Test with NVDA across Fidelity, BlackRock, Vanguard, JPMorgan |
+| N14 | Geode/Fidelity sub-adviser exclusion | High | When computing Fidelity/FMR N-PORT children or totals, exclude series where named adviser is Geode Capital Management. Geode appears only as its own standalone parent row (via 13F), never as child under Fidelity. Add `SUBADVISER_EXCLUSIONS` dict in config.py mapping parent→excluded sub-advisers. Apply in all N-PORT rollup queries. Extensible for future sub-adviser relationships without code changes. Test: NVDA — Geode shares appear once under Geode, not also under Fidelity |
 
 ---
 
@@ -214,6 +215,7 @@ _Last updated: April 3, 2026_
 6. ~~N2 — Short squeeze UI tab~~ Done
 7. ~~N3 — Short vs long UI integration~~ Done
 8. **N13 — N-PORT series-level deduplication** (fix double-counting across all rollup queries)
+9. **N14 — Geode/Fidelity sub-adviser exclusion** (SUBADVISER_EXCLUSIONS in config.py)
 4. Refresh readonly snapshot
 5. Build Short Squeeze UI tab (N2)
 6. Add short/long comparison to Smart Money tab (N3)
