@@ -205,6 +205,14 @@ _Last updated: April 3, 2026_
 
 ---
 
+## UI/UX Improvements
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| U1 | N-PORT coverage disclaimer tooltip | Low | Hover tooltip on coverage % explaining: "Covers mutual funds filing N-PORT. ETF holdings (iShares, Vanguard ETFs) excluded by SEC filing rules. Sub-adviser positions deduplicated to avoid double-counting." |
+
+---
+
 ## SEQUENCE — NEXT STEPS
 
 1. ~~N-PORT index/ETF download + merge~~ Done
