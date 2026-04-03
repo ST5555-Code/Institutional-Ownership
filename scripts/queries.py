@@ -854,7 +854,7 @@ def query3(ticker):
                 WHERE COALESCE(inst_parent_name, manager_name) = ?
                   AND ticker = ? AND shares > 0
                 GROUP BY quarter ORDER BY quarter
-            """, [parent, ticker]).fetchall()
+            f""", [parent, ticker]).fetchall()
             quarters_held = [r[0] for r in history if r[1] and r[1] > 0]
             since_raw = quarters_held[0] if quarters_held else None
             held_count = len(quarters_held)
@@ -872,7 +872,7 @@ def query3(ticker):
                     FROM investor_flows
                     WHERE ticker = ? AND inst_parent_name = ?
                       AND quarter_from = '{FQ}' AND quarter_to = '{LQ}'
-                """, [ticker, parent]).fetchone()
+                f""", [ticker, parent]).fetchone()
                 if flow:
                     pct_chg = float(flow[1]) if flow[1] is not None else None
                     if flow[4]:  # is_new_entry
@@ -1125,7 +1125,7 @@ def query7(ticker, cik=None, fund_name=None):
                   AND manager_type NOT IN ('passive')
                 ORDER BY market_value_live DESC NULLS LAST
                 LIMIT 1
-            """, [ticker]).fetchone()
+            f""", [ticker]).fetchone()
             if not row:
                 return {'stats': {}, 'positions': []}
             cik = row[0]
@@ -1574,9 +1574,9 @@ def flow_analysis(ticker, period='4Q', peers=None):
 
     Falls back to live computation if pre-computed tables do not exist.
     """
-    period_map = {'4Q': '{FQ}', '2Q': '{QUARTERS[1]}', '1Q': '{PQ}'}
-    quarter_from = period_map.get(period, '{FQ}')
-    quarter_to = '{LQ}'
+    period_map = {'4Q': FQ, '2Q': QUARTERS[1] if len(QUARTERS) > 1 else FQ, '1Q': PQ}
+    quarter_from = period_map.get(period, FQ)
+    quarter_to = LQ
 
     con = get_db()
     try:
@@ -1752,7 +1752,7 @@ def _get_summary_impl(ticker):
         ).fetchone()
 
         # N-PORT coverage
-        nport = get_nport_coverage(ticker, '{LQ}', con)
+        nport = get_nport_coverage(ticker, LQ, con)
         total_value = totals[0] if totals else 0
         nport_val = nport.get('nport_total_value') or 0
         nport_pct = round(nport_val / total_value * 100, 1) if total_value and total_value > 0 else None
