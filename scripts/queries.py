@@ -76,7 +76,8 @@ def get_cusip(con, ticker):
 def get_nport_family_patterns():
     """Map inst_parent_name keywords to N-PORT fund_holdings family_name search patterns."""
     return {
-        'fidelity': ['Fidelity', 'FMR', 'Puritan', 'Rutland'],
+        'fidelity': ['Fidelity', 'FMR', 'Puritan', 'Rutland', 'Strategic Advisers'],
+        'geode': ['Geode'],
         'vanguard': ['Vanguard'],
         'blackrock': ['BlackRock', 'iShares', 'BGFA'],
         'wellington': ['Wellington'],
@@ -118,6 +119,8 @@ def get_nport_family_patterns():
         'william blair': ['William Blair'],
         'parnassus': ['Parnassus'],
         'calamos': ['Calamos'],
+        'schwab': ['Schwab', 'Charles Schwab'],
+        'capital group': ['Capital Research', 'Capital Group', 'American Funds'],
     }
 
 
