@@ -363,6 +363,148 @@ def api_admin_errors():
         return jsonify({'errors': 'No error log found', 'count': 0})
 
 
+@app.route('/api/admin/run_script', methods=['POST'])
+def api_admin_run_script():
+    """Run a pipeline script in the background. Returns immediately."""
+    import subprocess
+    data = request.json or {}
+    script = data.get('script', '')
+    flags = data.get('flags', [])
+
+    # Whitelist of allowed scripts
+    allowed = {
+        'fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
+        'fetch_finra_short.py', 'fetch_ncen.py', 'compute_flows.py',
+        'build_cusip.py', 'build_summaries.py', 'unify_positions.py',
+        'run_pipeline.sh', 'merge_staging.py', 'refresh_snapshot.sh',
+    }
+    if script not in allowed:
+        return jsonify({'error': f'Script not allowed: {script}'}), 400
+
+    # Check if already running
+    try:
+        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
+        if ps.returncode == 0:
+            return jsonify({'error': f'{script} is already running'}), 409
+    except Exception:
+        pass
+
+    # Build command
+    script_path = os.path.join(BASE_DIR, 'scripts', script)
+    if script.endswith('.sh'):
+        cmd = ['bash', script_path] + flags
+    else:
+        cmd = ['python3', '-u', script_path] + flags
+
+    # Run in background
+    log_name = script.replace('.py', '').replace('.sh', '')
+    log_path = os.path.join(BASE_DIR, 'logs', f'{log_name}_run.log')
+    with open(log_path, 'w') as log_file:
+        proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=BASE_DIR)
+
+    return jsonify({
+        'status': 'started',
+        'script': script,
+        'flags': flags,
+        'pid': proc.pid,
+        'log': log_path,
+    })
+
+
+@app.route('/api/admin/manager_changes')
+def api_admin_manager_changes():
+    """D2: Detect manager changes across quarters — new, disappeared, name changes."""
+    con = get_db()
+    try:
+        from config import LATEST_QUARTER, PREV_QUARTER
+        # New managers (in latest quarter but not previous)
+        new_mgrs = con.execute(f"""
+            SELECT DISTINCT cik, manager_name, manager_type
+            FROM holdings WHERE quarter = '{LATEST_QUARTER}'
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{PREV_QUARTER}')
+            ORDER BY manager_name LIMIT 50
+        """).fetchdf()
+        # Disappeared managers
+        gone_mgrs = con.execute(f"""
+            SELECT DISTINCT cik, manager_name, manager_type
+            FROM holdings WHERE quarter = '{PREV_QUARTER}'
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
+            ORDER BY manager_name LIMIT 50
+        """).fetchdf()
+        return jsonify(clean_for_json({
+            'new_managers': df_to_records(new_mgrs),
+            'disappeared_managers': df_to_records(gone_mgrs),
+            'latest_quarter': LATEST_QUARTER,
+            'prev_quarter': PREV_QUARTER,
+        }))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/ticker_changes')
+def api_admin_ticker_changes():
+    """D3: Detect ticker changes — new tickers, disappeared tickers."""
+    con = get_db()
+    try:
+        from config import LATEST_QUARTER, PREV_QUARTER
+        new_tickers = con.execute(f"""
+            SELECT DISTINCT ticker, MAX(issuer_name) as company
+            FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
+            GROUP BY ticker ORDER BY ticker LIMIT 100
+        """).fetchdf()
+        gone_tickers = con.execute(f"""
+            SELECT DISTINCT ticker, MAX(issuer_name) as company
+            FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
+            GROUP BY ticker ORDER BY ticker LIMIT 100
+        """).fetchdf()
+        return jsonify(clean_for_json({
+            'new_tickers': df_to_records(new_tickers),
+            'disappeared_tickers': df_to_records(gone_tickers),
+        }))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/staging_preview')
+def api_admin_staging_preview():
+    """F5: Preview what merge_staging would do (dry-run)."""
+    import subprocess
+    script_path = os.path.join(BASE_DIR, 'scripts', 'merge_staging.py')
+    try:
+        result = subprocess.run(
+            ['python3', script_path, '--all', '--dry-run'],
+            capture_output=True, text=True, timeout=30, cwd=BASE_DIR,
+        )
+        return jsonify({
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None,
+            'returncode': result.returncode,
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Preview timed out after 30s'}), 504
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/running')
+def api_admin_running():
+    """List currently running pipeline scripts."""
+    import subprocess
+    running = []
+    for script in ['fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
+                    'fetch_finra_short.py', 'compute_flows.py', 'merge_staging.py']:
+        try:
+            ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
+            if ps.returncode == 0:
+                pids = ps.stdout.strip().split('\n')
+                running.append({'script': script, 'pids': pids})
+        except Exception:
+            pass
+    return jsonify({'running': running})
+
+
 # ---------------------------------------------------------------------------
 # Flask routes
 # ---------------------------------------------------------------------------

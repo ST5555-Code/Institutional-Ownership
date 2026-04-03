@@ -71,6 +71,49 @@
             <div id="progress-log" class="log-box" style="margin-top:12px;display:none"></div>
         </div>
 
+        <!-- Pipeline Controls -->
+        <div class="card">
+            <h2>Pipeline Controls</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                <button class="btn btn-success" onclick="runScript('run_pipeline.sh',['--staging'])">
+                    ▶ Full Monthly Update (staging)
+                </button>
+                <button class="btn btn-outline" onclick="runScript('merge_staging.py',['--all','--drop-staging'])">
+                    Merge Staging → Production
+                </button>
+                <button class="btn btn-outline" onclick="runScript('refresh_snapshot.sh',[])">
+                    Refresh Readonly Snapshot
+                </button>
+            </div>
+            <h3 style="font-size:13px;color:#666;margin:12px 0 8px">Individual Scripts</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <select id="script-select" style="padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+                    <option value="">Select script...</option>
+                    <option value="fetch_13dg.py">fetch_13dg.py — 13D/G filings</option>
+                    <option value="fetch_nport.py">fetch_nport.py — N-PORT holdings</option>
+                    <option value="fetch_market.py">fetch_market.py — Market data</option>
+                    <option value="fetch_finra_short.py">fetch_finra_short.py — FINRA short</option>
+                    <option value="fetch_ncen.py">fetch_ncen.py — N-CEN adviser map</option>
+                    <option value="compute_flows.py">compute_flows.py — Flow analytics</option>
+                    <option value="build_cusip.py">build_cusip.py — Securities table</option>
+                    <option value="build_summaries.py">build_summaries.py — Summary tables</option>
+                    <option value="unify_positions.py">unify_positions.py — Unified positions</option>
+                </select>
+                <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+                    <input type="checkbox" id="flag-staging"> --staging
+                </label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+                    <input type="checkbox" id="flag-update"> --update
+                </label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+                    <input type="checkbox" id="flag-test"> --test
+                </label>
+                <button class="btn btn-primary" onclick="runSelectedScript()">Run</button>
+            </div>
+            <div id="run-result" style="margin-top:8px;font-size:12px"></div>
+            <div id="running-list" style="margin-top:8px;font-size:12px;color:#666"></div>
+        </div>
+
         <!-- Add Ticker -->
         <div class="card">
             <h2>On-Demand Ticker Add</h2>
@@ -177,13 +220,61 @@
         document.getElementById('add-ticker-btn').disabled = false;
     }
 
+    async function runScript(script, flags) {
+        const result = document.getElementById('run-result');
+        if (!confirm(`Run ${script} with flags: ${flags.join(' ') || '(none)'}?`)) return;
+        result.innerHTML = `<span style="color:#666">Starting ${script}...</span>`;
+        try {
+            const res = await fetch('/api/admin/run_script', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({script, flags}),
+            });
+            const d = await res.json();
+            if (d.status === 'started') {
+                result.innerHTML = `<b style="color:#27AE60">Started</b> ${script} (PID ${d.pid})`;
+                loadRunning();
+                setTimeout(loadProgress, 2000);
+            } else {
+                result.innerHTML = `<span style="color:#E74C3C">${d.error}</span>`;
+            }
+        } catch (e) {
+            result.innerHTML = `<span style="color:#E74C3C">Error: ${e.message}</span>`;
+        }
+    }
+
+    function runSelectedScript() {
+        const script = document.getElementById('script-select').value;
+        if (!script) { alert('Select a script'); return; }
+        const flags = [];
+        if (document.getElementById('flag-staging').checked) flags.push('--staging');
+        if (document.getElementById('flag-update').checked) flags.push('--update');
+        if (document.getElementById('flag-test').checked) flags.push('--test');
+        runScript(script, flags);
+    }
+
+    async function loadRunning() {
+        try {
+            const res = await fetch('/api/admin/running');
+            const d = await res.json();
+            const el = document.getElementById('running-list');
+            if (d.running.length > 0) {
+                el.innerHTML = '<b>Running:</b> ' + d.running.map(r => r.script + ' (PID ' + r.pids.join(',') + ')').join(', ');
+            } else {
+                el.innerHTML = 'No scripts running';
+            }
+        } catch (e) {}
+    }
+
     // Auto-refresh
     loadStats();
     loadProgress();
     loadErrors();
+    loadRunning();
     setInterval(loadStats, 30000);
     setInterval(loadProgress, 10000);
     setInterval(loadErrors, 60000);
+    setInterval(loadRunning, 15000);
     </script>
 </body>
 </html>

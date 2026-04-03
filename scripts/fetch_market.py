@@ -76,29 +76,58 @@ def fetch_batch_prices(tickers):
 
 
 def fetch_ticker_info(tickers):
-    """Fetch detailed info (market cap, float, sector) per ticker in batches."""
+    """Fetch market data in two passes: batch download for prices, then metadata."""
     records = []
     failed = []
-    batch_size = 50
     today = datetime.now().strftime("%Y-%m-%d")
 
+    # Pass 1: Batch price download (truly batched — single HTTP call per 500 tickers)
+    print("  Pass 1: Batch price download...", flush=True)
+    price_map = {}
+    batch_size = 500
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i:i + batch_size]
+        try:
+            df = yf.download(batch, period="5d", progress=False, threads=True)
+            if not df.empty:
+                if isinstance(df.columns, pd.MultiIndex):
+                    close = df['Close']
+                    for t in close.columns:
+                        vals = close[t].dropna()
+                        if len(vals) > 0:
+                            price_map[t] = float(vals.iloc[-1])
+                elif len(batch) == 1 and 'Close' in df.columns:
+                    vals = df['Close'].dropna()
+                    if len(vals) > 0:
+                        price_map[batch[0]] = float(vals.iloc[-1])
+        except Exception as e:
+            print(f"    Batch price error at {i}: {e}", flush=True)
+        if (i + batch_size) % 2000 == 0:
+            print(f"    [{min(i + batch_size, len(tickers)):,}/{len(tickers):,}] prices", flush=True)
+    print(f"  Prices fetched: {len(price_map):,}/{len(tickers):,}", flush=True)
+
+    # Pass 2: Metadata (sector, market cap, float) — per ticker via yf.Tickers
+    print("  Pass 2: Metadata (sector, market cap, float)...", flush=True)
+    meta_batch = 50
+    for i in range(0, len(tickers), meta_batch):
+        batch = tickers[i:i + meta_batch]
         try:
             data = yf.Tickers(" ".join(batch))
             for tkr_str in batch:
                 try:
                     tkr = data.tickers.get(tkr_str)
                     if tkr is None:
-                        failed.append(tkr_str)
+                        if tkr_str not in price_map:
+                            failed.append(tkr_str)
                         continue
-                    info = tkr.info
-                    if not info or not info.get("regularMarketPrice"):
+                    info = tkr.info or {}
+                    price = price_map.get(tkr_str) or info.get("regularMarketPrice") or info.get("currentPrice")
+                    if not price:
                         failed.append(tkr_str)
                         continue
                     record = {
                         "ticker": tkr_str,
-                        "price_live": info.get("regularMarketPrice") or info.get("currentPrice"),
+                        "price_live": price,
                         "market_cap": info.get("marketCap"),
                         "float_shares": info.get("floatShares"),
                         "shares_outstanding": info.get("sharesOutstanding"),
@@ -110,20 +139,19 @@ def fetch_ticker_info(tickers):
                         "exchange": info.get("exchange"),
                         "fetch_date": today,
                     }
-                    # Quarterly snapshot prices — skip if not needed on incremental
                     for q in SNAPSHOT_DATES:
                         record[f"price_{q}"] = None
                     records.append(record)
                 except Exception:
                     failed.append(tkr_str)
         except Exception as e:
-            print(f"    Batch error at {i}: {e}")
+            print(f"    Metadata batch error at {i}: {e}", flush=True)
             failed.extend(batch)
 
-        if (i + batch_size) % 200 == 0:
-            print(f"    [{min(i + batch_size, len(tickers)):,}/{len(tickers):,}] "
+        if (i + meta_batch) % 200 == 0:
+            print(f"    [{min(i + meta_batch, len(tickers)):,}/{len(tickers):,}] "
                   f"{len(records):,} ok, {len(failed):,} failed", flush=True)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
     print(f"  Fetched: {len(records):,}, Failed: {len(failed):,}")
     return pd.DataFrame(records), failed
