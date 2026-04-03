@@ -7,11 +7,28 @@ import and call these functions — no raw SQL in app.py.
 
 import logging
 import math
+import time as _time
 import pandas as pd
 import duckdb
 from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
 
 logger = logging.getLogger(__name__)
+
+# Simple time-based cache for expensive queries
+_query_cache = {}
+CACHE_TTL = 300  # 5 minutes
+
+
+def _cached(key, fn):
+    """Return cached result if fresh, else compute and cache."""
+    now = _time.time()
+    if key in _query_cache:
+        val, ts = _query_cache[key]
+        if now - ts < CACHE_TTL:
+            return val
+    result = fn()
+    _query_cache[key] = (result, now)
+    return result
 
 LQ = LATEST_QUARTER
 FQ = FIRST_QUARTER
@@ -572,7 +589,7 @@ def query1(ticker):
                     })
         return results
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -751,7 +768,7 @@ def query2(ticker):
             })
         return results
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -930,7 +947,7 @@ def query3(ticker):
 
         return results
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -959,7 +976,7 @@ def query4(ticker):
         df['pct_of_inst'] = df['total_value'] / grand_total * 100 if grand_total > 0 else 0
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -992,7 +1009,7 @@ def query5(ticker):
         """, [ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1092,7 +1109,7 @@ def query6(ticker):
 
         return sections
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1181,7 +1198,7 @@ def query7(ticker, cik=None, fund_name=None):
 
         return clean_for_json({'stats': stats, 'positions': records})
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1214,7 +1231,7 @@ def query8(ticker):
             df['overlap_pct'] = df['shared_holders'] / df['target_holders_count'] * 100
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1243,7 +1260,7 @@ def query9(ticker):
         """, [ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1267,7 +1284,7 @@ def query10(ticker):
         """, [ticker, ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1290,7 +1307,7 @@ def query11(ticker):
         """, [ticker, ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1321,7 +1338,7 @@ def query12(ticker):
         """, [ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1355,7 +1372,7 @@ def query13(ticker=None):
         """).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1381,7 +1398,7 @@ def query14(ticker):
         """, [ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1428,7 +1445,7 @@ def query15(ticker=None):
         }
         return clean_for_json([stats])
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 # ---------------------------------------------------------------------------
@@ -1488,7 +1505,7 @@ def ownership_trend_summary(ticker):
 
         return {'quarters': rows, 'summary': summary}
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1548,7 +1565,7 @@ def cohort_analysis(ticker):
         }
         return {'summary': summary, 'detail': detail}
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 
@@ -1660,7 +1677,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
             },
         })
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 # Map query number to function
@@ -1684,7 +1701,10 @@ QUERY_NAMES = {
 
 
 def get_summary(ticker):
-    """Quick summary stats for the header card."""
+    """Quick summary stats for the header card. Cached for 5 min."""
+    return _cached(f"summary:{ticker}", lambda: _get_summary_impl(ticker))
+
+def _get_summary_impl(ticker):
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -1755,7 +1775,7 @@ def get_summary(ticker):
         }
         return clean_for_json(result)
     finally:
-        con.close()
+        pass  # connection managed by thread-local cache
 
 
 # ---------------------------------------------------------------------------

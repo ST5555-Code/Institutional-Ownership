@@ -162,8 +162,12 @@ def _init_db_path():
         _start_switchback_monitor()
 
 
+_conn_local = _threading.local()
+
+
 def get_db():
-    """Open a read-only DuckDB connection. Caller must close it."""
+    """Get a read-only DuckDB connection. Uses thread-local cache to avoid
+    reopening on every request. Caller should NOT close it."""
     global _active_db_path
     with _db_path_lock:
         if _active_db_path is None:
@@ -172,8 +176,22 @@ def get_db():
             if _active_db_path != DB_PATH:
                 _start_switchback_monitor()
         path = _active_db_path
+
+    # Thread-local connection cache
+    cached = getattr(_conn_local, 'con', None)
+    cached_path = getattr(_conn_local, 'path', None)
+    if cached and cached_path == path:
+        try:
+            cached.execute("SELECT 1")  # verify alive
+            return cached
+        except Exception:
+            pass  # stale — reopen
+
     try:
-        return duckdb.connect(path, read_only=True)
+        con = duckdb.connect(path, read_only=True)
+        _conn_local.con = con
+        _conn_local.path = path
+        return con
     except Exception as e:
         app.logger.warning(f"[get_db] Connection stale, re-resolving: {e}")
         with _db_path_lock:
@@ -465,6 +483,191 @@ def api_admin_ticker_changes():
         }))
     finally:
         con.close()
+
+
+@app.route('/api/admin/parent_mapping_health')
+def api_admin_parent_health():
+    """D4: Check parent mapping health — orphaned CIKs, unmatched managers."""
+    con = get_db()
+    try:
+        # Managers without parent assignment
+        orphaned = con.execute(f"""
+            SELECT cik, manager_name, manager_type,
+                   SUM(market_value_live) as total_value
+            FROM holdings
+            WHERE quarter = '2025Q4' AND inst_parent_name IS NULL
+            GROUP BY cik, manager_name, manager_type
+            ORDER BY total_value DESC NULLS LAST
+            LIMIT 20
+        """).fetchdf()
+        # Top parents by value
+        top_parents = con.execute(f"""
+            SELECT inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
+                   SUM(market_value_live) as total_value
+            FROM holdings WHERE quarter = '2025Q4' AND inst_parent_name IS NOT NULL
+            GROUP BY inst_parent_name
+            ORDER BY total_value DESC NULLS LAST LIMIT 20
+        """).fetchdf()
+        return jsonify(clean_for_json({
+            'orphaned_managers': df_to_records(orphaned),
+            'top_parents': df_to_records(top_parents),
+        }))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/stale_data')
+def api_admin_stale_data():
+    """D5: Flag stale data — old market data, inactive managers."""
+    con = get_db()
+    try:
+        result = {}
+        # Tickers with old market data
+        try:
+            stale_market = con.execute("""
+                SELECT ticker, fetch_date, price_live
+                FROM market_data
+                WHERE fetch_date < CURRENT_DATE - INTERVAL '30' DAY
+                ORDER BY fetch_date ASC LIMIT 20
+            """).fetchdf()
+            result['stale_market_data'] = df_to_records(stale_market)
+        except Exception:
+            result['stale_market_data'] = []
+        # Managers only in old quarters
+        try:
+            inactive = con.execute(f"""
+                SELECT cik, manager_name, MAX(quarter) as last_quarter
+                FROM holdings
+                GROUP BY cik, manager_name
+                HAVING MAX(quarter) < '2025Q3'
+                ORDER BY last_quarter DESC LIMIT 20
+            """).fetchdf()
+            result['inactive_managers'] = df_to_records(inactive)
+        except Exception:
+            result['inactive_managers'] = []
+        return jsonify(clean_for_json(result))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/merger_signals')
+def api_admin_merger_signals():
+    """D6: Detect potential mergers — CIK disappears + another CIK's holdings jump."""
+    con = get_db()
+    try:
+        from config import LATEST_QUARTER, PREV_QUARTER
+        # CIKs that disappeared AND had large holdings
+        signals = con.execute(f"""
+            WITH gone AS (
+                SELECT cik, manager_name, SUM(market_value_usd) as prev_value
+                FROM holdings WHERE quarter = '{PREV_QUARTER}'
+                  AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
+                GROUP BY cik, manager_name
+                HAVING SUM(market_value_usd) > 1000000000
+            )
+            SELECT * FROM gone ORDER BY prev_value DESC LIMIT 20
+        """).fetchdf()
+        return jsonify(clean_for_json({
+            'potential_mergers': df_to_records(signals),
+        }))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/new_companies')
+def api_admin_new_companies():
+    """D7: New companies with institutional interest — recent entries."""
+    con = get_db()
+    try:
+        from config import LATEST_QUARTER, PREV_QUARTER
+        # Tickers that appeared in latest quarter with significant institutional value
+        new_cos = con.execute(f"""
+            SELECT h.ticker, MAX(h.issuer_name) as company,
+                   COUNT(DISTINCT h.cik) as holder_count,
+                   SUM(h.market_value_live) as total_value,
+                   MAX(m.sector) as sector
+            FROM holdings h
+            LEFT JOIN market_data m ON h.ticker = m.ticker
+            WHERE h.quarter = '{LATEST_QUARTER}' AND h.ticker IS NOT NULL
+              AND h.ticker NOT IN (
+                  SELECT DISTINCT ticker FROM holdings
+                  WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
+              )
+            GROUP BY h.ticker
+            HAVING SUM(h.market_value_live) > 10000000
+            ORDER BY total_value DESC LIMIT 30
+        """).fetchdf()
+        return jsonify(clean_for_json({
+            'new_companies': df_to_records(new_cos),
+        }))
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/data_quality')
+def api_admin_data_quality():
+    """F6: Data quality metrics — coverage, parse rates, gaps."""
+    con = get_db()
+    try:
+        result = {}
+        # Holdings coverage
+        try:
+            r = con.execute(f"""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(ticker) as with_ticker,
+                    COUNT(market_value_live) as with_live_value,
+                    COUNT(pct_of_float) as with_float_pct
+                FROM holdings WHERE quarter = '2025Q4'
+            """).fetchone()
+            result['holdings'] = {
+                'total': r[0], 'with_ticker': r[1],
+                'with_live_value': r[2], 'with_float_pct': r[3],
+                'ticker_pct': round(r[1] / r[0] * 100, 1) if r[0] else 0,
+                'live_value_pct': round(r[2] / r[0] * 100, 1) if r[0] else 0,
+            }
+        except Exception:
+            result['holdings'] = {}
+        # 13D/G parse quality
+        try:
+            r = con.execute("""
+                SELECT COUNT(*) as total,
+                    COUNT(pct_owned) as with_pct,
+                    COUNT(shares_owned) as with_shares,
+                    COUNT(CASE WHEN filer_name = 'UNKNOWN' OR filer_name IS NULL THEN 1 END) as unknown_filers
+                FROM beneficial_ownership
+            """).fetchone()
+            result['beneficial_ownership'] = {
+                'total': r[0], 'with_pct': r[1], 'with_shares': r[2],
+                'unknown_filers': r[3],
+                'pct_coverage': round(r[1] / r[0] * 100, 1) if r[0] else 0,
+            }
+        except Exception:
+            result['beneficial_ownership'] = {}
+        # Error log stats
+        error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
+        try:
+            with open(error_file) as f:
+                error_count = sum(1 for _ in f) - 1
+            result['fetch_errors'] = error_count
+        except FileNotFoundError:
+            result['fetch_errors'] = 0
+        return jsonify(result)
+    finally:
+        con.close()
+
+
+@app.route('/api/admin/quarter_config')
+def api_admin_quarter_config():
+    """F7: Show current quarter configuration."""
+    from config import QUARTERS, QUARTER_URLS, QUARTER_REPORT_DATES, QUARTER_SNAPSHOT_DATES
+    return jsonify({
+        'quarters': QUARTERS,
+        'urls': QUARTER_URLS,
+        'report_dates': QUARTER_REPORT_DATES,
+        'snapshot_dates': QUARTER_SNAPSHOT_DATES,
+        'config_file': os.path.join(BASE_DIR, 'scripts', 'config.py'),
+    })
 
 
 @app.route('/api/admin/staging_preview')

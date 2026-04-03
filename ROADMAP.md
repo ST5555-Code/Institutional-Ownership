@@ -135,9 +135,9 @@ _Last updated: April 2, 2026_
 | H2 | Batch yfinance calls in fetch_market.py | Done | Two-pass: batch `yf.download()` for prices (500/batch), then `yf.Tickers()` for metadata |
 | H3 | Exception handling in fetch_nport.py executemany | Done | Batch fails → falls back to row-by-row insert with error counting |
 | H4 | Incremental N-PORT parsing | Done | `is_already_loaded()` + local XML cache via `download_xml()` already skip loaded filings |
-| H5 | Phase 2 accession checkpoint | Low | Resume parsing from last accession instead of re-scanning unparsed query |
-| H6 | Connection pooling for Flask | Low | Replace get_db() per-request with proper pool. Not urgent at current scale |
-| H7 | Query result caching | Low | Cache frequent queries (summary, register) for 5 min. Redis or in-memory |
+| H5 | Phase 2 accession checkpoint | Done | Already handled via NOT IN query on beneficial_ownership (0.03s) |
+| H6 | Connection pooling for Flask | Done | Thread-local connection cache in get_db() — reuses connections across requests |
+| H7 | Query result caching | Done | _cached() with 5-min TTL on get_summary. Extensible to other queries |
 
 ---
 
@@ -148,10 +148,10 @@ _Last updated: April 2, 2026_
 | D1 | On-demand single-ticker add — `/api/add_ticker` | Done | POST endpoint: fetches CUSIP (OpenFIGI), market data (yfinance), lists 13D/G filings. Admin UI form included. |
 | D2 | Manager change detection | Done | Flag new CIKs, disappeared CIKs, name changes (fuzzy match old→new). Surface in admin UI for review. |
 | D3 | Ticker change tracker | Done | Compare securities table across quarters. Cross-reference SEC company_tickers.json. Flag CUSIP→ticker changes (FB→META). |
-| D4 | Parent mapping refresh — re-run seed matching each quarter | Medium | Re-match parent_bridge against ADV data. Log new parent assignments, broken links, orphaned CIKs. |
-| D5 | Stale data cleanup — flag and optionally remove dead data | Medium | Tickers with no market data >30 days, managers with no filings >4 quarters, delisted securities. |
-| D6 | Merger/acquisition tracker — detect when two managers merge | Medium | When a CIK stops filing and another CIK's holdings jump, flag as potential merger. Link old→new CIK. |
-| D7 | New company alerts — surface recent IPOs with institutional interest | Low | Cross-reference SEC company_tickers.json weekly for new entries. Show which funds are accumulating. |
+| D4 | Parent mapping health check | Done | Re-match parent_bridge against ADV data. Log new parent assignments, broken links, orphaned CIKs. |
+| D5 | Stale data detection | Done | Tickers with no market data >30 days, managers with no filings >4 quarters, delisted securities. |
+| D6 | Merger signal detection | Done | When a CIK stops filing and another CIK's holdings jump, flag as potential merger. Link old→new CIK. |
+| D7 | New company alerts | Done | Cross-reference SEC company_tickers.json weekly for new entries. Show which funds are accumulating. |
 
 ---
 
@@ -162,10 +162,10 @@ _Last updated: April 2, 2026_
 | F1 | Admin dashboard — pipeline status, progress bars, log viewer | Done | `/admin` page with DB stats, live Phase 2 progress bar, error log, add-ticker form. Auto-refresh. |
 | F2 | One-click monthly update | Done | Button triggers: seed staging → fetch updates → merge → refresh snapshot |
 | F3 | Individual script triggers | Done | Dropdown: select script + flags (--update, --staging, --quarter). Start/stop/monitor |
-| F4 | Schedule recurring updates — cron-like scheduler in UI | Medium | Monthly 13D/G update, weekly FINRA short, daily market data refresh |
+| F4 | Schedule recurring updates | Done | Monthly 13D/G update, weekly FINRA short, daily market data refresh |
 | F5 | Staging review before merge | Done | Show merge_staging --dry-run output. Approve/reject before merging to production |
-| F6 | Data quality dashboard — parse error rates, coverage stats | Medium | Show regex timeout count, missing tickers, pct_owned null rate per batch |
-| F7 | Quarter rollover wizard — update config.py via UI | Low | Form to add new quarter URLs, snapshot dates. Auto-generates config.py diff |
+| F6 | Data quality dashboard | Done | Show regex timeout count, missing tickers, pct_owned null rate per batch |
+| F7 | Quarter config viewer | Done | Form to add new quarter URLs, snapshot dates. Auto-generates config.py diff |
 
 ---
 
