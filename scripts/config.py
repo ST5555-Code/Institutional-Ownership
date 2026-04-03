@@ -45,3 +45,14 @@ if len(QUARTERS) >= 3:
     FLOW_PERIODS.append(("2Q", QUARTERS[-3], QUARTERS[-1]))
 if len(QUARTERS) >= 2:
     FLOW_PERIODS.append(("1Q", QUARTERS[-2], QUARTERS[-1]))
+
+# Sub-adviser exclusions for N-PORT rollup deduplication.
+# When rolling up N-PORT fund holdings to a parent, exclude series where the
+# named adviser is in this list. Prevents double-counting when a sub-adviser
+# also files its own 13F (e.g., Geode manages Fidelity index funds but files
+# its own 13F — don't count Geode-managed shares under Fidelity).
+# Add new entries here without code changes.
+SUBADVISER_EXCLUSIONS = {
+    'fidelity': ['Geode Capital Management'],
+    'fmr': ['Geode Capital Management'],
+}

@@ -10,7 +10,7 @@ import math
 import time as _time
 import pandas as pd
 import duckdb
-from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
+from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, SUBADVISER_EXCLUSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -234,24 +234,55 @@ def match_nport_family(inst_parent_name):
 
 
 
+def _get_subadviser_exclusions(family_patterns):
+    """Return list of adviser names to exclude for this family's N-PORT rollup."""
+    exclusions = []
+    for pattern in family_patterns:
+        for key, excl_list in SUBADVISER_EXCLUSIONS.items():
+            if key in pattern.lower():
+                exclusions.extend(excl_list)
+    return exclusions
+
+
 def get_nport_position(family_patterns, ticker, quarter, con):
-    """Query fund_holdings for a family's position in a ticker."""
+    """Query fund_holdings for a family's position in a ticker.
+    Deduplicates by series_id and excludes sub-adviser positions."""
     if not family_patterns:
         return None
     try:
         like_patterns = ['%' + p + '%' for p in family_patterns]
         placeholders = ','.join(['?'] * len(like_patterns))
+
+        # Build sub-adviser exclusion clause
+        exclusions = _get_subadviser_exclusions(family_patterns)
+        excl_clause = ""
+        excl_params = []
+        if exclusions:
+            excl_placeholders = ','.join(['?'] * len(exclusions))
+            excl_patterns = ['%' + e + '%' for e in exclusions]
+            excl_clause = f"""
+                AND fh.series_id NOT IN (
+                    SELECT DISTINCT nam.series_id FROM ncen_adviser_map nam
+                    WHERE EXISTS (SELECT 1 FROM UNNEST([{excl_placeholders}]) x(p) WHERE nam.adviser_name ILIKE x.p)
+                )"""
+            excl_params = excl_patterns
+
+        # Deduplicate by series_id: one row per fund, then aggregate
         result = con.execute(f"""
-            SELECT
-                SUM(market_value_usd) as total_value,
-                SUM(shares_or_principal) as total_shares,
-                AVG(pct_of_nav) as avg_pct_nav,
-                COUNT(DISTINCT series_id) as fund_count
-            FROM fund_holdings
-            WHERE EXISTS (SELECT 1 FROM UNNEST([{placeholders}]) t(p) WHERE family_name ILIKE t.p)
-            AND ticker = ?
-            AND quarter = ?
-        """, like_patterns + [ticker, quarter]).fetchone()
+            WITH per_fund AS (
+                SELECT series_id,
+                       MAX(market_value_usd) as market_value_usd,
+                       MAX(shares_or_principal) as shares,
+                       MAX(pct_of_nav) as pct_of_nav
+                FROM fund_holdings fh
+                WHERE EXISTS (SELECT 1 FROM UNNEST([{placeholders}]) t(p) WHERE family_name ILIKE t.p)
+                  AND ticker = ? AND quarter = ?
+                  {excl_clause}
+                GROUP BY series_id
+            )
+            SELECT SUM(market_value_usd), SUM(shares), AVG(pct_of_nav), COUNT(*)
+            FROM per_fund
+        """, like_patterns + [ticker, quarter] + excl_params).fetchone()
         if result and result[0]:
             return {
                 'nport_value': float(result[0]),
@@ -261,24 +292,30 @@ def get_nport_position(family_patterns, ticker, quarter, con):
                 'source': 'N-PORT',
             }
     except Exception as e:
-        logger.error(f"[get_nport_coverage] {e}", exc_info=True)
+        logger.error(f"[get_nport_position] {e}", exc_info=True)
     return None
 
 
 
 def get_nport_coverage(ticker, quarter, con):
-    """Get overall N-PORT coverage stats for a ticker."""
+    """Get overall N-PORT coverage stats for a ticker. Deduplicates by series_id."""
     try:
         result = con.execute("""
+            WITH per_fund AS (
+                SELECT series_id,
+                       MAX(market_value_usd) as market_value_usd
+                FROM fund_holdings
+                WHERE ticker = ? AND quarter = ?
+                GROUP BY series_id
+            )
             SELECT SUM(market_value_usd) as total_value,
-                   COUNT(DISTINCT series_id) as fund_count
-            FROM fund_holdings
-            WHERE ticker = ? AND quarter = ?
+                   COUNT(*) as fund_count
+            FROM per_fund
         """, [ticker, quarter]).fetchone()
         if result and result[0]:
             return {'nport_total_value': float(result[0]), 'nport_fund_count': int(result[1])}
     except Exception as e:
-        logger.error(f"[get_nport_total] {e}", exc_info=True)
+        logger.error(f"[get_nport_coverage] {e}", exc_info=True)
     return {'nport_total_value': None, 'nport_fund_count': 0}
 
 
@@ -344,6 +381,21 @@ def get_subadviser_note(inst_parent_name):
 
 
 
+def _build_excl_clause(family_patterns):
+    """Build SQL exclusion clause and params for sub-adviser dedup."""
+    exclusions = _get_subadviser_exclusions(family_patterns)
+    if not exclusions:
+        return "", []
+    excl_ph = ','.join(['?'] * len(exclusions))
+    excl_patterns = ['%' + e + '%' for e in exclusions]
+    clause = f"""
+        AND fh.series_id NOT IN (
+            SELECT DISTINCT nam.series_id FROM ncen_adviser_map nam
+            WHERE EXISTS (SELECT 1 FROM UNNEST([{excl_ph}]) x(p) WHERE nam.adviser_name ILIKE x.p)
+        )"""
+    return clause, excl_patterns
+
+
 def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
     """Get top fund series from fund_holdings for a parent institution.
 
@@ -355,21 +407,23 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
     try:
         like_patterns = ['%' + p + '%' for p in patterns]
         ph = ','.join(['?'] * len(like_patterns))
+        excl_clause, excl_params = _build_excl_clause(patterns)
         df = con.execute(f"""
             SELECT
                 fund_name,
-                SUM(market_value_usd) as value,
-                SUM(shares_or_principal) as shares,
-                AVG(pct_of_nav) as pct_of_nav,
+                MAX(market_value_usd) as value,
+                MAX(shares_or_principal) as shares,
+                MAX(pct_of_nav) as pct_of_nav,
                 series_id
-            FROM fund_holdings
+            FROM fund_holdings fh
             WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE family_name ILIKE t.p)
               AND ticker = ?
               AND quarter = ?
+              {excl_clause}
             GROUP BY fund_name, series_id
             ORDER BY value DESC NULLS LAST
             LIMIT {int(limit)}
-        """, like_patterns + [ticker, quarter]).fetchdf()
+        """, like_patterns + [ticker, quarter] + excl_params).fetchdf()
         rows = df_to_records(df)
         if not rows:
             return None
@@ -390,23 +444,25 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
     try:
         like_patterns = ['%' + p + '%' for p in patterns]
         ph = ','.join(['?'] * len(like_patterns))
+        excl_clause, excl_params = _build_excl_clause(patterns)
         df = con.execute(f"""
             SELECT
                 fund_name,
-                SUM(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) as q1_shares,
-                SUM(CASE WHEN quarter = '{LQ}' THEN shares_or_principal END) as q4_shares,
-                SUM(CASE WHEN quarter = '{LQ}' THEN market_value_usd END) as q4_value,
+                MAX(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) as q1_shares,
+                MAX(CASE WHEN quarter = '{LQ}' THEN shares_or_principal END) as q4_shares,
+                MAX(CASE WHEN quarter = '{LQ}' THEN market_value_usd END) as q4_value,
                 series_id
-            FROM fund_holdings
+            FROM fund_holdings fh
             WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE family_name ILIKE t.p)
               AND ticker = ?
               AND quarter IN ('{FQ}', '{LQ}')
+              {excl_clause}
             GROUP BY fund_name, series_id
-            HAVING SUM(CASE WHEN quarter = '{LQ}' THEN shares_or_principal END) IS NOT NULL
-                OR SUM(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) IS NOT NULL
+            HAVING MAX(CASE WHEN quarter = '{LQ}' THEN shares_or_principal END) IS NOT NULL
+                OR MAX(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) IS NOT NULL
             ORDER BY q4_value DESC NULLS LAST
             LIMIT {int(limit)}
-        """, like_patterns + [ticker]).fetchdf()
+        """, like_patterns + [ticker] + excl_params).fetchdf()
         rows = df_to_records(df)
         if not rows:
             return None
