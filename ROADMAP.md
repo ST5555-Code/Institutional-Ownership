@@ -211,6 +211,7 @@ _Last updated: April 3, 2026_
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | P4 | iShares Trust N-PORT | Done | Fetched 3 iShares entities (Trust, Inc, U.S. ETF Trust). +391K ETF holdings. BlackRock NVDA coverage: 6.4% → 42.5%. Fixed ETF exclusion filter in fetch_nport.py |
+| P5 | SPDR / State Street N-PORT | Done | Fetched 6 entities (SPDR Series Trust, Index Shares, Select Sector, SS Institutional, SSGA Funds, Navigator). +170K rows. State Street NVDA: 9% → 16.4%. Note: SPY is a UIT, exempt from N-PORT |
 
 ---
 
