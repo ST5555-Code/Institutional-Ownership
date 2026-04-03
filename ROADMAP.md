@@ -8,7 +8,9 @@ _Last updated: April 2, 2026_
 
 | # | Item | Notes |
 |---|------|-------|
-| P1 | Full 13D/G fetch — `fetch_13dg.py` | Phase 2 running, 55,173 filings, 4 workers, edgar library |
+| P1 | Full 13D/G fetch — `fetch_13dg.py` | 57,612 unparsed filings in listed_filings_13dg. Awaiting authorization to run Phase 2 |
+| P2 | `fetch_market.py` batch rewrite | Persistent yfinance cache, batch `yf.download()`, upsert-only. Code only |
+| P3 | `compute_flows.py` set-based rewrite | Replace per-ticker loop with window function SQL. Code only |
 
 ---
 
@@ -70,6 +72,16 @@ _Last updated: April 2, 2026_
 | 28 | Pyflakes cleanup — unused imports removed from 17 scripts | Done | 31 unused imports fixed |
 | 29 | SHOW TABLES removed from Flask endpoints — cached via `has_table()` | Done | 6 per-request queries replaced with startup-time cache |
 | 30 | Snapshot switchback monitor — background thread auto-recovers from snapshot | Done | 60s polling, logs switchover |
+| 31 | `queries.py` service layer — extract SQL from app.py route handlers | Done | 34 functions, 1,789 lines. app.py 2,362→618 lines |
+| 32 | `export.py` — extract Excel export logic from app.py | Done | `build_excel()` + style constants, 83 lines |
+| 33 | `run_pipeline.sh` hardened — process guard, timestamps, macOS notification | Done | pgrep check, phase start/end, osascript notify |
+| 34 | Global SEC rate limiter — 2 req/s across all workers, Retry-After parsing | Done | `_rate_limit()` with shared lock, Phase 2 workers reduced to 2 |
+| 35 | Phase 2 stall fix — reduced retry timeouts, per-future timeout | Done | Retry 3→2, sleep 10→5s, HTTP timeout 15→10s, fut.result(timeout=60) |
+| 36 | `--phase1-only`, `--phase2-only`, `--phase3-only` CLI flags | Done | Each phase independently runnable and resumable |
+| 37 | Crash handler on all fetch scripts | Done | db.crash_handler() writes traceback to logs/<script>_crash.log |
+| 38 | Test isolation — `--test` uses `13f_test.duckdb`, write guard | Done | `db.py` centralized, assert_write_safe() |
+| 39 | Bug 6 — fetch_market.py upsert, never drops table | Done | Unique index on ticker, delete-then-insert per batch |
+| 40 | Bug 7 — app.py snapshot switchback monitor | Done | Background thread, 60s poll, auto-switch + log |
 
 ---
 
@@ -100,15 +112,27 @@ _Last updated: April 2, 2026_
 | 2026-04-02 | `compute_flows.py` confirmed | investor_flows table populated; needs re-run after full 13D/G fetch |
 | 2026-04-02 | Pre-commit linting | `.pre-commit-config.yaml` with flake8, pylint, bandit hooks |
 | 2026-04-02 | Code review bug fixes | `update.py`: dynamic quarter via MAX(quarter), exit code enforcement. `app.py`: Query 2 join on (cik, manager_name) |
+| 2026-04-02 | queries.py service layer | 34 query functions extracted from app.py (1,789 lines). app.py reduced to 618 lines |
+| 2026-04-02 | export.py | `build_excel()` + Excel style constants extracted (83 lines) |
+| 2026-04-02 | run_pipeline.sh hardened | Process guard, phase timestamps, macOS desktop notification |
+| 2026-04-02 | Global rate limiter + Phase 2 stall fix | 2 req/s cap, Retry-After parsing, 2 workers for Phase 2, reduced timeouts |
+| 2026-04-02 | Phase CLI flags | `--phase1-only`, `--phase2-only`, `--phase3-only` for independent execution |
+| 2026-04-02 | Crash handlers | All 7 fetch scripts log to `logs/<script>_crash.log` on unhandled exception |
+| 2026-04-02 | Test isolation | `--test` uses `13f_test.duckdb` via `db.py`, write guard prevents production writes |
+| 2026-04-02 | Bug 6 + Bug 7 | fetch_market.py upsert (never drops), app.py snapshot switchback monitor |
+| 2026-04-02 | Pyflakes cleanup | 31 unused imports removed across 17 scripts |
+| 2026-04-02 | SHOW TABLES cached | 6 per-request queries replaced with `has_table()` at startup |
+| 2026-04-02 | Ruff + pre-commit config | Replaced flake8 with ruff, documented semgrep status |
 
 ---
 
 ## SEQUENCE — NEXT STEPS
 
-1. Full 13D/G fetch completes (Phase 2 running)
-2. Run `python3 scripts/compute_flows.py`
-3. `cp data/13f.duckdb data/13f_readonly.duckdb`
-4. Restart app — test Flow Analysis charts (item 11)
-5. Claude Code: Items 1, 3, 4 (amendment tracking, crossed 5% flag, intent change)
-6. Claude Code: Items 19, 20, 21, 22 (infrastructure — HIGH priority)
-7. App features: items 14-18 (short interest integration into tabs)
+1. Authorize full 13D/G Phase 2 run (57,612 unparsed filings)
+2. `fetch_market.py` batch rewrite (Item P2)
+3. `compute_flows.py` set-based rewrite (Item P3)
+4. Run `python3 scripts/compute_flows.py`
+5. `cp data/13f.duckdb data/13f_readonly.duckdb`
+6. Restart app — test Flow Analysis charts
+7. Items 1, 3, 4 (amendment tracking, crossed 5% flag, intent change)
+8. App features: items 14-18 (short interest integration into tabs)
