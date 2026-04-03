@@ -508,6 +508,80 @@ def api_peer_group_detail(group_id):
         con.close()
 
 
+@app.route('/api/crowding')
+def api_crowding():
+    """Crowding analysis: institutional concentration + short interest overlay."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    con = get_db()
+    try:
+        # Top holders by % of float
+        holders = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as holder,
+                   manager_type, SUM(pct_of_float) as pct_float,
+                   SUM(market_value_live) as value
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q4'
+            GROUP BY holder, manager_type
+            ORDER BY pct_float DESC NULLS LAST LIMIT 20
+        """, [ticker]).fetchdf()
+        result = {'holders': df_to_records(holders)}
+        # Short interest overlay
+        if has_table('short_interest'):
+            si = con.execute("""
+                SELECT report_date, short_volume, total_volume, short_pct
+                FROM short_interest WHERE ticker = ?
+                ORDER BY report_date DESC LIMIT 20
+            """, [ticker]).fetchdf()
+            result['short_history'] = df_to_records(si)
+        return jsonify(clean_for_json(result))
+    finally:
+        con.close()
+
+
+@app.route('/api/smart_money')
+def api_smart_money():
+    """Smart Money: net exposure view — long 13F vs short FINRA per manager type."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    con = get_db()
+    try:
+        # Long positions by manager type
+        longs = con.execute(f"""
+            SELECT manager_type, COUNT(DISTINCT cik) as holders,
+                   SUM(shares) as long_shares, SUM(market_value_live) as long_value
+            FROM holdings WHERE ticker = ? AND quarter = '2025Q4'
+            GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
+        """, [ticker]).fetchdf()
+        result = {'long_by_type': df_to_records(longs)}
+        # Latest short volume
+        if has_table('short_interest'):
+            si = con.execute("""
+                SELECT short_volume, total_volume, short_pct, report_date
+                FROM short_interest WHERE ticker = ?
+                ORDER BY report_date DESC LIMIT 1
+            """, [ticker]).fetchone()
+            if si:
+                result['short_volume'] = si[0]
+                result['short_pct'] = si[2]
+                result['short_date'] = str(si[3])
+        # N-PORT short positions for this ticker
+        if has_table('fund_holdings'):
+            nport_shorts = con.execute("""
+                SELECT fund_name, shares_or_principal as shares_short,
+                       market_value_usd as short_value, quarter
+                FROM fund_holdings
+                WHERE ticker = ? AND shares_or_principal < 0
+                  AND asset_category IN ('EC', 'EP')
+                ORDER BY market_value_usd ASC LIMIT 10
+            """, [ticker]).fetchdf()
+            result['nport_shorts'] = df_to_records(nport_shorts)
+        return jsonify(clean_for_json(result))
+    finally:
+        con.close()
+
+
 @app.route('/api/summary')
 def api_summary():
     ticker = request.args.get('ticker', '').upper().strip()

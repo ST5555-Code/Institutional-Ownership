@@ -880,6 +880,18 @@ def query3(ticker):
                         'subadviser_note': None,
                     })
 
+        # Item 14: Add short interest summary for this ticker
+        if has_table('short_interest') and results:
+            si = con.execute("""
+                SELECT short_volume, total_volume, short_pct
+                FROM short_interest WHERE ticker = ?
+                ORDER BY report_date DESC LIMIT 1
+            """, [ticker]).fetchone()
+            if si:
+                for row in results:
+                    if row.get('level', 0) == 0:
+                        row['short_pct'] = si[2]
+
         return results
     finally:
         con.close()
@@ -966,7 +978,10 @@ def query6(ticker):
                     latest_filing_date AS filing_date,
                     latest_filing_type AS filing_type,
                     days_since_filing,
-                    is_current
+                    is_current,
+                    crossed_5pct,
+                    prior_intent,
+                    amendment_count
                 FROM beneficial_ownership_current
                 WHERE subject_ticker = ? AND intent = 'activist'
                 ORDER BY latest_filing_date DESC
@@ -983,7 +998,10 @@ def query6(ticker):
                     latest_filing_date AS filing_date,
                     latest_filing_type AS filing_type,
                     days_since_filing,
-                    is_current
+                    is_current,
+                    crossed_5pct,
+                    prior_intent,
+                    amendment_count
                 FROM beneficial_ownership_current
                 WHERE subject_ticker = ? AND intent = 'passive'
                 ORDER BY pct_owned DESC NULLS LAST
@@ -1022,6 +1040,19 @@ def query6(ticker):
             ORDER BY manager_name, quarter
         """, [ticker]).fetchdf()
         sections['activist_13f'] = df_to_records(df_legacy)
+
+        # Item 17: Short interest context for activist analysis
+        if has_table('short_interest'):
+            si = con.execute("""
+                SELECT short_volume, total_volume, short_pct, report_date
+                FROM short_interest WHERE ticker = ?
+                ORDER BY report_date DESC LIMIT 1
+            """, [ticker]).fetchone()
+            if si:
+                sections['short_interest'] = {
+                    'short_volume': si[0], 'total_volume': si[1],
+                    'short_pct': si[2], 'date': str(si[3]),
+                }
 
         return sections
     finally:

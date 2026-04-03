@@ -156,7 +156,8 @@ def create_tables(con):
         filer_cik VARCHAR, filer_name VARCHAR, subject_ticker VARCHAR,
         subject_cusip VARCHAR, latest_filing_type VARCHAR, latest_filing_date DATE,
         pct_owned DOUBLE, shares_owned BIGINT, intent VARCHAR, crossing_date DATE,
-        days_since_filing INTEGER, is_current BOOLEAN, accession_number VARCHAR)""")
+        days_since_filing INTEGER, is_current BOOLEAN, accession_number VARCHAR,
+        crossed_5pct BOOLEAN, prior_intent VARCHAR, amendment_count INTEGER)""")
 
 def get_existing(con):
     try: return {r[0] for r in con.execute("SELECT accession_number FROM beneficial_ownership").fetchall()}
@@ -184,15 +185,37 @@ def rebuild_current(con):
     con.execute("DROP TABLE IF EXISTS beneficial_ownership_current")
     con.execute("""CREATE TABLE beneficial_ownership_current AS
         WITH ranked AS (
-            SELECT *, ROW_NUMBER() OVER (PARTITION BY filer_cik, subject_ticker ORDER BY filing_date DESC) as rn
-            FROM beneficial_ownership WHERE subject_ticker IS NOT NULL)
-        SELECT filer_cik, filer_name, subject_ticker, subject_cusip,
-            filing_type AS latest_filing_type, filing_date AS latest_filing_date,
-            pct_owned, shares_owned, intent, report_date AS crossing_date,
-            CAST(CURRENT_DATE - filing_date AS INTEGER) AS days_since_filing,
-            CASE WHEN filing_date >= CURRENT_DATE - INTERVAL '2 years' THEN TRUE ELSE FALSE END AS is_current,
-            accession_number
-        FROM ranked WHERE rn = 1""")
+            SELECT *,
+                ROW_NUMBER() OVER (PARTITION BY filer_cik, subject_ticker ORDER BY filing_date DESC) as rn,
+                -- Item 1: count amendments per filer+subject
+                COUNT(*) OVER (PARTITION BY filer_cik, subject_ticker) as amendment_count,
+                -- Item 4: previous intent (second-most-recent filing)
+                LAG(intent) OVER (PARTITION BY filer_cik, subject_ticker ORDER BY filing_date DESC) as next_older_intent
+            FROM beneficial_ownership WHERE subject_ticker IS NOT NULL
+        ),
+        -- Item 3: first 13G filing per filer+subject = first time crossing 5%
+        first_13g AS (
+            SELECT filer_cik, subject_ticker,
+                MIN(filing_date) as first_13g_date
+            FROM beneficial_ownership
+            WHERE subject_ticker IS NOT NULL AND filing_type LIKE 'SC 13G%'
+            GROUP BY filer_cik, subject_ticker
+        )
+        SELECT r.filer_cik, r.filer_name, r.subject_ticker, r.subject_cusip,
+            r.filing_type AS latest_filing_type, r.filing_date AS latest_filing_date,
+            r.pct_owned, r.shares_owned, r.intent, r.report_date AS crossing_date,
+            CAST(CURRENT_DATE - r.filing_date AS INTEGER) AS days_since_filing,
+            CASE WHEN r.filing_date >= CURRENT_DATE - INTERVAL '2 years' THEN TRUE ELSE FALSE END AS is_current,
+            r.accession_number,
+            -- Item 3: crossed 5% if there's any 13G filing for this pair
+            g.first_13g_date IS NOT NULL AS crossed_5pct,
+            -- Item 4: prior intent from the second-most-recent filing
+            r.next_older_intent AS prior_intent,
+            -- Item 1: amendment count (1 = original only, 2+ = has amendments)
+            r.amendment_count
+        FROM ranked r
+        LEFT JOIN first_13g g ON r.filer_cik = g.filer_cik AND r.subject_ticker = g.subject_ticker
+        WHERE r.rn = 1""")
     cnt = con.execute("SELECT COUNT(*) FROM beneficial_ownership_current").fetchone()[0]
     print(f"\n  beneficial_ownership_current rebuilt: {cnt} rows")
 

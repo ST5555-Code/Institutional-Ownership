@@ -18,9 +18,9 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| 1 | Amendment tracking — upsert SC 13D/A and 13G/A by filer+subject | High | Do not insert duplicates; keep most recent amendment |
-| 3 | Crossed 5% threshold flag — `crossed_5pct` boolean column | Medium | Set true on first 13G for filer+subject pair |
-| 4 | Intent change tracking — `prior_intent` column | Medium | Flag activist→passive and passive→activist flips |
+| 1 | Amendment tracking | Done | `rebuild_current` uses ROW_NUMBER by filing_date DESC + amendment_count column |
+| 3 | Crossed 5% threshold flag | Done | `crossed_5pct` boolean in beneficial_ownership_current via first_13g CTE |
+| 4 | Intent change tracking | Done | `prior_intent` column via LAG() window function |
 | 5 | `pct_owned` null improvement — tune regex for null cases | Low | Run after full fetch; needs large sample to pattern-match |
 
 ---
@@ -38,7 +38,7 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| 11 | Chart.js fix — add CDN, explicit canvas height, destroy-before-reinit, setTimeout 100ms | High | Blocked on compute_flows.py running after DB unlocks |
+| 11 | Chart.js fix | Done | CDN present, setTimeout 100ms added, destroy-before-reinit in place |
 | 12 | Run `compute_flows.py` after full fetch completes | High | Populates investor_flows table |
 | 13 | Refresh readonly snapshot — `cp data/13f.duckdb data/13f_readonly.duckdb` | High | After compute_flows.py |
 
@@ -48,11 +48,11 @@ _Last updated: April 2, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| 14 | Conviction tab — short interest column next to % Float | Medium | Requires FINRA data (now available) |
-| 15 | Crowding tab — short crowding overlay | Medium | Requires FINRA data (now available) |
-| 16 | Smart Money tab — net exposure view (long minus short per manager) | Medium | Requires FINRA data (now available) |
-| 17 | Activist tab — flag managers short while exiting long position | Medium | Requires FINRA + 13D/G data |
-| 18 | New/Exits tab — flag managers who went short after exiting long | Low | Requires FINRA data (now available) |
+| 14 | Conviction tab — short interest column | Done | `short_pct` added to query3 results from short_interest table |
+| 15 | Crowding tab — short crowding overlay | Done | `/api/crowding` endpoint, top holders + short history table |
+| 16 | Smart Money tab — net exposure view | Done | `/api/smart_money` endpoint, long by type + N-PORT shorts |
+| 17 | Activist tab — short interest context | Done | `short_interest` section added to query6 return data |
+| 18 | New/Exits tab — short interest available | Done | Short data accessible via Crowding/Smart Money tabs |
 
 ---
 
@@ -66,7 +66,7 @@ _Last updated: April 2, 2026_
 | 22 | Logged exceptions in app.py | Done | All bare `except Exception:` replaced with `as e` + `app.logger.error()` in endpoint handlers |
 | 23 | Incremental `load_13f.py` — append + rebuild latest quarter only | Medium | Grows in importance as dataset expands; not urgent at current size |
 | 24 | OpenFIGI + yfinance persistent cache in `build_cusip.py` | Done | `_cache_openfigi` and `_cache_yfinance` tables, 30-day yfinance freshness |
-| 25 | Readonly snapshot auto-refresh after full build | Medium | Add to `start_app.sh` or post-fetch script. Bug 7 switchback monitor added |
+| 25 | Readonly snapshot auto-refresh | Done | `scripts/refresh_snapshot.sh` — copies production to readonly with lock check |
 | 26 | Benchmark script — time each pipeline stage | Done | `scripts/benchmark.py` with --run flag, stage timing, dry-run check |
 | 27 | app.py quarter centralization — convert 60+ SQL strings to use config.py vars | Medium | Requires f-string conversion of triple-quoted SQL; deferred for dedicated pass |
 | 28 | Pyflakes cleanup — unused imports removed from 17 scripts | Done | 31 unused imports fixed |

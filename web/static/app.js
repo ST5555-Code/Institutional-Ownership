@@ -261,7 +261,11 @@ function switchTab(tabId) {
         loadNewExits();
     } else if (tabId === 'activist') {
         loadActivistTab();
-    } else if (tabId === 'crowding' || tabId === 'smart-money' || tabId === 'peer-matrix') {
+    } else if (tabId === 'crowding') {
+        loadCrowding();
+    } else if (tabId === 'smart-money') {
+        loadSmartMoney();
+    } else if (tabId === 'peer-matrix') {
         renderPlaceholder(tabId);
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
@@ -797,8 +801,77 @@ function renderTableFromKeys(data, keys) {
 function renderPlaceholder(tabId) {
     hideSpinner();
     clearError();
-    const names = {'crowding': 'Crowding', 'smart-money': 'Smart Money', 'peer-matrix': 'Peer Matrix'};
-    tableWrap.innerHTML = `<div class="empty-state" style="padding:48px"><p>${names[tabId] || tabId} — Coming soon, building in next session.</p></div>`;
+    const names = {'peer-matrix': 'Peer Matrix'};
+    tableWrap.innerHTML = `<div class="empty-state" style="padding:48px"><p>${names[tabId] || tabId} — Coming soon.</p></div>`;
+}
+
+async function loadCrowding() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch(`/api/crowding?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+        const wrap = tableWrap;
+        // Top holders by % float
+        if (data.holders && data.holders.length) {
+            wrap.appendChild(sectionHeader('Top Holders by % of Float'));
+            wrap.appendChild(buildSimpleTable(data.holders, [
+                {key: 'holder', label: 'Holder', type: 'text'},
+                {key: 'manager_type', label: 'Type', type: 'text'},
+                {key: 'pct_float', label: '% Float', type: 'pct'},
+                {key: 'value', label: 'Value', type: 'dollar'},
+            ]));
+        }
+        // Short interest history
+        if (data.short_history && data.short_history.length) {
+            wrap.appendChild(sectionHeader('Daily Short Sale Volume'));
+            wrap.appendChild(buildSimpleTable(data.short_history, [
+                {key: 'report_date', label: 'Date', type: 'text'},
+                {key: 'short_volume', label: 'Short Vol', type: 'shares'},
+                {key: 'total_volume', label: 'Total Vol', type: 'shares'},
+                {key: 'short_pct', label: 'Short %', type: 'pct'},
+            ]));
+        }
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+async function loadSmartMoney() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch(`/api/smart_money?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+        const wrap = tableWrap;
+        // Summary
+        if (data.short_pct != null) {
+            const summary = document.createElement('div');
+            summary.style.cssText = 'padding:12px;background:#f8f9fa;border-radius:6px;margin-bottom:16px;font-size:13px;';
+            summary.innerHTML = `<b>Short Volume:</b> ${(data.short_pct || 0).toFixed(1)}% of daily volume (${data.short_date || ''})`;
+            wrap.appendChild(summary);
+        }
+        // Long positions by type
+        if (data.long_by_type && data.long_by_type.length) {
+            wrap.appendChild(sectionHeader('Long Positions by Manager Type'));
+            wrap.appendChild(buildSimpleTable(data.long_by_type, [
+                {key: 'manager_type', label: 'Type', type: 'text'},
+                {key: 'holders', label: 'Holders', type: 'num'},
+                {key: 'long_shares', label: 'Long Shares', type: 'shares'},
+                {key: 'long_value', label: 'Long Value', type: 'dollar'},
+            ]));
+        }
+        // N-PORT short positions
+        if (data.nport_shorts && data.nport_shorts.length) {
+            wrap.appendChild(sectionHeader('Fund Short Positions (N-PORT)'));
+            wrap.appendChild(buildSimpleTable(data.nport_shorts, [
+                {key: 'fund_name', label: 'Fund', type: 'text'},
+                {key: 'shares_short', label: 'Shares Short', type: 'shares'},
+                {key: 'short_value', label: 'Short Value', type: 'dollar'},
+                {key: 'quarter', label: 'Quarter', type: 'text'},
+            ]));
+        }
+    } catch (e) { hideSpinner(); showError(e.message); }
 }
 
 // ---------------------------------------------------------------------------
