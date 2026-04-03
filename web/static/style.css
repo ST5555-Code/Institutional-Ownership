@@ -988,3 +988,27 @@ body {
     color: var(--oxford-blue);
     font-variant-numeric: tabular-nums;
 }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    .tab-bar { flex-wrap: wrap; gap: 2px; }
+    .tab { font-size: 11px; padding: 6px 8px; }
+    .data-table { font-size: 11px; }
+    .data-table th, .data-table td { padding: 4px 6px; }
+    .cross-ownership-panel { padding: 8px; }
+    .co-ticker-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Table scroll wrapper for mobile */
+#results-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Loading state: fade old data while loading new */
+#results-table-wrap.loading {
+    opacity: 0.4;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}

@@ -123,6 +123,51 @@
             <div id="add-result"></div>
         </div>
 
+        <!-- Data Quality -->
+        <div class="card">
+            <h2>Data Quality</h2>
+            <div class="grid" id="dq-stats">
+                <div class="stat"><div class="value" id="dq-ticker-pct">—</div><div class="label">Ticker Coverage %</div></div>
+                <div class="stat"><div class="value" id="dq-live-pct">—</div><div class="label">Live Value Coverage %</div></div>
+                <div class="stat"><div class="value" id="dq-bo-pct">—</div><div class="label">13D/G pct_owned Coverage %</div></div>
+                <div class="stat"><div class="value" id="dq-errors">—</div><div class="label">Fetch Errors</div></div>
+            </div>
+        </div>
+
+        <!-- Manager & Ticker Changes -->
+        <div class="card">
+            <h2>Quarter-over-Quarter Changes</h2>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="flex:1;min-width:250px">
+                    <h3 style="font-size:13px;color:#27AE60;margin-bottom:8px">New Managers</h3>
+                    <div id="new-managers" style="font-size:12px;max-height:150px;overflow-y:auto">Loading...</div>
+                </div>
+                <div style="flex:1;min-width:250px">
+                    <h3 style="font-size:13px;color:#E74C3C;margin-bottom:8px">Disappeared Managers</h3>
+                    <div id="gone-managers" style="font-size:12px;max-height:150px;overflow-y:auto">Loading...</div>
+                </div>
+                <div style="flex:1;min-width:250px">
+                    <h3 style="font-size:13px;color:#002147;margin-bottom:8px">New Tickers</h3>
+                    <div id="new-tickers" style="font-size:12px;max-height:150px;overflow-y:auto">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merger Signals -->
+        <div class="card">
+            <h2>Merger Signals & New Companies</h2>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="flex:1;min-width:300px">
+                    <h3 style="font-size:13px;margin-bottom:8px">Potential Mergers (large CIKs disappeared)</h3>
+                    <div id="merger-signals" style="font-size:12px;max-height:150px;overflow-y:auto">Loading...</div>
+                </div>
+                <div style="flex:1;min-width:300px">
+                    <h3 style="font-size:13px;margin-bottom:8px">New Companies (>$10M institutional)</h3>
+                    <div id="new-companies" style="font-size:12px;max-height:150px;overflow-y:auto">Loading...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Recent Errors -->
         <div class="card">
             <h2>Recent Errors</h2>
@@ -266,11 +311,68 @@
         } catch (e) {}
     }
 
+    async function loadDataQuality() {
+        try {
+            const res = await fetch('/api/admin/data_quality');
+            const d = await res.json();
+            if (d.holdings) {
+                document.getElementById('dq-ticker-pct').textContent = (d.holdings.ticker_pct || 0) + '%';
+                document.getElementById('dq-live-pct').textContent = (d.holdings.live_value_pct || 0) + '%';
+            }
+            if (d.beneficial_ownership) {
+                document.getElementById('dq-bo-pct').textContent = (d.beneficial_ownership.pct_coverage || 0) + '%';
+            }
+            document.getElementById('dq-errors').textContent = d.fetch_errors || 0;
+        } catch (e) {}
+    }
+
+    async function loadChanges() {
+        try {
+            const res = await fetch('/api/admin/manager_changes');
+            const d = await res.json();
+            const newEl = document.getElementById('new-managers');
+            const goneEl = document.getElementById('gone-managers');
+            newEl.innerHTML = (d.new_managers || []).slice(0, 10).map(m =>
+                `<div>${m.manager_name} <span style="color:#999">(${m.manager_type})</span></div>`
+            ).join('') || 'None';
+            goneEl.innerHTML = (d.disappeared_managers || []).slice(0, 10).map(m =>
+                `<div>${m.manager_name} <span style="color:#999">(${m.manager_type})</span></div>`
+            ).join('') || 'None';
+        } catch (e) {}
+        try {
+            const res = await fetch('/api/admin/ticker_changes');
+            const d = await res.json();
+            document.getElementById('new-tickers').innerHTML = (d.new_tickers || []).slice(0, 15).map(t =>
+                `<div><b>${t.ticker}</b> ${t.company || ''}</div>`
+            ).join('') || 'None';
+        } catch (e) {}
+    }
+
+    async function loadSignals() {
+        try {
+            const res = await fetch('/api/admin/merger_signals');
+            const d = await res.json();
+            document.getElementById('merger-signals').innerHTML = (d.potential_mergers || []).slice(0, 5).map(m =>
+                `<div>${m.manager_name} — $${(m.prev_value/1e9).toFixed(1)}B</div>`
+            ).join('') || 'None detected';
+        } catch (e) {}
+        try {
+            const res = await fetch('/api/admin/new_companies');
+            const d = await res.json();
+            document.getElementById('new-companies').innerHTML = (d.new_companies || []).slice(0, 10).map(c =>
+                `<div><b>${c.ticker}</b> ${c.company || ''} — ${c.holder_count} holders</div>`
+            ).join('') || 'None';
+        } catch (e) {}
+    }
+
     // Auto-refresh
     loadStats();
     loadProgress();
     loadErrors();
     loadRunning();
+    loadDataQuality();
+    loadChanges();
+    loadSignals();
     setInterval(loadStats, 30000);
     setInterval(loadProgress, 10000);
     setInterval(loadErrors, 60000);

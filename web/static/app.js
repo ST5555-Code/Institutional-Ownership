@@ -12,6 +12,7 @@ let currentQuery = 1;         // legacy query number for old endpoints
 let currentData = [];         // raw JSON from last query
 let sortCol = null;
 let sortDir = 'asc';
+const _sortState = {};  // per-tab sort state: tabId → {col, dir}
 let autocompleteIdx = -1;     // keyboard selection index
 
 // ---------------------------------------------------------------------------
@@ -238,10 +239,14 @@ const TAB_QUERY_MAP = {
 };
 
 function switchTab(tabId) {
+    // Save current sort state
+    if (currentTab) _sortState[currentTab] = {col: sortCol, dir: sortDir};
     currentTab = tabId;
     currentQuery = TAB_QUERY_MAP[tabId] || 0;
-    sortCol = null;
-    sortDir = 'asc';
+    // Restore sort state for this tab (or reset)
+    const saved = _sortState[tabId];
+    sortCol = saved ? saved.col : null;
+    sortDir = saved ? saved.dir : 'asc';
     // Hide all special panels
     managerSelector.classList.add('hidden');
     coPanel.classList.add('hidden');
@@ -288,7 +293,7 @@ let _lastExtraParams = {};
 async function loadQuery(qnum, extraParams) {
     showSpinner();
     clearError();
-    tableWrap.innerHTML = '';
+    tableWrap.classList.add('loading');
     _lastExtraParams = extraParams || {};
 
     const params = new URLSearchParams();
@@ -304,14 +309,28 @@ async function loadQuery(qnum, extraParams) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || `HTTP ${res.status}`);
         }
-        const raw = await res.json();
+        let raw;
+        try {
+            raw = await res.json();
+        } catch (parseErr) {
+            throw new Error('Invalid response from server — could not parse JSON');
+        }
         hideSpinner();
+        tableWrap.classList.remove('loading');
+        tableWrap.innerHTML = '';
+
+        // Validate response shape
+        if (raw === null || raw === undefined) {
+            throw new Error('Empty response from server');
+        }
+        if (raw.error) {
+            throw new Error(raw.error);
+        }
 
         if (qnum === 15) {
             currentData = raw;
             renderStats(raw);
         } else if (qnum === 7) {
-            // Q7 returns {stats, positions}
             currentData = raw.positions || [];
             renderQuery7(raw);
         } else {
@@ -320,6 +339,7 @@ async function loadQuery(qnum, extraParams) {
         }
     } catch (e) {
         hideSpinner();
+        tableWrap.classList.remove('loading');
         showError(e.message);
     }
 }
@@ -539,26 +559,63 @@ function findNameKey(cols) {
     return nameCol ? nameCol.key : null;
 }
 
+const PAGE_SIZE = 50;
+let _currentPage = 0;
+let _fullData = [];
+let _currentQnum = 0;
+
 function renderTable(data, qnum) {
     if (!data || !data.length) {
         tableWrap.innerHTML = '<div class="error-msg">No data available.</div>';
         return;
     }
 
+    _fullData = data;
+    _currentQnum = qnum;
+    _currentPage = 0;
+    _renderCurrentPage();
+}
+
+function _renderCurrentPage() {
+    const data = _fullData;
+    const qnum = _currentQnum;
+    const totalPages = Math.ceil(data.length / PAGE_SIZE);
+    const start = _currentPage * PAGE_SIZE;
+    const pageData = data.length > PAGE_SIZE ? data.slice(start, start + PAGE_SIZE) : data;
+
     const cols = QUERY_COLUMNS[qnum];
     if (!cols) {
         const keys = Object.keys(data[0]).filter(k => !k.startsWith('_'));
-        return renderTableFromKeys(data, keys);
+        renderTableFromKeys(pageData, keys);
+    } else {
+        const hasHierarchy = pageData.some(r => r.level === 1 || r.is_parent === true);
+        const hasSections = pageData.some(r => r.section != null);
+        const collapsible = hasHierarchy && (qnum === 1 || qnum === 2 || qnum === 3);
+        renderHierarchicalTable(pageData, cols, qnum, hasHierarchy, hasSections, collapsible);
     }
 
-    // Detect hierarchy: data has level/is_parent fields
-    const hasHierarchy = data.some(r => r.level === 1 || r.is_parent === true);
-    // Detect sections (Query 2 entries/exits)
-    const hasSections = data.some(r => r.section != null);
-    // Collapsible hierarchy for Q1 and Q2
-    const collapsible = hasHierarchy && (qnum === 1 || qnum === 2 || qnum === 3);
-
-    renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, collapsible);
+    // Pagination controls
+    if (totalPages > 1) {
+        const nav = document.createElement('div');
+        nav.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:8px;padding:12px;font-size:13px;';
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Prev';
+        prevBtn.className = 'co-view-btn';
+        prevBtn.disabled = _currentPage === 0;
+        prevBtn.addEventListener('click', () => { _currentPage--; _renderCurrentPage(); });
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Next →';
+        nextBtn.className = 'co-view-btn';
+        nextBtn.disabled = _currentPage >= totalPages - 1;
+        nextBtn.addEventListener('click', () => { _currentPage++; _renderCurrentPage(); });
+        const info = document.createElement('span');
+        info.style.color = '#666';
+        info.textContent = `Page ${_currentPage + 1} of ${totalPages} (${data.length} rows)`;
+        nav.appendChild(prevBtn);
+        nav.appendChild(info);
+        nav.appendChild(nextBtn);
+        tableWrap.appendChild(nav);
+    }
 }
 
 /**
