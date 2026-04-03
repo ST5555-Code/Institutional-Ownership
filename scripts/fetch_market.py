@@ -19,7 +19,7 @@ import yfinance as yf
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import set_staging_mode, get_db_path, crash_handler
+from db import set_staging_mode, is_staging_mode, get_db_path, connect_read, crash_handler
 from config import QUARTER_SNAPSHOT_DATES as SNAPSHOT_DATES, LATEST_QUARTER
 
 
@@ -243,7 +243,13 @@ def main():
 
     con = duckdb.connect(get_db_path())
 
-    all_tickers = get_tickers(con)
+    # In staging mode, read tickers from production (holdings only exists there)
+    if is_staging_mode():
+        read_con = connect_read()
+        all_tickers = get_tickers(read_con)
+        read_con.close()
+    else:
+        all_tickers = get_tickers(con)
     print(f"  Total tickers: {len(all_tickers):,}")
 
     tickers = get_stale_tickers(con, all_tickers)
@@ -272,8 +278,11 @@ def main():
     fetch_snapshot_prices(con, fetched_tickers)
     con.execute("CHECKPOINT")
 
-    # Update holdings
-    update_holdings(con)
+    # Update holdings (skip in staging — holdings only exists in production)
+    if not is_staging_mode():
+        update_holdings(con)
+    else:
+        print("  Staging mode: skipping holdings update (run after merge)")
     con.close()
     print("\nDone.")
 
