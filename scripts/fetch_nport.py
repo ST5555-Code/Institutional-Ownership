@@ -297,12 +297,15 @@ def parse_nport_xml(xml_bytes):
     return metadata, holdings
 
 
+_include_index = False  # set via --include-index flag
+
+
 def classify_fund(metadata, holdings):
     """Classify a fund. Returns (is_active_equity, fund_category, is_actively_managed)."""
     series_name = (metadata.get("series_name") or metadata.get("reg_name") or "").strip()
 
-    # Exclusions
-    if INDEX_PATTERNS.search(series_name):
+    # Exclusions (skip index/ETF filter when --include-index is active)
+    if not _include_index and INDEX_PATTERNS.search(series_name):
         return False, "index", False
     if EXCLUDE_PATTERNS.search(series_name):
         return False, "excluded", False
@@ -801,10 +804,15 @@ def main():
     parser.add_argument("--fund", help="Single fund by name or CIK")
     parser.add_argument("--test", action="store_true", help="Test mode: 5 funds only")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--include-index", action="store_true", help="Include index/ETF funds (normally excluded)")
     args = parser.parse_args()
 
     if args.staging:
         set_staging_mode(True)
+    if args.include_index:
+        global _include_index
+        _include_index = True
+        print("  Including index/ETF funds in this run")
 
     print("=" * 60)
     print("FETCH N-PORT — Mutual Fund Holdings")

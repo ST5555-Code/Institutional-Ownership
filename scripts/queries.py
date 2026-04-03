@@ -59,25 +59,6 @@ def has_table(name):
     return _has_table(name)
 
 
-SUBADVISER_NOTES = {
-    'wellington': 'Subadviser \u2014 fund-level holdings filed under client fund companies (Hartford, Vanguard Windsor, John Hancock, MassMutual)',
-    'dodge': 'Primarily manages separate accounts \u2014 limited registered fund filings',
-    'capital group': 'American Funds filed under separate CIKs \u2014 may not match via family name',
-    'causeway': 'Subadviser \u2014 files under client fund companies',
-    'harris': 'Oakmark funds filed under Harris Associates \u2014 check Oakmark family',
-    'southeastern': 'Longleaf Partners \u2014 filed under Southeastern Asset Management',
-    'grantham': 'GMO \u2014 primarily institutional separate accounts, limited N-PORT',
-    'pzena': 'Primarily separate accounts \u2014 limited registered fund filings',
-    'hotchkis': 'Primarily separate accounts \u2014 limited registered fund filings',
-    'sanders': 'Primarily separate accounts',
-    'numeric': 'Subadviser \u2014 quantitative, files under client fund companies',
-    'intech': 'Subadviser \u2014 files under client fund companies',
-    'acadian': 'Primarily separate accounts and subadvised mandates',
-    'epoch': 'Subadviser \u2014 files under client fund companies',
-    'martin currie': 'Subadviser \u2014 files under client fund companies',
-    'manning': 'Primarily separate accounts',
-}
-
 
 def get_cusip(con, ticker):
     """Resolve ticker to CUSIP."""
@@ -208,6 +189,31 @@ def get_nport_coverage(ticker, quarter, con):
 # ---------------------------------------------------------------------------
 # Subadviser notes — explains why some managers show 13F instead of N-PORT
 # ---------------------------------------------------------------------------
+
+
+# Known 13F entities that do not file N-PORT — shown as fund-equivalent with footnotes
+_13F_ENTITY_NOTES = {
+    'fiam': 'Institutional separate accounts \u2014 pension funds, endowments. No N-PORT.',
+    'fidelity management trust': '401(k) and retirement plan trust. No N-PORT.',
+    'strategic advisers': 'Multi-manager advisory arm. No N-PORT.',
+    'fidelity diversifying': 'Alternative strategies. No N-PORT.',
+    'blackrock fund advisors': 'iShares ETF management. Not in N-PORT scrape.',
+    'blackrock institutional trust': 'Institutional index/trust products. No N-PORT.',
+    'ssga funds management': 'State Street index management. No N-PORT as separate entity.',
+    'geode capital': 'Index fund subadviser for Fidelity. Files under Fidelity fund trusts.',
+}
+
+
+def _13f_entity_footnote(entity_name):
+    """Return footnote for known 13F entities that don't file N-PORT, or None."""
+    if not entity_name:
+        return None
+    name_lower = entity_name.lower()
+    for pattern, note in _13F_ENTITY_NOTES.items():
+        if pattern in name_lower:
+            return note
+    return None
+
 
 SUBADVISER_NOTES = {
     'wellington': 'Subadviser \u2014 fund-level holdings filed under client fund companies (Hartford, Vanguard Windsor, John Hancock, MassMutual)',
@@ -938,13 +944,46 @@ def query3(ticker):
                 row['pct_change'] = None
                 row['price_adj_flow'] = None
 
-            # N-PORT fund-level children: show individual fund series under parent
+            # N-PORT fund-level children + 13F entity fallback
             nport_children = nport_by_parent.get(parent, [])
-            if nport_children:
-                row['source'] = 'N-PORT'
+
+            # 13F entities that don't file N-PORT — show as fund-equivalent
+            entity_children = []
+            if has_table('holdings'):
+                try:
+                    entities = con.execute(f"""
+                        SELECT fund_name, SUM(shares) as shares, SUM(market_value_live) as value
+                        FROM holdings
+                        WHERE COALESCE(inst_parent_name, manager_name) = ?
+                          AND ticker = ? AND quarter = '{LQ}'
+                          AND fund_name NOT IN (
+                              SELECT DISTINCT manager_name FROM holdings
+                              WHERE COALESCE(inst_parent_name, manager_name) = ?
+                                AND ticker = ? AND quarter = '{LQ}'
+                              LIMIT 1
+                          )
+                        GROUP BY fund_name
+                        HAVING SUM(market_value_live) > 0
+                        ORDER BY value DESC LIMIT 5
+                    """, [parent, ticker, parent, ticker]).fetchall()
+                    for e in entities:
+                        # Check if this entity name is already covered by N-PORT
+                        if not any(e[0].lower() in c['fund_name'].lower() for c in nport_children):
+                            note = _13f_entity_footnote(e[0])
+                            if note:  # only include entities we can explain
+                                entity_children.append({
+                                    'fund_name': e[0], 'shares': e[1],
+                                    'value': e[2], 'note': note,
+                                })
+                except Exception:
+                    pass
+
+            all_children = nport_children + entity_children
+            if all_children:
+                row['source'] = 'N-PORT' if nport_children else '13F'
                 row['subadviser_note'] = None
                 row['is_parent'] = True
-                row['child_count'] = len(nport_children)
+                row['child_count'] = len(all_children)
             else:
                 row['source'] = '13F estimate'
                 row['subadviser_note'] = get_subadviser_note(parent)
@@ -969,6 +1008,21 @@ def query3(ticker):
                     'direction': None, 'since': None, 'held_label': None,
                     'is_parent': False, 'child_count': 0, 'level': 1,
                     'subadviser_note': None,
+                })
+            for c in entity_children:
+                results.append({
+                    'manager_name': c['fund_name'],
+                    'institution': c['fund_name'],
+                    'position_value': c['value'],
+                    'shares': c['shares'],
+                    'pct_of_portfolio': None,
+                    'pct_of_float': None,
+                    'mktcap_percentile': None,
+                    'manager_type': row.get('manager_type'),
+                    'source': '13F entity',
+                    'direction': None, 'since': None, 'held_label': None,
+                    'is_parent': False, 'child_count': 0, 'level': 1,
+                    'subadviser_note': c.get('note'),
                 })
 
         # Item 14: Add short interest summary for this ticker
