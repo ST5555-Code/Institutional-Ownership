@@ -127,6 +127,20 @@ _Last updated: April 2, 2026_
 
 ---
 
+## FUTURE — Data Integrity & On-Demand Updates
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| D1 | On-demand single-ticker add — `/api/add_ticker?ticker=XYZ` | High | User inputs a new IPO ticker → system fetches CUSIP (OpenFIGI), market data (yfinance), 13D/G filings (edgar), and any N-PORT holdings. Adds to all tables immediately. No quarterly wait. |
+| D2 | Manager change detection — quarterly diff of managers table | High | Flag new CIKs, disappeared CIKs, name changes (fuzzy match old→new). Surface in admin UI for review. |
+| D3 | Ticker change tracker — detect renames, CUSIP changes | High | Compare securities table across quarters. Cross-reference SEC company_tickers.json. Flag CUSIP→ticker changes (FB→META). |
+| D4 | Parent mapping refresh — re-run seed matching each quarter | Medium | Re-match parent_bridge against ADV data. Log new parent assignments, broken links, orphaned CIKs. |
+| D5 | Stale data cleanup — flag and optionally remove dead data | Medium | Tickers with no market data >30 days, managers with no filings >4 quarters, delisted securities. |
+| D6 | Merger/acquisition tracker — detect when two managers merge | Medium | When a CIK stops filing and another CIK's holdings jump, flag as potential merger. Link old→new CIK. |
+| D7 | New company alerts — surface recent IPOs with institutional interest | Low | Cross-reference SEC company_tickers.json weekly for new entries. Show which funds are accumulating. |
+
+---
+
 ## FUTURE — Admin UI (all pipeline operations via web interface)
 
 | # | Item | Priority | Notes |
