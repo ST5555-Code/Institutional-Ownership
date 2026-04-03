@@ -30,7 +30,7 @@ from lxml import etree
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, set_staging_mode, crash_handler
+from db import get_db_path, set_staging_mode, is_staging_mode, crash_handler
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
@@ -304,10 +304,10 @@ def classify_fund(metadata, holdings):
     """Classify a fund. Returns (is_active_equity, fund_category, is_actively_managed)."""
     series_name = (metadata.get("series_name") or metadata.get("reg_name") or "").strip()
 
-    # Exclusions (skip index/ETF filter when --include-index is active)
+    # Exclusions (skip index AND ETF filters when --include-index is active)
     if not _include_index and INDEX_PATTERNS.search(series_name):
         return False, "index", False
-    if EXCLUDE_PATTERNS.search(series_name):
+    if not _include_index and EXCLUDE_PATTERNS.search(series_name):
         return False, "excluded", False
     if metadata.get("is_final") == "Y":
         return False, "final_filing", False
@@ -530,6 +530,9 @@ def update_fund_universe(con, metadata, holdings, fund_category):
 
 def enrich_tickers(con):
     """Join fund_holdings to securities table to fill missing tickers."""
+    if is_staging_mode():
+        print("  Staging mode: skipping ticker enrichment (run after merge)")
+        return
     con.execute("""
         UPDATE fund_holdings
         SET ticker = s.ticker
