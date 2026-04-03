@@ -5,10 +5,13 @@ All database queries are defined here. Route handlers in app.py
 import and call these functions — no raw SQL in app.py.
 """
 
+import logging
 import math
 import pandas as pd
 import duckdb
 from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
+
+logger = logging.getLogger(__name__)
 
 LQ = LATEST_QUARTER
 FQ = FIRST_QUARTER
@@ -142,9 +145,8 @@ def get_nport_position(family_patterns, ticker, quarter, con):
     if not family_patterns:
         return None
     try:
-        conditions = ' OR '.join(
-            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in family_patterns
-        )
+        like_patterns = ['%' + p + '%' for p in family_patterns]
+        placeholders = ','.join(['?'] * len(like_patterns))
         result = con.execute(f"""
             SELECT
                 SUM(market_value_usd) as total_value,
@@ -152,10 +154,10 @@ def get_nport_position(family_patterns, ticker, quarter, con):
                 AVG(pct_of_nav) as avg_pct_nav,
                 COUNT(DISTINCT series_id) as fund_count
             FROM fund_holdings
-            WHERE ({conditions})
+            WHERE EXISTS (SELECT 1 FROM UNNEST([{placeholders}]) t(p) WHERE family_name ILIKE t.p)
             AND ticker = ?
             AND quarter = ?
-        """, [ticker, quarter]).fetchone()
+        """, like_patterns + [ticker, quarter]).fetchone()
         if result and result[0]:
             return {
                 'nport_value': float(result[0]),
@@ -165,7 +167,7 @@ def get_nport_position(family_patterns, ticker, quarter, con):
                 'source': 'N-PORT',
             }
     except Exception as e:
-        app.logger.error(f"[get_nport_coverage] {e}", exc_info=True)
+        logger.error(f"[get_nport_coverage] {e}", exc_info=True)
     return None
 
 
@@ -182,7 +184,7 @@ def get_nport_coverage(ticker, quarter, con):
         if result and result[0]:
             return {'nport_total_value': float(result[0]), 'nport_fund_count': int(result[1])}
     except Exception as e:
-        app.logger.error(f"[get_nport_total] {e}", exc_info=True)
+        logger.error(f"[get_nport_total] {e}", exc_info=True)
     return {'nport_total_value': None, 'nport_fund_count': 0}
 
 
@@ -232,9 +234,8 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
     if not patterns:
         return None
     try:
-        conds = ' OR '.join(
-            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in patterns
-        )
+        like_patterns = ['%' + p + '%' for p in patterns]
+        ph = ','.join(['?'] * len(like_patterns))
         df = con.execute(f"""
             SELECT
                 fund_name,
@@ -243,13 +244,13 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
                 AVG(pct_of_nav) as pct_of_nav,
                 series_id
             FROM fund_holdings
-            WHERE ({conds})
+            WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE family_name ILIKE t.p)
               AND ticker = ?
               AND quarter = ?
             GROUP BY fund_name, series_id
             ORDER BY value DESC NULLS LAST
             LIMIT {int(limit)}
-        """, [ticker, quarter]).fetchdf()
+        """, like_patterns + [ticker, quarter]).fetchdf()
         rows = df_to_records(df)
         if not rows:
             return None
@@ -257,7 +258,7 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
                  'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
                  'source': 'N-PORT'} for r in rows]
     except Exception as e:
-        app.logger.error(f"[get_nport_children] {e}", exc_info=True)
+        logger.error(f"[get_nport_children] {e}", exc_info=True)
         return None
 
 
@@ -268,9 +269,8 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
     if not patterns:
         return None
     try:
-        conds = ' OR '.join(
-            "family_name ILIKE '%{}%'".format(p.replace("'", "''")) for p in patterns
-        )
+        like_patterns = ['%' + p + '%' for p in patterns]
+        ph = ','.join(['?'] * len(like_patterns))
         df = con.execute(f"""
             SELECT
                 fund_name,
@@ -279,7 +279,7 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
                 SUM(CASE WHEN quarter = '{LQ}' THEN market_value_usd END) as q4_value,
                 series_id
             FROM fund_holdings
-            WHERE ({conds})
+            WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE family_name ILIKE t.p)
               AND ticker = ?
               AND quarter IN ('{FQ}', '{LQ}')
             GROUP BY fund_name, series_id
@@ -287,7 +287,7 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
                 OR SUM(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) IS NOT NULL
             ORDER BY q4_value DESC NULLS LAST
             LIMIT {int(limit)}
-        """, [ticker]).fetchdf()
+        """, like_patterns + [ticker]).fetchdf()
         rows = df_to_records(df)
         if not rows:
             return None
@@ -307,14 +307,13 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
             })
         return result
     except Exception as e:
-        app.logger.error(f"[get_nport_children_q2] {e}", exc_info=True)
+        logger.error(f"[get_nport_children_q2] {e}", exc_info=True)
         return None
 
 
 
 def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
     """Get 13F filing entity child rows as fallback."""
-    safe_name = str(inst_parent_name).replace("'", "''") if inst_parent_name else ''
     df = con.execute(f"""
         SELECT
             h.fund_name as institution,
@@ -325,11 +324,11 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
         FROM holdings h
         WHERE h.quarter = '{quarter}'
           AND (h.ticker = ? OR h.cusip = ?)
-          AND COALESCE(h.inst_parent_name, h.manager_name) = '{safe_name}'
+          AND COALESCE(h.inst_parent_name, h.manager_name) = ?
         GROUP BY h.fund_name, type
         ORDER BY value_live DESC NULLS LAST
         LIMIT {int(limit)}
-    """, [ticker, cusip]).fetchdf()
+    """, [ticker, cusip, inst_parent_name or '']).fetchdf()
     rows = df_to_records(df)
     return [{'institution': r.get('institution'), 'value_live': r.get('value_live'),
              'shares': r.get('shares'), 'pct_float': r.get('pct_float'),
@@ -349,8 +348,8 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
 
     try:
         # Find adviser name in ncen_adviser_map matching this parent
-        safe_name = inst_parent_name.replace("'", "''")
-        df = con.execute(f"""
+        like_param = '%' + (inst_parent_name or '') + '%'
+        df = con.execute("""
             SELECT DISTINCT
                 fh.fund_name,
                 SUM(fh.market_value_usd) as value,
@@ -360,13 +359,13 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
                 MAX(nam.role) as role
             FROM ncen_adviser_map nam
             JOIN fund_holdings fh ON nam.series_id = fh.series_id
-            WHERE nam.adviser_name ILIKE '%{safe_name}%'
+            WHERE nam.adviser_name ILIKE ?
               AND fh.ticker = ?
               AND fh.quarter = ?
             GROUP BY fh.fund_name, fh.series_id
             ORDER BY value DESC NULLS LAST
             LIMIT ?
-        """, [ticker, quarter, limit]).fetchdf()
+        """, [like_param, ticker, quarter, limit]).fetchdf()
 
         rows = df_to_records(df)
         if not rows:
@@ -376,7 +375,7 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
                  'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
                  'source': f"N-PORT ({r.get('role', 'adviser')})"} for r in rows]
     except Exception as e:
-        app.logger.error(f"[get_nport_children_ncen] {e}", exc_info=True)
+        logger.error(f"[get_nport_children_ncen] {e}", exc_info=True)
         return None
 
 

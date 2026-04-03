@@ -44,12 +44,7 @@ MAX_WORKERS_PHASE1 = 4
 MAX_WORKERS_PHASE2 = 2  # curl subprocess — no connection pool issues
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
-_thread_local = threading.local()
-_rate_lock = threading.Lock()
-_last_request_time = [0.0]
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
-SEC_MAX_RPS = 1  # max requests/second across all workers — SEC rate limit safe
-_last_completion_time = [0.0]  # watchdog: track when last filing completed
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
@@ -371,16 +366,6 @@ def parse_one_filing(filing, ticker, cusip_map, error_log):
     }
 
 
-
-def _rate_limit():
-    """Global rate limiter — enforces SEC_MAX_RPS across all threads."""
-    min_interval = 1.0 / SEC_MAX_RPS
-    with _rate_lock:
-        now = time.time()
-        elapsed = now - _last_request_time[0]
-        if elapsed < min_interval:
-            time.sleep(min_interval - elapsed)
-        _last_request_time[0] = time.time()
 
 
 def _download_filing_text(acc, subject_cik):

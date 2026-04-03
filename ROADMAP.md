@@ -127,6 +127,20 @@ _Last updated: April 2, 2026_
 
 ---
 
+## FUTURE — Performance & Stability Hardening
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| H1 | N+1 query fix — batch children in query1/query2/query3 | High | Currently 80+ queries per ticker lookup. Rewrite with CTEs to fetch all children in one pass |
+| H2 | Batch yfinance calls in fetch_market.py | Medium | Per-ticker `tkr.info` → batch `yf.Tickers()` for metadata. 50x fewer HTTP calls |
+| H3 | Exception handling in fetch_nport.py executemany | Medium | One bad row kills entire batch. Add per-row error handling with logging |
+| H4 | Incremental N-PORT parsing | Medium | Skip re-parsing already-loaded quarter/series_id combos. Currently re-parses all |
+| H5 | Phase 2 accession checkpoint | Low | Resume parsing from last accession instead of re-scanning unparsed query |
+| H6 | Connection pooling for Flask | Low | Replace get_db() per-request with proper pool. Not urgent at current scale |
+| H7 | Query result caching | Low | Cache frequent queries (summary, register) for 5 min. Redis or in-memory |
+
+---
+
 ## FUTURE — Data Integrity & On-Demand Updates
 
 | # | Item | Priority | Notes |

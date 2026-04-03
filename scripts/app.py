@@ -82,7 +82,10 @@ def _resolve_db_path():
         # Create snapshot from the main DB
         try:
             print(f'  Database locked — creating read-only snapshot...')
-            shutil.copy2(DB_PATH, DB_SNAPSHOT_PATH)
+            # Atomic copy: write to temp file, then rename (prevents corrupt snapshot)
+            tmp_path = DB_SNAPSHOT_PATH + '.tmp'
+            shutil.copy2(DB_PATH, tmp_path)
+            os.replace(tmp_path, DB_SNAPSHOT_PATH)
             print(f'  Snapshot ready: {DB_SNAPSHOT_PATH}')
             return DB_SNAPSHOT_PATH
         except Exception as e2:
@@ -92,6 +95,8 @@ def _resolve_db_path():
 
 
 # Resolved once at import/startup; updated if needed
+import threading as _threading
+_db_path_lock = _threading.Lock()
 _active_db_path = None
 _switchback_running = False
 _available_tables = set()
@@ -99,7 +104,6 @@ _available_tables = set()
 
 def _start_switchback_monitor():
     """Background thread: check every 60s if primary DB is available again."""
-    import threading
     global _switchback_running
     if _switchback_running:
         return
@@ -110,13 +114,15 @@ def _start_switchback_monitor():
         import time as _time
         while True:
             _time.sleep(60)
-            if _active_db_path == DB_PATH:
-                _switchback_running = False
-                return
+            with _db_path_lock:
+                if _active_db_path == DB_PATH:
+                    _switchback_running = False
+                    return
             try:
                 con = duckdb.connect(DB_PATH, read_only=True)
                 con.close()
-                _active_db_path = DB_PATH
+                with _db_path_lock:
+                    _active_db_path = DB_PATH
                 _refresh_table_list()
                 app.logger.info("[switchback] Primary DB available — switched back from snapshot")
                 _switchback_running = False
@@ -124,7 +130,7 @@ def _start_switchback_monitor():
             except Exception:
                 pass
 
-    t = threading.Thread(target=_monitor, daemon=True)
+    t = _threading.Thread(target=_monitor, daemon=True)
     t.start()
 
 
@@ -159,18 +165,22 @@ def _init_db_path():
 def get_db():
     """Open a read-only DuckDB connection. Caller must close it."""
     global _active_db_path
-    if _active_db_path is None:
-        _active_db_path = _resolve_db_path()
-        _refresh_table_list()
-        if _active_db_path != DB_PATH:
-            _start_switchback_monitor()
+    with _db_path_lock:
+        if _active_db_path is None:
+            _active_db_path = _resolve_db_path()
+            _refresh_table_list()
+            if _active_db_path != DB_PATH:
+                _start_switchback_monitor()
+        path = _active_db_path
     try:
-        return duckdb.connect(_active_db_path, read_only=True)
+        return duckdb.connect(path, read_only=True)
     except Exception as e:
         app.logger.warning(f"[get_db] Connection stale, re-resolving: {e}")
-        _active_db_path = _resolve_db_path()
+        with _db_path_lock:
+            _active_db_path = _resolve_db_path()
+            path = _active_db_path
         _refresh_table_list()
-        if _active_db_path != DB_PATH:
+        if path != DB_PATH:
             _start_switchback_monitor()
         return duckdb.connect(_active_db_path, read_only=True)
 
