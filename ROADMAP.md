@@ -202,6 +202,7 @@ _Last updated: April 3, 2026_
 | N12 | Investor name standardization | Done | `normalize_names.py`: smart Title Case for 8.6M rows, 8 table/columns. Handles acronyms, canonical names, dotted abbrevs. ALL CAPS 27%→0% |
 | N13 | N-PORT series-level deduplication | Done | All N-PORT rollup queries GROUP BY series_id (MAX per series). get_nport_position, get_nport_coverage, get_nport_children, get_nport_children_q2 all deduplicated. Fidelity NVDA: 1.39B → 1.07B shares after dedup |
 | N14 | Geode/Fidelity sub-adviser exclusion | Done | `SUBADVISER_EXCLUSIONS` dict in config.py. Geode excluded from Fidelity rollup. Applied in get_nport_position, get_nport_children, get_nport_children_q2 via `_build_excl_clause()`. Extensible for future sub-advisers |
+| N15 | International sub-adviser deduplication | High | Fidelity shows 110% coverage because HK/Japan/UK affiliates (Fidelity Management & Research (Hong Kong) Limited, etc.) manage the SAME underlying shares as the primary FMR adviser but appear as separate advisers in ncen_adviser_map. Fix: when multiple advisers exist for the same series_id, keep only the primary (domestic) adviser. Add international affiliate patterns to `SUBADVISER_EXCLUSIONS` in config.py. Applies to any manager with international sub-advisers. Test: Fidelity NVDA should drop from 110% to ~100% |
 
 ---
 
@@ -234,6 +235,7 @@ _Last updated: April 3, 2026_
 9. ~~N14 — Geode/Fidelity sub-adviser exclusion~~ Done
 10. ~~U1 — N-PORT coverage disclaimer tooltip~~ Done
 11. ~~P4 — iShares Trust N-PORT~~ Done
+12. **N15 — International sub-adviser deduplication** (Fidelity HK/Japan/UK inflate to 110%)
 4. Refresh readonly snapshot
 5. Build Short Squeeze UI tab (N2)
 6. Add short/long comparison to Smart Money tab (N3)
