@@ -205,6 +205,14 @@ _Last updated: April 3, 2026_
 
 ---
 
+## FUTURE — Pipelines
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| P4 | iShares Trust N-PORT | High | Fetch ETF holdings for iShares Trust (CIK 0001100663, ~118 series), iShares Inc. (CIK 0000930667, ~17 series), iShares U.S. ETF Trust (CIK 0001524513, ~4 series). ~139 ETF series with monthly position data via N-PORT filings. CIKs added to fund_universe. Run: `fetch_nport.py --staging --fund <CIK> --include-index` for each. Will close BlackRock's 94% N-PORT gap. 2,395 total N-PORT filings on EDGAR |
+
+---
+
 ## UI/UX Improvements
 
 | # | Item | Priority | Notes |
