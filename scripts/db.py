@@ -13,8 +13,10 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROD_DB = os.path.join(BASE_DIR, "data", "13f.duckdb")
 TEST_DB = os.path.join(BASE_DIR, "data", "13f_test.duckdb")
+STAGING_DB = os.path.join(BASE_DIR, "data", "13f_staging.duckdb")
 
 _test_mode = False
+_staging_mode = False
 
 
 def set_test_mode(enabled=True):
@@ -22,12 +24,25 @@ def set_test_mode(enabled=True):
     _test_mode = enabled
 
 
+def set_staging_mode(enabled=True):
+    global _staging_mode
+    _staging_mode = enabled
+
+
 def is_test_mode():
     return _test_mode
 
 
+def is_staging_mode():
+    return _staging_mode
+
+
 def get_db_path():
-    return TEST_DB if _test_mode else PROD_DB
+    if _test_mode:
+        return TEST_DB
+    if _staging_mode:
+        return STAGING_DB
+    return PROD_DB
 
 
 def assert_write_safe(con):

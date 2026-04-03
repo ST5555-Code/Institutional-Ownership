@@ -26,3 +26,4 @@ __pycache__/
 .ipynb_checkpoints/
 data/13f_readonly.duckdb
 13f_test.duckdb
+13f_staging.duckdb

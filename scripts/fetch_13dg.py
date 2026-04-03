@@ -28,7 +28,7 @@ edgar = None
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-from db import get_db_path, set_test_mode, assert_write_safe, crash_handler
+from db import get_db_path, set_test_mode, set_staging_mode, assert_write_safe, crash_handler
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def _init_edgar():
@@ -819,13 +819,16 @@ if __name__ == "__main__":
     parser.add_argument("--phase1-only", action="store_true", help="Run Phase 1 only (list filings)")
     parser.add_argument("--phase2-only", action="store_true", help="Run Phase 2 only (parse filings)")
     parser.add_argument("--phase3-only", action="store_true", help="Run Phase 3 only (post-process)")
+    parser.add_argument("--staging", action="store_true", help="Write to staging DB instead of production")
     args = parser.parse_args()
 
     if args.test:
         set_test_mode(True)
-        # Only seed test DB on Phase 1 or full run (not Phase 2/3 which read prior state)
         if not args.phase2_only and not args.phase3_only:
             _seed_test_db()
+    elif args.staging:
+        set_staging_mode(True)
+        print(f"  Writing to staging DB: {get_db_path()}", flush=True)
 
     def _main():
         t = args.tickers.split(",") if args.tickers else None
