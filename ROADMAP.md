@@ -130,6 +130,15 @@ _Last updated: April 3, 2026_
 | 2026-04-03 | Item 23 — Incremental load_13f.py | `--quarter` flag for single-quarter reload, `--staging` support, crash handler |
 | 2026-04-03 | Item 27 — app.py quarter centralization | All 6 hardcoded quarter strings replaced with config.py variables (LQ/PQ) |
 | 2026-04-03 | N11 — Filer name resolution | `resolve_names.py` 3-pass pipeline: holdings (219 CIKs/12K rows), EDGAR API (353 CIKs/25K rows), 98 filing agents marked. `name_resolved` column added. query6 fallback JOIN. Data quality endpoint updated |
+| 2026-04-03 | N-PORT index/ETF merge | 1.6M new rows (4.2M→5.8M), 6,306 series, 98.4% adviser-mapped. Fixed CUSIP→ticker for 2.1M rows |
+| 2026-04-03 | market_value_usd 1000x fix | SEC bulk VALUE is in dollars, not thousands. Removed `*1000` from load_13f.py, divided all existing values by 1000. Removed compensating `/1000` in 6 locations |
+| 2026-04-03 | FLOW_PERIODS fix | 1Q/2Q were identical (both Q3→Q4). Fixed to 4 distinct periods: 4Q, 3Q, 2Q, 1Q |
+| 2026-04-03 | manager_type expansion | 50→110 PARENT_SEEDS + keyword-based fallback classification. NULL rate: 71%→40% |
+| 2026-04-03 | pct_of_float fallback | shares_outstanding used where float_shares NULL. NULL rate: 30%→24% |
+| 2026-04-03 | fund_classes.quarter fix | Derived from report_date for all 31,056 rows |
+| 2026-04-03 | FINRA short interest refresh | 102K→328K rows, 29 dates, 12,511 tickers |
+| 2026-04-03 | enrich_tickers.py | +1,076 CUSIPs resolved, Q4 ticker coverage 91.6% |
+| 2026-04-03 | Staging support | Added --staging to enrich_tickers.py, auto_resolve.py. fetch_market.py fixed for staging isolation |
 
 ---
 
@@ -179,7 +188,7 @@ _Last updated: April 3, 2026_
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
-| N1 | N-PORT index/ETF fund download | High | `fetch_nport.py --include-index` — adds index funds, ETFs currently excluded. Significantly increases Vanguard/BlackRock coverage |
+| N1 | N-PORT index/ETF fund download | Done | Merged 1.6M new rows (4.2M→5.8M). 6,306 series, 98.4% mapped to advisers. Vanguard 30→96, BlackRock 132→243, Fidelity 281→449 |
 | N2 | Short squeeze UI tab | Medium | Frontend tab to display `/api/short_squeeze` candidates. Sortable by squeeze score, short %, inst ownership |
 | N3 | Short vs long UI integration | Medium | Add long/short comparison section to Smart Money tab. Show net exposure per manager |
 | N4 | Ownership concentration heatmap | Medium | Cross-tab visualization: top N managers × top N tickers. Color by pct_of_float |
@@ -189,15 +198,20 @@ _Last updated: April 3, 2026_
 | N8 | Webhook/alert system | Low | Configurable alerts: new 13D filing, >5% ownership change, short squeeze threshold crossed |
 | N9 | 13F-HR amendment reconciliation | Low | Track 13F-HR/A amendments and reconcile position changes within same quarter |
 | N10 | Multi-quarter position timeline | Medium | Sparkline or mini-chart in Register tab showing shares held across all quarters per holder |
-| N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→78.3% resolved, 21.7% filing agents marked. query6 fallback JOINs holdings for display |
+| N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→90.0% resolved, 10% filing agents marked. `resolve_agent_names.py` extracts reporting person from filing text |
+| N12 | Investor name standardization | High | Normalize casing across all tables: Title Case for all investor/manager names (no ALL CAPS unless actual legal name like "FMR LLC"). Audit and fix: manager_name, inst_parent_name in holdings; filer_name in beneficial_ownership; adviser_name in ncen_adviser_map. Ensure consistent display across Register, Conviction, Activist, Flow Analysis, and Smart Money tabs. Deduplicate near-matches (e.g., "BLACKROCK ADVISORS LLC" vs "BlackRock Advisors, LLC") |
 
 ---
 
 ## SEQUENCE — NEXT STEPS
 
-1. N-PORT index/ETF download running (`fetch_nport.py --staging --include-index`)
-2. Merge N-PORT staging data → production (`merge_staging.py`)
-3. Re-run `compute_flows.py` after merge
+1. ~~N-PORT index/ETF download + merge~~ Done
+2. ~~Data quality fixes (market_value, manager_type, flows, pct_of_float)~~ Done
+3. ~~FINRA short interest refresh + enrich_tickers~~ Done
+4. **Retry `fetch_market.py --staging`** when Yahoo rate limit resets (fills snapshot prices + 420 missing tickers)
+5. **N12 — Investor name standardization** (Title Case, dedup, consistency audit)
+6. N2 — Short squeeze UI tab
+7. N3 — Short vs long UI integration
 4. Refresh readonly snapshot
 5. Build Short Squeeze UI tab (N2)
 6. Add short/long comparison to Smart Money tab (N3)
