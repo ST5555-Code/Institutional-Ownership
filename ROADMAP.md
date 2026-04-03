@@ -127,13 +127,25 @@ _Last updated: April 2, 2026_
 
 ---
 
+## FUTURE — Admin UI (all pipeline operations via web interface)
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| F1 | Admin dashboard — pipeline status, progress bars, log viewer | High | Replace CLI monitoring with web UI. Show Phase 2 progress, error counts, rate |
+| F2 | One-click monthly update — run full pipeline via staging from UI | High | Button triggers: seed staging → fetch updates → merge → refresh snapshot |
+| F3 | Individual script triggers — run any fetch script from UI | High | Dropdown: select script + flags (--update, --staging, --quarter). Start/stop/monitor |
+| F4 | Schedule recurring updates — cron-like scheduler in UI | Medium | Monthly 13D/G update, weekly FINRA short, daily market data refresh |
+| F5 | Staging review before merge — preview changes in UI | Medium | Show merge_staging --dry-run output. Approve/reject before merging to production |
+| F6 | Data quality dashboard — parse error rates, coverage stats | Medium | Show regex timeout count, missing tickers, pct_owned null rate per batch |
+| F7 | Quarter rollover wizard — update config.py via UI | Low | Form to add new quarter URLs, snapshot dates. Auto-generates config.py diff |
+
+---
+
 ## SEQUENCE — NEXT STEPS
 
-1. Authorize full 13D/G Phase 2 run (57,612 unparsed filings)
-2. `fetch_market.py` batch rewrite (Item P2)
-3. `compute_flows.py` set-based rewrite (Item P3)
-4. Run `python3 scripts/compute_flows.py`
-5. `cp data/13f.duckdb data/13f_readonly.duckdb`
-6. Restart app — test Flow Analysis charts
-7. Items 1, 3, 4 (amendment tracking, crossed 5% flag, intent change)
-8. App features: items 14-18 (short interest integration into tabs)
+1. Phase 2 running (41K filings at 230/min, ETA ~2.4 hours)
+2. Run `python3 scripts/compute_flows.py`
+3. `cp data/13f.duckdb data/13f_readonly.duckdb`
+4. Restart app — test Flow Analysis charts
+5. Items 9, 10 (short vs long comparison, short squeeze signal)
+6. Admin UI (items F1-F7)
