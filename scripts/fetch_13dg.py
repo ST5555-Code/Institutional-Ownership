@@ -402,11 +402,11 @@ def parse_one_filing_by_acc(acc, ticker, form, filing_date, filer_cik,
 
     text = _clean_text(raw_text)
 
-    # Guard: skip empty text and truncate very long filings to prevent regex hangs
+    # Guard: skip empty text and truncate to prevent regex hangs
     if len(text) < 50:
         return None
-    if len(text) > 500_000:
-        text = text[:500_000]
+    if len(text) > 20_000:
+        text = text[:20_000]
 
     fields = _extract_fields(text, form)
 
