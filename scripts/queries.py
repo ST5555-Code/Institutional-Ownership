@@ -223,6 +223,37 @@ def get_nport_family_patterns():
 
 
 
+def _classify_fund_type(fund_name):
+    """Classify a fund as passive or active based on fund name keywords."""
+    if not fund_name:
+        return 'active'
+    name_upper = fund_name.upper()
+
+    # Direct keyword matches → passive
+    PASSIVE_KEYWORDS = [
+        'INDEX', 'ETF', 'MSCI', 'FTSE', 'STOXX', 'NIKKEI',
+        'TOTAL STOCK', 'TOTAL MARKET', 'TOTAL BOND', 'TOTAL INTERNATIONAL',
+        'BROAD MARKET', 'TRACKER',
+        'NASDAQ', 'DOW JONES', 'WILSHIRE',
+    ]
+    if any(kw in name_upper for kw in PASSIVE_KEYWORDS):
+        return 'passive'
+
+    # Index number + known index name → passive
+    # Catches "S&P 500", "Russell 1000", "Russell 2000", "Russell 3000"
+    INDEX_COMBOS = [
+        ('S&P', '500'), ('S&P', '400'), ('S&P', '600'), ('S&P', '100'),
+        ('RUSSELL', '1000'), ('RUSSELL', '2000'), ('RUSSELL', '3000'),
+        ('BLOOMBERG', '500'), ('BLOOMBERG', 'AGGREGATE'),
+        ('ALL', 'CAP INDEX'), ('ALL', 'CAP EQUITY INDEX'),
+    ]
+    for prefix, suffix in INDEX_COMBOS:
+        if prefix in name_upper and suffix in name_upper:
+            return 'passive'
+
+    return 'active'
+
+
 def match_nport_family(inst_parent_name):
     """Return list of search patterns for N-PORT family_name matching."""
     if not inst_parent_name:
@@ -742,13 +773,7 @@ def query1(ticker):
                             for k in kids:
                                 if k[0] not in seen:
                                     # Determine child type from fund name
-                                    fname_upper = (k[0] or '').upper()
-                                    child_type = 'passive' if any(
-                                        kw in fname_upper for kw in
-                                        ['INDEX', 'ETF', 'S&P', 'RUSSELL', 'MSCI',
-                                         'FTSE', 'TOTAL STOCK', 'TOTAL MARKET',
-                                         'TOTAL BOND', 'TOTAL INTERNATIONAL']
-                                    ) else 'active'
+                                    child_type = _classify_fund_type(k[0])
                                     nport_by_parent[pname].append({
                                         'institution': k[0], 'value_live': k[2],
                                         'shares': k[1], 'pct_float': None,
