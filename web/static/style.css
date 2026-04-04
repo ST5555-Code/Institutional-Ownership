@@ -1043,10 +1043,15 @@ body {
 /* Print styles for PDF export */
 @media print {
     .tab-bar, .action-bar, .search-container, #print-btn,
-    .period-selector, .btn { display: none !important; }
+    .period-selector, .btn, .register-filter-bar,
+    .sub-view-bar, .toggle-arrow { display: none !important; }
     .summary-card { break-inside: avoid; }
-    .data-table { font-size: 10px; }
-    body { font-size: 11px; }
-    #tab-container { padding: 0; }
-    .chart-card { break-inside: avoid; max-height: 300px; }
+    .data-table { font-size: 9px; width: 100%; }
+    .data-table th, .data-table td { padding: 2px 4px; }
+    .data-table .col-text-overflow { max-width: none; overflow: visible; white-space: normal; }
+    body { font-size: 10px; margin: 0; }
+    #tab-container { padding: 0; max-width: none; }
+    .chart-card { break-inside: avoid; max-height: 250px; }
+    .child-row { display: table-row !important; }
+    .level-1 { opacity: 0.85; }
 }

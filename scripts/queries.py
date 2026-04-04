@@ -444,6 +444,12 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         like_patterns = ['%' + p + '%' for p in patterns]
         ph = ','.join(['?'] * len(like_patterns))
         excl_clause, excl_params = _build_excl_clause(patterns)
+        # Get float_shares for pct_of_float calculation
+        float_row = con.execute(
+            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        float_shares = float_row[0] if float_row and float_row[0] else None
+
         df = con.execute(f"""
             SELECT
                 fund_name,
@@ -463,9 +469,14 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         rows = df_to_records(df)
         if not rows:
             return None
-        return [{'institution': r.get('fund_name'), 'value_live': r.get('value'),
-                 'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
-                 'source': 'N-PORT'} for r in rows]
+        result = []
+        for r in rows:
+            shares = r.get('shares') or 0
+            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else r.get('pct_of_nav')
+            result.append({'institution': r.get('fund_name'), 'value_live': r.get('value'),
+                           'shares': shares, 'pct_float': pct_float,
+                           'source': 'N-PORT'})
+        return result
     except Exception as e:
         logger.error(f"[get_nport_children] {e}", exc_info=True)
         return None
@@ -708,6 +719,18 @@ def query1(ticker):
             LIMIT 25
         """, [ticker, cusip]).fetchdf()
 
+        # R14: Fetch AUM for each parent from managers table
+        aum_map = {}
+        try:
+            aum_df = con.execute("""
+                SELECT parent_name, SUM(aum_total) / 1e9 as aum_bn
+                FROM managers WHERE aum_total IS NOT NULL
+                GROUP BY parent_name
+            """).fetchdf()
+            aum_map = {r['parent_name']: round(r['aum_bn'], 1) for _, r in aum_df.iterrows() if r['aum_bn']}
+        except Exception:
+            pass
+
         parent_names = parents['parent_name'].tolist()
         if not parent_names:
             return []
@@ -811,6 +834,7 @@ def query1(ticker):
                 'value_live': parent['total_value_live'],
                 'shares': parent['total_shares'],
                 'pct_float': parent['pct_float'],
+                'aum': aum_map.get(pname),
                 'type': parent['type'],
                 'is_parent': effective_children >= 2,
                 'child_count': effective_children,

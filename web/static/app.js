@@ -358,6 +358,7 @@ const QUERY_COLUMNS = {
         {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
         {key: 'shares',      label: 'Shares',       type: 'shares'},
         {key: 'pct_float',   label: '% Float / NAV', type: 'pct'},
+        {key: 'aum',         label: 'AUM ($B)',     type: 'num'},
         {key: 'type',        label: 'Type',         type: 'text'},
         {key: 'source',      label: 'Source',       type: 'text'},
     ],
@@ -616,8 +617,34 @@ function _renderCurrentPage() {
             clearBtn.className = 'btn btn-secondary';
             clearBtn.style.fontSize = '12px';
             clearBtn.onclick = () => { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); };
+            // R13: Heatmap toggle
+            const heatmapToggle = document.createElement('button');
+            heatmapToggle.className = 'btn btn-secondary';
+            heatmapToggle.style.fontSize = '12px';
+            heatmapToggle.textContent = 'Heatmap On';
+            heatmapToggle.onclick = () => {
+                const on = heatmapToggle.textContent === 'Heatmap On';
+                heatmapToggle.textContent = on ? 'Heatmap Off' : 'Heatmap On';
+                _applyHeatmapOverlay(on);
+            };
+            filterBar.appendChild(heatmapToggle);
+
+            // R9: Source column toggle
+            const sourceToggle = document.createElement('button');
+            sourceToggle.className = 'btn btn-secondary';
+            sourceToggle.style.fontSize = '12px';
+            sourceToggle.style.marginLeft = 'auto';
+            const sourceHidden = localStorage.getItem('hideSourceCol') === 'true';
+            sourceToggle.textContent = sourceHidden ? 'Show Source' : 'Hide Source';
+            sourceToggle.onclick = () => {
+                const hide = localStorage.getItem('hideSourceCol') !== 'true';
+                localStorage.setItem('hideSourceCol', hide);
+                sourceToggle.textContent = hide ? 'Show Source' : 'Hide Source';
+                _applySourceColumnVisibility();
+            };
             filterBar.appendChild(searchInput);
             filterBar.appendChild(clearBtn);
+            filterBar.appendChild(sourceToggle);
             tableWrap.appendChild(filterBar);
         }
     }
@@ -631,6 +658,9 @@ function _renderCurrentPage() {
         const collapsible = hasHierarchy && (qnum === 1 || qnum === 2 || qnum === 3);
         renderHierarchicalTable(pageData, cols, qnum, hasHierarchy, hasSections, collapsible);
     }
+
+    // R9: Apply source column visibility after render
+    if (qnum === 1) _applySourceColumnVisibility();
 
     // Pagination controls
     if (totalPages > 1) {
@@ -1416,6 +1446,70 @@ function _formatCellValue(val, type) {
 
 function _isNumericCol(type) {
     return type === 'num' || type === 'dollar' || type === 'pct' || type === 'shares';
+}
+
+// R13: Heatmap overlay on Value column
+function _applyHeatmapOverlay(enabled) {
+    const table = tableWrap.querySelector('.data-table');
+    if (!table) return;
+    // Find Value column index
+    const headers = table.querySelectorAll('thead th');
+    let valIdx = -1;
+    headers.forEach((th, i) => {
+        if (th.textContent.trim().includes('Value')) valIdx = i;
+    });
+    if (valIdx < 0) return;
+
+    // Get max value for scaling
+    let maxVal = 0;
+    if (enabled) {
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const cells = tr.querySelectorAll('td');
+            if (cells[valIdx]) {
+                const text = cells[valIdx].textContent.replace(/[$,BMKTk]/g, '');
+                const num = parseFloat(text);
+                if (!isNaN(num)) maxVal = Math.max(maxVal, num);
+            }
+        });
+    }
+
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (!cells[valIdx]) return;
+        if (!enabled) {
+            cells[valIdx].style.background = '';
+            cells[valIdx].style.color = '';
+            return;
+        }
+        const text = cells[valIdx].textContent.replace(/[$,BMKTk]/g, '');
+        const num = parseFloat(text);
+        if (!isNaN(num) && maxVal > 0) {
+            const intensity = Math.min(num / maxVal, 1);
+            const r = Math.round(255 - intensity * 253);
+            const g = Math.round(255 - intensity * 222);
+            const b = Math.round(255 - intensity * 184);
+            cells[valIdx].style.background = `rgb(${r},${g},${b})`;
+            cells[valIdx].style.color = intensity > 0.5 ? '#fff' : '#333';
+        }
+    });
+}
+
+// R9: Toggle Source column visibility
+function _applySourceColumnVisibility() {
+    const hide = localStorage.getItem('hideSourceCol') === 'true';
+    const table = tableWrap.querySelector('.data-table');
+    if (!table) return;
+    // Find Source column index (look for "Source" header text)
+    const headers = table.querySelectorAll('thead th');
+    let sourceIdx = -1;
+    headers.forEach((th, i) => { if (th.textContent.trim() === 'Source') sourceIdx = i; });
+    if (sourceIdx < 0) return;
+    const display = hide ? 'none' : '';
+    headers[sourceIdx].style.display = display;
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (cells[sourceIdx]) cells[sourceIdx].style.display = display;
+    });
 }
 
 // Tier separator rows: faint line at 10/15/20
