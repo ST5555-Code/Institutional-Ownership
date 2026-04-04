@@ -741,10 +741,18 @@ def query1(ticker):
                             seen = {c['institution'] for c in nport_by_parent[pname]}
                             for k in kids:
                                 if k[0] not in seen:
+                                    # Determine child type from fund name
+                                    fname_upper = (k[0] or '').upper()
+                                    child_type = 'passive' if any(
+                                        kw in fname_upper for kw in
+                                        ['INDEX', 'ETF', 'S&P', 'RUSSELL', 'MSCI',
+                                         'FTSE', 'TOTAL STOCK', 'TOTAL MARKET',
+                                         'TOTAL BOND', 'TOTAL INTERNATIONAL']
+                                    ) else 'active'
                                     nport_by_parent[pname].append({
                                         'institution': k[0], 'value_live': k[2],
                                         'shares': k[1], 'pct_float': None,
-                                        'type': 'active', 'source': 'N-PORT',
+                                        'type': child_type, 'source': 'N-PORT',
                                         'subadviser_note': None,
                                     })
                                     seen.add(k[0])
