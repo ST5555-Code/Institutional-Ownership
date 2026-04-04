@@ -2408,10 +2408,12 @@ function renderFlowAnalysis(data) {
             const card = document.createElement('div');
             card.className = 'chart-card';
             card.innerHTML = '<h3>' + title + '</h3>';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;height:250px;';
             const canvas = document.createElement('canvas');
             canvas.id = canvasId;
-            canvas.style.cssText = 'height:250px;min-height:250px;';
-            card.appendChild(canvas);
+            wrap.appendChild(canvas);
+            card.appendChild(wrap);
             return {card, canvas};
         }
 
