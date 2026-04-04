@@ -2120,10 +2120,26 @@ def _build_cohort(q1_map, q4_map):
         'unchanged': sum(1 for i in top10_inv if i in set(unchanged)),
     }
 
-    # Economic-weighted retention: retained value as % of prior total value
-    prior_total_value = sum((q1_map[i].get('value') or 0) for i in q1_set)
-    retained_value_in_q4 = sum((q4_map[i].get('value') or 0) for i in retained)
-    econ_retention = round(retained_value_in_q4 / prior_total_value * 100, 1) if prior_total_value > 0 else 0
+    # Economic-weighted retention: investor-level, share-based, capped at 100%
+    # weight_i = Q1_shares_i / total_Q1_shares; retention_i = min(Q4_shares / Q1_shares, 1.0)
+    # Exits get retention=0 with their Q1 weight. New entries excluded.
+    total_q1_shares = sum((q1_map[i].get('shares') or 0) for i in q1_set)
+    if total_q1_shares > 0:
+        weighted_sum = 0
+        for inv in q1_set:
+            s1 = q1_map[inv].get('shares') or 0
+            if s1 <= 0:
+                continue
+            weight = s1 / total_q1_shares
+            if inv in q4_set:
+                s4 = q4_map[inv].get('shares') or 0
+                inv_ret = min(s4 / s1, 1.0)  # cap at 100%
+            else:
+                inv_ret = 0  # exit
+            weighted_sum += weight * inv_ret
+        econ_retention = round(weighted_sum * 100, 1)
+    else:
+        econ_retention = 0
 
     # Totals row (no double-counting): all unique entities in Q4
     total_q4_holders = len(q4_set)
@@ -2215,14 +2231,14 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
         summary['active_only'] = active_only
 
         # Economic retention for last 3 QoQ transitions (active investors only)
-        # Uses 13F holdings with active manager types regardless of cohort level setting
+        # Share-weighted, investor-level, capped at 100% per investor
         econ_retention_trend = []
         for i in range(len(QUARTERS) - 1):
             q_from, q_to = QUARTERS[i], QUARTERS[i + 1]
             try:
                 from_df = con.execute(f"""
                     SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                           SUM(market_value_usd) as value
+                           SUM(shares) as shares
                     FROM holdings
                     WHERE ticker = ? AND quarter = '{q_from}'
                       AND manager_type NOT IN ('passive', 'unknown')
@@ -2230,18 +2246,26 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                 """, [ticker]).fetchdf()
                 to_df = con.execute(f"""
                     SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                           SUM(market_value_usd) as value
+                           SUM(shares) as shares
                     FROM holdings
                     WHERE ticker = ? AND quarter = '{q_to}'
                       AND manager_type NOT IN ('passive', 'unknown')
                     GROUP BY investor
                 """, [ticker]).fetchdf()
-                from_map = {r['investor']: float(r['value'] or 0) for _, r in from_df.iterrows()}
-                to_map = {r['investor']: float(r['value'] or 0) for _, r in to_df.iterrows()}
-                ret_set = set(from_map) & set(to_map)
-                prior_val = sum(from_map.values())
-                retained_val = sum(to_map[i] for i in ret_set)
-                er = round(retained_val / prior_val * 100, 1) if prior_val > 0 else 0
+                from_map = {r['investor']: float(r['shares'] or 0) for _, r in from_df.iterrows()}
+                to_map = {r['investor']: float(r['shares'] or 0) for _, r in to_df.iterrows()}
+                total_from = sum(from_map.values())
+                if total_from > 0:
+                    weighted_sum = 0
+                    for inv, s_from in from_map.items():
+                        if s_from <= 0:
+                            continue
+                        w = s_from / total_from
+                        s_to = to_map.get(inv, 0)
+                        weighted_sum += w * min(s_to / s_from, 1.0)
+                    er = round(weighted_sum * 100, 1)
+                else:
+                    er = 0
                 econ_retention_trend.append({
                     'from': q_from, 'to': q_to,
                     'econ_retention': er,

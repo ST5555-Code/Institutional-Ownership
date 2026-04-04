@@ -1722,18 +1722,18 @@ function renderCohort(data, container) {
     const ert = summary.econ_retention_trend || [];
     if (ert.length > 0) {
         const retLine = document.createElement('div');
-        retLine.style.cssText = 'font-size:12px;color:#555;margin:6px 0 10px 0;display:flex;align-items:center;gap:16px;';
+        retLine.style.cssText = 'font-size:14px;color:#333;margin:8px 0 14px 0;display:flex;align-items:center;gap:20px;padding:8px 12px;background:#f8f9fa;border-radius:6px;border:1px solid #e5e7eb;';
         const retLabel = document.createElement('span');
-        retLabel.style.fontWeight = '600';
-        retLabel.textContent = 'Active Econ. Retention:';
+        retLabel.style.cssText = 'font-weight:700;color:#002147;white-space:nowrap;';
+        retLabel.textContent = 'Active Share Retention';
         retLine.appendChild(retLabel);
         ert.forEach(p => {
             const s = document.createElement('span');
             const pct = p.econ_retention;
             const color = pct >= 95 ? '#27AE60' : pct >= 85 ? '#F39C12' : '#C0392B';
-            s.innerHTML = `<span style="color:#999">${_fmtQ(p.from)}\u2192${_fmtQ(p.to)}</span> `
-                + `<strong style="color:${color}">${pct}%</strong>`
-                + `<span style="color:#bbb;font-size:11px;margin-left:2px">(${p.active_holders_from}\u2192${p.active_holders_to})</span>`;
+            s.innerHTML = `<span style="color:#777">${_fmtQ(p.from)} \u2192 ${_fmtQ(p.to)}</span> `
+                + `<strong style="color:${color};font-size:16px">${pct}%</strong>`
+                + `<span style="color:#aaa;font-size:12px;margin-left:3px">(${p.active_holders_from}\u2192${p.active_holders_to})</span>`;
             retLine.appendChild(s);
         });
         container.appendChild(retLine);
