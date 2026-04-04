@@ -153,6 +153,22 @@ def fetch_ticker_info(tickers):
                   f"{len(records):,} ok, {len(failed):,} failed", flush=True)
         time.sleep(0.1)
 
+    # Fallback: if metadata pass failed, save price-only records from Pass 1
+    if len(records) == 0 and len(price_map) > 0:
+        print(f"  Metadata pass failed — falling back to {len(price_map):,} price-only records")
+        for tkr_str, price in price_map.items():
+            record = {
+                "ticker": tkr_str, "price_live": price,
+                "market_cap": None, "float_shares": None,
+                "shares_outstanding": None, "fifty_two_week_high": None,
+                "fifty_two_week_low": None, "avg_volume_30d": None,
+                "sector": None, "industry": None, "exchange": None,
+                "fetch_date": today,
+            }
+            for q in SNAPSHOT_DATES:
+                record[f"price_{q}"] = None
+            records.append(record)
+
     print(f"  Fetched: {len(records):,}, Failed: {len(failed):,}")
     return pd.DataFrame(records), failed
 
