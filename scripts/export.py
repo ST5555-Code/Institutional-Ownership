@@ -40,7 +40,7 @@ def build_excel(data, sheet_name='Data'):
                 flat[k] = v
         flat_data.append(flat)
 
-    headers = list(flat_data[0].keys())
+    headers = ['#'] + list(flat_data[0].keys())
     ws.append(headers)
 
     for col_idx in range(1, len(headers) + 1):
@@ -50,7 +50,12 @@ def build_excel(data, sheet_name='Data'):
         cell.alignment = Alignment(horizontal='center')
 
     for row_idx, record in enumerate(flat_data, 2):
-        for col_idx, key in enumerate(headers, 1):
+        # Row number column
+        num_cell = ws.cell(row=row_idx, column=1)
+        num_cell.value = row_idx - 1
+        num_cell.font = DATA_FONT
+        num_cell.alignment = Alignment(horizontal='right')
+        for col_idx, key in enumerate(headers[1:], 2):
             cell = ws.cell(row=row_idx, column=col_idx)
             val = record.get(key)
             cell.value = val

@@ -220,9 +220,9 @@ _Last updated: April 3, 2026_
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | U1 | N-PORT coverage disclaimer tooltip | Done | Hover tooltip on "N-PORT Coverage" label in summary card. Dotted underline indicates hoverable. Explains mutual fund + ETF coverage and deduplication |
-| U2 | Row numbers on all tables | Medium | Add sequential row number column (1, 2, 3...) to all data tables in HTML display and Excel export. Applies to Register, Conviction, Flow Analysis, Activist, Smart Money, Crowding, Fund Portfolio, Cross-Ownership, Sector Rotation, New/Exits, AUM tabs. Row numbers should reset per table/section and persist through pagination |
-| U3 | Top 25 investor list with tier separators | Medium | All investor list tables show up to 25 rows with faint separator lines after rows 10, 15, and 20. Bold subtotal rows after 10 and 25 (shares, value, % float). Applies to: Register, Conviction, Crowding, Flow Analysis buyers/sellers, Smart Money, Ownership Trend. Backend queries return 25 rows. Frontend renders faint border-bottom separators at tier breaks |
-| U4 | Nested fund children — limit 5 largest under parent | Medium | For expandable/nested investor rows, show only the 5 largest N-PORT fund-level children under each ultimate parent investor. Data source: N-PORT fund_holdings only (not 13F sub-entities). Ordered by position value descending. Applies to: Register, Conviction, Ownership Trend, Flow Analysis, Activist tabs. Exception: Cross-Ownership tab shows top 10 fund children instead of 5 (wider analysis view). Consistent across all tabs — no tab should show more than 5 children except Cross-Ownership |
+| U2 | Row numbers on all tables | Done | # column added to all 3 table renderers (renderHierarchicalTable, buildSimpleTable, _flowTable) + Excel export. Parent rows only numbered in hierarchical tables. Children get blank |
+| U3 | Top 25 with tier separators and subtotals | Done | Faint border-bottom at rows 10, 15, 20. Bold subtotal rows at 10 and 25 (sums numeric columns). Applied to buildSimpleTable and renderHierarchicalTable. _flowTable gets tier breaks |
+| U4 | Nested fund children — limit 5 largest under parent | Done | get_nport_children default limit=5 already in place. Cross-Ownership (query8) doesn't use N-PORT children — pure 13F cross-holder. Consistent across Register, Conviction, Ownership Trend |
 
 ---
 

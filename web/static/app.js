@@ -644,9 +644,14 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
     });
     table.appendChild(colgroup);
 
-    // --- Header ---
+    // --- Header with # column ---
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
+    const thNum = document.createElement('th');
+    thNum.textContent = '#';
+    thNum.style.textAlign = 'right';
+    thNum.style.width = '35px';
+    headerRow.appendChild(thNum);
     cols.forEach((col, ci) => {
         const th = document.createElement('th');
         const meta = inferColMeta(col);
@@ -662,10 +667,11 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // --- Body ---
+    // --- Body with row numbers and tier breaks ---
     const tbody = document.createElement('tbody');
     let lastSection = null;
     let parentIdx = 0;  // unique ID for collapsible groups
+    let parentRowNum = 0;  // counts only parent-level rows
 
     data.forEach(row => {
         // Section headers (Query 2 entries/exits)
@@ -700,6 +706,19 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
 
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
+
+        // Row number (parent-level only, children get blank)
+        const tdRowNum = document.createElement('td');
+        tdRowNum.style.cssText = 'text-align:right;color:#999;font-size:11px;';
+        if (!row.level || row.level === 0) {
+            parentRowNum++;
+            tdRowNum.textContent = parentRowNum;
+            // Tier separator
+            if (TIER_BREAKS.includes(parentRowNum)) {
+                tr.style.borderBottom = '1px solid #ccc';
+            }
+        }
+        tr.appendChild(tdRowNum);
 
         // Type tint
         const rtype = row.type || row.manager_type || '';
@@ -1352,40 +1371,98 @@ function sectionHeader(text) {
     return h;
 }
 
+function _formatCellValue(val, type) {
+    if (val == null || val === '') return '—';
+    if (type === 'dollar') return fmtDollars(val);
+    if (type === 'shares') return fmtShares(val);
+    if (type === 'pct') return fmtPct(val);
+    if (type === 'num') return fmtNum(val);
+    const s = String(val);
+    return s.length > 120 ? s.slice(0, 120) + '…' : s;
+}
+
+function _isNumericCol(type) {
+    return type === 'num' || type === 'dollar' || type === 'pct' || type === 'shares';
+}
+
+// Tier separator rows: faint line at 10/15/20
+const TIER_BREAKS = [10, 15, 20];
+// Subtotal rows at 10 and 25
+const SUBTOTAL_AT = [10, 25];
+
+function _buildSubtotalRow(data, cols, fromIdx, toIdx, label) {
+    const tr = document.createElement('tr');
+    tr.className = 'subtotal-row';
+    // # column
+    const tdNum = document.createElement('td');
+    tdNum.style.cssText = 'font-weight:700;text-align:left;border-top:2px solid #999;';
+    tdNum.textContent = label;
+    tr.appendChild(tdNum);
+    cols.forEach(c => {
+        const td = document.createElement('td');
+        td.style.cssText = 'font-weight:700;border-top:2px solid #999;';
+        td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
+        if (_isNumericCol(c.type) && c.type !== 'pct') {
+            let sum = 0;
+            for (let i = fromIdx; i < Math.min(toIdx, data.length); i++) {
+                const v = data[i][c.key];
+                if (v != null && typeof v === 'number') sum += v;
+            }
+            td.textContent = sum !== 0 ? _formatCellValue(sum, c.type) : '—';
+        } else {
+            td.textContent = '';
+        }
+        tr.appendChild(td);
+    });
+    return tr;
+}
+
 function buildSimpleTable(data, cols) {
     const table = document.createElement('table');
     table.className = 'data-table';
-    // Header
+    // Header with # column
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
+    const thNum = document.createElement('th');
+    thNum.textContent = '#';
+    thNum.style.textAlign = 'right';
+    thNum.style.width = '35px';
+    hr.appendChild(thNum);
     cols.forEach(c => {
         const th = document.createElement('th');
         th.textContent = c.label;
-        th.style.textAlign = (c.type === 'num' || c.type === 'dollar' || c.type === 'pct' || c.type === 'shares') ? 'right' : 'left';
+        th.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
         hr.appendChild(th);
     });
     thead.appendChild(hr);
     table.appendChild(thead);
-    // Body
+    // Body with row numbers, tier breaks, subtotals
     const tbody = document.createElement('tbody');
-    data.forEach(row => {
+    data.forEach((row, idx) => {
+        const rowNum = idx + 1;
         const tr = document.createElement('tr');
+        // Tier separator: faint bottom border
+        if (TIER_BREAKS.includes(rowNum)) {
+            tr.style.borderBottom = '1px solid #ccc';
+        }
+        // Row number
+        const tdNum = document.createElement('td');
+        tdNum.textContent = rowNum;
+        tdNum.style.textAlign = 'right';
+        tdNum.style.color = '#999';
+        tdNum.style.fontSize = '11px';
+        tr.appendChild(tdNum);
         cols.forEach(c => {
             const td = document.createElement('td');
-            const val = row[c.key];
-            td.style.textAlign = (c.type === 'num' || c.type === 'dollar' || c.type === 'pct' || c.type === 'shares') ? 'right' : 'left';
-            if (val == null || val === '') td.textContent = '—';
-            else if (c.type === 'dollar') td.textContent = fmtDollars(val);
-            else if (c.type === 'shares') td.textContent = fmtShares(val);
-            else if (c.type === 'pct') td.textContent = fmtPct(val);
-            else if (c.type === 'num') td.textContent = fmtNum(val);
-            else {
-                const s = String(val);
-                td.textContent = s.length > 120 ? s.slice(0, 120) + '…' : s;
-            }
+            td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
+            td.textContent = _formatCellValue(row[c.key], c.type);
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
+        // Subtotal rows
+        if (SUBTOTAL_AT.includes(rowNum) && rowNum <= data.length) {
+            tbody.appendChild(_buildSubtotalRow(data, cols, 0, rowNum, `Top ${rowNum}`));
+        }
     });
     table.appendChild(tbody);
     return table;
@@ -1447,6 +1524,11 @@ function _flowTable(rows, cols, rowClass) {
     table.style.tableLayout = 'auto';
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
+    const thNum = document.createElement('th');
+    thNum.textContent = '#';
+    thNum.style.textAlign = 'right';
+    thNum.style.width = '35px';
+    hr.appendChild(thNum);
     cols.forEach(c => {
         const th = document.createElement('th');
         th.textContent = c.label;
@@ -1456,9 +1538,16 @@ function _flowTable(rows, cols, rowClass) {
     thead.appendChild(hr);
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
-    rows.forEach(row => {
+    rows.forEach((row, idx) => {
+        const rowNum = idx + 1;
         const tr = document.createElement('tr');
         if (rowClass) tr.classList.add(rowClass);
+        if (TIER_BREAKS.includes(rowNum)) tr.style.borderBottom = '1px solid #ccc';
+        // Row number
+        const tdNum = document.createElement('td');
+        tdNum.textContent = rowNum;
+        tdNum.style.cssText = 'text-align:right;color:#999;font-size:11px;';
+        tr.appendChild(tdNum);
         cols.forEach(c => {
             const td = document.createElement('td');
             td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
