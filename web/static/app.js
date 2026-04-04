@@ -2424,7 +2424,7 @@ function _flowTable(rows, cols, rowClass) {
 function renderFlowAnalysis(data) {
     currentData = data.buyers || [];
 
-    // --- 4 charts in one row with section titles ---
+    // --- All 4 charts in one row, pairs grouped with divider ---
     const qoq = data.qoq_charts || [];
     if (qoq.length > 0 && typeof Chart !== 'undefined') {
         const labels = qoq.map(d => d.label);
@@ -2432,65 +2432,67 @@ function renderFlowAnalysis(data) {
 
         function _chartCard(title) {
             const card = document.createElement('div');
-            card.className = 'chart-card';
-            card.style.cssText = 'flex:1;min-width:0;padding:8px;';
+            card.style.cssText = 'flex:1;min-width:0;';
             const h = document.createElement('div');
-            h.style.cssText = 'font-size:11px;font-weight:600;color:#002147;text-align:center;margin-bottom:4px;';
+            h.style.cssText = 'font-size:10px;font-weight:600;color:#002147;text-align:center;margin-bottom:2px;';
             h.textContent = title;
             card.appendChild(h);
             const wrap = document.createElement('div');
-            wrap.style.cssText = 'position:relative;height:160px;';
+            wrap.style.cssText = 'position:relative;height:130px;';
             const canvas = document.createElement('canvas');
             wrap.appendChild(canvas);
             card.appendChild(wrap);
             return {card, canvas};
         }
 
-        // Section 1: Flow Intensity
-        const fiHeader = document.createElement('div');
-        fiHeader.style.cssText = 'padding:12px 0 4px 0;';
-        fiHeader.innerHTML = '<span style="font-size:14px;font-weight:700;color:#002147;">Flow Intensity</span>'
-            + '<span style="font-size:11px;color:#777;margin-left:10px;">'
-            + 'Net dollar change in institutional positions as % of market cap. Positive = net buying, negative = net selling.</span>';
-        tableWrap.appendChild(fiHeader);
+        // Section labels above chart row
+        const labelRow = document.createElement('div');
+        labelRow.style.cssText = 'display:flex;gap:0;padding:8px 0 2px 0;';
+        const fiLabel = document.createElement('div');
+        fiLabel.style.cssText = 'flex:1;text-align:center;';
+        fiLabel.innerHTML = '<span style="font-size:12px;font-weight:700;color:#002147;">Flow Intensity</span>'
+            + '<br><span style="font-size:10px;color:#888;">Net $ change as % of mkt cap</span>';
+        const chLabel = document.createElement('div');
+        chLabel.style.cssText = 'flex:1;text-align:center;';
+        chLabel.innerHTML = '<span style="font-size:12px;font-weight:700;color:#002147;">Holder Churn</span>'
+            + '<br><span style="font-size:10px;color:#888;">Turnover as % of avg inst value</span>';
+        labelRow.appendChild(fiLabel);
+        labelRow.appendChild(chLabel);
+        tableWrap.appendChild(labelRow);
 
-        const fiRow = document.createElement('div');
-        fiRow.style.cssText = 'display:flex;gap:12px;';
+        // Single row: [FI Total] [FI Active] | [Churn NP] [Churn Active]
+        const chartRow = document.createElement('div');
+        chartRow.style.cssText = 'display:flex;gap:6px;align-items:stretch;padding:0 0 4px 0;';
+
         const fi1 = _chartCard('Total');
         const fi2 = _chartCard('Active Only');
-        fiRow.appendChild(fi1.card);
-        fiRow.appendChild(fi2.card);
-        tableWrap.appendChild(fiRow);
+        chartRow.appendChild(fi1.card);
+        chartRow.appendChild(fi2.card);
 
-        // Section 2: Holder Churn
-        const chHeader = document.createElement('div');
-        chHeader.style.cssText = 'padding:16px 0 4px 0;';
-        chHeader.innerHTML = '<span style="font-size:14px;font-weight:700;color:#002147;">Holder Churn</span>'
-            + '<span style="font-size:11px;color:#777;margin-left:10px;">'
-            + 'Absolute value of position changes as % of average institutional value. Higher = more turnover. Measures trading activity, not direction.</span>';
-        tableWrap.appendChild(chHeader);
+        // Divider between pairs
+        const divider = document.createElement('div');
+        divider.style.cssText = 'width:2px;background:#ddd;margin:0 6px;flex-shrink:0;';
+        chartRow.appendChild(divider);
 
-        const chRow = document.createElement('div');
-        chRow.style.cssText = 'display:flex;gap:12px;';
         const ch1 = _chartCard('Non-Passive');
         const ch2 = _chartCard('Active Only');
-        chRow.appendChild(ch1.card);
-        chRow.appendChild(ch2.card);
-        tableWrap.appendChild(chRow);
+        chartRow.appendChild(ch1.card);
+        chartRow.appendChild(ch2.card);
+
+        tableWrap.appendChild(chartRow);
 
         // Footnote
         const fn = document.createElement('div');
-        fn.style.cssText = 'font-size:10px;color:#aaa;padding:6px 0 14px 0;font-style:italic;';
-        fn.textContent = 'Based on net 13F position changes per quarter. Understates gross trading activity. Active Only excludes index and passive managers.';
+        fn.style.cssText = 'font-size:10px;color:#aaa;padding:2px 0 12px 0;font-style:italic;';
+        fn.textContent = 'Based on net 13F position changes per quarter. Active Only excludes index and passive managers.';
         tableWrap.appendChild(fn);
 
-        // Render charts after DOM insertion
+        // Render charts
         setTimeout(() => {
             ['_fiChart1','_fiChart2','_chChart1','_chChart2'].forEach(k => {
                 if (window[k]) { window[k].destroy(); window[k] = null; }
             });
 
-            // Compute consistent scale per pair
             const fiTotalVals = qoq.map(d => (d.flow_intensity_total || 0) * 100);
             const fiActiveVals = qoq.map(d => (d.flow_intensity_active || 0) * 100);
             const allFi = fiTotalVals.concat(fiActiveVals);
@@ -2515,8 +2517,8 @@ function renderFlowAnalysis(data) {
                             data: vals,
                             backgroundColor: _barColors(vals),
                             borderRadius: 2,
-                            barPercentage: 0.5,
-                            categoryPercentage: 0.6,
+                            barPercentage: 0.4,
+                            categoryPercentage: 0.5,
                         }],
                     },
                     options: {
@@ -2527,11 +2529,11 @@ function renderFlowAnalysis(data) {
                             tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' } },
                         },
                         scales: {
-                            x: { ticks: { font: { size: 10 } } },
+                            x: { ticks: { font: { size: 9 } }, grid: { display: false } },
                             y: {
                                 min: scale.min, max: scale.max,
-                                title: { display: true, text: yLabel, font: { size: 10 } },
-                                ticks: { font: { size: 9 }, callback: v => v.toFixed(1) + '%' },
+                                ticks: { font: { size: 8 }, callback: v => v.toFixed(1) + '%', maxTicksLimit: 5 },
+                                grid: { color: '#f0f0f0' },
                             },
                         },
                     },
@@ -2544,35 +2546,24 @@ function renderFlowAnalysis(data) {
         }, 100);
     }
 
-    // --- Tabbed Buyers / Sellers / New Entries / Exits ---
+    // --- Tabbed view with unified columns ---
     const nameLabel = (data.level === 'fund') ? 'Fund' : 'Institution';
-    const flowCols = [
+    // Same columns for all tabs — data just has nulls where not applicable
+    const unifiedCols = [
         {key: 'inst_parent_name', label: nameLabel, type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
         {key: 'net_shares', label: 'Net Shares', type: 'shares'},
         {key: 'from_shares', label: 'From', type: 'shares'},
         {key: 'to_shares', label: 'To', type: 'shares'},
         {key: 'pct_change', label: '% Chg', type: 'pct'},
-        {key: 'net_value', label: 'Net Value', type: 'dollar'},
-    ];
-    const entryCols = [
-        {key: 'inst_parent_name', label: nameLabel, type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'to_shares', label: 'Shares', type: 'shares'},
-        {key: 'to_value', label: 'Value', type: 'dollar'},
-    ];
-    const exitCols = [
-        {key: 'inst_parent_name', label: nameLabel, type: 'text'},
-        {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'from_shares', label: 'Shares', type: 'shares'},
-        {key: 'from_value', label: 'Value', type: 'dollar'},
+        {key: 'net_value', label: 'Net $', type: 'dollar'},
     ];
 
-    const tabs = [
-        {id: 'buyers', label: '\u25B2 Buyers', rows: data.buyers || [], cols: flowCols, cls: 'row-buyer'},
-        {id: 'sellers', label: '\u25BC Sellers', rows: data.sellers || [], cols: flowCols, cls: 'row-seller'},
-        {id: 'new', label: '\u2605 New', rows: data.new_entries || [], cols: entryCols, cls: 'row-new-entry'},
-        {id: 'exits', label: '\u2715 Exits', rows: data.exits || [], cols: exitCols, cls: 'row-seller'},
+    const tabDefs = [
+        {id: 'buyers', label: '\u25B2 Buyers', rows: data.buyers || [], color: '#F0FBF4'},
+        {id: 'sellers', label: '\u25BC Sellers', rows: data.sellers || [], color: '#FDF0F0'},
+        {id: 'new', label: '\u2605 New', rows: data.new_entries || [], color: '#EBF3FB'},
+        {id: 'exits', label: '\u2715 Exits', rows: data.exits || [], color: '#FFF8EB'},
     ];
 
     // Tab bar
@@ -2586,23 +2577,83 @@ function renderFlowAnalysis(data) {
             b.classList.toggle('active', b.dataset.tabId === tabId);
         });
         tableArea.innerHTML = '';
-        const tab = tabs.find(t => t.id === tabId);
+        const tab = tabDefs.find(t => t.id === tabId);
         if (!tab || !tab.rows.length) {
             tableArea.innerHTML = '<div style="padding:16px;color:#999;">No data for this category.</div>';
             return;
         }
-        const table = _flowTable(tab.rows, tab.cols, tab.cls);
-        tableArea.appendChild(table);
+
+        // Build table with unified columns
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.style.tableLayout = 'fixed';
+        // Colgroup: #, name, type, net shares, from, to, %chg, net$
+        const colgroup = document.createElement('colgroup');
+        ['3%', null, '8%', '12%', '11%', '11%', '8%', '12%'].forEach(w => {
+            const cg = document.createElement('col');
+            if (w) cg.style.width = w;
+            colgroup.appendChild(cg);
+        });
+        table.appendChild(colgroup);
+
+        const thead = document.createElement('thead');
+        const hr = document.createElement('tr');
+        const thNum = document.createElement('th');
+        thNum.textContent = '#';
+        thNum.style.textAlign = 'right';
+        hr.appendChild(thNum);
+        unifiedCols.forEach(c => {
+            const th = document.createElement('th');
+            th.textContent = c.label;
+            th.style.textAlign = (c.type === 'text') ? 'left' : 'right';
+            hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        const evenColor = tab.color;
+        tab.rows.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            // Alternating row shading with category color
+            if (idx % 2 === 1) {
+                tr.style.backgroundColor = evenColor;
+            }
+            // # col
+            const tdN = document.createElement('td');
+            tdN.className = 'col-rownum';
+            tdN.textContent = idx + 1;
+            tr.appendChild(tdN);
+
+            unifiedCols.forEach(c => {
+                const td = document.createElement('td');
+                td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
+                const val = row[c.key];
+                if (c.key === 'pct_change') {
+                    if (val == null) {
+                        td.innerHTML = row.is_new_entry ? '<span style="color:#27AE60;font-size:10px;font-weight:600">NEW</span>'
+                            : (row.is_exit ? '<span style="color:#C0392B;font-size:10px;font-weight:600">EXIT</span>' : '\u2014');
+                    } else {
+                        const pct = (val * 100).toFixed(1);
+                        td.innerHTML = val > 0
+                            ? '<span class="positive">+' + pct + '%</span>'
+                            : '<span class="negative">(' + Math.abs(pct).toFixed(1) + '%)</span>';
+                    }
+                } else {
+                    td.innerHTML = formatCell(val, fmtType(c));
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
 
         // Totals row
-        const tbody = table.querySelector('tbody');
         const totals = document.createElement('tr');
         totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
-        // # col
-        const tdNum = document.createElement('td');
-        tdNum.className = 'col-rownum';
-        totals.appendChild(tdNum);
-        tab.cols.forEach(c => {
+        const tdTNum = document.createElement('td');
+        tdTNum.className = 'col-rownum';
+        totals.appendChild(tdTNum);
+        unifiedCols.forEach(c => {
             const td = document.createElement('td');
             td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
             if (c.key === 'inst_parent_name') {
@@ -2611,17 +2662,18 @@ function renderFlowAnalysis(data) {
                 let sum = 0;
                 tab.rows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
                 td.innerHTML = sum ? formatCell(sum, c.type === 'dollar' ? 'dollar' : 'shares') : '\u2014';
-            } else if (c.key === 'pct_change') {
-                td.textContent = '';
             } else {
                 td.textContent = '';
             }
             totals.appendChild(td);
         });
         tbody.appendChild(totals);
+
+        table.appendChild(tbody);
+        tableArea.appendChild(table);
     }
 
-    tabs.forEach(t => {
+    tabDefs.forEach(t => {
         const btn = document.createElement('button');
         btn.dataset.tabId = t.id;
         btn.style.cssText = 'padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#666;border-bottom:2px solid transparent;margin-bottom:-2px;';
