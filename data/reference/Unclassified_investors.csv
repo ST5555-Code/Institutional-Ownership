@@ -1,48 +1,16 @@
 investor_name,ciks,positions,aum_mm,total_shares
-Focus Partners Wealth,1,2291,87743.0,1043280065
-US Bancorp \de\,1,3516,85348.4,855820076
-Mackenzie Financial Corp,1,1537,84433.4,1039368813
-BROOKFIELD Corp /ON/,1,120,80757.1,1644500082
-Corient Private Wealth LLC,1,2402,75225.9,992614627
-"Commonwealth Equity Services, LLC",1,3036,75011.2,978091641
-Truist Financial Corp,1,2286,74996.0,745675472
-"Wealth Enhancement Advisory Services, LLC",1,3040,73731.4,920999827
-Walleye Trading LLC,1,1559,70137.6,767985916
-Cerity Partners LLC,1,2588,68622.3,679587934
-Aberdeen Group plc,1,889,64591.0,562577792
-Cibc World Market Inc.,1,1245,62020.9,834161706
-"Allspring Global Investments Holdings, LLC",1,1577,61731.6,920724526
-Universal- Beteiligungs- und Servicegesellschaft mbH,1,1929,61603.6,1482470603
-"Federated Hermes, Inc.",1,1932,59855.1,843471905
-Healthcare of Ontario Pension Plan Trust Fund,1,1117,59787.2,977113719
-Aviva PLC,1,818,59300.7,470480920
-CIBC Private Wealth Group LLC,1,3037,59158.5,457164495
-Caisse de Depot et Placement du Quebec,1,523,58951.5,552282818
-LMR Partners LLP,1,738,53137.7,2373405878
-Credit Agricole S A,1,1010,44040.7,309527318
-Tidal Investments LLC,1,1653,42137.6,656932897
-Woodbridge Co Ltd,1,76,40536.4,308650322
-"Grantham, Mayo, Van Otterloo & Co. LLC",1,611,39121.6,401110851
-Blair William & Co /IL/,1,1652,37259.5,259886823
-"Empower Advisory Group, LLC",1,490,37032.9,648237225
-"Chevy Chase Trust Holdings, LLC",1,621,37017.5,247948940
-Bamco Inc /NY/,1,313,36910.8,439002412
 "Mirae Asset Global Investments Co., Ltd.",1,1527,36035.6,273980721
 "Alyeska Investment Group, L.P.",1,526,35403.8,713364529
-"PFA Pension, Forsikringsaktieselskab",1,360,35251.3,221224803
 "Ieq Capital, LLC",1,1709,33399.6,276348641
 Walleye Capital LLC,1,1745,32596.8,1390976815
 Eurizon Capital SGR S.p.A.,1,1072,32131.9,231220771
 Vontobel Holding Ltd.,1,1081,31750.0,251389122
 Temasek Holdings (Private) Ltd,1,125,31574.8,295695807
 Fiera Capital Corp,1,359,31534.1,253182531
-Fifth Third Bancorp,1,2437,31482.4,189019308
 "State of Tennessee, Department of Treasury",1,1656,31274.3,290263877
-Public Sector Pension Investment Board,1,1286,29783.4,367833196
 Natixis,1,1040,28164.1,243933868
 Clear Street Group Inc.,1,309,26928.2,312355939
 Strs Ohio,1,2033,26811.4,242977755
-Federation des caisses Desjardins du Quebec,1,2429,26174.8,342963364
 "Pathstone Holdings, LLC",1,2051,25926.4,297578813
 Klp Kapitalforvaltning As,1,2082,25896.3,206434373
 Polar Capital Holdings Plc,1,247,25877.2,341843988
@@ -54,11 +22,9 @@ Allworth Financial LP,1,4042,24413.2,324345737
 Castle Hook Partners LP,1,56,24069.8,111953925
 Earnest Partners LLC,1,288,23335.5,378253905
 Agf Management Ltd,1,610,23054.6,281963837
-Alecta Tjanstepension Omsesidigt,1,68,22417.9,113101507
 AustralianSuper Pty Ltd,1,264,21511.4,172983576
 Menora Mivtachim Holdings Ltd.,1,123,21275.1,193391319
 Edgewood Management LLC,1,86,20999.5,76036329
-Cibc World Markets Corp,1,1095,20777.6,177437965
 Jain Global LLC,1,983,20687.2,570191874
 Lansforsakringar Fondforvaltning AB (publ),1,535,20218.0,135117789
 Capula Management Ltd,1,366,19962.6,102852610
@@ -72,15 +38,11 @@ Forsta Ap-Fonden,1,527,16776.6,102387875
 Capitolis Liquid Global Markets LLC,1,311,16766.6,141569577
 UniSuper Management Pty Ltd,1,668,16694.9,108750993
 ING Groep NV,1,529,16579.5,153079785
-Varma Mutual Pension Insurance Co,1,299,16539.0,243717695
-AMF Tjanstepension AB,1,118,16139.5,85546102
 TD Waterhouse Canada Inc.,1,1790,16078.9,190018735
 Marex Group plc,1,738,15886.4,232151191
 Regions Financial Corp,1,803,15622.1,124419751
-"Capital Wealth Planning, LLC",1,148,15447.3,87173745
 "Equitable Holdings, Inc.",1,1372,14627.1,165929312
 "Caption Management, LLC",1,818,14582.8,369146915
-Zurich Insurance Group Ltd/FI,1,278,14413.9,96202674
 "Banco Bilbao Vizcaya Argentaria, S.A.",1,714,14352.1,103081596
 "First Command Advisory Services, Inc.",1,722,14348.4,104561466
 OMERS ADMINISTRATION Corp,1,875,14030.8,163146076
@@ -94,12 +56,10 @@ Unisphere Establishment,1,58,13377.2,74714326
 "Banco Santander, S.A.",1,439,13354.7,642819480
 Tredje AP-fonden,1,338,13279.2,125990951
 Boston Trust Walden Corp,1,378,13249.8,117011296
-"Pinnacle Financial Partners, Inc.",1,985,13235.6,111654189
 "Exchange Traded Concepts, LLC",1,1472,13144.1,196046010
 Prudential PLC,1,652,12611.8,169160175
 Westwood Holdings Group Inc,1,451,12299.6,298626488
 "Centiva Capital, LP",1,730,12289.6,191001563
-Johnson Investment Counsel Inc,1,758,12236.4,89225825
 B. Metzler seel. Sohn & Co. AG,1,716,11465.0,73736439
 "Twin Tree Management, LP",1,697,11461.5,111226774
 Axiom Investors LLC /DE/,1,109,11393.7,68107763
@@ -111,7 +71,6 @@ Mairs & Power Inc,1,233,10390.3,76081399
 Mediolanum International Funds Ltd,1,395,10006.9,70021483
 "Rtw Investments, LP",1,85,9983.3,258594584
 "Champlain Investment Partners, LLC",1,125,9877.1,124333141
-Factory Mutual Insurance Co,1,191,9864.0,82123102
 Quadrature Capital Ltd,1,1031,9796.6,175218045
 "Mather Group, LLC.",1,616,9710.7,192224492
 Sarasin & Partners LLP,1,77,9631.7,52254110
@@ -123,18 +82,14 @@ Phoenix Financial Ltd.,1,418,9227.0,176361336
 Egerton Capital (UK) LLP,1,23,9200.4,49922640
 Compagnie Lombard Odier SCmA,1,396,9197.6,58230970
 LGT Group Foundation,1,278,9174.5,54808197
-"Rwa Wealth Partners, LLC",1,578,9149.4,76657285
 Fiduciary Management Inc /WI/,1,56,9094.8,122491967
 Benjamin Edwards Inc,1,1145,9037.5,114415620
-"NewEdge Wealth, LLC",1,1106,8851.8,94427252
 "Blue Trust, Inc.",1,2280,8850.1,112291359
-"Stratos Wealth Partners, LTD.",1,1394,8845.9,107872023
 "Atria Investments, Inc",1,1797,8798.7,103643079
 Meitav Investment House Ltd,1,220,8662.0,100063683
 Lbp Am SA,1,393,8625.4,59538916
 MUFG Securities EMEA plc,1,546,8618.6,69865963
 ASR Vermogensbeheer N.V.,1,502,8599.1,58018484
-Railway Pension Investments Ltd,1,105,8512.2,46395091
 Engineers Gate Manager LP,1,1881,8432.3,189818025
 "Union Bancaire Privee, UBP SA",1,487,8422.6,86881065
 Everett Harris & Co /CA/,1,259,8265.9,49676876
@@ -145,7 +100,6 @@ Welch & Forbes LLC,1,367,8254.2,46247108
 Andra AP-fonden,1,388,8094.3,63886599
 Stephens Inc /AR/,1,1165,8038.1,90728511
 Montrusco Bolton Investments Inc.,1,73,8025.0,59970060
-Illinois Municipal Retirement Fund,1,1125,7979.7,85516360
 "Horizon Investments, LLC",1,1224,7894.8,97753368
 "Vest Financial, LLC",1,405,7884.4,72787033
 Findlay Park Partners LLP,1,57,7837.2,46426780
@@ -177,9 +131,7 @@ Liontrust Investment Partners LLP,1,189,6738.8,51741762
 "ICONIQ Capital, LLC",1,80,6620.6,162851774
 Altshuler Shaham Ltd,1,358,6579.1,100278935
 "Signaturefd, LLC",1,3027,6548.4,68303185
-Cincinnati Insurance Co,1,59,6546.3,47107036
 "Bokf, NA",1,977,6534.1,53000076
-Elo Mutual Pension Insurance Co,1,587,6526.1,49276784
 Bristol John W & Co Inc /NY/,1,60,6503.0,36252359
 Ethic Inc.,1,1138,6502.8,63233545
 Cambridge Associates LLC /ma/ /adv,1,57,6491.8,57160669
@@ -191,13 +143,9 @@ Gradient Investments LLC,1,297,6299.8,90718198
 Kohlberg Kravis Roberts & Co. L.P.,1,85,6254.8,546797390
 J. Safra Sarasin Holding AG,1,475,6148.5,43595189
 "Letko, Brosseau & Associates Inc",1,94,6107.6,134751540
-Prospera Financial Services Inc,1,1179,6092.6,76123384
 "RiverFront Investment Group, LLC",1,316,6063.4,76902940
 "OpenArc Corporate Advisory, LLC",1,621,6049.8,60979020
 Mizuho Securities Usa LLC,1,583,6049.4,297749103
-Old National Bancorp /IN/,1,569,6018.8,88417747
-Crawford Investment Counsel Inc,1,291,6006.9,60523636
-"Danica Pension, Livsforsikringsaktieselskab",1,79,5974.5,44964638
 Quilter Plc,1,125,5955.8,29923254
 "NorthRock Partners, LLC",1,573,5926.8,70438576
 Gf Fund Management Co. Ltd.,1,626,5850.5,37250589
@@ -210,10 +158,7 @@ Harvest Portfolios Group Inc.,1,247,5751.0,47069593
 Reaves W H & Co Inc,1,80,5717.1,73798038
 "Nicholas Company, Inc.",1,200,5709.7,43192242
 Marshfield Associates,1,17,5704.8,27806588
-Local Pensions Partnership Investment Ltd,1,32,5680.1,19743257
 AIA Group Ltd,1,394,5656.8,47025728
-"Facet Wealth, Inc.",1,295,5650.2,59885199
-"Global Retirement Partners, LLC",1,3397,5636.1,70857711
 Comgest Global Investors S.A.S.,1,53,5611.2,23723720
 "Deep Track Capital, LP",1,51,5608.7,206106228
 "Interval Partners, LP",1,264,5586.4,65976262
@@ -221,10 +166,8 @@ Exor N.V.,1,2,5577.7,263959985
 Hancock Whitney Corp,1,726,5546.3,49577050
 "Energy Income Partners, LLC",1,85,5521.2,124580030
 Situational Awareness LP,1,24,5516.8,139707516
-"Badgley Phelps Wealth Managers, LLC",1,320,5459.9,36810410
 Japan Science & Technology Agency,1,12,5442.8,53991810
 Barings LLC,1,156,5427.0,243740727
-"Evoke Wealth, LLC",1,629,5357.8,71901915
 "Sessa Capital IM, L.P.",1,27,5349.6,139342871
 Cannell & Spears LLC,1,378,5345.2,75027677
 "Donald Smith & Co., Inc.",1,49,5338.5,266758027
@@ -251,7 +194,6 @@ Equity Investment Corp,1,70,4953.3,93500963
 "Darwin Global Management, Ltd.",1,6,4939.4,36235099
 "Harbour Investments, Inc.",1,2812,4931.5,82288086
 Mgo One Seven LLC,1,1226,4902.3,63424624
-Maryland State Retirement & Pension System,1,1343,4856.6,58206403
 "Catterton Management Company, L.L.C.",1,3,4835.3,118296746
 "Advent International, L.P.",1,22,4832.1,795231164
 AQR Arbitrage LLC,1,213,4752.3,1313891986
@@ -292,30 +234,21 @@ Millburn Ridgefield LLC /DE/,1,36,4197.7,45794815
 "H&F Corporate Investors X, Ltd.",1,1,4179.6,99514069
 Itau Unibanco Holding S.A.,1,321,4172.5,173112428
 Banque Transatlantique SA,1,252,4126.4,16882369
-"CreativeOne Wealth, LLC",1,985,4124.6,54073140
-Munich Reinsurance Co Stock Corp in Munich,1,195,4112.7,37654458
-"Ashton Thomas Private Wealth, LLC",1,892,4102.1,56135425
 Chicago Partners Investment Group LLC,1,1159,4058.1,62191808
 "Chicago Capital, LLC",1,348,4048.8,27735117
 Cary Street Partners Financial LLC,1,892,4038.0,48835025
 Lindsell Train Ltd,1,27,3943.4,30735105
 Avanza Fonder AB,1,483,3942.8,24899818
-Arbejdsmarkedets Tillaegspension,1,161,3925.4,43489787
 "BlueSpruce Investments, LP",1,9,3918.5,10497506
 Associated Banc-Corp,1,322,3906.3,27598783
 "SBI Securities Co., Ltd.",1,3264,3889.9,46786849
-"MassMutual Private Wealth & Trust, FSB",1,2190,3885.8,29645759
-"Dai-ichi Life Insurance Company, Ltd",1,475,3883.0,24600161
 Fisher Funds Management LTD,1,160,3873.6,27034543
 "HUB Investment Partners, LLC",1,783,3862.7,42528784
 Munro Partners,1,57,3849.6,21145163
 XTX Topco Ltd,1,2675,3808.3,183613056
-Journey Strategic Wealth LLC,1,718,3805.2,24630385
 "Zimmer Partners, LP",1,112,3795.1,188169241
-"Quotient Wealth Partners, LLC",1,345,3757.5,45275566
 "Frazier Life Sciences Management, L.P.",1,38,3723.2,163702779
 "Advisory Alpha, LLC",1,487,3672.4,71580562
-Sumitomo Life Insurance Co,1,275,3651.9,62581079
 "Americana Partners, LLC",1,429,3642.8,43750884
 Mirae Asset Securities (usa) Inc.,1,92,3634.9,30908653
 Sigma Planning Corp,1,1104,3622.7,45519747
@@ -326,12 +259,8 @@ SurgoCap Partners LP,1,16,3612.1,31309644
 "Avantax Planning Partners, Inc.",1,420,3575.2,82319436
 XN LP,1,26,3568.3,30989278
 "Edgestream Partners, L.P.",1,900,3553.6,62527725
-DV Trading LLC,1,953,3551.8,25457240
-Mitsui Sumitomo Insurance Co Ltd,1,1,3542.9,50526511
-Salem Investment Counselors Inc,1,376,3540.9,26844516
 Amazon Com Inc,1,6,3521.4,172084661
 "Aspiriant, LLC",1,304,3480.6,30469828
-Meiji Yasuda Life Insurance Co,1,218,3450.6,37751656
 Private Management Group Inc,1,288,3434.8,209360922
 Lincoln National Corp,1,20,3420.7,37494128
 Voyager Global Management LP,1,9,3419.5,12590000
@@ -354,8 +283,6 @@ Paulson & Co. Inc.,1,8,3262.0,219057839
 "NZS Capital, LLC",1,60,3260.1,24213116
 "Karpus Management, Inc.",1,122,3256.2,199086924
 Hancock Prospecting Pty Ltd,1,28,3254.5,59571194
-Stonehage Fleming Financial Services Holdings Ltd,1,213,3251.6,14094457
-"Nan Shan Life Insurance Co., Ltd.",1,81,3250.9,54124835
 "Senvest Management, LLC",1,48,3227.1,95314493
 Meritage Group LP,1,10,3215.7,20795424
 "Yarbrough Capital, LLC",1,150,3212.2,16139105
@@ -372,7 +299,6 @@ Dynamic Advisor Solutions LLC,1,831,3116.4,45306917
 Venture Visionary Partners LLC,1,585,3068.3,33939207
 DeepCurrents Investment Group LLC,1,120,3051.9,2297027358
 Covea Finance,1,127,3034.8,18657912
-Dixon Mitchell Investment Counsel Inc.,1,141,3031.8,26768589
 "Joel Isaacson & Co., LLC",1,437,3028.6,21710947
 "Fund Evaluation Group, LLC",1,60,3023.1,53825965
 "TCG Crossover Management, LLC",1,40,3021.7,142379962
@@ -385,7 +311,6 @@ Sprott Inc.,1,176,2962.2,202666371
 "SageView Advisory Group, LLC",1,2307,2957.6,46038618
 Bls Capital Fondsmaeglerselskab A/s,1,12,2950.5,23383854
 Hirtle Callaghan & Co LLC,1,107,2937.2,28622281
-Gts Securities LLC,1,875,2932.2,58474891
 "Ascent Group, LLC",1,723,2925.2,28913458
 Saudi Electronic Games Holding Co,1,1,2922.5,11414680
 "Alpha Cubed Investments, LLC",1,284,2922.3,15073972
@@ -393,17 +318,13 @@ Michael & Susan Dell Foundation,1,8,2884.7,12347670
 Wedmont Private Capital,1,783,2878.2,33049886
 BNDES Participacoes S.A.,1,0,2874.1,199311644
 "General Atlantic, L.P.",1,8,2872.7,158594943
-Schwartz Investment Counsel Inc,1,130,2861.2,30527590
 "Maplelane Capital, LLC",1,47,2841.0,28921176
-"BIP Wealth, LLC",1,401,2833.2,38197707
 Banque Cantonale Vaudoise,1,759,2800.8,32782729
 "Nfj Investment Group, LLC",1,218,2779.3,39186296
 "American Family Investments, Inc.",1,11,2778.4,49658076
 Greenhouse Funds LLLP,1,31,2768.5,119597008
-"Avidian Wealth Enterprises, LLC",1,537,2747.9,36274845
 "Integrity Alliance, LLC.",1,668,2741.7,37211133
 GLOBALT Investments LLC / GA,1,148,2739.5,37530924
-Sowell Financial Services LLC,1,992,2722.3,36778045
 BIT Capital GmbH,1,85,2718.0,57301200
 Arizona PSPRS Trust,1,18,2716.6,32902664
 "Delta Accumulation, LLC",1,98,2714.4,9645512
@@ -423,8 +344,6 @@ Cercano Management LLC,1,143,2642.6,39429822
 Balentine LLC,1,216,2636.4,44259512
 F/m Investments LLC,1,407,2631.0,24401579
 Aviso Financial Inc.,1,324,2631.0,24007859
-Canada Post Corp Registered Pension Plan,1,492,2625.5,25936332
-Capital Counsel LLC /NY/,1,55,2618.6,10213094
 "Welch Group, LLC",1,301,2594.1,21686699
 Alphabet Inc.,1,28,2579.8,105852195
 "Cornerstone Investment Partners, LLC",1,213,2579.2,12558678
@@ -434,21 +353,15 @@ NS Partners Ltd,1,72,2552.7,18765369
 "GM Advisory Group, LLC",1,324,2552.4,32761146
 First Beijing Investment Ltd,1,8,2535.5,162695831
 Chesley Taft & Associates LLC,1,365,2534.0,16808658
-Waldron Private Wealth LLC,1,316,2530.2,17994729
 Mantle Ridge LP,1,2,2503.6,16211910
 "Nishkama Capital, LLC",1,53,2495.0,21950860
-"Bogart Wealth, LLC",1,1460,2492.1,29962385
 Renaissance Group LLC,1,224,2490.4,22537111
 Capital Asset Advisory Services LLC,1,279,2487.9,29055445
 "Beacon Investment Advisory Services, Inc.",1,257,2450.4,15933279
 JB Capital LLC,1,254,2449.7,25072897
 "Ursa Fund Management, LLC",1,22,2438.9,8882092
-Massachusetts Mutual Life Insurance Co,1,2,2425.0,85986681
-"Confluence Wealth Services, Inc.",1,358,2413.9,38647579
 "Nippon Life Global Investors Americas, Inc.",1,103,2413.7,12890380
-Trajan Wealth LLC,1,146,2400.1,18691752
 Summitry LLC,1,242,2399.9,27159809
-"Linscomb Wealth, Inc.",1,299,2382.2,24573962
 Bpifrance SA,1,2,2365.8,205297810
 "CAS Investment Partners, LLC",1,5,2337.1,16652169
 "Moors & Cabot, Inc.",1,826,2336.1,29458265
@@ -476,22 +389,17 @@ Elm Partners Management LLC,1,152,2204.0,32520972
 "EcoR1 Capital, LLC",1,26,2204.0,87719353
 Ruffer LLP,1,145,2196.5,67685759
 Montag A & Associates Inc,1,898,2191.5,13100725
-Obermeyer Wealth Partners,1,282,2188.3,13894522
 "Aristotle Atlantic Partners, LLC",1,90,2185.8,14462160
 "NLB Skladi, upravljanje premozenja, d.o.o.",1,315,2185.7,15825911
 Greylock XIV GP LLC,1,1,2183.2,58420365
 Regents of the University of California,1,5,2173.9,27193949
 Brooklyn Investment Group,1,1424,2168.4,30487253
-"Strategic Financial Services, Inc.",1,138,2167.7,31582456
-"Zions Bancorporation, National Association /UT/",1,1158,2164.2,17392761
-"Ausdal Financial Partners, Inc.",1,814,2155.3,35812704
 Heard Capital LLC,1,21,2130.0,11910619
 Berkley W R Corp,1,95,2125.3,146114219
 "PFG Investments, LLC",1,985,2122.6,39478277
 "Sound Income Strategies, LLC",1,2125,2113.5,65001113
 "Mason Investment Advisory Services, Inc.",1,78,2107.6,24035572
 Investment House LLC,1,207,2104.0,14165816
-Woodley Farra Manion Portfolio Management Inc,1,113,2099.4,12599220
 "Empirical Finance, LLC",1,469,2096.4,17191939
 Y.D. More Investments Ltd,1,442,2088.1,75779135
 "Voss Capital, LP",1,48,2084.4,88397916
@@ -513,16 +421,13 @@ Clearline Capital LP,1,93,2027.2,63242954
 "Vr Adviser, LLC",1,25,2024.5,124682754
 "Ribbit Management Company, LLC",1,11,2017.2,65854394
 Syon Capital LLC,1,849,2005.7,24852081
-"Sofi Wealth, LLC",1,48,2005.1,25580235
 Finepoint Capital LP,1,7,2003.6,36131414
 ATLAS Infrastructure Partners (UK) Ltd.,1,9,1994.4,37549181
 GAMMA Investing LLC,1,3197,1990.5,21945002
 "Eversept Partners, LP",1,98,1984.4,88952778
 Mizuho Markets Cayman LP,1,90,1982.8,14802871
 Qvr LLC,1,68,1982.1,7739229
-Sigma Investment Counselors Inc,1,199,1968.2,27047655
 "NEA Management Company, LLC",1,25,1961.1,130943750
-"Root Financial Partners, LLC",1,2245,1956.9,34876040
 Blue Whale Capital LLP,1,24,1948.7,11720545
 "Cavalier Investments, LLC",1,51,1946.1,6602254
 "Gilead Sciences, Inc.",1,6,1935.5,72590001
@@ -543,7 +448,6 @@ Spinnaker Trust,1,283,1868.2,20102075
 Maren Capital LLC,1,21,1859.4,13007036
 "Progeny 3, Inc.",1,37,1857.9,50886178
 "Entropy Technologies, LP",1,811,1843.4,27629184
-Mogy Joel R Investment Counsel Inc,1,112,1843.2,6721797
 Roffman Miller Associates Inc /PA/,1,81,1831.3,10120112
 "Sepio Capital, LP",1,346,1827.2,30835828
 Srb Corp,1,23,1821.8,14059473
@@ -552,10 +456,8 @@ Rothschild Investment LLC,1,3091,1817.9,20623701
 Soma Equity Partners LP,1,17,1817.6,26612160
 Greenwood Gearhart Inc,1,108,1817.5,19107171
 "Rice Hall James & Associates, LLC",1,236,1816.5,62974627
-Cerity Partners OCIO LLC,1,25,1807.4,25110219
 Pine Valley Investments Ltd Liability Co,1,483,1801.5,28934746
 Sourcerock Group LLC,1,32,1791.7,76182081
-"McKinley Carter Wealth Services, Inc.",1,300,1790.3,19048386
 "Investure, LLC",1,15,1788.7,7810066
 AlphaQuest LLC,1,2169,1787.0,43600799
 Money Concepts Capital Corp,1,469,1783.6,21056339
@@ -582,9 +484,7 @@ Mariner Investment Group LLC,1,88,1712.7,109307074
 "ARS Investment Partners, LLC",1,185,1711.2,23409651
 Patten & Patten Inc /TN/,1,333,1703.7,14268267
 Broadwood Capital Inc,1,12,1702.2,86730737
-Founders Financial Securities LLC,1,503,1697.5,22966051
 "Strategic Blueprint, LLC",1,532,1696.7,22930207
-Svb Wealth LLC,1,293,1696.1,12261550
 Hilltop Holdings Inc.,1,828,1689.7,18878522
 "Symmetry Partners, LLC",1,198,1689.6,30680811
 "Granite Investment Partners, LLC",1,239,1687.2,21553593
@@ -592,12 +492,9 @@ Sienna Gestion,1,146,1683.8,12160508
 "Diversified Enterprises, LLC",1,373,1681.2,34200180
 Oak Associates Ltd /OH/,1,130,1663.7,8233440
 Logos Global Management LP,1,61,1655.0,73033652
-"Invictus Private Wealth, LLC",1,78,1652.2,7058222
 Oak Ridge Investments LLC,1,173,1649.9,8444330
 "Atairos Group, Inc.",1,4,1649.4,93996958
 Glenorchy Capital Ltd,1,50,1649.1,12307138
-Parcion Private Wealth LLC,1,401,1643.4,22032653
-"BOK Financial Private Wealth, Inc.",1,445,1633.9,12434452
 Cumberland Partners Ltd,1,168,1632.7,11161661
 MFF Capital Investments Ltd,1,19,1632.2,7930854
 Mcdonald Capital Investors Inc /CA/,1,21,1630.6,12158602
@@ -611,7 +508,6 @@ Zweig-DiMenna Associates LLC,1,95,1611.2,18707382
 Mufg Securities Americas Inc.,1,495,1606.7,21525163
 "Ae Industrial Partners, LP",1,3,1606.3,128297047
 "Rush Island Management, LP",1,17,1600.3,40147998
-Woodmont Investment Counsel LLC,1,249,1595.3,19125660
 "Certuity, LLC",1,565,1588.9,22478525
 Azora Capital LP,1,45,1588.0,65886528
 "Triglav Skladi, D.O.O.",1,154,1584.5,40368413
@@ -621,13 +517,9 @@ Browning West LP,1,5,1578.3,26832437
 "DDD Partners, LLC",1,127,1571.3,11739204
 Impactive Capital LP,1,8,1570.8,55787448
 GAM Holding AG,1,268,1567.1,21273588
-"Wealthspire Retirement, LLC",1,285,1566.3,19334612
-Baldwin Wealth Partners LLC /MA/,1,228,1563.8,10938144
 Alaska Permanent Fund Corp,1,5,1562.5,8180370
-"Valley Wealth Managers, Inc.",1,342,1560.6,15570225
 Hill Path Capital LP,1,7,1554.0,52332280
 "Phillips Financial Management, LLC",1,295,1551.8,24709911
-"FAS Wealth Partners, Inc.",1,477,1547.5,19172340
 "Vivo Capital, LLC",1,44,1547.1,137948154
 "Avestar Capital, LLC",1,393,1543.2,13836224
 Oasis Management Co Ltd.,1,60,1542.7,117143702
@@ -637,7 +529,6 @@ Swiss Re Ltd,1,235,1533.3,2288866
 Kranot Hishtalmut Le Morim Ve Gananot Havera Menahelet LTD,1,55,1532.9,20161822
 Fiduciary Alliance LLC,1,485,1530.2,20601596
 "Fifth Third Securities, Inc. ",1,292,1529.6,18065998
-FUKOKU MUTUAL LIFE INSURANCE Co,1,242,1524.2,19502332
 "Asset Dedication, LLC",1,1031,1523.2,32044021
 "Burkehill Global Management, LP",1,146,1518.3,116173458
 Norris Perne & French LLP /MI/,1,159,1515.1,8771413
@@ -657,15 +548,11 @@ Partners Group Holding AG,1,47,1481.0,121652258
 "Armstrong Advisory Group, Inc",1,888,1479.7,16594682
 Shufro Rose & Co LLC,1,271,1478.3,23989378
 Cullinan Associates Inc,1,208,1475.4,9302016
-Lutz Financial Services LLC,1,100,1470.4,20312019
-"Cornerstone Wealth Group, LLC",1,359,1462.8,12832986
 "First American Trust, Fsb",1,253,1455.4,14782036
 IQ EQ FUND MANAGEMENT (IRELAND) Ltd,1,284,1449.4,29080227
 Covalis Capital LLP,1,71,1424.0,49708294
-Heitman Real Estate Securities LLC,1,53,1421.7,25350804
 "Generali Investments CEE, investicni spolecnost, a.s.",1,306,1419.5,28563997
 "Capital Investment Advisory Services, LLC",1,905,1414.4,20323293
-"Private Wealth Partners, LLC",1,163,1411.1,8205631
 Baring Fintech Manager Holding Ltd,1,1,1410.4,18051851
 Twinbeech Capital LP,1,530,1407.5,27615099
 "ProVise Management Group, LLC",1,247,1404.8,16257652
@@ -677,7 +564,6 @@ Prescott General Partners LLC,1,9,1400.8,10404936
 P/E Global LLC,1,5,1387.6,5045566
 "Quent Capital, LLC",1,1483,1386.0,20462960
 "Blue Chip Partners, LLC",1,163,1378.9,12542595
-"Leo Wealth, LLC",1,390,1378.7,20891375
 Delta Global Management LP,1,153,1374.5,18611144
 Johns Hopkins University,1,13,1373.2,13149898
 "Nicholas Investment Partners, LP",1,191,1372.8,121155749
@@ -702,19 +588,15 @@ PPSC Investment Service Corp,1,8,1339.7,5974755
 "Main Street Financial Solutions, LLC",1,473,1335.7,23910934
 "Nbc Securities, Inc.",1,1916,1333.9,20005936
 Vicus Capital,1,245,1333.0,17951852
-Leith Wheeler Investment Counsel Ltd.,1,84,1332.4,10289601
 "Harbor Investment Advisory, LLC",1,1121,1331.9,9450819
 "a16z Perennial Management, L.P.",1,139,1331.1,24649048
 "Ycg, LLC",1,44,1325.4,6171579
-Wealthquest Corp,1,143,1324.3,15065409
 "Smith, Moore & Co.",1,482,1322.8,17257915
 "First Heartland Consultants, Inc.",1,446,1319.4,22647146
 Arnhold LLC,1,105,1318.4,24630976
 "Global X Japan Co., Ltd.",1,321,1314.4,5852228
 Fairmount Funds Management LLC,1,13,1313.8,48721157
 "DigitalBridge Group, Inc.",1,61,1311.0,18932292
-"RVW Wealth, LLC",1,166,1309.3,23525534
-American Securities LLC,1,1,1305.8,45026743
 "Styrax Capital, LP",1,16,1305.2,6490271
 Value Partners Investments Inc.,1,99,1304.2,15433170
 Credit Industriel et Commercial,1,233,1301.3,123491771
@@ -736,7 +618,6 @@ LGT Fund Management Co Ltd.,1,212,1265.1,10834434
 Nan Fung Trinity (hk) Ltd,1,74,1262.2,33336254
 Algebris (UK) Ltd,1,77,1260.3,46952326
 W.G. Shaheen & Associates DBA Whitney & Co,1,166,1256.7,9447450
-"MBL Wealth, LLC",1,269,1247.8,17834619
 Guardian Partners Inc.,1,196,1247.7,16941443
 Central Securities Corp,1,29,1243.7,7404380
 "Advisor OS, LLC",1,465,1241.4,14611618
@@ -760,30 +641,23 @@ Fishman Jay A Ltd /MI/,1,82,1216.0,8880616
 "Talbot Financial, LLC",1,68,1214.8,5303284
 Caligan Partners LP,1,20,1214.8,36470160
 "AltraVue Capital, LLC",1,26,1213.6,28815094
-Neumeier Poma Investment Counsel LLC,1,42,1210.0,18103067
 "DT Investment Partners, LLC",1,531,1207.8,9268669
 American Express Co,1,1,1207.1,157786199
 "Diversified Portfolios, Inc.",1,172,1201.2,17280788
 Chescapmanager LLC,1,19,1201.0,21078591
 Clean Energy Transition LLP,1,10,1198.5,11038729
 Headlands Technologies LLC,1,601,1198.4,27310122
-"Heritage Financial Services, LLC",1,124,1198.0,20811260
 "Meteora Capital, LLC",1,114,1195.3,257260292
 "Estate Counselors, LLC",1,89,1194.3,30235307
 Longaeva Partners L.P.,1,110,1192.2,32556652
-Brandywine Oak Private Wealth LLC,1,225,1191.5,17017662
 "Fiduciary Group, LLC",1,288,1190.6,9774959
 American Trust,1,316,1189.5,10804799
 "Journey Advisory Group, LLC",1,252,1189.2,17973457
-Falcon Wealth Planning,1,207,1187.3,16805842
 "Means Investment Co., Inc.",1,180,1187.0,8676552
-"FourThought Financial Partners, LLC",1,485,1184.1,11631756
 "Kintegral Advisory, LLC",1,228,1180.8,7518280
 Sagefield Capital LP,1,92,1180.3,29053606
 Winthrop Advisory Group LLC,1,185,1180.1,10651799
-"German American Bancorp, Inc.",1,121,1174.3,8770320
 J. Stern & Co. LLP,1,43,1173.4,1173366950
-"Elevation Point Wealth Partners, LLC",1,507,1166.9,13293029
 Woodstock Corp,1,150,1165.3,8185217
 Anderson Hoagland & Co,1,136,1162.3,11340365
 Sora Investors LLC,1,80,1161.3,10177771
@@ -791,7 +665,6 @@ Zazove Associates LLC,1,116,1161.3,1000129675
 Connors Investor Services Inc,1,145,1161.3,11274576
 "Levin Capital Strategies, L.P.",1,197,1158.7,20946224
 Consolidated Portfolio Review Corp,1,33,1157.4,7974884
-Mirabella Financial Services LLP,1,233,1154.1,70067365
 Sylebra Capital LLC,1,8,1153.3,74292743
 Symmetry Investments LP,1,109,1153.1,12743512
 Electrum Group LLC,1,8,1146.9,156381301
@@ -811,7 +684,6 @@ Keystone Investors Pte Ltd,1,74,1113.3,8759570
 North of South Capital LLP,1,23,1112.8,42945763
 EQT Fund Management S.a r.l.,1,2,1112.1,39133973
 "Inspire Investing, LLC",1,1039,1111.4,30428794
-"Wealth Architects, LLC",1,235,1109.8,13800265
 MOTCO,1,604,1103.2,8075469
 "Awm Capital, LLC",1,100,1101.7,22623813
 "Royal Fund Management, LLC",1,242,1099.6,10058053
@@ -819,14 +691,9 @@ Greenvale Capital LLP,1,14,1099.1,42711791
 "Hackensack Meridian Health, Inc.",1,7,1097.0,8106932
 Connable Office Inc,1,226,1090.8,9573008
 Avenir Tech Ltd,1,18,1089.3,30604234
-"First Business Financial Services, Inc.",1,165,1089.0,7411251
-"Syntegra Private Wealth Group, LLC",1,175,1088.9,14158057
 GuoLine Advisory Pte Ltd,1,23,1087.4,4039000
-"Verus Financial Partners, Inc.",1,112,1087.0,11786813
-OneAscent Financial Services LLC,1,398,1085.7,24226274
 Baring Fintech Fund III Managers Ltd,1,1,1083.7,13870945
 Clarity Financial LLC,1,113,1081.3,9316625
-Shepherd Financial Partners LLC,1,242,1079.3,10524035
 "McIlrath & Eck, LLC",1,875,1076.5,18185932
 "Goodnow Investment Group, LLC",1,21,1071.9,9955101
 Abc Arbitrage SA,1,252,1068.0,42018478
@@ -837,9 +704,7 @@ RDST Capital LLC,1,18,1061.3,16203951
 "Capital Investment Services of America, Inc.",1,79,1059.7,7156325
 "Angelo Gordon & Co., L.P.",1,44,1059.4,439513495
 Discerene Group LP,1,12,1056.3,64561751
-KWB Wealth,1,164,1055.8,19206024
 MASTERINVEST Kapitalanlage GmbH,1,264,1053.1,6448795
-"Triad Wealth Partners, LLC",1,398,1052.4,16284599
 Summit Partners L P,1,8,1051.0,71793876
 Parkman Healthcare Partners LLC,1,93,1050.5,36862618
 Allen Holding Inc /NY/,1,9,1049.1,10968788
@@ -848,7 +713,6 @@ Allen Holding Inc /NY/,1,9,1049.1,10968788
 "Shellback Capital, LP",1,80,1047.9,14496620
 Randolph Co Inc,1,41,1042.9,10992780
 "Steigerwald, Gordon & Koch Inc.",1,832,1041.8,8784793
-Rothschild Wealth LLC,1,492,1040.7,23641860
 Tetrad Corp,1,3,1039.9,3734623
 PSG Equity L.L.C.,1,1,1035.0,85464516
 "Nextech Invest, Ltd.",1,16,1034.4,48695878
@@ -860,7 +724,6 @@ Atlas FRM LLC,1,12,1023.8,35949954
 "UNICOM Systems, Inc.",1,20,1022.9,12109846
 Norden Group LLC,1,585,1021.4,10324215
 "Gleason Group, Inc.",1,200,1019.8,8858212
-"Abacus Wealth Partners, LLC",1,484,1019.3,32500626
 Bruni J V & Co /CO/,1,29,1018.5,20820007
 "Cornerstone Capital, Inc.",1,108,1014.2,8006685
 "Goehring & Rozencwajg Associates, LLC",1,39,1009.4,44680500
@@ -872,7 +735,6 @@ Bbfit Investments Pte Ltd,1,8,1002.7,14967717
 MMCAP International Inc. SPC,1,69,1000.3,174378543
 "Bensler, LLC",1,182,998.8,14647491
 Villere St Denis J & Co LLC,1,77,996.7,14421652
-"Uniplan Investment Counsel, Inc.",1,163,995.9,21946394
 Consolidated Planning Corp,1,197,990.4,15258184
 Relyea Zuckerberg Hanson LLC,1,256,990.0,7753251
 Suncoast Equity Management,1,83,989.9,3759420
@@ -881,11 +743,9 @@ Swf LLC,1,10,988.8,3809702
 "MayTech Global Investments, LLC",1,25,987.7,5930425
 "Rodgers & Associates, LTD",1,105,987.6,9856060
 "Linden Thomas Advisory Services, LLC",1,471,986.6,10353609
-"Cascade Financial Partners, LLC",1,260,986.5,9153554
 "Cynosure Group, LLC",1,392,983.1,14029682
 "Planning Center, Inc.",1,74,979.3,22011386
 SPX Gestao de Recursos Ltda,1,50,978.9,51963390
-"Pinkerton Retirement Specialists, LLC",1,137,975.5,12730429
 Walmart Inc.,1,3,974.4,18375000
 "Inscription Capital, LLC",1,647,973.9,11871744
 "Sixth Street Partners Management Company, L.P.",1,7,973.6,48627942
@@ -897,13 +757,9 @@ Shay Capital LLC,1,371,968.7,64986006
 "Pembroke Management, LTD",1,87,967.9,17373776
 Passaic Partners LLC,1,14,966.1,7586171
 KADENSA CAPITAL Ltd,1,42,963.0,11796839
-"Great Lakes Retirement, Inc.",1,192,961.8,11732382
-Cutler Investment Counsel LLC,1,142,961.3,11558648
 Tairen Capital Ltd,1,56,960.9,7896985
-"Ullmann Wealth Partners Group, LLC",1,144,960.8,10236256
 Galaxy Group Investments LLC,1,73,958.7,60847902
 "Condire Management, LP",1,19,958.0,209421308
-"Pinnacle Wealth Planning Services, Inc.",1,2470,957.8,20292681
 Brehaut David Pascal,1,1,957.7,12257305
 Mbb Public Markets I LLC,1,25,957.2,9161549
 Archon Partners LLC,1,42,956.8,4030751
@@ -914,21 +770,16 @@ Sunriver Management LLC,1,23,953.9,32381278
 "Black Diamond Financial, LLC",1,171,948.6,14186924
 "Intrua Financial, LLC",1,431,948.0,13919642
 "Tamar Securities, LLC",1,80,947.4,5612067
-"Graves Light Lenhart Wealth, Inc.",1,183,942.9,10501090
 Middleton & Co Inc /MA/,1,158,941.8,4987565
-"Marble Harbor Investment Counsel, LLC",1,180,935.5,8009369
 Blueprint Investment Partners LLC,1,113,935.0,20240216
-Gryphon Financial Partners LLC,1,321,934.7,6957967
 Biglari Capital Corp.,1,12,932.7,8366788
 "Philadelphia Financial Management of San Francisco, LLC",1,50,931.8,24311252
 "Bedel Financial Consulting, Inc.",1,266,929.3,8355393
 Water Island Capital LLC,1,64,927.6,75362990
 Parthenon LLC,1,130,926.7,7804658
-Curated Wealth Partners LLC,1,201,925.3,10484897
 Indivisible Partners,1,407,922.2,11714589
 Avenir Corp,1,69,921.7,14668489
 Greenwood Capital Associates LLC,1,244,920.9,9653544
-"DiNuzzo Private Wealth, Inc.",1,1324,919.2,21276390
 Oak Harvest Investment Services,1,166,917.0,9031596
 Flat Footed LLC,1,22,914.8,82148351
 Altfest L J & Co Inc,1,301,913.5,18004987
@@ -938,52 +789,39 @@ Ardsley Advisory Partners LP,1,120,911.1,29537186
 TLT Family Holdco ULC,1,8,910.8,6776701
 Mak Capital One LLC,1,19,908.8,96472638
 "Nuance Investments, LLC",1,42,907.6,23602126
-"WealthShield Partners, LLC",1,486,906.8,11109774
-"BlueStem Wealth Partners, LLC",1,118,905.7,20391735
 V3 Holding Ltd,1,1,905.0,61316694
 "L. Roy Papp & Associates, LLP",1,182,904.5,5457275
 Ninepoint Partners LP,1,147,904.2,24149198
 Caledonia Investments PLC,1,15,902.3,5707873
-"Gateway Wealth Partners, LLC",1,415,898.5,15198733
 Think Investments LP,1,22,897.3,21297774
-Catalyst Financial Partners LLC,1,317,896.7,6895752
 "LVZ, Inc.",1,142,894.5,16330450
 Navellier & Associates Inc,1,303,892.4,10196652
 "Rock Creek Group, LP",1,48,891.7,10118154
 "Permian Investment Partners, LP",1,11,882.7,49626941
 "RPG Investment Advisory, LLC",1,89,881.2,10552475
 Romano Brothers and Company,1,309,880.0,6724965
-"Minneapolis Portfolio Management Group, LLC",1,31,878.1,10401034
 "Aperture Investors, LLC",1,79,875.4,14564724
 "First Turn Management, LLC",1,31,875.2,17572171
 Periscope Capital Inc. ,1,95,874.4,91852430
 "Greenline Partners, LLC",1,147,874.1,10470535
 Mpm Bioimpact LLC,1,34,874.0,56201950
-"Destiny Wealth Partners, LLC",1,205,871.5,12138204
 "Financial Plan, Inc.",1,83,871.1,17041250
 Semper Augustus Investments Group LLC,1,37,869.6,10441380
 "8 Knots Management, LLC",1,12,868.1,20601356
 One Madison Group LLC,1,27,866.6,4827366
-"Financial Partners Group, Inc",1,214,864.9,7705590
 Baxter Bros Inc,1,163,864.2,4576484
 "Portfolio Strategies, Inc.",1,58,863.7,5240363
-"IAG Wealth Partners, LLC",1,463,863.6,15412273
 "B&D White Capital Company, LLC",1,64,863.2,9519456
-"Philip James Wealth Mangement, LLC",1,160,863.2,13295087
 Viking Fund Management LLC,1,130,862.8,11094300
 "Archford Capital Strategies, LLC",1,309,858.1,12856941
 ION Fund Management Ltd,1,53,857.4,24682943
-"Howard Financial Services, Ltd.",1,197,855.1,13902559
 "Long Pond Capital, LP",1,30,851.2,51926046
-"Revolve Wealth Partners, LLC",1,217,850.7,13290368
-"Capital Investment Counsel, Inc",1,246,850.4,6013169
 "Patton Albertson Miller Group, LLC",1,207,850.3,6732465
 "ZEGA Investments, LLC",1,130,848.3,7065873
 "Greatmark Investment Partners, Inc.",1,138,845.5,8791915
 "Hill Investment Group Partners, LLC",1,48,840.6,17104345
 Consolidated Investment Group LLC,1,66,835.9,3992812
 Rodgers Brothers Inc.,1,233,835.4,7960710
-BSW Wealth Partners,1,307,833.4,9453828
 Brookwood Investment Group LLC,1,423,833.2,13261115
 "Sloy Dahl & Holst, LLC",1,90,832.7,8288950
 "Alta Park Capital, LP",1,31,831.1,14492700
@@ -999,15 +837,12 @@ Triata Capital Ltd,1,15,825.1,42167938
 Ally Financial Inc.,1,108,819.0,7761040
 Bdf-Gestion,1,144,818.2,4332974
 "Fund 1 Investments, LLC",1,47,817.6,62558693
-"Lake Street Private Wealth, LLC",1,264,817.5,9404406
 "Alpha Wave Global, LP",1,22,815.7,36670647
-"Strategic Wealth Investment Group, LLC",1,90,813.6,9340556
 City Holding Co,1,547,812.8,6160733
 "Mass General Brigham, Inc",1,7,809.8,7154580
 "Johnson Bixby & Associates, LLC",1,123,806.8,15917933
 "Strid Group, LLC",1,75,803.4,21002094
 IDG China Capital Fund III Associates L.P.,1,1,801.2,15694700
-"Global Endowment Management, LP",1,128,801.1,10551099
 Mjp Associates Inc /adv,1,235,799.5,9107139
 Allen Operations LLC,1,34,799.2,18321522
 GSK plc,1,13,799.0,51051181
@@ -1021,10 +856,8 @@ Castellan Group,1,53,795.2,11553283
 Planning Alternatives Ltd /adv,1,97,793.9,6636458
 Gemsstock Ltd.,1,22,793.4,15006324
 Cortland Associates Inc /MO/,1,57,792.1,8359261
-"Wealth Enhancement Trust Services, Inc.",1,702,791.6,13141939
 Family Management Corp,1,270,791.3,7769902
 Freedom Together Foundation,1,2,788.6,1947400
-"Buck Wealth Strategies, LLC",1,153,787.9,7937954
 "Hrtg Gpe, LLC",1,5,785.0,22699858
 Eagle Strategies LLC,1,236,783.0,9639824
 "D'Orazio & Associates, Inc.",1,273,782.5,8103029
@@ -1034,14 +867,12 @@ Alibaba Group Holding Ltd,1,2,772.1,42537232
 "Cullen Investment Group, Ltd.",1,172,771.4,5300420
 "Oarsman Capital, Inc.",1,232,770.7,9998242
 Tri Locum Partners LP,1,15,770.1,6395151
-Concord Wealth Partners,1,792,769.7,11320063
 "Brio Consultants, LLC",1,140,769.5,13168995
 Qtron Investments LLC,1,408,769.3,8016058
 Financial Enhancement Group LLC,1,123,768.7,11143516
 Summit Securities Group LLC,1,833,767.7,14427020
 Permanens Capital L.P.,1,76,766.8,10945913
 "May Hill Capital, LLC",1,326,764.7,6754007
-"CRA Financial Services, LLC",1,262,764.2,9626976
 "Garnet Equity Capital Holdings, Inc.",1,20,763.8,12670958
 Fcpm III Services B.V.,1,9,762.9,43804192
 "Cim, LLC",1,163,762.7,6974529
@@ -1050,7 +881,6 @@ Atmos Capital Gestao de Recursos Ltda.,1,12,760.5,30299769
 Wahed Invest LLC,1,206,759.0,4259213
 "Crawford Fund Management, LLC",1,180,759.0,26163084
 Opaleye Management Inc.,1,48,758.0,55571565
-O'Brien Wealth Partners LLC,1,109,756.2,12528342
 Power Corp of Canada,1,1,753.9,31557117
 Massachusetts Institute of Technology,1,7,753.3,22745588
 K.J. Harrison & Partners Inc,1,211,752.2,8882647
@@ -1065,25 +895,19 @@ George Kaiser Family Foundation,1,65,747.2,15469367
 Monarch Alternative Capital LP,1,4,744.9,153291798
 "Symphony Financial, Ltd. Co.",1,278,744.5,7565078
 Renaissancere Holdings Ltd,1,5,744.2,11423302
-"Portside Wealth Group, LLC",1,435,743.7,7736711
 Decheng Capital LLC,1,16,743.4,56572785
-"Third View Private Wealth, LLC",1,265,742.9,5475312
 Manchester Global Management (UK) Ltd,1,20,742.2,3997251
 "Capital Advantage, Inc.",1,145,741.3,11211399
 Jlb & Associates Inc,1,70,741.3,4596968
 Lee Financial Co,1,141,741.2,8702445
-Glassman Wealth Services,1,176,741.0,11750470
 Sava Infond d.o.o.,1,216,740.6,5627761
 "Technology Crossover Management XI, Ltd.",1,2,740.2,3338036
 "Rice Partnership, LLC",1,173,739.6,5870065
 "Skylands Capital, LLC",1,142,737.1,16535444
 "Keating Financial Advisory Services, Inc.",1,2019,737.0,10710518
-"Pasadena Private Wealth, LLC",1,213,735.5,12330250
 "Northstar Group, Inc.",1,160,734.2,5589722
-Live Oak Private Wealth LLC,1,179,734.2,8946640
 Berman McAleer LLC,1,158,731.9,11565538
 "Financial Consulate, Inc",1,1243,731.4,25946240
-"Insight Wealth Partners, LLC",1,103,729.7,4449891
 Culbertson A N & Co Inc,1,127,728.9,4054727
 GCQ FUNDS MANAGEMENT PTY Ltd,1,9,726.3,3240908
 "James J. Burns & Company, LLC",1,158,724.7,8262970
@@ -1091,16 +915,10 @@ Intel Corp,1,1,724.2,65316315
 "Ellevest, Inc.",1,406,723.2,9606457
 Sciencast Management LP,1,268,723.2,9776938
 "Koch, Inc.",1,7,722.7,169171567
-"Cypress Wealth Services, LLC",1,341,722.7,8561559
-Mivtachim The Workers Social Insurance Fund Ltd. (Under Special Management),1,35,721.5,7624524
-"Marble Wealth, LLC",1,267,720.0,6253618
-"Capital Investment Counsel, LLC",1,135,719.9,11000344
 Oak Thistle LLC,1,468,719.9,12005561
 "Cannon Financial Strategists, Inc.",1,95,719.3,11402188
 Palo Alto Investors LP,1,45,718.4,42595344
-"Evergreen Wealth Solutions, LLC",1,204,716.8,15515412
 Fractal Investments LLC,1,78,716.2,21153439
-"Ironwood Investment Counsel, LLC",1,256,716.1,6598025
 Artal Group S.A.,1,2,714.6,145688471
 "Arvest Investments, Inc.",1,210,711.7,10152160
 Burton Enright Welch,1,123,710.5,13253545
@@ -1132,10 +950,7 @@ Arrowpoint Investment Partners (Singapore) Pte. Ltd.,1,102,678.7,7677196
 Acorn Financial Advisory Services Inc /adv,1,205,677.6,10146524
 Hudson Edge Investment Partners Inc.,1,87,674.9,10806727
 Providence Equity Partners L.L.C.,1,3,671.2,48379947
-"WealthPLAN Partners, LLC",1,244,669.4,7901216
-"TFO Wealth Partners, LLC",1,49,668.2,11491672
 "Harbor Group, Inc.",1,112,668.2,13984944
-Triasima Portfolio Management inc.,1,135,667.7,11177268
 Foresight Group Ltd Liability Partnership,1,56,664.4,6979055
 "Matauro, LLC",1,140,664.2,11392801
 Kemnay Advisory Services Inc.,1,830,663.1,10676038
@@ -1147,15 +962,10 @@ Oliver Luxxe Assets LLC,1,182,656.9,7577663
 "TSG Advice Partners, LLC",1,113,655.1,2748449
 General Electric Co,1,1,655.1,28362874
 Globeflex Capital L P,1,359,653.3,23463650
-SFE Investment Counsel,1,135,652.9,8187858
 "ARCH Venture Management, LLC",1,9,651.7,48234149
 "Dumac, Inc.",1,9,651.0,9248511
-"HORAN Wealth, LLC",1,173,650.9,6159967
 "Fox Run Management, L.L.C.",1,819,647.9,16806892
-Summit Wealth Group LLC / Co,1,237,646.0,13087824
 "Blue Fin Capital, Inc.",1,150,644.9,3954823
-"Newbridge Financial Services Group, Inc.",1,1087,644.0,6667688
-"Burling Wealth Partners, LLC",1,181,643.6,3494606
 Versor Investments LP,1,572,641.8,18901130
 Cornerstone Planning Group LLC,1,1584,641.3,9503188
 Eclectic Associates Inc /adv,1,141,641.1,11141265
@@ -1163,23 +973,18 @@ Nalanda India Equity Fund Ltd,1,0,641.0,13702500
 "Bearing Point Capital, LLC",1,177,639.7,5101203
 "Optas, LLC",1,447,639.3,5228017
 Quarry LP,1,1831,639.2,52375906
-WPWealth LLP,1,75,638.9,14828228
 Drexel Morgan & Co.,1,57,638.9,12887512
 "Pettyjohn, Wood & White, Inc",1,212,638.1,4337162
 Shannon River Fund Management LLC,1,25,637.5,11696938
-"Security Financial Services, INC.",1,198,636.9,9556445
-"Hughes Financial Services, LLC",1,1212,636.7,9619346
 "American Money Management, LLC",1,157,636.3,5529091
 Financial Management Network Inc,1,170,632.0,8582077
 VR Advisory Services Ltd,1,20,631.8,38204633
 Affinity Partners GP LP,1,1,630.5,32686065
 "Personal CFO Solutions, LLC",1,488,629.8,5813023
-Tyche Wealth Partners LLC,1,307,629.8,7293202
 "Pandi, LLC",1,2,629.7,1898238
 "RH Tailwind Management, LLC",1,23,629.2,2904540
 Vega Investment Solutions,1,181,629.2,3907814
 Rbo & Co LLC,1,49,628.4,6399526
-Siemens Pension Trust E V,1,1,628.2,31761131
 "Pier Capital, LLC",1,120,626.4,15343661
 "Kimmeridge Energy Management Company, LLC",1,4,626.3,20170157
 Al Mehwar Commercial Investments LLC,1,1,623.9,12822581
@@ -1200,13 +1005,11 @@ Strategy Asset Managers LLC,1,248,608.3,4059755
 "Portfolio Design Labs, LLC",1,201,606.5,4314869
 Sky Investment Group LLC,1,136,605.4,3832374
 Cypress Funds LLC,1,13,604.7,1824958
-Balboa Wealth Partners,1,398,604.6,6648064
 Camrose Capital Investment Partners LLP,1,10,603.8,3648629
 "Conifer Management, L.L.C.",1,5,603.6,12514973
 Mcmorgan & Co LLC,1,45,603.5,10428616
 "Bwcp, LP",1,27,602.9,14180265
 "Beck Bode, LLC",1,91,601.2,9579031
-MA Private Wealth,1,82,599.4,7479242
 Ritter Daniher Financial Advisory LLC / DE,1,532,596.2,7810626
 RPTC Inc.,1,6,595.7,5149985
 "Clayton, Dubilier & Rice, LLC",1,1,595.0,114976142
@@ -1215,20 +1018,14 @@ CVC Management Holdings II Ltd.,1,2,594.7,169913073
 "Bricktown Capital, LLC",1,25,594.0,5622704
 Calydon Capital,1,186,592.9,6437116
 D L Carlson Investment Group Inc,1,132,592.8,7337539
-Abundance Wealth Counselors,1,153,592.3,10997147
 Longbow Finance SA,1,62,590.6,3215119
-Partners in Financial Planning,1,114,590.6,6513123
 Somerville Kurt F,1,96,589.7,3730806
-"Retirement Income Solutions, Inc",1,159,589.6,6241270
 "Ironwood Financial, llc",1,160,589.6,9203631
 "MIG Capital, LLC",1,43,589.4,5775994
 "Almanack Investment Partners, LLC.",1,156,588.5,12646061
-"GenWealth Group, Inc.",1,78,586.5,6888340
-Maia Wealth LLC,1,301,585.9,9616881
 Vanderbilt University,1,66,585.7,5661535
 Banco BTG Pactual S.A.,1,140,585.1,9764211
 Generali Powszechne Towarzystwo Emerytalne,1,30,584.6,4353025
-"Wealth Alliance Advisory Group, LLC",1,183,584.0,8250487
 Stempoint Capital LP,1,68,583.2,31800780
 Martin & Co Inc /TN/,1,98,582.7,7852690
 Ranmore Fund Management Ltd,1,17,582.7,20086007
@@ -1245,12 +1042,10 @@ OAKMONT Corp,1,31,578.1,1837646
 "Ellis Investment Partners, LLC",1,236,573.5,7718769
 Freemont Management S.A.,1,107,572.9,4297848
 Bregal Sagemount IV General Partner Jersey Ltd,1,1,569.5,19530472
-"Drucker Wealth 3.0, LLC",1,253,568.9,5592713
 Advisory Resource Group,1,154,568.6,10145236
 Bleichroeder LP,1,65,568.3,53510519
 Laura & John Arnold Foundation,1,4,568.1,6454549
 ORG Partners LLC,1,1404,568.0,24462412
-"Brady Martz Wealth Solutions, LLC",1,168,567.9,10671754
 PBCay One RSC Ltd,1,10,567.2,3049006
 Spear Holdings RSC Ltd,1,10,567.2,3048993
 Walter Public Investments Inc.,1,46,565.5,3278502
@@ -1261,12 +1056,10 @@ Kahn Brothers Group Inc,1,40,564.7,23508956
 Essex LLC,1,171,564.6,9220841
 "Matthew Goff Investment Advisor, LLC",1,84,564.2,6220903
 KKM Financial LLC,1,153,563.3,5709670
-"Tempo Wealth, LLC",1,206,561.3,3859638
 Strong Tower Advisory Services,1,97,558.5,5382585
 Standard General L.P.,1,2,558.1,67916169
 Baker Chad R,1,56,557.4,3263812
 Robotti Robert,1,53,556.8,20229177
-"SkyOak Wealth, LLC",1,239,556.0,6610389
 Act Two Investors LLC,1,38,555.9,3598849
 "Ramsay, Stattman, Vela & Price, Inc.",1,65,555.2,2820227
 Panoramic Hills Capital Ltd,1,3,555.0,1710222
@@ -1279,20 +1072,15 @@ Lincoln Capital LLC,1,130,551.8,3513740
 "Spinnaker Investment Group, LLC",1,163,551.4,10741433
 Truvestments Capital LLC,1,960,550.3,8234159
 CDAM (UK) Ltd,1,11,549.9,10649230
-"Madison Wealth Partners, Inc",1,206,548.1,6582611
 "Greenstone Partners & Co., LLC",1,11,546.9,6143253
 "J. H. Whitney Equity Partners VI, LLC",1,1,546.5,20256615
 TLWM,1,67,546.3,9918772
 "Harraden Circle Investments, LLC",1,38,545.6,188511340
 "Gibson Capital, LLC",1,79,545.2,3956893
-"Community Financial Services Group, LLC",1,97,544.6,3179033
 Privium Fund Management B.V.,1,52,543.1,14260816
-Golden Reserve Retirement LLC,1,117,541.6,9522669
-"Summit Wealth Partners, LLC",1,190,541.2,6324667
 "Patten Group, Inc.",1,280,540.7,5443077
 Asset Allocation Strategies LLC,1,149,540.4,11176045
 CacheTech Inc.,1,210,539.7,10498190
-"Discipline Wealth Solutions, LLC",1,156,539.5,8973366
 Independent Investors Inc,1,68,538.1,2461811
 "Edenbrook Capital, LLC",1,13,536.3,29625409
 Moody Aldrich Partners LLC,1,178,535.8,11028857
@@ -1300,7 +1088,6 @@ Squadra Investments - Gestao de Recursos Ltda.,1,3,534.8,24587629
 Manchester Financial Inc,1,124,534.8,14217269
 Call To Action Foundation,1,1,534.7,852551
 Legacy Trust,1,188,534.7,2990905
-Wealth High Governance Capital Ltda,1,43,534.5,7509215
 Orland Properties Ltd,1,9,534.4,17590977
 "ERn Financial, LLC",1,139,531.9,8711782
 Unio Capital LLC,1,24,531.5,1396715
@@ -1313,12 +1100,8 @@ Sage Rhino Capital LLC,1,297,529.7,6730579
 Broderick Brian C,1,75,529.0,5372545
 Lynch & Associates /IN/,1,118,528.9,4977713
 Goodman Financial Corp,1,71,528.0,8853545
-Virtus Wealth Solutions LLC,1,45,526.8,5601847
 "Ashton Thomas Securities, LLC",1,279,526.7,7305528
-"Curran Financial Partners, LLC",1,120,526.5,9419383
 Conversant Capital LLC,1,12,526.5,24389183
-Waterfront Wealth Inc.,1,260,526.3,14241099
-"Hamilton Wealth, LLC",1,106,525.7,6319550
 "Systelligence, LLC",1,45,525.3,6862654
 Okabena Investment Services Inc,1,143,524.3,4628005
 Machina Capital S.A.S.,1,328,523.9,6099758
@@ -1333,25 +1116,19 @@ Kapitalo Investimentos Ltda,1,33,522.5,13368987
 GoalVest Advisory LLC,1,482,522.1,4451027
 Seeds Investor LLC,1,252,521.7,6483177
 "ESL Trust Services, LLC",1,247,521.0,6464620
-"Alvarez & Marsal Private Wealth Partners, LLC",1,111,520.5,3660777
 "Great Diamond Partners, LLC",1,219,519.7,4830355
 Hazelview Securities Inc.,1,42,519.5,8123444
 "Canton Hathaway, LLC",1,262,518.6,3941094
 Wexford Capital LP,1,333,518.4,52065735
-"Bedell Frazier Investment Counselling, LLC",1,132,518.3,4904598
 "Kozak & Associates, Inc.",1,413,517.6,3147421
-"Northwest Bancshares, Inc.",1,171,517.5,7678666
 Sphera Funds Management Ltd.,1,89,517.3,33829530
 "Financial Security Advisor, Inc.",1,148,516.7,7678237
 Schoolcraft Capital LLC,1,64,514.7,7215065
-Rockport Wealth LLC,1,90,514.1,10401780
-Napean Trading & Investment Co (Singapore) PTE Ltd,1,37,514.1,8613527
 New Hampshire Trust,1,167,513.9,4779870
 Accel XI Associates L.L.C.,1,1,513.8,6479748
 "Balefire, LLC",1,369,513.3,7254155
 "Hobart Private Capital, LLC",1,121,512.5,7732783
 "Francis Financial, Inc.",1,102,512.1,5851063
-"High Note Wealth, LLC",1,873,510.7,5335380
 Kranot Hishtalmut Le Morim Tichoniim Havera Menahelet LTD,1,55,509.4,6886640
 "Trigran Investments, Inc.",1,17,507.6,27575069
 Havemeyer Place LP,1,493,507.3,10952591
@@ -1361,7 +1138,6 @@ Spectrum Financial Alliance Ltd LLC,1,26,506.0,3403078
 "Montis Financial, LLC",1,152,505.9,7571686
 "Single Point Partners, LLC",1,86,505.8,4068547
 Banc Funds Co LLC,1,54,505.2,22244691
-"Wealth Dimensions Group, Ltd.",1,167,504.0,7176004
 Marietta Investment Partners LLC,1,156,503.7,4270840
 "Marino Management, LLC",1,10,503.6,2002649
 "Convergence Investment Partners, LLC",1,234,502.9,6178113
@@ -1378,52 +1154,39 @@ Board of Trustees of The Leland Stanford Junior University,1,21,496.2,8227592
 Verum Partners LLC,1,163,496.0,7379231
 Riggs Asset Managment Co. Inc.,1,123,495.8,5719800
 "Family Investment Center, Inc.",1,94,495.2,8095085
-General Pension Society PZU Joint Stock Co,1,14,494.7,5603163
 Gwn Securities Inc.,1,383,494.2,7421974
 "WESCAP Management Group, Inc.",1,94,493.4,7892806
 Apeiron RIA LLC,1,195,492.9,6637724
-"Vantage Financial Partners, LLC",1,180,492.6,7718487
 Palidye Holdings (Caymans) Ltd,1,12,491.2,1699101
-Gagnon Securities LLC,1,82,491.1,25611123
-"Solidarity Wealth, LLC",1,76,488.8,2948742
 "Integrated Investment Consultants, LLC",1,257,488.7,5709198
 "Second Line Capital, LLC",1,161,486.6,10073384
 "Moment Partners, LLC",1,103,486.0,2401112
 "Prosight Management, LP",1,38,483.9,35531506
-"Mycio Wealth Partners, LLC",1,48,483.0,2388098
 Rosenberg Matthew Hamilton,1,781,482.8,7238739
 "JSF Financial, LLC",1,131,482.4,4834586
 Lightrock Netherlands B.V.,1,39,482.3,14384105
-"West Wealth Group, LLC",1,126,482.0,6262574
 Bender Robert & Associates,1,39,481.3,1742619
 Headwater Capital Co Ltd,1,16,480.9,3929400
 Park Place Capital Corp,1,756,480.4,7829448
 LCC Family Corp.,1,1,480.0,3639067
 "Newman Dignan & Sheerar, Inc.",1,183,479.9,8709843
 Dash Acquisitions Inc.,1,66,479.8,2058121
-"Whitaker-Myers Wealth Managers, LTD.",1,102,479.3,6885976
 Stonebrook Private Inc.,1,204,477.7,6287359
 "Curtis Advisory Group, LLC",1,111,476.7,5649210
 Crumly & Associates Inc.,1,189,476.7,7660081
-"Hedeker Wealth, LLC",1,77,476.5,4927637
 "CoreCommodity Management, LLC",1,113,476.5,17362713
 Cliffwater LLC,1,21,476.4,10253388
 FIFTHDELTA Ltd,1,10,475.9,24611138
-"Keystone Wealth Services, LLC",1,219,474.6,5826254
 Lantz Financial LLC,1,219,473.9,7163381
 "Peavine Capital, LLC",1,9,473.2,3034489
 "PCM Encore, LLC",1,411,470.0,4961961
-Continental General Insurance Co,1,5,469.9,20118643
 Wendel SE,1,0,469.8,62975396
 Platform Technology Partners,1,244,469.6,5775309
 "Holistic Planning, LLC",1,230,469.1,7408037
 "HS Management Partners, LLC",1,24,468.5,4587226
 Joho Capital LLC,1,9,468.5,3242884
-"Madrona Financial Services, LLC",1,109,468.0,5017786
-Coyle Financial Counsel LLC,1,113,467.9,5124115
 "Brooklyn FI, LLC",1,79,467.3,6048391
 Patient Square Capital LP,1,26,467.1,20343368
-"Legacy Capital Wealth Partners, LLC",1,347,465.9,6832355
 "ER Collective Holdings, LLC",1,1,464.6,8518300
 "Alpine Global Management, LLC",1,254,463.9,34674648
 "Hourglass Capital, LLC",1,111,463.7,7576627
@@ -1432,7 +1195,6 @@ Builder Investment Group Inc /adv,1,100,463.0,5381646
 "Clune & Associates, Ltd.",1,164,463.0,6863756
 "Blankinship & Foster, LLC",1,79,462.7,6260564
 Dorsey Wright & Associates,1,124,462.6,5874814
-Vantage Wealth,1,30,462.6,2858704
 Riposte Capital LLC,1,26,462.3,6639914
 Kiltearn Partners LLP,1,26,461.7,17622488
 Rudius Management LP,1,3,461.0,5071012
@@ -1445,7 +1207,6 @@ Rudius Management LP,1,3,461.0,5071012
 111 Capital,1,309,458.4,3703287
 "Miramar Capital, LLC",1,55,457.6,3136583
 "DDFG, Inc",1,86,456.8,5870354
-New York Life Insurance Co,1,3,456.1,6031231
 Eagle Health Investments LP,1,28,455.1,9283319
 Halter Ferguson Financial Inc.,1,33,455.0,6280683
 Landaas & Co /wi /adv,1,119,454.5,3959325
@@ -1453,13 +1214,9 @@ Landaas & Co /wi /adv,1,119,454.5,3959325
 Almitas Capital LLC,1,76,454.2,40633762
 Garden State Investment Advisory Services LLC,1,246,454.1,6671397
 "Winch Advisory Services, LLC",1,446,452.1,4588266
-"Waller Financial Planning Group, Inc",1,75,450.4,5941921
 "Aspire Private Capital, LLC",1,167,449.6,6945269
 Long Walk Management LP,1,8,449.5,7080600
 "Bulldog Investors, LLP",1,73,449.0,49570814
-Shelter Mutual Insurance Co,1,58,448.3,3501934
-Wealth Group Ltd,1,79,446.8,3437683
-"Fairvoy Private Wealth, LLC",1,190,446.7,4219582
 "3Chopt Investment Partners, LLC",1,222,446.3,2718299
 "Kraft, Davis & Associates, LLC",1,143,446.2,4484668
 Townsquare Capital LLC,1,238,446.1,3369477
@@ -1479,11 +1236,8 @@ First Reserve GP XIII Ltd,1,2,441.0,26251764
 Crow's Nest Holdings LP,1,8,439.2,2580525
 Sagil Capital LLP,1,18,438.9,14597551
 Sector Gamma As,1,36,438.7,7131022
-"BetterWealth, LLC",1,70,438.6,8830476
 "PKS Advisory Services, LLC",1,239,438.4,4313056
-Mandatum Life Insurance Co Ltd,1,73,438.0,2683266
 "Schusterman Interests, LLC",1,9,436.9,7790255
-"Tempus Wealth Planning, LLC",1,263,436.5,6906807
 "Van Den Berg Management I, Inc",1,119,436.5,10108980
 Laurore Ltd,1,1,436.2,8786279
 "Trinity Legacy Partners, LLC",1,95,435.9,6851443
@@ -1492,10 +1246,8 @@ Meiji Yasuda America Inc,1,56,435.6,2026434
 "Weil Company, Inc.",1,109,434.8,5361959
 Anchor @ 65 Pte. Ltd.,1,2,434.0,94537410
 High Net Worth Advisory Group LLC,1,229,433.9,4640867
-Cincinnati Specialty Underwriters Insurance CO,1,37,433.5,2424012
 "NetEase, Inc.",1,2,432.4,6453781
 Beacon Financial Advisory LLC,1,326,431.6,6660366
-"Inlet Private Wealth, LLC",1,126,431.1,4260627
 Catalyst Funds Management Pty Ltd,1,316,430.9,8644512
 "American Investment Services, Inc.",1,127,430.9,6165493
 "Vertex Planning Partners, LLC",1,123,430.4,6597195
@@ -1505,21 +1257,14 @@ RV Capital AG,1,12,429.5,2757752
 Fosun International Ltd,1,51,429.5,185093538
 "Slotnik Capital, LLC",1,26,429.4,7921822
 "Trv Gp V, LLC",1,3,429.2,14301624
-"Summit Wealth Group, LLC",1,118,428.3,6160355
-"Mattson Financial Services, LLC",1,159,428.2,5055138
 "Abel Hall, LLC",1,665,428.2,11022972
 "Medina Value Partners, LLC",1,21,428.0,13045476
-"Triune Financial Partners, LLC",1,49,427.8,9675261
 Kotler Kevin,1,34,427.5,14994272
 "Ballast, Inc.",1,133,427.3,3405649
-"Peak Retirement Planning, Inc.",1,142,427.1,4668960
 "Chapin Davis, Inc.",1,232,426.7,4747751
 Fortress Investment Group LLC,1,33,426.2,51192964
-"ORG Wealth Partners, LLC",1,536,425.6,17491967
 Tejara Capital Ltd,1,54,424.8,31888852
-"Summit Wealth & Retirement Planning, Inc.",1,108,424.7,8043920
 "Whitcomb & Hess, Inc.",1,52,424.1,7791294
-Wealthspring Capital LLC,1,40,423.6,64922448
 "DeDora Capital, Inc.",1,114,422.5,3504406
 "Nokomis Capital, L.L.C.",1,49,422.4,60630536
 "Midwest Professional Planners, LTD.",1,137,422.2,3570289
@@ -1527,27 +1272,21 @@ Wealthspring Capital LLC,1,40,423.6,64922448
 ArchPoint Investors,1,75,421.7,5292024
 "Magnitude Capital, LLC",1,1,421.2,15096940
 G2 Investment Partners Management LLC,1,65,420.7,18702002
-"Mbm Wealth Consultants, LLC",1,109,420.5,4887910
-MilWealth Group LLC,1,73,420.1,5273894
 "Alpine Woods Capital Investors, LLC",1,171,420.0,3508687
 Aegis Financial Corp,1,30,419.3,31542714
 "Tradewinds, LLC.",1,208,419.0,3330846
 Prostatis Group LLC,1,148,418.8,6864286
-"Warther Private Wealth, LLC",1,47,418.4,3895641
 "Nikulski Financial, Inc.",1,160,418.3,3492756
 "Pennant Investors, LP",1,15,417.9,9187547
-"Oak Harbor Wealth Partners, LLC",1,269,416.5,3938144
 Gavilan Investment Partners LLC,1,12,416.4,2967000
 "Strategic Investment Solutions, Inc. /IL",1,545,415.9,5803063
 RIA Advisory Group LLC,1,139,415.9,4052826
 RDA Financial Network,1,256,415.4,4835176
-Meridian Investment Counsel Inc.,1,226,415.0,4617159
 Capricorn Fund Managers Ltd,1,76,414.9,11242102
 SWS Partners,1,113,414.3,9452781
 Uncommon Cents Investing LLC,1,186,413.1,8867763
 HWG Holdings LP,1,44,412.7,1598462
 Clark Estates Inc /NY/,1,95,412.1,15792258
-"KFA Private Wealth Group, LLC",1,145,411.2,4119774
 "Technology Crossover Management VIII, Ltd.",1,5,410.7,41463725
 "D.B. Root & Company, LLC",1,175,409.9,7774404
 "Ewa, LLC",1,254,409.6,4979775
@@ -1555,29 +1294,24 @@ Weaver Consulting Group,1,211,409.0,6547023
 "Dunhill Financial, LLC",1,1927,408.9,4507219
 Arjuna Capital,1,107,408.2,3554434
 Al Warda Investments RSC Ltd,1,1,408.1,8218712
-"Dodds Wealth, LLC",1,56,407.8,8226308
 "Farringdon Capital, Ltd.",1,404,407.5,7196324
 "Bill Few Associates, Inc.",1,185,406.8,4326020
 "Goodman Advisory Group, LLC",1,178,406.4,5146675
 "Brown, Lisle/cummings, Inc.",1,703,405.9,3295064
-"Briaud Financial Planning, Inc",1,37,405.9,4423657
 "Logan Stone Capital, LLC",1,72,405.5,27443555
 "Wellington Shields & Co., LLC",1,309,405.4,4138117
 Groupe Bruxelles Lambert,1,1,404.9,8773667
 Cordoba Advisory Partners LLC,1,136,404.6,5491831
-PCJ Investment Counsel Ltd.,1,59,404.2,18802134
 Meridian Management Co,1,80,403.9,3879465
 Citizens & Northern Corp,1,122,403.6,5140563
 "Dalal Street, LLC",1,2,402.0,29842062
 Saybrook Capital /NC/,1,39,401.7,2429298
 Clg LLC,1,131,401.7,5762400
 "Westmount Partners, LLC",1,234,401.1,3228147
-Global Wealth Strategies & Associates,1,487,401.1,3103213
 "Napier Financial, LLC",1,51,400.4,3866529
 Addison Capital Co,1,138,400.4,4584737
 Opal Capital LLC,1,178,400.2,5260684
 Davis-Rea Ltd.,1,53,399.5,2644953
-Kelly Financial Services LLC,1,117,399.0,5078647
 "RFG Holdings, Inc.",1,63,398.9,5504738
 "Scott & Selber, Inc.",1,92,398.7,2872219
 Gray Foundation,1,11,398.5,2721892
@@ -1593,18 +1327,13 @@ Div Capital Phoenix Assets Ltd,1,13,395.1,1028456
 Rinkey Investments,1,126,393.8,7210960
 Trustees of Dartmouth College,1,9,393.3,2930899
 Sequent Planning LLC,1,177,392.9,8219667
-Pacific Center for Financial Services,1,455,392.1,3511211
 Engaged Capital LLC,1,8,392.0,31621223
-Retirement Solution LLC,1,44,391.8,9571149
-Peterson Wealth Services,1,213,391.1,2045300
 "Safeguard Investment Advisory Group, LLC",1,145,390.9,5631456
 Strategic Advocates LLC,1,579,390.9,5002976
 Sinvest Investments II Ltd.,1,0,390.4,8400000
 Siemens AG,1,1,390.4,19738064
 Dockside LLC,1,175,389.4,6340404
-"Ifrah Financial Services, Inc.",1,199,389.4,5040835
 "MPS Loria Financial Planners, LLC",1,83,389.0,2624208
-WealthTrust Axiom LLC,1,253,388.7,13611727
 "NovaPoint Capital, LLC",1,72,388.3,3537955
 HighVista Strategies LLC,1,138,388.3,12015411
 West Branch Capital LLC,1,396,388.1,1742727
@@ -1613,8 +1342,6 @@ Hilltop Partners LLC,1,122,388.0,6206952
 "Quaker Capital Investments, LLC",1,20,387.7,17795556
 Searle & Co.,1,184,387.6,3123103
 Supplemental Annuity Collective Trust of NJ,1,207,386.9,2858730
-"One Charles Private Wealth Services, LLC",1,159,386.8,5376568
-"Legacy Wealth Partners, LLC",1,166,386.3,3734111
 "Eldred Rock Partners, LLC",1,30,385.5,6763970
 "Plan Group Financial, LLC",1,189,385.3,5946311
 "Truffle Hound Capital, LLC",1,43,383.9,19795900
@@ -1625,7 +1352,6 @@ Sherborne Investors Management LP,1,1,382.8,29449997
 "EnCap Partners GP, LLC",1,2,382.8,10447426
 Naria Inc.,1,0,382.7,10284166
 SEG Family Corp.,1,1,382.7,2901405
-Cardinal Strategic Wealth Guidance,1,59,382.7,2986349
 Vista Investment Partners LLC,1,157,382.6,3749883
 "Prosperity Planning, Inc.",1,103,382.3,5314891
 Next Level Private LLC,1,145,381.5,4996227
@@ -1635,13 +1361,10 @@ Roman Butler Fullerton & Co,1,252,381.4,4185290
 PARUS FINANCE (UK) Ltd,1,33,380.5,2263956
 "West Virginia University Foundation, Inc",1,2,380.2,838879
 DSC Meridian Capital LP,1,15,380.1,43581620
-"55 North Private Wealth, LLC",1,193,379.5,5970074
 "Nixon Capital, LLC",1,26,379.0,14031129
 Granger Management LLC,1,6,378.4,2513822
 Towle & Co,1,41,378.3,16418766
 Selkirk Management LLC,1,12,378.1,2572121
-"Measured Wealth Private Client Group, LLC",1,691,378.0,3970229
-"Fischer Financial Services, Inc.",1,63,378.0,2637162
 Rubicon Global Capital Ltd,1,11,377.5,3160925
 Symmetry Peak Management LLC,1,50,377.4,1995916
 Sicart Associates LLC,1,75,376.9,4171706
@@ -1649,13 +1372,11 @@ Keewaydin Investments LLC,1,16,375.8,4539769
 EdgeRock Capital LLC,1,127,375.8,5978377
 Phraction Management LLC,1,64,375.3,2274867
 Winmill & Co. Inc,1,49,374.9,5045533
-"Prasad Wealth Partners, LLC",1,132,374.8,5963890
 "Daybright Advisory Services, Inc.",1,132,374.8,3375884
 "New Republic Capital, LLC",1,359,374.7,3412335
 "BWM Planning, LLC",1,88,374.2,6150578
 Tikvah Management LLC,1,23,374.2,15227231
 Tiger Pacific Capital LP,1,10,373.8,15465544
-"CGC Financial Services, LLC",1,321,373.8,6514425
 First American Financial Corp,1,2,373.4,7543540
 Retail Employees Superannuation Pty Ltd as trustee for Retail Employees Superannuation Trust,1,29,373.2,1368007
 "Diametric Capital, LP",1,316,373.1,38484044
@@ -1663,19 +1384,15 @@ Retail Employees Superannuation Pty Ltd as trustee for Retail Employees Superann
 "Eaton Financial Holdings Company, LLC",1,129,372.0,5343111
 C Partners Holding GmbH ,1,8,371.7,1513182
 "Financial Perspectives, Inc",1,655,371.2,3148310
-Fairway Wealth LLC,1,229,370.8,5434985
 "Butensky & Cohen Financial Security, Inc",1,94,369.6,4643815
 Euclidean Capital LLC,1,10,369.5,11738928
-Stone Summit Wealth LLC,1,140,368.7,3279988
 Charles-Lim Capital Ltd,1,7,368.6,5337500
 "Aip, LLC",1,3,368.5,17195163
 "Freedom Day Solutions, LLC",1,89,368.0,5196253
 Puzo Michael J,1,65,367.3,1943049
 "Pacifica Capital Investments, LLC",1,15,367.1,3244867
-EnRich Financial Partners LLC,1,60,366.9,7778449
 "Promethos Capital, LLC",1,42,366.8,8690311
 Elevatus Welath Management,1,151,365.7,3968572
-"Narus Financial Partners, LLC",1,167,365.5,3798054
 Sentry LLC,1,121,365.3,1750049
 "Fivespan Partners, LP",1,5,364.9,12842933
 PhiloSmith Capital Corp,1,22,363.6,2969577
@@ -1683,33 +1400,23 @@ PhiloSmith Capital Corp,1,22,363.6,2969577
 "Ark & Tlk Investments, LLC",1,101,363.5,7116808
 Atwater Malick LLC,1,85,362.7,2616359
 Core Alternative Capital,1,208,362.6,2332686
-Cypress Financial Planning LLC,1,93,362.2,4431904
 KP Management LLC,1,55,361.9,1536466
 "Owls Nest Partners IA, LLC",1,13,361.2,8155260
 Merk Investments LLC,1,7,360.7,47394393
-Keating Investment Counselors Inc,1,55,360.7,11649426
-"Elyxium Wealth, LLC",1,1274,360.6,20421265
 Inceptionr LLC,1,559,360.4,7466801
 Clean Yield Group,1,394,360.2,4246547
 "Swmg, LLC",1,115,360.2,3952145
 "Science & Technology Partners, L.P.",1,24,359.8,3073080
-"Bare Financial Services, Inc",1,1459,359.5,5768371
 "Headland Capital, LLC",1,66,359.3,4685650
 OnyxPoint Global Management LP,1,23,359.2,20707021
 ParaFi Capital LP,1,14,358.4,16938952
 "World Equity Group, Inc.",1,282,358.3,4655857
-"Crown Wealth Group, LLC",1,125,357.9,5069186
 "Legacy CG, LLC",1,40,357.2,6884342
 "Cypress Capital, LLC",1,93,357.2,3835124
 Capital Planning LLC,1,81,356.9,3165194
-"Haverford Financial Services, Inc.",1,48,356.8,1471066
 "Peak Planning Group, LLC",1,113,356.7,3818798
-OLIO Financial Planning,1,70,356.5,4550668
-"Leeward Financial Partners, LLC",1,96,355.8,3117386
 "Fusion Capital, LLC",1,99,355.5,3811785
 Naman Capital Ltda,1,10,355.5,15504114
-Highline Wealth Partners LLC,1,907,355.5,3971758
-Alaethes Wealth LLC,1,114,355.3,2968022
 Night Squared LP,1,63,354.8,3480358
 Kidder Stephen W,1,68,354.7,2191416
 "Financial Advisory Partners, LLC",1,65,354.6,3548845
@@ -1724,14 +1431,8 @@ S.E.E.D. Planning Group LLC,1,85,350.9,3193739
 "Tensor Edge Capital, LLC",1,13,350.8,3085120
 "Redwood Grove Capital, LLC",1,21,350.7,8975988
 "Snow Phipps Group, LLC",1,2,350.7,15535761
-"Seven Springs Wealth Group, LLC",1,83,350.0,6129137
 "Global Assets Advisory, LLC",1,253,349.7,4333951
-Missouri Education Pension Trust,1,2,349.4,1194658
-"Sterling Investment Counsel, LLC",1,182,349.0,3438724
-"Endeavor Private Wealth, Inc.",1,195,348.8,4471623
 FC Advisory LLC,1,104,348.1,4396660
-Valtinson Bruner Financial Planning LLC,1,121,347.6,6983124
-Osprey Private Wealth LLC,1,79,347.5,1762684
 "Lanham O'Dell & Company, Inc.",1,40,347.3,2741008
 Steph & Co,1,300,347.0,3547396
 "Bouvel Investment Partners, LLC",1,79,346.9,4500987
@@ -1740,27 +1441,17 @@ Avidity Partners Management LP,1,39,346.7,23607736
 Pinebridge Investments Asia Ltd,1,7,346.1,4966010
 Prevatt Capital Ltd,1,11,345.7,7039300
 McCollum Christoferson Group LLC,1,73,345.7,2030572
-Oxler Private Wealth LLC,1,88,345.4,1908992
-"Beirne Wealth Consulting Services, LLC",1,99,345.3,4170766
 "FFG Partners, LLC",1,37,344.9,2734693
-"Keystone Financial Planning, Inc.",1,43,344.8,8499219
 Singapore Technologies Telemedia Pte Ltd,1,1,343.3,9835680
 Smart Money Group LLC,1,80,342.9,9219973
 "Frec Markets, Inc.",1,337,342.1,2476153
 "Covenant Partners, LLC",1,133,342.0,2370755
-"Regimen Wealth, LLC",1,76,341.9,5548142
-"Retirement Financial Solutions, LLC",1,46,341.6,4744834
-Iat Reinsurance Co Ltd.,1,30,341.5,39611188
 Maestria Partners LLC,1,15,341.4,3851195
 "Yeomans Consulting Group, Inc.",1,110,341.3,4974453
-"Shoker Investment Counsel, Inc.",1,110,341.3,3197943
-"Pinnacle Bancorp, Inc.",1,825,341.2,2699409
-"True Wealth Design, LLC",1,2347,341.1,7433450
 Missouri Trust & Investment Co,1,392,340.7,3855685
 "Focused Alpha, LLC",1,226,340.3,4629468
 "Capital Advisory Group Advisory Services, LLC",1,159,340.0,4070175
 Indigo Partners LLC,1,2,339.9,53349573
-"Parkwoods Wealth Partners, LLC",1,106,339.9,6573483
 Veracity Capital LLC,1,229,339.8,3115976
 Lexington Partners L.P.,1,5,339.5,5861980
 Knuff & Co LLC,1,126,339.3,2077181
@@ -1769,13 +1460,9 @@ Newton One Investments LLC,1,118,339.0,3173478
 "Sweeney & Michel, LLC",1,134,338.8,3749277
 Kooman & Associates,1,52,338.1,7206164
 Valence8 US LP,1,15,337.5,3446254
-"Accretive Wealth Partners, LLC",1,148,337.0,3727784
 "Atlas Brown,Inc.",1,222,336.4,2556295
 HT Partners LLC,1,54,336.3,7806110
 Red Wave Investments LLC,1,110,336.2,3056182
-Meredith Wealth Planning,1,57,335.9,4963560
-"Oldfather Financial Services, LLC",1,96,335.8,1883696
-"Cove Private Wealth, LLC",1,155,335.8,1975946
 "Hudson Value Partners, LLC",1,104,335.8,2541963
 Continental Grain Co,1,4,335.7,5494288
 Congress Park Capital LLC,1,121,334.9,12486585
@@ -1785,43 +1472,32 @@ Sara-Bay Financial,1,74,334.4,3180077
 "Bcwm, LLC",1,52,334.0,3882878
 "Joule Financial, LLC",1,109,333.8,5477420
 "Palo Duro Investment Partners, LP",1,22,333.4,8415656
-Watershed Private Wealth LLC,1,114,333.4,2719296
 Wright Investors Service Inc,1,142,333.1,2512336
 Untitled Investments LP,1,16,332.9,4435175
 SVF Sponsor III (DE) LLC,1,1,332.6,5590000
-"Hibernia Wealth Partners, LLC",1,103,332.1,5525900
 "Courage Miller Partners, LLC",1,81,332.1,8797887
 Pure Portfolios Holdings LLC,1,103,332.1,8424315
 "Equita Financial Network, Inc.",1,93,331.8,5721032
-"Sterling Financial Planning, Inc.",1,112,331.8,4835529
 "Hamel Associates, Inc.",1,79,331.8,3996679
 "ONE Advisory Partners, LLC",1,71,331.6,4188271
-"Intergy Private Wealth, LLC",1,112,331.5,4170177
 "Comprehensive Financial Consultants Institutional, Inc.",1,161,331.3,3405079
-Keystone Financial Services,1,119,331.3,3543917
 Harbor Advisory Corp /MA/,1,76,330.6,3563598
 "Shayne & Jacobs, LLC",1,92,330.3,2418443
 "Aft, Forsyth & Sober, LLC",1,57,330.1,2007640
 "Hixon Zuercher, LLC",1,88,329.8,2849682
-Metropolitan Life Insurance Co/NY,1,11,329.7,2498709
 Fiduciary Planning LLC,1,73,329.5,4700411
-Atlas Wealth LLC,1,84,329.3,7863705
 "Cisco Systems, Inc.",1,4,329.0,2549572
 "Cowa, LLC",1,142,328.7,7158298
 Orion Investment Co,1,67,328.2,4120421
 MADDEN SECURITIES Corp,1,97,328.0,5254138
-SMART Wealth LLC,1,146,328.0,6532014
 "TigerOak Management, L.L.C.",1,117,327.9,2589304
 "Vectors Research Management, LLC",1,120,327.6,3312685
-Independent Wealth Network Inc.,1,261,327.4,5688938
 "Sage Financial Management Group, Inc.",1,58,327.4,4628861
 Matthew 25 Management Corp,1,20,327.0,2325617
-"Uniting Wealth Partners, LLC",1,147,326.2,4000419
 Anchyra Partners LLC,1,251,326.0,2567131
 "Veery Capital, LLC",1,94,325.8,4966298
 Knox Lane LP,1,0,325.2,28176542
 Ferguson Shapiro LLC,1,62,325.0,9208902
-Stiles Financial Services Inc,1,168,324.8,2184609
 "Cosmic Management, LLC",1,4,324.6,12951534
 "Howard Bailey Securities, LLC",1,120,324.4,6802114
 Weybosset Research & Management LLC,1,34,324.3,3426694
@@ -1831,26 +1507,19 @@ Flagship Pioneering Inc.,1,4,324.0,43463975
 Donoghue Forlines LLC,1,111,323.4,5948163
 "Guardian Point Capital, LP",1,11,323.2,3456239
 "Bruce & Co., Inc.",1,33,322.5,6796451
-"Genesis Private Wealth, LLC",1,178,322.3,4272117
-"Acima Private Wealth, LLC",1,172,322.2,3899029
 "Permit Capital, LLC",1,17,321.4,6909409
 Checkpoint Capital L.P.,1,6,320.1,2653710
 Whelan Financial,1,95,320.1,3928316
 "Private Client Services, LLC",1,182,320.0,4351619
 "Client 1st Advisory Group, LLC",1,137,319.8,5278643
 Investment Advisory Services Inc /tx /adv,1,122,319.7,2963283
-Transatlantique Private Wealth LLC,1,200,318.8,3030013
 "Essex Woodlands Management, Inc.",1,6,318.3,51221101
 "5AM Venture Management, LLC",1,18,318.1,45510553
 "Crestview Partners II GP, L.P.",1,3,318.1,9915447
 "Muzinich & Co., Inc.",1,37,318.0,19206043
 Mcdonald Partners LLC,1,189,317.5,3274277
-"Patriot Financial Partners GP II, L.P.",1,10,316.2,14560446
 American Assets Inc,1,24,316.0,9610125
-"IronBridge Private Wealth, LLC",1,43,316.0,3204922
 Powszechne Towarzystwo Emerytalne Allianz Polska S.A.,1,11,315.9,3037629
-"Amtrust Financial Services, Inc.",1,15,315.6,3547756
-"Shaker Financial Services, LLC",1,89,315.5,28688402
 25 LLC,1,70,315.1,3883490
 "Berkeley, Inc",1,72,314.5,3900803
 Auour Investments LLC,1,83,314.3,5463750
@@ -1863,12 +1532,9 @@ DORVAL Corp,1,41,313.3,4435982
 Regents Gate Capital LLP,1,36,312.4,3227507
 Radcliff Management LLC,1,0,312.2,13135000
 Harvest Management LLC,1,51,312.0,6108368
-Gen-Wealth Partners Inc,1,654,311.9,4848022
 "Cabot-Wellington, LLC",1,5,311.8,1717098
 "Planned Solutions, Inc.",1,133,311.7,4451241
-"Balance Wealth, LLC",1,129,311.6,4120381
 Schiavi & Co LLC,1,39,311.2,6731238
-Commonwealth Retirement Investments LLC,1,409,310.6,2529258
 "Catalys Pacific, LLC",1,2,310.5,9332852
 Sanofi,1,8,310.4,25737724
 "Team Hewins, LLC",1,35,310.3,5636168
@@ -1879,14 +1545,10 @@ Lind Value II ApS,1,8,309.6,7129694
 Sava Penzisko Drushtvo A.D. Skopje,1,24,309.6,3489017
 "Stephens Consulting, LLC",1,444,309.4,3019110
 Skaana Management L.P.,1,65,309.0,114607478
-"Precision Wealth Strategies, LLC",1,155,308.7,4639502
 "Defender Capital, LLC.",1,36,308.7,9026335
-Alteri Wealth LLC,1,261,308.5,3482804
 Great Point Partners LLC,1,27,308.4,25363333
 "Rakuten Securities, Inc.",1,855,308.2,3640222
 California First Leasing Corp,1,44,307.9,2459575
-Concord Investment Counsel Inc.,1,40,307.9,1794656
-Crestmont Private Wealth LLC,1,95,307.7,3492174
 jvl associates llc,1,63,307.2,1715175
 "Argentarii, LLC",1,191,307.2,3109403
 "Canopy Partners, LLC",1,220,307.0,2660325
@@ -1896,25 +1558,19 @@ Goepper Burkhardt LLC,1,100,306.9,7690084
 "Fore Capital, LLC",1,41,306.0,36065875
 Firetrail Investments Pty Ltd,1,28,305.1,2090069
 Eaton-Cambridge Inc.,1,44,304.8,6168104
-"StrongBox Wealth, LLC",1,92,304.3,3141467
 "Highland Peak Capital, LLC",1,13,303.8,13349117
-"Juncture Wealth Strategies, LLC",1,130,303.8,4590724
 "Fortress Private Ledger, LLC",1,208,303.7,3333363
-Solitude Financial Services,1,38,303.3,4906079
 Milestones Administradora de Recursos Ltda.,1,16,302.8,5573643
 "Game Creek Capital, LP",1,78,302.7,3180756
 Spruce Street Capital LP,1,26,302.7,30902371
-"Westshore Wealth, LLC",1,101,302.3,3496480
 "Investment Research & Advisory Group, Inc.",1,258,302.1,1216896
 "Rogco, LP",1,195,302.0,3240910
-TSA Wealth Managment LLC,1,85,302.0,4395294
 "TFR Capital, LLC.",1,158,301.9,2512792
 Berkshire Capital Holdings Inc,1,101,301.7,1847560
 "Sunpointe, LLC",1,247,301.6,3215800
 "Peachtree Investment Partners, LLC",1,127,301.3,1823101
 Sonoma Allocations LLC,1,110,301.2,4165854
 "Richard W. Paul & Associates, LLC",1,281,301.2,3357943
-"Beacon Bridge Wealth Partners, LLC",1,96,301.0,4158902
 Cooper Investors Pty Ltd,1,35,300.9,6048222
 Hall Laurie J Trustee,1,106,300.9,1843221
 Punch Card Management L.P.,1,5,300.9,2204626
@@ -1923,10 +1579,8 @@ Ketron Financial,1,52,300.4,1935520
 Ravenswood Partners LP,1,32,300.0,3145056
 "Barrett & Company, Inc.",1,613,299.8,3162041
 "Denver PWM, LLC",1,75,299.4,8532205
-"Marks Wealth, LLC",1,21,298.7,3715023
 Lcnb Corp,1,183,298.5,3785757
 "Corundum Group, Inc.",1,84,298.0,1831130
-Veridan Wealth LLC,1,75,297.6,8423191
 Helix Partners Management LP,1,12,297.4,12395607
 Theory Financial LLC,1,95,296.9,5030054
 "Borer Denton & Associates, Inc.",1,64,296.7,1554897
@@ -1936,21 +1590,17 @@ Crcm LP,1,10,296.0,22526378
 "Post Oak Energy Holdings, LLC",1,1,295.3,21048629
 "Tounjian Advisory Partners, LLC",1,139,295.3,3208200
 "Union Heritage Capital, LLC",1,60,295.2,1824424
-Groupe des Assurances du Credit Mutuel,1,5,294.9,10732139
 Strategic Equity Management,1,55,294.9,4729220
 Forum Private Client Group LLC,1,81,293.4,4180473
 Renesas Electronics America Inc.,1,1,293.4,16852372
 Gallatin Point Capital LLC,1,2,293.2,14827820
-"Burkett Financial Services, LLC",1,210,293.0,7246151
 Maniro Ltd,1,17,293.0,12464614
 "Santori & Peters, Inc.",1,66,293.0,2891700
 Sphera Management Technology Funds Ltd,1,57,293.0,18890935
 Incline Global Management LLC,1,28,292.7,5175053
 Long Path Partners LP,1,7,292.4,9489042
 Sonnipe Ltd,1,1,291.9,1978479
-Beacon Wealthcare LLC,1,24,291.2,3443521
 University of Illinois Foundation,1,13,291.2,2172864
-"Arkfeld Wealth Strategies, L.L.C.",1,108,290.9,2646106
 "Juniper Investment Company, LLC",1,8,290.9,16772947
 Silver Coast Investments LLC,1,103,290.1,4617731
 "Main Street Group, LTD",1,86,289.9,4231813
@@ -1966,9 +1616,7 @@ Hillman Co,1,15,288.4,3772026
 "New Perspectives, Inc",1,41,288.4,4996502
 "NWK Group, Inc.",1,66,287.9,1114784
 "Range Rock Capital, LLC",1,26,287.8,1752225
-"Rede Wealth, LLC",1,105,287.8,1350373
 "SmartHarvest Portfolios, LLC",1,331,287.7,3511927
-"Alliance Private Wealth, LLC",1,79,287.5,3883634
 Holowesko Partners Ltd.,1,26,287.3,4544888
 "Thurston, Springer, Miller, Herd & Titak, Inc.",1,998,286.9,8858357
 "HF Advisory Group, LLC",1,160,286.6,4651357
@@ -1982,105 +1630,74 @@ PCA Investment Advisory Services Inc.,1,52,286.0,3025174
 "Autumn Glory Partners, LLC",1,201,285.4,3011694
 "Global Financial Private Client, LLC",1,216,285.3,2817826
 Axis Capital Holdings Ltd,1,3,284.9,939034
-"Aerodigm Wealth, LLC",1,95,284.2,4015312
 "Intercapital, LLC",1,71,284.0,6490670
 Sharper & Granite LLC,1,105,283.9,3373886
 Wilkerson Advisory Group LLC,1,544,283.9,3849595
 "Miller Value Partners, LLC",1,32,283.8,29310490
-Collaborative Wealth Managment Inc.,1,207,283.7,5271273
 Friday Financial,1,89,283.6,5039910
-Enzi Wealth,1,68,283.6,3117890
 G&S Capital LLC,1,124,283.0,3101589
 Stelac Advisory Services LLC,1,104,282.8,2328125
 "Sittner & Nelson, LLC",1,501,282.6,2865597
-"Curio Wealth, LLC",1,417,282.3,5491141
 "Carlson Capital, L.P.",1,64,282.0,10977991
 Gimbel Daniel Scott,1,2,282.0,6274365
-"Samalin Investment Counsel, LLC",1,278,282.0,7921500
 Lincoln Capital Corp,1,88,281.5,3722980
 David Kennon Inc,1,36,281.3,2953360
 B&I Capital AG,1,25,281.2,4794626
 Acasta Partners UK LLP,1,18,281.0,202699031
-"Tiller Private Wealth, Inc.",1,60,281.0,3807273
 "Geneva Partners, LLC",1,67,280.8,1334296
 "GFG Capital, LLC",1,61,280.7,3055392
 "Strengthening Families & Communities, LLC",1,369,280.6,1744352
 "Sherman Porfolios, LLC",1,70,280.1,2793171
 "Great Hill Partners, L.P.",1,1,280.0,2788912
-"Lakeshore Financial Planning, Inc.",1,85,279.9,3087720
 Seven Post Investment Office LP,1,37,279.7,3267198
 Vantage Point Financial LLC,1,152,279.6,5643256
 "Boothe Investment Group, Inc.",1,32,279.4,6564243
 "Highlander Partners, L.P.",1,64,278.7,4683120
 Panview Capital Ltd,1,9,278.5,3933112
-"ShoreHaven Wealth Partners, LLC",1,98,278.4,3892785
 "Saiph Capital, LLC",1,69,278.4,3093503
 "Eley Financial Management, Inc",1,64,278.4,2406534
-"Fsa Wealth Partners, Inc.",1,58,278.3,3184060
 iSAM Funds (UK) Ltd,1,292,278.1,3727670
-Wealth Quarterback LLC,1,146,277.7,2557888
 "Tranquility Partners, LLC",1,224,277.6,3396935
 Excalibur Management Corp,1,159,277.4,2139328
 "Joseph P. Lucia & Associates, LLC",1,139,277.3,4497829
-"Stonebridge Financial Planning Group, LLC",1,154,277.0,3463971
 Stableford Capital II LLC,1,141,276.8,3752818
 Daily Journal Corp,1,4,276.7,3727500
 "Hartree Partners, LP",1,53,276.5,17199572
 "Merck & Co., Inc.",1,11,276.3,26971651
-"Walker Financial Services, Inc.",1,41,276.0,6036674
-Holistic Financial Partners,1,131,275.8,3135396
 "Robertson Opportunity Capital, LLC",1,24,275.5,4149839
-Freedom Financial Partners LLC,1,83,274.9,4437947
-"Access Financial Services, Inc.",1,90,274.7,6459615
-"Fourth Dimension Wealth, LLC",1,562,274.0,3581699
 "Zullo Investment Group, Inc.",1,149,273.4,1934734
 IMZ Advisory Inc,1,39,273.1,2902362
-Potentia Wealth,1,91,272.9,2440598
-waypoint wealth counsel,1,278,272.7,2408748
 Ted Buchan & Co,1,86,272.4,3087300
 Amansa Capital Pte. Ltd.,1,2,272.1,6499580
 Amiral Gestion,1,26,272.0,4841351
 "Congruence Capital, LLC",1,28,271.9,4931169
 Mechanics Financial Corp,1,225,270.9,2797735
-Empower Annuity Insurance Co,1,1,270.7,2456850
-Searcy Financial Services Inc /adv,1,25,269.8,2118298
-Ticino Wealth,1,139,269.8,3175997
 Barbara Oil Co.,1,71,269.4,1839594
 BRIGHT VALLEY CAPITAL Ltd,1,13,269.2,7853013
 "Lhm, Inc.",1,22,268.8,4079444
 "Quartz Partners, LLC",1,164,268.7,3204962
 "Alexis Investment Partners, LLC",1,95,268.6,4120146
 "TAGStone Capital, Inc.",1,109,268.5,2589588
-OMC Financial Services LTD,1,65,268.3,1527549
 Visualize Group LP,1,11,267.7,1336639
 All-Stars Investment Ltd,1,4,267.5,22910814
 Monolith Management Ltd,1,18,267.0,2490146
 Gainplan LLC,1,56,266.9,2226929
-1776 Wealth LLC,1,115,265.6,2509422
 "Powers Advisory Group, LLC",1,123,265.5,5387690
 Members Advisory Group LLC,1,26,265.3,5080930
 "Summit Investment Advisory Services, LLC",1,82,265.0,5373092
 First Financial Corp /IN/,1,296,264.9,2050309
 "Palisades Investment Partners, LLC",1,47,264.7,6168007
-"Envision Financial Planning, LLC",1,40,264.5,7518697
 Lunate Capital Ltd,1,5,264.3,8570343
-"Tencap Wealth Coaching, LLC",1,6,264.2,5412659
 Silchester International Investors LLP,1,2,264.2,4229924
 Investors Towarzystwo Funduszy Inwestycyjnych Spolka Akcyjna,1,177,264.0,1993351
-"Long Road Investment Counsel, LLC",1,71,264.0,1936738
 Lineage Point Capital LP,1,53,263.6,33379294
-Intrepid Financial Planning Group LLC,1,113,263.1,3043956
 "Houlihan Financial Resource Group, Ltd.",1,106,263.0,3068515
 "Owen LaRue, LLC",1,103,262.9,4725951
 Wheelhouse Advisory Group LLC,1,47,262.9,1671242
-REDW Wealth LLC,1,100,262.3,3330944
-White Mountains Insurance Group Ltd,1,2,261.9,17901614
 "Twin Securities, Inc.",1,14,261.7,3749944
 Harbor Island Capital LLC,1,15,260.8,3262729
 Compass Capital Corp /ma/ /adv,1,167,260.2,3164317
 "Disciplined Investments, LLC",1,126,260.1,4539008
-Titan Wealth (CI) Ltd,1,65,260.1,1608887
-TL Private Wealth,1,46,259.8,2239615
 "Grey Rock Energy Management, LLC",1,1,259.8,55265968
 Formula Growth Ltd,1,119,259.5,13194828
 "Penney Financial, LLC",1,49,259.1,3142500
@@ -2108,68 +1725,44 @@ SWAN Capital LLC,1,465,257.1,2594394
 "Hatch Cove Capital, LLC",1,20,256.2,12341560
 Sellwood Investment Partners LLC,1,58,256.1,3445024
 "Grunden Financial Advisory, Inc.",1,35,255.9,6184450
-"Mine & Arao Wealth Creation & Management, LLC.",1,75,255.5,1065494
 "Trv Gp IV, LLC",1,2,255.1,12348532
-"Wealth Analytics Partners, LLC",1,44,255.0,1582138
 "Eos Management, L.P.",1,41,255.0,2686386
 Urban Financial Advisory Corp,1,49,254.7,3441535
-"Flagship Private Wealth, LLC",1,111,254.4,2195239
 Ruggaard & Associates LLC,1,117,254.0,4515209
-Evergreen Private Wealth LLC,1,88,253.7,3518052
 "Luken Investment Analytics, LLC",1,381,253.4,5362536
-"Greykasell Wealth Strategies, Inc.",1,470,253.3,2364919
 S.A. Mason LLC,1,252,252.9,1956078
-Meridian Financial Partners LLC,1,114,252.8,2707010
-Integrity Wealth Solutions LLC,1,116,252.8,3815830
-"Towerpoint Wealth, LLC",1,86,252.5,2273702
 Eurizon SLJ Capital Ltd,1,131,252.4,2148370
-Proactive Wealth Strategies LLC,1,134,252.3,3653743
 Western Financial Corp/CA,1,108,252.1,3051748
 MKA Charitable Fund,1,1,251.8,1855463
 "Diesslin Group, Inc.",1,51,251.6,2529005
 Georgetown University,1,12,251.2,5158693
 "Red Spruce Capital, LLC",1,91,250.8,3374850
 "Financial Council, LLC",1,99,250.5,3724937
-"5T Wealth, LLC",1,116,250.3,3624317
-Altus Wealth Group LLC,1,137,250.2,2579419
 "Orin Green Financial, LLC",1,77,250.0,2744649
 "Pennington Partners & Co., LLC",1,96,249.6,1796562
 "Stash Investments, LLC",1,5,249.5,2920927
 "Solstein Capital, LLC",1,449,249.3,2611508
-"Retirement Planning Co of New England, Inc.",1,235,249.3,3182975
-"Beta Wealth Group, Inc.",1,96,248.7,5400956
 "Madden Advisory Services, Inc.",1,103,248.7,4115416
 Mount Capital Ltd,1,16,247.5,8072438
 "Prospect Hill Management, LLC",1,13,247.4,956785
 Bay Rivers Group,1,93,247.3,1609544
 MTCO Ltd.,1,2,247.2,13640919
-Shared Vision Wealth Group LLC,1,94,247.0,2585167
-Cherokee Insurance Co,1,121,246.7,3116941
 Parker Financial LLC,1,34,246.6,3561089
-"Kensington Investment Counsel, LLC",1,104,246.2,1348204
 TMT General Partner Ltd,1,3,246.0,14555902
 Blacksheep Fund Management Ltd,1,7,246.0,3024095
-Wrenne Financial Planning LLC,1,51,245.8,3092304
-"Traveka Wealth, LLC",1,185,245.6,2436798
 Metavasi Capital LP,1,24,245.4,14865290
 Financial Symmetry Inc,1,55,245.2,5441972
 Avalon Advisory Group,1,13,245.1,1878457
 "Elevation Capital Advisory, LLC",1,58,244.8,3043289
 "Bull Oak Capital, LLC",1,36,244.8,1990850
 "Financial Guidance Group, Inc.",1,78,244.5,4186461
-"WealthCollab, LLC",1,937,244.4,4116120
 Salzhauer Michael,1,76,244.3,7801779
-"Fiduciary Wealth Partners, LLC",1,87,243.9,1503344
 "Aristotle Pacific Capital, LLC",1,5,243.8,6028017
 "Verisail Partners, LLC",1,23,243.5,6249294
 "Threadgill Financial, LLC",1,51,242.8,2152264
-"Element Wealth, LLC",1,191,242.6,4096424
 "Burford Brothers, Inc.",1,162,242.2,3826417
-Security Benefit Life Insurance Co /KS/,1,11,242.1,20030065
-"Deane Retirement Strategies, Inc.",1,71,241.7,3238177
 "Rector, Church-Wardens & Vestrymen of Trinity Church in the City of New-York",1,2,241.5,4972423
 Zeno Equity Partners LLP,1,10,241.2,18895152
-"Mitchell & Pahl Private Wealth, LLC",1,140,240.9,2342888
 "Pavion Blue Capital, LLC",1,106,240.8,1553648
 JNE Partners LLP,1,6,240.7,5902263
 "Nvest Financial, LLC",1,112,240.6,1886542
@@ -2200,8 +1793,6 @@ Values Added Financial LLC,1,126,236.9,3737075
 Creekside Partners,1,172,236.6,4243671
 Pfizer Inc,1,15,236.5,55204352
 "SimpliFi, Inc.",1,37,236.4,2793548
-"Melone Private Wealth, LLC",1,49,235.8,7798466
-Physician Wealth Solutions Inc.,1,45,235.8,5011949
 "Myecfo, LLC",1,63,235.6,5969970
 I.G.Y. Ltd,1,3,235.3,548649
 YANKCOM Partnership,1,358,235.2,2459457
@@ -2213,11 +1804,8 @@ Deseret Mutual Benefit Administrators,1,489,234.4,3031722
 "Christensen, King & Associates Investment Services, Inc.",1,103,234.3,6276821
 "Lgl Partners, LLC",1,52,234.3,1699651
 "Wishbone Management, LP",1,5,234.2,4657500
-"Capital Wealth Alliance, LLC",1,80,234.1,5454566
 "NavPoint Financial, Inc.",1,71,234.0,3980502
 "BRC Group Holdings, Inc.",1,14,234.0,35557309
-Forge Financial Services LLC,1,25,233.9,5858142
-"Keyvantage Wealth, LLC",1,99,233.8,4037642
 Summa Corp.,1,75,233.2,1756434
 Investment Research Partners LLC,1,217,233.0,3094491
 "CPV Partners, LLC",1,4,232.8,10115826
@@ -2229,13 +1817,11 @@ Bontempo Ohly Capital Mgmt LLC,1,31,232.1,1667804
 GP Brinson Investments LLC,1,14,232.1,2927718
 "Vista Investment Partners II, LLC",1,136,232.1,2522336
 "Kinloch Capital, LLC",1,76,232.0,3189924
-"RCS Financial Planning, LLC",1,87,232.0,4308970
 "Aft, Forsyth & Company, Inc.",1,126,231.8,1271069
 Longitude (Cayman) Ltd.,1,25,231.5,7594300
 Boit C F David,1,105,231.4,1192893
 "Carroll Advisory Group, LLC",1,68,231.1,3690921
 New Millennium Group LLC,1,374,231.0,1485503
-"Strategic Financial Partners, Ltd.",1,79,231.0,3095931
 Optima Capital LLC,1,1285,230.9,3852303
 "American Capital Advisory, LLC",1,1018,230.8,4517382
 RPD Fund Management LLC,1,6,230.7,14187923
@@ -2246,10 +1832,8 @@ Ewing Morris & Co. Investment Partners Ltd.,1,88,229.2,67421482
 "New England Research & Management, Inc.",1,142,228.6,1688912
 "Haven Private, LLC",1,144,228.5,5258332
 "Aspect Partners, LLC",1,674,228.5,3071604
-"Resolute Wealth Strategies, LLC",1,107,228.1,1868843
 "DMKC Advisory Services, LLC",1,82,227.9,2155640
 "Keystone Global Partners, LLC",1,54,227.4,3623475
-State Insurance Fund,1,1,227.3,2697658
 Spinecap SAS,1,13,227.2,959282
 Vision Capital Corp,1,10,227.1,4060619
 "Insight 2811, Inc.",1,96,226.7,2488816
@@ -2262,47 +1846,34 @@ Plustick Management LLC,1,19,226.0,10380929
 "Nightview Capital, LLC",1,12,225.7,920805
 "Dixon Fnancial Services, Inc.",1,45,225.6,3355801
 "CMG Global Holdings, LLC",1,95,225.3,2046041
-"Second Half Financial Partners, LLC",1,100,225.2,4283263
 Pacifica Partners Inc.,1,409,225.1,2885250
 Catawba River Capital,1,21,224.8,5513720
 "Spider Management Company, LLC",1,3,224.7,584977
 VPR Management LLC,1,55,224.5,5990963
 Matisse Capital,1,140,224.4,13174493
-Roberts Financial Services LLC,1,25,224.2,4057891
 "Carl P. Sherr & Co., LLC",1,124,224.0,2038069
 Family CFO Inc,1,84,223.6,1926517
-"Windle Wealth, LLC",1,33,223.2,2013007
-"NerdWallet Wealth Partners, LLC",1,60,223.1,2041418
 Humankind Investments LLC,1,18,222.9,1007977
 Hengistbury Investment Partners LLP,1,4,222.7,1496770
 "Darrow Company, Inc.",1,59,222.5,2748696
-Mccarter Private Wealth Services LLC,1,146,222.5,1530372
 Bandera Partners LLC,1,11,222.5,19298462
-"Leslie Global Wealth, LLC",1,70,222.2,2945783
-Core Wealth Partners LLC,1,160,222.1,2651957
 "Powers Capital, LLC",1,2,222.1,365212
-"Entrewealth, LLC",1,81,221.9,4140500
 "General Catalyst Group Management, LLC",1,7,221.7,11061850
 True Light Capital Pte. Ltd.,1,8,221.6,3084040
 Lrz Capital LLC,1,18,221.5,1130985
 Mitchell Sinkler & Starr /PA/,1,136,221.3,1615791
 Gildi - lifeyrissjodur,1,1,221.1,3557364
 Robbins Farley,1,137,220.5,2318806
-"Horizon Financial Services, LLC",1,365,219.8,4746535
 Alpha Family Trust,1,193,219.5,1850175
-Retirement Guys Formula LLC,1,141,219.3,3021847
 "Nipun Capital, L.P.",1,9,219.1,4006390
 Genoa Capital Gestora de Recursos Ltda.,1,13,218.8,1370311
 "PFS Partners, LLC",1,518,218.6,4737027
 "Finley Financial, LLC",1,105,218.3,1669914
 "Woodward Diversified Capital, LLC",1,177,218.3,3679410
-Optimist Retirement Group LLC,1,108,218.3,2719849
-Financial Planning Navigators CORP,1,46,217.9,3378571
 IRON Financial LLC,1,128,217.6,3198928
 "RWQ Financial Management Services, Inc.",1,20,217.4,826454
 Western Standard LLC,1,23,216.8,15062199
 "Armstrong, Fleming & Moore, Inc",1,103,216.5,3347782
-Melia Wealth LLC,1,21,216.3,15982596
 "Capital Today Evergreen Fund, L.P.",1,3,216.3,13585176
 venBio Partners LLC,1,5,216.3,20434430
 "EnCap Energy Capital Fund X, L.P.",1,1,216.2,5903074
@@ -2316,13 +1887,10 @@ Citrine Capital LLC,1,45,215.4,3870423
 "eCIO, Inc.",1,177,214.7,5065818
 "Epiq Partners, LLC",1,70,214.5,5395780
 "Sender Co & Partners, Inc.",1,79,214.5,10833574
-Peoples Financial Services Corp.,1,254,214.4,1609442
 "Pflug Koory, LLC",1,399,214.3,1998571
 R Squared Ltd,1,464,214.0,7104870
-Boyum Wealth Architects LLC,1,72,213.9,4464023
 Ironclad Investments LLC,1,3,213.9,326227
 "Landmark Investment Partners, L.P.",1,34,213.9,8378535
-Employees' Retirement Fund of the City of Fort Worth,1,18,213.9,3466086
 "CDC Financial, Inc.",1,26,213.6,27369484
 Brooklands Fund Management Ltd,1,70,212.6,12748449
 Alden Global Capital LLC,1,19,212.5,4517622
@@ -2335,11 +1903,8 @@ Attestor Capital Ltd,1,9,211.8,9866111
 May Barnhard Investments LLC,1,84,211.6,2733703
 Axa S.A.,1,73,211.4,4958296
 Montaka Global Pty Ltd,1,19,211.3,1061253
-"Forefront Wealth Partners, LLC",1,129,211.2,2726238
-Higgins & Schmidt Wealth Strategies LLC,1,58,211.1,3303089
 New Vernon Capital Holdings II LLC,1,83,211.0,4971633
 "Unconventional Investor, LLC",1,45,210.5,1278697
-"A&i Financial Services, LLC",1,72,210.5,4846666
 Kieckhefer Group LLC,1,49,210.2,2858965
 Viewpoint Investment Partners Corp,1,71,210.1,3027146
 Keeler Thomas Management LLC,1,91,209.8,5330387
@@ -2350,12 +1915,9 @@ Triavera Capital LLC,1,18,209.2,1770854
 Fortune 45 LLC,1,32,209.1,1097721
 SMA Capital LLC,1,41,209.0,1733137
 "Cornerstone Enterprises, LLC",1,36,209.0,3731153
-"Legacy Wealth Managment, LLC/ID",1,814,209.0,17910872
 "Sound Stewardship, LLC",1,57,208.7,4350295
-"Private Wealth Group, LLC",1,66,208.5,2908092
 AXS Investments LLC,1,188,208.4,2175949
 "Strategic Value Partners, LLC",1,1,208.3,9486266
-"LifeWealth Investments, LLC",1,93,207.9,3591365
 Intelligent Financial Strategies,1,71,207.9,1172455
 Croban,1,78,207.5,3784461
 University of Chicago,1,11,206.8,552039
@@ -2365,23 +1927,16 @@ University of Chicago,1,11,206.8,552039
 Praetorian PR LLC,1,12,206.4,6114990
 Cannell Capital LLC,1,45,206.3,23002579
 Marnell Management LLC,1,49,206.1,5560953
-Darden Wealth Group Inc,1,145,206.1,1698313
 "Wynn Capital, LLC",1,108,205.9,2170278
 GGM Financials LLC,1,212,205.8,2914487
 "McBroom & Associates, LLC",1,38,205.8,1305148
 Cna Financial Corp,1,14,205.8,4373000
-"Oxford Wealth Group, LLC",1,84,205.7,2282143
 Excelsior Advisor Network LLC,1,165,205.7,2115771
 "Thayer Partners, LLC / MA",1,85,205.6,2132674
 Generali Investments Towarzystwo Funduszy Inwestycyjnych,1,139,205.5,1729167
 Pachira Investments Inc.,1,71,205.5,1977144
 Dow Chemical Co /DE/,1,5,205.1,883207
-Vienna Powszechne Towarzystwo Emerytalne S.A. Vienna Insurance Group,1,24,205.0,2807275
-"Olistico Wealth, LLC",1,324,205.0,1727014
-"Gray Private Wealth, LLC",1,48,204.8,860385
-School Employees Retirement Board of Ohio,1,4,204.7,4710437
 Oakum Bay Capital LLC,1,73,204.5,4514152
-Plan A Wealth LLC,1,153,204.4,3097646
 Canerector Inc,1,9,204.3,1598425
 "Grafton Street Partners Management Company, LLC",1,12,204.2,1109013
 "Foresight Global Investors, Inc.",1,26,204.0,2904952
@@ -2395,23 +1950,17 @@ Orion Resource Partners LP,1,20,203.3,32320128
 First Citizens Financial Corp,1,124,202.4,1908996
 "Brandywine Managers, LLC",1,38,202.3,5119165
 Chou Associates Management Inc.,1,27,201.6,3406605
-"Wealth Intelligence, LLC",1,54,201.5,2362252
 "Financial Freedom, LLC",1,326,201.5,1859590
 North Ground Capital,1,30,201.4,22155168
-Decker Retirement Planning Inc.,1,200,201.1,3059079
 American Financial & Tax Strategies Inc,1,91,200.7,3466017
 "Birchbrook, Inc.",1,284,200.6,2856731
 "Asset Advisory Group, Inc.",1,119,200.2,2555688
 Declaration Partners LP,1,1,200.1,14786990
-"Henderson Brothers Financial Partners, LLC",1,71,199.6,3178501
-Econ Financial Services Corp,1,74,199.4,3674161
 "L.K. Benson & Company, P.C.",1,106,199.3,3285142
 Delaney Dennis R,1,46,199.0,1187965
-Prepared Retirement Institute LLC,1,74,198.7,3125389
 Fairfield University,1,3,198.5,705613
 Optimize Financial Inc,1,310,198.5,5477665
 Planning Directions Inc,1,97,198.4,3063850
-Innova Wealth Partners,1,135,198.3,3206020
 BDFS Capital LLC,1,129,198.1,3119901
 Share Andrew L.,1,11,198.0,81073990
 Brown Financial Advisory,1,55,197.9,2297861
@@ -2421,8 +1970,6 @@ Integrity Financial Corp /WA,1,219,197.5,2596953
 "Allodium Investment Consultants, LLC",1,50,197.3,3818211
 KilterHowling LLC,1,49,197.3,2418207
 Cincinnati Casualty Co,1,23,197.1,1389209
-Enterprise Financial Services Corp,1,157,197.0,1479884
-International City Management Association Retirement Corp,1,6,196.9,1824320
 Sprinkle Financial Consultants LLC,1,80,196.8,3779549
 True Vision MN LLC,1,106,196.8,3089030
 "Griffith & Werner, Inc.",1,65,196.4,2488784
@@ -2430,14 +1977,10 @@ Mithaq Capital SPC,1,3,196.3,34224805
 Successful Portfolios LLC,1,188,196.3,2617469
 Flower City Capital,1,42,196.1,1600294
 "Torren Management, LLC",1,1405,195.8,2986816
-"apricus wealth, LLC",1,117,195.8,2968311
 "TenCore Partners, LP",1,14,195.6,984900
 "Forest Hill Capital, LLC",1,34,195.6,4521482
-"OMNI 360 Wealth, Inc.",1,123,195.3,2476959
 HealthCor Partners Management LP,1,1,195.2,6697556
-BostonPremier Wealth LLC,1,65,195.2,1451820
 Aufman Associates Inc,1,66,195.1,1849878
-"Symphony Financial Services, Inc.",1,93,195.1,3184267
 Inherent Management Corp.,1,8,194.9,5904269
 "Jones Kertz & Associates, Inc.",1,55,194.6,1113967
 "POM Investment Strategies, LLC",1,323,194.5,3323530
@@ -2455,18 +1998,13 @@ Advanced Micro Devices Inc,1,2,192.7,6865337
 "Ameriflex Group, Inc.",1,1015,192.6,2325163
 Carson Advisory Inc.,1,177,192.4,3399830
 VVR Holdings LLC,1,36,192.4,2002031
-"Kaufman Rossin Wealth, LLC",1,153,192.0,3689273
 Littlejohn & Co LLC,1,11,192.0,14194228
 Dempze Nancy E,1,80,192.0,1498946
-"Novak & Powell Financial Services, Inc.",1,155,191.7,1484526
 "Steffes Financial, Ltd.",1,27,191.5,1808031
 "Turning Point Benefit Group, Inc.",1,793,191.4,3511915
-Sbe LLC Dba Cedar Cove Wealth Partners,1,76,191.3,4254029
 "Patrick Mauro Investment Advisor, INC.",1,42,191.3,2219246
-West Bancorporation Inc,1,98,190.9,1621657
 Palmer Knight Co,1,32,190.5,998730
 Foundry Financial LLC,1,65,190.3,3900729
-Aurora Investment Counsel,1,86,190.2,3575763
 OxenFree Capital LLC,1,31,190.2,4785385
 "Fairfield, Bush & Co.",1,114,189.5,1200083
 Alpine Fox Capital LLC,1,18,189.5,9649806
@@ -2474,39 +2012,28 @@ Alpine Fox Capital LLC,1,18,189.5,9649806
 Gouws Capital LLC,1,55,189.2,664816
 Envision Financial LLC,1,40,189.2,3566197
 "Pennant Select, LLC",1,12,189.0,2829228
-"MB Generational Wealth, LLC",1,65,188.9,4630462
 Hofer & Associates. Inc,1,65,188.7,2007396
 "Rachor Investment Advisory Services, LLC",1,406,188.5,4375517
 Accel Leaders 3 Associates L.P.,1,0,188.5,2251905
 "Granville Capital, Inc.",1,82,188.5,1850514
-Treasure Coast Financial Planning,1,39,188.3,3669315
 Saranac Partners Ltd,1,67,188.2,1479193
 Stegner Investment Associates Inc.,1,29,188.2,1340202
 "Andrews Advisory Associates, LLC",1,80,188.1,2319065
-"First Bancorp, Inc /ME/",1,124,188.1,2279957
 Claris Financial LLC,1,162,188.0,1945808
 Pelham Capital Ltd.,1,11,187.9,1197570
-"Next Level Wealth Planning, LLC",1,65,187.9,2133921
 David J Yvars Group,1,85,187.9,2026300
 "LCW Services, LLC",1,39,187.8,3159642
 Granite FO LLC,1,175,187.5,1548354
 "TritonPoint Partners, LLC",1,150,187.3,1776123
-"Broadway Wealth Solutions, Inc.",1,92,187.2,3347226
 "GuidedMoney, LLC",1,30,187.2,1714981
-"Boomfish Wealth Group, LLC",1,84,187.1,1241229
 Brown Shipley& Co Ltd,1,70,187.0,835387
 "1248 Management, LLC",1,150,186.9,4983662
 J Digital 6 LLC,1,2,186.4,11224430
-"Investments & Financial Planning, LLC",1,37,186.3,1755194
 "Panoramic Capital, LLC",1,35,186.3,3717778
-"Sage Private Wealth Group, LLC",1,89,186.0,2736346
 "Financial Architects, LLC",1,30,185.9,3627631
 General Motors Holdings LLC,1,3,185.9,46187615
-"Aventura Private Wealth, LLC",1,699,185.8,1812261
 Greencape Capital Pty Ltd,1,1,185.8,2722911
-Semus Wealth Partners LLC,1,108,185.6,1609653
 "Strategic Planning, Inc.",1,51,185.6,3864895
-"Hoge Financial Services, LLC",1,70,185.5,1456880
 "Stephens Group, LLC",1,3,185.4,21481010
 EVR Research LP,1,32,185.3,11615854
 "BCK Partners, Inc.",1,27,185.0,1736988
@@ -2519,9 +2046,7 @@ Lynx Investment Advisory,1,158,183.3,2604572
 Cromwell Holdings LLC,1,966,183.2,1518321
 Attessa Capital LLC,1,32,182.9,2338317
 "Brucke Financial, Inc.",1,163,182.9,2829198
-"Alchemi Wealth, LLC",1,145,182.9,2333620
 Straightline Group LLC,1,13,182.9,4162792
-"Aspen Wealth Strategies, LLC",1,81,182.8,2200144
 "William B. Walkup & Associates, Inc.",1,165,182.7,1500023
 "Cladis Investment Advisory, LLC",1,152,182.7,1978182
 "Frederick Financial Consultants, LLC",1,103,182.7,2078219
@@ -2542,10 +2067,8 @@ Stilwell Value LLC,1,17,181.4,7851291
 Four Tree Island Advisory LLC,1,19,181.2,2494116
 "Tilia Fiduciary Partners, Inc.",1,115,181.2,1144461
 Bayhunt Capital LLC,1,18,181.1,5034288
-"Axis Wealth Partners, LLC",1,161,181.0,2691460
 "Signature Equity Partners, LLC",1,1408,180.8,3294499
 "J Hagan Capital, Inc.",1,70,180.7,2436279
-Laurel Wealth Planning LLC,1,55,180.5,2493616
 Buckland Partners Management Co LLC,1,101,180.4,2735436
 "Lotus Technology Management, LP",1,139,180.0,5946337
 Meritech Capital Associates V L.L.C.,1,2,179.7,1757221
@@ -2555,7 +2078,6 @@ Sun Financial Inc,1,152,179.4,3070494
 Everest Management Corp.,1,62,179.3,1905963
 American Airlines Group Inc.,1,1,179.2,9755889
 Beacon Financial Strategies CORP,1,181,179.2,2037484
-Keynote Financial Services LLC,1,153,178.8,2888732
 "FACT Capital, LP",1,17,178.8,2191404
 "Kure Advisory, LLC",1,55,178.8,3526685
 "Marest Capital, LLC",1,26,178.8,725685
@@ -2567,14 +2089,10 @@ Insight Inv LLC,1,108,178.4,1599028
 "Vision One Management Partners, LP",1,10,178.2,6171902
 Corsicana & Co.,1,256,178.2,1279206
 "Beckerman Institutional, LLC",1,110,178.1,2912820
-"Viawealth, LLC",1,148,177.8,1735891
 "Arrien Investments, Inc.",1,45,177.3,3228112
-"Meriwether Wealth & Planning, LLC",1,117,177.3,4058712
-"Wealth Forward, LLC",1,42,177.0,2988392
 Karnit Road Accident Victims Compensation Fund,1,15,176.9,444258
 "Presper Financial Architects, LLC",1,53,176.9,2213442
 "United Airlines Holdings, Inc.",1,2,176.7,13565995
-"Pacific Wealth Strategies Group, Inc.",1,55,176.6,2884601
 Financial Designs Corp,1,21,176.6,3383019
 "CAP Partners, LLC",1,130,176.5,2761350
 "General Partner, Inc.",1,157,176.4,1060734
@@ -2584,9 +2102,7 @@ William Allan Corp,1,58,176.3,1084841
 EJF Capital LLC,1,74,176.1,8087380
 "Mercuria Capital Strategies, LLC",1,21,176.1,9903653
 Wormser Freres Gestion,1,38,176.0,801519
-"Burrus Financial Services, Inc.",1,12,175.9,1891041
 "McHugh Group, LLC",1,78,175.8,791745
-"Strategic Financial Planning, Inc.",1,38,175.8,4506902
 "Gridiron Partners, LLC",1,41,175.5,5306793
 "Teca Partners, LP",1,11,175.3,2695004
 "Lam Group, Inc.",1,69,174.7,2876019
@@ -2594,12 +2110,9 @@ Howard Hughes Medical Institute,1,487,174.7,315555
 "Equitec Proprietary Markets, LLC",1,37,174.2,4844895
 Shearwater Capital LLC,1,53,174.2,3951684
 HarbourVest Partners LLC,1,6,174.2,8225011
-Prospect Financial Services LLC,1,100,174.1,1867243
 Farrow Financial Inc.,1,51,174.0,2190124
 Stephens Greth Foundation,1,4,173.9,520019
-"Coordinated Financial Services, Inc.",1,172,173.9,2138634
 "Trivant Custom Portfolio Group, LLC",1,69,173.6,1141325
-"Financial Planning Hawaii, Inc.",1,125,173.6,1124285
 Optivise Advisory Services LLC,1,187,173.5,2847270
 H Squared Management LP,1,10,173.3,766671
 Presima Securities ULC,1,48,173.3,4483538
@@ -2610,18 +2123,15 @@ Finivi Inc.,1,101,172.9,1762775
 "Williams Financial, LLC",1,24,172.8,3330554
 Tacita Capital Inc,1,208,172.6,2667492
 "Align Financial, LLC",1,372,172.4,172411580
-LeClair Wealth Partners LLC,1,107,172.4,2821748
 SeaTown Holdings Pte. Ltd.,1,17,172.4,753519
 Tranquilli Financial Advisor LLC,1,128,172.4,2152277
 "Anderson Financial Strategies, LLC",1,34,172.3,3769102
 "Financial Alternatives, Inc",1,83,172.0,2941249
 Independent Order of Foresters,1,2,171.7,886609
 "Fischer Investment Strategies, LLC",1,44,171.6,2447199
-"Fee-Only Financial Planning, L.C.",1,42,171.5,833992
 Arwa LLC,1,121,171.3,1595057
 "Beaconlight Capital, LLC",1,21,171.2,3963195
 "IES Holdings, Inc.",1,11,171.2,10823412
-"Forbes Financial Planning, Inc.",1,36,171.0,2070217
 "Graney & King, LLC",1,339,171.0,2585806
 Ames National Corp,1,65,170.8,1249982
 "Birchview Capital, LP",1,62,170.8,9215269
@@ -2630,9 +2140,7 @@ PJT Investments Corp.,1,6,170.8,1720680
 Ariston Services Group,1,69,170.5,1493090
 Windward Management LP,1,7,170.5,10668342
 "Daviman Financial, LLC",1,82,170.4,2579459
-Astra Wealth Partners LLC,1,93,170.1,1900342
 "Millstone Evans Group, LLC",1,790,170.0,1740449
-Holos Integrated Wealth LLC,1,290,169.9,4383363
 "Klein Pavlis & Peasley Financial, Inc.",1,92,169.7,2338692
 MQS Management LLC,1,377,169.6,3477521
 Farrell Financial LLC,1,72,169.6,1952759
@@ -2641,10 +2149,8 @@ Rainwater Charitable Foundation,1,4,169.5,1589684
 "EnCap Energy Capital Fund XII, L.P.",1,1,169.3,1126468
 Applied Capital LLC/FL,1,91,168.8,1295437
 "Bush Investment Group, LLC",1,37,168.8,3044126
-"Traction Financial Partners, LLC",1,58,168.7,2565738
 Prime Buchholz LLC,1,20,168.4,2371872
 "South Plains Financial, Inc.",1,245,168.1,1362113
-"Dynamic Wealth Strategies, LLC",1,245,168.0,2018166
 "Blue Investment Opportunities, LLC - Project Breeze Series 1",1,1,167.8,8698038
 "Cria, Inc.",1,2,167.7,4491661
 TB Capital Gestao de Recursos Ltda.,1,14,167.7,2503639
@@ -2652,7 +2158,6 @@ TB Capital Gestao de Recursos Ltda.,1,14,167.7,2503639
 Peak XV Partners Operations LLC,1,1,167.6,8182822
 "Tenzing Global Management, LLC",1,14,167.1,5307950
 "Thompson Davis & Co., Inc.",1,142,167.0,4394874
-"Instrumental Wealth, LLC",1,69,166.8,2231906
 Investidor Profissional Gestao de Recursos Ltda.,1,16,166.7,408225
 Shotwell Rutter Baer Inc,1,38,166.5,2442594
 "H&F Corporate Investors VIII, Ltd.",1,1,166.2,3887858
@@ -2665,30 +2170,20 @@ StoryOne LLC,1,68,165.4,0
 "Seros Financial, LLC",1,54,165.3,2998250
 "Addis & Hill, Inc",1,27,165.1,1425986
 "Fearless Solutions, LLC dba Best Invest",1,111,165.1,2689083
-United Financial Planning Group LLC,1,463,164.8,1541998
 Marcho Partners LLP,1,5,164.7,5467608
-Basepoint Wealth LLC,1,566,164.6,3693107
-"Pandora Wealth, Inc.",1,215,164.6,1722226
-"Xxi Wealth, LLC",1,176,164.5,1118839
 Baring Financial LLC,1,69,164.3,1784840
 "Reyes Financial Architecture, Inc.",1,367,164.2,1566720
 "FSA Investment Group, LLC",1,36,164.0,4224440
 "M3 Advisory Group, LLC",1,137,164.0,1151052
 Systrade AG,1,13,163.9,3074674
-"Alpha Financial Partners, LLC",1,90,163.8,1430254
 "Crescent Park Management, L.P.",1,27,163.6,4563934
 Pingora Partners LLC,1,196,163.5,7398613
 Pearl Planning LLC,1,50,163.5,1520624
-"Widmann Financial Services, Inc.",1,111,163.5,1512916
-"Eliot Finkel Investment Counsel, LLC",1,33,163.3,1575817
 "Fort Henry Capital, LLC",1,16,163.2,1632970
 "Camelot Portfolios, LLC",1,507,163.2,4641613
 Elefante Mark B,1,52,163.2,966345
 Obsido Oy,1,18,162.8,1760648
 Live Oak Investment Partners,1,79,162.7,2581598
-Brewster Financial Planning LLC,1,26,162.7,1492560
-ZynergyRetirementPlanningLLC,1,26,162.5,4817334
-"Livet Wealth, LLC",1,114,162.3,3348884
 "Gould Capital, LLC",1,189,162.3,2350643
 Warner Group LLC,1,68,162.3,1617851
 "Axecap Investments, LLC",1,73,162.1,1336898
@@ -2696,10 +2191,8 @@ Warner Group LLC,1,68,162.3,1617851
 Old Peak Finance LLC,1,85,162.0,2574384
 "Ti-Trust, Inc",1,128,162.0,1697484
 "Financial Harvest, LLC",1,61,162.0,3490234
-"Alpha Wealth Funds, LLC",1,46,161.7,1883164
 22C Capital LLC,1,1,161.6,3202267
 "Manuka Financial, LLC",1,56,161.1,1460839
-Rayburn West Financial Services LLC,1,77,160.9,1458502
 Cox Capital Mgt LLC,1,59,160.8,2563333
 BFI Infinity Ltd.,1,47,160.7,2134579
 "New Mountain Capital, L.L.C.",1,1,160.4,14000000
@@ -2707,26 +2200,19 @@ Cyr Financial Inc.,1,51,160.4,2925772
 "Sterling Manor Financial, LLC",1,30,160.3,3190908
 "Pacific Park Financial, Inc.",1,74,160.2,2276067
 Rubicon Founders LLC,1,2,160.2,11589645
-Flywheel Private Wealth LLC,1,82,160.2,1213623
 Rare Wolf Capital LLC,1,120,160.1,1739162
 General Equity Holdings LP,1,10,160.0,3411745
-Ballast Rock Private Wealth LLC,1,154,160.0,2383136
 "Patrick M Sweeney & Associates, Inc",1,157,159.9,1190496
 "Blackston Financial Advisory Group, LLC",1,96,159.9,1019186
 Graphene Investments SAS,1,43,159.5,1704400
 "Holcombe Financial, Inc.",1,40,159.3,3529348
-"Rochester Wealth Strategies, LLC",1,24,159.3,2122593
 "Mustard Seed Financial, LLC",1,86,159.1,2092792
 Scientech Research LLC,1,428,159.0,8832511
 TOWER TRUST & INVESTMENT Co,1,200,158.9,1075930
 "GEN Financial Management, INC.",1,45,158.8,2810265
 XY Capital Ltd,1,126,158.8,3326654
-Coastline Complete Wealth LLC,1,44,158.8,2426688
-"Gentry Private Wealth, LLC",1,91,158.7,1339483
 Southern Capital Services Inc /adv,1,25,158.7,2617185
 "ELCO Management Co., LLC",1,102,158.6,2721978
-"Pathfinder Wealth Consulting, Inc.",1,159,158.4,1545796
-Retirement Wealth Solutions LLC,1,733,158.2,1605179
 "Argosy-Lionbridge Management, LLC",1,14,158.2,6308603
 "Strategent Financial, LLC",1,40,158.0,1908240
 Niatross Investments Ltd,1,1,158.0,8326995
@@ -2737,32 +2223,23 @@ Greycroft LP,1,11,157.8,11553793
 Emory University,1,7,157.1,3216178
 "FWG Investments, LLC.",1,80,157.0,2582170
 Redwood Financial Network Corp,1,171,156.9,2535662
-"LFG Wealth Partners, LLC",1,76,156.9,2162057
 Atala Financial Inc,1,112,156.8,2344859
-Fidato Wealth LLC,1,15,156.5,981349
 "Breakthru Advisory Services, LLC",1,59,156.5,2779015
-"Atlantic Private Wealth, LLC",1,359,156.4,2176241
 "Avory & Company, LLC",1,34,156.3,4339984
 "LifeSteps Financial, Inc.",1,87,156.3,1116188
 "Cultivar Capital, Inc.",1,41,156.2,3099606
-"Schulz Wealth, LTD.",1,42,156.1,3335514
 Code Waechter LLC,1,107,155.7,2828784
 "Bridger Management, LLC",1,23,155.5,3596284
 SLT Holdings LLC,1,127,155.4,6756442
-"Dba Trading, LLC",1,36,155.4,5092036
 State of Wisconsin - Board of Commissioners of Public Lands,1,4,154.7,16783926
 Financially Speaking Inc,1,134,154.6,25654741
 Petiole USA ltd,1,30,154.3,5040121
 "J.E. Simmons & Co., P.C.",1,65,154.3,2642720
-Income Insurance Ltd,1,157,154.2,840723
-"Equity Wealth Partners, LLC",1,77,154.2,1601119
 Rareview Capital LLC,1,27,154.2,8502752
 "Emergence GP Partners, LLC",1,4,154.1,5248379
 Capstone Capital LLC,1,19,153.9,3834845
 Central Asset Investments & Management Holdings (HK) Ltd,1,39,153.8,4365982
-Chico Wealth RIA,1,33,153.5,3720974
 Climber Capital SA,1,53,153.5,2101329
-Wright Wealth LLC,1,55,153.4,3379564
 "Verus Advisory, Inc.",1,7,153.2,972668
 Advaya LLP,1,6,153.1,1687614
 Lighthouse Financial LLC,1,71,153.0,1412530
@@ -2774,10 +2251,8 @@ Sharp Capital Gestora de Recursos Ltda.,1,3,152.5,12494758
 "Leigh Baldwin & Co., LLC",1,151,152.1,2065986
 Albert D Mason Inc,1,104,151.9,5448435
 "Travelers Companies, Inc.",1,3,151.9,7344449
-Wealthgarden F.S. LLC,1,123,151.7,2344946
 "Factorial Partners, LLC",1,61,151.4,3208309
 "Vista Finance, LLC",1,48,151.2,4204521
-"Comprehensive Financial Planning, Inc./PA",1,372,151.2,1609186
 Caspian Capital LP,1,10,151.2,18960596
 Ndwm LLC,1,32,151.1,846554
 "Versant Venture Management, LLC",1,7,151.1,11534330
@@ -2786,7 +2261,6 @@ Ndwm LLC,1,32,151.1,846554
 Lansing Management LP,1,13,150.5,1890449
 "Daventry Group, LP",1,7,150.4,2235301
 Arini Captial Management Ltd,1,3,150.3,16823943
-Kuhn & Co Investment Counsel,1,140,150.1,1838631
 Settian Capital LP,1,25,150.0,1120515
 "DMC Group, LLC",1,144,149.9,1921415
 "Cascade Investment Group, Inc.",1,131,149.8,1880238
@@ -2797,14 +2271,10 @@ CPR Investments Inc.,1,40,149.0,1815928
 Aspetuck Financial Management LLC,1,73,148.9,1839698
 "Darwins River Capital, LP",1,23,148.9,2232554
 "Latash Investments, LLC",1,18,148.9,1758207
-Future Financial Wealth Managment LLC,1,118,148.6,2636042
 "Trv Gp VI, LLC",1,3,148.5,5375051
-Strong Retirement Solutions LLC,1,82,148.4,1717085
 Twin Lions Management LLC,1,8,148.3,2178579
-Clark Wealth Partners,1,528,148.2,2682387
 Alamea Verwaltungs GmbH,1,84,148.2,1381831
 Zeit Capital LLC,1,27,148.2,1298498
-MFA Wealth Services,1,109,148.0,1667986
 Brightwater Advisory LLC,1,57,148.0,2963764
 "Bruce G. Allen Investments, LLC",1,1036,147.8,2534422
 Ellerson Group Inc /adv,1,53,147.8,1018255
@@ -2815,7 +2285,6 @@ Tsai Capital Corp,1,20,146.9,1857233
 Palliser Capital (UK) Ltd,1,5,146.8,3306071
 Columbia Advisory Partners LLC,1,82,146.8,2691063
 Walnut Level Capital LLC,1,30,146.7,4804060
-"Paladin Wealth, LLC",1,99,146.5,1965028
 Fundamenta Capital S.A.,1,10,145.9,6700665
 Immersion Corp,1,7,145.9,20368344
 Avant Capital LLC,1,74,145.7,2038213
@@ -2834,9 +2303,7 @@ Ecofi Investissements SA,1,35,144.9,1093300
 Accordant Advisory Group Inc,1,164,144.9,7818870
 "Amara Financial, LLC.",1,43,144.4,1453352
 Compass Planning Associates Inc,1,28,144.4,1390119
-"Ridgeline Wealth, LLC",1,46,144.2,2045103
 "Impact Investors, Inc",1,85,144.2,2429752
-"Cornerstone Wealth Partners, LLC",1,18,144.1,1936168
 "Cathy Pareto & Associates, Inc",1,89,144.1,2385133
 Occam Crest Management LP,1,24,144.0,17229346
 Dahring | Cusmano LLC,1,45,143.8,3313779
@@ -2846,15 +2313,12 @@ Aspire Growth Partners LLC,1,121,143.6,1308514
 "Durante & Waters, LLC",1,32,143.4,1128970
 "bLong Financial, LLC",1,73,143.2,1475926
 Copos Capital S.a r.l.,1,44,143.2,495680
-"Magnolia Private Wealth, LLC",1,107,143.1,2562543
 "Roger Wittlin Investment Advisory, LLC",1,39,143.0,1351206
 "Yorktown Energy Partners XI, L.P.",1,4,142.9,9602880
-"SwitchPoint Financial Planning, LLC",1,60,142.8,2755636
 Brown University,1,9,142.6,10153579
 "Tme Financial, Inc.",1,70,142.4,1868008
 "Asset Planning,Inc",1,271,142.3,870796
 Constant Guidance Financial LLC,1,43,142.2,661919
-"Hopwood Financial Services, Inc.",1,89,142.0,1699552
 Ibex Investors LLC,1,12,142.0,6363853
 Visa Foundation,1,1,141.9,1172735
 S. R. Schill & Associates,1,25,141.6,2497632
@@ -2867,25 +2331,18 @@ Piper Sandler & Co.,1,24,141.2,143858178
 "Sherrill & Hutchins Financial Advisory, Inc",1,13,141.0,1680299
 Hauser Brothers GmbH,1,4,140.7,3692700
 Bulwark Capital Corp,1,91,140.6,2183981
-"Pine Haven Investment Counsel, Inc",1,116,140.5,1084214
-"Entruity Wealth, LLC",1,39,140.3,4080972
 "Blue Capital, Inc.",1,79,140.3,1454146
 Hoese & Co LLP,1,133,140.3,1235188
-"Ridgeline Wealth Planning, LLC",1,50,140.1,2319211
 Enhancing Capital LLC,1,88,139.8,1208008
-Monetta Financial Services Inc,1,57,139.6,845110
 Mountain Hill Investment Partners Corp.,1,204,139.6,3500427
 TSG Consumer Partners LP,1,1,139.6,2279846
-Turn8 Private Wealth Inc.,1,45,139.5,1196650
 GordonMD Global Investments LP,1,12,139.5,13054450
 Financial Life Planners,1,60,139.3,613845
-"Morey & Quinn Wealth Partners, LLC",1,124,139.3,1608203
 "Odyssean, LLC",1,238,139.2,4415175
 Vitruvian Partners LLP,1,7,139.2,14300491
 "Willner & Heller, LLC",1,154,139.1,1057558
 "TFJ Management, LLC",1,9,138.9,6035146
 Aflac Inc,1,2,138.7,4079486
-"Leibman Financial Services, Inc.",1,50,138.5,2247027
 Clayton Partners LLC,1,36,138.5,4890616
 "SageOak Financial, LLC",1,25,138.2,3061096
 "Slocum, Gordon & Co LLP",1,60,138.1,1754704
@@ -2893,34 +2350,24 @@ Towerview LLC,1,13,138.0,13052302
 Grand Central Investment Group,1,42,137.8,2691855
 Summit Financial Consulting LLC,1,41,137.7,2033047
 Summer Road LLC,1,21,137.7,11155514
-"Dean, Jacobson Financial Services, LLC",1,16,137.6,1083117
 "Anson Capital, Inc.",1,77,137.4,2495298
-"Welch Financial Planning, LLC",1,41,137.3,2557653
-Innovative Wealth Building LLC,1,60,137.2,989100
 Canaan Partners XI LLC,1,3,136.8,7431628
-"Nicholas Wealth, LLC.",1,76,136.7,2909924
-"Cooksen Wealth, LLC",1,41,136.7,1305943
 "WFA of San Diego, LLC",1,366,136.6,1625851
 Morgens Waterfall Vintiadis & Co Inc,1,23,136.5,1313600
 "Rik Saylor Financial, Inc.",1,80,136.5,1499899
 46 Peaks LLC,1,19,136.3,2581876
-"Nvest Wealth Strategies, Inc.",1,201,136.3,2426254
 Cypress Advisory Group LLC,1,71,136.2,763379
 "Michels Family Financial, LLC",1,131,136.1,2048045
 "Haven Global Partners, LLC",1,9,136.1,3367793
 "Redpoint Management, LLC",1,3,136.1,9117499
 Axos Invest Inc.,1,20,136.0,2097765
-Vantus Wealth LLC,1,187,135.7,1475273
 Soapstone Management L.P.,1,13,135.7,3055606
 Wallace Hart LLC,1,58,135.7,372427
 "B Group, Inc.",1,15,135.4,16111118
-"Platt Investment Counsel, LLC",1,12,135.3,1215180
 CVS HEALTH Corp,1,9,135.3,841398
 "EMG Holdings, L.P.",1,24,135.2,4107927
 Kampmann Melissa S.,1,41,135.2,764236
-"Total Wealth Planning & Management, Inc.",1,172,134.9,2817597
 "Dalton Investments, Inc.",1,16,134.8,4345257
-"Lauer Wealth, LLC",1,52,134.7,2873567
 Entrust Financial LLC,1,403,134.6,1878517
 Creek Drive Management Group LLC,1,34,134.4,14360311
 Farley Capital L.P.,1,16,134.3,588791
@@ -2935,9 +2382,7 @@ First Community Trust NA,1,337,134.0,833422
 Hudson Executive Capital LP,1,2,134.0,20611294
 Bonfire Financial,1,58,133.9,1267762
 Privium Fund Management (UK) Ltd,1,7,133.9,1370829
-White & Co Financial Planning Inc,1,17,133.8,4535021
 Themes Management Co LLC,1,130,133.8,5212370
-"Burr Financial Services, LLC",1,26,133.7,723313
 "Planwiser Financial, LLC",1,46,133.7,1955816
 "Grizzlyrock Capital, LLC",1,20,133.6,11118024
 Value Base Ltd.,1,8,133.5,37594774
@@ -2950,30 +2395,20 @@ Collier Financial,1,120,133.1,2972363
 Farnam Financial LLC,1,50,132.9,3139747
 "Williams & Novak, LLC",1,126,132.8,6721491
 Somerset Group LLC,1,59,132.7,1032597
-"Sunrise Financial Services, LLC",1,499,132.7,2206038
 Stanich Group LLC,1,47,132.6,1436321
 "Fairway Financial, LLC",1,22,132.5,2719311
-"Twin City Private Wealth, LLC",1,92,132.2,1530519
 Katamaran Capital LLP,1,32,132.1,793365
 Rexford Capital Inc,1,264,132.0,1368711
 "Fifth Lane Capital, LP",1,77,131.9,6946836
 "Bislett Management, LLC",1,16,131.8,2687398
 "McAlister, Sweet & Associates, Inc.",1,24,131.7,732298
 CFC Planning Co LLC,1,69,131.7,1054359
-"Cogent Private Wealth, Inc.",1,95,131.3,2033422
 "John S. & James L. Knight Foundation, Inc.",1,3,131.1,1008808
 "VUB Generali dochodkova spravcovska spolocnost, a.s.",1,94,130.6,663002
 "Life Planning Partners, Inc",1,65,130.6,1525473
-"PUREfi Wealth, LLC",1,161,130.5,1071061
 "Fjell Capital, LLC",1,62,130.4,1361285
 "LifePlan Financial, LLC",1,86,130.4,2144450
-"Carbahal Olsen Financial Services Group, LLC",1,42,130.3,773397
-University of Pittsburgh - Of the Commonwealth System of Higher Education,1,2,130.2,1934870
-"DBK Financial Counsel, LLC",1,59,130.2,1554930
-"Vested Financial Planning, LLC",1,29,129.9,2583882
 Centerpoint Advisory Group,1,104,129.8,1521283
-BXM Wealth LLC,1,126,129.7,5200115
-"ATX Financial Planning, LLC",1,65,129.7,2327780
 "Stolz & Associates, Ps",1,29,129.6,2698194
 "Clifford Group, LLC",1,75,129.5,618756
 K2 Financial Inc.,1,56,129.4,2771763
@@ -2982,14 +2417,11 @@ Miramar Fiduciary Corp,1,4,129.3,4608968
 SALT Holding Corp.,1,18,129.1,6037638
 Concorde Financial Corp,1,25,129.0,1385314
 Trium Capital LLP,1,43,128.9,7912377
-Finward Bancorp,1,104,128.8,1144248
 "Rahlfs Capital, LLC",1,82,128.8,1504207
 Daytona Street Capital LLC,1,267,128.7,6662901
-Clear Retirement Advice LLC,1,53,128.6,2103367
 John & Kathleen Schreiber Foundation,1,4,128.5,1473482
 LTG Capital LLC,1,25,128.3,1324876
 "Rydar Equities, Inc.",1,89,128.3,894099
-"Momentum Wealth Planning, LLC",1,40,128.2,788060
 "Richard Young Associates, Ltd.",1,24,128.1,2155443
 "SBI Holdings USA, Inc.",1,1,128.0,1614000
 "Williamson Legacy Group, LLC",1,87,127.9,1205474
@@ -3002,7 +2434,6 @@ Outfitters Financial LLC,1,75,127.1,1973700
 180 GPS Investments IC Ltd,1,19,126.5,214201
 "Dauntless Investment Group, LLC",1,60,125.9,14906991
 "Kennon-Green & Company, LLC",1,38,125.9,1181562
-"Journey Beyond Wealth, LLC",1,31,125.7,1130141
 Morangie Management LLC,1,33,125.7,1312392
 BluePrint Investing LLC,1,25,125.6,1842277
 "Northstar Financial Companies, Inc.",1,113,125.6,1024274
@@ -3015,14 +2446,9 @@ Yorktown Management & Research Co Inc,1,210,125.1,2024897
 Steel Partners Holdings L.P.,1,9,125.1,11050799
 Bey-Douglas LLC,1,41,124.8,520288
 Medici Capital LLC,1,8,124.8,4865657
-Coquina Private Wealth LLC,1,85,124.8,1321036
-Paller Financial Services Inc,1,35,124.7,2924213
 "Eclipse Operations, LLC",1,1,124.7,7700835
-Phillips Wealth Planners LLC,1,180,124.6,950293
-Sun Group Wealth Partners,1,61,124.6,663363
 JM2 Capital Inc.,1,109,124.4,967116
 14B Captial Management LP,1,17,124.4,2180098
-Mallini Complete Financial Planning LLC,1,60,124.4,1822763
 "Sincerus Advisory, LLC",1,71,124.4,1198365
 "Rhl Group, LLC",1,202,124.4,1362482
 "Barnett & Company, Inc.",1,79,124.2,2614987
@@ -3037,23 +2463,18 @@ HCEP Management Ltd,1,3,122.6,2057705
 Mh & Associates Securities Management Corp /adv,1,92,122.5,2626612
 "SCP Investment, LP",1,38,122.4,2750226
 "Chung Wu Investment Group, LLC",1,235,122.3,1337376
-"marrick wealth, LLC",1,54,122.2,2483363
 Hingham Institution for Savings,1,12,122.0,624517
 Pekao Towarzystwo Funduszy Inwestycyjnych S.A.,1,78,122.0,1109651
 "Storgate, LLC",1,144,121.7,1910282
-"Geremia Financial Services, LLC",1,10,121.2,1244093
 "True Blue Financial, LLC",1,47,121.1,2918603
-TrueWealth Financial Partners,1,46,121.1,2921643
 "Shepherd Kaplan Krochuk, LLC",1,59,121.1,2328267
 "Midwestern Financial, LLC /IA",1,50,120.9,1418513
-"Mueller Wealth, LLC",1,15,120.8,2273762
 "Sierra Ocean, LLC",1,61,120.8,1799510
 "NDVR, Inc.",1,120,120.5,1299500
 "Rangeley Capital, LLC",1,85,120.4,13064251
 Linden Rose Investment LLC,1,7,120.3,530816
 URS Advisory LLC,1,44,120.3,1393057
 "Alexander Randolph Advisory, Inc.",1,49,120.3,4620111
-Golden Bell Financial Planning LLC,1,34,120.1,2248976
 Semitam Bonam LLC,1,47,120.1,1876529
 Womack Financial LLC,1,63,120.1,2694425
 "Parsonex Advisory Services, Inc.",1,94,119.9,1205298
@@ -3061,26 +2482,18 @@ Womack Financial LLC,1,63,120.1,2694425
 Mishpacha Holdings Corp,1,11,119.7,873744
 Cdkv Holdings LLC,1,266,119.5,1948435
 "R.H. Investment Group, LLC",1,33,119.4,808232
-"Boyce & Associates Wealth Consulting, Inc.",1,71,119.3,2314869
 "Wulff, Hansen & Co.",1,99,119.2,1089063
 "Ridge Creek Global, Inc",1,85,119.2,1026519
-Emissary Wealth LLC,1,56,119.0,1690761
 Santa Clara Valley Transportation Authority,1,4,119.0,2097054
 University of Wisconsin Foundation,1,6,118.9,4103699
-Evergreen Wealth Partners LLC,1,76,118.7,2035182
 "CM Management, LLC",1,58,118.6,18423300
 Tandem Investment Partners LLC,1,67,118.6,1201069
-Stewardship Concepts Financial Services LLC,1,52,118.6,2779234
 Post Resch Tallon Group Inc.,1,102,118.4,2602066
-Clarity Wealth Development LLC,1,45,118.2,2332166
 Clarendon Private LLC,1,101,118.0,853588
 "Fortitude Financial, LLC",1,37,117.8,1791659
 "Luts & Greenleigh Group, Inc.",1,85,117.7,762449
 Agman Capital LLC,1,18,117.6,2630343
 Peapod Lane Capital LLC,1,48,117.5,21078675
-"Donalies Financial Planning, LLC",1,70,117.4,1661953
-H&H Retirement Design & Management INC,1,35,117.4,1520491
-"GPS Wealth Strategies Group, LLC",1,543,117.4,1408444
 "Flight Deck Capital, LP",1,11,117.3,2691515
 "Heights Point Management, LP",1,19,117.2,3710463
 Nano Cap New Millennium Growth Fund L P,1,147,117.2,16852914
@@ -3093,9 +2506,7 @@ Sparta 24 Ltd.,1,7,116.9,8907261
 Chatterton & Associates Inc.,1,78,116.8,1491953
 "AG Asset Advisory, LLC",1,25,116.7,1177863
 "Kelsey Financial, LLC",1,61,116.4,911710
-Hudson Portfolio Management LLC,1,104,116.1,1717516
 "North Capital, Inc.",1,84,116.0,1505674
-"Sherwood Financial Partners, LLC",1,8,116.0,3361464
 Sellaronda Global Management LP,1,8,115.7,1108100
 PARK CIRCLE Co,1,47,115.6,1400396
 "Institutional Venture Management Xv, LLC",1,3,115.5,2892072
@@ -3103,37 +2514,28 @@ OV Management LLC,1,55,115.5,4091203
 "Godfrey Financial Associates, Inc.",1,1032,115.3,1206357
 North Horizon Holdings Inc.,1,1,115.3,169115
 "Frankly Finances, LLC",1,60,115.2,1631841
-"WealthPoint Financial, LLC",1,110,114.9,1830656
-"BLVD Private Wealth, LLC",1,57,114.9,1601012
 Schaeffer Financial LLC,1,21,114.6,2870258
 PSP Research LLC,1,83,114.4,1927858
 "Mercato Partners Growth III Gp, LLC",1,1,114.4,6168022
-"Financial Planning Fort Collins, LLC",1,27,113.9,1838047
 "Alan B Lancz & Associates, Inc.",1,128,113.8,1015423
 "Legacy Solutions, LLC",1,71,113.8,1657776
 "Safe Harbor Family Capital, LLC",1,50,113.8,1089499
 Powerhouse Assets LLC,1,54,113.7,910352
-"Clarity Retirement & Wealth, LLC",1,25,113.6,2505113
-"CrossGen Wealth, LLC",1,195,113.5,672839
 "Gallo Partners, LP",1,35,113.4,951548
 "Forefront Analytics, LLC",1,37,113.3,1740058
 "Safe Harbor Fiduciary, LLC",1,208,113.2,954722
 "Dara Capital US, Inc.",1,116,113.0,677363
-"NewCorp Financial Services, Inc.",1,37,112.9,1876451
 Karl Kapital LLC,1,18,112.8,3797574
 "Stirlingshire Investments, Inc.",1,159,112.7,1999442
-"RM Financial Services, LLC",1,71,112.7,1845415
 Investment Advisory Services Group LLC,1,31,112.7,1266083
 First Growth Capital LLC,1,112,112.6,1213837
 "DB Fitzpatrick & Co, Inc",1,89,112.5,849530
 "Bolthouse Investments, LLC",1,69,112.5,1046861
 Figure 8 Investment Strategies LLC,1,56,112.3,912846
-Stone Wealth Partners,1,67,112.3,855663
 "BG Investment Services, Inc.",1,41,112.2,1642322
 "Windsor Advisory Group, LLC",1,77,112.0,1502642
 "Dougherty & Associates, LLC",1,54,111.9,1079896
 Tannin Capital LLC,1,134,111.8,851997
-"Quest 10 Wealth Builders, Inc.",1,726,111.8,1453688
 Nan Fung Group Holdings Ltd,1,25,111.7,7395662
 "Guardian Capital, LLC",1,84,111.7,763850
 Advocate Investing Services LLC,1,429,111.6,2009482
@@ -3144,15 +2546,11 @@ Moneda S.A. Administradora General de Fondos,1,30,111.3,2104191
 Drystone LLC,1,17,111.2,1047212
 Investors Portfolio Services LLC,1,410,111.0,1465159
 "Avise Financial Cooperative, Inc.",1,83,111.0,1800888
-Prosperity Bancshares Inc,1,383,110.8,1255083
 "Ruggiero Investments, Inc.",1,78,110.8,771840
 "Wasserstein Debt Opportunities Management, L.P.",1,1,110.7,5573398
 "Miller Global Investments, LLC",1,221,110.5,3400687
 Lane Generational LLC,1,29,110.4,6396445
-"Prairieview Wealth Partners, LLC",1,30,110.2,970031
 HS Investments IV Ltd,1,0,110.0,15224183
-Graetz Wealth LLC,1,77,109.8,1130539
-"Infinity Wealth Counsel, LLC",1,60,109.8,2275121
 "Kitching Partners, LLC",1,39,109.6,1487625
 "Strategic Financial Concepts, LLC",1,123,109.4,1653604
 "Sfam, LLC",1,250,109.4,991057
@@ -3169,14 +2567,10 @@ LB Partners LLC,1,22,108.4,9094079
 J. Mark Nickell & Co.,1,26,108.3,1717737
 "Winter & Associates, Inc.",1,77,108.2,1397897
 Smith Thomas W,1,5,108.2,944498
-"Clarion Wealth Managment Partners, LLC",1,79,108.1,1056372
 Aldebaran Financial Inc.,1,77,108.1,764851
-"Ponta Wealth Partners, LLC",1,114,107.3,775501
-"Wheels Up Wealth, Inc.",1,25,107.3,2351622
 Standard Investments LLC,1,1,107.3,2240000
 "Financially in Tune, LLC",1,64,107.1,1965547
 "O'Domhnaill Enterprises, Inc.",1,59,106.8,1238556
-"Alliance Wealth Strategies, LLC d/b/a Brown Edwards Wealth Strategies",1,65,106.6,886790
 Luma Capital S.A. - SPF,1,11,106.6,346034
 STF Management LP,1,98,106.5,555139
 Q Fund Management (Hong Kong) Ltd,1,32,106.5,940396
@@ -3190,19 +2584,14 @@ Blantyre Capital Ltd,1,1,105.6,27144639
 Lawood & Co,1,90,105.6,1165742
 "Palladiem, LLC",1,156,105.5,1528933
 Town Lane Management LP,1,4,105.4,2386004
-"Ofc Financial Planning, LLC",1,52,105.3,840199
 LTS Liquid Investments LLC,1,7,105.2,2257038
-Board of the Pension Protection Fund,1,245,105.1,2392470
 Baer Investment Advisory LLC,1,25,105.1,361211
 "Alpine Peaks Capital, LP",1,21,105.0,1382195
 "Ares Financial Consulting, LLC",1,858,105.0,1693928
 GLP Holdings LLLP,1,4,105.0,446101
-"BFI Wealth Solutions, LLC",1,38,105.0,2632095
 Eagle Point Credit Management LLC,1,10,104.8,46641804
 "Toronado Partners, LLC",1,10,104.7,3625292
-Signet Private Wealth LLC,1,112,104.5,739119
 "Heffernan Advisory, Inc",1,27,104.5,2354310
-"Reality Financial Planning Services, LLC",1,20,104.4,715809
 "Lynch Investment Planning, LLC",1,52,104.4,944206
 Arrow Capital Pty Ltd,1,17,104.3,1015000
 Sip Global Opportunity Manager LLC,1,0,104.3,9552270
@@ -3210,19 +2599,15 @@ Sip Global Opportunity Manager LLC,1,0,104.3,9552270
 IDG China Capital Fund GP III Associates Ltd.,1,1,104.2,1590886
 "Grange Capital, LLC",1,45,104.2,1511254
 Jacobs Equity LLC,1,102,103.8,1558609
-Twin Cities Retirement Group LLC,1,24,103.6,2070193
 "Alta Partners Management Company, L.P.",1,2,103.6,4333342
 Expect Equity LLC,1,46,103.5,3002058
 Fund Resources Investment Holding Group Co Ltd,1,0,102.7,9164320
 "Hyundai Investments Co., Ltd.",1,62,102.6,21185128
 "Karras Company, Inc.",1,55,102.5,936461
 Corecam AG,1,37,102.4,2595675
-"Valued Retirements, Inc.",1,90,102.3,1216389
 Absoluto Partners Gestao de Recursos Ltda,1,1,102.1,4015422
 Ramiah Investment Group,1,35,102.1,1121401
-ATLas Financial Planning LLC,1,62,101.9,1363637
 "Red Mountain Financial, LLC",1,74,101.9,1578778
-"Provident Living Financial Services, Inc.",1,48,101.8,2146214
 Trailhead Planners LLC,1,46,101.8,1928737
 "Cape Investment Advisory, Inc.",1,794,101.7,1025034
 "Monetary Solutions, Ltd",1,303,101.5,2259317
@@ -3231,24 +2616,19 @@ Trailhead Planners LLC,1,46,101.8,1928737
 "Measured Risk Portfolios, Inc.",1,58,100.9,2148186
 "Vertex Investment Solutions Co., Ltd.",1,21,100.9,1341036
 "Silversmith Partners I GP, LLC",1,1,100.8,14324197
-"Birchwood Financial Partners, Inc.",1,333,100.7,1514693
 "Applied Fundamental Research, LLC",1,10,100.7,3657748
 Robert B. Daugherty Foundation,1,1,100.6,250000
 "Marathon Partners Equity Management, LLC",1,15,100.6,2374250
-"Ankerstar Wealth, LLC",1,954,100.4,1592941
 "Benchmark Financial, LLC",1,45,100.3,1555992
 "Totem Point Management, LLC",1,14,100.2,912447
 "J.M. Arbour, LLC",1,107,100.2,1943199
 "Michael Brady & Co., LLC",1,52,100.2,2154916
-"Mkd Wealth Coaches, LLC",1,25,100.0,692992
 Square Peg Capital Pty Ltd,1,8,100.0,806852
-"Townsend Financial Planning, LLC",1,26,99.9,1092370
 "Entelevest, LLC",1,111,99.8,1607346
 "Michelson Medical Research Foundation, Inc.",1,18,99.8,2126928
 "Shelter Rock Management, LLC",1,42,99.6,513120
 "Jefferson Bridge Capital, LLC",1,53,99.3,1113264
 "RCW Management, LLC",1,65,99.0,1607450
-Box Hill Private Wealth LLC,1,53,98.8,528864
 Fulcrum Equity Management,1,86,98.7,888448
 "J. Team Financial, Inc.",1,84,98.6,1332638
 Whitford Management LLC,1,20,98.5,618783
@@ -3257,42 +2637,27 @@ Payne Capital LLC,1,51,98.2,1897768
 Vision Financial Markets LLC,1,380,98.0,664865
 Terra Alpha Investments LLC,1,32,97.7,573974
 "Fortress Financial Solutions, LLC",1,58,97.7,1139563
-"Generations Wealth, LLC",1,28,97.7,1883112
-"WealthSpring Partners, LLC",1,57,97.6,1124929
 "Crescent Sterling, Ltd.",1,76,97.6,998812
-"Elevated Private Wealth, LLC",1,77,97.1,969677
-Arnold Financial Planning LLC,1,24,97.0,3084377
 Provident Co of the Employees of the Hebrew University LTD,1,32,96.3,1684731
 "Empower Harvest Management Services, Inc.",1,1,96.3,8970263
-"Variant Private Wealth, LLC",1,38,96.2,845265
 Ally Bridge Group (NY) LLC,1,13,96.0,12692446
 "Sherry Group, Inc.",1,36,95.4,1435456
 "Value Investment Professionals, LLC",1,76,95.4,1287058
-Axim Planning & Wealth,1,63,95.1,5415003
 Breachway Investments LLC,1,94,94.8,1605828
 "Thayer Financial, L.L.C.",1,33,94.6,1808489
 OneAscent Investment Solutions LLC,1,109,94.4,1471919
-"Boyer Financial Services, Inc.",1,47,94.3,2726735
 "Divco West Real Estate Services, LLC",1,4,93.3,4338422
-"FinDec Wealth Services, Inc.",1,32,93.2,2363052
 Account Management LLC,1,21,93.2,646119
-Surience Private Wealth LLC,1,29,93.1,1122490
 JAT Capital Mgmt LP,1,15,92.9,1369806
 Circumference Group LLC,1,19,92.8,5874894
 "Corre Partners Management, LLC",1,4,92.8,10079793
 "Wilian Securities, LLC",1,92,92.8,1410032
-Expressive Wealth LLC,1,120,92.6,841708
-Shelter Ins Retirement Plan,1,8,92.5,487925
 Yu Fan,1,4,92.3,7191585
-"truNorth Financial Services, Inc.",1,48,92.2,1201079
 Framtiden Holdings Management Co LLC,1,5,92.2,1134100
 "Mlp3, LLC",1,83,91.6,785426
-"Aspirean Wealth, LLC",1,18,91.6,1066310
 "Decision Investments, Inc",1,102,91.4,1869101
 "Rivulet Capital, LLC",1,3,91.2,330270
 Goodwin Investment Advisory,1,26,91.1,1437989
-"Atlas Wealth Partners, LLC",1,59,91.0,1378149
-Sage Investment Counsel LLC,1,109,90.9,1866220
 "Gigafund Management Company, LLC",1,1,90.9,19459882
 October Effect Ltd,1,60,90.8,1545313
 Benefit Street Partners LLC,1,16,90.7,36803531
@@ -3304,7 +2669,6 @@ August Group Capital Ltd,1,101,90.1,735129
 "Walleye Partners, LLC",1,53,90.0,1245927
 "Telligent Fund, LP",1,20,90.0,537400
 "Indie Asset Partners, LLC",1,80,89.7,1087721
-Significant Wealth Partners LLC,1,64,89.7,3130184
 Amitell Capital Pte Ltd,1,20,89.4,1068898
 Carnegie Mellon University,1,3,89.3,371083
 Prism Planning Partners LLC,1,45,89.1,1181882
@@ -3321,9 +2685,6 @@ APEIRON CAPITAL Ltd,1,4,86.5,3273148
 Colter Lewis Investment Partners LLC,1,96,86.5,917221
 Magma Venture Partners General Partner Ltd.,1,2,86.4,23683297
 AI-Squared Management Ltd,1,17,86.1,2423825
-Miller Financial Services LLC,1,106,85.3,1454373
-"Xena Financial Planning, LLC",1,34,85.2,1014103
-Teachers Insurance & Annuity Association of America,1,73,85.1,513366
 "EnCap Energy Capital Fund VIII, L.P.",1,2,84.9,6783474
 Kize Capital LP,1,5,84.8,879836
 "JCSD Capital, LLC",1,23,84.7,1727095
@@ -3335,7 +2696,6 @@ ABS Direct Equity Fund LLC,1,35,84.1,3181398
 13D Management LLC,1,16,84.0,1945264
 "Tandem Financial, LLC",1,47,83.4,1299025
 Xiamen Xinweidachuang Investment Partnership (Limited Partnership),1,1,83.4,4926165
-Sonoma Private Wealth LLC,1,64,82.8,831003
 Column Group LLC,1,4,82.8,14948733
 "Ventas, Inc.",1,1,82.5,9342501
 Luminist Capital LLC,1,205,81.1,1257947
@@ -3343,7 +2703,6 @@ Luminist Capital LLC,1,205,81.1,1257947
 "Bradyco, Inc.",1,35,80.6,342693
 "T3 Companies, LLC",1,120,80.5,15915199
 "Cannae Holdings, Inc.",1,2,80.3,40833859
-One Wealth Map LLC,1,37,79.1,1225561
 Oberndorf William E,1,7,79.0,716087
 "SG Americas Securities, LLC",1,2807,78.3,937345442
 Conrad N. Hilton Foundation,1,1,78.3,114347
@@ -3354,7 +2713,6 @@ Conrad N. Hilton Foundation,1,1,78.3,114347
 "Yorktown Energy Partners IX, L.P.",1,3,75.7,5513617
 Global Media & Entertainment Investments Ltd,1,1,75.5,18140000
 "Holland Advisory Services, Inc.",1,45,74.1,551248
-KERR FINANCIAL PLANNING Corp,1,460,74.0,833233
 Mayar Capital Ltd.,1,13,73.7,1301846
 MWG Caph Ltd,1,3,72.4,4067260
 Florin Court Capital LLP,1,24,71.8,1332521
@@ -3362,14 +2720,12 @@ Incentive AS,1,0,71.3,1843624
 Truxt Investmentos Ltda.,1,19,71.3,2543447
 26North Partners LP,1,1,70.9,103499
 "McGrath & Associates, Inc.",1,39,70.4,1605766
-Wise Wealth Partners,1,49,69.7,756201
 Immersion Capital LLP,1,9,69.1,503536
 "Charis Legacy Partners, LLC",1,24,67.8,570821
 QSV Equity Investors LLC,1,87,67.6,1400011
 "Fountainhead AM, LLC",1,160,67.5,706581
 "China-UAE Investment Cooperation Fund, L.P.",1,1,67.4,7769918
 "Van Diest Capital, LLC",1,130,67.0,612568
-"Solutions 4 Wealth, Ltd",1,52,66.2,4246188
 Bessemer Group Inc,1,2424,65.1,481724926
 Sanders Morris Harris LLC,1,30,64.7,3789081
 AlpInvest Partners B.V.,1,12,64.2,4257477
@@ -3386,11 +2742,9 @@ AIFG Consultants Ltd.,1,48,58.2,1115550
 CoinFund Management LLC,1,8,58.1,22445627
 Deer Park Road Corp,1,4,58.1,13028860
 VanderPol Investments L.L.C.,1,51,57.5,1198353
-CANADA LIFE ASSURANCE Co,1,1819,57.5,487280672
 Thrivent Financial for Lutherans,1,2361,56.4,1472686634
 Silver Rock Financial LP,1,9,55.9,13114029
 "John W. Brooker & Co., CPAs",1,57,55.9,987024
-"Connective Portfolio Management, LLC",1,38,55.5,786412
 "Cohen & Steers, Inc.",1,384,55.3,962994606
 Valor Management LLC,1,2,55.1,2787710
 Markin Volterra Fund LP,1,38,55.0,454095
@@ -3404,9 +2758,7 @@ Paragon Associates & Paragon Associates II Joint Venture,1,12,48.4,5986400
 Baypointe Partners LLC,1,14,47.6,223781
 Schubert & Co,1,24,47.5,567768
 Towarzystwo Funduszy Inwestycyjnych Allianz Polska S.A.,1,36,47.0,1785946
-"Total Wealth Planning, LLC",1,39,46.7,869236
 Prospector Partners LLC,1,15,46.7,243880
-Investment Counsel Co of Nevada,1,81,46.6,463191
 P.A.W. Capital Corp,1,17,46.0,8255000
 "Gruss & Co., LLC",1,33,45.5,722052
 "nVerses Capital, LLC",1,187,44.6,2294340
@@ -3435,7 +2787,6 @@ ClearAlpha Technologies LP,1,54,35.0,704082
 Syncona Portfolio Ltd,1,2,34.3,17853776
 "Regeneron Pharmaceuticals, Inc.",1,1,33.8,3763506
 "CSU Producer Resources, Inc.",1,22,33.5,256923
-"Advanced Portfolio Management, LLC",1,37,32.8,473437
 "Centerstone Investors, LLC",1,22,31.8,199455
 Hrt Financial LP,1,2124,31.7,436487510
 FTX Recovery Trust,1,2,31.4,1942749
@@ -3444,11 +2795,9 @@ Treasurer of the State of North Carolina,1,972,31.2,219655655
 Mediatel Partners,1,2,29.8,1161569
 Great Mountain Partners LLC,1,1,29.1,25559846
 "Southport Management, L.L.C.",1,27,28.6,1314576
-"Berry Wealth Group, LP",1,32,28.5,124881
 Shengqi Capital (Hong Kong) Ltd,1,1,27.9,157000
 HS Investments III Ltd,1,1,27.4,1088409
 "Axon Enterprise, Inc.",1,0,27.2,1509341
-Public Employees Retirement Association of Colorado,1,1778,27.2,162301333
 "Vorpal, LLC",1,2,27.1,839842
 "Pura Vida Investments, LLC",1,15,26.8,2096557
 "Sapience Investments, LLC",1,46,26.5,601299
@@ -3461,7 +2810,6 @@ Global IMC LLC,1,8,23.4,899046
 Covalent Partners LLC,1,11,22.6,2055974
 Samsung C&T Corp,1,1,22.5,1585804
 "Capital & Planning, LLC",1,9,21.6,101810
-Imprint Wealth LLC,1,298,21.4,227920
 Bakala Capital LLC,1,11,21.1,268913
 Vantage Consulting Group Inc,1,3,19.7,4243147
 "Lion Point Capital, LP",1,35,19.3,5626859
@@ -3472,17 +2820,11 @@ Bp PLC,1,1,16.8,60000
 Brummer Multi-Strategy AB,1,9,16.5,1719215
 Mn Services Vermogensbeheer B.V.,1,415,16.3,104948324
 Raine Capital LLC,1,1,16.0,934512
-Clal Insurance Enterprises Holdings Ltd,1,200,15.5,189638299
 Cabana LLC,1,13,13.3,157811
-Ilmarinen Mutual Pension Insurance Co,1,323,12.5,164567122
 "Transce3nd, LLC",1,110,12.4,1036916
 MetLife Inc,1,5,12.2,189178
 IFM Investors Pty Ltd,1,580,12.0,82761473
-Migdal Insurance & Financial Holdings Ltd.,1,322,11.6,146021055
 "Bci Securities, Inc.",1,17,11.6,121510
-Harel Insurance Investments & Financial Services Ltd.,1,408,11.5,165003764
-WealthNavi Inc.,1,10,11.3,108837743
-CMT Capital Markets Trading GmbH,1,131,11.2,89061535
 Ppm America Inc /IL/,1,4,10.9,1777943
 Vitol Holding B.V.,1,1,10.9,40000
 Raine Group LLC,1,2,10.9,333985
@@ -3497,12 +2839,9 @@ Peapack Gladstone Financial Corp,1,623,7.9,59116049
 Wafra Inc.,1,1,7.7,2500000
 Mizuho Securities Co. Ltd.,1,14,7.5,158274
 "Founders Fund Growth Management, LLC",1,1,7.0,259388
-Capital Markets Trading UK LLP,1,102,6.8,96379379
 "Spurstone Advisory Services, LLC",1,92,6.4,55237
 PGGM Investments,1,63,6.3,93594915
 Oakland Financial Corp,1,10,6.0,55165
-Nippon Life Insurance Co,1,4,5.8,143964606
-Border to Coast Pensions Partnership Ltd,1,82,5.7,38726352
 C WorldWide Group Holding A/S,1,93,5.7,44011331
 Belfer Management LLC,1,14,5.7,150873
 Gramercy Funds Management LLC,1,1,5.5,2328028
@@ -3522,11 +2861,9 @@ Wedbush Securities Inc,1,1042,3.4,37788965
 PayPay Securities Corp,1,257,3.4,129558
 1922 Investment Co LLC,1,4,3.3,7565
 "Capital Analysts, LLC",1,1118,3.3,49162708
-New Mexico Educational Retirement Board,1,877,3.2,26800881
 New York University,1,1,3.0,55741
 "West Family Investments, Inc.",1,1,3.0,87773
 "VK Services, LLC",1,1,2.9,1023014
-"Valpey Financial Services, LLC",1,71,2.8,156631755
 "Pinegrove Venture Partners, LLC",1,5,2.8,189856
 "Harvest Fund Management Co., Ltd",1,584,2.7,19824775
 Old Republic International Corp,1,54,2.5,25436169
@@ -3536,13 +2873,11 @@ Newport Asia LLC,1,1,2.2,205876
 "Centaurus Financial, Inc.",1,821,2.2,33175064
 "Founders Fund V Management, LLC",1,1,2.2,258072
 Maj Invest Holding A/S,1,38,2.1,17932427
-Deroy & Devereaux Private Investment Counsel Inc,1,153,2.1,23949959
 Milestone Resources Group Ltd,1,10,2.0,15094806
 "Founders Fund VII Management, LLC",1,2,2.0,295444
 HPC Germany GmbH & Co. KG,1,0,1.9,49718
 Foster & Motley Inc,1,376,1.9,30844708
 Premier Fund Managers Ltd,1,151,1.7,16611778
-Wesleyan Assurance Society,1,103,1.7,11144698
 Summit Global Investments,1,455,1.7,38847707
 S&co Inc,1,167,1.6,17116242
 Rheos Capital Works Inc.,1,56,1.6,14818015
@@ -3553,75 +2888,55 @@ JTC Employer Solutions Trustee Ltd,1,287,1.5,21618294
 Payden & Rygel,1,112,1.4,14598090
 Main Management LLC,1,90,1.4,43686724
 Cohalo Advisory LLC,1,7,1.3,47763
-Baskin Financial Services Inc.,1,52,1.3,9033504
 Parkwood LLC,1,92,1.3,20672190
 Hikari Power Ltd,1,62,1.3,4152406
 QV Investors Inc.,1,62,1.2,15921266
-"SlateStone Wealth, LLC",1,205,1.2,9770142
 Lincluden Management Ltd,1,66,1.2,16984853
-Taiyo Life Insurance Co,1,10,1.2,3284075
-Amica Mutual Insurance Co,1,137,1.1,8878242
 "UNC Management Company, Inc.",1,4,1.1,2482387
 Graham Holdings Co,1,6,1.1,4687163
 Jacobs & Co /CA/,1,119,1.1,6350469
 Abner Herrman & Brock LLC,1,104,1.0,4773755
-Southern Farm Bureau Life Insurance,1,15,1.0,12926542
 Triple Frond Partners LLC,1,11,1.0,7927854
 Sierra Capital LLC,1,128,0.9,37064115
-GFI Investment Counsel Ltd.,1,4,0.9,11111
 WoodTrust Financial Corp,1,174,0.9,5890196
 "Annandale Capital, LLC",1,117,0.8,10096801
 Polianta Ltd,1,82,0.8,14971500
 "Roble, Belko & Company, Inc",1,474,0.8,8417796
 Jabodon Pt Co,1,6,0.8,5399122
-Graham Holdings Co Master Retirement Trust,1,2,0.8,58837
-Daido Life Insurance Co,1,6,0.7,1851536
 North Growth Management Ltd.,1,47,0.6,5863000
 Noked Israel Ltd,1,11,0.6,2343173
 Maxi Investments CY Ltd,1,108,0.5,9045291
-"First Fiduciary Investment Counsel, Inc.",1,71,0.5,3603983
 Lynrock Lake LP,1,0,0.5,50000
 Global Frontier Investments LLC,1,19,0.5,2486259
 Gifford Fong Associates,1,121,0.5,5162589
 "Acuitas Investments, LLC",1,1,0.5,37962
 Westwind Capital,1,40,0.5,3028810
-Avion Wealth,1,1460,0.5,5724223
 "Investor's Fiduciary Advisor Network, LLC",1,263,0.5,5386047
 H/2 Credit Manager LP,1,16,0.5,53029042
-"SG Trading Solutions, LLC",1,206,0.4,4352244
 "Coston, McIsaac & Partners",1,592,0.4,31767719
 "von Borstel & Associates, Inc.",1,39,0.4,10748243
-Canal Insurance CO,1,58,0.4,5698345
-Ayalon Insurance Comp Ltd.,1,57,0.4,3346279
 Lester Murray Antman dba SimplyRich,1,192,0.4,4334188
 Rovin Capital /ut/ /adv,1,169,0.4,6500456
 Packer & Co Ltd,1,8,0.4,17283951
-"Physicians Financial Services, Inc.",1,104,0.4,1698815
-Pensionfund Sabic,1,208,0.4,3838916
 "M3F, Inc.",1,15,0.4,18396664
 Nkcfo LLC,1,85,0.3,4800719
 Sivik Global Healthcare LLC,1,41,0.3,1757320
-WealthBridge Investment Counsel Inc.,1,42,0.3,2290075
 "Hazlett, Burt & Watson, Inc.",1,834,0.3,2733311
 Cederberg Capital Ltd,1,8,0.3,5848598
 "X-Square Capital, LLC",1,148,0.3,4947398
-"BCR Wealth Strategies, LLC",1,34,0.3,4698840
 "Financial Connections Group, Inc.",1,218,0.3,5032127
 "Brick & Kyle, Associates",1,46,0.3,2378879
 "Mathes Company, Inc.",1,115,0.3,2439471
 "Corebridge Financial, Inc.",1,1,0.3,1686
 Athos Capital Ltd,1,20,0.3,17413791
 AMS Capital Ltda,1,13,0.3,3348401
-Peloton Wealth Strategists,1,90,0.3,3482125
 ASO GROUP Ltd,1,54,0.3,1406720
 "Asset Allocation & Management Company, LLC",1,93,0.3,2897904
 National Mutual Funds Management Ltd,1,1,0.3,5035
 "Wayfinding Financial, LLC",1,144,0.2,2864358
-Keener Financial Planning LLC,1,57,0.2,3013139
 "Silver Oak Advisory Group, Inc.",1,75,0.2,3627789
 "Elite Financial, Inc.",1,54,0.2,3010380
 "Cairn Investment Group, Inc.",1,62,0.2,2309635
-Horizon Bancorp Inc /IN/,1,188,0.2,2964187
 "R. W. Roge & Company, Inc.",1,59,0.2,2262427
 Lipe & Dalton,1,75,0.2,1664035
 "Ring Mountain Capital, LLC",1,98,0.2,2052176
@@ -3630,10 +2945,7 @@ Motiv8 Investments LLC,1,681,0.2,13446329
 Santa Monica Partners LP,1,9,0.2,664250
 "Navigoe, LLC",1,260,0.2,2987173
 "Stonekeep Investments, LLC",1,60,0.2,2953515
-"A. D. Beadell Investment Counsel, Inc.",1,87,0.2,2427308
 "Banco de Sabadell, S.A",1,61,0.2,1012373
-"Aurora Private Wealth, Inc.",1,140,0.2,2501060
-Pensionfund DSM Netherlands,1,75,0.2,3517335
 Mount Vernon Associates Inc /MD/,1,56,0.1,2237057
 Aquamarine Zurich AG,1,7,0.1,271130
 Lakehouse Capital Pty Ltd,1,13,0.1,1264103
@@ -3642,8 +2954,6 @@ Topor & Co. Korea,1,15,0.1,1007031
 Global Strategic Management Inc,1,21,0.1,6617437
 Rye Brook Capital LLC,1,23,0.1,2732150
 Northwestern University,1,2,0.1,1086480
-"Wealth Group, Ltd.",1,83,0.1,504465
-"IFC & Insurance Marketing, Inc.",1,692,0.1,1685810
 RD Finance Ltd,1,25,0.1,716113
 Merrithew & Thorsten Inc,1,119,0.1,1851937
 "Delaware Ladera Management Company, Inc.",1,1,0.1,890
@@ -3658,70 +2968,66 @@ TradeLink Capital LLC,1,26,0.0,236715
 Phillip James Consulting Co.,1,94,0.0,29592
 "University of Maryland Foundation, Inc.",1,2,0.0,10004
 Parafestas Anastasios,1,0,0.0,193147
-NewGen Equity Long/Short Fund,1,1,0.0,0
-Stonegate Management LLC,1,0,0.0,0
-Ridgeback Capital Investments L.P.,1,0,0.0,0
-Consolidated Press International Holdings Ltd,1,0,0.0,0
-"Blind Man Capital, LLC",1,0,0.0,0
-"University of Massachusetts Foundation, Inc.",1,0,0.0,0
-"Cook Wealth, LLC",1,0,0.0,0
-NNS Holding,1,0,0.0,0
-"Brueske Advisory Services, LLC",1,0,0.0,0
-Unicom Capital LLC,1,0,0.0,0
-Decas Capital LLC,1,0,0.0,0
-Decade Renewable Partners LP,1,0,0.0,0
-"Sarepta Therapeutics, Inc.",1,0,0.0,0
-"Founders Fund IV Management, LLC",1,0,0.0,0
-"Touchstone Capital, Inc.",1,0,0.0,0
-"Scepter Holdings, Inc.",1,0,0.0,0
-Afbi LP,1,0,0.0,0
-Inflection Point Investments LLP,1,0,0.0,0
-Chevron Corp,1,0,0.0,0
-Permira Holdings LTD,1,0,0.0,0
-Carolinas Wealth Consulting LLC,1,0,0.0,0
-"EnCap Energy Capital Fund IX, L.P.",1,0,0.0,0
-Renwick Deborah Lee,1,0,0.0,0
-Tvl Management Corp,1,0,0.0,0
-"Council Ring Capital, LLC",1,0,0.0,0
-"Founders Fund II Management, LLC",1,0,0.0,0
-Genre Partners L P,1,0,0.0,0
-Schreiber John,1,0,0.0,0
-Bardin Hill Management Partners LP,1,0,0.0,0
-Pitcairn Co,1,0,0.0,0
-Thiel Macro LLC,1,0,0.0,0
-"Builders Vision, LLC",1,0,0.0,0
-"Cutter & CO Brokerage, Inc.",1,0,0.0,0
-"First Citizens Investor Services, Inc.",1,23,0.0,0
 UCLA Foundation,1,1,0.0,0
 53 House LLP,1,0,0.0,0
 Schreiber Kathleen,1,0,0.0,0
 CROSBY Co OF NEW HAMPSHIRE LLC,1,0,0.0,0
 Vesa Equity Investment S.a r.l.,1,0,0.0,0
-"Founders Fund III Management, LLC",1,0,0.0,0
-NNS Investments (Cyprus) Ltd,1,0,0.0,0
-Qalhat Capital Ltd,1,0,0.0,0
-"Hartz Capital, Inc.",1,0,0.0,0
-Stillwater LLC,1,0,0.0,0
-"El Puerto de Liverpool, S.A.B. de C.V. ",1,0,0.0,0
-Kellogg W K Foundation Trust,1,0,0.0,0
-Livelsberger Financial Advisory,1,0,0.0,0
-"Revolution Growth Management Company, Inc.",1,0,0.0,0
-Bass Edward P,1,0,0.0,0
-"Quent Long Short Global Small Cap Fund, LP",1,0,0.0,0
-"Tarsadia Capital, LLC",1,0,0.0,0
+"Blind Man Capital, LLC",1,0,0.0,0
+"University of Massachusetts Foundation, Inc.",1,0,0.0,0
+Consolidated Press International Holdings Ltd,1,0,0.0,0
 Bass Sid R,1,0,0.0,0
 Northwoods Investments LLC,1,0,0.0,0
 NJ State Employees Deferred Compensation Plan,1,0,0.0,0
+"Scepter Holdings, Inc.",1,0,0.0,0
+"Touchstone Capital, Inc.",1,0,0.0,0
+"Founders Fund IV Management, LLC",1,0,0.0,0
+"Tarsadia Capital, LLC",1,0,0.0,0
+RCF Management L.L.C.,1,0,0.0,0
+Bass Edward P,1,0,0.0,0
+Thomas H Lee Partners LP,1,0,0.0,0
+"Frist Capital, LLC",1,0,0.0,0
+"Revolution Growth Management Company, Inc.",1,0,0.0,0
+"El Puerto de Liverpool, S.A.B. de C.V. ",1,0,0.0,0
+Livelsberger Financial Advisory,1,0,0.0,0
+"Quent Long Short Global Small Cap Fund, LP",1,0,0.0,0
+"River Bend Holdings, LLC",1,0,0.0,0
+Nebula Research & Development LLC,1,0,0.0,0
+Hall Kathryn A.,1,0,0.0,0
+"Anthracite Investment Company, Inc.",1,0,0.0,0
+Cowbird Capital LP,1,0,0.0,0
+NewGen Equity Long/Short Fund,1,1,0.0,0
+Stonegate Management LLC,1,0,0.0,0
+Ridgeback Capital Investments L.P.,1,0,0.0,0
 "Keystone Group, L.P.",1,0,0.0,0
 "Stuart Chaussee & Associates, Inc.",1,0,0.0,0
 Bass Lee M /TX/,1,0,0.0,0
-Thomas H Lee Partners LP,1,0,0.0,0
+Unicom Capital LLC,1,0,0.0,0
+Decade Renewable Partners LP,1,0,0.0,0
+"Sarepta Therapeutics, Inc.",1,0,0.0,0
+NNS Holding,1,0,0.0,0
+"Brueske Advisory Services, LLC",1,0,0.0,0
+Decas Capital LLC,1,0,0.0,0
+Stillwater LLC,1,0,0.0,0
+NNS Investments (Cyprus) Ltd,1,0,0.0,0
+Qalhat Capital Ltd,1,0,0.0,0
+"Founders Fund III Management, LLC",1,0,0.0,0
+"Hartz Capital, Inc.",1,0,0.0,0
+Afbi LP,1,0,0.0,0
+Chevron Corp,1,0,0.0,0
+Inflection Point Investments LLP,1,0,0.0,0
+Permira Holdings LTD,1,0,0.0,0
+Bardin Hill Management Partners LP,1,0,0.0,0
+Pitcairn Co,1,0,0.0,0
+Thiel Macro LLC,1,0,0.0,0
+"Founders Fund II Management, LLC",1,0,0.0,0
+"EnCap Energy Capital Fund IX, L.P.",1,0,0.0,0
+Renwick Deborah Lee,1,0,0.0,0
+"Council Ring Capital, LLC",1,0,0.0,0
+Schreiber John,1,0,0.0,0
+Tvl Management Corp,1,0,0.0,0
+Genre Partners L P,1,0,0.0,0
 "Valinor Management, L.P.",1,0,0.0,0
-"Frist Capital, LLC",1,0,0.0,0
 "Gpi Capital, L.P.",1,0,0.0,0
-RCF Management L.L.C.,1,0,0.0,0
-Nebula Research & Development LLC,1,0,0.0,0
-Hall Kathryn A.,1,0,0.0,0
-"River Bend Holdings, LLC",1,0,0.0,0
-Cowbird Capital LP,1,0,0.0,0
-"Anthracite Investment Company, Inc.",1,0,0.0,0
+"First Citizens Investor Services, Inc.",1,23,0.0,0
+"Builders Vision, LLC",1,0,0.0,0
