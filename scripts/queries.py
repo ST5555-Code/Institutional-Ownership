@@ -2436,13 +2436,103 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
 
 
 
-def flow_analysis(ticker, period='4Q', peers=None):
-    """Flow analysis using pre-computed investor_flows and ticker_flow_stats tables.
+def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', active_only=False):
+    """Compute buyer/seller/new/exit flows live from holdings or fund_holdings.
+    Returns (buyers, sellers, new_entries, exits) lists.
+    """
+    if level == 'fund':
+        af = ""
+        if active_only:
+            passive_kw = "('INDEX','ETF','MSCI','FTSE','STOXX','NIKKEI','TOTAL STOCK','TOTAL MARKET','TOTAL BOND','TOTAL INTERNATIONAL','BROAD MARKET','TRACKER','NASDAQ','DOW JONES','WILSHIRE')"
+            af = f"""
+                AND NOT EXISTS (SELECT 1 FROM UNNEST([{passive_kw}]) t(kw) WHERE UPPER(fund_name) LIKE '%' || kw || '%')
+                AND UPPER(fund_name) NOT LIKE '%S&P 5%' AND UPPER(fund_name) NOT LIKE '%S&P 4%'
+                AND UPPER(fund_name) NOT LIKE '%RUSSELL 1%' AND UPPER(fund_name) NOT LIKE '%RUSSELL 2%'
+            """
+        from_df = con.execute(f"""
+            SELECT fund_name as entity, SUM(shares_or_principal) as shares, SUM(market_value_usd) as value
+            FROM fund_holdings WHERE ticker = ? AND quarter = '{quarter_from}' {af} GROUP BY fund_name
+        """, [ticker]).fetchdf()
+        to_df = con.execute(f"""
+            SELECT fund_name as entity, SUM(shares_or_principal) as shares, SUM(market_value_usd) as value
+            FROM fund_holdings WHERE ticker = ? AND quarter = '{quarter_to}' {af} GROUP BY fund_name
+        """, [ticker]).fetchdf()
+    else:
+        from_df = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as entity,
+                   MAX(manager_type) as manager_type,
+                   SUM(shares) as shares, SUM(market_value_usd) as value
+            FROM holdings WHERE ticker = ? AND quarter = '{quarter_from}' GROUP BY entity
+        """, [ticker]).fetchdf()
+        to_df = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as entity,
+                   MAX(manager_type) as manager_type,
+                   SUM(shares) as shares, SUM(market_value_usd) as value
+            FROM holdings WHERE ticker = ? AND quarter = '{quarter_to}' GROUP BY entity
+        """, [ticker]).fetchdf()
 
-    Falls back to live computation if pre-computed tables do not exist.
+    from_map = {r['entity']: r for _, r in from_df.iterrows()}
+    to_map = {r['entity']: r for _, r in to_df.iterrows()}
+    from_set, to_set = set(from_map), set(to_map)
+
+    rows = []
+    # Retained: compare shares
+    for entity in from_set & to_set:
+        fs = float(from_map[entity].get('shares') or 0)
+        ts = float(to_map[entity].get('shares') or 0)
+        fv = float(from_map[entity].get('value') or 0)
+        tv = float(to_map[entity].get('value') or 0)
+        net_s = ts - fs
+        mt = from_map[entity].get('manager_type') if level == 'parent' else None
+        rows.append({
+            'inst_parent_name': entity, 'manager_type': mt or '',
+            'from_shares': fs, 'to_shares': ts, 'net_shares': net_s,
+            'from_value': fv, 'to_value': tv, 'net_value': tv - fv,
+            'pct_change': (net_s / fs) if fs > 0 else None,
+            'is_new_entry': False, 'is_exit': False,
+        })
+    # New entries
+    for entity in to_set - from_set:
+        ts = float(to_map[entity].get('shares') or 0)
+        tv = float(to_map[entity].get('value') or 0)
+        mt = to_map[entity].get('manager_type') if level == 'parent' else None
+        rows.append({
+            'inst_parent_name': entity, 'manager_type': mt or '',
+            'from_shares': 0, 'to_shares': ts, 'net_shares': ts,
+            'from_value': 0, 'to_value': tv, 'net_value': tv,
+            'pct_change': None, 'is_new_entry': True, 'is_exit': False,
+        })
+    # Exits
+    for entity in from_set - to_set:
+        fs = float(from_map[entity].get('shares') or 0)
+        fv = float(from_map[entity].get('value') or 0)
+        mt = from_map[entity].get('manager_type') if level == 'parent' else None
+        rows.append({
+            'inst_parent_name': entity, 'manager_type': mt or '',
+            'from_shares': fs, 'to_shares': 0, 'net_shares': -fs,
+            'from_value': fv, 'to_value': 0, 'net_value': -fv,
+            'pct_change': -1.0, 'is_new_entry': False, 'is_exit': True,
+        })
+
+    # Split and sort by net_shares (shares-based primary)
+    buyers = sorted([r for r in rows if not r['is_new_entry'] and not r['is_exit'] and r['net_shares'] > 0],
+                    key=lambda x: x['net_shares'], reverse=True)[:25]
+    sellers = sorted([r for r in rows if not r['is_new_entry'] and not r['is_exit'] and r['net_shares'] < 0],
+                     key=lambda x: x['net_shares'])[:25]
+    new_entries = sorted([r for r in rows if r['is_new_entry']],
+                         key=lambda x: x['to_shares'], reverse=True)[:25]
+    exits = sorted([r for r in rows if r['is_exit']],
+                   key=lambda x: x['from_shares'], reverse=True)[:25]
+
+    return buyers, sellers, new_entries, exits
+
+
+def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=False):
+    """Flow analysis — default QoQ (1Q = most recent quarter).
+    level: 'parent' (13F) or 'fund' (N-PORT).
     """
     period_map = {'4Q': FQ, '2Q': QUARTERS[1] if len(QUARTERS) > 1 else FQ, '1Q': PQ}
-    quarter_from = period_map.get(period, FQ)
+    quarter_from = period_map.get(period, PQ)
     quarter_to = LQ
 
     con = get_db()
@@ -2478,35 +2568,33 @@ def flow_analysis(ticker, period='4Q', peers=None):
         """, [ticker]).fetchone()
         implied_to = ip2[0] if ip2 and ip2[0] else None
 
-        # Fetch flows for this period
-        df = con.execute("""
-            SELECT inst_parent_name, manager_type, from_shares, to_shares, net_shares,
-                   pct_change, from_value, to_value, from_price,
-                   price_adj_flow, raw_flow, price_effect,
-                   is_new_entry, is_exit, flow_4q, flow_2q,
-                   momentum_ratio, momentum_signal
-            FROM investor_flows
-            WHERE ticker = ? AND quarter_from = ?
-            ORDER BY price_adj_flow DESC NULLS LAST
-        """, [ticker, quarter_from]).fetchdf()
-        rows = df_to_records(df)
-
-        # Add subadviser notes
-        for r in rows:
-            r['subadviser_note'] = get_subadviser_note(r.get('inst_parent_name'))
-
-        # Split into categories
-        buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
-                  and r.get('price_adj_flow') is not None and r['price_adj_flow'] > 0][:25]
-        sellers_all = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
-                       and r.get('price_adj_flow') is not None and r['price_adj_flow'] < 0]
-        sellers = sellers_all[-25:] if len(sellers_all) > 25 else sellers_all
-        new_entries = [r for r in rows if r.get('is_new_entry')]
-        new_entries.sort(key=lambda x: x.get('to_value') or 0, reverse=True)
-        new_entries = new_entries[:25]
-        exits = [r for r in rows if r.get('is_exit')]
-        exits.sort(key=lambda x: x.get('from_value') or 0, reverse=True)
-        exits = exits[:25]
+        # Fetch flows — use precomputed for parent level, live for fund level
+        if level == 'fund' or not has_precomputed or cnt == 0:
+            buyers, sellers, new_entries, exits = _compute_flows_live(
+                ticker, quarter_from, quarter_to, con, level=level, active_only=active_only)
+        else:
+            df = con.execute("""
+                SELECT inst_parent_name, manager_type, from_shares, to_shares, net_shares,
+                       pct_change, from_value, to_value, from_price,
+                       price_adj_flow, raw_flow, price_effect,
+                       is_new_entry, is_exit, flow_4q, flow_2q,
+                       momentum_ratio, momentum_signal
+                FROM investor_flows
+                WHERE ticker = ? AND quarter_from = ?
+                ORDER BY net_shares DESC NULLS LAST
+            """, [ticker, quarter_from]).fetchdf()
+            rows = df_to_records(df)
+            for r in rows:
+                r['net_value'] = (r.get('to_value') or 0) - (r.get('from_value') or 0)
+            buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
+                      and (r.get('net_shares') or 0) > 0][:25]
+            sellers = sorted([r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
+                              and (r.get('net_shares') or 0) < 0],
+                             key=lambda x: x.get('net_shares') or 0)[:25]
+            new_entries = sorted([r for r in rows if r.get('is_new_entry')],
+                                 key=lambda x: x.get('to_shares') or 0, reverse=True)[:25]
+            exits = sorted([r for r in rows if r.get('is_exit')],
+                           key=lambda x: x.get('from_shares') or 0, reverse=True)[:25]
 
         # Charts: flow intensity and churn for ticker + peers
         chart_tickers = [ticker]
@@ -2607,6 +2695,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
             'period': period,
             'quarter_from': quarter_from,
             'quarter_to': quarter_to,
+            'level': level,
             'implied_prices': {quarter_from: implied_from, quarter_to: implied_to},
             'buyers': buyers,
             'sellers': sellers,

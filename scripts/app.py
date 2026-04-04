@@ -959,12 +959,14 @@ def api_holder_momentum():
 @app.route('/api/flow_analysis')
 def api_flow_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
-    period = request.args.get('period', '4Q').upper().strip()
+    period = request.args.get('period', '1Q').upper().strip()
     peers = request.args.get('peers', '').upper().strip() or None
+    level = request.args.get('level', 'parent').strip()
+    ao = request.args.get('active_only', '').strip() == 'true'
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = flow_analysis(ticker, period=period, peers=peers)
+        result = flow_analysis(ticker, period=period, peers=peers, level=level, active_only=ao)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500

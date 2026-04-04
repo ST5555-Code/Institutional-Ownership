@@ -2287,42 +2287,71 @@ function buildSimpleTable(data, cols) {
     return table;
 }
 
-let _flowPeriod = '4Q';
+let _flowPeriod = '1Q';
+let _flowLevel = 'parent';
+let _flowActiveOnly = false;
+let _flowTab = 'buyers';
 
 async function loadFlowAnalysis() {
     clearError(); tableWrap.innerHTML = '';
 
-    // Period selector — "Compare from: [Q1 2025] [Q2 2025] [Q3 2025] → to Q4 2025"
-    const pbar = document.createElement('div');
-    pbar.className = 'period-selector';
-    const label = document.createElement('span');
-    label.textContent = 'Compare from:';
-    pbar.appendChild(label);
-    [['4Q', 'Q1 2025'], ['2Q', 'Q2 2025'], ['1Q', 'Q3 2025']].forEach(([p, lbl]) => {
+    // Control bar: period + level toggle + active only
+    const cbar = document.createElement('div');
+    cbar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;flex-wrap:wrap;';
+
+    // Period selector
+    const pLabel = document.createElement('span');
+    pLabel.style.cssText = 'font-size:12px;color:#666;';
+    pLabel.textContent = 'Period:';
+    cbar.appendChild(pLabel);
+    const pGroup = document.createElement('div');
+    pGroup.className = 'register-view-toggle';
+    [['1Q', 'Q3 \u2192 Q4'], ['2Q', 'Q2 \u2192 Q4'], ['4Q', 'Q1 \u2192 Q4']].forEach(([p, lbl]) => {
         const btn = document.createElement('button');
-        btn.className = 'period-btn' + (p === _flowPeriod ? ' active' : '');
+        btn.className = 'btn btn-toggle' + (p === _flowPeriod ? ' active' : '');
         btn.textContent = lbl;
-        btn.addEventListener('click', () => { _flowPeriod = p; loadFlowAnalysis(); });
-        pbar.appendChild(btn);
+        btn.onclick = () => { _flowPeriod = p; loadFlowAnalysis(); };
+        pGroup.appendChild(btn);
     });
-    const arrow = document.createElement('span');
-    arrow.textContent = '\u2192 to Q4 2025 (latest)';
-    arrow.style.marginLeft = '6px';
-    pbar.appendChild(arrow);
-    tableWrap.appendChild(pbar);
+    cbar.appendChild(pGroup);
+
+    // Level toggle
+    const lvlGroup = document.createElement('div');
+    lvlGroup.className = 'register-view-toggle';
+    lvlGroup.style.marginLeft = '12px';
+    [['parent', 'By Parent'], ['fund', 'By Fund']].forEach(([v, txt]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-toggle' + (_flowLevel === v ? ' active' : '');
+        btn.textContent = txt;
+        btn.onclick = () => { _flowLevel = v; loadFlowAnalysis(); };
+        lvlGroup.appendChild(btn);
+    });
+    cbar.appendChild(lvlGroup);
+
+    // Active Only (fund level)
+    if (_flowLevel === 'fund') {
+        const aoBtn = document.createElement('button');
+        aoBtn.className = 'btn btn-toggle' + (_flowActiveOnly ? ' active' : '');
+        aoBtn.textContent = 'Active Only';
+        aoBtn.style.marginLeft = '6px';
+        aoBtn.onclick = () => { _flowActiveOnly = !_flowActiveOnly; loadFlowAnalysis(); };
+        cbar.appendChild(aoBtn);
+    }
+
+    tableWrap.appendChild(cbar);
 
     showSpinner();
-    // Get peers from cross-ownership if available
     const peers = getCOTickers().filter(t => t !== currentTicker).join(',');
-    const url = `/api/flow_analysis?ticker=${currentTicker}&period=${_flowPeriod}&peers=${peers}`;
+    const ao = _flowActiveOnly && _flowLevel === 'fund' ? '&active_only=true' : '';
+    const url = `/api/flow_analysis?ticker=${currentTicker}&period=${_flowPeriod}&peers=${peers}&level=${_flowLevel}${ao}`;
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
         const data = await res.json();
         hideSpinner();
-        const savedBar = tableWrap.querySelector('.period-selector');
+        const savedBar = tableWrap.querySelector('div');
         renderFlowAnalysis(data);
-        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+        if (savedBar && !tableWrap.contains(savedBar)) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
     } catch (e) { hideSpinner(); showError(e.message); }
 }
 
@@ -2515,60 +2544,96 @@ function renderFlowAnalysis(data) {
         }, 100);
     }
 
-    // --- Buyers / Sellers / New Entries / Exits tables ---
-    const buyerCols = [
-        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+    // --- Tabbed Buyers / Sellers / New Entries / Exits ---
+    const nameLabel = (data.level === 'fund') ? 'Fund' : 'Institution';
+    const flowCols = [
+        {key: 'inst_parent_name', label: nameLabel, type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'from_shares', label: 'From Shares', type: 'shares'},
-        {key: 'to_shares', label: 'To Shares', type: 'shares'},
         {key: 'net_shares', label: 'Net Shares', type: 'shares'},
-        {key: 'pct_change', label: '% Change', type: 'pct'},
-        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
-        {key: 'momentum_signal', label: 'Signal', type: 'text'},
+        {key: 'from_shares', label: 'From', type: 'shares'},
+        {key: 'to_shares', label: 'To', type: 'shares'},
+        {key: 'pct_change', label: '% Chg', type: 'pct'},
+        {key: 'net_value', label: 'Net Value', type: 'dollar'},
     ];
-    if (data.buyers && data.buyers.length) {
-        const h = document.createElement('div');
-        h.className = 'flow-section-header';
-        h.innerHTML = '\u25B2 Buyers \u2014 Top 25 by Price-Adjusted Flow';
-        tableWrap.appendChild(h);
-        tableWrap.appendChild(_flowTable(data.buyers, buyerCols, 'row-buyer'));
-    }
-    if (data.sellers && data.sellers.length) {
-        const h = document.createElement('div');
-        h.className = 'flow-section-header';
-        h.innerHTML = '\u25BC Sellers \u2014 Top 25 by Price-Adjusted Flow';
-        tableWrap.appendChild(h);
-        tableWrap.appendChild(_flowTable(data.sellers, buyerCols, 'row-seller'));
-    }
-    const neCols = [
-        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+    const entryCols = [
+        {key: 'inst_parent_name', label: nameLabel, type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
         {key: 'to_shares', label: 'Shares', type: 'shares'},
         {key: 'to_value', label: 'Value', type: 'dollar'},
-        {key: 'momentum_signal', label: 'Signal', type: 'text'},
     ];
-    if (data.new_entries && data.new_entries.length) {
-        const h = document.createElement('div');
-        h.className = 'flow-section-header';
-        h.innerHTML = '\u2605 New Entries \u2014 Initiated Positions';
-        tableWrap.appendChild(h);
-        tableWrap.appendChild(_flowTable(data.new_entries, neCols, 'row-new-entry'));
-    }
-    const exCols = [
-        {key: 'inst_parent_name', label: 'Institution', type: 'text'},
+    const exitCols = [
+        {key: 'inst_parent_name', label: nameLabel, type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
-        {key: 'from_shares', label: 'Shares Sold', type: 'shares'},
-        {key: 'from_value', label: 'Value Exited', type: 'dollar'},
-        {key: 'price_adj_flow', label: 'Price-Adj Flow', type: 'dollar'},
-        {key: 'momentum_signal', label: 'Signal', type: 'text'},
+        {key: 'from_shares', label: 'Shares', type: 'shares'},
+        {key: 'from_value', label: 'Value', type: 'dollar'},
     ];
-    if (data.exits && data.exits.length) {
-        const h = document.createElement('div');
-        h.className = 'flow-section-header';
-        h.innerHTML = '\u2715 Exits \u2014 Closed Positions';
-        tableWrap.appendChild(h);
-        tableWrap.appendChild(_flowTable(data.exits, exCols, 'row-seller'));
+
+    const tabs = [
+        {id: 'buyers', label: '\u25B2 Buyers', rows: data.buyers || [], cols: flowCols, cls: 'row-buyer'},
+        {id: 'sellers', label: '\u25BC Sellers', rows: data.sellers || [], cols: flowCols, cls: 'row-seller'},
+        {id: 'new', label: '\u2605 New', rows: data.new_entries || [], cols: entryCols, cls: 'row-new-entry'},
+        {id: 'exits', label: '\u2715 Exits', rows: data.exits || [], cols: exitCols, cls: 'row-seller'},
+    ];
+
+    // Tab bar
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display:flex;gap:2px;border-bottom:2px solid #002147;margin:16px 0 0 0;';
+    const tableArea = document.createElement('div');
+
+    function _renderFlowTab(tabId) {
+        _flowTab = tabId;
+        tabBar.querySelectorAll('button').forEach(b => {
+            b.classList.toggle('active', b.dataset.tabId === tabId);
+        });
+        tableArea.innerHTML = '';
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab || !tab.rows.length) {
+            tableArea.innerHTML = '<div style="padding:16px;color:#999;">No data for this category.</div>';
+            return;
+        }
+        const table = _flowTable(tab.rows, tab.cols, tab.cls);
+        tableArea.appendChild(table);
+
+        // Totals row
+        const tbody = table.querySelector('tbody');
+        const totals = document.createElement('tr');
+        totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
+        // # col
+        const tdNum = document.createElement('td');
+        tdNum.className = 'col-rownum';
+        totals.appendChild(tdNum);
+        tab.cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.textAlign = (c.type === 'text') ? 'left' : 'right';
+            if (c.key === 'inst_parent_name') {
+                td.textContent = 'TOTAL (' + tab.rows.length + ')';
+            } else if (c.type === 'shares' || c.type === 'dollar') {
+                let sum = 0;
+                tab.rows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
+                td.innerHTML = sum ? formatCell(sum, c.type === 'dollar' ? 'dollar' : 'shares') : '\u2014';
+            } else if (c.key === 'pct_change') {
+                td.textContent = '';
+            } else {
+                td.textContent = '';
+            }
+            totals.appendChild(td);
+        });
+        tbody.appendChild(totals);
     }
+
+    tabs.forEach(t => {
+        const btn = document.createElement('button');
+        btn.dataset.tabId = t.id;
+        btn.style.cssText = 'padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#666;border-bottom:2px solid transparent;margin-bottom:-2px;';
+        btn.textContent = t.label + ' (' + t.rows.length + ')';
+        btn.classList.toggle('active', t.id === _flowTab);
+        btn.onclick = () => _renderFlowTab(t.id);
+        tabBar.appendChild(btn);
+    });
+
+    tableWrap.appendChild(tabBar);
+    tableWrap.appendChild(tableArea);
+    _renderFlowTab(_flowTab);
 }
 
 // ---------------------------------------------------------------------------

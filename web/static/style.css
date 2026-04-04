@@ -730,6 +730,13 @@ body {
 .row-seller td { background-color: #FDF0F0 !important; }
 .row-new-entry td { background-color: #EBF3FB !important; }
 
+/* Flow tab buttons */
+button[data-tab-id].active {
+    color: #002147 !important;
+    border-bottom-color: #002147 !important;
+    background: #f0f4f8 !important;
+}
+
 /* === Sub-view bar (used by Ownership Trend, New/Exits) === */
 .sub-view-bar {
     display: flex;
