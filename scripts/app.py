@@ -933,10 +933,12 @@ def api_ownership_trend_summary():
 def api_cohort_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
     from_q = request.args.get('from', '').strip() or None
+    level = request.args.get('level', 'parent').strip()
+    active_only = request.args.get('active_only', '').strip() == 'true'
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = cohort_analysis(ticker, from_quarter=from_q)
+        result = cohort_analysis(ticker, from_quarter=from_q, level=level, active_only=active_only)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500

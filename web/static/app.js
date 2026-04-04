@@ -1627,15 +1627,17 @@ function renderOTSummary(data) {
 }
 
 let _cohortPeriod = null;  // null = most recent quarter (default)
+let _cohortLevel = 'parent';  // 'parent' | 'fund'
+let _cohortActiveOnly = false;
 
 async function loadOTCohort() {
-    // Loads inline below summary — no spinner/clear needed
     try {
         const fromQ = _cohortPeriod || '';
-        const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}&from=${fromQ}`);
+        const lvl = _cohortLevel;
+        const ao = _cohortActiveOnly && lvl === 'fund' ? '&active_only=true' : '';
+        const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}&from=${fromQ}&level=${lvl}${ao}`);
         if (!res.ok) return;
         const data = await res.json();
-        // Remove previous cohort section if re-rendering
         tableWrap.querySelectorAll('.cohort-section').forEach(el => el.remove());
         const wrap = document.createElement('div');
         wrap.className = 'cohort-section';
@@ -1645,7 +1647,6 @@ async function loadOTCohort() {
 }
 
 function _fmtQ(q) {
-    // "2025Q3" → "Q3 2025"
     if (!q || q.length < 6) return q || '';
     return 'Q' + q.slice(5) + ' ' + q.slice(0, 4);
 }
@@ -1654,22 +1655,50 @@ function renderCohort(data, container) {
     const {summary, detail} = data;
     const fq = summary.from_quarter || '';
     const lq = summary.to_quarter || '';
+    const lvl = summary.level || 'parent';
 
-    // Period selector
-    const periods = [
-        ['2025Q1', 'Q1 → Q4 (full year)'],
-        ['2025Q2', 'Q2 → Q4'],
-        ['2025Q3', 'Q3 → Q4 (latest)'],
-    ];
+    // Control bar: period selector + level toggle + active-only
     const selBar = document.createElement('div');
-    selBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin:20px 0 8px 0;';
+    selBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin:20px 0 8px 0;flex-wrap:wrap;';
+
     const label = document.createElement('span');
     label.style.cssText = 'font-size:14px;font-weight:700;color:#002147;';
-    label.textContent = `Cohort: ${_fmtQ(fq)} → ${_fmtQ(lq)}`;
+    label.textContent = `Cohort: ${_fmtQ(fq)} \u2192 ${_fmtQ(lq)}`;
     selBar.appendChild(label);
+
+    // Level toggle (By Parent / By Fund)
+    const lvlToggle = document.createElement('div');
+    lvlToggle.className = 'register-view-toggle';
+    lvlToggle.style.marginLeft = '12px';
+    [['parent', 'By Parent'], ['fund', 'By Fund']].forEach(([v, txt]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-toggle' + (lvl === v ? ' active' : '');
+        btn.textContent = txt;
+        btn.onclick = () => { _cohortLevel = v; loadOTCohort(); };
+        lvlToggle.appendChild(btn);
+    });
+    selBar.appendChild(lvlToggle);
+
+    // Active Only toggle (fund level only)
+    if (lvl === 'fund') {
+        const aoBtn = document.createElement('button');
+        aoBtn.className = 'btn btn-toggle' + (_cohortActiveOnly ? ' active' : '');
+        aoBtn.textContent = 'Active Only';
+        aoBtn.style.marginLeft = '6px';
+        aoBtn.onclick = () => { _cohortActiveOnly = !_cohortActiveOnly; loadOTCohort(); };
+        selBar.appendChild(aoBtn);
+    }
+
     const spacer = document.createElement('span');
     spacer.style.flex = '1';
     selBar.appendChild(spacer);
+
+    // Period selector
+    const periods = [
+        ['2025Q1', 'Q1 \u2192 Q4'],
+        ['2025Q2', 'Q2 \u2192 Q4'],
+        ['2025Q3', 'Q3 \u2192 Q4'],
+    ];
     const btnGroup = document.createElement('div');
     btnGroup.className = 'register-view-toggle';
     periods.forEach(([q, txt]) => {
@@ -1688,19 +1717,21 @@ function renderCohort(data, container) {
     const nh = summary.net_holders || 0;
     const ns = summary.net_shares || 0;
     const nv = summary.net_value || 0;
-    netLine.innerHTML = `<strong>Net:</strong> ${nh >= 0 ? '+' : ''}${nh} holders, `
+    const entityLabel = lvl === 'fund' ? 'funds' : 'holders';
+    netLine.innerHTML = `<strong>Net:</strong> ${nh >= 0 ? '+' : ''}${nh} ${entityLabel}, `
         + `${ns >= 0 ? '+' : ''}${fmtShares(Math.abs(ns))} shares, `
         + `${nv >= 0 ? '+' : '-'}${fmtDollars(Math.abs(nv))} `
         + `<span style="color:#999;margin-left:8px;">Retention: ${summary.retention_rate}%</span>`;
     container.appendChild(netLine);
 
-    // Detail table — hierarchical (Retained is parent with children)
+    // Detail table
     const table = document.createElement('table');
     table.className = 'data-table';
     table.style.tableLayout = 'fixed';
 
     const colgroup = document.createElement('colgroup');
-    [null, '10%', '14%', '14%', '14%', '14%'].forEach(w => {
+    // Category, Holders, Shares(Q4), Value(Q4), Δ Shares, Δ Value, Avg Pos, % Inst Float
+    [null, '7%', '12%', '12%', '12%', '12%', '11%', '9%'].forEach(w => {
         const cg = document.createElement('col');
         if (w) cg.style.width = w;
         colgroup.appendChild(cg);
@@ -1709,7 +1740,8 @@ function renderCohort(data, container) {
 
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    ['Category', 'Holders', 'Shares', 'Value', 'Avg Position', '% Inst Float'].forEach(h => {
+    const holderLabel = lvl === 'fund' ? 'Funds' : 'Holders';
+    ['Category', holderLabel, 'Shares', 'Value', '\u0394 Shares', '\u0394 Value', 'Avg Position', '% Inst Float'].forEach(h => {
         const th = document.createElement('th');
         th.textContent = h;
         th.style.textAlign = h === 'Category' ? 'left' : 'right';
@@ -1725,42 +1757,83 @@ function renderCohort(data, container) {
         const isChild = row.level === 1;
         if (isParent) tr.style.fontWeight = '700';
 
-        // Category cell
         const tdCat = document.createElement('td');
-        const catText = isChild ? row.category : row.category;
-        tdCat.textContent = catText;
+        tdCat.textContent = row.category;
         if (isChild) tdCat.style.paddingLeft = '28px';
         tr.appendChild(tdCat);
 
-        // Numeric cells
-        [
-            fmtNum(row.holders),
-            fmtShares(row.shares),
-            fmtDollars(row.value),
-            fmtDollars(row.avg_position),
-            row.pct_float_moved != null ? row.pct_float_moved.toFixed(1) + '%' : '\u2014',
-        ].forEach(v => {
+        // Helper for delta cells (colored)
+        function _deltaCell(val) {
             const td = document.createElement('td');
             td.style.textAlign = 'right';
-            td.textContent = v;
-            tr.appendChild(td);
-        });
+            if (val == null || val === 0) { td.textContent = '\u2014'; td.style.color = '#999'; }
+            else {
+                td.style.color = val > 0 ? '#27AE60' : '#C0392B';
+            }
+            return td;
+        }
+
+        // Holders
+        const tdH = document.createElement('td');
+        tdH.style.textAlign = 'right';
+        tdH.textContent = fmtNum(row.holders);
+        tr.appendChild(tdH);
+
+        // Shares (Q4 position)
+        const tdS = document.createElement('td');
+        tdS.style.textAlign = 'right';
+        tdS.textContent = fmtShares(row.shares);
+        tr.appendChild(tdS);
+
+        // Value (Q4 position)
+        const tdV = document.createElement('td');
+        tdV.style.textAlign = 'right';
+        tdV.textContent = fmtDollars(row.value);
+        tr.appendChild(tdV);
+
+        // Δ Shares
+        const tdDS = _deltaCell(row.delta_shares);
+        if (row.delta_shares && row.delta_shares !== 0) {
+            tdDS.textContent = (row.delta_shares > 0 ? '+' : '') + fmtShares(row.delta_shares);
+        }
+        tr.appendChild(tdDS);
+
+        // Δ Value
+        const tdDV = _deltaCell(row.delta_value);
+        if (row.delta_value && row.delta_value !== 0) {
+            tdDV.textContent = (row.delta_value > 0 ? '+' : '') + fmtDollars(row.delta_value);
+        }
+        tr.appendChild(tdDV);
+
+        // Avg Position
+        const tdAvg = document.createElement('td');
+        tdAvg.style.textAlign = 'right';
+        tdAvg.textContent = fmtDollars(row.avg_position);
+        tr.appendChild(tdAvg);
+
+        // % Inst Float
+        const tdPct = document.createElement('td');
+        tdPct.style.textAlign = 'right';
+        tdPct.textContent = row.pct_float_moved != null ? row.pct_float_moved.toFixed(1) + '%' : '\u2014';
+        tr.appendChild(tdPct);
+
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
     container.appendChild(table);
 
-    // Top 10 holders summary line
+    // Top 10 summary line
     const t10 = summary.top10;
     if (t10) {
         const t10Line = document.createElement('div');
         t10Line.style.cssText = 'font-size:12px;color:#666;margin:8px 0 0 0;';
         const parts = [];
+        const label10 = lvl === 'fund' ? 'Top 10 funds' : 'Top 10 holders';
         if (t10.increased) parts.push(`${t10.increased} increasing`);
         if (t10.decreased) parts.push(`${t10.decreased} decreasing`);
         if (t10.new) parts.push(`${t10.new} new`);
         if (t10.unchanged) parts.push(`${t10.unchanged} unchanged`);
-        t10Line.innerHTML = `<strong>Top 10 holders:</strong> ${parts.join(', ')}`;
+        t10Line.innerHTML = `<strong>${label10}:</strong> ${parts.join(', ')}`;
         container.appendChild(t10Line);
     }
 }

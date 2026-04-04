@@ -2007,103 +2007,158 @@ def ownership_trend_summary(ticker):
 
 
 
-def cohort_analysis(ticker, from_quarter=None):
+def _build_cohort(q1_map, q4_map):
+    """Core cohort logic shared by parent-level and fund-level analysis.
+    Returns (detail, summary_data) given two dicts keyed by entity name.
+    """
+    q1_set, q4_set = set(q1_map.keys()), set(q4_map.keys())
+    retained = q1_set & q4_set
+    new_entries_set = q4_set - q1_set
+    exits_set = q1_set - q4_set
+
+    increased, decreased, unchanged = [], [], []
+    for inv in retained:
+        s1 = q1_map[inv].get('shares') or 0
+        s4 = q4_map[inv].get('shares') or 0
+        (increased if s4 > s1 else decreased if s4 < s1 else unchanged).append(inv)
+
+    total_inst_shares = sum((q4_map[i].get('shares') or 0) for i in q4_set)
+
+    def _stats(investors, src, delta_src=None):
+        """src = position source, delta_src = other quarter for computing deltas."""
+        c = len(investors)
+        s = sum((src[i].get('shares') or 0) for i in investors)
+        v = sum((src[i].get('value') or 0) for i in investors)
+        pct_float = round(s / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
+        # Net deltas
+        if delta_src is not None:
+            delta_s = sum(((src[i].get('shares') or 0) - (delta_src.get(i, {}).get('shares') or 0)) for i in investors)
+            delta_v = sum(((src[i].get('value') or 0) - (delta_src.get(i, {}).get('value') or 0)) for i in investors)
+        else:
+            delta_s = s   # new entries: entire position is delta
+            delta_v = v
+        return {'holders': c, 'shares': s, 'value': v,
+                'avg_position': round(v / c, 2) if c > 0 else 0,
+                'pct_float_moved': pct_float,
+                'delta_shares': delta_s, 'delta_value': delta_v}
+
+    inc_stats = _stats(increased, q4_map, q1_map)
+    dec_stats = _stats(decreased, q4_map, q1_map)
+    unc_stats = _stats(unchanged, q4_map, q1_map)
+    # Exits: delta is negative (lost their entire Q1 position)
+    exit_stats = _stats(list(exits_set), q1_map)
+    exit_stats['delta_shares'] = -exit_stats['shares']
+    exit_stats['delta_value'] = -exit_stats['value']
+    new_stats = _stats(list(new_entries_set), q4_map)
+
+    # Retained parent totals
+    ret_holders = inc_stats['holders'] + dec_stats['holders'] + unc_stats['holders']
+    ret_shares = inc_stats['shares'] + dec_stats['shares'] + unc_stats['shares']
+    ret_value = inc_stats['value'] + dec_stats['value'] + unc_stats['value']
+    ret_delta_s = inc_stats['delta_shares'] + dec_stats['delta_shares'] + unc_stats['delta_shares']
+    ret_delta_v = inc_stats['delta_value'] + dec_stats['delta_value'] + unc_stats['delta_value']
+    ret_pct = round(ret_shares / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
+
+    detail = [
+        {'category': 'Retained', 'holders': ret_holders, 'shares': ret_shares,
+         'value': ret_value, 'avg_position': round(ret_value / ret_holders, 2) if ret_holders > 0 else 0,
+         'pct_float_moved': ret_pct, 'delta_shares': ret_delta_s, 'delta_value': ret_delta_v,
+         'level': 0, 'is_parent': True},
+        {'category': 'Increased', 'level': 1, **inc_stats},
+        {'category': 'Decreased', 'level': 1, **dec_stats},
+        {'category': 'Unchanged', 'level': 1, **unc_stats},
+        {'category': 'New Entries', 'level': 0, **new_stats},
+        {'category': 'Exits', 'level': 0, **exit_stats},
+    ]
+
+    total_q1 = len(q1_set)
+    net_holders = len(new_entries_set) - len(exits_set)
+    net_shares = ret_delta_s + new_stats['delta_shares'] + exit_stats['delta_shares']
+    net_value = (sum((q4_map[i].get('value') or 0) for i in q4_set)
+                 - sum((q1_map[i].get('value') or 0) for i in q1_set))
+
+    # Top 10 holders in latest quarter — which cohort bucket
+    top10_inv = sorted(q4_map.keys(), key=lambda x: q4_map[x].get('value') or 0, reverse=True)[:10]
+    top10 = {
+        'increased': sum(1 for i in top10_inv if i in set(increased)),
+        'decreased': sum(1 for i in top10_inv if i in set(decreased)),
+        'new': sum(1 for i in top10_inv if i in new_entries_set),
+        'unchanged': sum(1 for i in top10_inv if i in set(unchanged)),
+    }
+
+    summary = {
+        'retention_rate': round(len(retained) / total_q1 * 100, 2) if total_q1 > 0 else 0,
+        'net_holders': net_holders,
+        'net_shares': net_shares,
+        'net_value': net_value,
+        'top10': top10,
+    }
+    return detail, summary
+
+
+def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False):
     """Cohort retention analysis: compare two quarters.
-    from_quarter: starting quarter (default: PREV_QUARTER for most recent QoQ).
-    Always compares from_quarter → LATEST_QUARTER.
+    level: 'parent' (13F institutional) or 'fund' (N-PORT fund series).
+    active_only: when level='fund', exclude passive/index funds.
     """
     con = get_db()
     try:
         fq = from_quarter or PQ
         lq = LQ
 
-        q1_df = con.execute(f"""
-            SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                   SUM(shares) as shares, SUM(market_value_usd) as value
-            FROM holdings WHERE ticker = ? AND quarter = '{fq}' GROUP BY investor
-        """, [ticker]).fetchdf()
-        q4_df = con.execute(f"""
-            SELECT COALESCE(inst_parent_name, manager_name) as investor,
-                   SUM(shares) as shares, SUM(market_value_usd) as value
-            FROM holdings WHERE ticker = ? AND quarter = '{lq}' GROUP BY investor
-        """, [ticker]).fetchdf()
+        if level == 'fund':
+            # Fund-level from fund_holdings
+            active_filter = ""
+            if active_only:
+                # Exclude funds with passive keywords in name
+                passive_kw = "('INDEX','ETF','MSCI','FTSE','STOXX','NIKKEI','TOTAL STOCK','TOTAL MARKET','TOTAL BOND','TOTAL INTERNATIONAL','BROAD MARKET','TRACKER','NASDAQ','DOW JONES','WILSHIRE')"
+                active_filter = f"""
+                    AND NOT EXISTS (
+                        SELECT 1 FROM UNNEST([{passive_kw}]) t(kw)
+                        WHERE UPPER(fh.fund_name) LIKE '%' || kw || '%'
+                    )
+                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 5%'
+                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 4%'
+                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 6%'
+                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 1%'
+                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 2%'
+                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 3%'
+                """
+            q1_df = con.execute(f"""
+                SELECT fh.fund_name as investor,
+                       SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
+                FROM fund_holdings fh
+                WHERE fh.ticker = ? AND fh.quarter = '{fq}' {active_filter}
+                GROUP BY fh.fund_name
+            """, [ticker]).fetchdf()
+            q4_df = con.execute(f"""
+                SELECT fh.fund_name as investor,
+                       SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
+                FROM fund_holdings fh
+                WHERE fh.ticker = ? AND fh.quarter = '{lq}' {active_filter}
+                GROUP BY fh.fund_name
+            """, [ticker]).fetchdf()
+        else:
+            # Parent-level from holdings (13F)
+            q1_df = con.execute(f"""
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       SUM(shares) as shares, SUM(market_value_usd) as value
+                FROM holdings WHERE ticker = ? AND quarter = '{fq}' GROUP BY investor
+            """, [ticker]).fetchdf()
+            q4_df = con.execute(f"""
+                SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                       SUM(shares) as shares, SUM(market_value_usd) as value
+                FROM holdings WHERE ticker = ? AND quarter = '{lq}' GROUP BY investor
+            """, [ticker]).fetchdf()
 
         q1_map = {r['investor']: r for r in df_to_records(q1_df)}
         q4_map = {r['investor']: r for r in df_to_records(q4_df)}
-        q1_set, q4_set = set(q1_map.keys()), set(q4_map.keys())
-        retained = q1_set & q4_set
-        new_entries_set = q4_set - q1_set
-        exits_set = q1_set - q4_set
 
-        increased, decreased, unchanged = [], [], []
-        for inv in retained:
-            s1 = q1_map[inv].get('shares') or 0
-            s4 = q4_map[inv].get('shares') or 0
-            (increased if s4 > s1 else decreased if s4 < s1 else unchanged).append(inv)
-
-        # Total institutional shares in latest quarter (for % of float moved)
-        total_inst_shares = sum((q4_map[i].get('shares') or 0) for i in q4_set)
-
-        def _stats(investors, src):
-            c = len(investors)
-            s = sum((src[i].get('shares') or 0) for i in investors)
-            v = sum((src[i].get('value') or 0) for i in investors)
-            pct_float = round(s / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
-            return {'holders': c, 'shares': s, 'value': v, 'avg_position': round(v / c, 2) if c > 0 else 0,
-                    'pct_float_moved': pct_float}
-
-        # Retained subcategories
-        inc_stats = _stats(increased, q4_map)
-        dec_stats = _stats(decreased, q4_map)
-        unc_stats = _stats(unchanged, q4_map)
-        # Retained parent totals
-        ret_holders = inc_stats['holders'] + dec_stats['holders'] + unc_stats['holders']
-        ret_shares = inc_stats['shares'] + dec_stats['shares'] + unc_stats['shares']
-        ret_value = inc_stats['value'] + dec_stats['value'] + unc_stats['value']
-        ret_pct = round(ret_shares / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
-
-        detail = [
-            {'category': 'Retained', 'holders': ret_holders, 'shares': ret_shares,
-             'value': ret_value, 'avg_position': round(ret_value / ret_holders, 2) if ret_holders > 0 else 0,
-             'pct_float_moved': ret_pct, 'level': 0, 'is_parent': True},
-            {'category': 'Increased', 'level': 1, **inc_stats},
-            {'category': 'Decreased', 'level': 1, **dec_stats},
-            {'category': 'Unchanged', 'level': 1, **unc_stats},
-            {'category': 'New Entries', 'level': 0, **_stats(list(new_entries_set), q4_map)},
-            {'category': 'Exits', 'level': 0, **_stats(list(exits_set), q1_map)},
-        ]
-
-        total_q1 = len(q1_set)
-
-        # Net flow summary
-        net_holders = len(new_entries_set) - len(exits_set)
-        net_shares = (sum((q4_map[i].get('shares') or 0) for i in new_entries_set)
-                      - sum((q1_map[i].get('shares') or 0) for i in exits_set)
-                      + sum(((q4_map[i].get('shares') or 0) - (q1_map[i].get('shares') or 0)) for i in retained))
-        net_value = (sum((q4_map[i].get('value') or 0) for i in q4_set)
-                     - sum((q1_map[i].get('value') or 0) for i in q1_set))
-
-        # Top 10 holders in latest quarter — which cohort bucket
-        top10_inv = sorted(q4_map.keys(), key=lambda x: q4_map[x].get('value') or 0, reverse=True)[:10]
-        top10_increased = sum(1 for i in top10_inv if i in set(increased))
-        top10_decreased = sum(1 for i in top10_inv if i in set(decreased))
-        top10_new = sum(1 for i in top10_inv if i in new_entries_set)
-        top10_unchanged = sum(1 for i in top10_inv if i in set(unchanged))
-
-        summary = {
-            'retention_rate': round(len(retained) / total_q1 * 100, 2) if total_q1 > 0 else 0,
-            'net_holders': net_holders,
-            'net_shares': net_shares,
-            'net_value': net_value,
-            'from_quarter': fq,
-            'to_quarter': lq,
-            'top10': {
-                'increased': top10_increased,
-                'decreased': top10_decreased,
-                'new': top10_new,
-                'unchanged': top10_unchanged,
-            },
-        }
+        detail, summary = _build_cohort(q1_map, q4_map)
+        summary['from_quarter'] = fq
+        summary['to_quarter'] = lq
+        summary['level'] = level
+        summary['active_only'] = active_only
         return {'summary': summary, 'detail': detail}
     finally:
         pass  # connection managed by thread-local cache
