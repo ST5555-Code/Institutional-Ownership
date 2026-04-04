@@ -1757,80 +1757,92 @@ function renderCohort(data, container) {
     thead.appendChild(hr);
     table.appendChild(thead);
 
-    const tbody = document.createElement('tbody');
-    detail.forEach(row => {
+    // Plain formatters (no HTML wrapping for negatives)
+    function _plainShares(v) {
+        if (v == null || v === 0) return '\u2014';
+        const abs = Math.abs(v);
+        if (abs >= 1e9) return (abs / 1e9).toFixed(1) + 'B';
+        if (abs >= 1e6) return (abs / 1e6).toFixed(1) + 'M';
+        if (abs >= 1e3) return (abs / 1e3).toFixed(1) + 'K';
+        return abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    }
+    function _plainDollars(v) {
+        if (v == null || v === 0) return '\u2014';
+        const abs = Math.abs(v);
+        if (abs >= 1e12) return '$' + (abs / 1e12).toFixed(1) + 'T';
+        if (abs >= 1e9) return '$' + (abs / 1e9).toFixed(1) + 'B';
+        if (abs >= 1e6) return '$' + (abs / 1e6).toFixed(0) + 'M';
+        if (abs >= 1e3) return '$' + (abs / 1e3).toFixed(0) + 'K';
+        return '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+    }
+
+    /** Build a single cohort table row. */
+    function _buildRow(row, indent) {
         const tr = document.createElement('tr');
-        const isParent = row.is_parent || false;
-        const isChild = row.level === 1;
-        if (isParent) tr.style.fontWeight = '700';
+        if (row.is_parent) tr.style.fontWeight = '700';
 
+        // Category cell
         const tdCat = document.createElement('td');
-        tdCat.textContent = row.category;
-        if (isChild) tdCat.style.paddingLeft = '28px';
+        tdCat.style.paddingLeft = indent + 'px';
+        if (row.has_children && row.level !== 0) {
+            // Collapsible subcategory (Increased, Decreased, etc.)
+            const arrow = document.createElement('span');
+            arrow.className = 'toggle-arrow';
+            arrow.textContent = '\u25B6';  // ▶
+            arrow.style.cssText = 'margin-right:4px;font-size:10px;cursor:pointer;';
+            tdCat.appendChild(arrow);
+            tdCat.appendChild(document.createTextNode(row.category));
+            tdCat.style.cursor = 'pointer';
+        } else if (row.has_children && row.level === 0) {
+            // New Entries / Exits (top-level collapsible)
+            const arrow = document.createElement('span');
+            arrow.className = 'toggle-arrow';
+            arrow.textContent = '\u25B6';
+            arrow.style.cssText = 'margin-right:4px;font-size:10px;cursor:pointer;';
+            tdCat.appendChild(arrow);
+            tdCat.appendChild(document.createTextNode(row.category));
+            tdCat.style.cursor = 'pointer';
+        } else {
+            tdCat.textContent = row.category;
+        }
         tr.appendChild(tdCat);
-
-        // Helper for delta cells (colored)
-        function _deltaCell(val) {
-            const td = document.createElement('td');
-            td.style.textAlign = 'right';
-            if (val == null || val === 0) { td.textContent = '\u2014'; td.style.color = '#999'; }
-            else {
-                td.style.color = val > 0 ? '#27AE60' : '#C0392B';
-            }
-            return td;
-        }
-
-        // Plain number format (no HTML wrapping for negatives)
-        function _plainShares(v) {
-            if (v == null || v === 0) return '\u2014';
-            const abs = Math.abs(v);
-            if (abs >= 1e9) return (abs / 1e9).toFixed(1) + 'B';
-            if (abs >= 1e6) return (abs / 1e6).toFixed(1) + 'M';
-            if (abs >= 1e3) return (abs / 1e3).toFixed(1) + 'K';
-            return abs.toLocaleString('en-US', {maximumFractionDigits: 0});
-        }
-        function _plainDollars(v) {
-            if (v == null || v === 0) return '\u2014';
-            const abs = Math.abs(v);
-            if (abs >= 1e12) return '$' + (abs / 1e12).toFixed(1) + 'T';
-            if (abs >= 1e9) return '$' + (abs / 1e9).toFixed(1) + 'B';
-            if (abs >= 1e6) return '$' + (abs / 1e6).toFixed(0) + 'M';
-            if (abs >= 1e3) return '$' + (abs / 1e3).toFixed(0) + 'K';
-            return '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
-        }
 
         // Holders
         const tdH = document.createElement('td');
         tdH.style.textAlign = 'right';
-        tdH.textContent = row.holders != null ? row.holders.toLocaleString() : '\u2014';
+        tdH.textContent = row.level === 2 ? '' : (row.holders != null ? row.holders.toLocaleString() : '\u2014');
         tr.appendChild(tdH);
 
-        // Shares (Q4 position)
+        // Shares
         const tdS = document.createElement('td');
         tdS.style.textAlign = 'right';
         tdS.textContent = _plainShares(row.shares);
         tr.appendChild(tdS);
 
-        // Value (Q4 position)
+        // Value
         const tdV = document.createElement('td');
         tdV.style.textAlign = 'right';
         tdV.textContent = _plainDollars(row.value);
         tr.appendChild(tdV);
 
         // Δ Shares
-        const tdDS = _deltaCell(row.delta_shares);
+        const tdDS = document.createElement('td');
+        tdDS.style.textAlign = 'right';
         if (row.delta_shares && row.delta_shares !== 0) {
             const sign = row.delta_shares > 0 ? '+' : '\u2212';
             tdDS.textContent = sign + _plainShares(row.delta_shares);
-        }
+            tdDS.style.color = row.delta_shares > 0 ? '#27AE60' : '#C0392B';
+        } else { tdDS.textContent = '\u2014'; tdDS.style.color = '#999'; }
         tr.appendChild(tdDS);
 
         // Δ Value
-        const tdDV = _deltaCell(row.delta_value);
+        const tdDV = document.createElement('td');
+        tdDV.style.textAlign = 'right';
         if (row.delta_value && row.delta_value !== 0) {
             const sign = row.delta_value > 0 ? '+' : '\u2212';
             tdDV.textContent = sign + _plainDollars(row.delta_value);
-        }
+            tdDV.style.color = row.delta_value > 0 ? '#27AE60' : '#C0392B';
+        } else { tdDV.textContent = '\u2014'; tdDV.style.color = '#999'; }
         tr.appendChild(tdDV);
 
         // Avg Position
@@ -1842,10 +1854,48 @@ function renderCohort(data, container) {
         // % Inst Float
         const tdPct = document.createElement('td');
         tdPct.style.textAlign = 'right';
-        tdPct.textContent = row.pct_float_moved != null ? row.pct_float_moved.toFixed(1) + '%' : '\u2014';
+        tdPct.textContent = row.pct_float_moved != null ? (row.pct_float_moved < 0.1 && row.pct_float_moved > 0 ? '<0.1%' : row.pct_float_moved.toFixed(1) + '%') : '\u2014';
         tr.appendChild(tdPct);
 
+        return tr;
+    }
+
+    const tbody = document.createElement('tbody');
+    let cohortIdx = 0;
+    detail.forEach(row => {
+        const indent = row.level === 1 ? 28 : row.level === 2 ? 52 : 0;
+        const tr = _buildRow(row, indent);
+
+        // Entity-level children: hidden by default, toggled on click
+        const children = row.children || [];
+        const hasKids = row.has_children && children.length > 0;
+        if (hasKids) {
+            const cid = 'cohort-g' + (cohortIdx++);
+            tr.dataset.cohortGroup = cid;
+        }
         tbody.appendChild(tr);
+
+        if (hasKids) {
+            const gid = tr.dataset.cohortGroup;
+            const childRows = [];
+            children.forEach(child => {
+                const childIndent = row.level === 1 ? 52 : 28;
+                const ctr = _buildRow(child, childIndent);
+                ctr.dataset.cohortChildOf = gid;
+                ctr.style.display = 'none';
+                ctr.style.fontSize = '11px';
+                ctr.style.color = '#555';
+                childRows.push(ctr);
+                tbody.appendChild(ctr);
+            });
+            // Click handler on category row
+            tr.addEventListener('click', () => {
+                const expanded = childRows[0] && childRows[0].style.display !== 'none';
+                const arrow = tr.querySelector('.toggle-arrow');
+                childRows.forEach(cr => { cr.style.display = expanded ? 'none' : ''; });
+                if (arrow) arrow.textContent = expanded ? '\u25B6' : '\u25BC';
+            });
+        }
     });
     table.appendChild(tbody);
     container.appendChild(table);

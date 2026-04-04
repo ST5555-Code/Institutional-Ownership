@@ -2042,14 +2042,48 @@ def _build_cohort(q1_map, q4_map):
                 'pct_float_moved': pct_float,
                 'delta_shares': delta_s, 'delta_value': delta_v}
 
+    def _top5(investors, src, delta_src=None, sort_key='value', reverse=True):
+        """Return top 5 entity rows sorted by sort_key."""
+        def _entity_delta(inv):
+            s_now = src.get(inv, {}).get('shares') or 0
+            v_now = src.get(inv, {}).get('value') or 0
+            if delta_src is not None:
+                s_prev = delta_src.get(inv, {}).get('shares') or 0
+                v_prev = delta_src.get(inv, {}).get('value') or 0
+                ds, dv = s_now - s_prev, v_now - v_prev
+            else:
+                ds, dv = s_now, v_now  # new = entire position; exits handled by caller
+            return {'category': inv, 'holders': 1, 'shares': s_now, 'value': v_now,
+                    'avg_position': v_now, 'delta_shares': ds, 'delta_value': dv,
+                    'pct_float_moved': round(s_now / total_inst_shares * 100, 4) if total_inst_shares > 0 else 0,
+                    'level': 2}
+        rows = [_entity_delta(i) for i in investors]
+        # For exits, flip delta sign
+        if delta_src is None and not reverse:
+            for r in rows:
+                r['delta_shares'] = -r['shares']
+                r['delta_value'] = -r['value']
+        sk = sort_key if sort_key != 'delta' else 'delta_value'
+        rows.sort(key=lambda r: abs(r.get(sk) or 0), reverse=True)
+        return rows[:5]
+
     inc_stats = _stats(increased, q4_map, q1_map)
     dec_stats = _stats(decreased, q4_map, q1_map)
     unc_stats = _stats(unchanged, q4_map, q1_map)
-    # Exits: delta is negative (lost their entire Q1 position)
     exit_stats = _stats(list(exits_set), q1_map)
     exit_stats['delta_shares'] = -exit_stats['shares']
     exit_stats['delta_value'] = -exit_stats['value']
     new_stats = _stats(list(new_entries_set), q4_map)
+
+    # Top 5 per category
+    inc_top5 = _top5(increased, q4_map, q1_map, sort_key='delta')
+    dec_top5 = _top5(decreased, q4_map, q1_map, sort_key='delta')
+    unc_top5 = _top5(unchanged, q4_map, None, sort_key='value')
+    new_top5 = _top5(list(new_entries_set), q4_map, None, sort_key='value')
+    exit_top5 = _top5(list(exits_set), q1_map, None, sort_key='value', reverse=False)
+    for r in exit_top5:
+        r['delta_shares'] = -r['shares']
+        r['delta_value'] = -r['value']
 
     # Retained parent totals
     ret_holders = inc_stats['holders'] + dec_stats['holders'] + unc_stats['holders']
@@ -2063,12 +2097,12 @@ def _build_cohort(q1_map, q4_map):
         {'category': 'Retained', 'holders': ret_holders, 'shares': ret_shares,
          'value': ret_value, 'avg_position': round(ret_value / ret_holders, 2) if ret_holders > 0 else 0,
          'pct_float_moved': ret_pct, 'delta_shares': ret_delta_s, 'delta_value': ret_delta_v,
-         'level': 0, 'is_parent': True},
-        {'category': 'Increased', 'level': 1, **inc_stats},
-        {'category': 'Decreased', 'level': 1, **dec_stats},
-        {'category': 'Unchanged', 'level': 1, **unc_stats},
-        {'category': 'New Entries', 'level': 0, **new_stats},
-        {'category': 'Exits', 'level': 0, **exit_stats},
+         'level': 0, 'is_parent': True, 'has_children': False},
+        {'category': 'Increased', 'level': 1, 'has_children': True, 'children': inc_top5, **inc_stats},
+        {'category': 'Decreased', 'level': 1, 'has_children': True, 'children': dec_top5, **dec_stats},
+        {'category': 'Unchanged', 'level': 1, 'has_children': True, 'children': unc_top5, **unc_stats},
+        {'category': 'New Entries', 'level': 0, 'has_children': True, 'children': new_top5, **new_stats},
+        {'category': 'Exits', 'level': 0, 'has_children': True, 'children': exit_top5, **exit_stats},
     ]
 
     total_q1 = len(q1_set)
