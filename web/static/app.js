@@ -809,7 +809,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
 
-        // Row number: parent=bold rank, children=indented 1-5
+        // Row number: parent=bold rank in # column, children=blank # column (rank shown in Institution col)
         const tdRowNum = document.createElement('td');
         tdRowNum.className = 'col-rownum';
         if (!row.level || row.level === 0) {
@@ -819,10 +819,6 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
             if (TIER_BREAKS.includes(parentRowNum)) {
                 tr.style.borderBottom = '1px solid #ccc';
             }
-        } else if (row.level === 1 && row.rank) {
-            // Child row: show rank 1-5, indented, normal weight
-            tdRowNum.textContent = row.rank;
-            tdRowNum.style.paddingLeft = '8px';
         }
         tr.appendChild(tdRowNum);
 
@@ -858,7 +854,9 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
                         displayVal = null; // already set via DOM
                     } else if (row.level === 1) {
                         td.classList.add('col-indent');
-                        displayVal = val || '';
+                        td.style.paddingLeft = '24px';
+                        const childRank = row.rank ? row.rank + '. ' : '';
+                        displayVal = childRank + (val || '');
                     } else {
                         displayVal = val != null ? String(val) : '';
                     }

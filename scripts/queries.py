@@ -719,10 +719,13 @@ def query1(ticker):
             LIMIT 25
         """, [ticker, cusip]).fetchdf()
 
-        # R14: Fetch AUM for each parent — ADV data first, 13F total value as fallback
+        parent_names = parents['parent_name'].tolist()
+        if not parent_names:
+            return []
+
+        # R14: Fetch AUM — ADV data first, 13F total value as fallback
         aum_map = {}
         try:
-            # ADV-reported AUM (most accurate when available)
             aum_df = con.execute("""
                 SELECT parent_name, SUM(aum_total) / 1e9 as aum_bn
                 FROM managers WHERE aum_total IS NOT NULL AND aum_total > 1e9
@@ -730,7 +733,6 @@ def query1(ticker):
             """).fetchdf()
             aum_map = {r['parent_name']: round(r['aum_bn'], 1) for _, r in aum_df.iterrows() if r['aum_bn']}
 
-            # Fallback: use total 13F market_value_usd for parents missing ADV AUM
             ph_aum = ','.join(['?'] * len(parent_names))
             fallback_df = con.execute(f"""
                 SELECT inst_parent_name, SUM(market_value_usd) / 1e9 as val_bn
@@ -743,10 +745,6 @@ def query1(ticker):
                     aum_map[pn] = round(r['val_bn'], 1)
         except Exception:
             pass
-
-        parent_names = parents['parent_name'].tolist()
-        if not parent_names:
-            return []
 
         # Query 2: ALL 13F children for all parents in one pass
         ph = ','.join(['?'] * len(parent_names))
@@ -784,41 +782,18 @@ def query1(ticker):
                     'subadviser_note': note,
                 })
 
-        # N-PORT fund series lookup (same as query3)
+        # N-PORT fund series lookup — uses get_nport_children (deduped + exclusions + %float)
         nport_by_parent = {}
-        if has_table('fund_holdings') and has_table('fund_universe'):
-            try:
-                for pname in parent_names:
-                    mp = match_nport_family(pname)
-                    if not mp:
-                        continue
-                    for pat in mp:
-                        like_pat = '%' + pat + '%'
-                        kids = con.execute(f"""
-                            SELECT fh.fund_name, SUM(fh.shares_or_principal) as shares,
-                                   SUM(fh.market_value_usd) as value
-                            FROM fund_holdings fh
-                            JOIN fund_universe fu ON fh.series_id = fu.series_id
-                            WHERE fu.family_name ILIKE ? AND fh.ticker = ? AND fh.quarter = '{LQ}'
-                            GROUP BY fh.fund_name ORDER BY value DESC NULLS LAST LIMIT 5
-                        """, [like_pat, ticker]).fetchall()
-                        if kids:
-                            if pname not in nport_by_parent:
-                                nport_by_parent[pname] = []
-                            seen = {c['institution'] for c in nport_by_parent[pname]}
-                            for k in kids:
-                                if k[0] not in seen:
-                                    # Determine child type from fund name
-                                    child_type = _classify_fund_type(k[0])
-                                    nport_by_parent[pname].append({
-                                        'institution': k[0], 'value_live': k[2],
-                                        'shares': k[1], 'pct_float': None,
-                                        'type': child_type, 'source': 'N-PORT',
-                                        'subadviser_note': None,
-                                    })
-                                    seen.add(k[0])
-            except Exception:
-                pass
+        if has_table('fund_holdings'):
+            for pname in parent_names:
+                try:
+                    kids = get_nport_children(pname, ticker, LQ, con, limit=5)
+                    if kids:
+                        for k in kids:
+                            k['type'] = _classify_fund_type(k.get('institution'))
+                        nport_by_parent[pname] = kids
+                except Exception:
+                    pass
 
         # Build results — prefer N-PORT children, supplement with 13F entities
         results = []
