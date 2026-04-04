@@ -2049,7 +2049,6 @@ function _renderMomentum(data) {
         const isChild = row.level === 1;
         if (isParent || (!isChild && row.level === 0)) tr.style.fontWeight = isParent ? '700' : '500';
         if (isChild) {
-            tr.style.display = 'none';
             tr.style.fontSize = '11px';
             tr.style.color = '#555';
         }
@@ -2126,17 +2125,57 @@ function _renderMomentum(data) {
 
         tbody.appendChild(tr);
     });
+    // Totals row (parent-level only, no double-counting)
+    const parentRows = data.filter(r => r.level === 0);
+    const totalsRow = document.createElement('tr');
+    totalsRow.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
+    // #
+    totalsRow.appendChild(document.createElement('td'));
+    // Institution
+    const tdTotLabel = document.createElement('td');
+    tdTotLabel.textContent = `TOTAL (${parentRows.length} holders)`;
+    totalsRow.appendChild(tdTotLabel);
+    // Type
+    totalsRow.appendChild(document.createElement('td'));
+    // Quarter columns
+    qs.forEach(q => {
+        const td = document.createElement('td');
+        td.style.textAlign = 'right';
+        const sum = parentRows.reduce((acc, r) => acc + (r[q] || 0), 0);
+        td.innerHTML = fmtShares(sum);
+        totalsRow.appendChild(td);
+    });
+    // Change
+    const totalChg = parentRows.reduce((acc, r) => acc + (r.change || 0), 0);
+    const tdTotChg = document.createElement('td');
+    tdTotChg.style.textAlign = 'right';
+    if (totalChg > 0) tdTotChg.innerHTML = '+' + fmtShares(totalChg);
+    else tdTotChg.innerHTML = fmtShares(totalChg);
+    totalsRow.appendChild(tdTotChg);
+    // Chg%
+    const firstQSum = parentRows.reduce((acc, r) => acc + (r[qs[0]] || 0), 0);
+    const tdTotPct = document.createElement('td');
+    tdTotPct.style.textAlign = 'right';
+    if (firstQSum > 0) {
+        const pct = totalChg / firstQSum * 100;
+        if (pct > 0) tdTotPct.textContent = '+' + pct.toFixed(1) + '%';
+        else if (pct < 0) tdTotPct.innerHTML = '<span class="negative">(' + Math.abs(pct).toFixed(1) + '%)</span>';
+        else tdTotPct.textContent = '0.0%';
+    }
+    totalsRow.appendChild(tdTotPct);
+    tbody.appendChild(totalsRow);
+
     table.appendChild(tbody);
     tableWrap.appendChild(table);
 
-    // Click handlers for collapsible parents
+    // Click handlers for collapsible parents (toggle .visible class, not display)
     tbody.querySelectorAll('.collapsible-parent').forEach(parentTr => {
         parentTr.addEventListener('click', () => {
             const pid = parentTr.dataset.parentId;
             const arrow = parentTr.querySelector('.toggle-arrow');
             const children = tbody.querySelectorAll(`tr[data-child-of="${pid}"]`);
-            const isExpanded = children[0] && children[0].style.display !== 'none';
-            children.forEach(c => { c.style.display = isExpanded ? 'none' : ''; });
+            const isExpanded = children[0] && children[0].classList.contains('visible');
+            children.forEach(c => { c.classList.toggle('visible', !isExpanded); });
             if (arrow) arrow.textContent = isExpanded ? '\u25B6' : '\u25BC';
         });
     });
