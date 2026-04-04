@@ -222,11 +222,12 @@ body {
 .tab-bar .tab { flex-shrink: 0; }
 
 .tab {
-    padding: 8px 14px;
+    padding: 8px 12px;
     border: none;
     background: transparent;
     color: var(--text-secondary);
     font-family: Arial, sans-serif;
+    font-size: 12px;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;

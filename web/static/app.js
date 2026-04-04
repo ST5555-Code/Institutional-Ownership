@@ -662,6 +662,42 @@ function _renderCurrentPage() {
     // R9: Apply source column visibility after render
     if (qnum === 1) _applySourceColumnVisibility();
 
+    // R7: Add totals row at bottom of Register tab
+    if (qnum === 1 && pageData.length > 0) {
+        const table = tableWrap.querySelector('.data-table');
+        if (table) {
+            const tbody = table.querySelector('tbody');
+            const parentRows = pageData.filter(r => !r.level || r.level === 0);
+            const totals = document.createElement('tr');
+            totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
+            // # col
+            const tdNum = document.createElement('td');
+            tdNum.className = 'col-rownum';
+            totals.appendChild(tdNum);
+            // Build totals per column
+            const cols = QUERY_COLUMNS[1];
+            cols.forEach(c => {
+                const td = document.createElement('td');
+                td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
+                if (c.key === 'institution') {
+                    td.textContent = 'TOTAL (' + parentRows.length + ' holders)';
+                } else if (c.type === 'dollar' || c.type === 'shares') {
+                    let sum = 0;
+                    parentRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
+                    td.textContent = sum ? _formatCellValue(sum, c.type) : '—';
+                } else if (c.key === 'pct_float') {
+                    let sum = 0;
+                    parentRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
+                    td.textContent = sum ? fmtPct(sum) : '—';
+                } else {
+                    td.textContent = '';
+                }
+                totals.appendChild(td);
+            });
+            tbody.appendChild(totals);
+        }
+    }
+
     // Pagination controls
     if (totalPages > 1) {
         const nav = document.createElement('div');
