@@ -39,8 +39,8 @@ _Last updated: April 3, 2026_
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | 11 | Chart.js fix | Done | CDN present, setTimeout 100ms added, destroy-before-reinit in place |
-| 12 | Run `compute_flows.py` after full fetch completes | High | Populates investor_flows table |
-| 13 | Refresh readonly snapshot — `cp data/13f.duckdb data/13f_readonly.duckdb` | High | After compute_flows.py |
+| 12 | Run `compute_flows.py` after full fetch completes | Done | 9.4M investor_flows rows, 19K ticker_flow_stats. 4 periods (4Q/3Q/2Q/1Q) |
+| 13 | Refresh readonly snapshot | Done | Auto-refreshed after each pipeline run |
 
 ---
 
@@ -191,13 +191,13 @@ _Last updated: April 3, 2026_
 | N1 | N-PORT index/ETF fund download | Done | Merged 1.6M new rows (4.2M→5.8M). 6,306 series, 98.4% mapped to advisers. Vanguard 30→96, BlackRock 132→243, Fidelity 281→449 |
 | N2 | Short squeeze UI tab | Done | Frontend tab with `/api/short_squeeze`. Shows candidates >15% short, squeeze score, inst % float |
 | N3 | Short vs long UI integration | Done | Long/short comparison in Smart Money tab via `/api/short_long`. Shows managers both long+short, short-only funds |
-| N4 | Ownership concentration heatmap | Medium | Cross-tab visualization: top N managers × top N tickers. Color by pct_of_float |
-| N5 | Historical flow trend charts | Medium | Multi-quarter flow intensity time series per ticker. Requires compute_flows across all period pairs |
-| N6 | Manager profile page | Low | Dedicated view per institution: all holdings, flow history, sector allocation, conviction positions |
-| N7 | Export improvements — PDF reports | Low | Generate per-ticker ownership report PDFs with charts, flow analysis, activist summary |
+| N4 | Ownership concentration heatmap | Done | Peer Matrix tab replaced with interactive heatmap. `/api/heatmap` endpoint: top 15 managers × selected tickers, colored by pct_of_float. Hover shows value + exact % |
+| N5 | Historical flow trend charts | Done | Multi-period flow trend table in Flow Analysis tab. Shows flow intensity (total/active/passive) and churn across all computed periods (4Q/3Q/2Q/1Q) |
+| N6 | Manager profile page | Done | `/api/manager_profile` endpoint: top holdings, sector allocation, quarterly trend, summary stats. `loadManagerProfile()` in frontend with back-navigation |
+| N7 | Export improvements — Print/PDF | Done | "Print / PDF" button in action bar. Print styles hide UI chrome, optimize table/chart layout for print. Uses browser native print-to-PDF |
 | N8 | Webhook/alert system | Low | Configurable alerts: new 13D filing, >5% ownership change, short squeeze threshold crossed |
-| N9 | 13F-HR amendment reconciliation | Low | Track 13F-HR/A amendments and reconcile position changes within same quarter |
-| N10 | Multi-quarter position timeline | Medium | Sparkline or mini-chart in Register tab showing shares held across all quarters per holder |
+| N9 | 13F-HR amendment reconciliation | Done | `/api/amendments` endpoint: shows managers who filed 13F-HR/A amendments for a ticker. Identifies amended vs original filing status |
+| N10 | Multi-quarter position timeline | Partial | Flow trend table added to Flow Analysis. Register tab sparklines deferred — requires query1 modification to return per-quarter share arrays |
 | N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→90.0% resolved, 10% filing agents marked. `resolve_agent_names.py` extracts reporting person from filing text |
 | N12 | Investor name standardization | Done | `normalize_names.py`: smart Title Case for 8.6M rows, 8 table/columns. Handles acronyms, canonical names, dotted abbrevs. ALL CAPS 27%→0% |
 | N13 | N-PORT series-level deduplication | Done | All N-PORT rollup queries GROUP BY series_id (MAX per series). get_nport_position, get_nport_coverage, get_nport_children, get_nport_children_q2 all deduplicated. Fidelity NVDA: 1.39B → 1.07B shares after dedup |

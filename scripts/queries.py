@@ -1944,6 +1944,20 @@ def flow_analysis(ticker, period='4Q', peers=None):
                     'churn_nonpassive': stat[3], 'churn_active': stat[4],
                 })
 
+        # Multi-period flow trend (all periods for this ticker)
+        flow_trend = []
+        try:
+            trend_df = con.execute("""
+                SELECT quarter_from, quarter_to,
+                       flow_intensity_total, flow_intensity_active, flow_intensity_passive,
+                       churn_nonpassive, churn_active
+                FROM ticker_flow_stats WHERE ticker = ?
+                ORDER BY quarter_from
+            """, [ticker]).fetchdf()
+            flow_trend = df_to_records(trend_df)
+        except Exception:
+            pass
+
         return clean_for_json({
             'period': period,
             'quarter_from': quarter_from,
@@ -1957,6 +1971,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
                 'flow_intensity': chart_data,
                 'churn': chart_data,
             },
+            'flow_trend': flow_trend,
         })
     finally:
         pass  # connection managed by thread-local cache

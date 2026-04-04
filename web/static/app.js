@@ -273,7 +273,7 @@ function switchTab(tabId) {
     } else if (tabId === 'short-squeeze') {
         loadShortSqueeze();
     } else if (tabId === 'peer-matrix') {
-        renderPlaceholder(tabId);
+        loadHeatmap();
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
     }
@@ -854,14 +854,145 @@ function renderTableFromKeys(data, keys) {
 }
 
 // ---------------------------------------------------------------------------
+// Ownership Concentration Heatmap (Peer Matrix tab)
 // ---------------------------------------------------------------------------
-// Placeholder tabs
+async function loadHeatmap() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        // Get peers from cross-ownership input if available
+        const peersInput = document.getElementById('cross-tickers');
+        const peers = peersInput ? peersInput.value : '';
+        const res = await fetch(`/api/heatmap?ticker=${currentTicker}&peers=${peers}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+        const wrap = tableWrap;
+
+        if (!data.cells || !data.cells.length) {
+            wrap.innerHTML = '<div class="no-data">No heatmap data available.</div>';
+            return;
+        }
+
+        const info = document.createElement('div');
+        info.style.cssText = 'padding:12px;background:#f0f4f8;border-radius:6px;margin-bottom:16px;font-size:13px;';
+        info.innerHTML = '<b>Ownership Concentration:</b> Top 15 institutional holders by % of float across selected tickers. Darker = higher concentration.';
+        wrap.appendChild(info);
+
+        // Build heatmap table
+        const tickers = data.tickers;
+        const managers = data.managers;
+        const cellMap = {};
+        data.cells.forEach(c => { cellMap[`${c.manager}|${c.ticker}`] = c; });
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.style.fontSize = '12px';
+
+        // Header row
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = '<th style="min-width:200px">Manager</th>';
+        tickers.forEach(t => {
+            headerRow.innerHTML += `<th style="text-align:center;min-width:70px">${t}</th>`;
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Data rows
+        const tbody = document.createElement('tbody');
+        managers.forEach(mgr => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td style="white-space:nowrap;font-weight:500">${mgr}</td>`;
+            tickers.forEach(t => {
+                const cell = cellMap[`${mgr}|${t}`];
+                const pct = cell ? cell.pct_float : null;
+                const val = cell ? cell.value : null;
+                let bg = '#f8f9fa';
+                let color = '#999';
+                if (pct != null && pct > 0) {
+                    const intensity = Math.min(pct / 15, 1); // 15% = max intensity
+                    const r = Math.round(255 - intensity * 200);
+                    const g = Math.round(255 - intensity * 100);
+                    const b = Math.round(255 - intensity * 50);
+                    bg = `rgb(${r},${g},${b})`;
+                    color = intensity > 0.5 ? '#fff' : '#333';
+                }
+                const title = val ? `${fmtDollars(val)} | ${(pct||0).toFixed(2)}% of float` : '';
+                row.innerHTML += `<td style="text-align:center;background:${bg};color:${color};cursor:default" title="${title}">${pct != null ? pct.toFixed(1) + '%' : '—'}</td>`;
+            });
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
 // ---------------------------------------------------------------------------
-function renderPlaceholder(tabId) {
-    hideSpinner();
-    clearError();
-    const names = {'peer-matrix': 'Peer Matrix'};
-    tableWrap.innerHTML = `<div class="empty-state" style="padding:48px"><p>${names[tabId] || tabId} — Coming soon.</p></div>`;
+// Manager Profile (click-through from any manager name)
+// ---------------------------------------------------------------------------
+async function loadManagerProfile(managerName) {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch(`/api/manager_profile?manager=${encodeURIComponent(managerName)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        hideSpinner();
+        const wrap = tableWrap;
+
+        // Summary card
+        const summary = document.createElement('div');
+        summary.style.cssText = 'padding:16px;background:#f0f4f8;border-radius:6px;margin-bottom:16px;display:flex;gap:32px;flex-wrap:wrap;';
+        summary.innerHTML = `
+            <div><b>${data.manager}</b></div>
+            <div>Type: <b>${data.manager_type || 'Unknown'}</b></div>
+            <div>Positions: <b>${(data.num_positions || 0).toLocaleString()}</b></div>
+            <div>Total Value: <b>${fmtDollars(data.total_value)}</b></div>
+            <div>Sub-entities: <b>${data.num_ciks || 0}</b></div>
+        `;
+        wrap.appendChild(summary);
+
+        // Quarterly trend
+        if (data.quarterly_trend && data.quarterly_trend.length) {
+            wrap.appendChild(sectionHeader('Quarterly Trend'));
+            wrap.appendChild(buildSimpleTable(data.quarterly_trend, [
+                {key: 'quarter', label: 'Quarter', type: 'text'},
+                {key: 'positions', label: 'Positions', type: 'num'},
+                {key: 'total_value', label: 'Total Value', type: 'dollar'},
+            ]));
+        }
+
+        // Sector allocation
+        if (data.sector_allocation && data.sector_allocation.length) {
+            wrap.appendChild(sectionHeader('Sector Allocation'));
+            wrap.appendChild(buildSimpleTable(data.sector_allocation, [
+                {key: 'sector', label: 'Sector', type: 'text'},
+                {key: 'tickers', label: 'Tickers', type: 'num'},
+                {key: 'value', label: 'Value', type: 'dollar'},
+            ]));
+        }
+
+        // Top holdings
+        if (data.top_holdings && data.top_holdings.length) {
+            wrap.appendChild(sectionHeader('Top 50 Holdings'));
+            wrap.appendChild(buildSimpleTable(data.top_holdings, [
+                {key: 'ticker', label: 'Ticker', type: 'text'},
+                {key: 'issuer_name', label: 'Issuer', type: 'text'},
+                {key: 'shares', label: 'Shares', type: 'shares'},
+                {key: 'market_value_usd', label: 'Filed Value', type: 'dollar'},
+                {key: 'market_value_live', label: 'Live Value', type: 'dollar'},
+                {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
+                {key: 'pct_of_float', label: '% Float', type: 'pct'},
+            ]));
+        }
+
+        // Back button
+        const back = document.createElement('button');
+        back.className = 'btn btn-secondary';
+        back.style.marginTop = '16px';
+        back.textContent = '← Back to ' + document.querySelector('.tab.active').textContent;
+        back.onclick = () => switchTab(document.querySelector('.tab.active').dataset.tab);
+        wrap.appendChild(back);
+    } catch (e) { hideSpinner(); showError(e.message); }
 }
 
 async function loadCrowding() {
@@ -1500,6 +1631,21 @@ function renderFlowAnalysis(data) {
         card.appendChild(t);
         row.appendChild(card);
         tableWrap.appendChild(row);
+    }
+
+    // Multi-period flow trend table
+    const flowTrend = data.flow_trend || [];
+    if (flowTrend.length > 0) {
+        tableWrap.appendChild(sectionHeader('Flow Trend Across All Periods'));
+        tableWrap.appendChild(buildSimpleTable(flowTrend, [
+            {key: 'quarter_from', label: 'From', type: 'text'},
+            {key: 'quarter_to', label: 'To', type: 'text'},
+            {key: 'flow_intensity_total', label: 'Flow Intensity (Total)', type: 'pct'},
+            {key: 'flow_intensity_active', label: 'Active Only', type: 'pct'},
+            {key: 'flow_intensity_passive', label: 'Passive Only', type: 'pct'},
+            {key: 'churn_nonpassive', label: 'Churn (Non-Passive)', type: 'pct'},
+            {key: 'churn_active', label: 'Churn (Active)', type: 'pct'},
+        ]));
     }
 
     // Buyers

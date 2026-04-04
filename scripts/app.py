@@ -1145,6 +1145,173 @@ def api_short_squeeze():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/heatmap')
+def api_heatmap():
+    """Ownership concentration heatmap: top managers × tickers by pct_of_float."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    peers = request.args.get('peers', '').upper().strip()
+    con = get_db()
+    try:
+        # Build ticker list: current ticker + peers (comma-separated)
+        tickers = [ticker] if ticker else []
+        if peers:
+            tickers += [t.strip() for t in peers.split(',') if t.strip()]
+        if not tickers:
+            # Default: top 10 tickers by institutional value
+            top = con.execute(f"""
+                SELECT ticker, SUM(market_value_usd) as val
+                FROM holdings WHERE quarter = '{LQ}' AND ticker IS NOT NULL
+                GROUP BY ticker ORDER BY val DESC LIMIT 10
+            """).fetchall()
+            tickers = [r[0] for r in top]
+
+        # Top 15 managers by total value across these tickers
+        ticker_ph = ','.join(['?'] * len(tickers))
+        managers = con.execute(f"""
+            SELECT inst_parent_name, SUM(market_value_usd) as total_val
+            FROM holdings
+            WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
+              AND inst_parent_name IS NOT NULL
+            GROUP BY inst_parent_name
+            ORDER BY total_val DESC LIMIT 15
+        """, tickers).fetchall()
+        manager_names = [r[0] for r in managers]
+
+        if not manager_names:
+            return jsonify({'tickers': tickers, 'managers': [], 'cells': []})
+
+        # Build the matrix: pct_of_float for each manager × ticker
+        mgr_ph = ','.join(['?'] * len(manager_names))
+        cells = con.execute(f"""
+            SELECT inst_parent_name as manager, ticker,
+                   SUM(pct_of_float) as pct_float,
+                   SUM(shares) as shares,
+                   SUM(market_value_usd) as value
+            FROM holdings
+            WHERE quarter = '{LQ}'
+              AND ticker IN ({ticker_ph})
+              AND inst_parent_name IN ({mgr_ph})
+            GROUP BY inst_parent_name, ticker
+        """, tickers + manager_names).fetchdf()
+
+        return jsonify(clean_for_json({
+            'tickers': tickers,
+            'managers': manager_names,
+            'cells': df_to_records(cells),
+        }))
+    except Exception as e:
+        app.logger.error(f"heatmap error: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
+@app.route('/api/manager_profile')
+def api_manager_profile():
+    """Manager profile: all holdings, sector allocation, top positions."""
+    manager = request.args.get('manager', '').strip()
+    if not manager:
+        return jsonify({'error': 'Missing manager parameter'}), 400
+    con = get_db()
+    try:
+        # Top holdings
+        holdings = con.execute(f"""
+            SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
+                   pct_of_portfolio, pct_of_float
+            FROM holdings
+            WHERE quarter = '{LQ}' AND inst_parent_name ILIKE ?
+            ORDER BY market_value_usd DESC LIMIT 50
+        """, [f'%{manager}%']).fetchdf()
+
+        # Sector allocation
+        sectors = con.execute(f"""
+            SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
+                   SUM(h.market_value_usd) as value
+            FROM holdings h
+            LEFT JOIN market_data m ON h.ticker = m.ticker
+            WHERE h.quarter = '{LQ}' AND h.inst_parent_name ILIKE ?
+              AND m.sector IS NOT NULL
+            GROUP BY m.sector ORDER BY value DESC
+        """, [f'%{manager}%']).fetchdf()
+
+        # Summary stats
+        stats = con.execute(f"""
+            SELECT COUNT(DISTINCT ticker) as num_positions,
+                   SUM(market_value_usd) as total_value,
+                   COUNT(DISTINCT cik) as num_ciks,
+                   MAX(manager_type) as manager_type
+            FROM holdings
+            WHERE quarter = '{LQ}' AND inst_parent_name ILIKE ?
+        """, [f'%{manager}%']).fetchone()
+
+        # Quarter-over-quarter change
+        qoq = con.execute(f"""
+            SELECT quarter, COUNT(DISTINCT ticker) as positions,
+                   SUM(market_value_usd) as total_value
+            FROM holdings WHERE inst_parent_name ILIKE ?
+            GROUP BY quarter ORDER BY quarter
+        """, [f'%{manager}%']).fetchdf()
+
+        result = {
+            'manager': manager,
+            'num_positions': stats[0] if stats else 0,
+            'total_value': stats[1] if stats else 0,
+            'num_ciks': stats[2] if stats else 0,
+            'manager_type': stats[3] if stats else None,
+            'top_holdings': df_to_records(holdings),
+            'sector_allocation': df_to_records(sectors),
+            'quarterly_trend': df_to_records(qoq),
+        }
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        app.logger.error(f"manager_profile error: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
+@app.route('/api/amendments')
+def api_amendments():
+    """13F-HR amendment reconciliation: show amended vs original filings per quarter."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    con = get_db()
+    try:
+        # Find managers who filed amendments for this ticker
+        amendments = con.execute(f"""
+            WITH all_filings AS (
+                SELECT cik, manager_name, inst_parent_name, quarter,
+                       accession_number, shares, market_value_usd,
+                       CASE WHEN accession_number IN (
+                           SELECT accession_number FROM filings WHERE amended = true
+                       ) THEN true ELSE false END as is_amended
+                FROM holdings
+                WHERE ticker = ? AND quarter = '{LQ}'
+            ),
+            amended_managers AS (
+                SELECT DISTINCT cik FROM filings
+                WHERE amended = true AND quarter = '{LQ}'
+            )
+            SELECT a.inst_parent_name as manager, a.shares, a.market_value_usd,
+                   CASE WHEN a.cik IN (SELECT cik FROM amended_managers)
+                        THEN 'Amended' ELSE 'Original' END as filing_status
+            FROM all_filings a
+            WHERE a.cik IN (SELECT cik FROM amended_managers)
+            ORDER BY a.market_value_usd DESC LIMIT 30
+        """, [ticker]).fetchdf()
+
+        return jsonify(clean_for_json({
+            'ticker': ticker,
+            'amendments': df_to_records(amendments),
+        }))
+    except Exception as e:
+        app.logger.error(f"amendments error: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
 @app.route('/api/summary')
 def api_summary():
     ticker = request.args.get('ticker', '').upper().strip()

@@ -1012,3 +1012,14 @@ body {
     pointer-events: none;
     transition: opacity 0.15s;
 }
+
+/* Print styles for PDF export */
+@media print {
+    .tab-bar, .action-bar, .search-container, #print-btn,
+    .period-selector, .btn { display: none !important; }
+    .summary-card { break-inside: avoid; }
+    .data-table { font-size: 10px; }
+    body { font-size: 11px; }
+    #tab-container { padding: 0; }
+    .chart-card { break-inside: avoid; max-height: 300px; }
+}
