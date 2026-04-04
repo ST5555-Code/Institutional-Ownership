@@ -1498,40 +1498,132 @@ async function loadOTSummary() {
 }
 
 function renderOTSummary(data) {
-    const {quarters, summary} = data;
-    // Signal card
-    const card = document.createElement('div');
-    card.className = 'portfolio-stats';
-    if (summary && summary.trend) {
-        [
-            ['Trend', summary.trend],
-            ['Shares Added', fmtShares(summary.total_shares_added)],
-            ['Dollar Flow', fmtDollars(summary.total_dollar_flow)],
-            ['Net New Holders', summary.net_new_holders != null ? (summary.net_new_holders > 0 ? '+' : '') + summary.net_new_holders : '\u2014'],
-        ].forEach(([l, v]) => {
-            const s = document.createElement('span');
-            s.className = 'ps-item';
-            s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
-            card.appendChild(s);
-        });
-    }
-    // Keep sub-view bar that was already added
-    tableWrap.appendChild(card);
+    const {quarters} = data;
 
-    // Table
-    const cols = [
-        {key: 'quarter', label: 'Quarter', type: 'text'},
-        {key: 'total_inst_shares', label: 'Inst Shares', type: 'shares'},
-        {key: 'total_inst_value', label: 'Inst Value', type: 'dollar'},
-        {key: 'pct_float', label: '% Float', type: 'pct'},
-        {key: 'active_pct', label: 'Active %', type: 'pct'},
-        {key: 'passive_pct', label: 'Passive %', type: 'pct'},
-        {key: 'holder_count', label: 'Holders', type: 'num'},
-        {key: 'net_shares_change', label: 'QoQ Change', type: 'shares'},
-        {key: 'signal', label: 'Signal', type: 'text'},
-    ];
+    // Build custom table with stacked bar for Active/Passive
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.tableLayout = 'fixed';
+
+    const colgroup = document.createElement('colgroup');
+    // Quarter, Holders, +/-, Inst Shares, Inst Value, % Float, Active/Passive, QoQ Change, Signal
+    ['8%', '8%', '6%', '13%', '13%', '8%', '22%', '14%', '5%'].forEach(w => {
+        const cg = document.createElement('col');
+        cg.style.width = w;
+        colgroup.appendChild(cg);
+    });
+    table.appendChild(colgroup);
+
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    [
+        ['Quarter', 'left'], ['Holders', 'right'], ['+/\u2212', 'right'],
+        ['Inst Shares', 'right'], ['Inst Value', 'right'], ['% Float', 'right'],
+        ['Active / Passive', 'center'], ['QoQ Share \u0394', 'right'], ['', 'center']
+    ].forEach(([h, align]) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.textAlign = align;
+        hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    quarters.forEach(row => {
+        const tr = document.createElement('tr');
+
+        // Quarter
+        const tdQ = document.createElement('td');
+        tdQ.textContent = row.quarter || '';
+        tr.appendChild(tdQ);
+
+        // Holders
+        const tdH = document.createElement('td');
+        tdH.style.textAlign = 'right';
+        tdH.textContent = row.holder_count != null ? fmtNum(row.holder_count) : '\u2014';
+        tr.appendChild(tdH);
+
+        // +/- holders
+        const tdHC = document.createElement('td');
+        tdHC.style.textAlign = 'right';
+        tdHC.style.fontSize = '11px';
+        if (row.net_holder_change != null) {
+            const v = row.net_holder_change;
+            tdHC.textContent = (v > 0 ? '+' : '') + v;
+            tdHC.style.color = v > 0 ? '#27AE60' : v < 0 ? '#C0392B' : '#999';
+        } else {
+            tdHC.textContent = '\u2014';
+            tdHC.style.color = '#999';
+        }
+        tr.appendChild(tdHC);
+
+        // Inst Shares
+        const tdS = document.createElement('td');
+        tdS.style.textAlign = 'right';
+        tdS.textContent = fmtShares(row.total_inst_shares);
+        tr.appendChild(tdS);
+
+        // Inst Value
+        const tdV = document.createElement('td');
+        tdV.style.textAlign = 'right';
+        tdV.textContent = fmtDollars(row.total_inst_value);
+        tr.appendChild(tdV);
+
+        // % Float
+        const tdF = document.createElement('td');
+        tdF.style.textAlign = 'right';
+        tdF.textContent = row.pct_float != null ? row.pct_float + '%' : '\u2014';
+        tr.appendChild(tdF);
+
+        // Active/Passive stacked bar
+        const tdBar = document.createElement('td');
+        const aPct = row.active_pct || 0;
+        const pPct = row.passive_pct || 0;
+        const oPct = Math.max(0, 100 - aPct - pPct);  // other/unknown
+        const barWrap = document.createElement('div');
+        barWrap.className = 'ap-bar-wrap';
+        barWrap.title = `Active ${aPct}% / Passive ${pPct}% / Other ${oPct.toFixed(1)}%`;
+        const barA = document.createElement('div');
+        barA.className = 'ap-bar ap-active';
+        barA.style.width = aPct + '%';
+        const barP = document.createElement('div');
+        barP.className = 'ap-bar ap-passive';
+        barP.style.width = pPct + '%';
+        barWrap.appendChild(barA);
+        barWrap.appendChild(barP);
+        // Labels inside if wide enough
+        if (aPct > 12) { const lbl = document.createElement('span'); lbl.className = 'ap-label'; lbl.textContent = Math.round(aPct) + '%'; barA.appendChild(lbl); }
+        if (pPct > 12) { const lbl = document.createElement('span'); lbl.className = 'ap-label'; lbl.textContent = Math.round(pPct) + '%'; barP.appendChild(lbl); }
+        tdBar.appendChild(barWrap);
+        tr.appendChild(tdBar);
+
+        // QoQ Share Change
+        const tdC = document.createElement('td');
+        tdC.style.textAlign = 'right';
+        if (row.net_shares_change != null) {
+            tdC.textContent = (row.net_shares_change >= 0 ? '+' : '') + fmtShares(row.net_shares_change);
+            tdC.style.color = row.net_shares_change > 0 ? '#27AE60' : row.net_shares_change < 0 ? '#C0392B' : '';
+        } else {
+            tdC.textContent = '\u2014';
+        }
+        tr.appendChild(tdC);
+
+        // Signal arrow
+        const tdSig = document.createElement('td');
+        tdSig.style.textAlign = 'center';
+        tdSig.style.fontSize = '14px';
+        if (row.signal) {
+            tdSig.textContent = row.signal;
+            tdSig.style.color = row.signal === '\u2191' ? '#27AE60' : row.signal === '\u2193' ? '#C0392B' : '#999';
+        }
+        tr.appendChild(tdSig);
+
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
     currentData = quarters;
-    renderHierarchicalTable(quarters, cols, 0, false, false, false);
 }
 
 let _cohortPeriod = null;  // null = most recent quarter (default)

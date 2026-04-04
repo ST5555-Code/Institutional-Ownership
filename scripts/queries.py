@@ -1966,22 +1966,28 @@ def ownership_trend_summary(ticker):
 
         rows = df_to_records(df)
         prev_shares = None
+        prev_holders = None
         for row in rows:
             total_shares = row.get('total_inst_shares') or 0
             total_value = row.get('total_inst_value') or 0
+            holders = row.get('holder_count') or 0
             row['pct_float'] = round(total_shares / float_shares * 100, 2) if float_shares and float_shares > 0 else None
             active_val = row.get('active_value') or 0
-            row['active_pct'] = round(active_val / total_value * 100, 2) if total_value > 0 else None
-            row['passive_pct'] = round((total_value - active_val) / total_value * 100, 2) if total_value > 0 else None
+            passive_val = row.get('passive_value') or 0
+            row['active_pct'] = round(active_val / total_value * 100, 1) if total_value > 0 else 0
+            row['passive_pct'] = round(passive_val / total_value * 100, 1) if total_value > 0 else 0
             if prev_shares is not None:
                 net_change = total_shares - prev_shares
                 row['net_shares_change'] = net_change
+                row['net_holder_change'] = holders - prev_holders if prev_holders is not None else None
                 pct_change = net_change / prev_shares if prev_shares > 0 else 0
                 row['signal'] = '\u2191' if pct_change > 0.005 else ('\u2193' if pct_change < -0.005 else '\u2192')
             else:
                 row['net_shares_change'] = None
+                row['net_holder_change'] = None
                 row['signal'] = None
             prev_shares = total_shares
+            prev_holders = holders
 
         summary = {}
         if len(rows) >= 2:

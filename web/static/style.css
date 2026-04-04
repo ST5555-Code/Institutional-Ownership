@@ -616,6 +616,32 @@ body {
     opacity: 1;
 }
 
+/* Active/Passive stacked bar */
+.ap-bar-wrap {
+    display: flex;
+    height: 18px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--light-grey);
+    width: 100%;
+}
+.ap-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    transition: width 0.2s;
+}
+.ap-active  { background: #4A90D9; }
+.ap-passive { background: #7EC8A0; }
+.ap-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    padding: 0 3px;
+}
+
 /* === Negative/positive number formatting === */
 .negative { color: #C0392B; }
 .positive { color: #27AE60; }
