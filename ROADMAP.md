@@ -216,6 +216,18 @@ _Last updated: April 3, 2026_
 
 ---
 
+## PIPELINE 9 — 13D/G Integration into Register
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| R1 | Data quality audit — 13D/G `pct_owned` coverage | High | Assess null rate, parsing accuracy across filing types. Check `beneficial_ownership_current` completeness vs EDGAR filing count. Validate against known 5%+ holders (activist lists) |
+| R2 | Data quality audit — 13D/G name matching to 13F parents | High | Check how many 13D/G filers match existing `inst_parent_name` in holdings. Identify gaps: individuals, foreign entities, funds below 13F threshold |
+| R3 | Schema design — merge 13D/G into Register view | Medium | Decide: separate rows with badge, or enrich existing parent rows with 13D/G reported %. Handle conflicts (13F computed % vs 13D/G self-reported %). Priority: 13D/G % is more authoritative for 5%+ holders |
+| R4 | Intent tracking in Register | Medium | Surface 13D vs 13G filing type (activist intent vs passive). Show intent changes (13G→13D = going activist). Link to `prior_intent` column |
+| R5 | Threshold crossing alerts | Low | Flag when 13D/G shows new 5%+ holder or existing holder drops below 5%. Timeline of crossings per ticker |
+
+---
+
 ## UI/UX Improvements
 
 | # | Item | Priority | Notes |
@@ -243,7 +255,7 @@ _Last updated: April 3, 2026_
 10. ~~U1 — N-PORT coverage disclaimer tooltip~~ Done
 11. ~~P4 — iShares Trust N-PORT~~ Done
 12. **N15 — International sub-adviser deduplication** (Fidelity HK/Japan/UK inflate to 110%)
-4. Refresh readonly snapshot
-5. Build Short Squeeze UI tab (N2)
-6. Add short/long comparison to Smart Money tab (N3)
-7. Items N4-N10 as capacity allows
+13. **R1/R2 — 13D/G data quality audit** — assess pct_owned coverage, name matching to 13F parents before integrating into Register
+14. R3-R5 — 13D/G Register integration (pending R1/R2 results)
+15. Refresh readonly snapshot
+16. Items N4-N10 as capacity allows

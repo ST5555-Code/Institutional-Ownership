@@ -243,6 +243,7 @@ function switchTab(tabId) {
     if (currentTab) _sortState[currentTab] = {col: sortCol, dir: sortDir};
     currentTab = tabId;
     currentQuery = TAB_QUERY_MAP[tabId] || 0;
+    _legendTypeFilter = null;  // reset legend filter on tab switch
     // Restore sort state for this tab (or reset)
     const saved = _sortState[tabId];
     sortCol = saved ? saved.col : null;
@@ -335,6 +336,12 @@ async function loadQuery(qnum, extraParams) {
         } else if (qnum === 7) {
             currentData = raw.positions || [];
             renderQuery7(raw);
+        } else if ((qnum === 1 || qnum === 16) && raw.rows) {
+            // Register / Fund Register tabs return {rows, all_totals, type_totals}
+            currentData = raw.rows;
+            _registerAllTotals = raw.all_totals || null;
+            _registerTypeTotals = raw.type_totals || {};
+            renderTable(raw.rows, qnum);
         } else {
             currentData = raw;
             renderTable(raw, qnum);
@@ -354,13 +361,23 @@ async function loadQuery(qnum, extraParams) {
 // Width, alignment, and visual role are auto-inferred from key+label names.
 const QUERY_COLUMNS = {
     1: [
-        {key: 'institution', label: 'Institution',  type: 'text'},
-        {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
-        {key: 'shares',      label: 'Shares',       type: 'shares'},
-        {key: 'pct_float',   label: '% Float / NAV', type: 'pct'},
-        {key: 'aum',         label: 'AUM ($M)',     type: 'num'},
-        {key: 'type',        label: 'Type',         type: 'text'},
-        {key: 'source',      label: 'Source',       type: 'text'},
+        {key: 'institution', label: 'Institution',  type: 'text',   group: null},
+        {key: 'value_live',  label: 'Value (Live)', type: 'dollar', group: '_ticker_'},
+        {key: 'shares',      label: 'Shares',       type: 'shares', group: '_ticker_'},
+        {key: 'pct_float',   label: '% Float',      type: 'pct',   group: '_ticker_'},
+        {key: 'aum',         label: 'AUM ($M)',     type: 'num',    group: 'Fund'},
+        {key: 'pct_aum',     label: '% of AUM',    type: 'pct',    group: 'Fund'},
+        {key: 'type',        label: 'Type',         type: 'text',   group: 'Fund'},
+    ],
+    16: [
+        {key: 'institution', label: 'Fund Name',    type: 'text',   group: null},
+        {key: 'family',      label: 'Family',       type: 'text',   group: null},
+        {key: 'value_live',  label: 'Value (Live)', type: 'dollar', group: '_ticker_'},
+        {key: 'shares',      label: 'Shares',       type: 'shares', group: '_ticker_'},
+        {key: 'pct_float',   label: '% Float',      type: 'pct',   group: '_ticker_'},
+        {key: 'aum',         label: 'AUM ($M)',     type: 'num',    group: 'Fund'},
+        {key: 'pct_aum',     label: '% of NAV',    type: 'pct',    group: 'Fund'},
+        {key: 'type',        label: 'Type',         type: 'text',   group: 'Fund'},
     ],
     2: [
         {key: 'fund_name',     label: 'Institution / Fund', type: 'text'},
@@ -369,7 +386,6 @@ const QUERY_COLUMNS = {
         {key: 'change_shares', label: 'Change',             type: 'shares'},
         {key: 'change_pct',    label: 'Chg%',               type: 'pct'},
         {key: 'type',          label: 'Type',               type: 'text'},
-        {key: 'source',        label: 'Source',             type: 'text'},
     ],
     3: [
         {key: 'manager_name',      label: 'Active Holder',  type: 'text'},
@@ -381,7 +397,6 @@ const QUERY_COLUMNS = {
         {key: 'direction',        label: 'Direction',       type: 'text'},
         {key: 'since',            label: 'Since',           type: 'text'},
         {key: 'held_label',       label: 'Held',            type: 'text'},
-        {key: 'source',           label: 'Source',          type: 'text'},
     ],
     4: [
         {key: 'category',        label: 'Category',     type: 'text'},
@@ -582,15 +597,15 @@ function _renderCurrentPage() {
     const data = _fullData;
     const qnum = _currentQnum;
     // Register tab (query1): show all rows, no pagination
-    const noPagination = (qnum === 1);
+    const noPagination = (qnum === 1 || qnum === 16);
     const totalPages = noPagination ? 1 : Math.ceil(data.length / PAGE_SIZE);
     const start = noPagination ? 0 : _currentPage * PAGE_SIZE;
     const pageData = noPagination ? data : (data.length > PAGE_SIZE ? data.slice(start, start + PAGE_SIZE) : data);
 
     const cols = QUERY_COLUMNS[qnum];
 
-    // R16: Search filter for Register tab
-    if (qnum === 1) {
+    // R16: Search filter for Register / Fund Register tab
+    if (qnum === 1 || qnum === 16) {
         let filterBar = tableWrap.querySelector('.register-filter-bar');
         if (!filterBar) {
             filterBar = document.createElement('div');
@@ -617,34 +632,34 @@ function _renderCurrentPage() {
             clearBtn.className = 'btn btn-secondary';
             clearBtn.style.fontSize = '12px';
             clearBtn.onclick = () => { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); };
-            // R13: Heatmap toggle
-            const heatmapToggle = document.createElement('button');
-            heatmapToggle.className = 'btn btn-secondary';
-            heatmapToggle.style.fontSize = '12px';
-            heatmapToggle.textContent = 'Heatmap On';
-            heatmapToggle.onclick = () => {
-                const on = heatmapToggle.textContent === 'Heatmap On';
-                heatmapToggle.textContent = on ? 'Heatmap Off' : 'Heatmap On';
-                _applyHeatmapOverlay(on);
-            };
-            filterBar.appendChild(heatmapToggle);
 
-            // R9: Source column toggle
-            const sourceToggle = document.createElement('button');
-            sourceToggle.className = 'btn btn-secondary';
-            sourceToggle.style.fontSize = '12px';
-            sourceToggle.style.marginLeft = 'auto';
-            const sourceHidden = localStorage.getItem('hideSourceCol') === 'true';
-            sourceToggle.textContent = sourceHidden ? 'Show Source' : 'Hide Source';
-            sourceToggle.onclick = () => {
-                const hide = localStorage.getItem('hideSourceCol') !== 'true';
-                localStorage.setItem('hideSourceCol', hide);
-                sourceToggle.textContent = hide ? 'Show Source' : 'Hide Source';
-                _applySourceColumnVisibility();
+            // View toggle: Parent (query1) vs Fund (query16)
+            const viewToggle = document.createElement('div');
+            viewToggle.className = 'register-view-toggle';
+            const btnParent = document.createElement('button');
+            btnParent.textContent = 'By Parent';
+            btnParent.className = 'btn btn-toggle' + (qnum === 1 ? ' active' : '');
+            btnParent.onclick = () => {
+                if (_currentQnum === 1) return;
+                _legendTypeFilter = null;
+                currentQuery = 1; _currentQnum = 1;
+                loadQuery(1);
             };
+            const btnFund = document.createElement('button');
+            btnFund.textContent = 'By Fund';
+            btnFund.className = 'btn btn-toggle' + (qnum === 16 ? ' active' : '');
+            btnFund.onclick = () => {
+                if (_currentQnum === 16) return;
+                _legendTypeFilter = null;
+                currentQuery = 16; _currentQnum = 16;
+                loadQuery(16);
+            };
+            viewToggle.appendChild(btnParent);
+            viewToggle.appendChild(btnFund);
+
+            filterBar.appendChild(viewToggle);
             filterBar.appendChild(searchInput);
             filterBar.appendChild(clearBtn);
-            filterBar.appendChild(sourceToggle);
             tableWrap.appendChild(filterBar);
         }
     }
@@ -659,42 +674,11 @@ function _renderCurrentPage() {
         renderHierarchicalTable(pageData, cols, qnum, hasHierarchy, hasSections, collapsible);
     }
 
-    // R9: Apply source column visibility after render
-    if (qnum === 1) _applySourceColumnVisibility();
-
-    // R7: Add totals row at bottom of Register tab
-    if (qnum === 1 && pageData.length > 0) {
+    // R7: Add totals rows at bottom of Register / Fund Register tab
+    if ((qnum === 1 || qnum === 16) && pageData.length > 0) {
         const table = tableWrap.querySelector('.data-table');
         if (table) {
-            const tbody = table.querySelector('tbody');
-            const parentRows = pageData.filter(r => !r.level || r.level === 0);
-            const totals = document.createElement('tr');
-            totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
-            // # col
-            const tdNum = document.createElement('td');
-            tdNum.className = 'col-rownum';
-            totals.appendChild(tdNum);
-            // Build totals per column
-            const cols = QUERY_COLUMNS[1];
-            cols.forEach(c => {
-                const td = document.createElement('td');
-                td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
-                if (c.key === 'institution') {
-                    td.textContent = 'TOTAL (' + parentRows.length + ' holders)';
-                } else if (c.type === 'dollar' || c.type === 'shares') {
-                    let sum = 0;
-                    parentRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
-                    td.textContent = sum ? _formatCellValue(sum, c.type) : '—';
-                } else if (c.key === 'pct_float') {
-                    let sum = 0;
-                    parentRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
-                    td.textContent = sum ? fmtPct(sum) : '—';
-                } else {
-                    td.textContent = '';
-                }
-                totals.appendChild(td);
-            });
-            tbody.appendChild(totals);
+            _buildRegisterTotals(table, pageData);
         }
     }
 
@@ -737,17 +721,67 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
     const table = document.createElement('table');
     table.className = 'data-table';
 
+    // Register tabs: use proportional widths for balanced layout
+    const isRegister = (qnum === 1 || qnum === 16);
+    const REG_WIDTHS = {
+        // query 1 — Institution takes remaining space
+        1: {'#': '3%', institution: null, value_live: '13%', shares: '11%', pct_float: '8%', aum: '12%', pct_aum: '8%', type: '8%'},
+        // query 16 — Fund Name + Family share the text space
+        16: {'#': '3%', institution: null, family: '14%', value_live: '12%', shares: '10%', pct_float: '7%', aum: '11%', pct_aum: '8%', type: '7%'},
+    };
+
     const colgroup = document.createElement('colgroup');
+    // # column
+    const cgNum = document.createElement('col');
+    if (isRegister) cgNum.style.width = REG_WIDTHS[qnum]['#'];
+    else cgNum.style.width = '35px';
+    colgroup.appendChild(cgNum);
     cols.forEach(col => {
         const cg = document.createElement('col');
-        const meta = inferColMeta(col);
-        if (meta.w) cg.style.width = meta.w;
+        if (isRegister && REG_WIDTHS[qnum]) {
+            const w = REG_WIDTHS[qnum][col.key];
+            if (w) cg.style.width = w;
+            // null = auto-fill remaining space (name column)
+        } else {
+            const meta = inferColMeta(col);
+            if (meta.w) cg.style.width = meta.w;
+        }
         colgroup.appendChild(cg);
     });
     table.appendChild(colgroup);
 
     // --- Header with # column ---
     const thead = document.createElement('thead');
+
+    // Group header row (Register tab only)
+    const hasGroups = cols.some(c => c.group);
+    if (hasGroups) {
+        const groupRow = document.createElement('tr');
+        groupRow.className = 'column-group-row';
+        // # column spacer
+        const thGNum = document.createElement('th');
+        thGNum.className = 'group-header-empty';
+        groupRow.appendChild(thGNum);
+        let i = 0;
+        while (i < cols.length) {
+            const grp = cols[i].group;
+            let span = 1;
+            while (i + span < cols.length && cols[i + span].group === grp) span++;
+            const thG = document.createElement('th');
+            thG.colSpan = span;
+            if (grp) {
+                const label = grp === '_ticker_' ? (currentTicker || '').toUpperCase() : grp;
+                thG.textContent = label;
+                thG.className = 'group-header';
+            } else {
+                thG.className = 'group-header-empty';
+            }
+            groupRow.appendChild(thG);
+            i += span;
+        }
+        thead.appendChild(groupRow);
+    }
+
     const headerRow = document.createElement('tr');
     const thNum = document.createElement('th');
     thNum.textContent = '#';
@@ -822,10 +856,13 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         }
         tr.appendChild(tdRowNum);
 
-        // Type tint
+        // Type tint — only active/hedge_fund get color
         const rtype = row.type || row.manager_type || '';
-        if (rtype && rtype !== 'unknown') {
-            tr.classList.add('type-' + rtype.replace(/[^a-z_]/gi, '').toLowerCase());
+        const rtypeClean = rtype.replace(/[^a-z_]/gi, '').toLowerCase();
+        tr.dataset.rowType = rtypeClean || 'unknown';
+        tr.dataset.rowLevel = String(row.level || 0);
+        if (rtypeClean === 'active' || rtypeClean === 'hedge_fund') {
+            tr.classList.add('type-' + rtypeClean);
         }
 
         cols.forEach(col => {
@@ -892,33 +929,6 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
                 const weight = count >= 4 ? '700' : '400';
                 td.innerHTML = '<span style="color:' + color + ';font-weight:' + weight + '">' + val + '</span>';
             }
-            // --- Source column: render as badge with optional tooltip ---
-            else if (col.key === 'source' && val) {
-                const note = row.subadviser_note;
-                if (val !== 'N-PORT' && note) {
-                    // 13F badge with subadviser tooltip
-                    const wrapper = document.createElement('span');
-                    wrapper.className = 'tooltip-wrapper';
-                    const badge = document.createElement('span');
-                    badge.className = 'badge badge-13f';
-                    badge.textContent = val;
-                    wrapper.appendChild(badge);
-                    const icon = document.createElement('span');
-                    icon.className = 'tooltip-icon';
-                    icon.textContent = 'i';
-                    wrapper.appendChild(icon);
-                    const tip = document.createElement('span');
-                    tip.className = 'tooltip-text';
-                    tip.textContent = note;
-                    wrapper.appendChild(tip);
-                    td.appendChild(wrapper);
-                } else {
-                    const badge = document.createElement('span');
-                    badge.className = val === 'N-PORT' ? 'badge badge-nport' : 'badge badge-13f';
-                    badge.textContent = val;
-                    td.appendChild(badge);
-                }
-            }
             // --- All other columns ---
             else {
                 td.innerHTML = formatCell(val, fmtType(col));
@@ -946,26 +956,218 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
     // --- Assemble (don't clear — caller handles clearing) ---
     if (showLegend) tableWrap.appendChild(buildLegend());
     tableWrap.appendChild(table);
+
+    // Sticky header: offset column header row below group header row
+    const groupRow = table.querySelector('.column-group-row');
+    if (groupRow) {
+        requestAnimationFrame(() => {
+            const grpH = groupRow.getBoundingClientRect().height;
+            const colRow = groupRow.nextElementSibling;
+            if (colRow) {
+                colRow.querySelectorAll('th').forEach(th => { th.style.top = grpH + 'px'; });
+            }
+        });
+    }
+
+    // Re-apply type filter if one was active before re-render
+    if (_legendTypeFilter) _applyTypeFilter();
 }
 
-/** Build the color-coding legend bar. */
+/** Active legend type filter — null means "All" (no filter). */
+let _legendTypeFilter = null;
+let _registerAllTotals = null;
+let _registerTypeTotals = {};
+
+/** Build the clickable color-coding legend bar. */
 function buildLegend() {
     const legend = document.createElement('div');
     legend.className = 'color-legend';
-    [
-        ['sw-passive',      'Passive'],
-        ['sw-active',       'Active'],
-        ['sw-quantitative', 'Quantitative'],
-        ['sw-activist',     'Activist'],
-        ['sw-mixed',        'Mixed'],
-        ['sw-unknown',      'Unknown'],
-    ].forEach(([cls, label]) => {
+    const types = [
+        ['sw-all',          'All',           null],
+        ['sw-passive',      'Passive',       'passive'],
+        ['sw-active',       'Active',        'active'],
+        ['sw-quantitative', 'Quantitative',  'quantitative'],
+        ['sw-activist',     'Activist',      'activist'],
+        ['sw-mixed',        'Mixed',         'mixed'],
+        ['sw-unknown',      'Unknown',       'unknown'],
+    ];
+    const items = [];
+    types.forEach(([cls, label, typeVal]) => {
         const item = document.createElement('span');
-        item.className = 'legend-item';
+        const isSelected = typeVal === _legendTypeFilter;
+        item.className = 'legend-item' + (isSelected ? ' legend-active' : '')
+            + (!isSelected && _legendTypeFilter !== null ? ' legend-dimmed' : '');
+        item.dataset.typeFilter = typeVal || 'all';
         item.innerHTML = `<span class="legend-swatch ${cls}"></span>${label}`;
+        item.onclick = () => {
+            _legendTypeFilter = typeVal;
+            items.forEach(it => {
+                const isMe = it === item;
+                it.classList.toggle('legend-active', isMe);
+                it.classList.toggle('legend-dimmed', !isMe && typeVal !== null);
+            });
+            _applyTypeFilter();
+        };
         legend.appendChild(item);
+        items.push(item);
     });
     return legend;
+}
+
+/** Apply the legend type filter: show/hide rows & re-rank visible parents. */
+function _applyTypeFilter() {
+    const table = tableWrap.querySelector('.data-table');
+    if (!table) return;
+    const rows = table.querySelectorAll('tbody tr');
+    let visibleRank = 0;
+    rows.forEach(tr => {
+        const rtype = tr.dataset.rowType || '';
+        const level = parseInt(tr.dataset.rowLevel || '0', 10);
+        if (level === 1) {
+            // child follows parent visibility
+            const parentId = tr.dataset.childOf;
+            const parentTr = parentId ? table.querySelector(`tr[data-parent-id="${parentId}"]`) : null;
+            tr.style.display = parentTr && parentTr.style.display === 'none' ? 'none' : '';
+            return;
+        }
+        // parent row
+        const show = !_legendTypeFilter || rtype === _legendTypeFilter
+            || (_legendTypeFilter === 'active' && rtype === 'hedge_fund');
+        tr.style.display = show ? '' : 'none';
+        // hide children of hidden parents
+        const pid = tr.dataset.parentId;
+        if (pid) {
+            table.querySelectorAll(`tr[data-child-of="${pid}"]`).forEach(ch => {
+                ch.style.display = show ? '' : 'none';
+                if (!show) ch.classList.remove('visible');
+            });
+        }
+        if (show) {
+            visibleRank++;
+            const numCell = tr.querySelector('.col-rownum');
+            if (numCell) numCell.textContent = visibleRank;
+        }
+    });
+    // Rebuild totals to reflect filter
+    if (currentData && currentData.length) {
+        _buildRegisterTotals(table, currentData);
+    }
+}
+
+/** Build totals footer for Register tab. Shows top-25 total, all-investors total,
+ *  and filtered category total when a legend filter is active. */
+function _buildRegisterTotals(table, pageData) {
+    // Remove existing totals
+    table.querySelectorAll('.register-totals-row').forEach(r => r.remove());
+    const tbody = table.querySelector('tbody');
+    const cols = QUERY_COLUMNS[_currentQnum] || QUERY_COLUMNS[1];
+    const parentRows = pageData.filter(r => !r.level || r.level === 0);
+
+    function _makeTotalsRow(label, srcRows, extraClass) {
+        const tr = document.createElement('tr');
+        tr.className = 'register-totals-row ' + (extraClass || '');
+        tr.style.cssText = 'font-weight:700;background:#f0f4f8;';
+        const tdNum = document.createElement('td');
+        tdNum.className = 'col-rownum';
+        tr.appendChild(tdNum);
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
+            if (c.key === 'institution') {
+                td.textContent = label;
+            } else if (srcRows && (c.type === 'dollar' || c.type === 'shares')) {
+                let sum = 0;
+                srcRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
+                td.textContent = sum ? _formatCellValue(sum, c.type) : '—';
+            } else if (srcRows && c.key === 'pct_float') {
+                let sum = 0;
+                srcRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
+                td.textContent = sum ? fmtPct(sum) : '—';
+            } else {
+                td.textContent = '';
+            }
+            tr.appendChild(td);
+        });
+        return tr;
+    }
+
+    function _makeTotalsRowFromObj(label, obj, extraClass) {
+        const tr = document.createElement('tr');
+        tr.className = 'register-totals-row ' + (extraClass || '');
+        tr.style.cssText = 'font-weight:700;background:#f0f4f8;';
+        const tdNum = document.createElement('td');
+        tdNum.className = 'col-rownum';
+        tr.appendChild(tdNum);
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
+            if (c.key === 'institution') {
+                td.textContent = label;
+            } else if (obj && c.key === 'value_live' && obj.value_live) {
+                td.textContent = _formatCellValue(obj.value_live, 'dollar');
+            } else if (obj && c.key === 'shares' && obj.shares) {
+                td.textContent = _formatCellValue(obj.shares, 'shares');
+            } else if (obj && c.key === 'pct_float' && obj.pct_float) {
+                td.textContent = fmtPct(obj.pct_float);
+            } else {
+                td.textContent = '';
+            }
+            tr.appendChild(td);
+        });
+        return tr;
+    }
+
+    // 1. Top-25 shown total (from visible data)
+    const shownRow = _makeTotalsRow(
+        `TOP ${parentRows.length} SHOWN`, parentRows, 'totals-shown');
+    shownRow.style.borderTop = '3px solid #002147';
+    tbody.appendChild(shownRow);
+
+    // 2. All investors total (from backend)
+    if (_registerAllTotals) {
+        const allRow = _makeTotalsRowFromObj(
+            `ALL INVESTORS (${_registerAllTotals.count})`, _registerAllTotals, 'totals-all');
+        tbody.appendChild(allRow);
+    }
+
+    // 3. Category total when legend filter is active
+    if (_legendTypeFilter && _registerTypeTotals) {
+        const filterType = _legendTypeFilter;
+        // Combine active + hedge_fund when "active" selected
+        let catTotal = null;
+        if (filterType === 'active') {
+            const a = _registerTypeTotals['active'];
+            const h = _registerTypeTotals['hedge_fund'];
+            if (a || h) {
+                catTotal = {
+                    value_live: (a?.value_live || 0) + (h?.value_live || 0),
+                    shares: (a?.shares || 0) + (h?.shares || 0),
+                    pct_float: (a?.pct_float || 0) + (h?.pct_float || 0),
+                    count: (a?.count || 0) + (h?.count || 0),
+                };
+            }
+        } else {
+            catTotal = _registerTypeTotals[filterType] || null;
+        }
+        if (catTotal) {
+            const typeName = filterType.charAt(0).toUpperCase() + filterType.slice(1);
+            // Shown in category (from visible rows)
+            const visibleOfType = parentRows.filter(r => {
+                const rt = (r.type || '').toLowerCase();
+                if (filterType === 'active') return rt === 'active' || rt === 'hedge_fund';
+                return rt === filterType;
+            });
+            const catShown = _makeTotalsRow(
+                `${typeName.toUpperCase()} SHOWN (${visibleOfType.length})`, visibleOfType, 'totals-cat-shown');
+            catShown.style.borderTop = '2px solid var(--sandstone)';
+            tbody.appendChild(catShown);
+            // All in category
+            const catAll = _makeTotalsRowFromObj(
+                `${typeName.toUpperCase()} ALL (${catTotal.count})`, catTotal, 'totals-cat-all');
+            tbody.appendChild(catAll);
+        }
+    }
+
 }
 
 /** Fallback renderer for unknown query structures — also uses inferColMeta. */
@@ -1332,46 +1534,143 @@ function renderOTSummary(data) {
     renderHierarchicalTable(quarters, cols, 0, false, false, false);
 }
 
+let _cohortPeriod = null;  // null = most recent quarter (default)
+
 async function loadOTCohort() {
     // Loads inline below summary — no spinner/clear needed
     try {
-        const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}`);
-        if (!res.ok) return; // silently skip if cohort fails
+        const fromQ = _cohortPeriod || '';
+        const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}&from=${fromQ}`);
+        if (!res.ok) return;
         const data = await res.json();
-        tableWrap.appendChild(sectionHeader('Cohort Analysis (Q1 → Q4)'));
-        renderCohort(data);
+        // Remove previous cohort section if re-rendering
+        tableWrap.querySelectorAll('.cohort-section').forEach(el => el.remove());
+        const wrap = document.createElement('div');
+        wrap.className = 'cohort-section';
+        renderCohort(data, wrap);
+        tableWrap.appendChild(wrap);
     } catch (e) { /* cohort is optional enhancement */ }
 }
 
-function renderCohort(data) {
-    const {summary, detail} = data;
-    // Summary cards
-    const cards = document.createElement('div');
-    cards.className = 'portfolio-stats';
-    [
-        ['Retention Rate', summary.retention_rate != null ? summary.retention_rate + '%' : '\u2014'],
-        ['New Entries', `${summary.new_entries_count} holders, +${fmtShares(summary.new_entries_shares)}`],
-        ['Exits', `${summary.exits_count} holders, -${fmtShares(summary.exits_shares)}`],
-        ['Net Adds', `${summary.net_adds_count} increased, +${fmtDollars(summary.net_adds_value)}`],
-        ['Net Trims', `${summary.net_trims_count} decreased, ${fmtDollars(summary.net_trims_value)}`],
-    ].forEach(([l, v]) => {
-        const s = document.createElement('span');
-        s.className = 'ps-item';
-        s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
-        cards.appendChild(s);
-    });
-    tableWrap.appendChild(cards);
+function _fmtQ(q) {
+    // "2025Q3" → "Q3 2025"
+    if (!q || q.length < 6) return q || '';
+    return 'Q' + q.slice(5) + ' ' + q.slice(0, 4);
+}
 
-    // Detail table
-    const cols = [
-        {key: 'category', label: 'Category', type: 'text'},
-        {key: 'holders', label: 'Holders', type: 'num'},
-        {key: 'shares', label: 'Shares', type: 'shares'},
-        {key: 'value', label: 'Value', type: 'dollar'},
-        {key: 'avg_position', label: 'Avg Position', type: 'dollar'},
+function renderCohort(data, container) {
+    const {summary, detail} = data;
+    const fq = summary.from_quarter || '';
+    const lq = summary.to_quarter || '';
+
+    // Period selector
+    const periods = [
+        ['2025Q1', 'Q1 → Q4 (full year)'],
+        ['2025Q2', 'Q2 → Q4'],
+        ['2025Q3', 'Q3 → Q4 (latest)'],
     ];
-    currentData = detail;
-    renderHierarchicalTable(detail, cols, 0, false, false, false);
+    const selBar = document.createElement('div');
+    selBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin:20px 0 8px 0;';
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:14px;font-weight:700;color:#002147;';
+    label.textContent = `Cohort: ${_fmtQ(fq)} → ${_fmtQ(lq)}`;
+    selBar.appendChild(label);
+    const spacer = document.createElement('span');
+    spacer.style.flex = '1';
+    selBar.appendChild(spacer);
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'register-view-toggle';
+    periods.forEach(([q, txt]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-toggle' + (fq === q ? ' active' : '');
+        btn.textContent = txt;
+        btn.onclick = () => { _cohortPeriod = q; loadOTCohort(); };
+        btnGroup.appendChild(btn);
+    });
+    selBar.appendChild(btnGroup);
+    container.appendChild(selBar);
+
+    // Net flow summary line
+    const netLine = document.createElement('div');
+    netLine.style.cssText = 'font-size:13px;color:#333;margin:4px 0 12px 0;';
+    const nh = summary.net_holders || 0;
+    const ns = summary.net_shares || 0;
+    const nv = summary.net_value || 0;
+    netLine.innerHTML = `<strong>Net:</strong> ${nh >= 0 ? '+' : ''}${nh} holders, `
+        + `${ns >= 0 ? '+' : ''}${fmtShares(Math.abs(ns))} shares, `
+        + `${nv >= 0 ? '+' : '-'}${fmtDollars(Math.abs(nv))} `
+        + `<span style="color:#999;margin-left:8px;">Retention: ${summary.retention_rate}%</span>`;
+    container.appendChild(netLine);
+
+    // Detail table — hierarchical (Retained is parent with children)
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.tableLayout = 'fixed';
+
+    const colgroup = document.createElement('colgroup');
+    [null, '10%', '14%', '14%', '14%', '14%'].forEach(w => {
+        const cg = document.createElement('col');
+        if (w) cg.style.width = w;
+        colgroup.appendChild(cg);
+    });
+    table.appendChild(colgroup);
+
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    ['Category', 'Holders', 'Shares', 'Value', 'Avg Position', '% Inst Float'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.textAlign = h === 'Category' ? 'left' : 'right';
+        hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    detail.forEach(row => {
+        const tr = document.createElement('tr');
+        const isParent = row.is_parent || false;
+        const isChild = row.level === 1;
+        if (isParent) tr.style.fontWeight = '700';
+
+        // Category cell
+        const tdCat = document.createElement('td');
+        const catText = isChild ? row.category : row.category;
+        tdCat.textContent = catText;
+        if (isChild) tdCat.style.paddingLeft = '28px';
+        tr.appendChild(tdCat);
+
+        // Numeric cells
+        [
+            fmtNum(row.holders),
+            fmtShares(row.shares),
+            fmtDollars(row.value),
+            fmtDollars(row.avg_position),
+            row.pct_float_moved != null ? row.pct_float_moved.toFixed(1) + '%' : '\u2014',
+        ].forEach(v => {
+            const td = document.createElement('td');
+            td.style.textAlign = 'right';
+            td.textContent = v;
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    // Top 10 holders summary line
+    const t10 = summary.top10;
+    if (t10) {
+        const t10Line = document.createElement('div');
+        t10Line.style.cssText = 'font-size:12px;color:#666;margin:8px 0 0 0;';
+        const parts = [];
+        if (t10.increased) parts.push(`${t10.increased} increasing`);
+        if (t10.decreased) parts.push(`${t10.decreased} decreasing`);
+        if (t10.new) parts.push(`${t10.new} new`);
+        if (t10.unchanged) parts.push(`${t10.unchanged} unchanged`);
+        t10Line.innerHTML = `<strong>Top 10 holders:</strong> ${parts.join(', ')}`;
+        container.appendChild(t10Line);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1482,83 +1781,6 @@ function _formatCellValue(val, type) {
 
 function _isNumericCol(type) {
     return type === 'num' || type === 'dollar' || type === 'pct' || type === 'shares';
-}
-
-// R13: Heatmap overlay on Value column
-function _applyHeatmapOverlay(enabled) {
-    const table = tableWrap.querySelector('.data-table');
-    if (!table) return;
-    // Find Value column index
-    const headers = table.querySelectorAll('thead th');
-    let valIdx = -1;
-    headers.forEach((th, i) => {
-        if (th.textContent.trim().includes('Value')) valIdx = i;
-    });
-    if (valIdx < 0) return;
-
-    // Get max value for scaling
-    let maxVal = 0;
-    if (enabled) {
-        table.querySelectorAll('tbody tr').forEach(tr => {
-            const cells = tr.querySelectorAll('td');
-            if (cells[valIdx]) {
-                const text = cells[valIdx].textContent.replace(/[$,BMKTk]/g, '');
-                const num = parseFloat(text);
-                if (!isNaN(num)) maxVal = Math.max(maxVal, num);
-            }
-        });
-    }
-
-    // Find Type column index to check for 'active'
-    let typeIdx = -1;
-    headers.forEach((th, i) => {
-        if (th.textContent.trim() === 'Type') typeIdx = i;
-    });
-
-    table.querySelectorAll('tbody tr').forEach(tr => {
-        const cells = tr.querySelectorAll('td');
-        if (!cells[valIdx]) return;
-        if (!enabled) {
-            cells[valIdx].style.background = '';
-            cells[valIdx].style.color = '';
-            return;
-        }
-        // Only color active managers
-        const typeText = (typeIdx >= 0 && cells[typeIdx]) ? cells[typeIdx].textContent.trim().toLowerCase() : '';
-        if (typeText !== 'active' && typeText !== 'hedge_fund' && typeText !== 'activist') {
-            cells[valIdx].style.background = '';
-            cells[valIdx].style.color = '';
-            return;
-        }
-        const text = cells[valIdx].textContent.replace(/[$,BMKTk]/g, '');
-        const num = parseFloat(text);
-        if (!isNaN(num) && maxVal > 0) {
-            const intensity = Math.min(num / maxVal, 1);
-            const r = Math.round(255 - intensity * 253);
-            const g = Math.round(255 - intensity * 222);
-            const b = Math.round(255 - intensity * 184);
-            cells[valIdx].style.background = `rgb(${r},${g},${b})`;
-            cells[valIdx].style.color = intensity > 0.5 ? '#fff' : '#333';
-        }
-    });
-}
-
-// R9: Toggle Source column visibility
-function _applySourceColumnVisibility() {
-    const hide = localStorage.getItem('hideSourceCol') === 'true';
-    const table = tableWrap.querySelector('.data-table');
-    if (!table) return;
-    // Find Source column index (look for "Source" header text)
-    const headers = table.querySelectorAll('thead th');
-    let sourceIdx = -1;
-    headers.forEach((th, i) => { if (th.textContent.trim() === 'Source') sourceIdx = i; });
-    if (sourceIdx < 0) return;
-    const display = hide ? 'none' : '';
-    headers[sourceIdx].style.display = display;
-    table.querySelectorAll('tbody tr').forEach(tr => {
-        const cells = tr.querySelectorAll('td');
-        if (cells[sourceIdx]) cells[sourceIdx].style.display = display;
-    });
 }
 
 // Tier separator rows: faint line at 10/15/20

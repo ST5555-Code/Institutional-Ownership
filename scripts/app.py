@@ -26,7 +26,7 @@ from queries import (
     get_cusip, clean_for_json, df_to_records,
     query1, query2, query3, query4, query5,
     query6, query7, query8, query9, query10,
-    query11, query12, query13, query14, query15,
+    query11, query12, query13, query14, query15, query16,
     ownership_trend_summary, cohort_analysis, flow_analysis,
     get_summary, _cross_ownership_query,
 )
@@ -35,6 +35,7 @@ QUERY_FUNCTIONS = {
     1: query1, 2: query2, 3: query3, 4: query4, 5: query5,
     6: query6, 7: query7, 8: query8, 9: query9, 10: query10,
     11: query11, 12: query12, 13: query13, 14: query14, 15: query15,
+    16: query16,
 }
 
 QUERY_NAMES = {
@@ -931,10 +932,11 @@ def api_ownership_trend_summary():
 @app.route('/api/cohort_analysis')
 def api_cohort_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
+    from_q = request.args.get('from', '').strip() or None
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = cohort_analysis(ticker)
+        result = cohort_analysis(ticker, from_quarter=from_q)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1352,7 +1354,9 @@ def api_query(qnum):
         else:
             data = fn(ticker)
 
-        if not data:
+        # query1 returns dict {rows, all_totals, type_totals}; others return list
+        is_empty = (isinstance(data, dict) and not data.get('rows')) or (isinstance(data, list) and not data)
+        if is_empty:
             return jsonify({'error': f'No data found for ticker {ticker}'}), 404
         return jsonify(data)
     except Exception as e:

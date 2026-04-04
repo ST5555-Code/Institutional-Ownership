@@ -452,17 +452,19 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
 
         df = con.execute(f"""
             SELECT
-                fund_name,
-                MAX(market_value_usd) as value,
-                MAX(shares_or_principal) as shares,
-                MAX(pct_of_nav) as pct_of_nav,
-                series_id
+                fh.fund_name,
+                MAX(fh.market_value_usd) as value,
+                MAX(fh.shares_or_principal) as shares,
+                MAX(fh.pct_of_nav) as pct_of_nav,
+                fh.series_id,
+                MAX(fu.total_net_assets) / 1e6 as aum_mm
             FROM fund_holdings fh
-            WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE family_name ILIKE t.p)
-              AND ticker = ?
-              AND quarter = ?
+            LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+            WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE fh.family_name ILIKE t.p)
+              AND fh.ticker = ?
+              AND fh.quarter = ?
               {excl_clause}
-            GROUP BY fund_name, series_id
+            GROUP BY fh.fund_name, fh.series_id
             ORDER BY value DESC NULLS LAST
             LIMIT {int(limit)}
         """, like_patterns + [ticker, quarter] + excl_params).fetchdf()
@@ -472,10 +474,14 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         result = []
         for r in rows:
             shares = r.get('shares') or 0
-            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else r.get('pct_of_nav')
+            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            aum_val = r.get('aum_mm')
+            aum = int(aum_val) if aum_val and aum_val > 0 else None
+            # % of AUM/NAV: use pct_of_nav from N-PORT (position value as % of fund NAV)
+            pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
             result.append({'institution': r.get('fund_name'), 'value_live': r.get('value'),
                            'shares': shares, 'pct_float': pct_float,
-                           'source': 'N-PORT'})
+                           'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT'})
         return result
     except Exception as e:
         logger.error(f"[get_nport_children] {e}", exc_info=True)
@@ -815,13 +821,20 @@ def query1(ticker):
             children_to_show = sorted(nport_kids, key=lambda c: c.get('value_live') or 0, reverse=True)[:5]
             source = 'N-PORT' if has_nport else '13F'
 
+            parent_aum = aum_map.get(pname)
+            # % of AUM: position value / AUM (both in $M after conversion)
+            parent_pct_aum = None
+            if parent_aum and parent['total_value_live']:
+                val_mm = parent['total_value_live'] / 1e6
+                parent_pct_aum = round(val_mm / parent_aum * 100, 2) if parent_aum > 0 else None
             results.append({
                 'rank': rank,
                 'institution': pname,
                 'value_live': parent['total_value_live'],
                 'shares': parent['total_shares'],
                 'pct_float': parent['pct_float'],
-                'aum': aum_map.get(pname),
+                'aum': parent_aum,
+                'pct_aum': parent_pct_aum,
                 'type': parent['type'],
                 'is_parent': has_nport and len(children_to_show) > 0,
                 'child_count': len(children_to_show),
@@ -838,6 +851,8 @@ def query1(ticker):
                         'value_live': c.get('value_live'),
                         'shares': c.get('shares'),
                         'pct_float': c.get('pct_float'),
+                        'aum': c.get('aum'),
+                        'pct_aum': c.get('pct_aum'),
                         'type': c.get('type', parent['type']),
                         'is_parent': False,
                         'child_count': 0,
@@ -845,7 +860,37 @@ def query1(ticker):
                         'source': c.get('source', '13F'),
                         'subadviser_note': c.get('subadviser_note'),
                     })
-        return results
+        # Compute all-investor totals (beyond top 25) and by-type totals
+        all_totals_df = con.execute(f"""
+            SELECT
+                COALESCE(MAX(h.manager_type), 'unknown') as type,
+                COALESCE(h.inst_parent_name, h.manager_name) as parent_name,
+                SUM(h.market_value_live) as total_value,
+                SUM(h.shares) as total_shares,
+                SUM(h.pct_of_float) as pct_float
+            FROM holdings h
+            WHERE h.quarter = '{LQ}' AND (h.ticker = ? OR h.cusip = ?)
+            GROUP BY parent_name
+        """, [ticker, cusip]).fetchdf()
+
+        all_totals = {
+            'value_live': float(all_totals_df['total_value'].sum()) if len(all_totals_df) else 0,
+            'shares': float(all_totals_df['total_shares'].sum()) if len(all_totals_df) else 0,
+            'pct_float': float(all_totals_df['pct_float'].sum()) if len(all_totals_df) else 0,
+            'count': len(all_totals_df),
+        }
+        # By-type totals
+        type_totals = {}
+        for _, trow in all_totals_df.iterrows():
+            t = trow['type'] or 'unknown'
+            if t not in type_totals:
+                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_float': 0, 'count': 0}
+            type_totals[t]['value_live'] += float(trow['total_value'] or 0)
+            type_totals[t]['shares'] += float(trow['total_shares'] or 0)
+            type_totals[t]['pct_float'] += float(trow['pct_float'] or 0)
+            type_totals[t]['count'] += 1
+
+        return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
     finally:
         pass  # connection managed by thread-local cache
 
@@ -1801,6 +1846,100 @@ def query15(ticker=None):
         pass  # connection managed by thread-local cache
 
 
+def query16(ticker):
+    """Fund-level register — top 25 individual funds by position value."""
+    con = get_db()
+    try:
+        cusip = get_cusip(con, ticker)
+        # Get float_shares for % of float calculation
+        float_row = con.execute(
+            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        float_shares = float_row[0] if float_row and float_row[0] else None
+
+        df = con.execute(f"""
+            SELECT
+                fh.fund_name,
+                fh.family_name,
+                fh.series_id,
+                SUM(fh.market_value_usd) as value,
+                SUM(fh.shares_or_principal) as shares,
+                AVG(fh.pct_of_nav) as pct_of_nav,
+                MAX(fu.total_net_assets) / 1e6 as aum_mm
+            FROM fund_holdings fh
+            LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+            WHERE fh.ticker = ? AND fh.quarter = '{LQ}'
+            GROUP BY fh.fund_name, fh.family_name, fh.series_id
+            ORDER BY value DESC NULLS LAST
+            LIMIT 25
+        """, [ticker]).fetchdf()
+
+        if df.empty:
+            return {'rows': [], 'all_totals': None, 'type_totals': {}}
+
+        results = []
+        for rank, (_, r) in enumerate(df.iterrows(), 1):
+            fund_name = r['fund_name'] or ''
+            shares = float(r['shares'] or 0)
+            value = float(r['value'] or 0)
+            aum_val = r['aum_mm']
+            aum = int(aum_val) if aum_val and aum_val > 0 else None
+            pct_of_nav = round(float(r['pct_of_nav']), 2) if r['pct_of_nav'] else None
+            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            fund_type = _classify_fund_type(fund_name)
+
+            results.append({
+                'rank': rank,
+                'institution': fund_name,
+                'family': r['family_name'] or '',
+                'value_live': value,
+                'shares': shares,
+                'pct_float': pct_float,
+                'aum': aum,
+                'pct_aum': pct_of_nav,
+                'type': fund_type,
+                'level': 0,
+            })
+
+        # All-funds totals
+        all_df = con.execute(f"""
+            SELECT
+                fh.fund_name,
+                SUM(fh.market_value_usd) as total_value,
+                SUM(fh.shares_or_principal) as total_shares,
+                AVG(fh.pct_of_nav) as pct_of_nav
+            FROM fund_holdings fh
+            WHERE fh.ticker = ? AND fh.quarter = '{LQ}'
+            GROUP BY fh.fund_name, fh.series_id
+        """, [ticker]).fetchdf()
+
+        all_totals = {
+            'value_live': float(all_df['total_value'].sum()) if len(all_df) else 0,
+            'shares': float(all_df['total_shares'].sum()) if len(all_df) else 0,
+            'pct_float': round(float(all_df['total_shares'].sum()) * 100.0 / float_shares, 2) if float_shares and len(all_df) else 0,
+            'count': len(all_df),
+        }
+
+        # By-type totals
+        type_totals = {}
+        for _, trow in all_df.iterrows():
+            t = _classify_fund_type(trow['fund_name'])
+            if t not in type_totals:
+                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_float': 0, 'count': 0}
+            type_totals[t]['value_live'] += float(trow['total_value'] or 0)
+            s = float(trow['total_shares'] or 0)
+            type_totals[t]['shares'] += s
+            type_totals[t]['count'] += 1
+        # Compute pct_float per type
+        for t in type_totals:
+            if float_shares and type_totals[t]['shares']:
+                type_totals[t]['pct_float'] = round(type_totals[t]['shares'] * 100.0 / float_shares, 2)
+
+        return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
+    finally:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # New query functions — Ownership Trend, Cohort Analysis, Flow Analysis
 # ---------------------------------------------------------------------------
@@ -1862,19 +2001,25 @@ def ownership_trend_summary(ticker):
 
 
 
-def cohort_analysis(ticker):
-    """Cohort retention analysis: Q1 vs Q4 holders."""
+def cohort_analysis(ticker, from_quarter=None):
+    """Cohort retention analysis: compare two quarters.
+    from_quarter: starting quarter (default: PREV_QUARTER for most recent QoQ).
+    Always compares from_quarter → LATEST_QUARTER.
+    """
     con = get_db()
     try:
+        fq = from_quarter or PQ
+        lq = LQ
+
         q1_df = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as investor,
                    SUM(shares) as shares, SUM(market_value_usd) as value
-            FROM holdings WHERE ticker = ? AND quarter = '{FQ}' GROUP BY investor
+            FROM holdings WHERE ticker = ? AND quarter = '{fq}' GROUP BY investor
         """, [ticker]).fetchdf()
         q4_df = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as investor,
                    SUM(shares) as shares, SUM(market_value_usd) as value
-            FROM holdings WHERE ticker = ? AND quarter = '{LQ}' GROUP BY investor
+            FROM holdings WHERE ticker = ? AND quarter = '{lq}' GROUP BY investor
         """, [ticker]).fetchdf()
 
         q1_map = {r['investor']: r for r in df_to_records(q1_df)}
@@ -1890,31 +2035,68 @@ def cohort_analysis(ticker):
             s4 = q4_map[inv].get('shares') or 0
             (increased if s4 > s1 else decreased if s4 < s1 else unchanged).append(inv)
 
+        # Total institutional shares in latest quarter (for % of float moved)
+        total_inst_shares = sum((q4_map[i].get('shares') or 0) for i in q4_set)
+
         def _stats(investors, src):
             c = len(investors)
             s = sum((src[i].get('shares') or 0) for i in investors)
             v = sum((src[i].get('value') or 0) for i in investors)
-            return {'holders': c, 'shares': s, 'value': v, 'avg_position': round(v / c, 2) if c > 0 else 0}
+            pct_float = round(s / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
+            return {'holders': c, 'shares': s, 'value': v, 'avg_position': round(v / c, 2) if c > 0 else 0,
+                    'pct_float_moved': pct_float}
+
+        # Retained subcategories
+        inc_stats = _stats(increased, q4_map)
+        dec_stats = _stats(decreased, q4_map)
+        unc_stats = _stats(unchanged, q4_map)
+        # Retained parent totals
+        ret_holders = inc_stats['holders'] + dec_stats['holders'] + unc_stats['holders']
+        ret_shares = inc_stats['shares'] + dec_stats['shares'] + unc_stats['shares']
+        ret_value = inc_stats['value'] + dec_stats['value'] + unc_stats['value']
+        ret_pct = round(ret_shares / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
 
         detail = [
-            {'category': 'Retained \u2014 increased', **_stats(increased, q4_map)},
-            {'category': 'Retained \u2014 decreased', **_stats(decreased, q4_map)},
-            {'category': 'Retained \u2014 unchanged', **_stats(unchanged, q4_map)},
-            {'category': 'New entries', **_stats(list(new_entries_set), q4_map)},
-            {'category': 'Exits', **_stats(list(exits_set), q1_map)},
+            {'category': 'Retained', 'holders': ret_holders, 'shares': ret_shares,
+             'value': ret_value, 'avg_position': round(ret_value / ret_holders, 2) if ret_holders > 0 else 0,
+             'pct_float_moved': ret_pct, 'level': 0, 'is_parent': True},
+            {'category': 'Increased', 'level': 1, **inc_stats},
+            {'category': 'Decreased', 'level': 1, **dec_stats},
+            {'category': 'Unchanged', 'level': 1, **unc_stats},
+            {'category': 'New Entries', 'level': 0, **_stats(list(new_entries_set), q4_map)},
+            {'category': 'Exits', 'level': 0, **_stats(list(exits_set), q1_map)},
         ]
 
         total_q1 = len(q1_set)
+
+        # Net flow summary
+        net_holders = len(new_entries_set) - len(exits_set)
+        net_shares = (sum((q4_map[i].get('shares') or 0) for i in new_entries_set)
+                      - sum((q1_map[i].get('shares') or 0) for i in exits_set)
+                      + sum(((q4_map[i].get('shares') or 0) - (q1_map[i].get('shares') or 0)) for i in retained))
+        net_value = (sum((q4_map[i].get('value') or 0) for i in q4_set)
+                     - sum((q1_map[i].get('value') or 0) for i in q1_set))
+
+        # Top 10 holders in latest quarter — which cohort bucket
+        top10_inv = sorted(q4_map.keys(), key=lambda x: q4_map[x].get('value') or 0, reverse=True)[:10]
+        top10_increased = sum(1 for i in top10_inv if i in set(increased))
+        top10_decreased = sum(1 for i in top10_inv if i in set(decreased))
+        top10_new = sum(1 for i in top10_inv if i in new_entries_set)
+        top10_unchanged = sum(1 for i in top10_inv if i in set(unchanged))
+
         summary = {
             'retention_rate': round(len(retained) / total_q1 * 100, 2) if total_q1 > 0 else 0,
-            'new_entries_count': len(new_entries_set),
-            'new_entries_shares': sum((q4_map[i].get('shares') or 0) for i in new_entries_set),
-            'exits_count': len(exits_set),
-            'exits_shares': sum((q1_map[i].get('shares') or 0) for i in exits_set),
-            'net_adds_count': len(increased),
-            'net_adds_value': sum(((q4_map[i].get('value') or 0) - (q1_map[i].get('value') or 0)) for i in increased),
-            'net_trims_count': len(decreased),
-            'net_trims_value': sum(((q4_map[i].get('value') or 0) - (q1_map[i].get('value') or 0)) for i in decreased),
+            'net_holders': net_holders,
+            'net_shares': net_shares,
+            'net_value': net_value,
+            'from_quarter': fq,
+            'to_quarter': lq,
+            'top10': {
+                'increased': top10_increased,
+                'decreased': top10_decreased,
+                'new': top10_new,
+                'unchanged': top10_unchanged,
+            },
         }
         return {'summary': summary, 'detail': detail}
     finally:
