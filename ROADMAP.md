@@ -223,6 +223,8 @@ _Last updated: April 3, 2026_
 | U2 | Row numbers on all tables | Done | # column added to all 3 table renderers (renderHierarchicalTable, buildSimpleTable, _flowTable) + Excel export. Parent rows only numbered in hierarchical tables. Children get blank |
 | U3 | Top 25 with tier separators and subtotals | Done | Faint border-bottom at rows 10, 15, 20. Bold subtotal rows at 10 and 25 (sums numeric columns). Applied to buildSimpleTable and renderHierarchicalTable. _flowTable gets tier breaks |
 | U4 | Nested fund children — limit 5 largest under parent | Done | get_nport_children default limit=5 already in place. Cross-Ownership (query8) doesn't use N-PORT children — pure 13F cross-holder. Consistent across Register, Conviction, Ownership Trend |
+| U5 | Institution column width — expand to min 280px | Done | Single CSS rule covers all tabs via `th:nth-child(2)` and `.col-text-overflow`. Fixes truncation on parent names and N-PORT fund series children |
+| U6 | ETF/index fund passive classification | Medium | Fund series with "Index", "ETF", "S&P", "Russell", "MSCI" in name incorrectly showing as active. Fix classification in fund_universe. Affects Register, Conviction, Crowding tabs |
 
 ---
 

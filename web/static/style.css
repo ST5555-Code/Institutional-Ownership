@@ -1023,9 +1023,10 @@ body {
     font-size: 11px;
     padding-right: 4px;
 }
-.data-table .col-name {
-    min-width: 180px;
-    max-width: 280px;
+.data-table .col-name,
+.data-table td.col-text-overflow,
+.data-table th:nth-child(2) {
+    min-width: 280px;
 }
 .data-table .col-right {
     min-width: 80px;
