@@ -954,6 +954,7 @@ def api_flow_analysis():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/cross_ownership')
 def api_cross_ownership():
     """View 1: top holders of anchor company with cross-holdings in other tickers."""
     tickers_raw = request.args.get('tickers', '').upper().strip()
@@ -1343,7 +1344,10 @@ def api_query(qnum):
             if not data.get('positions'):
                 return jsonify({'error': f'No holdings found for CIK {cik}'}), 404
             return jsonify(data)
-        elif qnum in (13, 15):
+        elif qnum == 13:
+            sector = request.args.get('sector', '').strip() or None
+            data = fn(ticker or None, sector=sector)
+        elif qnum == 15:
             data = fn(ticker or None)
         else:
             data = fn(ticker)
@@ -1370,7 +1374,10 @@ def api_export(qnum):
         if qnum == 7:
             fund_name = request.args.get('fund_name', '').strip() or None
             data = fn(ticker, cik=cik or None, fund_name=fund_name)
-        elif qnum in (13, 15):
+        elif qnum == 13:
+            sector = request.args.get('sector', '').strip() or None
+            data = fn(ticker or None, sector=sector)
+        elif qnum == 15:
             data = fn(ticker or None)
         else:
             data = fn(ticker)

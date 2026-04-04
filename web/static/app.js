@@ -1143,17 +1143,17 @@ async function loadShortSqueeze() {
 // ---------------------------------------------------------------------------
 // Ownership Trend tab (3 sub-views)
 // ---------------------------------------------------------------------------
-let _otSubView = 'summary';  // 'summary' | 'changes' | 'cohort'
+let _otSubView = 'summary';  // 'summary' | 'changes'
 
 async function loadOwnershipTrend() {
     clearError(); tableWrap.innerHTML = '';
-    // Render sub-view selector
+    // Render sub-view selector (2 views: Summary + Cohort combined, and Holder Changes)
     const bar = document.createElement('div');
     bar.className = 'sub-view-bar';
-    ['summary', 'changes', 'cohort'].forEach(v => {
+    ['summary', 'changes'].forEach(v => {
         const btn = document.createElement('button');
         btn.className = 'co-view-btn' + (v === _otSubView ? ' active' : '');
-        btn.textContent = v === 'summary' ? 'Quarterly Summary' : (v === 'changes' ? 'Holder Changes' : 'Cohort Analysis');
+        btn.textContent = v === 'summary' ? 'Quarterly Summary & Cohort' : 'Holder Changes';
         btn.addEventListener('click', () => { _otSubView = v; loadOwnershipTrend(); });
         bar.appendChild(btn);
     });
@@ -1161,7 +1161,9 @@ async function loadOwnershipTrend() {
 
     if (_otSubView === 'summary') {
         await loadOTSummary();
-    } else if (_otSubView === 'changes') {
+        // Also load cohort inline below summary
+        await loadOTCohort();
+    } else {
         // Reuse existing query2 — fetch and render inline
         showSpinner();
         try {
@@ -1170,13 +1172,10 @@ async function loadOwnershipTrend() {
             currentData = await res.json();
             currentQuery = 2;
             hideSpinner();
-            // renderTable clears tableWrap — we need to preserve the bar
             const savedBar = tableWrap.querySelector('.sub-view-bar');
             renderTable(currentData, 2);
             if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
         } catch (e) { hideSpinner(); showError(e.message); }
-    } else {
-        await loadOTCohort();
     }
 }
 
@@ -1231,16 +1230,14 @@ function renderOTSummary(data) {
 }
 
 async function loadOTCohort() {
-    showSpinner();
+    // Loads inline below summary — no spinner/clear needed
     try {
         const res = await fetch(`/api/cohort_analysis?ticker=${currentTicker}`);
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        if (!res.ok) return; // silently skip if cohort fails
         const data = await res.json();
-        hideSpinner();
-        const savedBar = tableWrap.querySelector('.sub-view-bar');
+        tableWrap.appendChild(sectionHeader('Cohort Analysis (Q1 → Q4)'));
         renderCohort(data);
-        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
-    } catch (e) { hideSpinner(); showError(e.message); }
+    } catch (e) { /* cohort is optional enhancement */ }
 }
 
 function renderCohort(data) {
@@ -1806,27 +1803,40 @@ let _neSubView = 'new';
 
 async function loadNewExits() {
     clearError(); tableWrap.innerHTML = '';
-    const bar = document.createElement('div');
-    bar.className = 'sub-view-bar';
-    ['new', 'exits'].forEach(v => {
-        const btn = document.createElement('button');
-        btn.className = 'co-view-btn' + (v === _neSubView ? ' active' : '');
-        btn.textContent = v === 'new' ? 'New Positions' : 'Exits';
-        btn.addEventListener('click', () => { _neSubView = v; loadNewExits(); });
-        bar.appendChild(btn);
-    });
-    tableWrap.appendChild(bar);
-    const qnum = _neSubView === 'new' ? 10 : 11;
-    currentQuery = qnum;
+    currentQuery = 10;
     showSpinner();
     try {
-        const res = await fetch(`/api/query${qnum}?ticker=${currentTicker}`);
+        const res = await fetch(`/api/query10?ticker=${currentTicker}`);
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
-        currentData = await res.json();
+        const data = await res.json();
         hideSpinner();
-        const savedBar = tableWrap.querySelector('.sub-view-bar');
-        renderTable(currentData, qnum);
-        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
+        const wrap = tableWrap;
+        // New entries section
+        if (data.new_entries && data.new_entries.length) {
+            wrap.appendChild(sectionHeader('New Positions (Quarter-over-Quarter)'));
+            wrap.appendChild(buildSimpleTable(data.new_entries, [
+                {key: 'manager_name', label: 'Institution', type: 'text'},
+                {key: 'manager_type', label: 'Type', type: 'text'},
+                {key: 'shares', label: 'Shares', type: 'shares'},
+                {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
+                {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
+                {key: 'pct_of_float', label: '% Float', type: 'pct'},
+            ]));
+        }
+        // Exits section
+        if (data.exits && data.exits.length) {
+            wrap.appendChild(sectionHeader('Full Exits (Quarter-over-Quarter)'));
+            wrap.appendChild(buildSimpleTable(data.exits, [
+                {key: 'manager_name', label: 'Institution', type: 'text'},
+                {key: 'manager_type', label: 'Type', type: 'text'},
+                {key: 'q3_shares', label: 'Prior Shares', type: 'shares'},
+                {key: 'q3_value', label: 'Prior Value', type: 'dollar'},
+                {key: 'q3_pct', label: '% Portfolio', type: 'pct'},
+            ]));
+        }
+        if ((!data.new_entries || !data.new_entries.length) && (!data.exits || !data.exits.length)) {
+            wrap.innerHTML = '<div class="no-data">No position changes found.</div>';
+        }
     } catch (e) { hideSpinner(); showError(e.message); }
 }
 

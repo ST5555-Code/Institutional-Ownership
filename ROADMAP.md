@@ -196,6 +196,7 @@ _Last updated: April 3, 2026_
 | N6 | Manager profile page | Done | `/api/manager_profile` endpoint: top holdings, sector allocation, quarterly trend, summary stats. `loadManagerProfile()` in frontend with back-navigation |
 | N7 | Export improvements — Print/PDF | Done | "Print / PDF" button in action bar. Print styles hide UI chrome, optimize table/chart layout for print. Uses browser native print-to-PDF |
 | N8 | Webhook/alert system | Low | Configurable alerts: new 13D filing, >5% ownership change, short squeeze threshold crossed |
+| N16 | Query consolidation | Done | Fixed missing /api/cross_ownership route. Merged query10+11→Position Changes (entries+exits in one view). Improved query14 with parent grouping. Made query13 sector-generic (accepts ?sector= param). Consolidated Ownership Trend 3→2 sub-views (Summary+Cohort combined, Holder Changes) |
 | N9 | 13F-HR amendment reconciliation | Done | `/api/amendments` endpoint: shows managers who filed 13F-HR/A amendments for a ticker. Identifies amended vs original filing status |
 | N10 | Multi-quarter position timeline | Partial | Flow trend table added to Flow Analysis. Register tab sparklines deferred — requires query1 modification to return per-quarter share arrays |
 | N11 | Filer name resolution pipeline | Done | `resolve_names.py`: 3-pass resolution (holdings→EDGAR API→company_tickers.json). Added `name_resolved` column. 83.9%→90.0% resolved, 10% filing agents marked. `resolve_agent_names.py` extracts reporting person from filing text |

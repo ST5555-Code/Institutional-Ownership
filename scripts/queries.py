@@ -1547,37 +1547,24 @@ def query9(ticker):
 
 
 def query10(ticker):
-    """Largest new positions (Q4 entries)."""
+    """Position Changes — new entries AND exits combined."""
     con = get_db()
     try:
-        df = con.execute(f"""
+        entries = con.execute(f"""
             SELECT
-                q4.manager_name,
-                q4.manager_type,
-                q4.shares,
-                q4.market_value_live,
-                q4.pct_of_portfolio,
-                q4.pct_of_float
+                q4.manager_name, q4.manager_type,
+                q4.shares, q4.market_value_live,
+                q4.pct_of_portfolio, q4.pct_of_float
             FROM holdings q4
             LEFT JOIN holdings q3 ON q4.cik = q3.cik AND q3.ticker = ? AND q3.quarter = '{PQ}'
             WHERE q4.ticker = ? AND q4.quarter = '{LQ}' AND q3.cik IS NULL
             ORDER BY q4.market_value_live DESC NULLS LAST
-            LIMIT 20
+            LIMIT 25
         """, [ticker, ticker]).fetchdf()
-        return df_to_records(df)
-    finally:
-        pass  # connection managed by thread-local cache
 
-
-
-def query11(ticker):
-    """Largest exits (Q3 holders gone in Q4)."""
-    con = get_db()
-    try:
-        df = con.execute(f"""
+        exits = con.execute(f"""
             SELECT
-                q3.manager_name,
-                q3.manager_type,
+                q3.manager_name, q3.manager_type,
                 q3.shares as q3_shares,
                 q3.market_value_usd as q3_value,
                 q3.pct_of_portfolio as q3_pct
@@ -1585,11 +1572,20 @@ def query11(ticker):
             LEFT JOIN holdings q4 ON q3.cik = q4.cik AND q4.ticker = ? AND q4.quarter = '{LQ}'
             WHERE q3.ticker = ? AND q3.quarter = '{PQ}' AND q4.cik IS NULL
             ORDER BY q3.market_value_usd DESC
-            LIMIT 20
+            LIMIT 25
         """, [ticker, ticker]).fetchdf()
-        return df_to_records(df)
+
+        return clean_for_json({
+            'new_entries': df_to_records(entries),
+            'exits': df_to_records(exits),
+        })
     finally:
-        pass  # connection managed by thread-local cache
+        pass
+
+
+def query11(ticker):
+    """Redirects to query10 (consolidated Position Changes)."""
+    return query10(ticker)
 
 
 
@@ -1624,63 +1620,94 @@ def query12(ticker):
 
 
 
-def query13(ticker=None):
-    """Energy sector institutional rotation (Q1 to Q4 2025)."""
+def query13(ticker=None, sector=None):
+    """Sector rotation — institutional buying/selling by sector.
+    If sector is provided, shows stocks in that sector.
+    If no sector, shows all sectors with net flow summary."""
     con = get_db()
     try:
-        df = con.execute(f"""
-            WITH energy_moves AS (
-                SELECT
-                    h4.ticker,
-                    h4.issuer_name,
-                    COUNT(DISTINCT CASE WHEN h4.shares > COALESCE(h1.shares, 0) THEN h4.cik END) as buyers,
-                    COUNT(DISTINCT CASE WHEN h4.shares < COALESCE(h1.shares, 0) THEN h4.cik END) as sellers,
-                    COUNT(DISTINCT CASE WHEN h1.cik IS NULL THEN h4.cik END) as new_positions,
-                    SUM(h4.market_value_live) as q4_total_value
-                FROM holdings h4
-                INNER JOIN securities s ON h4.cusip = s.cusip AND s.is_energy = true
-                LEFT JOIN holdings h1 ON h4.cik = h1.cik AND h4.ticker = h1.ticker AND h1.quarter = '{FQ}'
-                WHERE h4.quarter = '{LQ}'
-                  AND h4.manager_type IN ('active', 'hedge_fund', 'activist')
-                GROUP BY h4.ticker, h4.issuer_name
-            )
-            SELECT *,
-                buyers - sellers as net_flow,
-                ROUND(buyers * 100.0 / (buyers + sellers), 1) as buy_pct
-            FROM energy_moves
-            WHERE buyers + sellers >= 5
-            ORDER BY net_flow DESC
-            LIMIT 25
-        """).fetchdf()
+        if sector:
+            # Specific sector: show individual stock rotation
+            df = con.execute(f"""
+                WITH sector_moves AS (
+                    SELECT
+                        h4.ticker,
+                        h4.issuer_name,
+                        COUNT(DISTINCT CASE WHEN h4.shares > COALESCE(h1.shares, 0) THEN h4.cik END) as buyers,
+                        COUNT(DISTINCT CASE WHEN h4.shares < COALESCE(h1.shares, 0) THEN h4.cik END) as sellers,
+                        COUNT(DISTINCT CASE WHEN h1.cik IS NULL THEN h4.cik END) as new_positions,
+                        SUM(h4.market_value_live) as q4_total_value
+                    FROM holdings h4
+                    INNER JOIN market_data md ON h4.ticker = md.ticker AND md.sector = ?
+                    LEFT JOIN holdings h1 ON h4.cik = h1.cik AND h4.ticker = h1.ticker AND h1.quarter = '{FQ}'
+                    WHERE h4.quarter = '{LQ}'
+                      AND h4.manager_type IN ('active', 'hedge_fund', 'activist')
+                    GROUP BY h4.ticker, h4.issuer_name
+                )
+                SELECT *,
+                    buyers - sellers as net_flow,
+                    ROUND(buyers * 100.0 / NULLIF(buyers + sellers, 0), 1) as buy_pct
+                FROM sector_moves
+                WHERE buyers + sellers >= 3
+                ORDER BY net_flow DESC
+                LIMIT 25
+            """, [sector]).fetchdf()
+        else:
+            # All sectors: summary view
+            df = con.execute(f"""
+                WITH sector_flows AS (
+                    SELECT
+                        md.sector,
+                        COUNT(DISTINCT h4.ticker) as stocks,
+                        COUNT(DISTINCT CASE WHEN h4.shares > COALESCE(h1.shares, 0) THEN h4.cik || h4.ticker END) as buy_moves,
+                        COUNT(DISTINCT CASE WHEN h4.shares < COALESCE(h1.shares, 0) THEN h4.cik || h4.ticker END) as sell_moves,
+                        SUM(h4.market_value_live) as q4_total_value
+                    FROM holdings h4
+                    INNER JOIN market_data md ON h4.ticker = md.ticker
+                    LEFT JOIN holdings h1 ON h4.cik = h1.cik AND h4.ticker = h1.ticker AND h1.quarter = '{FQ}'
+                    WHERE h4.quarter = '{LQ}' AND md.sector IS NOT NULL
+                      AND h4.manager_type IN ('active', 'hedge_fund', 'activist')
+                    GROUP BY md.sector
+                )
+                SELECT sector, stocks,
+                    buy_moves, sell_moves,
+                    buy_moves - sell_moves as net_flow,
+                    ROUND(buy_moves * 100.0 / NULLIF(buy_moves + sell_moves, 0), 1) as buy_pct,
+                    q4_total_value
+                FROM sector_flows
+                ORDER BY net_flow DESC
+            """).fetchdf()
         return df_to_records(df)
     finally:
-        pass  # connection managed by thread-local cache
+        pass
 
 
 
 def query14(ticker):
-    """Manager AUM vs position size."""
+    """Manager AUM vs position size — consolidated with conviction data."""
     con = get_db()
     try:
         df = con.execute(f"""
             SELECT
-                h.manager_name,
+                COALESCE(h.inst_parent_name, h.manager_name) as manager_name,
                 h.manager_type,
                 h.is_activist,
                 m.aum_total / 1e9 as manager_aum_bn,
-                h.market_value_live / 1e6 as position_mm,
-                h.pct_of_portfolio,
-                h.shares
+                SUM(h.market_value_live) / 1e6 as position_mm,
+                MAX(h.pct_of_portfolio) as pct_of_portfolio,
+                SUM(h.pct_of_float) as pct_of_float,
+                SUM(h.shares) as shares
             FROM holdings h
             LEFT JOIN managers m ON h.cik = m.cik
             WHERE h.ticker = ? AND h.quarter = '{LQ}'
-              AND m.aum_total IS NOT NULL AND m.aum_total > 0
-            ORDER BY h.market_value_live DESC NULLS LAST
-            LIMIT 50
+            GROUP BY COALESCE(h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
+            HAVING SUM(h.market_value_live) > 0
+            ORDER BY SUM(h.market_value_live) DESC NULLS LAST
+            LIMIT 25
         """, [ticker]).fetchdf()
         return df_to_records(df)
     finally:
-        pass  # connection managed by thread-local cache
+        pass
 
 
 
