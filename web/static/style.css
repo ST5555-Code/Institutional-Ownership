@@ -1013,6 +1013,24 @@ body {
     transition: opacity 0.15s;
 }
 
+/* Consistent table column widths */
+.data-table .col-rownum {
+    width: 28px;
+    max-width: 28px;
+    min-width: 28px;
+    text-align: right;
+    color: #999;
+    font-size: 11px;
+    padding-right: 4px;
+}
+.data-table .col-name {
+    min-width: 180px;
+    max-width: 280px;
+}
+.data-table .col-right {
+    min-width: 80px;
+}
+
 /* Print styles for PDF export */
 @media print {
     .tab-bar, .action-bar, .search-container, #print-btn,

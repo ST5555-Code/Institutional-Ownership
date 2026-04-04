@@ -354,7 +354,6 @@ async function loadQuery(qnum, extraParams) {
 // Width, alignment, and visual role are auto-inferred from key+label names.
 const QUERY_COLUMNS = {
     1: [
-        {key: 'rank',        label: '#',            type: 'num'},
         {key: 'institution', label: 'Institution',  type: 'text'},
         {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
         {key: 'shares',      label: 'Shares',       type: 'shares'},
@@ -709,7 +708,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
 
         // Row number (parent-level only, children get blank)
         const tdRowNum = document.createElement('td');
-        tdRowNum.style.cssText = 'text-align:right;color:#999;font-size:11px;';
+        tdRowNum.className = 'col-rownum';
         if (!row.level || row.level === 0) {
             parentRowNum++;
             tdRowNum.textContent = parentRowNum;
@@ -1393,16 +1392,21 @@ const SUBTOTAL_AT = [10, 25];
 function _buildSubtotalRow(data, cols, fromIdx, toIdx, label) {
     const tr = document.createElement('tr');
     tr.className = 'subtotal-row';
-    // # column
+    // # column (blank)
     const tdNum = document.createElement('td');
-    tdNum.style.cssText = 'font-weight:700;text-align:left;border-top:2px solid #999;';
-    tdNum.textContent = label;
+    tdNum.className = 'col-rownum';
+    tdNum.style.borderTop = '2px solid #999';
     tr.appendChild(tdNum);
+    // Data columns — first text col gets the label
+    let labelPlaced = false;
     cols.forEach(c => {
         const td = document.createElement('td');
         td.style.cssText = 'font-weight:700;border-top:2px solid #999;';
         td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
-        if (_isNumericCol(c.type) && c.type !== 'pct') {
+        if (!labelPlaced && !_isNumericCol(c.type)) {
+            td.textContent = label;
+            labelPlaced = true;
+        } else if (_isNumericCol(c.type) && c.type !== 'pct') {
             let sum = 0;
             for (let i = fromIdx; i < Math.min(toIdx, data.length); i++) {
                 const v = data[i][c.key];
@@ -1425,8 +1429,7 @@ function buildSimpleTable(data, cols) {
     const hr = document.createElement('tr');
     const thNum = document.createElement('th');
     thNum.textContent = '#';
-    thNum.style.textAlign = 'right';
-    thNum.style.width = '35px';
+    thNum.className = 'col-rownum';
     hr.appendChild(thNum);
     cols.forEach(c => {
         const th = document.createElement('th');
@@ -1448,9 +1451,7 @@ function buildSimpleTable(data, cols) {
         // Row number
         const tdNum = document.createElement('td');
         tdNum.textContent = rowNum;
-        tdNum.style.textAlign = 'right';
-        tdNum.style.color = '#999';
-        tdNum.style.fontSize = '11px';
+        tdNum.className = 'col-rownum';
         tr.appendChild(tdNum);
         cols.forEach(c => {
             const td = document.createElement('td');
@@ -1526,8 +1527,7 @@ function _flowTable(rows, cols, rowClass) {
     const hr = document.createElement('tr');
     const thNum = document.createElement('th');
     thNum.textContent = '#';
-    thNum.style.textAlign = 'right';
-    thNum.style.width = '35px';
+    thNum.className = 'col-rownum';
     hr.appendChild(thNum);
     cols.forEach(c => {
         const th = document.createElement('th');
@@ -1546,7 +1546,7 @@ function _flowTable(rows, cols, rowClass) {
         // Row number
         const tdNum = document.createElement('td');
         tdNum.textContent = rowNum;
-        tdNum.style.cssText = 'text-align:right;color:#999;font-size:11px;';
+        tdNum.className = 'col-rownum';
         tr.appendChild(tdNum);
         cols.forEach(c => {
             const td = document.createElement('td');
