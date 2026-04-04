@@ -2120,8 +2120,28 @@ def _build_cohort(q1_map, q4_map):
         'unchanged': sum(1 for i in top10_inv if i in set(unchanged)),
     }
 
+    # Economic-weighted retention: retained value as % of prior total value
+    prior_total_value = sum((q1_map[i].get('value') or 0) for i in q1_set)
+    retained_value_in_q4 = sum((q4_map[i].get('value') or 0) for i in retained)
+    econ_retention = round(retained_value_in_q4 / prior_total_value * 100, 1) if prior_total_value > 0 else 0
+
+    # Totals row (no double-counting): all unique entities in Q4
+    total_q4_holders = len(q4_set)
+    total_q4_shares = sum((q4_map[i].get('shares') or 0) for i in q4_set)
+    total_q4_value = sum((q4_map[i].get('value') or 0) for i in q4_set)
+    total_delta_s = net_shares
+    total_delta_v = net_value
+
+    detail.append({
+        'category': 'Total', 'holders': total_q4_holders, 'shares': total_q4_shares,
+        'value': total_q4_value, 'avg_position': round(total_q4_value / total_q4_holders, 2) if total_q4_holders > 0 else 0,
+        'pct_float_moved': 100.0, 'delta_shares': total_delta_s, 'delta_value': total_delta_v,
+        'level': -1, 'is_total': True, 'has_children': False,
+    })
+
     summary = {
         'retention_rate': round(len(retained) / total_q1 * 100, 2) if total_q1 > 0 else 0,
+        'econ_retention': econ_retention,
         'net_holders': net_holders,
         'net_shares': net_shares,
         'net_value': net_value,
@@ -2193,6 +2213,45 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
         summary['to_quarter'] = lq
         summary['level'] = level
         summary['active_only'] = active_only
+
+        # Economic retention for last 3 QoQ transitions (active investors only)
+        # Uses 13F holdings with active manager types regardless of cohort level setting
+        econ_retention_trend = []
+        for i in range(len(QUARTERS) - 1):
+            q_from, q_to = QUARTERS[i], QUARTERS[i + 1]
+            try:
+                from_df = con.execute(f"""
+                    SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                           SUM(market_value_usd) as value
+                    FROM holdings
+                    WHERE ticker = ? AND quarter = '{q_from}'
+                      AND manager_type NOT IN ('passive', 'unknown')
+                    GROUP BY investor
+                """, [ticker]).fetchdf()
+                to_df = con.execute(f"""
+                    SELECT COALESCE(inst_parent_name, manager_name) as investor,
+                           SUM(market_value_usd) as value
+                    FROM holdings
+                    WHERE ticker = ? AND quarter = '{q_to}'
+                      AND manager_type NOT IN ('passive', 'unknown')
+                    GROUP BY investor
+                """, [ticker]).fetchdf()
+                from_map = {r['investor']: float(r['value'] or 0) for _, r in from_df.iterrows()}
+                to_map = {r['investor']: float(r['value'] or 0) for _, r in to_df.iterrows()}
+                ret_set = set(from_map) & set(to_map)
+                prior_val = sum(from_map.values())
+                retained_val = sum(to_map[i] for i in ret_set)
+                er = round(retained_val / prior_val * 100, 1) if prior_val > 0 else 0
+                econ_retention_trend.append({
+                    'from': q_from, 'to': q_to,
+                    'econ_retention': er,
+                    'active_holders_from': len(from_map),
+                    'active_holders_to': len(to_map),
+                })
+            except Exception:
+                pass
+        summary['econ_retention_trend'] = econ_retention_trend
+
         return {'summary': summary, 'detail': detail}
     finally:
         pass  # connection managed by thread-local cache

@@ -1718,18 +1718,26 @@ function renderCohort(data, container) {
     selBar.appendChild(btnGroup);
     container.appendChild(selBar);
 
-    // Net flow summary line
-    const netLine = document.createElement('div');
-    netLine.style.cssText = 'font-size:13px;color:#333;margin:4px 0 12px 0;';
-    const nh = summary.net_holders || 0;
-    const ns = summary.net_shares || 0;
-    const nv = summary.net_value || 0;
-    const entityLabel = lvl === 'fund' ? 'funds' : 'holders';
-    netLine.innerHTML = `<strong>Net:</strong> ${nh >= 0 ? '+' : ''}${nh} ${entityLabel}, `
-        + `${ns >= 0 ? '+' : ''}${fmtShares(Math.abs(ns))} shares, `
-        + `${nv >= 0 ? '+' : '-'}${fmtDollars(Math.abs(nv))} `
-        + `<span style="color:#999;margin-left:8px;">Retention: ${summary.retention_rate}%</span>`;
-    container.appendChild(netLine);
+    // Economic retention trend (active investors, last 3 QoQ)
+    const ert = summary.econ_retention_trend || [];
+    if (ert.length > 0) {
+        const retLine = document.createElement('div');
+        retLine.style.cssText = 'font-size:12px;color:#555;margin:6px 0 10px 0;display:flex;align-items:center;gap:16px;';
+        const retLabel = document.createElement('span');
+        retLabel.style.fontWeight = '600';
+        retLabel.textContent = 'Active Econ. Retention:';
+        retLine.appendChild(retLabel);
+        ert.forEach(p => {
+            const s = document.createElement('span');
+            const pct = p.econ_retention;
+            const color = pct >= 95 ? '#27AE60' : pct >= 85 ? '#F39C12' : '#C0392B';
+            s.innerHTML = `<span style="color:#999">${_fmtQ(p.from)}\u2192${_fmtQ(p.to)}</span> `
+                + `<strong style="color:${color}">${pct}%</strong>`
+                + `<span style="color:#bbb;font-size:11px;margin-left:2px">(${p.active_holders_from}\u2192${p.active_holders_to})</span>`;
+            retLine.appendChild(s);
+        });
+        container.appendChild(retLine);
+    }
 
     // Detail table
     const table = document.createElement('table');
@@ -1780,6 +1788,11 @@ function renderCohort(data, container) {
     function _buildRow(row, indent) {
         const tr = document.createElement('tr');
         if (row.is_parent) tr.style.fontWeight = '700';
+        if (row.is_total) {
+            tr.style.fontWeight = '700';
+            tr.style.borderTop = '3px solid #002147';
+            tr.style.background = '#f0f4f8';
+        }
 
         // Category cell
         const tdCat = document.createElement('td');
