@@ -28,7 +28,7 @@ edgar = None
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-from db import get_db_path, set_test_mode, set_staging_mode, assert_write_safe, crash_handler
+from db import get_db_path, set_test_mode, set_staging_mode, is_staging_mode, connect_read, assert_write_safe, crash_handler
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def _init_edgar():
@@ -575,14 +575,23 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
     error_log = init_error_log()
     filing_cache = filing_cache or {}
 
-    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
-
-    unparsed = con.execute("""
-        SELECT l.accession_number, l.ticker, l.form, l.filing_date, l.filer_cik,
-               l.subject_name, l.subject_cik
-        FROM listed_filings_13dg l
+    # Read reference tables from production when in staging mode
+    read_con = connect_read() if is_staging_mode() else con
+    try:
+        cusip_map = {r[0]: r[1] for r in read_con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
+    except Exception:
+        cusip_map = {}
+    try:
+        unparsed = read_con.execute("""
+            SELECT l.accession_number, l.ticker, l.form, l.filing_date, l.filer_cik,
+                   l.subject_name, l.subject_cik
+            FROM listed_filings_13dg l
         WHERE l.accession_number NOT IN (SELECT accession_number FROM beneficial_ownership)
     """).fetchall()
+    except Exception:
+        unparsed = []
+    if is_staging_mode() and read_con is not con:
+        read_con.close()
 
     if not unparsed:
         print("  No unparsed filings — all up to date.")
