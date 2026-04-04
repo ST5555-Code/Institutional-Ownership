@@ -9,8 +9,8 @@ _Last updated: April 3, 2026_
 | # | Item | Notes |
 |---|------|-------|
 | P1 | Full 13D/G fetch — `fetch_13dg.py` | Done | 60,135 filings parsed (99.8%). 112 remaining are HTTP 404s or regex-hang filings — not recoverable |
-| P2 | `fetch_market.py` batch rewrite | Done — batch yf.download(), persistent cache (7-day), upsert-only. Needs production test |
-| P3 | `compute_flows.py` set-based rewrite | Done — single INSERT per period via window functions. Needs production test |
+| P2 | `fetch_market.py` batch rewrite | Done | Batch yf.download(), persistent cache (7-day), upsert-only. --metadata-only mode, price-only fallback. Production tested |
+| P3 | `compute_flows.py` set-based rewrite | Done | Single INSERT per period via window functions. 9.4M rows in 10s. Production tested |
 
 ---
 
