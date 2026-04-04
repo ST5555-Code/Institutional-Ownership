@@ -220,6 +220,7 @@ _Last updated: April 3, 2026_
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | U1 | N-PORT coverage disclaimer tooltip | Done | Hover tooltip on "N-PORT Coverage" label in summary card. Dotted underline indicates hoverable. Explains mutual fund + ETF coverage and deduplication |
+| U2 | Row numbers on all tables | Medium | Add sequential row number column (1, 2, 3...) to all data tables in HTML display and Excel export. Applies to Register, Conviction, Flow Analysis, Activist, Smart Money, Crowding, Fund Portfolio, Cross-Ownership, Sector Rotation, New/Exits, AUM tabs. Row numbers should reset per table/section and persist through pagination |
 
 ---
 
