@@ -809,16 +809,20 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
 
-        // Row number (parent=bold, children=blank)
+        // Row number: parent=bold rank, children=indented 1-5
         const tdRowNum = document.createElement('td');
         tdRowNum.className = 'col-rownum';
         if (!row.level || row.level === 0) {
             parentRowNum++;
             tdRowNum.textContent = parentRowNum;
-            if (row.is_parent) tdRowNum.style.fontWeight = '700';
+            tdRowNum.style.fontWeight = '700';
             if (TIER_BREAKS.includes(parentRowNum)) {
                 tr.style.borderBottom = '1px solid #ccc';
             }
+        } else if (row.level === 1 && row.rank) {
+            // Child row: show rank 1-5, indented, normal weight
+            tdRowNum.textContent = row.rank;
+            tdRowNum.style.paddingLeft = '8px';
         }
         tr.appendChild(tdRowNum);
 
@@ -854,8 +858,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
                         displayVal = null; // already set via DOM
                     } else if (row.level === 1) {
                         td.classList.add('col-indent');
-                        const prefix = (rtype && rtype !== 'passive' && rtype !== 'unknown') ? '* ' : '';
-                        displayVal = '\u21B3 ' + prefix + (val || '');
+                        displayVal = val || '';
                     } else {
                         displayVal = val != null ? String(val) : '';
                     }

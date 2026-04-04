@@ -834,12 +834,11 @@ def query1(ticker):
                 if c['institution'].lower() not in nport_names and c.get('subadviser_note'):
                     merged.append(c)
 
-            # If no N-PORT, use 13F children as-is
-            if not nport_kids:
-                merged = f13_kids
-
-            effective_children = len(merged)
-            source = 'N-PORT' if nport_kids else '13F'
+            # Only show N-PORT children as expandable. No N-PORT = flat row.
+            has_nport = len(nport_kids) > 0
+            # Limit to top 5 N-PORT children by value
+            children_to_show = sorted(nport_kids, key=lambda c: c.get('value_live') or 0, reverse=True)[:5]
+            source = 'N-PORT' if has_nport else '13F'
 
             results.append({
                 'rank': rank,
@@ -849,17 +848,17 @@ def query1(ticker):
                 'pct_float': parent['pct_float'],
                 'aum': aum_map.get(pname),
                 'type': parent['type'],
-                'is_parent': effective_children >= 2,
-                'child_count': effective_children,
+                'is_parent': has_nport and len(children_to_show) > 0,
+                'child_count': len(children_to_show),
                 'level': 0,
                 'source': source,
-                'subadviser_note': get_subadviser_note(pname) if not nport_kids else None,
+                'subadviser_note': get_subadviser_note(pname) if not has_nport else None,
             })
 
-            if effective_children >= 2:
-                for c in merged:
+            if has_nport and children_to_show:
+                for child_rank, c in enumerate(children_to_show, 1):
                     results.append({
-                        'rank': None,
+                        'rank': child_rank,
                         'institution': c.get('institution'),
                         'value_live': c.get('value_live'),
                         'shares': c.get('shares'),
