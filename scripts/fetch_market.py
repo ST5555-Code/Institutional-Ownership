@@ -252,12 +252,104 @@ def update_holdings(con):
     print(f"  Holdings with live value: {live:,} / {total:,} ({live / total * 100:.1f}%)")
 
 
+def fetch_metadata_only(con, batch_size=700):
+    """Fetch ONLY metadata (market_cap, float_shares, sector) for tickers that
+    already have price_live but are missing metadata. Avoids wasting rate limit
+    on price downloads we don't need."""
+    missing = con.execute("""
+        SELECT ticker FROM market_data
+        WHERE price_live IS NOT NULL AND market_cap IS NULL
+        ORDER BY price_live DESC
+    """).fetchdf()["ticker"].tolist()
+
+    if not missing:
+        print("  All tickers have metadata. Nothing to fetch.")
+        return
+
+    batch = missing[:batch_size]
+    print(f"  Missing metadata: {len(missing):,} tickers")
+    print(f"  Fetching batch: {len(batch):,} (ordered by price desc)")
+
+    records = []
+    failed = []
+    today = datetime.now().strftime("%Y-%m-%d")
+    meta_batch = 50
+
+    for i in range(0, len(batch), meta_batch):
+        chunk = batch[i:i + meta_batch]
+        try:
+            data = yf.Tickers(" ".join(chunk))
+            for tkr_str in chunk:
+                try:
+                    tkr = data.tickers.get(tkr_str)
+                    if tkr is None:
+                        failed.append(tkr_str)
+                        continue
+                    info = tkr.info or {}
+                    cap = info.get("marketCap")
+                    if not cap:
+                        failed.append(tkr_str)
+                        continue
+                    # Get existing price from DB
+                    existing = con.execute(
+                        "SELECT price_live FROM market_data WHERE ticker = ?", [tkr_str]
+                    ).fetchone()
+                    price = existing[0] if existing else info.get("regularMarketPrice")
+                    records.append({
+                        "ticker": tkr_str, "price_live": price,
+                        "market_cap": cap,
+                        "float_shares": info.get("floatShares"),
+                        "shares_outstanding": info.get("sharesOutstanding"),
+                        "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
+                        "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
+                        "avg_volume_30d": info.get("averageVolume"),
+                        "sector": info.get("sector"),
+                        "industry": info.get("industry"),
+                        "exchange": info.get("exchange"),
+                        "fetch_date": today,
+                    })
+                    for q in SNAPSHOT_DATES:
+                        records[-1][f"price_{q}"] = None
+                except Exception:
+                    failed.append(tkr_str)
+        except Exception as e:
+            print(f"    Batch error at {i}: {e}", flush=True)
+            failed.extend(chunk)
+
+        if (i + meta_batch) % 200 == 0:
+            print(f"    [{min(i + meta_batch, len(batch)):,}/{len(batch):,}] "
+                  f"{len(records):,} ok, {len(failed):,} failed", flush=True)
+        time.sleep(0.1)
+
+    print(f"  Metadata fetched: {len(records):,}, Failed: {len(failed):,}")
+
+    if records:
+        df = pd.DataFrame(records)
+        save_market_data(con, df)
+        fetch_snapshot_prices(con, df["ticker"].tolist())
+
+    return len(records)
+
+
 def main():
     print("=" * 60)
     print("fetch_market.py — Market Data")
     print("=" * 60)
 
     con = duckdb.connect(get_db_path())
+
+    # Metadata-only mode: fill gaps without burning rate limit on prices
+    if args.metadata_only:
+        print(f"  Mode: metadata-only (batch size {args.batch_size})")
+        count = fetch_metadata_only(con, batch_size=args.batch_size)
+        con.execute("CHECKPOINT")
+        if not is_staging_mode():
+            update_holdings(con)
+        else:
+            print("  Staging mode: skipping holdings update (run after merge)")
+        con.close()
+        print("\nDone.")
+        return
 
     # In staging mode, read tickers from production (holdings only exists there)
     if is_staging_mode():
@@ -307,6 +399,10 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Fetch market data from yfinance")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--metadata-only", action="store_true",
+                        help="Only fetch metadata for tickers already having price_live")
+    parser.add_argument("--batch-size", type=int, default=700,
+                        help="Number of tickers per metadata-only run (default 700)")
     args = parser.parse_args()
     if args.staging:
         set_staging_mode(True)
