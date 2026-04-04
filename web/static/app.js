@@ -2434,7 +2434,7 @@ function renderFlowAnalysis(data) {
             const card = document.createElement('div');
             card.style.cssText = 'flex:1;min-width:0;';
             const h = document.createElement('div');
-            h.style.cssText = 'font-size:10px;font-weight:600;color:#002147;text-align:center;margin-bottom:2px;';
+            h.style.cssText = 'font-size:12px;font-weight:600;color:#002147;text-align:center;margin-bottom:2px;';
             h.textContent = title;
             card.appendChild(h);
             const wrap = document.createElement('div');
@@ -2529,10 +2529,10 @@ function renderFlowAnalysis(data) {
                             tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' } },
                         },
                         scales: {
-                            x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+                            x: { ticks: { font: { size: 12 } }, grid: { display: false } },
                             y: {
                                 min: scale.min, max: scale.max,
-                                ticks: { font: { size: 8 }, callback: v => v.toFixed(1) + '%', maxTicksLimit: 5 },
+                                ticks: { font: { size: 11 }, callback: v => v.toFixed(1) + '%', maxTicksLimit: 5 },
                                 grid: { color: '#f0f0f0' },
                             },
                         },
