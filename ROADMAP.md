@@ -221,6 +221,7 @@ _Last updated: April 3, 2026_
 |---|------|----------|-------|
 | U1 | N-PORT coverage disclaimer tooltip | Done | Hover tooltip on "N-PORT Coverage" label in summary card. Dotted underline indicates hoverable. Explains mutual fund + ETF coverage and deduplication |
 | U2 | Row numbers on all tables | Medium | Add sequential row number column (1, 2, 3...) to all data tables in HTML display and Excel export. Applies to Register, Conviction, Flow Analysis, Activist, Smart Money, Crowding, Fund Portfolio, Cross-Ownership, Sector Rotation, New/Exits, AUM tabs. Row numbers should reset per table/section and persist through pagination |
+| U3 | Top 10 / Top 15 investor list formatting | Medium | All investor list tables show Top 10, then a visual separator line, then 5 more for Top 15. Below row 10: insert a bold subtotal row for Top 10 totals (shares, value, % float). Below row 15: insert a bold subtotal row for Top 15 totals. Applies to: Register, Conviction, Crowding, Flow Analysis buyers/sellers, Smart Money, Ownership Trend. Backend queries should return at least 15 rows. Frontend renders the separator and subtotal rows inline |
 
 ---
 
