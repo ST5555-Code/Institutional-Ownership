@@ -1598,12 +1598,19 @@ function renderOTSummary(data) {
         tdBar.appendChild(barWrap);
         tr.appendChild(tdBar);
 
-        // QoQ Share Change
+        // QoQ Share Change (use plain format to avoid HTML-in-textContent)
         const tdC = document.createElement('td');
         tdC.style.textAlign = 'right';
         if (row.net_shares_change != null) {
-            tdC.textContent = (row.net_shares_change >= 0 ? '+' : '') + fmtShares(row.net_shares_change);
-            tdC.style.color = row.net_shares_change > 0 ? '#27AE60' : row.net_shares_change < 0 ? '#C0392B' : '';
+            const nsc = row.net_shares_change;
+            const abs = Math.abs(nsc);
+            let txt;
+            if (abs >= 1e9) txt = (abs / 1e9).toFixed(1) + 'B';
+            else if (abs >= 1e6) txt = (abs / 1e6).toFixed(1) + 'M';
+            else if (abs >= 1e3) txt = (abs / 1e3).toFixed(1) + 'K';
+            else txt = abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+            tdC.textContent = (nsc >= 0 ? '+' : '\u2212') + txt;
+            tdC.style.color = nsc > 0 ? '#27AE60' : nsc < 0 ? '#C0392B' : '';
         } else {
             tdC.textContent = '\u2014';
         }
@@ -1773,42 +1780,63 @@ function renderCohort(data, container) {
             return td;
         }
 
+        // Plain number format (no HTML wrapping for negatives)
+        function _plainShares(v) {
+            if (v == null || v === 0) return '\u2014';
+            const abs = Math.abs(v);
+            if (abs >= 1e9) return (abs / 1e9).toFixed(1) + 'B';
+            if (abs >= 1e6) return (abs / 1e6).toFixed(1) + 'M';
+            if (abs >= 1e3) return (abs / 1e3).toFixed(1) + 'K';
+            return abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+        function _plainDollars(v) {
+            if (v == null || v === 0) return '\u2014';
+            const abs = Math.abs(v);
+            if (abs >= 1e12) return '$' + (abs / 1e12).toFixed(1) + 'T';
+            if (abs >= 1e9) return '$' + (abs / 1e9).toFixed(1) + 'B';
+            if (abs >= 1e6) return '$' + (abs / 1e6).toFixed(0) + 'M';
+            if (abs >= 1e3) return '$' + (abs / 1e3).toFixed(0) + 'K';
+            return '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+
         // Holders
         const tdH = document.createElement('td');
         tdH.style.textAlign = 'right';
-        tdH.textContent = fmtNum(row.holders);
+        tdH.textContent = row.holders != null ? row.holders.toLocaleString() : '\u2014';
         tr.appendChild(tdH);
 
         // Shares (Q4 position)
         const tdS = document.createElement('td');
         tdS.style.textAlign = 'right';
-        tdS.textContent = fmtShares(row.shares);
+        tdS.textContent = _plainShares(row.shares);
         tr.appendChild(tdS);
 
         // Value (Q4 position)
         const tdV = document.createElement('td');
         tdV.style.textAlign = 'right';
-        tdV.textContent = fmtDollars(row.value);
+        tdV.textContent = _plainDollars(row.value);
         tr.appendChild(tdV);
 
         // Δ Shares
         const tdDS = _deltaCell(row.delta_shares);
         if (row.delta_shares && row.delta_shares !== 0) {
-            tdDS.textContent = (row.delta_shares > 0 ? '+' : '') + fmtShares(row.delta_shares);
+            const sign = row.delta_shares > 0 ? '+' : '\u2212';
+            tdDS.textContent = sign + _plainShares(row.delta_shares);
         }
         tr.appendChild(tdDS);
 
         // Δ Value
         const tdDV = _deltaCell(row.delta_value);
         if (row.delta_value && row.delta_value !== 0) {
-            tdDV.textContent = (row.delta_value > 0 ? '+' : '') + fmtDollars(row.delta_value);
+            const sign = row.delta_value > 0 ? '+' : '\u2212';
+            tdDV.textContent = sign + _plainDollars(row.delta_value);
         }
         tr.appendChild(tdDV);
 
         // Avg Position
         const tdAvg = document.createElement('td');
         tdAvg.style.textAlign = 'right';
-        tdAvg.textContent = fmtDollars(row.avg_position);
+        tdAvg.textContent = _plainDollars(row.avg_position);
         tr.appendChild(tdAvg);
 
         // % Inst Float
