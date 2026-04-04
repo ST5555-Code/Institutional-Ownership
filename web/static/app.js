@@ -2395,57 +2395,89 @@ function _flowTable(rows, cols, rowClass) {
 function renderFlowAnalysis(data) {
     currentData = data.buyers || [];
 
-    // --- 2×2 Chart Grid (always shows all QoQ periods) ---
+    // --- 4 charts in one row with section titles ---
     const qoq = data.qoq_charts || [];
     if (qoq.length > 0 && typeof Chart !== 'undefined') {
         const labels = qoq.map(d => d.label);
         function _barColors(vals) { return vals.map(v => v >= 0 ? '#27AE60' : '#C0392B'); }
 
-        const grid = document.createElement('div');
-        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0;';
-
-        function _chartCard(title, canvasId) {
+        function _chartCard(title) {
             const card = document.createElement('div');
             card.className = 'chart-card';
-            card.innerHTML = '<h3>' + title + '</h3>';
+            card.style.cssText = 'flex:1;min-width:0;padding:8px;';
+            const h = document.createElement('div');
+            h.style.cssText = 'font-size:11px;font-weight:600;color:#002147;text-align:center;margin-bottom:4px;';
+            h.textContent = title;
+            card.appendChild(h);
             const wrap = document.createElement('div');
-            wrap.style.cssText = 'position:relative;height:250px;';
+            wrap.style.cssText = 'position:relative;height:160px;';
             const canvas = document.createElement('canvas');
-            canvas.id = canvasId;
             wrap.appendChild(canvas);
             card.appendChild(wrap);
             return {card, canvas};
         }
 
-        // Row 1: Flow Intensity
-        const fi1 = _chartCard('Flow Intensity \u2014 Total', '_fi_total');
-        const fi2 = _chartCard('Flow Intensity \u2014 Active Only', '_fi_active');
-        grid.appendChild(fi1.card);
-        grid.appendChild(fi2.card);
+        // Section 1: Flow Intensity
+        const fiHeader = document.createElement('div');
+        fiHeader.style.cssText = 'padding:12px 0 4px 0;';
+        fiHeader.innerHTML = '<span style="font-size:14px;font-weight:700;color:#002147;">Flow Intensity</span>'
+            + '<span style="font-size:11px;color:#777;margin-left:10px;">'
+            + 'Net dollar change in institutional positions as % of market cap. Positive = net buying, negative = net selling.</span>';
+        tableWrap.appendChild(fiHeader);
 
-        // Row 2: Holder Churn
-        const ch1 = _chartCard('Holder Churn \u2014 Non-Passive', '_ch_np');
-        const ch2 = _chartCard('Holder Churn \u2014 Active Only', '_ch_active');
-        grid.appendChild(ch1.card);
-        grid.appendChild(ch2.card);
+        const fiRow = document.createElement('div');
+        fiRow.style.cssText = 'display:flex;gap:12px;';
+        const fi1 = _chartCard('Total');
+        const fi2 = _chartCard('Active Only');
+        fiRow.appendChild(fi1.card);
+        fiRow.appendChild(fi2.card);
+        tableWrap.appendChild(fiRow);
 
-        tableWrap.appendChild(grid);
+        // Section 2: Holder Churn
+        const chHeader = document.createElement('div');
+        chHeader.style.cssText = 'padding:16px 0 4px 0;';
+        chHeader.innerHTML = '<span style="font-size:14px;font-weight:700;color:#002147;">Holder Churn</span>'
+            + '<span style="font-size:11px;color:#777;margin-left:10px;">'
+            + 'Absolute value of position changes as % of average institutional value. Higher = more turnover. Measures trading activity, not direction.</span>';
+        tableWrap.appendChild(chHeader);
 
-        // Footnote below charts
+        const chRow = document.createElement('div');
+        chRow.style.cssText = 'display:flex;gap:12px;';
+        const ch1 = _chartCard('Non-Passive');
+        const ch2 = _chartCard('Active Only');
+        chRow.appendChild(ch1.card);
+        chRow.appendChild(ch2.card);
+        tableWrap.appendChild(chRow);
+
+        // Footnote
         const fn = document.createElement('div');
-        fn.style.cssText = 'font-size:11px;color:#999;padding:4px 0 16px 0;font-style:italic;';
-        fn.textContent = 'Flow intensity and churn based on net 13F position changes per quarter. Understates gross trading activity. Active Only excludes index and passive managers.';
+        fn.style.cssText = 'font-size:10px;color:#aaa;padding:6px 0 14px 0;font-style:italic;';
+        fn.textContent = 'Based on net 13F position changes per quarter. Understates gross trading activity. Active Only excludes index and passive managers.';
         tableWrap.appendChild(fn);
 
         // Render charts after DOM insertion
         setTimeout(() => {
-            // Destroy old charts
             ['_fiChart1','_fiChart2','_chChart1','_chChart2'].forEach(k => {
                 if (window[k]) { window[k].destroy(); window[k] = null; }
             });
 
-            function _makeBarChart(canvas, dataArr, yLabel, pctMultiplier) {
-                const vals = dataArr.map(v => v ? v * (pctMultiplier || 100) : 0);
+            // Compute consistent scale per pair
+            const fiTotalVals = qoq.map(d => (d.flow_intensity_total || 0) * 100);
+            const fiActiveVals = qoq.map(d => (d.flow_intensity_active || 0) * 100);
+            const allFi = fiTotalVals.concat(fiActiveVals);
+            const fiMin = Math.min(0, ...allFi);
+            const fiMax = Math.max(0, ...allFi);
+            const fiPad = (fiMax - fiMin) * 0.15 || 1;
+            const fiScale = { min: fiMin - fiPad, max: fiMax + fiPad };
+
+            const chNpVals = qoq.map(d => (d.churn_nonpassive || 0) * 100);
+            const chActVals = qoq.map(d => (d.churn_active || 0) * 100);
+            const allCh = chNpVals.concat(chActVals);
+            const chMax = Math.max(0, ...allCh);
+            const chPad = chMax * 0.15 || 1;
+            const chScale = { min: 0, max: chMax + chPad };
+
+            function _makeBarChart(canvas, vals, yLabel, scale) {
                 return new Chart(canvas, {
                     type: 'bar',
                     data: {
@@ -2453,7 +2485,9 @@ function renderFlowAnalysis(data) {
                         datasets: [{
                             data: vals,
                             backgroundColor: _barColors(vals),
-                            borderRadius: 3,
+                            borderRadius: 2,
+                            barPercentage: 0.5,
+                            categoryPercentage: 0.6,
                         }],
                     },
                     options: {
@@ -2461,25 +2495,23 @@ function renderFlowAnalysis(data) {
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => ctx.parsed.y.toFixed(2) + '%',
-                                },
-                            },
+                            tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' } },
                         },
                         scales: {
+                            x: { ticks: { font: { size: 10 } } },
                             y: {
-                                title: { display: true, text: yLabel, font: { size: 11 } },
-                                ticks: { callback: v => v.toFixed(1) + '%' },
+                                min: scale.min, max: scale.max,
+                                title: { display: true, text: yLabel, font: { size: 10 } },
+                                ticks: { font: { size: 9 }, callback: v => v.toFixed(1) + '%' },
                             },
                         },
                     },
                 });
             }
-            window._fiChart1 = _makeBarChart(fi1.canvas, qoq.map(d => d.flow_intensity_total), '% of Mkt Cap');
-            window._fiChart2 = _makeBarChart(fi2.canvas, qoq.map(d => d.flow_intensity_active), '% of Mkt Cap');
-            window._chChart1 = _makeBarChart(ch1.canvas, qoq.map(d => d.churn_nonpassive), 'Churn Rate %');
-            window._chChart2 = _makeBarChart(ch2.canvas, qoq.map(d => d.churn_active), 'Churn Rate %');
+            window._fiChart1 = _makeBarChart(fi1.canvas, fiTotalVals, '% Mkt Cap', fiScale);
+            window._fiChart2 = _makeBarChart(fi2.canvas, fiActiveVals, '% Mkt Cap', fiScale);
+            window._chChart1 = _makeBarChart(ch1.canvas, chNpVals, 'Churn %', chScale);
+            window._chChart2 = _makeBarChart(ch2.canvas, chActVals, 'Churn %', chScale);
         }, 100);
     }
 
