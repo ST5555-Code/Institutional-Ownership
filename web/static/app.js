@@ -358,7 +358,7 @@ const QUERY_COLUMNS = {
         {key: 'value_live',  label: 'Value (Live)', type: 'dollar'},
         {key: 'shares',      label: 'Shares',       type: 'shares'},
         {key: 'pct_float',   label: '% Float / NAV', type: 'pct'},
-        {key: 'aum',         label: 'AUM ($B)',     type: 'num'},
+        {key: 'aum',         label: 'AUM ($M)',     type: 'num'},
         {key: 'type',        label: 'Type',         type: 'text'},
         {key: 'source',      label: 'Source',       type: 'text'},
     ],
@@ -943,8 +943,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         });
     }
 
-    // --- Assemble ---
-    tableWrap.innerHTML = '';
+    // --- Assemble (don't clear — caller handles clearing) ---
     if (showLegend) tableWrap.appendChild(buildLegend());
     tableWrap.appendChild(table);
 }
@@ -1510,10 +1509,23 @@ function _applyHeatmapOverlay(enabled) {
         });
     }
 
+    // Find Type column index to check for 'active'
+    let typeIdx = -1;
+    headers.forEach((th, i) => {
+        if (th.textContent.trim() === 'Type') typeIdx = i;
+    });
+
     table.querySelectorAll('tbody tr').forEach(tr => {
         const cells = tr.querySelectorAll('td');
         if (!cells[valIdx]) return;
         if (!enabled) {
+            cells[valIdx].style.background = '';
+            cells[valIdx].style.color = '';
+            return;
+        }
+        // Only color active managers
+        const typeText = (typeIdx >= 0 && cells[typeIdx]) ? cells[typeIdx].textContent.trim().toLowerCase() : '';
+        if (typeText !== 'active' && typeText !== 'hedge_fund' && typeText !== 'activist') {
             cells[valIdx].style.background = '';
             cells[valIdx].style.color = '';
             return;

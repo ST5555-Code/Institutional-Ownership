@@ -723,26 +723,26 @@ def query1(ticker):
         if not parent_names:
             return []
 
-        # R14: Fetch AUM — ADV data first, 13F total value as fallback
+        # R14: Fetch AUM in $M — ADV data first, 13F total value as fallback
         aum_map = {}
         try:
             aum_df = con.execute("""
-                SELECT parent_name, SUM(aum_total) / 1e9 as aum_bn
+                SELECT parent_name, SUM(aum_total) / 1e6 as aum_mm
                 FROM managers WHERE aum_total IS NOT NULL AND aum_total > 1e9
                 GROUP BY parent_name
             """).fetchdf()
-            aum_map = {r['parent_name']: round(r['aum_bn'], 1) for _, r in aum_df.iterrows() if r['aum_bn']}
+            aum_map = {r['parent_name']: int(r['aum_mm']) for _, r in aum_df.iterrows() if r['aum_mm']}
 
             ph_aum = ','.join(['?'] * len(parent_names))
             fallback_df = con.execute(f"""
-                SELECT inst_parent_name, SUM(market_value_usd) / 1e9 as val_bn
+                SELECT inst_parent_name, SUM(market_value_usd) / 1e6 as val_mm
                 FROM holdings WHERE quarter = '{LQ}' AND inst_parent_name IN ({ph_aum})
                 GROUP BY inst_parent_name
             """, parent_names).fetchdf()
             for _, r in fallback_df.iterrows():
                 pn = r['inst_parent_name']
-                if pn not in aum_map and r['val_bn'] and r['val_bn'] > 0:
-                    aum_map[pn] = round(r['val_bn'], 1)
+                if pn not in aum_map and r['val_mm'] and r['val_mm'] > 0:
+                    aum_map[pn] = int(r['val_mm'])
         except Exception:
             pass
 
