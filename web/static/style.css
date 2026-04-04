@@ -213,9 +213,13 @@ body {
     display: flex;
     gap: 2px;
     overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
     padding-bottom: 0;
     border-bottom: 2px solid var(--mid-grey);
 }
+.tab-bar .tab { flex-shrink: 0; }
 
 .tab {
     padding: 8px 14px;
@@ -1030,6 +1034,10 @@ body {
 }
 .data-table .col-right {
     min-width: 80px;
+}
+.data-table {
+    table-layout: auto;
+    width: 100%;
 }
 
 /* Print styles for PDF export */

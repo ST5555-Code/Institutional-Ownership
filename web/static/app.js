@@ -580,11 +580,48 @@ function renderTable(data, qnum) {
 function _renderCurrentPage() {
     const data = _fullData;
     const qnum = _currentQnum;
-    const totalPages = Math.ceil(data.length / PAGE_SIZE);
-    const start = _currentPage * PAGE_SIZE;
-    const pageData = data.length > PAGE_SIZE ? data.slice(start, start + PAGE_SIZE) : data;
+    // Register tab (query1): show all rows, no pagination
+    const noPagination = (qnum === 1);
+    const totalPages = noPagination ? 1 : Math.ceil(data.length / PAGE_SIZE);
+    const start = noPagination ? 0 : _currentPage * PAGE_SIZE;
+    const pageData = noPagination ? data : (data.length > PAGE_SIZE ? data.slice(start, start + PAGE_SIZE) : data);
 
     const cols = QUERY_COLUMNS[qnum];
+
+    // R16: Search filter for Register tab
+    if (qnum === 1) {
+        let filterBar = tableWrap.querySelector('.register-filter-bar');
+        if (!filterBar) {
+            filterBar = document.createElement('div');
+            filterBar.className = 'register-filter-bar';
+            filterBar.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 0;';
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.placeholder = 'Filter by institution name...';
+            searchInput.style.cssText = 'padding:6px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;width:250px;';
+            searchInput.autocomplete = 'off';
+            searchInput.autocorrect = 'off';
+            searchInput.spellcheck = false;
+            searchInput.addEventListener('input', () => {
+                const q = searchInput.value.toLowerCase();
+                const table = tableWrap.querySelector('.data-table');
+                if (!table) return;
+                table.querySelectorAll('tbody tr').forEach(tr => {
+                    const name = (tr.querySelector('td:nth-child(2)') || {}).textContent || '';
+                    tr.style.display = !q || name.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Clear';
+            clearBtn.className = 'btn btn-secondary';
+            clearBtn.style.fontSize = '12px';
+            clearBtn.onclick = () => { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); };
+            filterBar.appendChild(searchInput);
+            filterBar.appendChild(clearBtn);
+            tableWrap.appendChild(filterBar);
+        }
+    }
+
     if (!cols) {
         const keys = Object.keys(data[0]).filter(k => !k.startsWith('_'));
         renderTableFromKeys(pageData, keys);
@@ -706,13 +743,13 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         if (row.level === 1) tr.classList.add('level-1');
         if (row.is_parent) tr.classList.add('parent-row');
 
-        // Row number (parent-level only, children get blank)
+        // Row number (parent=bold, children=blank)
         const tdRowNum = document.createElement('td');
         tdRowNum.className = 'col-rownum';
         if (!row.level || row.level === 0) {
             parentRowNum++;
             tdRowNum.textContent = parentRowNum;
-            // Tier separator
+            if (row.is_parent) tdRowNum.style.fontWeight = '700';
             if (TIER_BREAKS.includes(parentRowNum)) {
                 tr.style.borderBottom = '1px solid #ccc';
             }
@@ -738,13 +775,13 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
                 if (hasHierarchy && col.key === nameKey) {
                     if (row.is_parent) {
                         const name = row.institution || val || '';
-                        // Add toggle arrow for collapsible parents
+                        // Add toggle arrow after name for collapsible parents
                         if (collapsible) {
+                            td.appendChild(document.createTextNode(name + ' '));
                             const arrow = document.createElement('span');
                             arrow.className = 'toggle-arrow';
                             arrow.textContent = '\u25B6';  // ▶
                             td.appendChild(arrow);
-                            td.appendChild(document.createTextNode(' ' + name));
                         } else {
                             td.textContent = name;
                         }
