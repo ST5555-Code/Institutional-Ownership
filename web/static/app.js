@@ -267,6 +267,8 @@ function switchTab(tabId) {
         loadNewExits();
     } else if (tabId === 'activist') {
         loadActivistTab();
+    } else if (tabId === 'short-analysis') {
+        loadShortAnalysis();
     } else if (tabId === 'crowding') {
         loadCrowding();
     } else if (tabId === 'smart-money') {
@@ -1316,6 +1318,197 @@ async function loadManagerProfile(managerName) {
         back.onclick = () => switchTab(document.querySelector('.tab.active').dataset.tab);
         wrap.appendChild(back);
     } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+async function loadShortAnalysis() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const res = await fetch(`/api/short_analysis?ticker=${currentTicker}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        const data = await res.json();
+        hideSpinner();
+        _renderShortAnalysis(data);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function _renderShortAnalysis(data) {
+    const summary = data.summary || {};
+    const qs = summary.quarters_available || [];
+
+    // Summary card
+    const card = document.createElement('div');
+    card.className = 'portfolio-stats';
+    [
+        ['Short Funds (N-PORT)', summary.short_funds || 0],
+        ['Short Shares', summary.short_shares ? fmtShares(summary.short_shares) : '0'],
+        ['Avg Short Vol %', summary.avg_short_vol_pct ? summary.avg_short_vol_pct + '%' : '\u2014'],
+        ['Long & Short', summary.cross_ref_count || 0],
+    ].forEach(([l, v]) => {
+        const s = document.createElement('span');
+        s.className = 'ps-item';
+        s.innerHTML = `<span class="ps-label">${l}:</span><span class="ps-value">${v}</span>`;
+        card.appendChild(s);
+    });
+    tableWrap.appendChild(card);
+
+    // --- Section 1: N-PORT Short Trend Chart ---
+    const nportTrend = data.nport_trend || [];
+    if (nportTrend.length > 0 && typeof Chart !== 'undefined') {
+        tableWrap.appendChild(sectionHeader('N-PORT Short Positions — Quarterly Trend'));
+        const chartRow = document.createElement('div');
+        chartRow.style.cssText = 'display:flex;gap:16px;';
+
+        // Shares chart
+        const c1 = document.createElement('div');
+        c1.className = 'chart-card'; c1.style.cssText = 'flex:1;';
+        c1.innerHTML = '<div style="font-size:12px;font-weight:600;color:#002147;text-align:center;margin-bottom:4px;">Short Shares</div>';
+        const w1 = document.createElement('div'); w1.style.cssText = 'position:relative;height:160px;';
+        const cv1 = document.createElement('canvas'); w1.appendChild(cv1); c1.appendChild(w1);
+
+        // Fund count chart
+        const c2 = document.createElement('div');
+        c2.className = 'chart-card'; c2.style.cssText = 'flex:1;';
+        c2.innerHTML = '<div style="font-size:12px;font-weight:600;color:#002147;text-align:center;margin-bottom:4px;">Funds Shorting</div>';
+        const w2 = document.createElement('div'); w2.style.cssText = 'position:relative;height:160px;';
+        const cv2 = document.createElement('canvas'); w2.appendChild(cv2); c2.appendChild(w2);
+
+        chartRow.appendChild(c1); chartRow.appendChild(c2);
+        tableWrap.appendChild(chartRow);
+
+        setTimeout(() => {
+            if (window._siChart1) { window._siChart1.destroy(); }
+            if (window._siChart2) { window._siChart2.destroy(); }
+            const labels = nportTrend.map(d => d.quarter);
+            window._siChart1 = new Chart(cv1, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: nportTrend.map(d => d.short_shares || 0), backgroundColor: '#C0392B', borderRadius: 3, barPercentage: 0.5 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtShares(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 12 } } }, y: { ticks: { font: { size: 11 }, callback: v => fmtShares(v) } } } },
+            });
+            window._siChart2 = new Chart(cv2, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: nportTrend.map(d => d.fund_count || 0), backgroundColor: '#E74C3C', borderRadius: 3, barPercentage: 0.5 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 12 } } }, y: { ticks: { font: { size: 11 }, stepSize: 1 } } } },
+            });
+        }, 100);
+    }
+
+    // --- Section 2: FINRA Short Volume Chart ---
+    const shortVol = data.short_volume || [];
+    if (shortVol.length > 0 && typeof Chart !== 'undefined') {
+        tableWrap.appendChild(sectionHeader('Daily Short Sale Volume (FINRA)'));
+        const svCard = document.createElement('div');
+        svCard.className = 'chart-card';
+        const svWrap = document.createElement('div');
+        svWrap.style.cssText = 'position:relative;height:180px;';
+        const svCanvas = document.createElement('canvas');
+        svWrap.appendChild(svCanvas); svCard.appendChild(svWrap);
+        tableWrap.appendChild(svCard);
+
+        // Compute 5-day moving average
+        const pcts = shortVol.map(d => d.short_pct || 0);
+        const ma5 = pcts.map((_, i) => {
+            const start = Math.max(0, i - 4);
+            const slice = pcts.slice(start, i + 1);
+            return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+
+        setTimeout(() => {
+            if (window._svChart) window._svChart.destroy();
+            const labels = shortVol.map(d => {
+                const dt = String(d.report_date || '').slice(5, 10);
+                return dt;
+            });
+            window._svChart = new Chart(svCanvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { type: 'bar', label: 'Short Vol %', data: pcts, backgroundColor: pcts.map(v => v > 40 ? '#C0392B' : '#E8B8B8'), borderRadius: 1, barPercentage: 0.8, order: 2 },
+                        { type: 'line', label: '5-Day Avg', data: ma5, borderColor: '#002147', borderWidth: 2, pointRadius: 0, tension: 0.3, order: 1 },
+                    ],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(1) + '%' } } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { ticks: { font: { size: 11 }, callback: v => v.toFixed(0) + '%' } } },
+                },
+            });
+        }, 120);
+
+        const svNote = document.createElement('div');
+        svNote.style.cssText = 'font-size:10px;color:#aaa;font-style:italic;padding:4px 0;';
+        svNote.textContent = 'FINRA short volume includes market makers and hedging. 30-40% is typical for liquid stocks. Sustained >50% may signal directional shorting.';
+        tableWrap.appendChild(svNote);
+    }
+
+    // --- Section 3: N-PORT Short Fund Detail ---
+    const nportDetail = data.nport_detail || [];
+    if (nportDetail.length > 0) {
+        tableWrap.appendChild(sectionHeader('Fund-Level Short Positions (Latest Quarter)'));
+        const table = _flowTable(nportDetail, [
+            {key: 'fund_name', label: 'Fund', type: 'text'},
+            {key: 'family_name', label: 'Family', type: 'text'},
+            {key: 'short_shares', label: 'Short Shares', type: 'shares'},
+            {key: 'short_value', label: 'Short Value', type: 'dollar'},
+            {key: 'pct_of_nav', label: '% of NAV', type: 'pct'},
+        ]);
+        tableWrap.appendChild(table);
+    }
+
+    // --- Section 4: Long/Short Cross-Reference ---
+    const crossRef = data.cross_ref || [];
+    if (crossRef.length > 0) {
+        tableWrap.appendChild(sectionHeader('Institutions Both Long & Short'));
+        const table = _flowTable(crossRef, [
+            {key: 'institution', label: 'Institution', type: 'text'},
+            {key: 'long_shares', label: 'Long Shares', type: 'shares'},
+            {key: 'long_value', label: 'Long Value', type: 'dollar'},
+            {key: 'short_shares', label: 'Short Shares', type: 'shares'},
+            {key: 'short_value', label: 'Short Value', type: 'dollar'},
+            {key: 'net_exposure_pct', label: 'Net Exp %', type: 'pct'},
+        ]);
+        tableWrap.appendChild(table);
+    }
+
+    // --- Section 5: N-PORT Short History by Fund ---
+    const nportByFund = data.nport_by_fund || [];
+    if (nportByFund.length > 0 && qs.length > 0) {
+        tableWrap.appendChild(sectionHeader('Short Position History by Fund'));
+        const table = document.createElement('table');
+        table.className = 'data-table'; table.style.tableLayout = 'fixed';
+        const colgroup = document.createElement('colgroup');
+        [null].concat(qs.map(() => Math.floor(60 / qs.length) + '%')).forEach(w => {
+            const cg = document.createElement('col');
+            if (w) cg.style.width = w;
+            colgroup.appendChild(cg);
+        });
+        table.appendChild(colgroup);
+        const thead = document.createElement('thead');
+        const hr = document.createElement('tr');
+        const thFund = document.createElement('th'); thFund.textContent = 'Fund'; hr.appendChild(thFund);
+        qs.forEach(q => { const th = document.createElement('th'); th.textContent = q; th.style.textAlign = 'right'; hr.appendChild(th); });
+        thead.appendChild(hr); table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        nportByFund.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            if (idx % 2 === 1) tr.style.backgroundColor = '#FDF0F0';
+            const tdN = document.createElement('td');
+            tdN.classList.add('col-text-overflow');
+            tdN.textContent = row.fund_name || '';
+            tdN.title = row.fund_name || '';
+            tr.appendChild(tdN);
+            qs.forEach(q => {
+                const td = document.createElement('td');
+                td.style.textAlign = 'right';
+                const v = row[q];
+                td.innerHTML = v ? fmtShares(v) : '<span style="color:#ccc">\u2014</span>';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+    }
 }
 
 async function loadCrowding() {

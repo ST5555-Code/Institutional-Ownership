@@ -28,6 +28,7 @@ from queries import (
     query6, query7, query8, query9, query10,
     query11, query12, query13, query14, query15, query16,
     ownership_trend_summary, cohort_analysis, flow_analysis, holder_momentum,
+    short_interest_analysis,
     get_summary, _cross_ownership_query,
 )
 
@@ -1092,6 +1093,19 @@ def api_crowding():
         return jsonify(clean_for_json(result))
     finally:
         con.close()
+
+
+@app.route('/api/short_analysis')
+def api_short_analysis():
+    """Short Interest Analysis — N-PORT shorts, FINRA volume, long/short cross-ref."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = short_interest_analysis(ticker)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/smart_money')

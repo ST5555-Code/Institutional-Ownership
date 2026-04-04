@@ -2717,6 +2717,155 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
 # ---------------------------------------------------------------------------
 
 
+def short_interest_analysis(ticker):
+    """Comprehensive short interest analysis for a ticker.
+    Combines N-PORT fund-level shorts, FINRA daily volume, and long/short cross-reference.
+    """
+    con = get_db()
+    try:
+        result = {}
+
+        # 1. N-PORT short positions by quarter (trend)
+        nport_trend = []
+        try:
+            trend_df = con.execute("""
+                SELECT quarter,
+                       COUNT(DISTINCT fund_name) as fund_count,
+                       SUM(ABS(shares_or_principal)) as short_shares,
+                       SUM(ABS(market_value_usd)) as short_value
+                FROM fund_holdings
+                WHERE ticker = ? AND shares_or_principal < 0
+                GROUP BY quarter ORDER BY quarter
+            """, [ticker]).fetchdf()
+            nport_trend = df_to_records(trend_df)
+        except Exception:
+            pass
+        result['nport_trend'] = nport_trend
+
+        # 2. N-PORT short positions detail (latest quarter)
+        nport_detail = []
+        try:
+            detail_df = con.execute(f"""
+                SELECT fh.fund_name, fh.family_name,
+                       ABS(fh.shares_or_principal) as short_shares,
+                       ABS(fh.market_value_usd) as short_value,
+                       fh.quarter,
+                       fu.total_net_assets / 1e6 as fund_aum_mm
+                FROM fund_holdings fh
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.shares_or_principal < 0
+                  AND fh.quarter = '{LQ}'
+                ORDER BY ABS(fh.shares_or_principal) DESC
+            """, [ticker]).fetchdf()
+            nport_detail = df_to_records(detail_df)
+            # Add pct of NAV
+            for r in nport_detail:
+                aum = r.get('fund_aum_mm')
+                val = r.get('short_value')
+                r['pct_of_nav'] = round(val / (aum * 1e6) * 100, 3) if aum and aum > 0 and val else None
+        except Exception:
+            pass
+        result['nport_detail'] = nport_detail
+
+        # 3. N-PORT short positions history per fund (for cross-quarter comparison)
+        nport_by_fund = []
+        try:
+            fund_hist = con.execute("""
+                SELECT fund_name, quarter, ABS(shares_or_principal) as short_shares
+                FROM fund_holdings
+                WHERE ticker = ? AND shares_or_principal < 0
+                ORDER BY fund_name, quarter
+            """, [ticker]).fetchdf()
+            # Pivot: fund → {quarter: shares}
+            funds_seen = {}
+            for _, r in fund_hist.iterrows():
+                fn = r['fund_name']
+                if fn not in funds_seen:
+                    funds_seen[fn] = {'fund_name': fn}
+                funds_seen[fn][r['quarter']] = float(r['short_shares'])
+            nport_by_fund = list(funds_seen.values())
+            # Sort by latest quarter shares
+            nport_by_fund.sort(key=lambda x: x.get(LQ, 0), reverse=True)
+        except Exception:
+            pass
+        result['nport_by_fund'] = nport_by_fund
+
+        # 4. FINRA daily short volume (all available days)
+        short_volume = []
+        try:
+            sv_df = con.execute("""
+                SELECT report_date, short_volume, total_volume, short_pct
+                FROM short_interest WHERE ticker = ?
+                ORDER BY report_date
+            """, [ticker]).fetchdf()
+            short_volume = df_to_records(sv_df)
+        except Exception:
+            pass
+        result['short_volume'] = short_volume
+
+        # 5. Long/short cross-reference — institutions both long and short
+        cross_ref = []
+        try:
+            # Long from 13F
+            long_df = con.execute(f"""
+                SELECT COALESCE(inst_parent_name, manager_name) as parent,
+                       SUM(shares) as long_shares, SUM(market_value_live) as long_value
+                FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
+                GROUP BY parent
+            """, [ticker]).fetchdf()
+            long_map = {r['parent']: r for _, r in long_df.iterrows()}
+
+            # Short from N-PORT — match family to parent
+            short_df = con.execute(f"""
+                SELECT family_name,
+                       SUM(ABS(shares_or_principal)) as short_shares,
+                       SUM(ABS(market_value_usd)) as short_value
+                FROM fund_holdings
+                WHERE ticker = ? AND shares_or_principal < 0 AND quarter = '{LQ}'
+                GROUP BY family_name
+            """, [ticker]).fetchdf()
+
+            for _, s in short_df.iterrows():
+                fam = s['family_name'] or ''
+                # Try to match to a long parent
+                for parent, lrow in long_map.items():
+                    parent_lower = parent.lower()
+                    fam_words = fam.lower().split()[:2]
+                    if any(w in parent_lower for w in fam_words if len(w) > 3):
+                        ls = float(lrow['long_shares'] or 0)
+                        lv = float(lrow['long_value'] or 0)
+                        ss = float(s['short_shares'] or 0)
+                        sv = float(s['short_value'] or 0)
+                        net_pct = round((ls - ss) / ls * 100, 1) if ls > 0 else 0
+                        cross_ref.append({
+                            'institution': parent,
+                            'long_shares': ls, 'long_value': lv,
+                            'short_shares': ss, 'short_value': sv,
+                            'net_exposure_pct': net_pct,
+                        })
+                        break
+            cross_ref.sort(key=lambda x: x['short_shares'], reverse=True)
+        except Exception:
+            pass
+        result['cross_ref'] = cross_ref
+
+        # 6. Summary card data
+        total_short_shares = sum(r.get(LQ, 0) for r in nport_by_fund)
+        total_short_funds = len([r for r in nport_by_fund if r.get(LQ, 0) > 0])
+        avg_short_vol = sum(r.get('short_pct', 0) for r in short_volume[-20:]) / max(len(short_volume[-20:]), 1) if short_volume else 0
+        result['summary'] = {
+            'short_funds': total_short_funds,
+            'short_shares': total_short_shares,
+            'avg_short_vol_pct': round(avg_short_vol, 1),
+            'cross_ref_count': len(cross_ref),
+            'quarters_available': [q.get('quarter') for q in nport_trend],
+        }
+
+        return clean_for_json(result)
+    finally:
+        pass
+
+
 def get_short_long_comparison(ticker):
     """Find managers who are long (13F) AND short (N-PORT) the same ticker."""
     con = get_db()

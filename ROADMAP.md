@@ -204,6 +204,8 @@ _Last updated: April 3, 2026_
 | N13 | N-PORT series-level deduplication | Done | All N-PORT rollup queries GROUP BY series_id (MAX per series). get_nport_position, get_nport_coverage, get_nport_children, get_nport_children_q2 all deduplicated. Fidelity NVDA: 1.39B → 1.07B shares after dedup |
 | N14 | Geode/Fidelity sub-adviser exclusion | Done | `SUBADVISER_EXCLUSIONS` dict in config.py. Geode excluded from Fidelity rollup. Applied in get_nport_position, get_nport_children, get_nport_children_q2 via `_build_excl_clause()`. Extensible for future sub-advisers |
 | N15 | International sub-adviser analysis | Done | Investigated: 183 shared series deduped by N13 (GROUP BY series_id). 83 intl-only series are real fund positions, excluding them loses data. Remaining ~10% excess (Fidelity 110%) is structural: N-PORT uses MAX of monthly snapshots vs 13F quarter-end. Only Fidelity and RBC (2 series) affected. No further exclusions needed |
+| N17 | Economic hold period | Medium | Weighted-average hold period per investor based on economic exposure, not binary presence. An investor holding 5M shares for 4 quarters who trims to 100 shares in Q5 should show ~4Q hold period, not 5Q. **Method:** For each investor-ticker pair across all quarters, compute exposure weight = `position_value / peak_position_value`. Hold period = sum of quarterly weights (e.g., 1.0 + 1.0 + 1.0 + 1.0 + 0.002 = 4.0Q). Threshold: ignore quarters where exposure weight < 5% of peak (de minimis). Surface on Register tab as "Held" column and on Conviction tab. Requires: multi-quarter position history per investor (query all quarters in holdings). Consider: cost basis approximation via VWAP for $-weighted hold period |
+| N18 | Portfolio positioning analysis — active investors | Medium | For each active investor holding the target company, analyze where the position sits within that investor's portfolio by market cap. **Method:** Pull full 13F portfolio for the investor, compute market cap distribution (25th/50th/75th percentile). Show where the target company's market cap falls relative to the investor's typical range. **Output:** Per-investor row showing: portfolio mkt cap P25/P50/P75, target company mkt cap, percentile rank within their portfolio, position size vs median position. Flag outliers where target is significantly outside the investor's normal mkt cap range (potential conviction signal). **UI:** Table on Conviction or Register tab showing active holders with their portfolio positioning. Visual indicator (dot on range bar) showing where company sits in each investor's mkt cap spectrum |
 
 ---
 
@@ -216,15 +218,29 @@ _Last updated: April 3, 2026_
 
 ---
 
-## PIPELINE 9 — 13D/G Integration into Register
+## PIPELINE 9 — 13D/G Cleanup & Integration
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
 | R1 | Data quality audit — 13D/G `pct_owned` coverage | High | Assess null rate, parsing accuracy across filing types. Check `beneficial_ownership_current` completeness vs EDGAR filing count. Validate against known 5%+ holders (activist lists) |
 | R2 | Data quality audit — 13D/G name matching to 13F parents | High | Check how many 13D/G filers match existing `inst_parent_name` in holdings. Identify gaps: individuals, foreign entities, funds below 13F threshold |
-| R3 | Schema design — merge 13D/G into Register view | Medium | Decide: separate rows with badge, or enrich existing parent rows with 13D/G reported %. Handle conflicts (13F computed % vs 13D/G self-reported %). Priority: 13D/G % is more authoritative for 5%+ holders |
-| R4 | Intent tracking in Register | Medium | Surface 13D vs 13G filing type (activist intent vs passive). Show intent changes (13G→13D = going activist). Link to `prior_intent` column |
-| R5 | Threshold crossing alerts | Low | Flag when 13D/G shows new 5%+ holder or existing holder drops below 5%. Timeline of crossings per ticker |
+| R3 | 13D/G data cleanup — dedup, amendment reconciliation, stale filing removal | High | Deduplicate overlapping filings (same filer, same security). Reconcile amendments (13D/A, 13G/A) to keep only latest effective filing. Remove filings for securities no longer in universe. Standardize filer names to match 13F parent mapping |
+| R4 | Schema design — merge 13D/G into Register view | Medium | Decide: separate rows with badge, or enrich existing parent rows with 13D/G reported %. Handle conflicts (13F computed % vs 13D/G self-reported %). Priority: 13D/G % is more authoritative for 5%+ holders |
+| R5 | Intent tracking in Register | Medium | Surface 13D vs 13G filing type (activist intent vs passive). Show intent changes (13G→13D = going activist). Link to `prior_intent` column |
+| R6 | Threshold crossing alerts | Low | Flag when 13D/G shows new 5%+ holder or existing holder drops below 5%. Timeline of crossings per ticker |
+
+---
+
+## PIPELINE 10 — Monthly N-PORT Update Flow
+
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| M1 | Design monthly update cadence | High | N-PORT filings arrive monthly (60-day lag). Define schedule: which months to fetch, how to detect new filings, incremental vs full refresh. Current fetch_nport.py supports `is_already_loaded()` skip logic |
+| M2 | Monthly → quarterly rollup logic | High | N-PORT has monthly snapshots; 13F is quarterly. Define how monthly fund_holdings roll up to quarter-end positions for comparison with 13F parents. Options: use quarter-end month only, or average across 3 months, or MAX (current approach). Document tradeoffs |
+| M3 | Fund → parent rollup reconciliation | High | Ensure N-PORT fund positions aggregate correctly to 13F parent totals. Handle: sub-adviser exclusions (Geode/Fidelity), share class dedup (series_id grouping), cross-filing families (Capital Group, American Funds). Quantify gap between N-PORT rollup and 13F reported value per parent |
+| M4 | Incremental fund_holdings update script | Medium | Fetch only new filings since last run. Use EDGAR XBRL index or filing date filter. Append to fund_holdings without dropping existing data. Update fund_universe metadata (total_net_assets) from latest filing |
+| M5 | Stale fund detection & cleanup | Medium | Identify funds that stopped filing (merged, liquidated, renamed). Flag in fund_universe. Exclude from active cohort analysis. Cross-reference with N-CEN adviser map for fund status changes |
+| M6 | Monthly position change tracking | Low | Track month-over-month position changes within a quarter at fund level. Surface intra-quarter trading patterns (e.g., fund bought in month 1, sold in month 3 of same quarter) |
 
 ---
 
@@ -238,6 +254,12 @@ _Last updated: April 3, 2026_
 | U4 | Nested fund children — limit 5 largest under parent | Done | get_nport_children default limit=5 already in place. Cross-Ownership (query8) doesn't use N-PORT children — pure 13F cross-holder. Consistent across Register, Conviction, Ownership Trend |
 | U5 | Institution column width — expand to min 280px | Done | Single CSS rule covers all tabs via `th:nth-child(2)` and `.col-text-overflow`. Fixes truncation on parent names and N-PORT fund series children |
 | U6 | ETF/index fund passive classification | Medium | Fund series with "Index", "ETF", "S&P", "Russell", "MSCI" in name incorrectly showing as active. Fix classification in fund_universe. Affects Register, Conviction, Crowding tabs |
+| U7 | Flow Analysis — fund-level churn toggle | Medium | Add "By Institution / By Fund" toggle above Row 2 churn charts. Institution = current 13F manager-level churn (default). Fund = N-PORT fund series level churn computed live from fund_holdings. Requires: QoQ fund_holdings comparison query (same quarter pairs as institutional), active-only filter for fund names, fund-level entry/exit counting. Toggle applies to both churn charts simultaneously. Deferred because precomputed `ticker_flow_stats` only has institutional data — fund-level needs live computation or a new precomputed table |
+| U8 | Name casing cleanup — Title Case pass | Medium | Many investor and fund names still display in ALL CAPS (e.g., "JPMORGAN ASSET MANAGEMENT" instead of "JPMorgan Asset Management"). N12 (normalize_names.py) fixed 27%→0% ALL CAPS in bulk, but new data loads and some edge cases reintroduce uppercase names. Need: re-run normalize_names.py on latest data, add Title Case normalization to the load pipeline so new data arrives clean, handle acronyms (ETF, LLC, LP, SPDR, iShares) and known canonical forms (BlackRock not Blackrock, JPMorgan not Jpmorgan). Affects all tabs — Register, Conviction, Flow, Cohort, Momentum |
+| U10 | Extend FINRA short volume lookback to 90+ days | Medium | Current fetch_finra_short.py only pulls ~29 days. Re-run with wider date range to support 90-day trend chart on Short Interest tab. Consider fetching 6 months for longer-term context |
+| U11 | Source true short interest (shares shorted as % of float) | Low | FINRA daily volume is a poor proxy for actual short interest. True SI is reported bi-monthly by NYSE/NASDAQ. Options: scrape exchange reports, use commercial API (S3 Partners, Ortex), or derive from FINRA RegSHO threshold list. Would enable days-to-cover calculation and proper squeeze scoring |
+| U12 | Short analysis cross-ref matching improvement | Medium | Long/short cross-reference on Short Interest tab uses naive family name matching. Many misses (Hartford funds → Hartford Funds parent not found). Need: use match_nport_family patterns, fall back to fuzzy matching, handle sub-adviser relationships (same patterns as Register tab fund matching) |
+| U9 | Summary dashboard tab | Medium | New tab (or landing view) with visual charts summarizing key analysis for a ticker at a glance. Candidates: (1) Ownership composition donut — active/passive/hedge/other by value, (2) QoQ share change waterfall — retained + new - exits = current, (3) Top 10 holders horizontal bar ranked by % float, (4) Active share retention trend sparkline (last 3 quarters), (5) Flow intensity mini bar chart (same as Flow tab but inline), (6) Short interest vs institutional ownership scatter or dual-axis chart, (7) Holder count trend line across quarters. Goal: one-page executive view before drilling into individual tabs. Should load fast — pull from precomputed summary tables where possible. Consider making this the default landing view when a ticker is entered |
 
 ---
 
@@ -255,7 +277,9 @@ _Last updated: April 3, 2026_
 10. ~~U1 — N-PORT coverage disclaimer tooltip~~ Done
 11. ~~P4 — iShares Trust N-PORT~~ Done
 12. **N15 — International sub-adviser deduplication** (Fidelity HK/Japan/UK inflate to 110%)
-13. **R1/R2 — 13D/G data quality audit** — assess pct_owned coverage, name matching to 13F parents before integrating into Register
-14. R3-R5 — 13D/G Register integration (pending R1/R2 results)
-15. Refresh readonly snapshot
-16. Items N4-N10 as capacity allows
+13. **R1/R2/R3 — 13D/G data quality audit + cleanup** — assess pct_owned coverage, name matching, dedup amendments, standardize filer names
+14. **M1/M2/M3 — Monthly N-PORT update flow design** — define cadence, monthly→quarterly rollup, fund→parent reconciliation
+15. R4-R6 — 13D/G Register integration (pending R1-R3 results)
+16. M4-M6 — Incremental N-PORT update implementation
+17. Refresh readonly snapshot
+18. Items N4-N10 as capacity allows
