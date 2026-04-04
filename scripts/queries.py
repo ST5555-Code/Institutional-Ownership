@@ -2543,6 +2543,66 @@ def flow_analysis(ticker, period='4Q', peers=None):
         except Exception:
             pass
 
+        # QoQ chart data: compute flow intensity & churn for each sequential quarter pair
+        qoq_charts = []
+        mktcap_row = con.execute(
+            "SELECT market_cap FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        mktcap = float(mktcap_row[0]) if mktcap_row and mktcap_row[0] else None
+        for i in range(len(QUARTERS) - 1):
+            qf, qt = QUARTERS[i], QUARTERS[i + 1]
+            try:
+                agg = con.execute(f"""
+                    SELECT
+                        COALESCE(h.manager_type, 'unknown') as mtype,
+                        SUM(CASE WHEN h.quarter = '{qf}' THEN h.shares ELSE 0 END) as from_s,
+                        SUM(CASE WHEN h.quarter = '{qt}' THEN h.shares ELSE 0 END) as to_s,
+                        SUM(CASE WHEN h.quarter = '{qf}' THEN h.market_value_usd ELSE 0 END) as from_v,
+                        SUM(CASE WHEN h.quarter = '{qt}' THEN h.market_value_usd ELSE 0 END) as to_v
+                    FROM (
+                        SELECT COALESCE(inst_parent_name, manager_name) as inv, manager_type, quarter,
+                               SUM(shares) as shares, SUM(market_value_usd) as market_value_usd
+                        FROM holdings WHERE ticker = ? AND quarter IN ('{qf}', '{qt}')
+                        GROUP BY inv, manager_type, quarter
+                    ) h
+                    GROUP BY mtype
+                """, [ticker]).fetchdf()
+                total_net = 0
+                active_net = 0
+                passive_net = 0
+                nonpassive_churn_v = 0
+                nonpassive_avg_v = 0
+                active_churn_v = 0
+                active_avg_v = 0
+                for _, r in agg.iterrows():
+                    mt = r['mtype'] or 'unknown'
+                    net_v = float(r['to_v'] or 0) - float(r['from_v'] or 0)
+                    avg_v = (float(r['to_v'] or 0) + float(r['from_v'] or 0)) / 2
+                    total_net += net_v
+                    if mt == 'passive':
+                        passive_net += net_v
+                    else:
+                        active_net += net_v if mt not in ('unknown',) else 0
+                        nonpassive_churn_v += abs(net_v)
+                        nonpassive_avg_v += avg_v
+                        if mt not in ('passive', 'unknown'):
+                            active_churn_v += abs(net_v)
+                            active_avg_v += avg_v
+                fi_total = total_net / mktcap if mktcap and mktcap > 0 else 0
+                fi_active = active_net / mktcap if mktcap and mktcap > 0 else 0
+                ch_np = nonpassive_churn_v / nonpassive_avg_v if nonpassive_avg_v > 0 else 0
+                ch_act = active_churn_v / active_avg_v if active_avg_v > 0 else 0
+                qoq_charts.append({
+                    'from': qf, 'to': qt,
+                    'label': qf.replace('2025', '') + '\u2192' + qt.replace('2025', ''),
+                    'flow_intensity_total': round(fi_total, 6),
+                    'flow_intensity_active': round(fi_active, 6),
+                    'churn_nonpassive': round(ch_np, 6),
+                    'churn_active': round(ch_act, 6),
+                })
+            except Exception:
+                pass
+
         return clean_for_json({
             'period': period,
             'quarter_from': quarter_from,
@@ -2556,6 +2616,7 @@ def flow_analysis(ticker, period='4Q', peers=None):
                 'flow_intensity': chart_data,
                 'churn': chart_data,
             },
+            'qoq_charts': qoq_charts,
             'flow_trend': flow_trend,
         })
     finally:

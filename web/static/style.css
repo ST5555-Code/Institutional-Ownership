@@ -1035,6 +1035,10 @@ body {
     .tab { font-size: 11px; padding: 6px 8px; }
     .data-table { font-size: 11px; }
     .data-table th, .data-table td { padding: 4px 5px; }
+    /* Stack 2x2 chart grid on mobile */
+    div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
     .cross-ownership-panel { padding: 8px; }
     .co-ticker-grid { grid-template-columns: repeat(3, 1fr); }
     .register-filter-bar { flex-wrap: wrap; }

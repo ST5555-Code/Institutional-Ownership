@@ -2274,7 +2274,7 @@ function buildSimpleTable(data, cols) {
         cols.forEach(c => {
             const td = document.createElement('td');
             td.style.textAlign = _isNumericCol(c.type) ? 'right' : 'left';
-            td.textContent = _formatCellValue(row[c.key], c.type);
+            td.innerHTML = _formatCellValue(row[c.key], c.type);
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
@@ -2395,167 +2395,93 @@ function _flowTable(rows, cols, rowClass) {
 function renderFlowAnalysis(data) {
     currentData = data.buyers || [];
 
-    // Footnote
-    const ip = data.implied_prices || {};
-    const qf = data.quarter_from || '';
-    const ipVal = ip[qf];
-    if (ipVal) {
+    // --- 2×2 Chart Grid (always shows all QoQ periods) ---
+    const qoq = data.qoq_charts || [];
+    if (qoq.length > 0 && typeof Chart !== 'undefined') {
+        const labels = qoq.map(d => d.label);
+        function _barColors(vals) { return vals.map(v => v >= 0 ? '#27AE60' : '#C0392B'); }
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0;';
+
+        function _chartCard(title, canvasId) {
+            const card = document.createElement('div');
+            card.className = 'chart-card';
+            card.innerHTML = '<h3>' + title + '</h3>';
+            const canvas = document.createElement('canvas');
+            canvas.id = canvasId;
+            canvas.style.cssText = 'height:250px;min-height:250px;';
+            card.appendChild(canvas);
+            return {card, canvas};
+        }
+
+        // Row 1: Flow Intensity
+        const fi1 = _chartCard('Flow Intensity \u2014 Total', '_fi_total');
+        const fi2 = _chartCard('Flow Intensity \u2014 Active Only', '_fi_active');
+        grid.appendChild(fi1.card);
+        grid.appendChild(fi2.card);
+
+        // Row 2: Holder Churn
+        const ch1 = _chartCard('Holder Churn \u2014 Non-Passive', '_ch_np');
+        const ch2 = _chartCard('Holder Churn \u2014 Active Only', '_ch_active');
+        grid.appendChild(ch1.card);
+        grid.appendChild(ch2.card);
+
+        tableWrap.appendChild(grid);
+
+        // Footnote below charts
         const fn = document.createElement('div');
-        fn.className = 'flow-footnote';
-        fn.textContent = 'Price-adjusted flows use implied ' + qf + ' price of $' + ipVal.toFixed(2) + ' derived from 13F reported market values as of quarter-end';
+        fn.style.cssText = 'font-size:11px;color:#999;padding:4px 0 16px 0;font-style:italic;';
+        fn.textContent = 'Flow intensity and churn based on net 13F position changes per quarter. Understates gross trading activity. Active Only excludes index and passive managers.';
         tableWrap.appendChild(fn);
-    }
 
-    // Charts section (flow intensity + churn) — using Chart.js
-    const chartData = (data.charts && data.charts.flow_intensity) || [];
-    if (chartData.length > 0 && typeof Chart !== 'undefined') {
-        const row = document.createElement('div');
-        row.className = 'charts-row';
-
-        // Flow intensity chart
-        const fiCard = document.createElement('div');
-        fiCard.className = 'chart-card';
-        fiCard.innerHTML = '<h3>Flow Intensity \u2014 Net Buying as % of Market Cap</h3>';
-        const fiCanvas = document.createElement('canvas');
-        fiCanvas.style.height = '250px';
-        fiCanvas.style.maxHeight = '250px';
-        fiCard.appendChild(fiCanvas);
-        row.appendChild(fiCard);
-
-        // Churn chart
-        const chCard = document.createElement('div');
-        chCard.className = 'chart-card';
-        chCard.innerHTML = '<h3 title="Measures dollar value of non-passive positions that entered or exited as % of average non-passive institutional value">Value-Weighted Holder Churn \u2014 Non-Passive Managers</h3>';
-        const chCanvas = document.createElement('canvas');
-        chCanvas.style.height = '250px';
-        chCanvas.style.maxHeight = '250px';
-        chCard.appendChild(chCanvas);
-        row.appendChild(chCard);
-
-        tableWrap.appendChild(row);
-
-        // Render charts after DOM insertion — setTimeout lets the browser lay out the canvas
+        // Render charts after DOM insertion
         setTimeout(() => {
-        const labels = chartData.map(d => d.ticker);
+            // Destroy old charts
+            ['_fiChart1','_fiChart2','_chChart1','_chChart2'].forEach(k => {
+                if (window[k]) { window[k].destroy(); window[k] = null; }
+            });
 
-        // Destroy old charts
-        if (window._fiChart) { window._fiChart.destroy(); window._fiChart = null; }
-        if (window._chChart) { window._chChart.destroy(); window._chChart = null; }
-
-        // Flow intensity bar chart
-        window._fiChart = new Chart(fiCanvas, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'Total',
-                        data: chartData.map(d => d.flow_intensity_total ? (d.flow_intensity_total * 100) : 0),
-                        backgroundColor: chartData.map(d =>
-                            (d.flow_intensity_total || 0) >= 0 ? '#27AE60' : '#C0392B'
-                        ),
+            function _makeBarChart(canvas, dataArr, yLabel, pctMultiplier) {
+                const vals = dataArr.map(v => v ? v * (pctMultiplier || 100) : 0);
+                return new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: vals,
+                            backgroundColor: _barColors(vals),
+                            borderRadius: 3,
+                        }],
                     },
-                    {
-                        label: 'Active Only',
-                        data: chartData.map(d => d.flow_intensity_active ? (d.flow_intensity_active * 100) : 0),
-                        backgroundColor: chartData.map(d =>
-                            (d.flow_intensity_active || 0) >= 0 ? '#52BE80' : '#E74C3C'
-                        ),
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ctx.parsed.y.toFixed(2) + '%',
+                                },
+                            },
+                        },
+                        scales: {
+                            y: {
+                                title: { display: true, text: yLabel, font: { size: 11 } },
+                                ticks: { callback: v => v.toFixed(1) + '%' },
+                            },
+                        },
                     },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                scales: {
-                    y: {
-                        title: { display: true, text: '% of Market Cap' },
-                        ticks: { callback: v => v.toFixed(1) + '%' },
-                    },
-                },
-            },
-        });
-
-        // Churn bar chart — non-passive and active only
-        window._chChart = new Chart(chCanvas, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'Non-Passive',
-                        data: chartData.map(d => d.churn_nonpassive ? (d.churn_nonpassive * 100) : 0),
-                        backgroundColor: chartData.map(d => {
-                            const v = d.churn_nonpassive || 0;
-                            return v < 0.10 ? '#27AE60' : (v < 0.20 ? '#F39C12' : '#C0392B');
-                        }),
-                    },
-                    {
-                        label: 'Active Only',
-                        data: chartData.map(d => d.churn_active ? (d.churn_active * 100) : 0),
-                        backgroundColor: chartData.map(d => {
-                            const v = d.churn_active || 0;
-                            return v < 0.10 ? '#52BE80' : (v < 0.20 ? '#F5B041' : '#E74C3C');
-                        }),
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                scales: {
-                    y: {
-                        title: { display: true, text: 'Churn Rate %' },
-                        ticks: { callback: v => v.toFixed(0) + '%' },
-                    },
-                },
-            },
-        });
-        }, 100);  // end setTimeout — let DOM render before chart init
-
-    } else if (chartData.length > 0) {
-        // Fallback if Chart.js not loaded — show as table
-        const row = document.createElement('div');
-        row.className = 'charts-row';
-        const card = document.createElement('div');
-        card.className = 'chart-card';
-        card.innerHTML = '<h3>Flow Intensity &amp; Churn</h3>';
-        const t = document.createElement('table');
-        t.className = 'data-table';
-        t.style.tableLayout = 'auto';
-        t.innerHTML = '<thead><tr><th>Ticker</th><th style="text-align:right">Flow Intensity</th><th style="text-align:right">Non-Passive Churn</th></tr></thead>';
-        const tb = document.createElement('tbody');
-        chartData.forEach(d => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + d.ticker + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.flow_intensity_total ? d.flow_intensity_total * 100 : null) + '</td>'
-                + '<td style="text-align:right">' + fmtPct(d.churn_nonpassive ? d.churn_nonpassive * 100 : null) + '</td>';
-            tb.appendChild(tr);
-        });
-        t.appendChild(tb);
-        card.appendChild(t);
-        row.appendChild(card);
-        tableWrap.appendChild(row);
+                });
+            }
+            window._fiChart1 = _makeBarChart(fi1.canvas, qoq.map(d => d.flow_intensity_total), '% of Mkt Cap');
+            window._fiChart2 = _makeBarChart(fi2.canvas, qoq.map(d => d.flow_intensity_active), '% of Mkt Cap');
+            window._chChart1 = _makeBarChart(ch1.canvas, qoq.map(d => d.churn_nonpassive), 'Churn Rate %');
+            window._chChart2 = _makeBarChart(ch2.canvas, qoq.map(d => d.churn_active), 'Churn Rate %');
+        }, 100);
     }
 
-    // Multi-period flow trend table
-    const flowTrend = data.flow_trend || [];
-    if (flowTrend.length > 0) {
-        tableWrap.appendChild(sectionHeader('Flow Trend Across All Periods'));
-        tableWrap.appendChild(buildSimpleTable(flowTrend, [
-            {key: 'quarter_from', label: 'From', type: 'text'},
-            {key: 'quarter_to', label: 'To', type: 'text'},
-            {key: 'flow_intensity_total', label: 'Flow Intensity (Total)', type: 'pct'},
-            {key: 'flow_intensity_active', label: 'Active Only', type: 'pct'},
-            {key: 'flow_intensity_passive', label: 'Passive Only', type: 'pct'},
-            {key: 'churn_nonpassive', label: 'Churn (Non-Passive)', type: 'pct'},
-            {key: 'churn_active', label: 'Churn (Active)', type: 'pct'},
-        ]));
-    }
-
-    // Buyers
+    // --- Buyers / Sellers / New Entries / Exits tables ---
     const buyerCols = [
         {key: 'inst_parent_name', label: 'Institution', type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
@@ -2573,8 +2499,6 @@ function renderFlowAnalysis(data) {
         tableWrap.appendChild(h);
         tableWrap.appendChild(_flowTable(data.buyers, buyerCols, 'row-buyer'));
     }
-
-    // Sellers
     if (data.sellers && data.sellers.length) {
         const h = document.createElement('div');
         h.className = 'flow-section-header';
@@ -2582,8 +2506,6 @@ function renderFlowAnalysis(data) {
         tableWrap.appendChild(h);
         tableWrap.appendChild(_flowTable(data.sellers, buyerCols, 'row-seller'));
     }
-
-    // New Entries
     const neCols = [
         {key: 'inst_parent_name', label: 'Institution', type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
@@ -2598,8 +2520,6 @@ function renderFlowAnalysis(data) {
         tableWrap.appendChild(h);
         tableWrap.appendChild(_flowTable(data.new_entries, neCols, 'row-new-entry'));
     }
-
-    // Exits
     const exCols = [
         {key: 'inst_parent_name', label: 'Institution', type: 'text'},
         {key: 'manager_type', label: 'Type', type: 'text'},
