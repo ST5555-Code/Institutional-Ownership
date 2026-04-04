@@ -273,7 +273,7 @@ def fetch_metadata_only(con, batch_size=700):
     records = []
     failed = []
     today = datetime.now().strftime("%Y-%m-%d")
-    meta_batch = 50
+    meta_batch = 10  # Small batches to avoid Yahoo rate limiting
 
     for i in range(0, len(batch), meta_batch):
         chunk = batch[i:i + meta_batch]
@@ -316,10 +316,10 @@ def fetch_metadata_only(con, batch_size=700):
             print(f"    Batch error at {i}: {e}", flush=True)
             failed.extend(chunk)
 
-        if (i + meta_batch) % 200 == 0:
+        if (i + meta_batch) % 100 == 0:
             print(f"    [{min(i + meta_batch, len(batch)):,}/{len(batch):,}] "
                   f"{len(records):,} ok, {len(failed):,} failed", flush=True)
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     print(f"  Metadata fetched: {len(records):,}, Failed: {len(failed):,}")
 
