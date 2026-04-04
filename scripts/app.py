@@ -27,7 +27,7 @@ from queries import (
     query1, query2, query3, query4, query5,
     query6, query7, query8, query9, query10,
     query11, query12, query13, query14, query15, query16,
-    ownership_trend_summary, cohort_analysis, flow_analysis,
+    ownership_trend_summary, cohort_analysis, flow_analysis, holder_momentum,
     get_summary, _cross_ownership_query,
 )
 
@@ -939,6 +939,18 @@ def api_cohort_analysis():
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
         result = cohort_analysis(ticker, from_quarter=from_q, level=level, active_only=active_only)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/holder_momentum')
+def api_holder_momentum():
+    ticker = request.args.get('ticker', '').upper().strip()
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = holder_momentum(ticker)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500

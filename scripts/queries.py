@@ -1075,6 +1075,160 @@ def query2(ticker):
 
 
 
+def holder_momentum(ticker):
+    """Full-year share momentum for top 25 parents, with fund-level children.
+    Returns shares per quarter for each parent and up to 10 N-PORT funds per parent
+    (union of top 5 from each quarter to capture movement).
+    """
+    con = get_db()
+    try:
+        cusip = get_cusip(con, ticker)
+        qs = QUARTERS  # e.g. ['2025Q1','2025Q2','2025Q3','2025Q4']
+        q_placeholders = ','.join([f"'{q}'" for q in qs])
+
+        # Top 25 parents by latest quarter value
+        top_parents = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as parent_name,
+                   SUM(market_value_live) as parent_val
+            FROM holdings
+            WHERE quarter = '{LQ}' AND (ticker = ? OR cusip = ?)
+            GROUP BY parent_name
+            ORDER BY parent_val DESC NULLS LAST
+            LIMIT 25
+        """, [ticker, cusip]).fetchdf()['parent_name'].tolist()
+
+        if not top_parents:
+            return []
+
+        # Shares per quarter per parent
+        ph = ','.join(['?'] * len(top_parents))
+        parent_df = con.execute(f"""
+            SELECT COALESCE(inst_parent_name, manager_name) as parent_name,
+                   quarter,
+                   SUM(shares) as shares,
+                   MAX(manager_type) as type
+            FROM holdings
+            WHERE (ticker = ? OR cusip = ?)
+              AND quarter IN ({q_placeholders})
+              AND COALESCE(inst_parent_name, manager_name) IN ({ph})
+            GROUP BY parent_name, quarter
+        """, [ticker, cusip] + top_parents).fetchdf()
+
+        # Build parent → {quarter: shares} map
+        parent_data = {}
+        parent_types = {}
+        for _, r in parent_df.iterrows():
+            pn = r['parent_name']
+            if pn not in parent_data:
+                parent_data[pn] = {}
+            parent_data[pn][r['quarter']] = float(r['shares'] or 0)
+            if r['type'] and r['type'] != 'unknown':
+                parent_types[pn] = r['type']
+
+        # For each parent, get N-PORT fund children across all quarters
+        # Union of top 5 per quarter → up to ~10 unique funds
+        def _get_fund_children(pname):
+            patterns = match_nport_family(pname)
+            if not patterns:
+                return []
+            like_patterns = ['%' + p + '%' for p in patterns]
+            lph = ','.join(['?'] * len(like_patterns))
+            excl_clause, excl_params = _build_excl_clause(patterns)
+            try:
+                fund_df = con.execute(f"""
+                    SELECT fund_name, quarter,
+                           MAX(shares_or_principal) as shares,
+                           series_id
+                    FROM fund_holdings fh
+                    WHERE EXISTS (SELECT 1 FROM UNNEST([{lph}]) t(p) WHERE family_name ILIKE t.p)
+                      AND ticker = ?
+                      AND quarter IN ({q_placeholders})
+                      {excl_clause}
+                    GROUP BY fund_name, quarter, series_id
+                """, like_patterns + [ticker] + excl_params).fetchdf()
+                if fund_df.empty:
+                    return []
+
+                # For each quarter, rank funds by shares and take top 5
+                top_funds = set()
+                for q in qs:
+                    qf = fund_df[fund_df['quarter'] == q].nlargest(5, 'shares')
+                    top_funds.update(qf['fund_name'].tolist())
+
+                # Cap at 10
+                if len(top_funds) > 10:
+                    # Keep the ones with highest max shares across any quarter
+                    fund_max = fund_df.groupby('fund_name')['shares'].max().to_dict()
+                    top_funds = sorted(top_funds, key=lambda f: fund_max.get(f, 0), reverse=True)[:10]
+                else:
+                    top_funds = list(top_funds)
+
+                # Build fund → {quarter: shares}
+                children = []
+                for fn in top_funds:
+                    frows = fund_df[fund_df['fund_name'] == fn]
+                    qmap = {}
+                    for _, fr in frows.iterrows():
+                        qmap[fr['quarter']] = float(fr['shares'] or 0)
+                    children.append({'fund_name': fn, 'quarters': qmap})
+                # Sort by latest quarter shares desc
+                children.sort(key=lambda c: c['quarters'].get(qs[-1], 0), reverse=True)
+                return children
+            except Exception:
+                return []
+
+        # Build results
+        results = []
+        for rank, pname in enumerate(top_parents, 1):
+            qshares = parent_data.get(pname, {})
+            # Change: first available → latest
+            first_s = next((qshares.get(q) for q in qs if qshares.get(q)), 0)
+            last_s = qshares.get(qs[-1], 0)
+            chg = last_s - first_s
+            chg_pct = round(chg / first_s * 100, 1) if first_s > 0 else None
+
+            children = _get_fund_children(pname)
+            has_kids = len(children) >= 2
+
+            row = {
+                'rank': rank,
+                'institution': pname,
+                'type': parent_types.get(pname, 'unknown'),
+                'is_parent': has_kids,
+                'child_count': len(children),
+                'level': 0,
+                'change': chg,
+                'change_pct': chg_pct,
+            }
+            for q in qs:
+                row[q] = qshares.get(q)
+            results.append(row)
+
+            if has_kids:
+                for child in children:
+                    cq = child['quarters']
+                    c_first = next((cq.get(q) for q in qs if cq.get(q)), 0)
+                    c_last = cq.get(qs[-1], 0)
+                    c_chg = c_last - c_first
+                    c_pct = round(c_chg / c_first * 100, 1) if c_first > 0 else None
+                    crow = {
+                        'institution': child['fund_name'],
+                        'type': None,
+                        'is_parent': False,
+                        'child_count': 0,
+                        'level': 1,
+                        'change': c_chg,
+                        'change_pct': c_pct,
+                    }
+                    for q in qs:
+                        crow[q] = cq.get(q)
+                    results.append(crow)
+
+        return results
+    finally:
+        pass
+
+
 def query3(ticker):
     """Active holder market cap analysis."""
     con = get_db()

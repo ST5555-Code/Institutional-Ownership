@@ -199,10 +199,10 @@ async function loadTicker() {
         const s = await res.json();
         document.getElementById('sum-company').textContent = s.company_name || ticker;
         document.getElementById('sum-quarter').textContent = s.latest_quarter || '\u2014';
-        document.getElementById('sum-holdings').textContent = fmtDollars(s.total_value);
-        document.getElementById('sum-float').textContent = fmtPct(s.total_pct_float);
+        document.getElementById('sum-holdings').innerHTML = fmtDollars(s.total_value);
+        document.getElementById('sum-float').innerHTML = fmtPct(s.total_pct_float);
         document.getElementById('sum-holders').textContent = s.num_holders != null ? s.num_holders.toLocaleString() : '\u2014';
-        document.getElementById('sum-mktcap').textContent = fmtDollars(s.market_cap);
+        document.getElementById('sum-mktcap').innerHTML = fmtDollars(s.market_cap);
         document.getElementById('sum-price').textContent = s.price != null ? '$' + s.price.toFixed(2) : '\u2014';
         document.getElementById('sum-nport').textContent = s.nport_coverage != null
             ? s.nport_coverage + '% (' + s.nport_funds + ' funds)'
@@ -1078,11 +1078,11 @@ function _buildRegisterTotals(table, pageData) {
             } else if (srcRows && (c.type === 'dollar' || c.type === 'shares')) {
                 let sum = 0;
                 srcRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
-                td.textContent = sum ? _formatCellValue(sum, c.type) : '—';
+                td.innerHTML = sum ? _formatCellValue(sum, c.type) : '—';
             } else if (srcRows && c.key === 'pct_float') {
                 let sum = 0;
                 srcRows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
-                td.textContent = sum ? fmtPct(sum) : '—';
+                td.innerHTML = sum ? fmtPct(sum) : '—';
             } else {
                 td.textContent = '';
             }
@@ -1104,11 +1104,11 @@ function _buildRegisterTotals(table, pageData) {
             if (c.key === 'institution') {
                 td.textContent = label;
             } else if (obj && c.key === 'value_live' && obj.value_live) {
-                td.textContent = _formatCellValue(obj.value_live, 'dollar');
+                td.innerHTML = _formatCellValue(obj.value_live, 'dollar');
             } else if (obj && c.key === 'shares' && obj.shares) {
-                td.textContent = _formatCellValue(obj.shares, 'shares');
+                td.innerHTML = _formatCellValue(obj.shares, 'shares');
             } else if (obj && c.key === 'pct_float' && obj.pct_float) {
-                td.textContent = fmtPct(obj.pct_float);
+                td.innerHTML = fmtPct(obj.pct_float);
             } else {
                 td.textContent = '';
             }
@@ -1458,7 +1458,7 @@ async function loadOwnershipTrend() {
     ['summary', 'changes'].forEach(v => {
         const btn = document.createElement('button');
         btn.className = 'co-view-btn' + (v === _otSubView ? ' active' : '');
-        btn.textContent = v === 'summary' ? 'Quarterly Summary & Cohort' : 'Holder Changes';
+        btn.textContent = v === 'summary' ? 'Quarterly Summary & Cohort' : 'Holder Momentum';
         btn.addEventListener('click', () => { _otSubView = v; loadOwnershipTrend(); });
         bar.appendChild(btn);
     });
@@ -1469,16 +1469,16 @@ async function loadOwnershipTrend() {
         // Also load cohort inline below summary
         await loadOTCohort();
     } else {
-        // Reuse existing query2 — fetch and render inline
+        // Holder Momentum — full year share history per parent, collapsible to funds
         showSpinner();
         try {
-            const res = await fetch(`/api/query2?ticker=${currentTicker}`);
+            const res = await fetch(`/api/holder_momentum?ticker=${currentTicker}`);
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
-            currentData = await res.json();
-            currentQuery = 2;
+            const data = await res.json();
             hideSpinner();
             const savedBar = tableWrap.querySelector('.sub-view-bar');
-            renderTable(currentData, 2);
+            currentData = data;
+            _renderMomentum(data);
             if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
         } catch (e) { hideSpinner(); showError(e.message); }
     }
@@ -1765,25 +1765,6 @@ function renderCohort(data, container) {
     thead.appendChild(hr);
     table.appendChild(thead);
 
-    // Plain formatters (no HTML wrapping for negatives)
-    function _plainShares(v) {
-        if (v == null || v === 0) return '\u2014';
-        const abs = Math.abs(v);
-        if (abs >= 1e9) return (abs / 1e9).toFixed(1) + 'B';
-        if (abs >= 1e6) return (abs / 1e6).toFixed(1) + 'M';
-        if (abs >= 1e3) return (abs / 1e3).toFixed(1) + 'K';
-        return abs.toLocaleString('en-US', {maximumFractionDigits: 0});
-    }
-    function _plainDollars(v) {
-        if (v == null || v === 0) return '\u2014';
-        const abs = Math.abs(v);
-        if (abs >= 1e12) return '$' + (abs / 1e12).toFixed(1) + 'T';
-        if (abs >= 1e9) return '$' + (abs / 1e9).toFixed(1) + 'B';
-        if (abs >= 1e6) return '$' + (abs / 1e6).toFixed(0) + 'M';
-        if (abs >= 1e3) return '$' + (abs / 1e3).toFixed(0) + 'K';
-        return '$' + abs.toLocaleString('en-US', {maximumFractionDigits: 0});
-    }
-
     /** Build a single cohort table row. */
     function _buildRow(row, indent) {
         const tr = document.createElement('tr');
@@ -1829,22 +1810,21 @@ function renderCohort(data, container) {
         // Shares
         const tdS = document.createElement('td');
         tdS.style.textAlign = 'right';
-        tdS.textContent = _plainShares(row.shares);
+        tdS.innerHTML = fmtShares(row.shares);
         tr.appendChild(tdS);
 
         // Value
         const tdV = document.createElement('td');
         tdV.style.textAlign = 'right';
-        tdV.textContent = _plainDollars(row.value);
+        tdV.innerHTML = fmtDollars(row.value);
         tr.appendChild(tdV);
 
-        // Δ Shares
+        // Δ Shares (positive = +prefix, negative = red parentheses via _negWrap)
         const tdDS = document.createElement('td');
         tdDS.style.textAlign = 'right';
         if (row.delta_shares && row.delta_shares !== 0) {
-            const sign = row.delta_shares > 0 ? '+' : '\u2212';
-            tdDS.textContent = sign + _plainShares(row.delta_shares);
-            tdDS.style.color = row.delta_shares > 0 ? '#27AE60' : '#C0392B';
+            if (row.delta_shares > 0) tdDS.innerHTML = '+' + fmtShares(row.delta_shares);
+            else tdDS.innerHTML = fmtShares(row.delta_shares);
         } else { tdDS.textContent = '\u2014'; tdDS.style.color = '#999'; }
         tr.appendChild(tdDS);
 
@@ -1852,16 +1832,15 @@ function renderCohort(data, container) {
         const tdDV = document.createElement('td');
         tdDV.style.textAlign = 'right';
         if (row.delta_value && row.delta_value !== 0) {
-            const sign = row.delta_value > 0 ? '+' : '\u2212';
-            tdDV.textContent = sign + _plainDollars(row.delta_value);
-            tdDV.style.color = row.delta_value > 0 ? '#27AE60' : '#C0392B';
+            if (row.delta_value > 0) tdDV.innerHTML = '+' + fmtDollars(row.delta_value);
+            else tdDV.innerHTML = fmtDollars(row.delta_value);
         } else { tdDV.textContent = '\u2014'; tdDV.style.color = '#999'; }
         tr.appendChild(tdDV);
 
         // Avg Position
         const tdAvg = document.createElement('td');
         tdAvg.style.textAlign = 'right';
-        tdAvg.textContent = _plainDollars(row.avg_position);
+        tdAvg.innerHTML = fmtDollars(row.avg_position);
         tr.appendChild(tdAvg);
 
         // % Inst Float
@@ -2016,6 +1995,151 @@ async function loadActivistTab() {
     } catch (e) {
         hideSpinner(); showError(e.message);
     }
+}
+
+function _renderMomentum(data) {
+    if (!data || !data.length) { tableWrap.appendChild(sectionHeader('No momentum data')); return; }
+
+    // Detect quarter columns from first row
+    const qs = Object.keys(data[0]).filter(k => /^\d{4}Q\d$/.test(k)).sort();
+
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.tableLayout = 'fixed';
+
+    // Colgroup: #, Institution, Q1..Q4, Change, Chg%
+    const colgroup = document.createElement('colgroup');
+    const numCols = 3 + qs.length + 2; // #, institution, type, quarters, change, chg%
+    [
+        '3%',  // #
+        null,  // institution (flex)
+        '7%',  // type
+    ].concat(qs.map(() => Math.floor(48 / qs.length) + '%'))
+     .concat(['11%', '7%'])  // change, chg%
+     .forEach(w => {
+        const cg = document.createElement('col');
+        if (w) cg.style.width = w;
+        colgroup.appendChild(cg);
+    });
+    table.appendChild(colgroup);
+
+    // Header
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    hr.style.position = 'sticky';
+    hr.style.top = '0';
+    hr.style.zIndex = '10';
+    [['#', 'right'], ['Institution', 'left'], ['Type', 'center']]
+        .concat(qs.map(q => [_fmtQ(q), 'right']))
+        .concat([['Change', 'right'], ['Chg%', 'right']])
+        .forEach(([h, align]) => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            th.style.textAlign = align;
+            hr.appendChild(th);
+        });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    let parentIdx = 0;
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        const isParent = row.is_parent || false;
+        const isChild = row.level === 1;
+        if (isParent || (!isChild && row.level === 0)) tr.style.fontWeight = isParent ? '700' : '500';
+        if (isChild) {
+            tr.style.display = 'none';
+            tr.style.fontSize = '11px';
+            tr.style.color = '#555';
+        }
+
+        // #
+        const tdNum = document.createElement('td');
+        tdNum.className = 'col-rownum';
+        if (!isChild && row.rank) { tdNum.textContent = row.rank; tdNum.style.fontWeight = '700'; }
+        tr.appendChild(tdNum);
+
+        // Institution
+        const tdName = document.createElement('td');
+        tdName.classList.add('col-text-overflow');
+        if (isChild) {
+            tdName.style.paddingLeft = '24px';
+            tdName.textContent = row.institution || '';
+        } else if (isParent) {
+            tdName.appendChild(document.createTextNode((row.institution || '') + ' '));
+            const arrow = document.createElement('span');
+            arrow.className = 'toggle-arrow';
+            arrow.textContent = '\u25B6';
+            tdName.appendChild(arrow);
+            tdName.style.cursor = 'pointer';
+        } else {
+            tdName.textContent = row.institution || '';
+        }
+        tdName.title = row.institution || '';
+        tr.appendChild(tdName);
+
+        // Type
+        const tdType = document.createElement('td');
+        tdType.style.textAlign = 'center';
+        tdType.textContent = (!isChild && row.type && row.type !== 'unknown') ? row.type : '';
+        tr.appendChild(tdType);
+
+        // Quarter shares
+        qs.forEach(q => {
+            const td = document.createElement('td');
+            td.style.textAlign = 'right';
+            td.innerHTML = row[q] != null ? fmtShares(row[q]) : '\u2014';
+            if (row[q] == null) td.style.color = '#ccc';
+            tr.appendChild(td);
+        });
+
+        // Change
+        const tdChg = document.createElement('td');
+        tdChg.style.textAlign = 'right';
+        if (row.change != null && row.change !== 0) {
+            if (row.change > 0) tdChg.innerHTML = '+' + fmtShares(row.change);
+            else tdChg.innerHTML = fmtShares(row.change);
+        } else { tdChg.textContent = '\u2014'; }
+        tr.appendChild(tdChg);
+
+        // Chg%
+        const tdPct = document.createElement('td');
+        tdPct.style.textAlign = 'right';
+        if (row.change_pct != null) {
+            const v = row.change_pct;
+            if (v > 0) tdPct.textContent = '+' + v.toFixed(1) + '%';
+            else if (v < 0) { tdPct.innerHTML = '<span class="negative">(' + Math.abs(v).toFixed(1) + '%)</span>'; }
+            else tdPct.textContent = '0.0%';
+        } else { tdPct.textContent = '\u2014'; }
+        tr.appendChild(tdPct);
+
+        // Collapsible setup
+        if (isParent) {
+            parentIdx++;
+            tr.dataset.parentId = 'mp' + parentIdx;
+            tr.classList.add('collapsible-parent');
+        } else if (isChild) {
+            tr.dataset.childOf = 'mp' + parentIdx;
+            tr.classList.add('child-row');
+        }
+
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+
+    // Click handlers for collapsible parents
+    tbody.querySelectorAll('.collapsible-parent').forEach(parentTr => {
+        parentTr.addEventListener('click', () => {
+            const pid = parentTr.dataset.parentId;
+            const arrow = parentTr.querySelector('.toggle-arrow');
+            const children = tbody.querySelectorAll(`tr[data-child-of="${pid}"]`);
+            const isExpanded = children[0] && children[0].style.display !== 'none';
+            children.forEach(c => { c.style.display = isExpanded ? 'none' : ''; });
+            if (arrow) arrow.textContent = isExpanded ? '\u25B6' : '\u25BC';
+        });
+    });
 }
 
 function sectionHeader(text) {
@@ -2921,7 +3045,7 @@ function renderCOMatrix(data) {
             td.style.textAlign = 'right';
             const val = inv.holdings[t];
             if (val != null) {
-                td.textContent = fmtDollars(val);
+                td.innerHTML = fmtDollars(val);
                 td.classList.add('cell-held');
                 colTotals[t] += val;
             } else {
@@ -2934,7 +3058,7 @@ function renderCOMatrix(data) {
         const tdTotal = document.createElement('td');
         tdTotal.style.textAlign = 'right';
         tdTotal.classList.add('col-total');
-        tdTotal.textContent = fmtDollars(inv.total_across);
+        tdTotal.innerHTML = fmtDollars(inv.total_across);
         grandTotal += (inv.total_across || 0);
         tr.appendChild(tdTotal);
 
@@ -2962,12 +3086,12 @@ function renderCOMatrix(data) {
     orderedTickers.forEach(t => {
         const td = document.createElement('td');
         td.style.textAlign = 'right';
-        td.textContent = fmtDollars(colTotals[t]);
+        td.innerHTML = fmtDollars(colTotals[t]);
         totalsRow.appendChild(td);
     });
     const tdGrand = document.createElement('td');
     tdGrand.style.textAlign = 'right';
-    tdGrand.textContent = fmtDollars(grandTotal);
+    tdGrand.innerHTML = fmtDollars(grandTotal);
     totalsRow.appendChild(tdGrand);
     totalsRow.appendChild(document.createElement('td'));
     tbody.appendChild(totalsRow);
