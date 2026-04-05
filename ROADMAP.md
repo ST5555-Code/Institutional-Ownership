@@ -1,6 +1,6 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 3, 2026_
+_Last updated: April 5, 2026_
 
 ---
 
@@ -83,6 +83,7 @@ _Last updated: April 3, 2026_
 | 39 | Bug 6 — fetch_market.py upsert, never drops table | Done | Unique index on ticker, delete-then-insert per batch |
 | 40 | Bug 7 — app.py snapshot switchback monitor | Done | Background thread, 60s poll, auto-switch + log |
 | 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
+| 42 | Entity MDM — Phase 1 in progress, see ENTITY_ARCHITECTURE.md | In progress | |
 
 ---
 
@@ -139,6 +140,7 @@ _Last updated: April 3, 2026_
 | 2026-04-03 | FINRA short interest refresh | 102K→328K rows, 29 dates, 12,511 tickers |
 | 2026-04-03 | enrich_tickers.py | +1,076 CUSIPs resolved, Q4 ticker coverage 91.6% |
 | 2026-04-03 | Staging support | Added --staging to enrich_tickers.py, auto_resolve.py. fetch_market.py fixed for staging isolation |
+| 2026-04-05 | fetch_market.py rewrite (H8-H11) | Bypassed yfinance entirely via new `yahoo_client.py` (direct curl_cffi to Yahoo's JSON API). Added `sec_shares_client.py` for authoritative shares outstanding from SEC XBRL (EntityCommonStockSharesOutstanding + EntityPublicFloat, from 10-K/10-Q covers, 90-day cache). New incremental update protocol: prices 7d / metadata 30d / SEC 90d staleness thresholds; `--force`, `--missing-only`, `--metadata-only`, `--sec-only`, `--limit` flags. Ticker pre-filter flags bonds/warrants/preferreds/FX-suffix as unfetchable. pct_of_float now uses SEC shares_outstanding as primary source. Schema additions: unfetchable, unfetchable_reason, metadata_date, sec_date, public_float_usd, shares_as_of, shares_form, shares_filed, cik. |
 
 ---
 
@@ -153,6 +155,13 @@ _Last updated: April 3, 2026_
 | H5 | Phase 2 accession checkpoint | Done | Already handled via NOT IN query on beneficial_ownership (0.03s) |
 | H6 | Connection pooling for Flask | Done | Thread-local connection cache in get_db() — reuses connections across requests |
 | H7 | Query result caching | Done | _cached() with 5-min TTL on get_summary. Extensible to other queries |
+| H8 | fetch_market.py rewrite — bypass yfinance | Done | yfinance 1.2.0 ignores `session=` param; internal requests hit YFRateLimitError at scale. New `scripts/yahoo_client.py` hits `/v7/quote`, `/v10/quoteSummary`, `/v8/chart` directly via curl_cffi with chrome impersonation. No rate limiting. 1,079 symbols/sec on batch quote. |
+| H9 | SEC XBRL shares outstanding | Done | `scripts/sec_shares_client.py` pulls `EntityCommonStockSharesOutstanding` + `EntityPublicFloat` from SEC companyfacts. Sourced from 10-K/10-Q cover pages — authoritative. 90-day cache on disk per CIK. `pct_of_float` now prefers SEC shares_outstanding over Yahoo float_shares. **`market_cap` is computed as `shares_outstanding (SEC) × price_live (Yahoo)`** — Yahoo's marketCap field is never written. NULL if either input is missing (no silent fallback). |
+| H10 | Ticker pre-filter for Yahoo | Done | `classify_unfetchable()` flags bonds (" " in ticker), warrants (WT/-WT/WS suffix), preferreds (-P*), class markers (*), FX-suffixed foreign OTC. Persisted as `market_data.unfetchable` + reason. Skipped on future runs. |
+| H11 | Incremental update protocol | Done | fetch_market.py defaults to incremental: skip prices <7d old, metadata <30d, SEC shares <90d. New flags: `--force`, `--missing-only`, `--metadata-only`, `--sec-only`, `--limit N`. Schema additions: `metadata_date`, `sec_date`, `public_float_usd`, `shares_as_of`, `shares_form`, `shares_filed`, `cik`, `unfetchable`, `unfetchable_reason`. |
+| H12 | Migrate remaining yfinance callers to yahoo_client | Done | All 6 scripts migrated: `refetch_missing_sectors.py`, `approve_overrides.py` (also fixed latent `FROM d` bug), `enrich_tickers.py`, `build_cusip.py`, `auto_resolve.py` (3 call sites), `app.py` `/api/add_ticker`. Zero `yfinance` imports remain in `scripts/`. yfinance dependency can be dropped from requirements. Along the way: added `long_name`/`short_name` to YahooClient.fetch_metadata, added `us-gaap:CommonStockSharesOutstanding` + `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` fallbacks to SECSharesClient (for multi-class filers like GOOGL/META/F/CMCSA), 2-year staleness guard on SEC facts (rejects BRK's 2011 legacy record), new `market_data.shares_source_tag` column for provenance, and `data/reference/shares_overrides.csv` for filers with broken XBRL (Visa, BRK-A/B). |
+| H13 | merge_staging.py column-swap bug | Done | Root cause: `merge_table()` built INSERT using staging's column order (positional), causing value corruption when staging and production had the same columns in different order. Hit during 2026-04-05 market_data merge — `cik` and `shares_source_tag` values were swapped in production after first merge. Fix: explicit named columns on both sides of `INSERT INTO t (cols) SELECT cols FROM staging_db.t`, with intersection of staging and production column sets (schema-drift tolerant). Regression test added. |
+| H14 | Period-accurate pct_of_float (historical shares outstanding) | Done | Previously `holdings.pct_of_float` used `market_data.shares_outstanding` (latest) as denominator for ALL historical quarters — materially wrong across splits, buybacks, offerings. GOOGL 2020Q1 was 18× off; TSLA 2019Q4 20× off; AAPL 2020Q1 3.4× off. New `shares_outstanding_history` table populated from SEC XBRL (all facts, not just latest) via `scripts/build_shares_history.py`. New `SECSharesClient.fetch_history()` method iterates all share facts from local companyfacts cache with same tag-preference fallback as `fetch()`. Holdings update uses DuckDB ASOF JOIN on `strptime(report_date, '%d-%b-%Y')::DATE >= soh.as_of_date`. 317K historical facts across 4,450 tickers, 70% of (ticker, report_date) pairs match to SEC history. Fallback to latest market_data shares for tickers without SEC XBRL coverage. `market_data.shares_outstanding` retains "latest" semantic for current market_cap calculation. |
 
 ---
 
@@ -273,7 +282,7 @@ _Last updated: April 3, 2026_
 1. ~~N-PORT index/ETF download + merge~~ Done
 2. ~~Data quality fixes (market_value, manager_type, flows, pct_of_float)~~ Done
 3. ~~FINRA short interest refresh + enrich_tickers~~ Done
-4. **Retry `fetch_market.py --staging`** when Yahoo rate limit resets (fills snapshot prices + 420 missing tickers)
+4. ~~Retry `fetch_market.py --staging` when Yahoo rate limit resets~~ Done (2026-04-05) — root cause was yfinance 1.2.0 ignoring passed sessions; bypassed via direct curl_cffi client (H8). SEC XBRL added for authoritative shares outstanding (H9).
 5. ~~N12 — Investor name standardization~~ Done
 6. ~~N2 — Short squeeze UI tab~~ Done
 7. ~~N3 — Short vs long UI integration~~ Done
