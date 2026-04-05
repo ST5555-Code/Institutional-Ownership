@@ -1384,9 +1384,9 @@ function _renderConviction(data) {
     table.className = 'data-table';
     table.style.tableLayout = 'fixed';
 
-    // Columns: #, Institution, Type, Value, Sector%, Rank, CoR, IndR, Top3, Div, Unk%
+    // Columns: #, Institution, Type, Value, Sector%, vs SPX, Score, SecRnk, CoR, IndR, Top3, Div, Unk%
     const colgroup = document.createElement('colgroup');
-    ['3%', null, '8%', '10%', '9%', '6%', '6%', '7%', '14%', '6%', '6%'].forEach(w => {
+    ['3%', null, '7%', '9%', '8%', '7%', '6%', '5%', '5%', '6%', '13%', '5%', '5%'].forEach(w => {
         const cg = document.createElement('col');
         if (w) cg.style.width = w;
         colgroup.appendChild(cg);
@@ -1395,6 +1395,8 @@ function _renderConviction(data) {
 
     const nameLabel = _convictionLevel === 'fund' ? 'Fund' : 'Institution';
     const sectorColLabel = `${subjSector} %`;
+    const spxWeight = data.subject_spx_weight;
+    const spxLabel = spxWeight != null ? `vs SPX (${spxWeight}%)` : 'vs SPX';
 
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
@@ -1404,6 +1406,8 @@ function _renderConviction(data) {
         ['Type', 'left'],
         ['Value', 'right'],
         [sectorColLabel, 'right'],
+        [spxLabel, 'right'],
+        ['Score', 'right'],
         ['Sec Rnk', 'right'],
         ['Co Rnk', 'right'],
         ['Ind Rnk', 'right'],
@@ -1461,6 +1465,37 @@ function _renderConviction(data) {
         tdSec.style.fontWeight = '600';
         tr.appendChild(tdSec);
 
+        // vs SPX (overweight/underweight)
+        const tdVs = document.createElement('td');
+        tdVs.style.textAlign = 'right';
+        if (row.vs_spx != null) {
+            const v = row.vs_spx;
+            if (v > 0) {
+                tdVs.innerHTML = '<span class="positive">+' + v.toFixed(1) + 'pp</span>';
+            } else if (v < 0) {
+                tdVs.innerHTML = '<span class="negative">(' + Math.abs(v).toFixed(1) + 'pp)</span>';
+            } else {
+                tdVs.textContent = '0.0pp';
+                tdVs.style.color = '#999';
+            }
+        } else {
+            tdVs.textContent = '\u2014';
+            tdVs.style.color = '#999';
+        }
+        tr.appendChild(tdVs);
+
+        // Conviction Score
+        const tdScore = document.createElement('td');
+        tdScore.style.textAlign = 'right';
+        tdScore.style.fontWeight = '700';
+        const s = row.conviction_score || 0;
+        tdScore.textContent = s;
+        if (s >= 60) tdScore.style.color = '#27AE60';
+        else if (s >= 30) tdScore.style.color = '#F39C12';
+        else if (s > 0) tdScore.style.color = '#666';
+        else tdScore.style.color = '#ccc';
+        tr.appendChild(tdScore);
+
         // Sector Rank
         const tdSR = document.createElement('td');
         tdSR.style.textAlign = 'right';
@@ -1513,8 +1548,10 @@ function _renderConviction(data) {
     // Legend footnote
     const fn = document.createElement('div');
     fn.style.cssText = 'font-size:11px;color:#888;padding:10px 0;line-height:1.5;';
-    fn.innerHTML = '<strong>Columns:</strong> '
+    fn.innerHTML = '<strong>Sorted by Conviction Score (highest first).</strong> '
         + `<strong>${sectorColLabel}</strong> = holder's % allocation to ${subjSector}. `
+        + `<strong>vs SPX</strong> = overweight/underweight vs S&P 500 sector weight (${subjSector} = ${data.subject_spx_weight || '?'}%). `
+        + '<strong>Score</strong> = conviction composite (0-90). Rewards overweight vs SPX + being holder\'s top sector + company rank in sector/industry. '
         + '<strong>Sec Rnk</strong> = where this sector ranks in their portfolio (1 = their top sector). '
         + `<strong>Co Rnk</strong> = where ${currentTicker} ranks in their ${subjSector} bucket. `
         + `<strong>Ind Rnk</strong> = where ${currentTicker} ranks in their ${subjIndustry || 'industry'} bucket. `

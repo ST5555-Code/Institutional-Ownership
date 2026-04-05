@@ -2742,6 +2742,20 @@ def portfolio_context(ticker, level='parent', active_only=False):
         subj_yf_industry = subj[1] if subj else None
         subj_gics_sector, subj_gics_code = _gics_sector(subj_yf_sector, subj_yf_industry)
 
+        # Load SPX benchmark weights for sector comparison
+        spx_weights = {}
+        try:
+            bw = con.execute("""
+                SELECT gics_sector, weight_pct FROM benchmark_weights
+                WHERE index_name = 'SPX' ORDER BY as_of_date DESC
+            """).fetchall()
+            for sec, wt in bw:
+                if sec not in spx_weights:
+                    spx_weights[sec] = float(wt)
+        except Exception:
+            pass
+        subj_spx_weight = spx_weights.get(subj_gics_sector, None)
+
         # Top 25 parents or funds by latest quarter value (same as Register)
         if level == 'fund':
             active_filter = "AND fu.is_actively_managed = true" if active_only else ""
@@ -2872,12 +2886,47 @@ def portfolio_context(ticker, level='parent', active_only=False):
             else:
                 row_type = h_row.get('mtype') or 'unknown'
 
+            # Overweight / underweight vs SPX
+            vs_spx = None
+            if subj_spx_weight is not None:
+                vs_spx = round(subject_sector_pct - subj_spx_weight, 1)
+
+            # Conviction score — composite of:
+            # (a) overweight vs SPX (capped at +50pp, scaled 0-40 points)
+            # (b) sector rank bonus (1st=20, 2nd=10, 3rd=5, else 0)
+            # (c) company rank in sector bonus (1st=15, 2nd=10, 3rd=5, else 0)
+            # (d) industry rank bonus (1st=15, 2nd=10, 3rd=5, else 0)
+            # Range: 0-90, higher = stronger conviction
+            score = 0
+            if vs_spx is not None:
+                score += max(0, min(vs_spx / 50 * 40, 40))
+            if subject_sector_rank == 1:
+                score += 20
+            elif subject_sector_rank == 2:
+                score += 10
+            elif subject_sector_rank == 3:
+                score += 5
+            if co_rank_in_sector == 1:
+                score += 15
+            elif co_rank_in_sector == 2:
+                score += 10
+            elif co_rank_in_sector == 3:
+                score += 5
+            if industry_rank == 1:
+                score += 15
+            elif industry_rank == 2:
+                score += 10
+            elif industry_rank == 3:
+                score += 5
+
             results.append({
                 'rank': idx + 1,
                 'institution': holder,
                 'type': row_type,
                 'value': subject_value,
                 'subject_sector_pct': subject_sector_pct,
+                'vs_spx': vs_spx,
+                'conviction_score': round(score, 0),
                 'sector_rank': subject_sector_rank,
                 'co_rank_in_sector': co_rank_in_sector,
                 'industry_rank': industry_rank,
@@ -2887,11 +2936,17 @@ def portfolio_context(ticker, level='parent', active_only=False):
                 'level': 0,
             })
 
+        # Sort by conviction score descending
+        results.sort(key=lambda x: x.get('conviction_score', 0), reverse=True)
+        for i, r in enumerate(results, 1):
+            r['rank'] = i
+
         return {
             'rows': results,
             'subject_sector': subj_gics_sector,
             'subject_sector_code': subj_gics_code,
             'subject_industry': subj_yf_industry or '',
+            'subject_spx_weight': subj_spx_weight,
             'level': level,
             'active_only': active_only,
         }
