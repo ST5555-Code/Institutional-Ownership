@@ -204,9 +204,17 @@ async function loadTicker() {
         document.getElementById('sum-holders').textContent = s.num_holders != null ? s.num_holders.toLocaleString() : '\u2014';
         document.getElementById('sum-mktcap').innerHTML = fmtDollars(s.market_cap);
         document.getElementById('sum-price').textContent = s.price != null ? '$' + s.price.toFixed(2) : '\u2014';
-        document.getElementById('sum-nport').textContent = s.nport_coverage != null
-            ? s.nport_coverage + '% (' + s.nport_funds + ' funds)'
-            : '\u2014';
+        // N-PORT coverage with latest filing date
+        const nportEl = document.getElementById('sum-nport');
+        if (s.nport_coverage != null) {
+            let txt = s.nport_coverage + '% (' + s.nport_funds + ' funds)';
+            if (s.nport_latest_date) {
+                txt += '<br><span style="font-size:10px;color:#888;">as of ' + s.nport_latest_date + '</span>';
+            }
+            nportEl.innerHTML = txt;
+        } else {
+            nportEl.textContent = '\u2014';
+        }
 
         // Active/Passive split
         const activeVal = s.active_value || 0;

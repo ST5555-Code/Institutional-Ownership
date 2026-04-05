@@ -3584,6 +3584,17 @@ def _get_summary_impl(ticker):
         nport_val = nport.get('nport_total_value') or 0
         nport_pct = round(nport_val / total_value * 100, 1) if total_value and total_value > 0 else None
 
+        # Latest N-PORT report date (most recent monthly filing in our data)
+        nport_date = None
+        try:
+            nd = con.execute("""
+                SELECT MAX(report_date) FROM fund_holdings WHERE ticker = ?
+            """, [ticker]).fetchone()
+            if nd and nd[0]:
+                nport_date = str(nd[0])[:10]  # YYYY-MM-DD
+        except Exception:
+            pass
+
         result = {
             'company_name': company_name,
             'ticker': ticker,
@@ -3599,6 +3610,7 @@ def _get_summary_impl(ticker):
             'shares_float': mkt[2] if mkt else None,
             'nport_coverage': nport_pct,
             'nport_funds': nport.get('nport_fund_count', 0),
+            'nport_latest_date': nport_date,
         }
         return clean_for_json(result)
     finally:
