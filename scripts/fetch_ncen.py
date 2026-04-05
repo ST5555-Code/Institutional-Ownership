@@ -245,7 +245,7 @@ def update_managers_adviser_cik(con):
     """Add adviser_cik to managers table by fuzzy matching adviser names."""
     try:
         con.execute("ALTER TABLE managers ADD COLUMN adviser_cik VARCHAR")
-    except Exception:
+    except Exception:  # nosec B110 — column already exists on subsequent runs
         pass
 
     # Get unique advisers from ncen_adviser_map
@@ -284,9 +284,24 @@ def update_managers_adviser_cik(con):
 # Main pipeline
 # ---------------------------------------------------------------------------
 
-def run(test_mode=False):
+def _entity_tables_exist(con):
+    """Check if entity MDM tables exist in the current DB (staging only)."""
+    try:
+        con.execute("SELECT 1 FROM entities LIMIT 0")
+        return True
+    except Exception:
+        return False
+
+
+def run(test_mode=False, staging=False):
     con = duckdb.connect(get_db_path())
     create_tables(con)
+
+    # Phase 2: if staging mode and entity tables exist, wire entity_sync
+    do_entity_sync = staging and _entity_tables_exist(con)
+    if staging and not do_entity_sync:
+        print("  [entity_sync] entity tables not found in staging — skipping entity sync.")
+        print("  [entity_sync] Run build_entities.py --reset first to create entity tables.")
 
     # Get target fund CIKs from fund_universe
     fund_ciks = con.execute("""
@@ -335,6 +350,19 @@ def run(test_mode=False):
             insert_records(con, records)
             total_records += len(records)
 
+            # Phase 2: sync new ncen rows into entity MDM tables (staging only)
+            if do_entity_sync:
+                import entity_sync  # noqa: E402
+
+                for rec in records:
+                    entity_sync.sync_from_ncen_row(
+                        con,
+                        adviser_name=rec.get("adviser_name"),
+                        adviser_crd=rec.get("adviser_crd"),
+                        series_id=rec.get("series_id"),
+                        role=rec.get("role", ""),
+                    )
+
         # Checkpoint periodically
         if (i + 1) % 25 == 0:
             con.execute("CHECKPOINT")
@@ -380,6 +408,16 @@ def run(test_mode=False):
         for r in wellington[:15]:
             print(f"  {r[0]:15s} {r[1]:45s} ({r[2]}) [{r[3]}]")
 
+    # Phase 2: entity sync summary (staging only)
+    if do_entity_sync:
+        ent_count = con.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+        rel_count = con.execute("SELECT COUNT(*) FROM entity_relationships").fetchone()[0]
+        staging_count = con.execute(
+            "SELECT COUNT(*) FROM entity_identifiers_staging WHERE review_status='pending'"
+        ).fetchone()[0]
+        print(f"\n[entity_sync] entities: {ent_count}, relationships: {rel_count}")
+        print(f"[entity_sync] identifier conflicts pending review: {staging_count}")
+
     con.close()
     print("\nDone.")
 
@@ -390,6 +428,7 @@ if __name__ == "__main__":
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
     args = parser.parse_args()
 
-    if hasattr(args, 'staging') and args.staging:
+    is_staging = hasattr(args, 'staging') and args.staging
+    if is_staging:
         set_staging_mode(True)
-    crash_handler("fetch_ncen")(lambda: run(test_mode=args.test))
+    crash_handler("fetch_ncen")(lambda: run(test_mode=args.test, staging=is_staging))
