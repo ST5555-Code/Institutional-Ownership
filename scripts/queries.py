@@ -1088,26 +1088,16 @@ def holder_momentum(ticker, level='parent', active_only=False):
 
         # --- Fund-level branch ---
         if level == 'fund':
-            # Fetch more funds than needed, then filter by classification
-            limit = 100 if active_only else 25
+            # SQL-level filter via fund_universe.is_actively_managed (N21: fixed)
+            af = "AND fu.is_actively_managed = true" if active_only else ""
             top_funds = con.execute(f"""
                 SELECT fh.fund_name, SUM(fh.market_value_usd) as val
                 FROM fund_holdings fh
-                WHERE fh.ticker = ? AND fh.quarter = '{LQ}'
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.quarter = '{LQ}' {af}
                 GROUP BY fh.fund_name
-                ORDER BY val DESC NULLS LAST LIMIT {limit}
+                ORDER BY val DESC NULLS LAST LIMIT 25
             """, [ticker]).fetchdf()
-
-            if top_funds.empty:
-                return []
-
-            # Filter to active-only using name-based classification
-            if active_only:
-                top_funds = top_funds[top_funds['fund_name'].apply(
-                    lambda n: _classify_fund_type(n) == 'active'
-                )].head(25).reset_index(drop=True)
-            else:
-                top_funds = top_funds.head(25).reset_index(drop=True)
 
             if top_funds.empty:
                 return []
@@ -1138,7 +1128,7 @@ def holder_momentum(ticker, level='parent', active_only=False):
                 last_s = qshares.get(qs[-1], 0)
                 chg = last_s - first_s
                 chg_pct = round(chg / first_s * 100, 1) if first_s > 0 else None
-                # Use name-based classification (is_actively_managed is unreliable)
+                # Name-based classification (matches type rendering elsewhere)
                 fund_type = _classify_fund_type(fn)
                 row = {
                     'rank': rank,
@@ -2182,41 +2172,24 @@ def ownership_trend_summary(ticker, level='parent', active_only=False):
         float_shares = float_row[0] if float_row and float_row[0] else None
 
         if level == 'fund':
-            # Fund-level: aggregate from fund_holdings
-            # Note: fund_universe.is_actively_managed is unreliable (N21 audit item).
-            # Use fund name keywords via _classify_fund_type() for passive/active split.
-            raw_df = con.execute("""
-                SELECT fh.quarter, fh.fund_name,
-                       SUM(fh.shares_or_principal) as shares,
-                       SUM(fh.market_value_usd) as value
+            # Fund-level: aggregate from fund_holdings joined to fund_universe.
+            # Uses fund_universe.is_actively_managed (N21: now reliable after
+            # classification backfill). Active/passive split at SQL level.
+            af = "AND fu.is_actively_managed = true" if active_only else ""
+            df = con.execute(f"""
+                SELECT fh.quarter,
+                       SUM(fh.shares_or_principal) as total_inst_shares,
+                       SUM(fh.market_value_usd) as total_inst_value,
+                       COUNT(DISTINCT fh.fund_name) as holder_count,
+                       SUM(CASE WHEN fu.is_actively_managed = true
+                                THEN fh.market_value_usd ELSE 0 END) as active_value,
+                       SUM(CASE WHEN fu.is_actively_managed = false
+                                THEN fh.market_value_usd ELSE 0 END) as passive_value
                 FROM fund_holdings fh
-                WHERE fh.ticker = ? AND fh.market_value_usd > 0
-                GROUP BY fh.quarter, fh.fund_name
-                ORDER BY fh.quarter
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.market_value_usd > 0 {af}
+                GROUP BY fh.quarter ORDER BY fh.quarter
             """, [ticker]).fetchdf()
-
-            # Aggregate per quarter with keyword-based active/passive split
-            quarter_agg = {}
-            for _, r in raw_df.iterrows():
-                fund_type = _classify_fund_type(r['fund_name'])
-                if active_only and fund_type != 'active':
-                    continue
-                q = r['quarter']
-                if q not in quarter_agg:
-                    quarter_agg[q] = {
-                        'quarter': q, 'total_inst_shares': 0, 'total_inst_value': 0,
-                        'holder_count': 0, 'active_value': 0, 'passive_value': 0,
-                    }
-                quarter_agg[q]['total_inst_shares'] += float(r['shares'] or 0)
-                quarter_agg[q]['total_inst_value'] += float(r['value'] or 0)
-                quarter_agg[q]['holder_count'] += 1
-                if fund_type == 'passive':
-                    quarter_agg[q]['passive_value'] += float(r['value'] or 0)
-                else:
-                    quarter_agg[q]['active_value'] += float(r['value'] or 0)
-
-            import pandas as pd
-            df = pd.DataFrame(list(quarter_agg.values())).sort_values('quarter').reset_index(drop=True)
         else:
             df = con.execute("""
                 SELECT quarter,
@@ -3299,7 +3272,7 @@ def short_interest_analysis(ticker):
                 aum = r.get('fund_aum_mm')
                 val2 = r.get('short_value')
                 r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
-                # fund_universe.is_actively_managed is unreliable, use name-based classification
+                # Name-based classification for consistent type display
                 r['type'] = _classify_fund_type(r.get('fund_name') or '')
         except Exception:
             pass

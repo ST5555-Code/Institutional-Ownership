@@ -301,8 +301,17 @@ _include_index = False  # set via --include-index flag
 
 
 def classify_fund(metadata, holdings):
-    """Classify a fund. Returns (is_active_equity, fund_category, is_actively_managed)."""
+    """Classify a fund. Returns (is_active_equity, fund_category, is_actively_managed).
+
+    is_actively_managed is determined by fund name patterns:
+    - Names matching INDEX_PATTERNS (index, ETF, S&P 500, etc.) → False
+    - All other equity funds → True
+    """
     series_name = (metadata.get("series_name") or metadata.get("reg_name") or "").strip()
+
+    # Determine active vs passive by name (independent of --include-index filter)
+    is_passive_name = bool(INDEX_PATTERNS.search(series_name))
+    is_actively_managed_flag = not is_passive_name
 
     # Exclusions (skip index AND ETF filters when --include-index is active)
     if not _include_index and INDEX_PATTERNS.search(series_name):
@@ -335,9 +344,9 @@ def classify_fund(metadata, holdings):
             category = "equity"
         else:
             category = "balanced"
-        return True, category, True
+        return True, category, is_actively_managed_flag
     elif equity_val_pct >= 0.30:
-        return True, "multi_asset", True
+        return True, "multi_asset", is_actively_managed_flag
 
     return False, "bond_or_other", False
 
@@ -477,7 +486,7 @@ def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, rep
     return len(rows)
 
 
-def update_fund_universe(con, metadata, holdings, fund_category):
+def update_fund_universe(con, metadata, holdings, fund_category, is_actively_managed=True):
     """Insert or update fund_universe entry."""
     series_id = metadata.get("series_id") or "UNKNOWN"
     fund_cik = (metadata.get("reg_cik") or "").lstrip("0").zfill(10)
@@ -513,18 +522,18 @@ def update_fund_universe(con, metadata, holdings, fund_category):
         con.execute(
             """UPDATE fund_universe
                SET fund_cik = ?, fund_name = ?, family_name = ?,
-                   total_net_assets = ?, fund_category = ?, is_actively_managed = true,
+                   total_net_assets = ?, fund_category = ?, is_actively_managed = ?,
                    total_holdings_count = ?, equity_pct = ?, top10_concentration = ?,
                    last_updated = ?
                WHERE series_id = ?""",
-            [fund_cik, fund_name, family_name, net_assets, fund_category,
+            [fund_cik, fund_name, family_name, net_assets, fund_category, is_actively_managed,
              total_count, equity_pct, top10_pct, now, series_id],
         )
     else:
         con.execute(
             """INSERT INTO fund_universe VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [fund_cik, fund_name, series_id, family_name, net_assets, fund_category,
-             True, total_count, equity_pct, top10_pct, now],
+             is_actively_managed, total_count, equity_pct, top10_pct, now],
         )
 
 
@@ -611,7 +620,7 @@ def process_filing(con, cik, accession_number, company_name, target_quarters=Non
     count = load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, report_month)
 
     # Update universe
-    update_fund_universe(con, metadata, holdings, category)
+    update_fund_universe(con, metadata, holdings, category, is_actively_managed=is_active)
 
     return [(quarter_label, series_id, count)]
 
