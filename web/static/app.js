@@ -1339,11 +1339,10 @@ function _renderConviction(data) {
     const subjCode = data.subject_sector_code || '';
     const subjIndustry = data.subject_industry || '';
 
-    // Control bar
+    // Control bar: level toggle + active only + search
     const cbar = document.createElement('div');
     cbar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;flex-wrap:wrap;';
 
-    // Level toggle
     const lvlGroup = document.createElement('div');
     lvlGroup.className = 'register-view-toggle';
     [['parent', 'By Parent'], ['fund', 'By Fund']].forEach(([v, txt]) => {
@@ -1364,11 +1363,32 @@ function _renderConviction(data) {
         cbar.appendChild(aoBtn);
     }
 
+    // Search filter
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Filter by institution name...';
+    searchInput.style.cssText = 'padding:6px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;width:220px;margin-left:8px;';
+    searchInput.autocomplete = 'off';
+    searchInput.spellcheck = false;
+    searchInput.addEventListener('input', () => {
+        const q = searchInput.value.toLowerCase();
+        const table = tableWrap.querySelector('.data-table');
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const name = (tr.querySelector('td:nth-child(2)') || {}).textContent || '';
+            tr.style.display = !q || name.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+    cbar.appendChild(searchInput);
+
     const subjLabel = document.createElement('span');
     subjLabel.style.cssText = 'margin-left:auto;font-size:12px;color:#666;';
     subjLabel.innerHTML = `<strong>${currentTicker}</strong> &rarr; Sector: <strong>${subjSector}</strong> (${subjCode}) &middot; Industry: <strong>${subjIndustry || '\u2014'}</strong>`;
     cbar.appendChild(subjLabel);
     tableWrap.appendChild(cbar);
+
+    // Legend filter (click to filter by type)
+    tableWrap.appendChild(buildLegend());
 
     if (!rows.length) {
         tableWrap.appendChild(sectionHeader('No portfolio data available'));
@@ -1421,25 +1441,57 @@ function _renderConviction(data) {
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
+    let parentIdx = 0;
     rows.forEach(row => {
         const tr = document.createElement('tr');
+        const isChild = row.level === 1;
+        const isParent = row.is_parent === true;
+
         // Type tint — only active/hedge_fund
         const rtype = (row.type || '').toLowerCase();
         if (rtype === 'active' || rtype === 'hedge_fund') {
             tr.classList.add('type-' + rtype);
         }
+        tr.dataset.rowType = rtype || 'unknown';
+        tr.dataset.rowLevel = String(row.level || 0);
+
+        // Collapsible setup
+        if (isParent) {
+            parentIdx++;
+            tr.dataset.parentId = 'cvp' + parentIdx;
+            tr.classList.add('collapsible-parent');
+        } else if (isChild) {
+            tr.dataset.childOf = 'cvp' + parentIdx;
+            tr.classList.add('child-row');
+            tr.style.fontSize = '11px';
+            tr.style.color = '#555';
+        }
 
         // #
         const tdN = document.createElement('td');
         tdN.className = 'col-rownum';
-        tdN.textContent = row.rank;
-        tdN.style.fontWeight = '700';
+        if (!isChild) {
+            tdN.textContent = row.rank;
+            tdN.style.fontWeight = '700';
+        }
         tr.appendChild(tdN);
 
-        // Institution / Fund
+        // Institution / Fund (with toggle arrow if parent)
         const tdName = document.createElement('td');
         tdName.classList.add('col-text-overflow');
-        tdName.textContent = row.institution || '';
+        if (isParent) {
+            tdName.appendChild(document.createTextNode((row.institution || '') + ' '));
+            const arrow = document.createElement('span');
+            arrow.className = 'toggle-arrow';
+            arrow.textContent = '\u25B6';
+            tdName.appendChild(arrow);
+            tdName.style.cursor = 'pointer';
+        } else if (isChild) {
+            tdName.style.paddingLeft = '24px';
+            tdName.textContent = row.institution || '';
+        } else {
+            tdName.textContent = row.institution || '';
+        }
         tdName.title = row.institution || '';
         tr.appendChild(tdName);
 
@@ -1547,8 +1599,52 @@ function _renderConviction(data) {
 
         tbody.appendChild(tr);
     });
+
+    // Totals row (parent-level only, no double-counting)
+    const parentRows = rows.filter(r => !r.level || r.level === 0);
+    if (parentRows.length > 0) {
+        const totals = document.createElement('tr');
+        totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
+        // # col
+        const tdTNum = document.createElement('td');
+        tdTNum.className = 'col-rownum';
+        totals.appendChild(tdTNum);
+        // Institution label
+        const tdTLabel = document.createElement('td');
+        tdTLabel.textContent = `TOTAL (${parentRows.length} holders)`;
+        totals.appendChild(tdTLabel);
+        // Type (empty)
+        totals.appendChild(document.createElement('td'));
+        // Value sum
+        const tdTVal = document.createElement('td');
+        tdTVal.style.textAlign = 'right';
+        const sumVal = parentRows.reduce((a, r) => a + (r.value || 0), 0);
+        tdTVal.innerHTML = sumVal ? fmtDollars(sumVal) : '\u2014';
+        totals.appendChild(tdTVal);
+        // Rest are empty (averages would be misleading)
+        for (let i = 0; i < 9; i++) {
+            totals.appendChild(document.createElement('td'));
+        }
+        tbody.appendChild(totals);
+    }
+
     table.appendChild(tbody);
     tableWrap.appendChild(table);
+
+    // Collapsible click handlers
+    tbody.querySelectorAll('.collapsible-parent').forEach(parentTr => {
+        parentTr.addEventListener('click', () => {
+            const pid = parentTr.dataset.parentId;
+            const arrow = parentTr.querySelector('.toggle-arrow');
+            const children = tbody.querySelectorAll(`tr[data-child-of="${pid}"]`);
+            const isExpanded = children[0] && children[0].classList.contains('visible');
+            children.forEach(c => { c.classList.toggle('visible', !isExpanded); });
+            if (arrow) arrow.textContent = isExpanded ? '\u25B6' : '\u25BC';
+        });
+    });
+
+    // Apply type filter if one was set from the legend
+    if (_legendTypeFilter) _applyTypeFilter();
 
     // Legend footnote
     const fn = document.createElement('div');

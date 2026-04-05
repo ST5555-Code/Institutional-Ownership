@@ -2872,6 +2872,82 @@ def portfolio_context(ticker, level='parent', active_only=False):
                 GROUP BY holder, h.ticker, m.sector, m.industry
             """, top_holders).fetchdf()
 
+        def _compute_metrics(holder_df, subject_value):
+            """Compute all concentration metrics for a single holder's portfolio."""
+            if holder_df.empty:
+                return None
+            total = float(holder_df['value'].sum())
+            if total <= 0:
+                return None
+            unknown_val = float(holder_df[holder_df['yf_sector'] == 'Unknown']['value'].sum())
+            etf_val = float(holder_df[holder_df['yf_sector'] == 'ETF']['value'].sum())
+            unk_pct_ = round(unknown_val / total * 100, 1)
+            etf_pct_ = round(etf_val / total * 100, 1)
+
+            sector_totals_ = {}
+            for _, prow in holder_df.iterrows():
+                gics, code = _gics_sector(prow['yf_sector'], prow['yf_industry'])
+                if gics in ('Unknown', 'ETF'):
+                    continue
+                sector_totals_[(gics, code)] = sector_totals_.get((gics, code), 0) + float(prow['value'])
+
+            sorted_s = sorted(sector_totals_.items(), key=lambda x: x[1], reverse=True)
+            subj_key_ = (subj_gics_sector, subj_gics_code)
+            subj_sec_value = sector_totals_.get(subj_key_, 0)
+            subj_sec_pct = round(subj_sec_value / total * 100, 1)
+            subj_sec_rank = None
+            for i, ((s, _), _) in enumerate(sorted_s, 1):
+                if s == subj_gics_sector:
+                    subj_sec_rank = i
+                    break
+
+            co_rank = None
+            if subj_sec_value > 0:
+                sec_rows = holder_df[
+                    holder_df.apply(lambda r: _gics_sector(r['yf_sector'], r['yf_industry'])[0] == subj_gics_sector, axis=1)
+                ].sort_values('value', ascending=False).reset_index(drop=True)
+                for i, srow in sec_rows.iterrows():
+                    if srow['ticker'] == ticker:
+                        co_rank = i + 1
+                        break
+
+            ind_rank = None
+            if subj_yf_industry:
+                ind_rows = holder_df[holder_df['yf_industry'] == subj_yf_industry].sort_values('value', ascending=False).reset_index(drop=True)
+                for i, srow in ind_rows.iterrows():
+                    if srow['ticker'] == ticker:
+                        ind_rank = i + 1
+                        break
+
+            top3_ = [code for (_, code), _ in sorted_s[:3]]
+            vs_ = round(subj_sec_pct - subj_spx_weight, 1) if subj_spx_weight is not None else None
+            score_ = 0
+            if vs_ is not None:
+                score_ += max(0, min(vs_ / 50 * 40, 40))
+            if subj_sec_rank == 1: score_ += 20
+            elif subj_sec_rank == 2: score_ += 10
+            elif subj_sec_rank == 3: score_ += 5
+            if co_rank == 1: score_ += 15
+            elif co_rank == 2: score_ += 10
+            elif co_rank == 3: score_ += 5
+            if ind_rank == 1: score_ += 15
+            elif ind_rank == 2: score_ += 10
+            elif ind_rank == 3: score_ += 5
+
+            return {
+                'value': subject_value,
+                'subject_sector_pct': subj_sec_pct,
+                'vs_spx': vs_,
+                'conviction_score': round(score_, 0),
+                'sector_rank': subj_sec_rank,
+                'co_rank_in_sector': co_rank,
+                'industry_rank': ind_rank,
+                'top3': top3_,
+                'diversity': len(sector_totals_),
+                'unk_pct': unk_pct_,
+                'etf_pct': etf_pct_,
+            }
+
         # Build per-holder aggregates
         results = []
         for idx, h_row in top_holders_df.iterrows():
@@ -2879,63 +2955,9 @@ def portfolio_context(ticker, level='parent', active_only=False):
             subject_value = float(h_row['val'] or 0)
 
             holder_df = portfolio_df[portfolio_df['holder'] == holder]
-            if holder_df.empty:
+            metrics = _compute_metrics(holder_df, subject_value)
+            if metrics is None:
                 continue
-
-            total = float(holder_df['value'].sum())
-            unknown_val = float(holder_df[holder_df['yf_sector'] == 'Unknown']['value'].sum())
-            etf_val = float(holder_df[holder_df['yf_sector'] == 'ETF']['value'].sum())
-            unk_pct = round(unknown_val / total * 100, 1) if total > 0 else 0
-            etf_pct = round(etf_val / total * 100, 1) if total > 0 else 0
-
-            # Sector aggregation (map to GICS) — ETF and Unknown excluded
-            sector_totals = {}
-            sector_positions = {}
-            for _, prow in holder_df.iterrows():
-                gics, code = _gics_sector(prow['yf_sector'], prow['yf_industry'])
-                if gics in ('Unknown', 'ETF'):
-                    continue
-                sector_totals[(gics, code)] = sector_totals.get((gics, code), 0) + float(prow['value'])
-                sector_positions[(gics, code)] = sector_positions.get((gics, code), 0) + 1
-
-            # Sort sectors by value desc
-            sorted_sectors = sorted(sector_totals.items(), key=lambda x: x[1], reverse=True)
-
-            # Subject sector metrics
-            subj_key = (subj_gics_sector, subj_gics_code)
-            subject_sector_value = sector_totals.get(subj_key, 0)
-            subject_sector_pct = round(subject_sector_value / total * 100, 1) if total > 0 else 0
-            subject_sector_rank = None
-            for i, ((s, _), _) in enumerate(sorted_sectors, 1):
-                if s == subj_gics_sector:
-                    subject_sector_rank = i
-                    break
-
-            # Company within sector rank + co % of sector
-            co_pct_of_sector = 0
-            co_rank_in_sector = None
-            if subject_sector_value > 0:
-                sector_rows = holder_df[
-                    holder_df.apply(lambda r: _gics_sector(r['yf_sector'], r['yf_industry'])[0] == subj_gics_sector, axis=1)
-                ].sort_values('value', ascending=False).reset_index(drop=True)
-                sector_total = float(sector_rows['value'].sum())
-                co_pct_of_sector = round(subject_value / sector_total * 100, 1) if sector_total > 0 else 0
-                for i, srow in sector_rows.iterrows():
-                    if srow['ticker'] == ticker:
-                        co_rank_in_sector = i + 1
-                        break
-
-            # Industry rank (within same Yahoo industry)
-            industry_rank = None
-            if subj_yf_industry:
-                ind_rows = holder_df[holder_df['yf_industry'] == subj_yf_industry].sort_values('value', ascending=False).reset_index(drop=True)
-                for i, srow in ind_rows.iterrows():
-                    if srow['ticker'] == ticker:
-                        industry_rank = i + 1
-                        break
-
-            # Top 3 sectors
-            top3 = [code for (s, code), _ in sorted_sectors[:3]]
 
             # Type
             if level == 'fund':
@@ -2943,61 +2965,132 @@ def portfolio_context(ticker, level='parent', active_only=False):
             else:
                 row_type = h_row.get('mtype') or 'unknown'
 
-            # Overweight / underweight vs SPX
-            vs_spx = None
-            if subj_spx_weight is not None:
-                vs_spx = round(subject_sector_pct - subj_spx_weight, 1)
-
-            # Conviction score — composite of:
-            # (a) overweight vs SPX (capped at +50pp, scaled 0-40 points)
-            # (b) sector rank bonus (1st=20, 2nd=10, 3rd=5, else 0)
-            # (c) company rank in sector bonus (1st=15, 2nd=10, 3rd=5, else 0)
-            # (d) industry rank bonus (1st=15, 2nd=10, 3rd=5, else 0)
-            # Range: 0-90, higher = stronger conviction
-            score = 0
-            if vs_spx is not None:
-                score += max(0, min(vs_spx / 50 * 40, 40))
-            if subject_sector_rank == 1:
-                score += 20
-            elif subject_sector_rank == 2:
-                score += 10
-            elif subject_sector_rank == 3:
-                score += 5
-            if co_rank_in_sector == 1:
-                score += 15
-            elif co_rank_in_sector == 2:
-                score += 10
-            elif co_rank_in_sector == 3:
-                score += 5
-            if industry_rank == 1:
-                score += 15
-            elif industry_rank == 2:
-                score += 10
-            elif industry_rank == 3:
-                score += 5
-
             results.append({
                 'rank': idx + 1,
                 'institution': holder,
                 'type': row_type,
-                'value': subject_value,
-                'subject_sector_pct': subject_sector_pct,
-                'vs_spx': vs_spx,
-                'conviction_score': round(score, 0),
-                'sector_rank': subject_sector_rank,
-                'co_rank_in_sector': co_rank_in_sector,
-                'industry_rank': industry_rank,
-                'top3': top3,
-                'diversity': len(sector_totals),
-                'unk_pct': unk_pct,
-                'etf_pct': etf_pct,
+                'value': metrics['value'],
+                'subject_sector_pct': metrics['subject_sector_pct'],
+                'vs_spx': metrics['vs_spx'],
+                'conviction_score': metrics['conviction_score'],
+                'sector_rank': metrics['sector_rank'],
+                'co_rank_in_sector': metrics['co_rank_in_sector'],
+                'industry_rank': metrics['industry_rank'],
+                'top3': metrics['top3'],
+                'diversity': metrics['diversity'],
+                'unk_pct': metrics['unk_pct'],
+                'etf_pct': metrics['etf_pct'],
                 'level': 0,
+                'is_parent': False,
+                'child_count': 0,
             })
 
         # Sort by conviction score descending
         results.sort(key=lambda x: x.get('conviction_score', 0), reverse=True)
         for i, r in enumerate(results, 1):
             r['rank'] = i
+
+        # --- Children: top 5 N-PORT funds per parent (parent level only) ---
+        if level == 'parent':
+            # Fetch top 5 N-PORT children per parent
+            children_by_parent = {}  # parent_name -> list of {fund_name, value}
+            all_child_funds = set()
+            for parent_row in results:
+                pname = parent_row['institution']
+                try:
+                    kids = get_nport_children(pname, ticker, LQ, con, limit=5)
+                    if kids:
+                        children_by_parent[pname] = kids
+                        for k in kids:
+                            if k.get('institution'):
+                                all_child_funds.add(k['institution'])
+                except Exception:
+                    continue
+
+            if all_child_funds:
+                # Batch query portfolios for all child funds
+                ph_funds = ','.join(['?'] * len(all_child_funds))
+                child_portfolio_df = con.execute(f"""
+                    SELECT
+                        fh.fund_name as holder,
+                        fh.ticker,
+                        COALESCE(m.sector, 'Unknown') as yf_sector,
+                        COALESCE(m.industry, '') as yf_industry,
+                        SUM(fh.market_value_usd) as value
+                    FROM fund_holdings fh
+                    LEFT JOIN market_data m ON fh.ticker = m.ticker
+                    WHERE fh.quarter = '{LQ}' AND fh.fund_name IN ({ph_funds})
+                      AND fh.market_value_usd > 0
+                    GROUP BY fh.fund_name, fh.ticker, m.sector, m.industry
+                """, list(all_child_funds)).fetchdf()
+
+                # Also need is_actively_managed per fund for child type
+                fund_meta_df = con.execute(f"""
+                    SELECT DISTINCT fh.fund_name, MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
+                    FROM fund_holdings fh
+                    LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                    WHERE fh.fund_name IN ({ph_funds}) AND fh.quarter = '{LQ}'
+                    GROUP BY fh.fund_name
+                """, list(all_child_funds)).fetchdf()
+                fund_is_active = {r['fund_name']: bool(r['is_active']) for _, r in fund_meta_df.iterrows()}
+
+                # Build results with children interleaved under each parent
+                new_results = []
+                for parent_row in results:
+                    pname = parent_row['institution']
+                    kids = children_by_parent.get(pname, [])
+                    if kids:
+                        parent_row['is_parent'] = True
+                        parent_row['child_count'] = len(kids)
+                    new_results.append(parent_row)
+
+                    for kid in kids:
+                        fund_name = kid.get('institution')
+                        subj_val = float(kid.get('value_live') or 0)
+                        kid_df = child_portfolio_df[child_portfolio_df['holder'] == fund_name]
+                        kid_metrics = _compute_metrics(kid_df, subj_val)
+                        if kid_metrics is None:
+                            # Child has no portfolio data — show with just position
+                            new_results.append({
+                                'institution': fund_name,
+                                'type': 'active' if fund_is_active.get(fund_name, False) else 'passive',
+                                'value': subj_val,
+                                'subject_sector_pct': None,
+                                'vs_spx': None,
+                                'conviction_score': 0,
+                                'sector_rank': None,
+                                'co_rank_in_sector': None,
+                                'industry_rank': None,
+                                'top3': [],
+                                'diversity': 0,
+                                'unk_pct': None,
+                                'etf_pct': None,
+                                'level': 1,
+                                'is_parent': False,
+                                'child_count': 0,
+                                'parent_name': pname,
+                            })
+                        else:
+                            new_results.append({
+                                'institution': fund_name,
+                                'type': 'active' if fund_is_active.get(fund_name, False) else 'passive',
+                                'value': kid_metrics['value'],
+                                'subject_sector_pct': kid_metrics['subject_sector_pct'],
+                                'vs_spx': kid_metrics['vs_spx'],
+                                'conviction_score': kid_metrics['conviction_score'],
+                                'sector_rank': kid_metrics['sector_rank'],
+                                'co_rank_in_sector': kid_metrics['co_rank_in_sector'],
+                                'industry_rank': kid_metrics['industry_rank'],
+                                'top3': kid_metrics['top3'],
+                                'diversity': kid_metrics['diversity'],
+                                'unk_pct': kid_metrics['unk_pct'],
+                                'etf_pct': kid_metrics['etf_pct'],
+                                'level': 1,
+                                'is_parent': False,
+                                'child_count': 0,
+                                'parent_name': pname,
+                            })
+                results = new_results
 
         return {
             'rows': results,
