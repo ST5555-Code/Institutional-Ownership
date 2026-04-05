@@ -1384,9 +1384,9 @@ function _renderConviction(data) {
     table.className = 'data-table';
     table.style.tableLayout = 'fixed';
 
-    // Columns: #, Institution, Type, Value, Sector%, vs SPX, Score, SecRnk, CoR, IndR, Top3, Div, Unk%
+    // Columns: #, Institution, Type, Value, Sector%, vs MKT, Score, SecRnk, CoR, IndR, Top3, Div, Unk%, ETF%
     const colgroup = document.createElement('colgroup');
-    ['3%', null, '7%', '9%', '8%', '7%', '6%', '5%', '5%', '6%', '13%', '5%', '5%'].forEach(w => {
+    ['3%', null, '7%', '8%', '7%', '6%', '5%', '5%', '5%', '6%', '12%', '4%', '5%', '5%'].forEach(w => {
         const cg = document.createElement('col');
         if (w) cg.style.width = w;
         colgroup.appendChild(cg);
@@ -1414,6 +1414,7 @@ function _renderConviction(data) {
         ['Top 3 Sectors', 'center'],
         ['Div', 'right'],
         ['Unk %', 'right'],
+        ['ETF %', 'right'],
     ].forEach(([h, align]) => {
         const th = document.createElement('th');
         th.textContent = h;
@@ -1540,6 +1541,14 @@ function _renderConviction(data) {
         if (row.unk_pct && row.unk_pct > 20) tdUnk.style.color = '#E67E22';
         tr.appendChild(tdUnk);
 
+        // ETF %
+        const tdEtf = document.createElement('td');
+        tdEtf.style.textAlign = 'right';
+        tdEtf.style.fontSize = '11px';
+        tdEtf.textContent = (row.etf_pct != null && row.etf_pct > 0) ? row.etf_pct.toFixed(0) + '%' : '\u2014';
+        if (row.etf_pct && row.etf_pct > 30) tdEtf.style.color = '#E67E22';
+        tr.appendChild(tdEtf);
+
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -1557,7 +1566,8 @@ function _renderConviction(data) {
         + `<strong>Ind Rnk</strong> = where ${currentTicker} ranks in their ${subjIndustry || 'industry'} bucket. `
         + '<strong>Top 3</strong> = GICS codes for their 3 largest sectors (TEC=Tech, FIN=Financials, HCR=HealthCare, CND=Cons Disc, CNS=Cons Staples, IND=Industrials, ENE=Energy, MAT=Materials, COM=Comm, UTL=Utilities, REA=Real Estate). '
         + '<strong>Div</strong> = distinct sector count. '
-        + '<strong>Unk %</strong> = % of portfolio with no sector classification (data quality indicator).';
+        + '<strong>Unk %</strong> = % of portfolio with no sector classification. '
+        + '<strong>ETF %</strong> = % of portfolio held as ETFs (excluded from sector math — ETFs are multi-sector instruments).';
     tableWrap.appendChild(fn);
 }
 

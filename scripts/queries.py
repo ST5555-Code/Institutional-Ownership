@@ -2720,6 +2720,9 @@ def _gics_sector(yf_sector, yf_industry):
     """Map Yahoo sector+industry to GICS sector name and 3-letter code."""
     if not yf_sector:
         return ('Unknown', 'UNK')
+    # ETF is a special bucket — excluded from sector math
+    if yf_sector == 'ETF':
+        return ('ETF', 'ETF')
     # Special case: REITs under Financial Services → Real Estate
     if yf_sector == 'Financial Services' and yf_industry and 'REIT' in yf_industry.upper():
         return ('Real Estate', 'REA')
@@ -2844,14 +2847,16 @@ def portfolio_context(ticker, level='parent', active_only=False):
 
             total = float(holder_df['value'].sum())
             unknown_val = float(holder_df[holder_df['yf_sector'] == 'Unknown']['value'].sum())
+            etf_val = float(holder_df[holder_df['yf_sector'] == 'ETF']['value'].sum())
             unk_pct = round(unknown_val / total * 100, 1) if total > 0 else 0
+            etf_pct = round(etf_val / total * 100, 1) if total > 0 else 0
 
-            # Sector aggregation (map to GICS)
+            # Sector aggregation (map to GICS) — ETF and Unknown excluded
             sector_totals = {}
             sector_positions = {}
             for _, prow in holder_df.iterrows():
                 gics, code = _gics_sector(prow['yf_sector'], prow['yf_industry'])
-                if gics == 'Unknown':
+                if gics in ('Unknown', 'ETF'):
                     continue
                 sector_totals[(gics, code)] = sector_totals.get((gics, code), 0) + float(prow['value'])
                 sector_positions[(gics, code)] = sector_positions.get((gics, code), 0) + 1
@@ -2948,6 +2953,7 @@ def portfolio_context(ticker, level='parent', active_only=False):
                 'top3': top3,
                 'diversity': len(sector_totals),
                 'unk_pct': unk_pct,
+                'etf_pct': etf_pct,
                 'level': 0,
             })
 
