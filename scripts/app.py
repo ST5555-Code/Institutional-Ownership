@@ -28,7 +28,7 @@ from queries import (
     query6, query7, query8, query9, query10,
     query11, query12, query13, query14, query15, query16,
     ownership_trend_summary, cohort_analysis, flow_analysis, holder_momentum,
-    short_interest_analysis,
+    short_interest_analysis, portfolio_context,
     get_summary, _cross_ownership_query,
 )
 
@@ -1093,6 +1093,21 @@ def api_crowding():
         return jsonify(clean_for_json(result))
     finally:
         con.close()
+
+
+@app.route('/api/portfolio_context')
+def api_portfolio_context():
+    """Conviction tab — portfolio concentration context."""
+    ticker = request.args.get('ticker', '').upper().strip()
+    level = request.args.get('level', 'parent').strip()
+    ao = request.args.get('active_only', '').strip() == 'true'
+    if not ticker:
+        return jsonify({'error': 'Missing ticker parameter'}), 400
+    try:
+        result = portfolio_context(ticker, level=level, active_only=ao)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/short_analysis')

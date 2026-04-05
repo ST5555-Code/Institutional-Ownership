@@ -233,7 +233,7 @@ async function loadTicker() {
 // ---------------------------------------------------------------------------
 // Tab ID → legacy query number mapping (for endpoints that use /api/queryN)
 const TAB_QUERY_MAP = {
-    'register': 1, 'conviction': 3,
+    'register': 1,
     'fund-portfolio': 7, 'cross-ownership': 8,
     'sector-rotation': 9, 'aum': 14,
 };
@@ -269,6 +269,8 @@ function switchTab(tabId) {
         loadActivistTab();
     } else if (tabId === 'short-analysis') {
         loadShortAnalysis();
+    } else if (tabId === 'conviction') {
+        loadConviction();
     } else if (tabId === 'crowding') {
         loadCrowding();
     } else if (tabId === 'smart-money') {
@@ -1318,6 +1320,208 @@ async function loadManagerProfile(managerName) {
         back.onclick = () => switchTab(document.querySelector('.tab.active').dataset.tab);
         wrap.appendChild(back);
     } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+let _convictionLevel = 'parent';
+let _convictionActiveOnly = false;
+
+async function loadConviction() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    try {
+        const ao = _convictionActiveOnly && _convictionLevel === 'fund' ? '&active_only=true' : '';
+        const res = await fetch(`/api/portfolio_context?ticker=${currentTicker}&level=${_convictionLevel}${ao}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+        const data = await res.json();
+        hideSpinner();
+        _renderConviction(data);
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function _renderConviction(data) {
+    const rows = data.rows || [];
+    const subjSector = data.subject_sector || 'Unknown';
+    const subjCode = data.subject_sector_code || '';
+    const subjIndustry = data.subject_industry || '';
+
+    // Control bar
+    const cbar = document.createElement('div');
+    cbar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;flex-wrap:wrap;';
+
+    // Level toggle
+    const lvlGroup = document.createElement('div');
+    lvlGroup.className = 'register-view-toggle';
+    [['parent', 'By Parent'], ['fund', 'By Fund']].forEach(([v, txt]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-toggle' + (_convictionLevel === v ? ' active' : '');
+        btn.textContent = txt;
+        btn.onclick = () => { _convictionLevel = v; loadConviction(); };
+        lvlGroup.appendChild(btn);
+    });
+    cbar.appendChild(lvlGroup);
+
+    if (_convictionLevel === 'fund') {
+        const aoBtn = document.createElement('button');
+        aoBtn.className = 'btn btn-toggle' + (_convictionActiveOnly ? ' active' : '');
+        aoBtn.textContent = 'Active Only';
+        aoBtn.style.marginLeft = '6px';
+        aoBtn.onclick = () => { _convictionActiveOnly = !_convictionActiveOnly; loadConviction(); };
+        cbar.appendChild(aoBtn);
+    }
+
+    const subjLabel = document.createElement('span');
+    subjLabel.style.cssText = 'margin-left:auto;font-size:12px;color:#666;';
+    subjLabel.innerHTML = `<strong>${currentTicker}</strong> &rarr; Sector: <strong>${subjSector}</strong> (${subjCode}) &middot; Industry: <strong>${subjIndustry || '\u2014'}</strong>`;
+    cbar.appendChild(subjLabel);
+    tableWrap.appendChild(cbar);
+
+    if (!rows.length) {
+        tableWrap.appendChild(sectionHeader('No portfolio data available'));
+        return;
+    }
+
+    // Build table
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.tableLayout = 'fixed';
+
+    // Columns: #, Institution, Type, Value, Sector%, Rank, CoR, IndR, Top3, Div, Unk%
+    const colgroup = document.createElement('colgroup');
+    ['3%', null, '8%', '10%', '9%', '6%', '6%', '7%', '14%', '6%', '6%'].forEach(w => {
+        const cg = document.createElement('col');
+        if (w) cg.style.width = w;
+        colgroup.appendChild(cg);
+    });
+    table.appendChild(colgroup);
+
+    const nameLabel = _convictionLevel === 'fund' ? 'Fund' : 'Institution';
+    const sectorColLabel = `${subjSector} %`;
+
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    const thN = document.createElement('th'); thN.textContent = '#'; thN.style.textAlign = 'right'; hr.appendChild(thN);
+    [
+        [nameLabel, 'left'],
+        ['Type', 'left'],
+        ['Value', 'right'],
+        [sectorColLabel, 'right'],
+        ['Sec Rnk', 'right'],
+        ['Co Rnk', 'right'],
+        ['Ind Rnk', 'right'],
+        ['Top 3 Sectors', 'center'],
+        ['Div', 'right'],
+        ['Unk %', 'right'],
+    ].forEach(([h, align]) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.textAlign = align;
+        hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(row => {
+        const tr = document.createElement('tr');
+        // Type tint — only active/hedge_fund
+        const rtype = (row.type || '').toLowerCase();
+        if (rtype === 'active' || rtype === 'hedge_fund') {
+            tr.classList.add('type-' + rtype);
+        }
+
+        // #
+        const tdN = document.createElement('td');
+        tdN.className = 'col-rownum';
+        tdN.textContent = row.rank;
+        tdN.style.fontWeight = '700';
+        tr.appendChild(tdN);
+
+        // Institution / Fund
+        const tdName = document.createElement('td');
+        tdName.classList.add('col-text-overflow');
+        tdName.textContent = row.institution || '';
+        tdName.title = row.institution || '';
+        tr.appendChild(tdName);
+
+        // Type
+        const tdType = document.createElement('td');
+        tdType.textContent = row.type || '';
+        tdType.style.fontSize = '11px';
+        tr.appendChild(tdType);
+
+        // Value
+        const tdVal = document.createElement('td');
+        tdVal.style.textAlign = 'right';
+        tdVal.innerHTML = fmtDollars(row.value);
+        tr.appendChild(tdVal);
+
+        // Sector %
+        const tdSec = document.createElement('td');
+        tdSec.style.textAlign = 'right';
+        tdSec.textContent = (row.subject_sector_pct != null) ? row.subject_sector_pct.toFixed(1) + '%' : '\u2014';
+        tdSec.style.fontWeight = '600';
+        tr.appendChild(tdSec);
+
+        // Sector Rank
+        const tdSR = document.createElement('td');
+        tdSR.style.textAlign = 'right';
+        tdSR.textContent = row.sector_rank || '\u2014';
+        if (row.sector_rank === 1) { tdSR.style.color = '#27AE60'; tdSR.style.fontWeight = '700'; }
+        tr.appendChild(tdSR);
+
+        // Co Rank in Sector
+        const tdCR = document.createElement('td');
+        tdCR.style.textAlign = 'right';
+        tdCR.textContent = row.co_rank_in_sector || '\u2014';
+        if (row.co_rank_in_sector === 1) { tdCR.style.color = '#27AE60'; tdCR.style.fontWeight = '700'; }
+        tr.appendChild(tdCR);
+
+        // Industry Rank
+        const tdIR = document.createElement('td');
+        tdIR.style.textAlign = 'right';
+        tdIR.textContent = row.industry_rank || '\u2014';
+        if (row.industry_rank === 1) { tdIR.style.color = '#27AE60'; tdIR.style.fontWeight = '700'; }
+        tr.appendChild(tdIR);
+
+        // Top 3
+        const tdT3 = document.createElement('td');
+        tdT3.style.textAlign = 'center';
+        tdT3.style.fontSize = '11px';
+        tdT3.style.fontFamily = 'monospace';
+        tdT3.textContent = (row.top3 || []).join(' ');
+        tr.appendChild(tdT3);
+
+        // Diversity
+        const tdDiv = document.createElement('td');
+        tdDiv.style.textAlign = 'right';
+        tdDiv.textContent = row.diversity || '\u2014';
+        if (row.diversity && row.diversity < 5) tdDiv.style.color = '#E67E22';
+        tr.appendChild(tdDiv);
+
+        // Unk %
+        const tdUnk = document.createElement('td');
+        tdUnk.style.textAlign = 'right';
+        tdUnk.style.fontSize = '11px';
+        tdUnk.textContent = (row.unk_pct != null) ? row.unk_pct.toFixed(0) + '%' : '\u2014';
+        if (row.unk_pct && row.unk_pct > 20) tdUnk.style.color = '#E67E22';
+        tr.appendChild(tdUnk);
+
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+
+    // Legend footnote
+    const fn = document.createElement('div');
+    fn.style.cssText = 'font-size:11px;color:#888;padding:10px 0;line-height:1.5;';
+    fn.innerHTML = '<strong>Columns:</strong> '
+        + `<strong>${sectorColLabel}</strong> = holder's % allocation to ${subjSector}. `
+        + '<strong>Sec Rnk</strong> = where this sector ranks in their portfolio (1 = their top sector). '
+        + `<strong>Co Rnk</strong> = where ${currentTicker} ranks in their ${subjSector} bucket. `
+        + `<strong>Ind Rnk</strong> = where ${currentTicker} ranks in their ${subjIndustry || 'industry'} bucket. `
+        + '<strong>Top 3</strong> = GICS codes for their 3 largest sectors (TEC=Tech, FIN=Financials, HCR=HealthCare, CND=Cons Disc, CNS=Cons Staples, IND=Industrials, ENE=Energy, MAT=Materials, COM=Comm, UTL=Utilities, REA=Real Estate). '
+        + '<strong>Div</strong> = distinct sector count. '
+        + '<strong>Unk %</strong> = % of portfolio with no sector classification (data quality indicator).';
+    tableWrap.appendChild(fn);
 }
 
 async function loadShortAnalysis() {

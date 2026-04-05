@@ -2331,34 +2331,20 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
         lq = LQ
 
         if level == 'fund':
-            # Fund-level from fund_holdings
-            active_filter = ""
-            if active_only:
-                # Exclude funds with passive keywords in name
-                passive_kw = "('INDEX','ETF','MSCI','FTSE','STOXX','NIKKEI','TOTAL STOCK','TOTAL MARKET','TOTAL BOND','TOTAL INTERNATIONAL','BROAD MARKET','TRACKER','NASDAQ','DOW JONES','WILSHIRE')"
-                active_filter = f"""
-                    AND NOT EXISTS (
-                        SELECT 1 FROM UNNEST([{passive_kw}]) t(kw)
-                        WHERE UPPER(fh.fund_name) LIKE '%' || kw || '%'
-                    )
-                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 5%'
-                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 4%'
-                    AND UPPER(fh.fund_name) NOT LIKE '%S&P 6%'
-                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 1%'
-                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 2%'
-                    AND UPPER(fh.fund_name) NOT LIKE '%RUSSELL 3%'
-                """
+            # Fund-level from fund_holdings, filter via fund_universe.is_actively_managed
+            join_clause = "LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id"
+            active_filter = "AND fu.is_actively_managed = true" if active_only else ""
             q1_df = con.execute(f"""
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
-                FROM fund_holdings fh
+                FROM fund_holdings fh {join_clause}
                 WHERE fh.ticker = ? AND fh.quarter = '{fq}' {active_filter}
                 GROUP BY fh.fund_name
             """, [ticker]).fetchdf()
             q4_df = con.execute(f"""
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
-                FROM fund_holdings fh
+                FROM fund_holdings fh {join_clause}
                 WHERE fh.ticker = ? AND fh.quarter = '{lq}' {active_filter}
                 GROUP BY fh.fund_name
             """, [ticker]).fetchdf()
@@ -2441,21 +2427,18 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     Returns (buyers, sellers, new_entries, exits) lists.
     """
     if level == 'fund':
-        af = ""
-        if active_only:
-            passive_kw = "('INDEX','ETF','MSCI','FTSE','STOXX','NIKKEI','TOTAL STOCK','TOTAL MARKET','TOTAL BOND','TOTAL INTERNATIONAL','BROAD MARKET','TRACKER','NASDAQ','DOW JONES','WILSHIRE')"
-            af = f"""
-                AND NOT EXISTS (SELECT 1 FROM UNNEST([{passive_kw}]) t(kw) WHERE UPPER(fund_name) LIKE '%' || kw || '%')
-                AND UPPER(fund_name) NOT LIKE '%S&P 5%' AND UPPER(fund_name) NOT LIKE '%S&P 4%'
-                AND UPPER(fund_name) NOT LIKE '%RUSSELL 1%' AND UPPER(fund_name) NOT LIKE '%RUSSELL 2%'
-            """
+        # Filter via fund_universe.is_actively_managed
+        join_clause = "LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id"
+        af = "AND fu.is_actively_managed = true" if active_only else ""
         from_df = con.execute(f"""
-            SELECT fund_name as entity, SUM(shares_or_principal) as shares, SUM(market_value_usd) as value
-            FROM fund_holdings WHERE ticker = ? AND quarter = '{quarter_from}' {af} GROUP BY fund_name
+            SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
+            FROM fund_holdings fh {join_clause}
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter_from}' {af} GROUP BY fh.fund_name
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
-            SELECT fund_name as entity, SUM(shares_or_principal) as shares, SUM(market_value_usd) as value
-            FROM fund_holdings WHERE ticker = ? AND quarter = '{quarter_to}' {af} GROUP BY fund_name
+            SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
+            FROM fund_holdings fh {join_clause}
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter_to}' {af} GROUP BY fh.fund_name
         """, [ticker]).fetchdf()
     else:
         from_df = con.execute(f"""
@@ -2715,6 +2698,205 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
 # ---------------------------------------------------------------------------
 # Short vs Long comparison (Item 9)
 # ---------------------------------------------------------------------------
+
+
+# GICS sector mapping from Yahoo Finance taxonomy
+_YF_TO_GICS = {
+    'Technology': ('Information Technology', 'TEC'),
+    'Financial Services': ('Financials', 'FIN'),  # REITs moved to Real Estate via industry
+    'Healthcare': ('Health Care', 'HCR'),
+    'Industrials': ('Industrials', 'IND'),
+    'Consumer Cyclical': ('Consumer Discretionary', 'CND'),
+    'Consumer Defensive': ('Consumer Staples', 'CNS'),
+    'Energy': ('Energy', 'ENE'),
+    'Basic Materials': ('Materials', 'MAT'),
+    'Communication Services': ('Communication Services', 'COM'),
+    'Utilities': ('Utilities', 'UTL'),
+    'Real Estate': ('Real Estate', 'REA'),
+}
+
+
+def _gics_sector(yf_sector, yf_industry):
+    """Map Yahoo sector+industry to GICS sector name and 3-letter code."""
+    if not yf_sector:
+        return ('Unknown', 'UNK')
+    # Special case: REITs under Financial Services → Real Estate
+    if yf_sector == 'Financial Services' and yf_industry and 'REIT' in yf_industry.upper():
+        return ('Real Estate', 'REA')
+    return _YF_TO_GICS.get(yf_sector, ('Unknown', 'UNK'))
+
+
+def portfolio_context(ticker, level='parent', active_only=False):
+    """Conviction tab — portfolio concentration context for top holders.
+    Returns each holder's sector breakdown with emphasis on the subject ticker's sector.
+    """
+    con = get_db()
+    try:
+        cusip = get_cusip(con, ticker)
+
+        # Get subject ticker's sector/industry
+        subj = con.execute(
+            "SELECT sector, industry FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        subj_yf_sector = subj[0] if subj else None
+        subj_yf_industry = subj[1] if subj else None
+        subj_gics_sector, subj_gics_code = _gics_sector(subj_yf_sector, subj_yf_industry)
+
+        # Top 25 parents or funds by latest quarter value (same as Register)
+        if level == 'fund':
+            active_filter = "AND fu.is_actively_managed = true" if active_only else ""
+            top_holders_df = con.execute(f"""
+                SELECT fh.fund_name as holder, SUM(fh.market_value_usd) as val,
+                       MAX(fu.is_actively_managed) as is_active
+                FROM fund_holdings fh
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.quarter = '{LQ}' {active_filter}
+                GROUP BY fh.fund_name
+                ORDER BY val DESC NULLS LAST LIMIT 25
+            """, [ticker]).fetchdf()
+        else:
+            top_holders_df = con.execute(f"""
+                SELECT COALESCE(inst_parent_name, manager_name) as holder,
+                       SUM(market_value_live) as val,
+                       MAX(manager_type) as mtype
+                FROM holdings
+                WHERE (ticker = ? OR cusip = ?) AND quarter = '{LQ}'
+                GROUP BY holder ORDER BY val DESC NULLS LAST LIMIT 25
+            """, [ticker, cusip]).fetchdf()
+
+        if top_holders_df.empty:
+            return {'rows': [], 'subject_sector': subj_gics_sector,
+                    'subject_sector_code': subj_gics_code,
+                    'subject_industry': subj_yf_industry or ''}
+
+        top_holders = top_holders_df['holder'].tolist()
+        ph = ','.join(['?'] * len(top_holders))
+
+        # Pull full portfolios for all top holders in one query, grouped by sector
+        if level == 'fund':
+            portfolio_df = con.execute(f"""
+                SELECT
+                    fh.fund_name as holder,
+                    fh.ticker,
+                    COALESCE(m.sector, 'Unknown') as yf_sector,
+                    COALESCE(m.industry, '') as yf_industry,
+                    SUM(fh.market_value_usd) as value
+                FROM fund_holdings fh
+                LEFT JOIN market_data m ON fh.ticker = m.ticker
+                WHERE fh.quarter = '{LQ}' AND fh.fund_name IN ({ph})
+                  AND fh.market_value_usd > 0
+                GROUP BY fh.fund_name, fh.ticker, m.sector, m.industry
+            """, top_holders).fetchdf()
+        else:
+            portfolio_df = con.execute(f"""
+                SELECT
+                    COALESCE(h.inst_parent_name, h.manager_name) as holder,
+                    h.ticker,
+                    COALESCE(m.sector, 'Unknown') as yf_sector,
+                    COALESCE(m.industry, '') as yf_industry,
+                    SUM(h.market_value_live) as value
+                FROM holdings h
+                LEFT JOIN market_data m ON h.ticker = m.ticker
+                WHERE h.quarter = '{LQ}'
+                  AND COALESCE(h.inst_parent_name, h.manager_name) IN ({ph})
+                  AND h.market_value_live > 0
+                GROUP BY holder, h.ticker, m.sector, m.industry
+            """, top_holders).fetchdf()
+
+        # Build per-holder aggregates
+        results = []
+        for idx, h_row in top_holders_df.iterrows():
+            holder = h_row['holder']
+            subject_value = float(h_row['val'] or 0)
+
+            holder_df = portfolio_df[portfolio_df['holder'] == holder]
+            if holder_df.empty:
+                continue
+
+            total = float(holder_df['value'].sum())
+            unknown_val = float(holder_df[holder_df['yf_sector'] == 'Unknown']['value'].sum())
+            unk_pct = round(unknown_val / total * 100, 1) if total > 0 else 0
+
+            # Sector aggregation (map to GICS)
+            sector_totals = {}
+            sector_positions = {}
+            for _, prow in holder_df.iterrows():
+                gics, code = _gics_sector(prow['yf_sector'], prow['yf_industry'])
+                if gics == 'Unknown':
+                    continue
+                sector_totals[(gics, code)] = sector_totals.get((gics, code), 0) + float(prow['value'])
+                sector_positions[(gics, code)] = sector_positions.get((gics, code), 0) + 1
+
+            # Sort sectors by value desc
+            sorted_sectors = sorted(sector_totals.items(), key=lambda x: x[1], reverse=True)
+
+            # Subject sector metrics
+            subj_key = (subj_gics_sector, subj_gics_code)
+            subject_sector_value = sector_totals.get(subj_key, 0)
+            subject_sector_pct = round(subject_sector_value / total * 100, 1) if total > 0 else 0
+            subject_sector_rank = None
+            for i, ((s, _), _) in enumerate(sorted_sectors, 1):
+                if s == subj_gics_sector:
+                    subject_sector_rank = i
+                    break
+
+            # Company within sector rank + co % of sector
+            co_pct_of_sector = 0
+            co_rank_in_sector = None
+            if subject_sector_value > 0:
+                sector_rows = holder_df[
+                    holder_df.apply(lambda r: _gics_sector(r['yf_sector'], r['yf_industry'])[0] == subj_gics_sector, axis=1)
+                ].sort_values('value', ascending=False).reset_index(drop=True)
+                sector_total = float(sector_rows['value'].sum())
+                co_pct_of_sector = round(subject_value / sector_total * 100, 1) if sector_total > 0 else 0
+                for i, srow in sector_rows.iterrows():
+                    if srow['ticker'] == ticker:
+                        co_rank_in_sector = i + 1
+                        break
+
+            # Industry rank (within same Yahoo industry)
+            industry_rank = None
+            if subj_yf_industry:
+                ind_rows = holder_df[holder_df['yf_industry'] == subj_yf_industry].sort_values('value', ascending=False).reset_index(drop=True)
+                for i, srow in ind_rows.iterrows():
+                    if srow['ticker'] == ticker:
+                        industry_rank = i + 1
+                        break
+
+            # Top 3 sectors
+            top3 = [code for (s, code), _ in sorted_sectors[:3]]
+
+            # Type
+            if level == 'fund':
+                row_type = 'active' if h_row.get('is_active') else 'passive'
+            else:
+                row_type = h_row.get('mtype') or 'unknown'
+
+            results.append({
+                'rank': idx + 1,
+                'institution': holder,
+                'type': row_type,
+                'value': subject_value,
+                'subject_sector_pct': subject_sector_pct,
+                'sector_rank': subject_sector_rank,
+                'co_rank_in_sector': co_rank_in_sector,
+                'industry_rank': industry_rank,
+                'top3': top3,
+                'diversity': len(sector_totals),
+                'unk_pct': unk_pct,
+                'level': 0,
+            })
+
+        return {
+            'rows': results,
+            'subject_sector': subj_gics_sector,
+            'subject_sector_code': subj_gics_code,
+            'subject_industry': subj_yf_industry or '',
+            'level': level,
+            'active_only': active_only,
+        }
+    finally:
+        pass
 
 
 def short_interest_analysis(ticker):
