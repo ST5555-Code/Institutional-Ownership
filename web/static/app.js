@@ -1422,14 +1422,13 @@ function _renderConviction(data) {
         // Sector Analysis group
         [sectorColLabel, 'right', 'subject_sector_pct', 'Sector Analysis'],
         [spxLabel, 'right', 'vs_spx', 'Sector Analysis'],
-        ['Rank in Portfolio', 'right', 'sector_rank', 'Sector Analysis'],
+        ['Rank in\nPortfolio', 'right', 'sector_rank', 'Sector Analysis'],
         ['Top 3 Sectors', 'center', null, 'Sector Analysis'],
         ['# Sectors', 'right', 'diversity', 'Sector Analysis'],
-        // Company Analysis group
-        ['Rank in Sector', 'right', 'co_rank_in_sector', 'Company Analysis'],
-        ['Rank in Industry', 'right', 'industry_rank', 'Company Analysis'],
-        // Standalone summary
-        ['Score', 'right', 'conviction_score', null],
+        // Company Analysis group — Score moved here as composite signal
+        ['Rank in\nSector', 'right', 'co_rank_in_sector', 'Company Analysis'],
+        ['Rank in\nIndustry', 'right', 'industry_rank', 'Company Analysis'],
+        ['Conviction\nScore', 'right', 'conviction_score', 'Company Analysis'],
         // Data Quality group
         ['Unk %', 'right', 'unk_pct', 'Data Quality'],
         ['ETF %', 'right', 'etf_pct', 'Data Quality'],
@@ -1470,8 +1469,14 @@ function _renderConviction(data) {
 
     colDefs.forEach(([h, align, key]) => {
         const th = document.createElement('th');
-        th.textContent = h;
+        // Support \n for line breaks in headers
+        const baseHtml = h.replace(/\n/g, '<br>');
+        th.innerHTML = baseHtml;
+        th.dataset.baseLabel = baseHtml;
         th.style.textAlign = align;
+        th.style.whiteSpace = 'normal';
+        th.style.verticalAlign = 'bottom';
+        th.style.lineHeight = '1.2';
         if (key) {
             th.style.cursor = 'pointer';
             th.dataset.sortKey = key;
@@ -1495,8 +1500,9 @@ function _renderConviction(data) {
         hr.querySelectorAll('th').forEach(th => {
             const key = th.dataset.sortKey;
             if (!key) return;
-            const base = th.textContent.replace(/[\u25B2\u25BC]\s*$/, '').trim();
-            th.textContent = base + (key === sortKey ? (sortDir === 'desc' ? ' \u25BC' : ' \u25B2') : '');
+            const base = th.dataset.baseLabel || th.innerHTML;
+            const arrow = key === sortKey ? (sortDir === 'desc' ? ' \u25BC' : ' \u25B2') : '';
+            th.innerHTML = base + arrow;
         });
     }
 
