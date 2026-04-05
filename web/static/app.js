@@ -1396,7 +1396,7 @@ function _renderConviction(data) {
     const nameLabel = _convictionLevel === 'fund' ? 'Fund' : 'Institution';
     const sectorColLabel = `${subjSector} %`;
     const spxWeight = data.subject_spx_weight;
-    const spxLabel = spxWeight != null ? `vs SPX (${spxWeight}%)` : 'vs SPX';
+    const spxLabel = spxWeight != null ? `vs MKT (${spxWeight}%)` : 'vs MKT';
 
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
@@ -1550,8 +1550,8 @@ function _renderConviction(data) {
     fn.style.cssText = 'font-size:11px;color:#888;padding:10px 0;line-height:1.5;';
     fn.innerHTML = '<strong>Sorted by Conviction Score (highest first).</strong> '
         + `<strong>${sectorColLabel}</strong> = holder's % allocation to ${subjSector}. `
-        + `<strong>vs SPX</strong> = overweight/underweight vs S&P 500 sector weight (${subjSector} = ${data.subject_spx_weight || '?'}%). `
-        + '<strong>Score</strong> = conviction composite (0-90). Rewards overweight vs SPX + being holder\'s top sector + company rank in sector/industry. '
+        + `<strong>vs MKT</strong> = overweight/underweight vs US market sector weight (${subjSector} = ${data.subject_spx_weight || '?'}%). Market weight derived from Vanguard Total Stock Market Index Fund, updated per quarter. `
+        + '<strong>Score</strong> = conviction composite (0-90). Rewards overweight vs market + being holder\'s top sector + company rank in sector/industry. '
         + '<strong>Sec Rnk</strong> = where this sector ranks in their portfolio (1 = their top sector). '
         + `<strong>Co Rnk</strong> = where ${currentTicker} ranks in their ${subjSector} bucket. `
         + `<strong>Ind Rnk</strong> = where ${currentTicker} ranks in their ${subjIndustry || 'industry'} bucket. `

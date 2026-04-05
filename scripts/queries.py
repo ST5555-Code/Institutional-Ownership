@@ -2742,19 +2742,34 @@ def portfolio_context(ticker, level='parent', active_only=False):
         subj_yf_industry = subj[1] if subj else None
         subj_gics_sector, subj_gics_code = _gics_sector(subj_yf_sector, subj_yf_industry)
 
-        # Load SPX benchmark weights for sector comparison
-        spx_weights = {}
+        # Load US market benchmark weights for the latest data quarter.
+        # Benchmark is derived from Vanguard Total Stock Market Index Fund (S000002848)
+        # and stored per-quarter so historical analysis uses period-appropriate weights.
+        q_date_map = {
+            '2025Q1': '2025-03-31', '2025Q2': '2025-06-30',
+            '2025Q3': '2025-09-30', '2025Q4': '2025-12-31',
+        }
+        bench_date = q_date_map.get(LQ, '2025-12-31')
+        mkt_weights = {}
         try:
             bw = con.execute("""
                 SELECT gics_sector, weight_pct FROM benchmark_weights
-                WHERE index_name = 'SPX' ORDER BY as_of_date DESC
-            """).fetchall()
+                WHERE index_name = 'US_MKT' AND as_of_date = ?
+            """, [bench_date]).fetchall()
             for sec, wt in bw:
-                if sec not in spx_weights:
-                    spx_weights[sec] = float(wt)
+                mkt_weights[sec] = float(wt)
+            # Fallback to latest available if quarter-specific not found
+            if not mkt_weights:
+                bw = con.execute("""
+                    SELECT gics_sector, weight_pct FROM benchmark_weights
+                    WHERE index_name = 'US_MKT' ORDER BY as_of_date DESC
+                """).fetchall()
+                for sec, wt in bw:
+                    if sec not in mkt_weights:
+                        mkt_weights[sec] = float(wt)
         except Exception:
             pass
-        subj_spx_weight = spx_weights.get(subj_gics_sector, None)
+        subj_spx_weight = mkt_weights.get(subj_gics_sector, None)
 
         # Top 25 parents or funds by latest quarter value (same as Register)
         if level == 'fund':
