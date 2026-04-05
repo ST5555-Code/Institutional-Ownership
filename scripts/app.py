@@ -246,11 +246,20 @@ def api_add_ticker():
         else:
             results['steps'].append(f'OpenFIGI: HTTP {figi_resp.status_code}')
 
-        # Step 2: Fetch market data via yfinance
-        import yfinance as yf
-        tkr = yf.Ticker(ticker)
-        info = tkr.info or {}
-        if info.get('regularMarketPrice'):
+        # Step 2: Fetch market data via YahooClient + SEC XBRL
+        # - Yahoo: price, sector, industry, float, 52w (via direct JSON API)
+        # - SEC:   authoritative shares_outstanding from 10-K/10-Q cover page
+        # - market_cap: computed as shares_outstanding × price (strict)
+        from yahoo_client import YahooClient
+        from sec_shares_client import SECSharesClient
+        yc = YahooClient()
+        sc = SECSharesClient()
+        m = yc.fetch_metadata(ticker) or {}
+        price = m.get('price')
+        if price:
+            sec = sc.fetch(ticker) or {}
+            shares_out = sec.get('shares_outstanding')
+            market_cap = (shares_out * price) if (shares_out and price) else None
             con = duckdb.connect(PROD_DB)
             from datetime import datetime
             now = datetime.now().strftime('%Y-%m-%d')
@@ -258,17 +267,19 @@ def api_add_ticker():
                 INSERT OR REPLACE INTO market_data (ticker, price_live, market_cap,
                     float_shares, shares_outstanding, sector, industry, exchange, fetch_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [ticker, info.get('regularMarketPrice'), info.get('marketCap'),
-                  info.get('floatShares'), info.get('sharesOutstanding'),
-                  info.get('sector'), info.get('industry'), info.get('exchange'), now])
+            """, [ticker, price, market_cap,
+                  m.get('float_shares'), shares_out,
+                  m.get('sector'), m.get('industry'), m.get('exchange'), now])
             con.execute("CHECKPOINT")
             con.close()
-            results['market_cap'] = info.get('marketCap')
-            results['price'] = info.get('regularMarketPrice')
-            results['sector'] = info.get('sector')
-            results['steps'].append('Market data: added')
+            results['market_cap'] = market_cap
+            results['price'] = price
+            results['sector'] = m.get('sector')
+            results['shares_source'] = 'SEC' if shares_out else None
+            results['steps'].append(
+                f'Market data: added (market_cap {"computed from SEC shares × price" if market_cap else "NULL — no SEC shares"})')
         else:
-            results['steps'].append('Market data: yfinance returned no price')
+            results['steps'].append('Market data: Yahoo returned no price')
 
         # Step 3: Fetch 13D/G filings
         try:
@@ -722,6 +733,191 @@ def api_admin_running():
         except Exception:
             pass
     return jsonify({'running': running})
+
+
+# ---------------------------------------------------------------------------
+# Entity MDM — Priority 6 manual override endpoint (Phase 1)
+# ---------------------------------------------------------------------------
+# CSV input format (header required):
+#   entity_id,action,field,old_value,new_value,reason,analyst
+#
+# Supported actions:
+#   reclassify  — update entity_classification_history (field=classification|is_activist)
+#   alias_add   — add a brand alias to entity_aliases (new_value = alias name)
+#   merge       — set rollup parent in entity_rollup_history (new_value = parent entity_id)
+#
+# All writes are applied against the STAGING entity tables with:
+#   source='manual', confidence='exact', is_inferred=FALSE
+# and logged to logs/entity_overrides.log with timestamp and analyst initials.
+#
+# Query param ?target=staging|prod — defaults to staging. Prod is blocked until
+# Phase 4 authorization (returns 403).
+@app.route('/api/admin/entity_override', methods=['POST'])
+def api_admin_entity_override():
+    import csv as _csv
+    import io as _io
+
+    target = (request.args.get('target') or 'staging').lower()
+    if target != 'staging':
+        return jsonify({
+            'error': 'entity_override against production is blocked until Phase 4 authorization',
+            'target': target,
+        }), 403
+
+    # Accept either raw CSV body (text/csv) or JSON {"csv": "..."}
+    if request.content_type and 'application/json' in request.content_type:
+        body = (request.json or {}).get('csv', '')
+    else:
+        body = request.get_data(as_text=True) or ''
+
+    if not body.strip():
+        return jsonify({'error': 'empty CSV body'}), 400
+
+    reader = _csv.DictReader(_io.StringIO(body))
+    required = {'entity_id', 'action', 'field', 'old_value', 'new_value', 'reason', 'analyst'}
+    if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
+        return jsonify({
+            'error': 'CSV must contain columns: ' + ','.join(sorted(required)),
+            'received': reader.fieldnames,
+        }), 400
+
+    # Open a staging write connection. Do NOT use the app's read-only get_db().
+    staging_path = os.path.join(BASE_DIR, 'data', '13f_staging.duckdb')
+    if not os.path.exists(staging_path):
+        return jsonify({'error': f'staging DB not found: {staging_path}'}), 500
+
+    log_path = os.path.join(BASE_DIR, 'logs', 'entity_overrides.log')
+    applied, skipped = [], []
+    con = duckdb.connect(staging_path, read_only=False)
+    try:
+        for row_num, row in enumerate(reader, start=2):  # row 1 is header
+            try:
+                entity_id = int(row['entity_id'])
+                action = (row['action'] or '').strip().lower()
+                field = (row['field'] or '').strip().lower()
+                old_value = row['old_value']
+                new_value = row['new_value']
+                reason = row['reason'] or ''
+                analyst = row['analyst'] or ''
+
+                # Verify the entity exists
+                exists = con.execute(
+                    "SELECT 1 FROM entities WHERE entity_id = ?", [entity_id]
+                ).fetchone()
+                if not exists:
+                    skipped.append({'row': row_num, 'reason': f'entity_id {entity_id} not found'})
+                    continue
+
+                if action == 'reclassify':
+                    # Close current classification, insert new one
+                    con.execute("BEGIN TRANSACTION")
+                    try:
+                        con.execute(
+                            """UPDATE entity_classification_history
+                               SET valid_to = CURRENT_DATE
+                               WHERE entity_id = ? AND valid_to = DATE '9999-12-31'""",
+                            [entity_id],
+                        )
+                        if field == 'classification':
+                            con.execute(
+                                """INSERT INTO entity_classification_history
+                                   (entity_id, classification, is_activist, confidence, source,
+                                    is_inferred, valid_from, valid_to)
+                                   VALUES (?, ?, FALSE, 'exact', 'manual', FALSE,
+                                           CURRENT_DATE, DATE '9999-12-31')""",
+                                [entity_id, new_value],
+                            )
+                        elif field == 'is_activist':
+                            prior = con.execute(
+                                """SELECT classification FROM entity_classification_history
+                                   WHERE entity_id = ? ORDER BY valid_from DESC LIMIT 1""",
+                                [entity_id],
+                            ).fetchone()
+                            cls = (prior[0] if prior else 'unknown')
+                            con.execute(
+                                """INSERT INTO entity_classification_history
+                                   (entity_id, classification, is_activist, confidence, source,
+                                    is_inferred, valid_from, valid_to)
+                                   VALUES (?, ?, ?, 'exact', 'manual', FALSE,
+                                           CURRENT_DATE, DATE '9999-12-31')""",
+                                [entity_id, cls, new_value.strip().lower() in ('true', '1', 'yes')],
+                            )
+                        else:
+                            raise ValueError(f"unsupported field for reclassify: {field}")
+                        con.execute("COMMIT")
+                    except Exception:
+                        con.execute("ROLLBACK")
+                        raise
+
+                elif action == 'alias_add':
+                    con.execute(
+                        """INSERT INTO entity_aliases
+                           (entity_id, alias_name, alias_type, is_preferred, preferred_key,
+                            source_table, is_inferred, valid_from, valid_to)
+                           VALUES (?, ?, 'brand', FALSE, NULL, 'manual', FALSE,
+                                   CURRENT_DATE, DATE '9999-12-31')
+                           ON CONFLICT DO NOTHING""",
+                        [entity_id, new_value],
+                    )
+
+                elif action == 'merge':
+                    # new_value = parent entity_id; close current rollup, insert new
+                    parent_id = int(new_value)
+                    parent_exists = con.execute(
+                        "SELECT 1 FROM entities WHERE entity_id = ?", [parent_id]
+                    ).fetchone()
+                    if not parent_exists:
+                        skipped.append({'row': row_num, 'reason': f'parent entity_id {parent_id} not found'})
+                        continue
+                    con.execute("BEGIN TRANSACTION")
+                    try:
+                        con.execute(
+                            """UPDATE entity_rollup_history
+                               SET valid_to = CURRENT_DATE
+                               WHERE entity_id = ?
+                                 AND rollup_type = 'economic_control_v1'
+                                 AND valid_to = DATE '9999-12-31'""",
+                            [entity_id],
+                        )
+                        con.execute(
+                            """INSERT INTO entity_rollup_history
+                               (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                                confidence, valid_from, valid_to)
+                               VALUES (?, ?, 'economic_control_v1', 'manual_override',
+                                       'exact', CURRENT_DATE, DATE '9999-12-31')""",
+                            [entity_id, parent_id],
+                        )
+                        con.execute("COMMIT")
+                    except Exception:
+                        con.execute("ROLLBACK")
+                        raise
+
+                else:
+                    skipped.append({'row': row_num, 'reason': f'unsupported action: {action}'})
+                    continue
+
+                # Audit log append
+                with open(log_path, 'a') as f:
+                    f.write(
+                        f"{datetime.now().isoformat()}\tentity_id={entity_id}\taction={action}"
+                        f"\tfield={field}\told={old_value}\tnew={new_value}"
+                        f"\tanalyst={analyst}\treason={reason}\n"
+                    )
+                applied.append({'row': row_num, 'entity_id': entity_id, 'action': action})
+
+            except Exception as e:
+                skipped.append({'row': row_num, 'reason': str(e)[:200]})
+    finally:
+        con.close()
+
+    return jsonify({
+        'target': target,
+        'applied': applied,
+        'skipped': skipped,
+        'applied_count': len(applied),
+        'skipped_count': len(skipped),
+        'log': log_path,
+    })
 
 
 # ---------------------------------------------------------------------------
