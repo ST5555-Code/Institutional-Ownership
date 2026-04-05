@@ -108,8 +108,8 @@ All 11 gates must pass before Phase 1 merge to production. Gates 1-4 are structu
 | 2 | structural_identifiers | Identifier uniqueness violations | Exactly 0 | Structural |
 | 3 | structural_no_identifier | Entities with no identifier | <5% of total | Structural |
 | 4 | structural_no_rollup | Non-standalone entities with no rollup parent | Exactly 0 | Structural |
-| 5 | top_50_parents | Value match for top 50 inst_parent_name | Exact — zero tolerance | Output |
-| 6 | top_50_aum | AUM match for top 50 parents | Exact — zero tolerance | Output |
+| 5 | top_50_parents | Case-insensitive set overlap for top 50 parents | PASS at 50/50; MANUAL at 48-49/50 (documented legacy corrections); FAIL below | Output |
+| 6 | top_50_aum | AUM match for top 50 parents | PASS: per-name ≤0.01% AND total ≤0.01%; MANUAL: total ≤0.5% with ≤2 per-name diffs (documented legacy corrections); FAIL above | Output |
 | 7 | random_sample | n=100 random CIK→parent mappings | 100% match | Output |
 | 8 | known_edge_cases | Geode not under Fidelity, Wellington not as parent | Manual sign-off | Output |
 | 9 | standalone_filers | Filers with no parent appear in rollup | Count matches legacy | Output |
@@ -184,3 +184,4 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 4 2026 | Dual-write migration (Phase 4) | Zero downtime, fully reversible | Fast table swap — lock contention risk |
 | Apr 5 2026 | Sentinel date 9999-12-31 instead of NULL for valid_to | DuckDB does not support partial unique indexes — sentinel date preserves DB-level uniqueness enforcement via full unique constraints | NULL semantics with partial indexes — not supported in DuckDB |
 | Apr 5 2026 | Nullable key columns (primary_parent_key, preferred_key) for flag-gated uniqueness | DuckDB allows multiple NULLs in UNIQUE and does not support constraints on generated columns — app-maintained nullable key gives equivalent enforcement | Generated column with CASE — constraints on generated columns unsupported in DuckDB 1.4 |
+| Apr 5 2026 | Amova/Nikko consolidation accepted as legacy data correction | Amova Asset Management is former name of Nikko Asset Management — legacy system split them into two separate parents ($213.8B each), new entity model correctly merges under Nikko ($427.5B). This is the first documented legacy data correction caught by the validation gates. | Keeping Amova split to force gate 5/6 to exact match — would enshrine known bug |

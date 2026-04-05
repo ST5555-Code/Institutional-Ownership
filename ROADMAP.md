@@ -83,7 +83,7 @@ _Last updated: April 5, 2026_
 | 39 | Bug 6 — fetch_market.py upsert, never drops table | Done | Unique index on ticker, delete-then-insert per batch |
 | 40 | Bug 7 — app.py snapshot switchback monitor | Done | Background thread, 60s poll, auto-switch + log |
 | 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
-| 42 | Entity MDM — Phase 1 in progress, see ENTITY_ARCHITECTURE.md | In progress | |
+| 42 | Entity MDM — Phase 1 build complete on staging, see ENTITY_ARCHITECTURE.md | Staging complete, awaiting Phase 4 merge | 18,317 entities, 27,147 identifiers, 8,930 relationships, 18,540 aliases; 4/4 structural gates PASS, 4/4 output gates PASS, 3/11 MANUAL (top_50 Amova/Nikko legacy fix + known_edge_cases); scripts/entity_schema.sql, scripts/build_entities.py, scripts/validate_entities.py, POST /api/admin/entity_override |
 
 ---
 
