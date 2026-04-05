@@ -263,8 +263,6 @@ function switchTab(tabId) {
         loadOwnershipTrend();
     } else if (tabId === 'flow-analysis') {
         loadFlowAnalysis();
-    } else if (tabId === 'new-exits') {
-        loadNewExits();
     } else if (tabId === 'activist') {
         loadActivistTab();
     } else if (tabId === 'short-analysis') {
@@ -273,8 +271,6 @@ function switchTab(tabId) {
         loadConviction();
     } else if (tabId === 'crowding') {
         loadCrowding();
-    } else if (tabId === 'smart-money') {
-        loadSmartMoney();
     } else if (tabId === 'short-squeeze') {
         loadShortSqueeze();
     } else if (tabId === 'peer-matrix') {
@@ -1721,6 +1717,33 @@ function _renderShortAnalysis(data) {
         tableWrap.appendChild(table);
     }
 
+    // --- Section 4b: Short-Only Funds (merged from Smart Money) ---
+    const shortOnly = data.short_only_funds || [];
+    if (shortOnly.length > 0) {
+        tableWrap.appendChild(sectionHeader('Short-Only Funds (No Matching Long Position)'));
+        const table = _flowTable(shortOnly, [
+            {key: 'fund_name', label: 'Fund', type: 'text'},
+            {key: 'family_name', label: 'Family', type: 'text'},
+            {key: 'short_shares', label: 'Short Shares', type: 'shares'},
+            {key: 'short_value', label: 'Short Value', type: 'dollar'},
+            {key: 'fund_aum_mm', label: 'Fund AUM ($M)', type: 'num'},
+        ]);
+        tableWrap.appendChild(table);
+    }
+
+    // --- Section 4c: Long Positions by Manager Type (merged from Smart Money) ---
+    const longByType = data.long_by_type || [];
+    if (longByType.length > 0) {
+        tableWrap.appendChild(sectionHeader('Long Positions by Manager Type'));
+        const table = _flowTable(longByType, [
+            {key: 'manager_type', label: 'Type', type: 'text'},
+            {key: 'holders', label: 'Holders', type: 'num'},
+            {key: 'long_shares', label: 'Long Shares', type: 'shares'},
+            {key: 'long_value', label: 'Long Value', type: 'dollar'},
+        ]);
+        tableWrap.appendChild(table);
+    }
+
     // --- Section 5: N-PORT Short History by Fund ---
     const nportByFund = data.nport_by_fund || [];
     if (nportByFund.length > 0 && qs.length > 0) {
@@ -1790,71 +1813,6 @@ async function loadCrowding() {
                 {key: 'short_pct', label: 'Short %', type: 'pct'},
             ]));
         }
-    } catch (e) { hideSpinner(); showError(e.message); }
-}
-
-async function loadSmartMoney() {
-    showSpinner(); clearError(); tableWrap.innerHTML = '';
-    try {
-        const res = await fetch(`/api/smart_money?ticker=${currentTicker}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        hideSpinner();
-        const wrap = tableWrap;
-        // Summary
-        if (data.short_pct != null) {
-            const summary = document.createElement('div');
-            summary.style.cssText = 'padding:12px;background:#f8f9fa;border-radius:6px;margin-bottom:16px;font-size:13px;';
-            summary.innerHTML = `<b>Short Volume:</b> ${(data.short_pct || 0).toFixed(1)}% of daily volume (${data.short_date || ''})`;
-            wrap.appendChild(summary);
-        }
-        // Long positions by type
-        if (data.long_by_type && data.long_by_type.length) {
-            wrap.appendChild(sectionHeader('Long Positions by Manager Type'));
-            wrap.appendChild(buildSimpleTable(data.long_by_type, [
-                {key: 'manager_type', label: 'Type', type: 'text'},
-                {key: 'holders', label: 'Holders', type: 'num'},
-                {key: 'long_shares', label: 'Long Shares', type: 'shares'},
-                {key: 'long_value', label: 'Long Value', type: 'dollar'},
-            ]));
-        }
-        // N-PORT short positions
-        if (data.nport_shorts && data.nport_shorts.length) {
-            wrap.appendChild(sectionHeader('Fund Short Positions (N-PORT)'));
-            wrap.appendChild(buildSimpleTable(data.nport_shorts, [
-                {key: 'fund_name', label: 'Fund', type: 'text'},
-                {key: 'shares_short', label: 'Shares Short', type: 'shares'},
-                {key: 'short_value', label: 'Short Value', type: 'dollar'},
-                {key: 'quarter', label: 'Quarter', type: 'text'},
-            ]));
-        }
-        // Long vs Short comparison
-        try {
-            const slRes = await fetch(`/api/short_long?ticker=${currentTicker}`);
-            if (slRes.ok) {
-                const slData = await slRes.json();
-                if (slData.long_short_managers && slData.long_short_managers.length) {
-                    wrap.appendChild(sectionHeader('Managers Both Long (13F) and Short (N-PORT)'));
-                    wrap.appendChild(buildSimpleTable(slData.long_short_managers, [
-                        {key: 'manager', label: 'Manager', type: 'text'},
-                        {key: 'fund_name', label: 'Short Fund', type: 'text'},
-                        {key: 'long_shares', label: 'Long Shares', type: 'shares'},
-                        {key: 'long_value_k', label: 'Long Value', type: 'dollar'},
-                        {key: 'short_shares', label: 'Short Shares', type: 'shares'},
-                        {key: 'net_shares', label: 'Net Shares', type: 'shares'},
-                    ]));
-                }
-                if (slData.short_only_funds && slData.short_only_funds.length) {
-                    wrap.appendChild(sectionHeader('Short-Only Funds (No 13F Long Position)'));
-                    wrap.appendChild(buildSimpleTable(slData.short_only_funds, [
-                        {key: 'fund_name', label: 'Fund', type: 'text'},
-                        {key: 'adviser', label: 'Adviser', type: 'text'},
-                        {key: 'short_shares', label: 'Short Shares', type: 'shares'},
-                        {key: 'short_value', label: 'Short Value', type: 'dollar'},
-                    ]));
-                }
-            }
-        } catch (e2) { /* short_long is optional */ }
     } catch (e) { hideSpinner(); showError(e.message); }
 }
 
@@ -3000,6 +2958,7 @@ function renderFlowAnalysis(data) {
         {key: 'from_shares', label: 'From', type: 'shares'},
         {key: 'to_shares', label: 'To', type: 'shares'},
         {key: 'pct_change', label: '% Chg', type: 'pct'},
+        {key: 'pct_float', label: '% Float', type: 'pct'},
         {key: 'net_value', label: 'Net $', type: 'dollar'},
     ];
 
@@ -3031,9 +2990,9 @@ function renderFlowAnalysis(data) {
         const table = document.createElement('table');
         table.className = 'data-table';
         table.style.tableLayout = 'fixed';
-        // Colgroup: #, name, type, net shares, from, to, %chg, net$
+        // Colgroup: #, name, type, net shares, from, to, %chg, %float, net$
         const colgroup = document.createElement('colgroup');
-        ['3%', null, '8%', '12%', '11%', '11%', '8%', '12%'].forEach(w => {
+        ['3%', null, '7%', '11%', '10%', '10%', '7%', '7%', '11%'].forEach(w => {
             const cg = document.createElement('col');
             if (w) cg.style.width = w;
             colgroup.appendChild(cg);
@@ -3083,6 +3042,10 @@ function renderFlowAnalysis(data) {
                             ? '<span class="positive">+' + pct + '%</span>'
                             : '<span class="negative">(' + Math.abs(pct).toFixed(1) + '%)</span>';
                     }
+                } else if (c.key === 'pct_float') {
+                    // pct_float stored as percentage already (e.g. 12.68)
+                    td.textContent = (val != null && val > 0) ? val.toFixed(2) + '%' : '\u2014';
+                    if (val == null || val === 0) td.style.color = '#ccc';
                 } else {
                     td.innerHTML = formatCell(val, fmtType(c));
                 }
@@ -3106,6 +3069,10 @@ function renderFlowAnalysis(data) {
                 let sum = 0;
                 tab.rows.forEach(r => { if (r[c.key]) sum += r[c.key]; });
                 td.innerHTML = sum ? formatCell(sum, c.type === 'dollar' ? 'dollar' : 'shares') : '\u2014';
+            } else if (c.key === 'pct_float') {
+                let sum = 0;
+                tab.rows.forEach(r => { if (r.pct_float) sum += r.pct_float; });
+                td.textContent = sum > 0 ? sum.toFixed(2) + '%' : '\u2014';
             } else {
                 td.textContent = '';
             }
@@ -3136,45 +3103,6 @@ function renderFlowAnalysis(data) {
 // New/Exits tab (two sub-views reusing existing queries 10 and 11)
 // ---------------------------------------------------------------------------
 let _neSubView = 'new';
-
-async function loadNewExits() {
-    clearError(); tableWrap.innerHTML = '';
-    currentQuery = 10;
-    showSpinner();
-    try {
-        const res = await fetch(`/api/query10?ticker=${currentTicker}`);
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
-        const data = await res.json();
-        hideSpinner();
-        const wrap = tableWrap;
-        // New entries section
-        if (data.new_entries && data.new_entries.length) {
-            wrap.appendChild(sectionHeader('New Positions (Quarter-over-Quarter)'));
-            wrap.appendChild(buildSimpleTable(data.new_entries, [
-                {key: 'manager_name', label: 'Institution', type: 'text'},
-                {key: 'manager_type', label: 'Type', type: 'text'},
-                {key: 'shares', label: 'Shares', type: 'shares'},
-                {key: 'market_value_live', label: 'Value (Live)', type: 'dollar'},
-                {key: 'pct_of_portfolio', label: '% Portfolio', type: 'pct'},
-                {key: 'pct_of_float', label: '% Float', type: 'pct'},
-            ]));
-        }
-        // Exits section
-        if (data.exits && data.exits.length) {
-            wrap.appendChild(sectionHeader('Full Exits (Quarter-over-Quarter)'));
-            wrap.appendChild(buildSimpleTable(data.exits, [
-                {key: 'manager_name', label: 'Institution', type: 'text'},
-                {key: 'manager_type', label: 'Type', type: 'text'},
-                {key: 'q3_shares', label: 'Prior Shares', type: 'shares'},
-                {key: 'q3_value', label: 'Prior Value', type: 'dollar'},
-                {key: 'q3_pct', label: '% Portfolio', type: 'pct'},
-            ]));
-        }
-        if ((!data.new_entries || !data.new_entries.length) && (!data.exits || !data.exits.length)) {
-            wrap.innerHTML = '<div class="no-data">No position changes found.</div>';
-        }
-    } catch (e) { hideSpinner(); showError(e.message); }
-}
 
 // ---------------------------------------------------------------------------
 // Query 7 — Fund Portfolio (manager selector + custom rendering)

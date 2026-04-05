@@ -2426,6 +2426,12 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     """Compute buyer/seller/new/exit flows live from holdings or fund_holdings.
     Returns (buyers, sellers, new_entries, exits) lists.
     """
+    # Get float_shares once for fund-level % float calculation
+    float_row = con.execute(
+        "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
+    ).fetchone()
+    float_shares = float(float_row[0]) if float_row and float_row[0] else None
+
     if level == 'fund':
         # Filter via fund_universe.is_actively_managed
         join_clause = "LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id"
@@ -2444,19 +2450,37 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         from_df = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
-                   SUM(shares) as shares, SUM(market_value_usd) as value
+                   SUM(shares) as shares, SUM(market_value_usd) as value,
+                   SUM(pct_of_float) as pct_of_float
             FROM holdings WHERE ticker = ? AND quarter = '{quarter_from}' GROUP BY entity
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
-                   SUM(shares) as shares, SUM(market_value_usd) as value
+                   SUM(shares) as shares, SUM(market_value_usd) as value,
+                   SUM(pct_of_float) as pct_of_float
             FROM holdings WHERE ticker = ? AND quarter = '{quarter_to}' GROUP BY entity
         """, [ticker]).fetchdf()
 
     from_map = {r['entity']: r for _, r in from_df.iterrows()}
     to_map = {r['entity']: r for _, r in to_df.iterrows()}
     from_set, to_set = set(from_map), set(to_map)
+
+    def _pct_float(shares):
+        """Compute % of float from shares, fall back to None if no float data."""
+        if float_shares and shares:
+            return round(shares / float_shares * 100, 3)
+        return None
+
+    def _get_pf(entity_row, fallback_shares):
+        """Safely extract pct_of_float from a pandas row, fall back to computed."""
+        raw = entity_row.get('pct_of_float') if entity_row is not None else None
+        try:
+            if raw is not None and not (isinstance(raw, float) and raw != raw):
+                return float(raw)
+        except (TypeError, ValueError):
+            pass
+        return _pct_float(fallback_shares)
 
     rows = []
     # Retained: compare shares
@@ -2467,11 +2491,13 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         tv = float(to_map[entity].get('value') or 0)
         net_s = ts - fs
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
+        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_float(ts)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': ts, 'net_shares': net_s,
             'from_value': fv, 'to_value': tv, 'net_value': tv - fv,
             'pct_change': (net_s / fs) if fs > 0 else None,
+            'pct_float': pf,
             'is_new_entry': False, 'is_exit': False,
         })
     # New entries
@@ -2479,22 +2505,26 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         ts = float(to_map[entity].get('shares') or 0)
         tv = float(to_map[entity].get('value') or 0)
         mt = to_map[entity].get('manager_type') if level == 'parent' else None
+        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_float(ts)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': 0, 'to_shares': ts, 'net_shares': ts,
             'from_value': 0, 'to_value': tv, 'net_value': tv,
-            'pct_change': None, 'is_new_entry': True, 'is_exit': False,
+            'pct_change': None, 'pct_float': pf,
+            'is_new_entry': True, 'is_exit': False,
         })
     # Exits
     for entity in from_set - to_set:
         fs = float(from_map[entity].get('shares') or 0)
         fv = float(from_map[entity].get('value') or 0)
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
+        pf = _get_pf(from_map[entity], fs) if level == 'parent' else _pct_float(fs)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': 0, 'net_shares': -fs,
             'from_value': fv, 'to_value': 0, 'net_value': -fv,
-            'pct_change': -1.0, 'is_new_entry': False, 'is_exit': True,
+            'pct_change': -1.0, 'pct_float': pf,
+            'is_new_entry': False, 'is_exit': True,
         })
 
     # Split and sort by net_shares (shares-based primary)
@@ -2567,8 +2597,15 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ORDER BY net_shares DESC NULLS LAST
             """, [ticker, quarter_from]).fetchdf()
             rows = df_to_records(df)
+            # Compute net_value and pct_of_float using float_shares
+            fr = con.execute("SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]).fetchone()
+            flt = float(fr[0]) if fr and fr[0] else None
             for r in rows:
                 r['net_value'] = (r.get('to_value') or 0) - (r.get('from_value') or 0)
+                ts = r.get('to_shares') or 0
+                fs = r.get('from_shares') or 0
+                ref_shares = ts if ts > 0 else fs
+                r['pct_float'] = round(ref_shares / flt * 100, 3) if flt and ref_shares else None
             buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
                       and (r.get('net_shares') or 0) > 0][:25]
             sellers = sorted([r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
@@ -3107,7 +3144,60 @@ def short_interest_analysis(ticker):
             pass
         result['cross_ref'] = cross_ref
 
-        # 6. Summary card data
+        # 6. Long positions aggregated by manager type (from Smart Money)
+        long_by_type = []
+        try:
+            lbt = con.execute(f"""
+                SELECT COALESCE(manager_type, 'unknown') as manager_type,
+                       COUNT(DISTINCT cik) as holders,
+                       SUM(shares) as long_shares,
+                       SUM(market_value_live) as long_value
+                FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
+                GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
+            """, [ticker]).fetchdf()
+            long_by_type = df_to_records(lbt)
+        except Exception:
+            pass
+        result['long_by_type'] = long_by_type
+
+        # 7. Short-only funds (N-PORT shorts without matching 13F long parent)
+        short_only = []
+        try:
+            sof_df = con.execute(f"""
+                SELECT fh.fund_name, fh.family_name,
+                       ABS(fh.shares_or_principal) as short_shares,
+                       ABS(fh.market_value_usd) as short_value,
+                       MAX(fu.total_net_assets) / 1e6 as fund_aum_mm
+                FROM fund_holdings fh
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{LQ}'
+                GROUP BY fh.fund_name, fh.family_name, fh.series_id
+                ORDER BY short_value DESC
+            """, [ticker]).fetchdf()
+            # Exclude funds whose family matched a long parent in cross_ref
+            matched_families = set()
+            for c in cross_ref:
+                matched_families.add(c['institution'].lower())
+            for _, r in sof_df.iterrows():
+                fam = (r['family_name'] or '').lower()
+                is_matched = False
+                for m in matched_families:
+                    if any(w in m for w in fam.split()[:2] if len(w) > 3):
+                        is_matched = True
+                        break
+                if not is_matched:
+                    short_only.append({
+                        'fund_name': r['fund_name'],
+                        'family_name': r['family_name'],
+                        'short_shares': float(r['short_shares'] or 0),
+                        'short_value': float(r['short_value'] or 0),
+                        'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,
+                    })
+        except Exception:
+            pass
+        result['short_only_funds'] = short_only
+
+        # 8. Summary card data
         total_short_shares = sum(r.get(LQ, 0) for r in nport_by_fund)
         total_short_funds = len([r for r in nport_by_fund if r.get(LQ, 0) > 0])
         avg_short_vol = sum(r.get('short_pct', 0) for r in short_volume[-20:]) / max(len(short_volume[-20:]), 1) if short_volume else 0
