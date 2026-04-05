@@ -168,6 +168,40 @@ CREATE TABLE IF NOT EXISTS entity_rollup_history (
 CREATE INDEX IF NOT EXISTS idx_rollup_parent ON entity_rollup_history(rollup_entity_id, valid_to);
 
 -- -----------------------------------------------------------------------------
+-- entity_identifiers_staging — soft-landing queue for identifier conflicts
+-- -----------------------------------------------------------------------------
+-- Phase 2: replaces silent ON CONFLICT DO NOTHING in feeders. When a feeder
+-- (fetch_ncen.py, ADV parser, long-tail resolver) wants to add an identifier
+-- that collides with an existing active mapping, the attempted row lands here
+-- for operator review instead of being silently dropped.
+--
+-- Review workflow: pending → promoted (merged to entity_identifiers) / rejected / duplicate.
+-- Auto-promotion logic deferred to Phase 3.5.
+CREATE SEQUENCE IF NOT EXISTS identifier_staging_id_seq START 1;
+
+CREATE TABLE IF NOT EXISTS entity_identifiers_staging (
+    staging_id          BIGINT PRIMARY KEY,
+    entity_id           BIGINT NOT NULL REFERENCES entities(entity_id),
+    identifier_type     VARCHAR NOT NULL,
+    identifier_value    VARCHAR NOT NULL,
+    confidence          VARCHAR NOT NULL
+        CHECK (confidence IN ('exact','high','medium','low','fuzzy_match')),
+    source              VARCHAR NOT NULL,
+    conflict_reason     VARCHAR NOT NULL,  -- duplicate_active_mapping|entity_ambiguous|cross_feeder_disagreement|manual_review_requested
+    existing_entity_id  BIGINT,            -- the entity that currently owns this identifier (NULL if ambiguous)
+    review_status       VARCHAR NOT NULL DEFAULT 'pending'
+        CHECK (review_status IN ('pending','promoted','rejected','duplicate')),
+    reviewed_by         VARCHAR,
+    reviewed_at         TIMESTAMP,
+    notes               VARCHAR,
+    created_at          TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eis_pending ON entity_identifiers_staging(review_status, created_at);
+CREATE INDEX IF NOT EXISTS idx_eis_identifier ON entity_identifiers_staging(identifier_type, identifier_value);
+CREATE INDEX IF NOT EXISTS idx_eis_entity ON entity_identifiers_staging(entity_id);
+
+-- -----------------------------------------------------------------------------
 -- entity_current — denormalized current-state view
 -- -----------------------------------------------------------------------------
 -- "Currently active" throughout this view means valid_to = '9999-12-31'.

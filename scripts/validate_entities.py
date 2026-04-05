@@ -452,6 +452,107 @@ def gate_row_count(con):
 # =============================================================================
 # Runner
 # =============================================================================
+def gate_wellington_sub_advisory(con):
+    """
+    Phase 2 validation gate: Wellington sub-advisory correctly modeled.
+
+    Asserts:
+      (a) Fund entities rolling up to Wellington each have ncen role='adviser'
+          for a Wellington CRD. Institution entities rolling up are subsidiaries
+          from parent_bridge (not incorrectly routed sub-advised funds).
+      (b) Wellington appears as sub_adviser with is_primary=FALSE for sub-advised
+          funds — none have is_primary=TRUE when the relationship is sub_adviser.
+      (c) No fund whose primary adviser is NOT Wellington incorrectly rolls up
+          to Wellington.
+    """
+    findings = {}
+    issues = []
+
+    # --- (a) Primary rollups to Wellington: verify each is legitimate
+    # Fund rollups should match ncen adviser-role
+    wellington_fund_rollups = con.execute(f"""
+        SELECT erh.entity_id, e.canonical_name, erh.rule_applied
+        FROM entity_rollup_history erh
+        JOIN entities ew ON ew.entity_id = erh.rollup_entity_id
+        JOIN entities e ON e.entity_id = erh.entity_id
+        WHERE LOWER(ew.canonical_name) LIKE '%wellington%'
+          AND erh.valid_to = {ACTIVE}
+          AND erh.rule_applied != 'self'
+          AND e.entity_type = 'fund'
+    """).fetchall()  # nosec B608
+
+    # Cross-check against ncen: these funds should have Wellington as adviser
+    wellington_crds = con.execute("""
+        SELECT DISTINCT adviser_crd FROM ncen_adviser_map
+        WHERE LOWER(adviser_name) LIKE '%wellington%' AND role = 'adviser'
+    """).fetchall()
+    wellington_crd_set = {r[0] for r in wellington_crds if r[0]}
+
+    wellington_adviser_series = set()
+    if wellington_crd_set:
+        placeholders = ",".join(["?"] * len(wellington_crd_set))
+        rows = con.execute(
+            f"SELECT DISTINCT series_id FROM ncen_adviser_map "  # nosec B608
+            f"WHERE adviser_crd IN ({placeholders}) AND role = 'adviser'",
+            list(wellington_crd_set),
+        ).fetchall()
+        wellington_adviser_series = {r[0] for r in rows if r[0]}
+
+    # For each fund rolling up to Wellington, verify its series_id is in the adviser set
+    fund_rollup_issues = []
+    for eid, ename, rule in wellington_fund_rollups:
+        series = con.execute(f"""
+            SELECT identifier_value FROM entity_identifiers
+            WHERE entity_id = ? AND identifier_type = 'series_id' AND valid_to = {ACTIVE}
+        """, [eid]).fetchone()  # nosec B608
+        sid = series[0] if series else None
+        if sid and sid not in wellington_adviser_series:
+            fund_rollup_issues.append({"entity_id": eid, "name": ename, "series_id": sid})
+
+    findings["fund_rollups_to_wellington"] = len(wellington_fund_rollups)
+    findings["fund_rollup_issues"] = fund_rollup_issues
+    if fund_rollup_issues:
+        issues.append(f"{len(fund_rollup_issues)} funds roll up to Wellington without ncen adviser role")
+
+    # Institution rollups (subsidiaries) — informational, not gated
+    inst_rollups = con.execute(f"""
+        SELECT COUNT(*) FROM entity_rollup_history erh
+        JOIN entities ew ON ew.entity_id = erh.rollup_entity_id
+        JOIN entities e ON e.entity_id = erh.entity_id
+        WHERE LOWER(ew.canonical_name) LIKE '%wellington%'
+          AND erh.valid_to = {ACTIVE} AND erh.rule_applied != 'self'
+          AND e.entity_type = 'institution'
+    """).fetchone()[0]  # nosec B608
+    findings["institution_rollups_to_wellington"] = inst_rollups
+
+    # --- (b) Sub-adviser relationships must all be is_primary=FALSE
+    bad_sub = con.execute(f"""
+        SELECT COUNT(*) FROM entity_relationships er
+        JOIN entities ep ON ep.entity_id = er.parent_entity_id
+        WHERE LOWER(ep.canonical_name) LIKE '%wellington%'
+          AND er.relationship_type = 'sub_adviser'
+          AND er.is_primary = TRUE
+          AND er.valid_to = {ACTIVE}
+    """).fetchone()[0]  # nosec B608
+    findings["sub_adviser_with_primary_true"] = bad_sub
+    if bad_sub:
+        issues.append(f"{bad_sub} sub_adviser relationships have is_primary=TRUE")
+
+    # --- (c) Sub-adviser count (informational — these should NOT drive rollup)
+    sub_count = con.execute(f"""
+        SELECT COUNT(*) FROM entity_relationships er
+        JOIN entities ep ON ep.entity_id = er.parent_entity_id
+        WHERE LOWER(ep.canonical_name) LIKE '%wellington%'
+          AND er.relationship_type = 'sub_adviser'
+          AND er.valid_to = {ACTIVE}
+    """).fetchone()[0]  # nosec B608
+    findings["wellington_sub_adviser_count"] = sub_count
+
+    status = "PASS" if not issues else "FAIL"
+    findings["issues"] = issues
+    return status, findings
+
+
 GATES = [
     ("structural_aliases", gate_structural_aliases),
     ("structural_identifiers", gate_structural_identifiers),
@@ -464,6 +565,7 @@ GATES = [
     ("standalone_filers", gate_standalone_filers),
     ("total_aum", gate_total_aum),
     ("row_count", gate_row_count),
+    ("wellington_sub_advisory", gate_wellington_sub_advisory),
 ]
 
 

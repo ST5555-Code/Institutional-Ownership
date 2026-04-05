@@ -92,10 +92,6 @@ def next_entity_id(con) -> int:
     return con.execute("SELECT nextval('entity_id_seq')").fetchone()[0]
 
 
-def next_relationship_id(con) -> int:
-    return con.execute("SELECT nextval('relationship_id_seq')").fetchone()[0]
-
-
 def reset_entity_tables(con):
     """Truncate all entity tables and reset sequences for a clean rebuild."""
     logger.info("[reset] truncating entity tables and resetting sequences")
@@ -349,63 +345,26 @@ def step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_row
 # =============================================================================
 # Step 4 — Populate entity_relationships
 # =============================================================================
-def insert_relationship(
-    con, parent_id, child_id, rel_type, control_type, is_primary,
-    confidence, source, has_primary_parent: set[int] | None = None,
-):
-    """
-    Atomic insert of a relationship. Returns True if inserted, False if skipped.
-
-    If is_primary=TRUE, checks has_primary_parent set first — if the child already
-    has a primary parent, demotes this insert by logging a conflict and skipping.
-    Caller is responsible for updating has_primary_parent on successful primary insert.
-    """
-    if is_primary and has_primary_parent is not None and child_id in has_primary_parent:
-        conflict_logger.info(
-            "primary_parent_conflict child=%s existing_primary=skipped new_parent=%s source=%s",
-            child_id, parent_id, source,
-        )
-        return False
-    rid = next_relationship_id(con)
-    primary_key = child_id if is_primary else None
-    # ON CONFLICT DO NOTHING guards against duplicate (parent,child,type,valid_to)
-    # and duplicate primary_parent_key entries that slip past the Python check.
-    result = con.execute(
-        """INSERT INTO entity_relationships
-           (relationship_id, parent_entity_id, child_entity_id, relationship_type,
-            control_type, is_primary, primary_parent_key, confidence, source,
-            is_inferred, valid_from, valid_to)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, DATE '2000-01-01', DATE '9999-12-31')
-           ON CONFLICT DO NOTHING
-           RETURNING relationship_id""",
-        [rid, parent_id, child_id, rel_type, control_type, is_primary, primary_key,
-         confidence, source],
-    ).fetchall()
-    inserted = len(result) > 0
-    if inserted and is_primary and has_primary_parent is not None:
-        has_primary_parent.add(child_id)
-    return inserted
-
-
 def step4_populate_relationships(
     con, seed_map, series_to_entity, manager_rows,
 ):
     """
     Populate entity_relationships from two sources:
       A) parent_bridge / managers  → seed→manager fund_sponsor (primary) where matched
-      B) ncen_adviser_map          → adviser→fund fund_sponsor (primary) / sub_adviser (non-primary)
+      B) ncen_adviser_map          → adviser→fund fund_sponsor / sub_adviser (via entity_sync)
 
     Source A runs first so manager entities have their primary parents from the
-    fuzzy-matched PARENT_SEEDS mapping. Source B (ncen) is exact; if ncen tries
-    to set a second primary parent on a child that already has one, the conflict
-    is logged and the second insert is skipped (ux_primary_parent blocks it).
+    fuzzy-matched PARENT_SEEDS mapping. Source B (ncen) uses entity_sync's
+    shared insert_relationship_idempotent which queries the DB for existing
+    primary parents — so it correctly defers to Source A's earlier inserts.
     """
+    import entity_sync  # noqa: E402
+
     logger.info("[step 4] populating entity_relationships")
     inserted = {"seed_fund_sponsor": 0, "ncen_fund_sponsor": 0, "ncen_sub_adviser": 0}
     skipped = {"self_parent": 0, "seed_not_found": 0, "adviser_not_found": 0, "fund_not_found": 0}
-    has_primary_parent: set[int] = set()
 
-    # --- Source A: parent_bridge via managers
+    # --- Source A: parent_bridge via managers (uses entity_sync for consistency)
     con.execute("BEGIN TRANSACTION")
     try:
         for (entity_id, _cik, mname, pname, _st, _ia, _crd, _all) in manager_rows:
@@ -417,12 +376,11 @@ def step4_populate_relationships(
                 skipped["seed_not_found"] += 1
                 continue
             if parent_eid == entity_id:
-                # absorbed case: entity IS the seed, no self-relationship needed
                 skipped["self_parent"] += 1
                 continue
-            if insert_relationship(
+            if entity_sync.insert_relationship_idempotent(
                 con, parent_eid, entity_id, "fund_sponsor", "control",
-                True, "fuzzy_match", "parent_bridge", has_primary_parent,
+                True, "fuzzy_match", "parent_bridge",
             ):
                 inserted["seed_fund_sponsor"] += 1
         con.execute("COMMIT")
@@ -430,16 +388,11 @@ def step4_populate_relationships(
         con.execute("ROLLBACK")
         raise
 
-    # --- Source B: ncen_adviser_map
-    # Build CRD→entity_id lookup (advisers) from already-populated identifiers
-    crd_to_entity = dict(con.execute(
-        """SELECT identifier_value, entity_id FROM entity_identifiers
-           WHERE identifier_type='crd' AND valid_to = DATE '9999-12-31'"""
-    ).fetchall())
-
-    # Any ncen advisers without a CRD match need a new entity created
-    # (adv_managers has ~16k CRDs; managers/adv_managers overlap heavily but some
-    #  ncen advisers are not in either).
+    # --- Source B: ncen_adviser_map (via entity_sync shared module)
+    # Uses entity_sync.sync_from_ncen_row() for each row, which handles:
+    #   - get_or_create_entity_by_crd for advisers (new entities + identifiers)
+    #   - insert_relationship_idempotent (primary for 'adviser', non-primary for 'subadviser')
+    #   - Conflicts logged to entity_identifiers_staging (not silently dropped)
     ncen_rows = con.execute(
         """SELECT adviser_name, adviser_crd, series_id, role
            FROM ncen_adviser_map
@@ -447,65 +400,31 @@ def step4_populate_relationships(
     ).fetchall()
     logger.info("[step 4] ncen rows with series_id and crd: %d", len(ncen_rows))
 
-    # Pre-create missing adviser entities in one transaction
-    missing_crds: dict[str, str] = {}
-    for adv_name, crd, _sid, _role in ncen_rows:
-        if crd and crd not in crd_to_entity and crd not in missing_crds:
-            missing_crds[crd] = adv_name or f"CRD {crd}"
-    if missing_crds:
-        logger.info("[step 4] creating %d new adviser entities for ncen-only CRDs", len(missing_crds))
-        con.execute("BEGIN TRANSACTION")
-        try:
-            for crd, name in missing_crds.items():
-                eid = next_entity_id(con)
-                con.execute(
-                    """INSERT INTO entities
-                       (entity_id, entity_type, canonical_name, created_source, is_inferred)
-                       VALUES (?, 'institution', ?, 'ncen_adviser_map', TRUE)""",
-                    [eid, name],
-                )
-                con.execute(
-                    """INSERT INTO entity_identifiers
-                       (entity_id, identifier_type, identifier_value, confidence, source, is_inferred)
-                       VALUES (?, 'crd', ?, 'exact', 'ncen_adviser_map', TRUE)""",
-                    [eid, crd],
-                )
-                crd_to_entity[crd] = eid
-            con.execute("COMMIT")
-        except Exception:
-            con.execute("ROLLBACK")
-            raise
-
-    # Insert ncen relationships
+    ncen_created = 0
     con.execute("BEGIN TRANSACTION")
     try:
         for adv_name, crd, series_id, role in ncen_rows:
-            adv_eid = crd_to_entity.get(crd)
-            fund_eid = series_to_entity.get(series_id)
-            if adv_eid is None:
-                skipped["adviser_not_found"] += 1
+            r = entity_sync.sync_from_ncen_row(
+                con, adv_name, crd, series_id, role,
+            )
+            if r["skipped_reason"]:
+                if "adviser" in (r["skipped_reason"] or ""):
+                    skipped["adviser_not_found"] += 1
+                else:
+                    skipped["fund_not_found"] += 1
                 continue
-            if fund_eid is None:
-                skipped["fund_not_found"] += 1
-                continue
-            if role == "adviser":
-                ok = insert_relationship(
-                    con, adv_eid, fund_eid, "fund_sponsor", "control",
-                    True, "exact", "ncen_adviser_map", has_primary_parent,
-                )
-                if ok:
+            if r["adviser_created"]:
+                ncen_created += 1
+            if r["relationship_inserted"]:
+                if role == "adviser":
                     inserted["ncen_fund_sponsor"] += 1
-            elif role == "subadviser":
-                ok = insert_relationship(
-                    con, adv_eid, fund_eid, "sub_adviser", "advisory",
-                    False, "exact", "ncen_adviser_map", has_primary_parent,
-                )
-                if ok:
+                elif role == "subadviser":
                     inserted["ncen_sub_adviser"] += 1
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")
         raise
+    logger.info("[step 4] ncen-only entities created: %d", ncen_created)
 
     logger.info("[step 4] relationships inserted: %s", inserted)
     logger.info("[step 4] relationships skipped: %s", skipped)
@@ -785,9 +704,39 @@ def step7_compute_rollups(con):
 # =============================================================================
 # Main
 # =============================================================================
+def refresh_reference_tables(con):
+    """Copy latest reference tables from production to staging.
+
+    Attaches the production DB read-only, drops and recreates each table
+    in staging from the prod copy. This ensures the entity build runs
+    against current data even when staging was seeded weeks ago.
+    """
+    prod_path = str(ROOT / "data" / "13f.duckdb")
+    tables = [
+        "managers", "parent_bridge", "fund_universe", "adv_managers",
+        "ncen_adviser_map", "cik_crd_links", "cik_crd_direct",
+    ]
+    logger.info("[refresh] attaching production DB from %s", prod_path)
+    con.execute(f"ATTACH '{prod_path}' AS prod (READ_ONLY)")
+    for t in tables:
+        try:
+            con.execute(f"DROP TABLE IF EXISTS {t}")  # nosec B608
+            con.execute(f"CREATE TABLE {t} AS SELECT * FROM prod.{t}")  # nosec B608
+            n = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]  # nosec B608
+            logger.info("[refresh]   %s: %d rows", t, n)
+        except Exception as e:
+            logger.warning("[refresh]   %s: skipped (%s)", t, str(e)[:80])
+    con.execute("DETACH prod")
+    logger.info("[refresh] done")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reset", action="store_true", help="Truncate entity tables before build")
+    ap.add_argument(
+        "--refresh-reference-tables", action="store_true",
+        help="Copy latest reference tables from production to staging before build",
+    )
     args = ap.parse_args()
 
     db.set_staging_mode(True)
@@ -800,6 +749,8 @@ def main():
     seeds = load_parent_seeds()
     con = db.connect_write()
     try:
+        if args.refresh_reference_tables:
+            refresh_reference_tables(con)
         if args.reset:
             reset_entity_tables(con)
 
