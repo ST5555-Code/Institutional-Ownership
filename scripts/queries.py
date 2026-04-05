@@ -2985,8 +2985,8 @@ def portfolio_context(ticker, level='parent', active_only=False):
                 'child_count': 0,
             })
 
-        # Sort by conviction score descending
-        results.sort(key=lambda x: x.get('conviction_score', 0), reverse=True)
+        # Keep the top-25-by-value order (same as Register) — do NOT resort by score.
+        # Frontend allows user to click column headers to sort interactively.
         for i, r in enumerate(results, 1):
             r['rank'] = i
 

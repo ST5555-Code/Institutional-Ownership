@@ -1417,32 +1417,112 @@ function _renderConviction(data) {
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
     const thN = document.createElement('th'); thN.textContent = '#'; thN.style.textAlign = 'right'; hr.appendChild(thN);
-    [
-        [nameLabel, 'left'],
-        ['Type', 'left'],
-        ['Value', 'right'],
-        [sectorColLabel, 'right'],
-        [spxLabel, 'right'],
-        ['Score', 'right'],
-        ['Sec Rnk', 'right'],
-        ['Co Rnk', 'right'],
-        ['Ind Rnk', 'right'],
-        ['Top 3 Sectors', 'center'],
-        ['Div', 'right'],
-        ['Unk %', 'right'],
-        ['ETF %', 'right'],
-    ].forEach(([h, align]) => {
+
+    // Sortable column definitions: [label, align, sortKey]
+    const colDefs = [
+        [nameLabel, 'left', 'institution'],
+        ['Type', 'left', 'type'],
+        ['Value', 'right', 'value'],
+        [sectorColLabel, 'right', 'subject_sector_pct'],
+        [spxLabel, 'right', 'vs_spx'],
+        ['Score', 'right', 'conviction_score'],
+        ['Sec Rnk', 'right', 'sector_rank'],
+        ['Co Rnk', 'right', 'co_rank_in_sector'],
+        ['Ind Rnk', 'right', 'industry_rank'],
+        ['Top 3 Sectors', 'center', null],
+        ['Div', 'right', 'diversity'],
+        ['Unk %', 'right', 'unk_pct'],
+        ['ETF %', 'right', 'etf_pct'],
+    ];
+
+    // Current sort state
+    let sortKey = 'value';
+    let sortDir = 'desc';
+
+    colDefs.forEach(([h, align, key]) => {
         const th = document.createElement('th');
         th.textContent = h;
         th.style.textAlign = align;
+        if (key) {
+            th.style.cursor = 'pointer';
+            th.dataset.sortKey = key;
+            th.addEventListener('click', () => {
+                if (sortKey === key) {
+                    sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+                } else {
+                    sortKey = key;
+                    sortDir = 'desc';
+                }
+                _rebuildConvictionRows();
+                _updateSortIndicators();
+            });
+        }
         hr.appendChild(th);
     });
     thead.appendChild(hr);
     table.appendChild(thead);
 
+    function _updateSortIndicators() {
+        hr.querySelectorAll('th').forEach(th => {
+            const key = th.dataset.sortKey;
+            if (!key) return;
+            const base = th.textContent.replace(/[\u25B2\u25BC]\s*$/, '').trim();
+            th.textContent = base + (key === sortKey ? (sortDir === 'desc' ? ' \u25BC' : ' \u25B2') : '');
+        });
+    }
+
     const tbody = document.createElement('tbody');
-    let parentIdx = 0;
-    rows.forEach(row => {
+
+    // Organize rows: parents with their children grouped beneath them
+    // so sorting can rearrange parent groups without breaking the hierarchy
+    const parentsList = rows.filter(r => r.level === 0);
+    const childrenByParent = {};
+    let currentParent = null;
+    rows.forEach(r => {
+        if (r.level === 0) {
+            currentParent = r.institution;
+            childrenByParent[currentParent] = [];
+        } else if (r.level === 1 && currentParent) {
+            childrenByParent[currentParent].push(r);
+        }
+    });
+
+    function _sortedParents() {
+        const sorted = [...parentsList];
+        sorted.sort((a, b) => {
+            let av = a[sortKey];
+            let bv = b[sortKey];
+            // null handling: push nulls to end
+            if (av == null && bv == null) return 0;
+            if (av == null) return 1;
+            if (bv == null) return -1;
+            if (typeof av === 'string') {
+                return sortDir === 'desc' ? bv.localeCompare(av) : av.localeCompare(bv);
+            }
+            return sortDir === 'desc' ? bv - av : av - bv;
+        });
+        return sorted;
+    }
+
+    function _rebuildConvictionRows() {
+        tbody.innerHTML = '';
+        let parentIdx = 0;
+        const sortedParents = _sortedParents();
+        let rank = 0;
+        sortedParents.forEach(parentRow => {
+            rank++;
+            parentRow.rank = rank;
+            _renderConvictionRow(parentRow, ++parentIdx, tbody);
+            const kids = childrenByParent[parentRow.institution] || [];
+            kids.forEach(kid => _renderConvictionRow(kid, parentIdx, tbody));
+        });
+        // Re-append totals row after rebuild
+        _appendConvictionTotals(tbody, parentsList);
+        // Re-apply type filter if active
+        if (_legendTypeFilter) _applyTypeFilter();
+    }
+
+    function _renderConvictionRow(row, parentIdx, tbody) {
         const tr = document.createElement('tr');
         const isChild = row.level === 1;
         const isParent = row.is_parent === true;
@@ -1598,53 +1678,48 @@ function _renderConviction(data) {
         tr.appendChild(tdEtf);
 
         tbody.appendChild(tr);
-    });
+    }  // end of _renderConvictionRow
 
-    // Totals row (parent-level only, no double-counting)
-    const parentRows = rows.filter(r => !r.level || r.level === 0);
-    if (parentRows.length > 0) {
+    function _appendConvictionTotals(tbody, parentRows) {
+        if (parentRows.length === 0) return;
         const totals = document.createElement('tr');
         totals.style.cssText = 'font-weight:700;border-top:3px solid #002147;background:#f0f4f8;';
-        // # col
         const tdTNum = document.createElement('td');
         tdTNum.className = 'col-rownum';
         totals.appendChild(tdTNum);
-        // Institution label
         const tdTLabel = document.createElement('td');
         tdTLabel.textContent = `TOTAL (${parentRows.length} holders)`;
         totals.appendChild(tdTLabel);
-        // Type (empty)
         totals.appendChild(document.createElement('td'));
-        // Value sum
         const tdTVal = document.createElement('td');
         tdTVal.style.textAlign = 'right';
         const sumVal = parentRows.reduce((a, r) => a + (r.value || 0), 0);
         tdTVal.innerHTML = sumVal ? fmtDollars(sumVal) : '\u2014';
         totals.appendChild(tdTVal);
-        // Rest are empty (averages would be misleading)
         for (let i = 0; i < 9; i++) {
             totals.appendChild(document.createElement('td'));
         }
         tbody.appendChild(totals);
     }
 
+    // Initial render — uses default sortKey='value', sortDir='desc' (matches Register)
+    _rebuildConvictionRows();
+    _updateSortIndicators();
+
     table.appendChild(tbody);
     tableWrap.appendChild(table);
 
-    // Collapsible click handlers
-    tbody.querySelectorAll('.collapsible-parent').forEach(parentTr => {
-        parentTr.addEventListener('click', () => {
-            const pid = parentTr.dataset.parentId;
-            const arrow = parentTr.querySelector('.toggle-arrow');
-            const children = tbody.querySelectorAll(`tr[data-child-of="${pid}"]`);
-            const isExpanded = children[0] && children[0].classList.contains('visible');
-            children.forEach(c => { c.classList.toggle('visible', !isExpanded); });
-            if (arrow) arrow.textContent = isExpanded ? '\u25B6' : '\u25BC';
-        });
+    // Collapsible click handlers — delegated so they work after re-sort
+    tbody.addEventListener('click', (e) => {
+        const parentTr = e.target.closest('.collapsible-parent');
+        if (!parentTr || !tbody.contains(parentTr)) return;
+        const pid = parentTr.dataset.parentId;
+        const arrow = parentTr.querySelector('.toggle-arrow');
+        const children = tbody.querySelectorAll(`tr[data-child-of="${pid}"]`);
+        const isExpanded = children[0] && children[0].classList.contains('visible');
+        children.forEach(c => { c.classList.toggle('visible', !isExpanded); });
+        if (arrow) arrow.textContent = isExpanded ? '\u25B6' : '\u25BC';
     });
-
-    // Apply type filter if one was set from the legend
-    if (_legendTypeFilter) _applyTypeFilter();
 
     // Legend footnote
     const fn = document.createElement('div');
