@@ -53,10 +53,18 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 **Status:** Prompt sent to Claude Code. Awaiting completion.
 **Validation gate:** All 11 gates must pass before merge to production.
 
-### Phase 2 — Wire N-CEN as Primary Feeder ⬜ NOT STARTED
+### Phase 2 — Wire N-CEN as Primary Feeder ✅ COMPLETE
 **Scope:** Update fetch_ncen.py to populate entity_relationships on each run. Add entity_identifiers_staging table for conflict resolution before promotion to canonical table.
-**Depends on:** Phase 1 validation gate passed.
-**Validation gate:** Wellington sub-advisory relationships correctly modeled.
+**Depends on:** Phase 1 validation gate passed. ✅
+**Validation gate:** Wellington sub-advisory relationships correctly modeled. ✅ PASS — 22 fund rollups verified against ncen role='adviser', 9 subsidiary rollups correct, 0 sub_adviser with is_primary=TRUE, 111 sub_adviser relationships correctly non-rollup.
+**Deliverables:**
+- `entity_identifiers_staging` table + sequence + indexes (schema)
+- `scripts/entity_sync.py` shared module (6 functions, used by build_entities.py and fetch_ncen.py)
+- `build_entities.py` step 4 refactored to use entity_sync (phase 1 gates still pass)
+- `fetch_ncen.py` wired as incremental feeder (--staging flag, idempotent)
+- `--refresh-reference-tables` flag on build_entities.py
+- Wellington validation gate (#12) added to validate_entities.py
+**Build metrics:** 20,193 entities, 29,023 identifiers, 11,621 relationships, 20,416 aliases. Validation: 8 PASS, 4 MANUAL, 0 FAIL.
 
 ### Phase 3 — Long-tail Filer Resolution ⬜ NOT STARTED
 **Scope:** Batch resolve ~5,000 unmatched CIKs via SEC company search API. Populate entity_aliases. Attempt parent matching.
@@ -87,7 +95,7 @@ These items were explicitly scoped out of Phase 1 but must not be forgotten. Eac
 |---|------|-------------|-----------------|-------|
 | 1 | Multi-parent / JV structures | Phase 3.5 | Requires ADV Schedule A/B data to model correctly | is_primary = FALSE on secondary relationships preserves them in graph now |
 | 2 | Indirect ownership chains | Phase 4+ | Requires recursive CTE — design supports it, not needed for Phase 1 rollups | Current design only supports direct relationships — must document this limitation in UI |
-| 3 | Staging table for identifier conflicts (entity_identifiers_staging) | Phase 2 | Phase 1 hard-fails on conflicts which is correct for top 50 parents — long-tail needs softer landing | Add before N-CEN wiring to prevent pipeline brittleness |
+| 3 | ~~Staging table for identifier conflicts (entity_identifiers_staging)~~ | ~~Phase 2~~ ✅ | Resolved Apr 5 2026 — `entity_identifiers_staging` table created, `entity_sync.py` routes all feeder conflicts through it | Build + incremental paths both use soft-landing |
 | 4 | Structural integrity validation in CI | Phase 2 | Phase 1 runs validation manually — automate in pipeline | Add to run_pipeline.sh post-merge checks |
 | 5 | is_inferred flag on synthetic dates | Phase 1 ✓ | Already implemented — all '2000-01-01' seed dates marked is_inferred = TRUE | Enables future distinction of real vs synthetic history |
 | 6 | rollup_type label | Phase 1 ✓ | Already implemented — rollup_type = 'economic_control_v1' on all records | Future rollup worldviews coexist via this field |
@@ -140,9 +148,11 @@ These are architectural limitations of the current design, not bugs. Must be doc
 
 | File | Purpose |
 |------|---------|
-| `scripts/entity_schema.sql` | Complete DDL for all tables, sequences, indexes, view |
-| `scripts/build_entities.py` | Phase 1 population script |
-| `scripts/validate_entities.py` | Validation gate runner |
+| `scripts/entity_schema.sql` | Complete DDL for all tables, sequences, indexes, view, staging table |
+| `scripts/entity_sync.py` | Shared feeder module — entity lookup, creation, conflict routing (Phase 2) |
+| `scripts/build_entities.py` | Full rebuild population script (`--reset`, `--refresh-reference-tables`) |
+| `scripts/validate_entities.py` | Validation gate runner (12 gates including Wellington) |
+| `scripts/fetch_ncen.py` | N-CEN feeder — incremental entity sync via `--staging` flag (Phase 2) |
 | `logs/entity_build.log` | Transaction log from build_entities.py |
 | `logs/entity_build_conflicts.log` | Identifier conflicts during population |
 | `logs/entity_validation_report.json` | Validation gate results |
@@ -185,3 +195,5 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 5 2026 | Sentinel date 9999-12-31 instead of NULL for valid_to | DuckDB does not support partial unique indexes — sentinel date preserves DB-level uniqueness enforcement via full unique constraints | NULL semantics with partial indexes — not supported in DuckDB |
 | Apr 5 2026 | Nullable key columns (primary_parent_key, preferred_key) for flag-gated uniqueness | DuckDB allows multiple NULLs in UNIQUE and does not support constraints on generated columns — app-maintained nullable key gives equivalent enforcement | Generated column with CASE — constraints on generated columns unsupported in DuckDB 1.4 |
 | Apr 5 2026 | Amova/Nikko consolidation accepted as legacy data correction | Amova Asset Management is former name of Nikko Asset Management — legacy system split them into two separate parents ($213.8B each), new entity model correctly merges under Nikko ($427.5B). This is the first documented legacy data correction caught by the validation gates. | Keeping Amova split to force gate 5/6 to exact match — would enshrine known bug |
+| Apr 5 2026 | Shared entity_sync.py module instead of inline feeder logic | Phase 2 N-CEN wiring, Phase 3 long-tail, and Phase 3.5 ADV all need the same get-or-create and conflict-routing pattern — shared module prevents code duplication and ensures both --reset rebuild and incremental feeder paths use identical logic | Inline per-script feeder code — would diverge over time |
+| Apr 5 2026 | DB-backed primary-parent check (replace in-memory set) | entity_sync.insert_relationship_idempotent queries entity_relationships to check for existing primary parents — correct in both batch and incremental modes, no stale-set risk | In-memory has_primary_parent set — only works in batch mode, stale across transactions |
