@@ -1400,9 +1400,9 @@ function _renderConviction(data) {
     table.className = 'data-table';
     table.style.tableLayout = 'fixed';
 
-    // Columns: #, Institution, Type, Value, Sector%, vs MKT, Score, SecRnk, CoR, IndR, Top3, Div, Unk%, ETF%
+    // Colgroup: #, Inst, Type, Value | Sector Analysis (5 cols) | Company Analysis (2 cols) | Score | Data Quality (2 cols)
     const colgroup = document.createElement('colgroup');
-    ['3%', null, '7%', '8%', '7%', '6%', '5%', '5%', '5%', '6%', '12%', '4%', '5%', '5%'].forEach(w => {
+    ['3%', null, '6%', '8%', '7%', '6%', '6%', '13%', '5%', '7%', '7%', '5%', '5%', '5%'].forEach(w => {
         const cg = document.createElement('col');
         if (w) cg.style.width = w;
         colgroup.appendChild(cg);
@@ -1410,30 +1410,59 @@ function _renderConviction(data) {
     table.appendChild(colgroup);
 
     const nameLabel = _convictionLevel === 'fund' ? 'Fund' : 'Institution';
-    const sectorColLabel = `${subjSector} %`;
+    const sectorColLabel = `% in ${subjSector}`;
     const spxWeight = data.subject_spx_weight;
     const spxLabel = spxWeight != null ? `vs MKT (${spxWeight}%)` : 'vs MKT';
 
+    // Sortable column definitions: [label, align, sortKey, group]
+    const colDefs = [
+        [nameLabel, 'left', 'institution', null],
+        ['Type', 'left', 'type', null],
+        ['Value', 'right', 'value', null],
+        // Sector Analysis group
+        [sectorColLabel, 'right', 'subject_sector_pct', 'Sector Analysis'],
+        [spxLabel, 'right', 'vs_spx', 'Sector Analysis'],
+        ['Rank in Portfolio', 'right', 'sector_rank', 'Sector Analysis'],
+        ['Top 3 Sectors', 'center', null, 'Sector Analysis'],
+        ['# Sectors', 'right', 'diversity', 'Sector Analysis'],
+        // Company Analysis group
+        ['Rank in Sector', 'right', 'co_rank_in_sector', 'Company Analysis'],
+        ['Rank in Industry', 'right', 'industry_rank', 'Company Analysis'],
+        // Standalone summary
+        ['Score', 'right', 'conviction_score', null],
+        // Data Quality group
+        ['Unk %', 'right', 'unk_pct', 'Data Quality'],
+        ['ETF %', 'right', 'etf_pct', 'Data Quality'],
+    ];
+
     const thead = document.createElement('thead');
+
+    // Group header row
+    const groupRow = document.createElement('tr');
+    groupRow.className = 'column-group-row';
+    const thGNum = document.createElement('th');
+    thGNum.className = 'group-header-empty';
+    groupRow.appendChild(thGNum);
+    let gi = 0;
+    while (gi < colDefs.length) {
+        const grp = colDefs[gi][3];
+        let span = 1;
+        while (gi + span < colDefs.length && colDefs[gi + span][3] === grp) span++;
+        const thG = document.createElement('th');
+        thG.colSpan = span;
+        if (grp) {
+            thG.textContent = grp;
+            thG.className = 'group-header';
+        } else {
+            thG.className = 'group-header-empty';
+        }
+        groupRow.appendChild(thG);
+        gi += span;
+    }
+    thead.appendChild(groupRow);
+
     const hr = document.createElement('tr');
     const thN = document.createElement('th'); thN.textContent = '#'; thN.style.textAlign = 'right'; hr.appendChild(thN);
-
-    // Sortable column definitions: [label, align, sortKey]
-    const colDefs = [
-        [nameLabel, 'left', 'institution'],
-        ['Type', 'left', 'type'],
-        ['Value', 'right', 'value'],
-        [sectorColLabel, 'right', 'subject_sector_pct'],
-        [spxLabel, 'right', 'vs_spx'],
-        ['Score', 'right', 'conviction_score'],
-        ['Sec Rnk', 'right', 'sector_rank'],
-        ['Co Rnk', 'right', 'co_rank_in_sector'],
-        ['Ind Rnk', 'right', 'industry_rank'],
-        ['Top 3 Sectors', 'center', null],
-        ['Div', 'right', 'diversity'],
-        ['Unk %', 'right', 'unk_pct'],
-        ['ETF %', 'right', 'etf_pct'],
-    ];
 
     // Current sort state
     let sortKey = 'value';
@@ -1587,14 +1616,15 @@ function _renderConviction(data) {
         tdVal.innerHTML = fmtDollars(row.value);
         tr.appendChild(tdVal);
 
-        // Sector %
+        // --- Sector Analysis group ---
+        // % in Sector
         const tdSec = document.createElement('td');
         tdSec.style.textAlign = 'right';
         tdSec.textContent = (row.subject_sector_pct != null) ? row.subject_sector_pct.toFixed(1) + '%' : '\u2014';
         tdSec.style.fontWeight = '600';
         tr.appendChild(tdSec);
 
-        // vs SPX (overweight/underweight)
+        // vs MKT (overweight/underweight)
         const tdVs = document.createElement('td');
         tdVs.style.textAlign = 'right';
         if (row.vs_spx != null) {
@@ -1613,7 +1643,48 @@ function _renderConviction(data) {
         }
         tr.appendChild(tdVs);
 
-        // Conviction Score
+        // Rank in Portfolio (sector_rank)
+        const tdSR = document.createElement('td');
+        tdSR.style.textAlign = 'right';
+        tdSR.textContent = row.sector_rank || '\u2014';
+        if (row.sector_rank === 1) { tdSR.style.color = '#27AE60'; tdSR.style.fontWeight = '700'; }
+        tr.appendChild(tdSR);
+
+        // Top 3 Sectors — colored pills
+        const tdT3 = document.createElement('td');
+        tdT3.style.textAlign = 'center';
+        tdT3.style.whiteSpace = 'nowrap';
+        (row.top3 || []).forEach(code => {
+            const pill = document.createElement('span');
+            pill.className = 'sector-pill sp-' + code.toLowerCase();
+            pill.textContent = code;
+            tdT3.appendChild(pill);
+        });
+        tr.appendChild(tdT3);
+
+        // # Sectors (diversity)
+        const tdDiv = document.createElement('td');
+        tdDiv.style.textAlign = 'right';
+        tdDiv.textContent = row.diversity || '\u2014';
+        if (row.diversity && row.diversity < 5) tdDiv.style.color = '#E67E22';
+        tr.appendChild(tdDiv);
+
+        // --- Company Analysis group ---
+        // Rank in Sector
+        const tdCR = document.createElement('td');
+        tdCR.style.textAlign = 'right';
+        tdCR.textContent = row.co_rank_in_sector || '\u2014';
+        if (row.co_rank_in_sector === 1) { tdCR.style.color = '#27AE60'; tdCR.style.fontWeight = '700'; }
+        tr.appendChild(tdCR);
+
+        // Rank in Industry
+        const tdIR = document.createElement('td');
+        tdIR.style.textAlign = 'right';
+        tdIR.textContent = row.industry_rank || '\u2014';
+        if (row.industry_rank === 1) { tdIR.style.color = '#27AE60'; tdIR.style.fontWeight = '700'; }
+        tr.appendChild(tdIR);
+
+        // --- Score (standalone) ---
         const tdScore = document.createElement('td');
         tdScore.style.textAlign = 'right';
         tdScore.style.fontWeight = '700';
@@ -1624,42 +1695,6 @@ function _renderConviction(data) {
         else if (s > 0) tdScore.style.color = '#666';
         else tdScore.style.color = '#ccc';
         tr.appendChild(tdScore);
-
-        // Sector Rank
-        const tdSR = document.createElement('td');
-        tdSR.style.textAlign = 'right';
-        tdSR.textContent = row.sector_rank || '\u2014';
-        if (row.sector_rank === 1) { tdSR.style.color = '#27AE60'; tdSR.style.fontWeight = '700'; }
-        tr.appendChild(tdSR);
-
-        // Co Rank in Sector
-        const tdCR = document.createElement('td');
-        tdCR.style.textAlign = 'right';
-        tdCR.textContent = row.co_rank_in_sector || '\u2014';
-        if (row.co_rank_in_sector === 1) { tdCR.style.color = '#27AE60'; tdCR.style.fontWeight = '700'; }
-        tr.appendChild(tdCR);
-
-        // Industry Rank
-        const tdIR = document.createElement('td');
-        tdIR.style.textAlign = 'right';
-        tdIR.textContent = row.industry_rank || '\u2014';
-        if (row.industry_rank === 1) { tdIR.style.color = '#27AE60'; tdIR.style.fontWeight = '700'; }
-        tr.appendChild(tdIR);
-
-        // Top 3
-        const tdT3 = document.createElement('td');
-        tdT3.style.textAlign = 'center';
-        tdT3.style.fontSize = '11px';
-        tdT3.style.fontFamily = 'monospace';
-        tdT3.textContent = (row.top3 || []).join(' ');
-        tr.appendChild(tdT3);
-
-        // Diversity
-        const tdDiv = document.createElement('td');
-        tdDiv.style.textAlign = 'right';
-        tdDiv.textContent = row.diversity || '\u2014';
-        if (row.diversity && row.diversity < 5) tdDiv.style.color = '#E67E22';
-        tr.appendChild(tdDiv);
 
         // Unk %
         const tdUnk = document.createElement('td');
@@ -1696,7 +1731,8 @@ function _renderConviction(data) {
         const sumVal = parentRows.reduce((a, r) => a + (r.value || 0), 0);
         tdTVal.innerHTML = sumVal ? fmtDollars(sumVal) : '\u2014';
         totals.appendChild(tdTVal);
-        for (let i = 0; i < 9; i++) {
+        // Remaining 10 columns (Sec%, vsMKT, RankPort, Top3, #Sec, RankSec, RankInd, Score, Unk, ETF)
+        for (let i = 0; i < 10; i++) {
             totals.appendChild(document.createElement('td'));
         }
         tbody.appendChild(totals);

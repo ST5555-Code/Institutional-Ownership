@@ -790,6 +790,33 @@ button[data-tab-id].active {
 .legend-swatch.sw-mixed         { background: #E8D8B8; }
 .legend-swatch.sw-unknown       { background: var(--white); border: 1px solid var(--mid-grey); }
 
+/* === Sector pills (Top 3 Sectors on Conviction tab) === */
+.sector-pill {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 0 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    min-width: 28px;
+    text-align: center;
+}
+.sector-pill.sp-tec { background: #1f4e79; }  /* Technology — dark blue */
+.sector-pill.sp-fin { background: #4a148c; }  /* Financials — purple */
+.sector-pill.sp-hcr { background: #b71c1c; }  /* Health Care — red */
+.sector-pill.sp-cnd { background: #e65100; }  /* Consumer Discretionary — orange */
+.sector-pill.sp-cns { background: #5d4037; }  /* Consumer Staples — brown */
+.sector-pill.sp-ind { background: #455a64; }  /* Industrials — blue-gray */
+.sector-pill.sp-ene { background: #2e7d32; }  /* Energy — green */
+.sector-pill.sp-mat { background: #827717; }  /* Materials — olive */
+.sector-pill.sp-com { background: #006064; }  /* Communication — teal */
+.sector-pill.sp-utl { background: #f9a825; color: #000; }  /* Utilities — amber (black text) */
+.sector-pill.sp-rea { background: #880e4f; }  /* Real Estate — dark pink */
+.sector-pill.sp-unk { background: #9e9e9e; }  /* Unknown — gray */
+
 /* === Results === */
 .results-area {
     background: var(--white);
