@@ -1399,8 +1399,16 @@ def api_query(qnum):
         else:
             data = fn(ticker)
 
-        # query1 returns dict {rows, all_totals, type_totals}; others return list
-        is_empty = (isinstance(data, dict) and not data.get('rows')) or (isinstance(data, list) and not data)
+        # Empty check: list = empty if no rows; dict = only check 'rows' key
+        # if the dict has one (query1/query16 structure). Other dict shapes
+        # (like query6 with activist_13d/passive_5pct/history) are always
+        # considered non-empty at this layer.
+        if isinstance(data, list):
+            is_empty = not data
+        elif isinstance(data, dict) and 'rows' in data:
+            is_empty = not data.get('rows')
+        else:
+            is_empty = False
         if is_empty:
             return jsonify({'error': f'No data found for ticker {ticker}'}), 404
         return jsonify(data)
