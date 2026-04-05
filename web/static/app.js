@@ -991,13 +991,21 @@ function buildLegend() {
     const legend = document.createElement('div');
     legend.className = 'color-legend';
     const types = [
-        ['sw-all',          'All',           null],
-        ['sw-passive',      'Passive',       'passive'],
-        ['sw-active',       'Active',        'active'],
-        ['sw-quantitative', 'Quantitative',  'quantitative'],
-        ['sw-activist',     'Activist',      'activist'],
-        ['sw-mixed',        'Mixed',         'mixed'],
-        ['sw-unknown',      'Unknown',       'unknown'],
+        ['sw-all',             'All',           null],
+        ['sw-passive',         'Passive',       'passive'],
+        ['sw-active',          'Active',        'active'],
+        ['sw-quantitative',    'Quant',         'quantitative'],
+        ['sw-hedge',           'Hedge',         'hedge_fund'],
+        ['sw-activist',        'Activist',      'activist'],
+        ['sw-private-equity',  'PE',            'private_equity'],
+        ['sw-venture',         'VC',            'venture_capital'],
+        ['sw-strategic',       'Strategic',     'strategic'],
+        ['sw-wealth',          'Wealth Mgr',    'wealth_management'],
+        ['sw-pension',         'Pension',       'pension_insurance'],
+        ['sw-endowment',       'Endowment',     'endowment_foundation'],
+        ['sw-swf',             'SWF',           'swf'],
+        ['sw-mixed',           'Mixed',         'mixed'],
+        ['sw-unknown',         'Unknown',       'unknown'],
     ];
     const items = [];
     types.forEach(([cls, label, typeVal]) => {
@@ -1038,9 +1046,8 @@ function _applyTypeFilter() {
             tr.style.display = parentTr && parentTr.style.display === 'none' ? 'none' : '';
             return;
         }
-        // parent row
-        const show = !_legendTypeFilter || rtype === _legendTypeFilter
-            || (_legendTypeFilter === 'active' && rtype === 'hedge_fund');
+        // parent row — match exactly (hedge_fund now has its own legend entry)
+        const show = !_legendTypeFilter || rtype === _legendTypeFilter;
         tr.style.display = show ? '' : 'none';
         // hide children of hidden parents
         const pid = tr.dataset.parentId;

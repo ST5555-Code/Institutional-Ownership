@@ -750,13 +750,14 @@ button[data-tab-id].active {
 .color-legend {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
     border-bottom: 1px solid var(--mid-grey);
     background: var(--white);
     border-radius: 6px 6px 0 0;
+    flex-wrap: wrap;
 }
 
 .legend-item {
@@ -782,13 +783,21 @@ button[data-tab-id].active {
     border-radius: 2px;
 }
 
-.legend-swatch.sw-all           { background: var(--oxford-blue); }
-.legend-swatch.sw-passive       { background: #B0C4DE; }
-.legend-swatch.sw-active        { background: var(--tint-active); }
-.legend-swatch.sw-quantitative  { background: #C8B8E8; }
-.legend-swatch.sw-activist      { background: #E8B8B8; }
-.legend-swatch.sw-mixed         { background: #E8D8B8; }
-.legend-swatch.sw-unknown       { background: var(--white); border: 1px solid var(--mid-grey); }
+.legend-swatch.sw-all             { background: var(--oxford-blue); }
+.legend-swatch.sw-passive         { background: #B0C4DE; }
+.legend-swatch.sw-active          { background: var(--tint-active); }
+.legend-swatch.sw-quantitative    { background: #C8B8E8; }
+.legend-swatch.sw-hedge           { background: #F4A261; }
+.legend-swatch.sw-activist        { background: #E8B8B8; }
+.legend-swatch.sw-private-equity  { background: #8E7CC3; }
+.legend-swatch.sw-venture         { background: #B8E8C8; }
+.legend-swatch.sw-strategic       { background: #A8D8E8; }
+.legend-swatch.sw-wealth          { background: #E8D0A8; }
+.legend-swatch.sw-pension         { background: #C0D8E8; }
+.legend-swatch.sw-endowment       { background: #D8C8B8; }
+.legend-swatch.sw-swf             { background: #F4C8D8; }
+.legend-swatch.sw-mixed           { background: #E8D8B8; }
+.legend-swatch.sw-unknown         { background: var(--white); border: 1px solid var(--mid-grey); }
 
 /* === Sector pills (Top 3 Sectors on Conviction tab) === */
 .sector-pill {
