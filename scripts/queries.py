@@ -3114,6 +3114,12 @@ def short_interest_analysis(ticker):
         result = {}
 
         # 1. N-PORT short positions by quarter (trend)
+        # Get live price early for value recomputation across sections
+        price_row = con.execute(
+            "SELECT price_live FROM market_data WHERE ticker = ?", [ticker]
+        ).fetchone()
+        live_price = float(price_row[0]) if price_row and price_row[0] else None
+
         nport_trend = []
         try:
             # Dedupe by (fund_name, quarter) first to avoid double-counting series
@@ -3133,6 +3139,12 @@ def short_interest_analysis(ticker):
                 GROUP BY quarter ORDER BY quarter
             """, [ticker]).fetchdf()
             nport_trend = df_to_records(trend_df)
+            # Recompute value from shares × live_price for consistency across quarters
+            if live_price:
+                for r in nport_trend:
+                    shares = r.get('short_shares') or 0
+                    if shares > 0:
+                        r['short_value'] = shares * live_price
         except Exception:
             pass
         result['nport_trend'] = nport_trend
@@ -3162,9 +3174,19 @@ def short_interest_analysis(ticker):
             """, [ticker]).fetchdf()
             nport_detail = df_to_records(detail_df)
             for r in nport_detail:
+                shares = r.get('short_shares') or 0
+                val = r.get('short_value') or 0
+                # Data quality guard: if implied per-share price is off by >3x from live
+                # (or if value is zero/missing), recompute as shares × live_price.
+                # This fixes corrupted N-PORT filings where market_value_usd is mangled.
+                if live_price and shares > 0:
+                    implied = val / shares if val > 0 else 0
+                    if implied == 0 or implied > live_price * 3 or implied < live_price / 3:
+                        r['short_value'] = shares * live_price
+                        r['value_recomputed'] = True
                 aum = r.get('fund_aum_mm')
-                val = r.get('short_value')
-                r['pct_of_nav'] = round(val / (aum * 1e6) * 100, 3) if aum and aum > 0 and val else None
+                val2 = r.get('short_value')
+                r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
         except Exception:
             pass
         result['nport_detail'] = nport_detail
@@ -3255,6 +3277,11 @@ def short_interest_analysis(ticker):
                 lv = float(lrow['long_value'] or 0)
                 ss = shorts['short_shares']
                 sv = shorts['short_value']
+                # Recompute short value if implied price is way off from live
+                if live_price and ss > 0:
+                    implied = sv / ss if sv > 0 else 0
+                    if implied == 0 or implied > live_price * 3 or implied < live_price / 3:
+                        sv = ss * live_price
                 net_pct = round((ls - ss) / ls * 100, 1) if ls > 0 else 0
                 cross_ref.append({
                     'institution': parent,
@@ -3301,11 +3328,18 @@ def short_interest_analysis(ticker):
                         is_matched = True
                         break
                 if not is_matched:
+                    ss = float(r['short_shares'] or 0)
+                    sv = float(r['short_value'] or 0)
+                    # Recompute if implied price is way off
+                    if live_price and ss > 0:
+                        implied = sv / ss if sv > 0 else 0
+                        if implied == 0 or implied > live_price * 3 or implied < live_price / 3:
+                            sv = ss * live_price
                     short_only.append({
                         'fund_name': r['fund_name'],
                         'family_name': r['family_name'],
-                        'short_shares': float(r['short_shares'] or 0),
-                        'short_value': float(r['short_value'] or 0),
+                        'short_shares': ss,
+                        'short_value': sv,
                         'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,
                     })
         except Exception:

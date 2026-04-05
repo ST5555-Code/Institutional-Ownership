@@ -1400,9 +1400,9 @@ function _renderConviction(data) {
     table.className = 'data-table';
     table.style.tableLayout = 'fixed';
 
-    // Colgroup: #, Inst, Type, Value | Sector Analysis (5 cols) | Company Analysis (2 cols) | Score | Data Quality (2 cols)
+    // Colgroup: #, Inst, Type, Value | Sector Analysis (5 cols) | Company Analysis (2 cols) | Data Quality (2 cols)
     const colgroup = document.createElement('colgroup');
-    ['3%', null, '6%', '8%', '7%', '6%', '6%', '13%', '5%', '7%', '7%', '5%', '5%', '5%'].forEach(w => {
+    ['3%', null, '6%', '9%', '8%', '7%', '7%', '14%', '6%', '8%', '8%', '6%', '6%'].forEach(w => {
         const cg = document.createElement('col');
         if (w) cg.style.width = w;
         colgroup.appendChild(cg);
@@ -1425,10 +1425,9 @@ function _renderConviction(data) {
         ['Rank in\nPortfolio', 'right', 'sector_rank', 'Sector Analysis'],
         ['Top 3 Sectors', 'center', null, 'Sector Analysis'],
         ['# Sectors', 'right', 'diversity', 'Sector Analysis'],
-        // Company Analysis group — Score moved here as composite signal
+        // Company Analysis group
         ['Rank in\nSector', 'right', 'co_rank_in_sector', 'Company Analysis'],
         ['Rank in\nIndustry', 'right', 'industry_rank', 'Company Analysis'],
-        ['Conviction\nScore', 'right', 'conviction_score', 'Company Analysis'],
         // Data Quality group
         ['Unk %', 'right', 'unk_pct', 'Data Quality'],
         ['ETF %', 'right', 'etf_pct', 'Data Quality'],
@@ -1690,18 +1689,6 @@ function _renderConviction(data) {
         if (row.industry_rank === 1) { tdIR.style.color = '#27AE60'; tdIR.style.fontWeight = '700'; }
         tr.appendChild(tdIR);
 
-        // --- Score (standalone) ---
-        const tdScore = document.createElement('td');
-        tdScore.style.textAlign = 'right';
-        tdScore.style.fontWeight = '700';
-        const s = row.conviction_score || 0;
-        tdScore.textContent = s;
-        if (s >= 60) tdScore.style.color = '#27AE60';
-        else if (s >= 30) tdScore.style.color = '#F39C12';
-        else if (s > 0) tdScore.style.color = '#666';
-        else tdScore.style.color = '#ccc';
-        tr.appendChild(tdScore);
-
         // Unk %
         const tdUnk = document.createElement('td');
         tdUnk.style.textAlign = 'right';
@@ -1737,8 +1724,8 @@ function _renderConviction(data) {
         const sumVal = parentRows.reduce((a, r) => a + (r.value || 0), 0);
         tdTVal.innerHTML = sumVal ? fmtDollars(sumVal) : '\u2014';
         totals.appendChild(tdTVal);
-        // Remaining 10 columns (Sec%, vsMKT, RankPort, Top3, #Sec, RankSec, RankInd, Score, Unk, ETF)
-        for (let i = 0; i < 10; i++) {
+        // Remaining 9 columns (Sec%, vsMKT, RankPort, Top3, #Sec, RankSec, RankInd, Unk, ETF)
+        for (let i = 0; i < 9; i++) {
             totals.appendChild(document.createElement('td'));
         }
         tbody.appendChild(totals);
@@ -1766,15 +1753,14 @@ function _renderConviction(data) {
     // Legend footnote
     const fn = document.createElement('div');
     fn.style.cssText = 'font-size:11px;color:#888;padding:10px 0;line-height:1.5;';
-    fn.innerHTML = '<strong>Sorted by Conviction Score (highest first).</strong> '
-        + `<strong>${sectorColLabel}</strong> = holder's % allocation to ${subjSector}. `
+    fn.innerHTML = '<strong>Sorted by Value (highest first). Click any column header to re-sort.</strong> '
+        + `<strong>% in ${subjSector}</strong> = holder's portfolio % allocated to ${subjSector}. `
         + `<strong>vs MKT</strong> = overweight/underweight vs US market sector weight (${subjSector} = ${data.subject_spx_weight || '?'}%). Market weight derived from Vanguard Total Stock Market Index Fund, updated per quarter. `
-        + '<strong>Score</strong> = conviction composite (0-90). Rewards overweight vs market + being holder\'s top sector + company rank in sector/industry. '
-        + '<strong>Sec Rnk</strong> = where this sector ranks in their portfolio (1 = their top sector). '
-        + `<strong>Co Rnk</strong> = where ${currentTicker} ranks in their ${subjSector} bucket. `
-        + `<strong>Ind Rnk</strong> = where ${currentTicker} ranks in their ${subjIndustry || 'industry'} bucket. `
-        + '<strong>Top 3</strong> = GICS codes for their 3 largest sectors (TEC=Tech, FIN=Financials, HCR=HealthCare, CND=Cons Disc, CNS=Cons Staples, IND=Industrials, ENE=Energy, MAT=Materials, COM=Comm, UTL=Utilities, REA=Real Estate). '
-        + '<strong>Div</strong> = distinct sector count. '
+        + `<strong>Rank in Portfolio</strong> = where ${subjSector} ranks among this holder's sectors (1 = their top sector). `
+        + `<strong>Rank in Sector</strong> = where ${currentTicker} ranks among this holder's ${subjSector} positions. `
+        + `<strong>Rank in Industry</strong> = where ${currentTicker} ranks within their ${subjIndustry || 'industry'} bucket. `
+        + '<strong>Top 3 Sectors</strong> = holder\'s 3 largest sector allocations as colored pills. '
+        + '<strong># Sectors</strong> = count of distinct sectors held. '
         + '<strong>Unk %</strong> = % of portfolio with no sector classification. '
         + '<strong>ETF %</strong> = % of portfolio held as ETFs (excluded from sector math — ETFs are multi-sector instruments).';
     tableWrap.appendChild(fn);
