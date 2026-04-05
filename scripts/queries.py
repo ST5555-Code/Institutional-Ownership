@@ -3116,13 +3116,20 @@ def short_interest_analysis(ticker):
         # 1. N-PORT short positions by quarter (trend)
         nport_trend = []
         try:
+            # Dedupe by (fund_name, quarter) first to avoid double-counting series
             trend_df = con.execute("""
                 SELECT quarter,
-                       COUNT(DISTINCT fund_name) as fund_count,
-                       SUM(ABS(shares_or_principal)) as short_shares,
-                       SUM(ABS(market_value_usd)) as short_value
-                FROM fund_holdings
-                WHERE ticker = ? AND shares_or_principal < 0
+                       COUNT(*) as fund_count,
+                       SUM(short_shares) as short_shares,
+                       SUM(short_value) as short_value
+                FROM (
+                    SELECT quarter, fund_name,
+                           SUM(ABS(shares_or_principal)) as short_shares,
+                           SUM(ABS(market_value_usd)) as short_value
+                    FROM fund_holdings
+                    WHERE ticker = ? AND shares_or_principal < 0
+                    GROUP BY quarter, fund_name
+                )
                 GROUP BY quarter ORDER BY quarter
             """, [ticker]).fetchdf()
             nport_trend = df_to_records(trend_df)
@@ -3130,23 +3137,30 @@ def short_interest_analysis(ticker):
             pass
         result['nport_trend'] = nport_trend
 
-        # 2. N-PORT short positions detail (latest quarter)
+        # 2. N-PORT short positions detail (latest quarter) — dedupe by fund_name
         nport_detail = []
         try:
             detail_df = con.execute(f"""
-                SELECT fh.fund_name, fh.family_name,
-                       ABS(fh.shares_or_principal) as short_shares,
-                       ABS(fh.market_value_usd) as short_value,
-                       fh.quarter,
-                       fu.total_net_assets / 1e6 as fund_aum_mm
-                FROM fund_holdings fh
-                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.shares_or_principal < 0
-                  AND fh.quarter = '{LQ}'
-                ORDER BY ABS(fh.shares_or_principal) DESC
+                SELECT fund_name,
+                       MAX(family_name) as family_name,
+                       SUM(ABS(shares_or_principal)) as short_shares,
+                       SUM(ABS(market_value_usd)) as short_value,
+                       MAX(quarter) as quarter,
+                       MAX(fund_aum_mm) as fund_aum_mm
+                FROM (
+                    SELECT fh.fund_name, fh.family_name,
+                           fh.shares_or_principal, fh.market_value_usd,
+                           fh.quarter, fh.series_id,
+                           fu.total_net_assets / 1e6 as fund_aum_mm
+                    FROM fund_holdings fh
+                    LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                    WHERE fh.ticker = ? AND fh.shares_or_principal < 0
+                      AND fh.quarter = '{LQ}'
+                )
+                GROUP BY fund_name
+                ORDER BY short_shares DESC
             """, [ticker]).fetchdf()
             nport_detail = df_to_records(detail_df)
-            # Add pct of NAV
             for r in nport_detail:
                 aum = r.get('fund_aum_mm')
                 val = r.get('short_value')
@@ -3155,13 +3169,14 @@ def short_interest_analysis(ticker):
             pass
         result['nport_detail'] = nport_detail
 
-        # 3. N-PORT short positions history per fund (for cross-quarter comparison)
+        # 3. N-PORT short positions history per fund — dedupe by (fund_name, quarter)
         nport_by_fund = []
         try:
             fund_hist = con.execute("""
-                SELECT fund_name, quarter, ABS(shares_or_principal) as short_shares
+                SELECT fund_name, quarter, SUM(ABS(shares_or_principal)) as short_shares
                 FROM fund_holdings
                 WHERE ticker = ? AND shares_or_principal < 0
+                GROUP BY fund_name, quarter
                 ORDER BY fund_name, quarter
             """, [ticker]).fetchdf()
             # Pivot: fund → {quarter: shares}
@@ -3203,16 +3218,24 @@ def short_interest_analysis(ticker):
             """, [ticker]).fetchdf()
             long_map = {r['parent']: r for _, r in long_df.iterrows()}
 
-            # Short from N-PORT — match family to parent
+            # Short from N-PORT — aggregate per family (dedupe series)
             short_df = con.execute(f"""
                 SELECT family_name,
-                       SUM(ABS(shares_or_principal)) as short_shares,
-                       SUM(ABS(market_value_usd)) as short_value
-                FROM fund_holdings
-                WHERE ticker = ? AND shares_or_principal < 0 AND quarter = '{LQ}'
+                       SUM(short_shares) as short_shares,
+                       SUM(short_value) as short_value
+                FROM (
+                    SELECT family_name, fund_name,
+                           SUM(ABS(shares_or_principal)) as short_shares,
+                           SUM(ABS(market_value_usd)) as short_value
+                    FROM fund_holdings
+                    WHERE ticker = ? AND shares_or_principal < 0 AND quarter = '{LQ}'
+                    GROUP BY family_name, fund_name
+                )
                 GROUP BY family_name
             """, [ticker]).fetchdf()
 
+            # Accumulate shorts per parent (dedupe by institution name)
+            parent_shorts = {}  # parent -> {short_shares, short_value}
             for _, s in short_df.iterrows():
                 fam = s['family_name'] or ''
                 # Try to match to a long parent
@@ -3220,51 +3243,50 @@ def short_interest_analysis(ticker):
                     parent_lower = parent.lower()
                     fam_words = fam.lower().split()[:2]
                     if any(w in parent_lower for w in fam_words if len(w) > 3):
-                        ls = float(lrow['long_shares'] or 0)
-                        lv = float(lrow['long_value'] or 0)
-                        ss = float(s['short_shares'] or 0)
-                        sv = float(s['short_value'] or 0)
-                        net_pct = round((ls - ss) / ls * 100, 1) if ls > 0 else 0
-                        cross_ref.append({
-                            'institution': parent,
-                            'long_shares': ls, 'long_value': lv,
-                            'short_shares': ss, 'short_value': sv,
-                            'net_exposure_pct': net_pct,
-                        })
+                        if parent not in parent_shorts:
+                            parent_shorts[parent] = {'short_shares': 0, 'short_value': 0}
+                        parent_shorts[parent]['short_shares'] += float(s['short_shares'] or 0)
+                        parent_shorts[parent]['short_value'] += float(s['short_value'] or 0)
                         break
+
+            for parent, shorts in parent_shorts.items():
+                lrow = long_map[parent]
+                ls = float(lrow['long_shares'] or 0)
+                lv = float(lrow['long_value'] or 0)
+                ss = shorts['short_shares']
+                sv = shorts['short_value']
+                net_pct = round((ls - ss) / ls * 100, 1) if ls > 0 else 0
+                cross_ref.append({
+                    'institution': parent,
+                    'long_shares': ls, 'long_value': lv,
+                    'short_shares': ss, 'short_value': sv,
+                    'net_exposure_pct': net_pct,
+                })
             cross_ref.sort(key=lambda x: x['short_shares'], reverse=True)
         except Exception:
             pass
         result['cross_ref'] = cross_ref
 
-        # 6. Long positions aggregated by manager type (from Smart Money)
-        long_by_type = []
-        try:
-            lbt = con.execute(f"""
-                SELECT COALESCE(manager_type, 'unknown') as manager_type,
-                       COUNT(DISTINCT cik) as holders,
-                       SUM(shares) as long_shares,
-                       SUM(market_value_live) as long_value
-                FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
-                GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
-            """, [ticker]).fetchdf()
-            long_by_type = df_to_records(lbt)
-        except Exception:
-            pass
-        result['long_by_type'] = long_by_type
-
         # 7. Short-only funds (N-PORT shorts without matching 13F long parent)
         short_only = []
         try:
             sof_df = con.execute(f"""
-                SELECT fh.fund_name, fh.family_name,
-                       ABS(fh.shares_or_principal) as short_shares,
-                       ABS(fh.market_value_usd) as short_value,
-                       MAX(fu.total_net_assets) / 1e6 as fund_aum_mm
-                FROM fund_holdings fh
-                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{LQ}'
-                GROUP BY fh.fund_name, fh.family_name, fh.series_id
+                SELECT fund_name,
+                       MAX(family_name) as family_name,
+                       SUM(short_shares) as short_shares,
+                       SUM(short_value) as short_value,
+                       MAX(fund_aum_mm) as fund_aum_mm
+                FROM (
+                    SELECT fh.fund_name, fh.family_name, fh.series_id,
+                           SUM(ABS(fh.shares_or_principal)) as short_shares,
+                           SUM(ABS(fh.market_value_usd)) as short_value,
+                           MAX(fu.total_net_assets) / 1e6 as fund_aum_mm
+                    FROM fund_holdings fh
+                    LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                    WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{LQ}'
+                    GROUP BY fh.fund_name, fh.family_name, fh.series_id
+                )
+                GROUP BY fund_name
                 ORDER BY short_value DESC
             """, [ticker]).fetchdf()
             # Exclude funds whose family matched a long parent in cross_ref

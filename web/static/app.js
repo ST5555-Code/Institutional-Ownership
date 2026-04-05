@@ -1944,19 +1944,6 @@ function _renderShortAnalysis(data) {
         tableWrap.appendChild(table);
     }
 
-    // --- Section 4c: Long Positions by Manager Type (merged from Smart Money) ---
-    const longByType = data.long_by_type || [];
-    if (longByType.length > 0) {
-        tableWrap.appendChild(sectionHeader('Long Positions by Manager Type'));
-        const table = _flowTable(longByType, [
-            {key: 'manager_type', label: 'Type', type: 'text'},
-            {key: 'holders', label: 'Holders', type: 'num'},
-            {key: 'long_shares', label: 'Long Shares', type: 'shares'},
-            {key: 'long_value', label: 'Long Value', type: 'dollar'},
-        ]);
-        tableWrap.appendChild(table);
-    }
-
     // --- Section 5: N-PORT Short History by Fund ---
     const nportByFund = data.nport_by_fund || [];
     if (nportByFund.length > 0 && qs.length > 0) {
