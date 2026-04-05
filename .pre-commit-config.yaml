@@ -3,14 +3,14 @@ repos:
     rev: v0.15.9
     hooks:
       - id: ruff
-        args: [--select=E,F,W, --ignore=E501,E402,E701,E731, --target-version=py39]
+        args: ['--select=E,F,W', '--ignore=E501,E402,E701,E731', '--target-version=py39']
         files: ^scripts/
 
   - repo: https://github.com/pylint-dev/pylint
     rev: v3.3.6
     hooks:
       - id: pylint
-        args: [--disable=C,R,W0611,W0612,W0613,W0621,W0622,W0702,W0718, --max-line-length=120]
+        args: ['--disable=C,R,W0611,W0612,W0613,W0621,W0622,W0702,W0718', '--max-line-length=120']
         files: ^scripts/
         additional_dependencies: [duckdb, requests, rapidfuzz, flask, openpyxl, pandas, lxml]
 
