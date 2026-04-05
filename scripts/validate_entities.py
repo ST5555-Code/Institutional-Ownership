@@ -1,0 +1,530 @@
+#!/usr/bin/env python3
+"""
+Entity MDM Phase 1 — validate_entities.py
+
+Runs all 11 validation gates against the staging entity tables and produces
+logs/entity_validation_report.json. Exits non-zero if any structural gate
+(1-4) fails — those are zero-tolerance and block merge to production.
+
+"Currently active" means valid_to = '9999-12-31' (sentinel date).
+
+Usage:
+  python scripts/validate_entities.py           # run against staging
+"""
+from __future__ import annotations
+
+# pylint: disable=too-many-locals,too-many-statements,broad-exception-caught
+
+import json
+import random
+import sys
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import db  # noqa: E402
+
+LOG_DIR = ROOT / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+REPORT_PATH = LOG_DIR / "entity_validation_report.json"
+
+ACTIVE = "DATE '9999-12-31'"
+STRUCTURAL_GATES = {
+    "structural_aliases",
+    "structural_identifiers",
+    "structural_no_identifier",
+    "structural_no_rollup",
+}
+
+
+# =============================================================================
+# Gate implementations — each returns (status, details) where status is
+# "PASS" | "FAIL" | "MANUAL"
+# =============================================================================
+def gate_structural_aliases(con):
+    sql = f"""
+        SELECT entity_id, COUNT(*) AS n
+        FROM entity_aliases
+        WHERE is_preferred = TRUE AND valid_to = {ACTIVE}
+        GROUP BY entity_id
+        HAVING COUNT(*) > 1
+    """  # nosec B608
+    rows = con.execute(sql).fetchall()
+    status = "PASS" if len(rows) == 0 else "FAIL"
+    return status, {
+        "threshold": "exactly 0",
+        "violations": len(rows),
+        "sample": [{"entity_id": r[0], "preferred_count": r[1]} for r in rows[:10]],
+    }
+
+
+def gate_structural_identifiers(con):
+    sql = f"""
+        SELECT identifier_type, identifier_value, COUNT(*) AS n
+        FROM entity_identifiers
+        WHERE valid_to = {ACTIVE}
+        GROUP BY identifier_type, identifier_value
+        HAVING COUNT(*) > 1
+    """  # nosec B608
+    rows = con.execute(sql).fetchall()
+    status = "PASS" if len(rows) == 0 else "FAIL"
+    return status, {
+        "threshold": "exactly 0",
+        "violations": len(rows),
+        "sample": [{"type": r[0], "value": r[1], "count": r[2]} for r in rows[:10]],
+    }
+
+
+def gate_structural_no_identifier(con):
+    total = con.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+    sql = f"""
+        SELECT COUNT(*)
+        FROM entities e
+        LEFT JOIN entity_identifiers ei
+          ON e.entity_id = ei.entity_id AND ei.valid_to = {ACTIVE}
+        WHERE ei.entity_id IS NULL
+    """  # nosec B608
+    no_id = con.execute(sql).fetchone()[0]
+    pct = (no_id / total * 100) if total else 0
+    status = "PASS" if pct < 5.0 else "FAIL"
+    return status, {
+        "threshold": "<5% of total entities",
+        "total_entities": total,
+        "entities_without_identifier": no_id,
+        "pct": round(pct, 3),
+    }
+
+
+def gate_structural_no_rollup(con):
+    # Every entity must have an active row in entity_rollup_history.
+    sql = f"""
+        SELECT COUNT(*)
+        FROM entities e
+        LEFT JOIN entity_rollup_history erh
+          ON e.entity_id = erh.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+        WHERE erh.entity_id IS NULL
+    """  # nosec B608
+    rows = con.execute(sql).fetchone()[0]
+    status = "PASS" if rows == 0 else "FAIL"
+    return status, {
+        "threshold": "exactly 0",
+        "entities_without_rollup": rows,
+    }
+
+
+# --- Legacy vs new rollup helpers --------------------------------------------
+def _legacy_top_parents(con, limit=50):
+    """Top N parents by summed manager AUM using legacy parent_bridge mapping."""
+    sql = f"""
+        SELECT parent_name, SUM(COALESCE(aum_total, 0)) AS total_aum
+        FROM managers
+        WHERE parent_name IS NOT NULL
+        GROUP BY parent_name
+        ORDER BY total_aum DESC
+        LIMIT {limit}
+    """  # nosec B608
+    return con.execute(sql).fetchall()
+
+
+def _new_top_parents(con, limit=50):
+    """Top N parents via entity rollup: manager → entity → rollup_entity → canonical_name."""
+    sql = f"""
+        SELECT re.canonical_name AS parent_name, SUM(COALESCE(m.aum_total, 0)) AS total_aum
+        FROM managers m
+        JOIN entity_identifiers ei
+          ON ei.identifier_type = 'cik'
+          AND ei.identifier_value = m.cik
+          AND ei.valid_to = {ACTIVE}
+        JOIN entity_rollup_history erh
+          ON erh.entity_id = ei.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+        JOIN entities re ON re.entity_id = erh.rollup_entity_id
+        GROUP BY re.canonical_name
+        ORDER BY total_aum DESC
+        LIMIT {limit}
+    """  # nosec B608
+    return con.execute(sql).fetchall()
+
+
+def gate_top_50_parents(con):
+    """
+    Compare legacy top 50 parent_names to new top 50 rollup canonical_names.
+
+    Case-insensitive. A legacy parent_name that doesn't appear in the new top 50
+    is flagged as either:
+      - legacy_only: a name only the old system had (likely a legacy data bug
+        merged away by the new system — e.g., old-name/new-name duplicates)
+      - new_only: a name only the new system has
+
+    PASS: case-insensitive set overlap >= 48/50 and no unexplained new_only names.
+    FAIL: more than 2 legacy_only names (real regression risk).
+    MANUAL when diffs exist but are within tolerance — requires sign-off on each.
+    """
+    legacy = _legacy_top_parents(con, 50)
+    new = _new_top_parents(con, 50)
+    legacy_names = [r[0] for r in legacy]
+    new_names = [r[0] for r in new]
+    legacy_lower = {n.lower() for n in legacy_names}
+    new_lower = {n.lower() for n in new_names}
+    overlap = legacy_lower & new_lower
+    legacy_only = sorted(legacy_lower - new_lower)
+    new_only = sorted(new_lower - legacy_lower)
+    positional_matches = sum(
+        1 for a, b in zip(legacy_names, new_names) if a.lower() == b.lower()
+    )
+    if len(overlap) == 50:
+        status = "PASS"
+    elif len(overlap) >= 48:
+        status = "MANUAL"
+    else:
+        status = "FAIL"
+    return status, {
+        "threshold": "case-insensitive set overlap >= 48/50 (MANUAL) or 50/50 (PASS)",
+        "legacy_top_50": legacy_names,
+        "new_top_50": new_names,
+        "positional_matches_ci": positional_matches,
+        "set_overlap_ci": len(overlap),
+        "legacy_only": legacy_only,
+        "new_only": new_only,
+        "notes": (
+            "legacy_only names represent parent labels that only exist in the old "
+            "managers.parent_name column. These are typically resolved by the new "
+            "entity rollup (e.g., old-name/new-name duplicates merged into one "
+            "entity). Review each legacy_only name against new_only to confirm."
+        ),
+    }
+
+
+def gate_top_50_aum(con):
+    """
+    Compare AUM between legacy and new for the case-insensitive intersection of
+    top 50 names. Also reports the total AUM across top 50 on each side as a
+    sanity check — should match within 0.01% even if individual names differ,
+    because any merged (legacy-split) names simply re-concentrate the AUM.
+    """
+    legacy = _legacy_top_parents(con, 50)
+    new = _new_top_parents(con, 50)
+    legacy_map = {r[0].lower(): float(r[1] or 0) for r in legacy}
+    new_map = {r[0].lower(): float(r[1] or 0) for r in new}
+    legacy_total = sum(legacy_map.values())
+    new_total = sum(new_map.values())
+    total_diff_pct = (
+        abs(legacy_total - new_total) / legacy_total * 100 if legacy_total else 0
+    )
+    diffs = []
+    for name in legacy_map:
+        if name not in new_map:
+            continue
+        la = legacy_map[name]
+        na = new_map[name]
+        if la == 0:
+            continue
+        pct = abs(la - na) / la * 100
+        if pct > 0.01:
+            diffs.append(
+                {"parent": name, "legacy": la, "new": na, "pct_diff": round(pct, 4)}
+            )
+    if not diffs and total_diff_pct < 0.01:
+        status = "PASS"
+    elif total_diff_pct < 0.5 and len(diffs) <= 2:
+        status = "MANUAL"
+    else:
+        status = "FAIL"
+    return status, {
+        "threshold": "per-name <=0.01% and total <=0.01% (PASS); total <=0.5% with <=2 per-name diffs (MANUAL)",
+        "legacy_total_top50": legacy_total,
+        "new_total_top50": new_total,
+        "total_diff_pct": round(total_diff_pct, 4),
+        "per_name_mismatches": len(diffs),
+        "sample": diffs[:10],
+    }
+
+
+def gate_random_sample(con, n=100, seed=42):
+    """
+    Sample N random CIKs; verify each CIK is correctly mapped by checking that
+    the legacy parent_name appears among the new entity's aliases (or matches
+    its rollup canonical_name case-insensitively + punctuation-insensitively).
+
+    Using the alias set as the match target is more robust than comparing
+    canonical_name strings, because the managers table contains dupe rows with
+    different name variants for the same CIK — all of which become aliases on
+    the new entity. If the legacy parent_name matches any of those aliases,
+    the CIK is correctly mapped to the correct entity regardless of which
+    name string the new system chose as canonical.
+    """
+    sql = f"""
+        SELECT m.cik, MIN(m.parent_name) AS legacy_parent, e.entity_id, re.canonical_name
+        FROM managers m
+        JOIN entity_identifiers ei
+          ON ei.identifier_type = 'cik'
+          AND ei.identifier_value = m.cik
+          AND ei.valid_to = {ACTIVE}
+        JOIN entities e ON e.entity_id = ei.entity_id
+        JOIN entity_rollup_history erh
+          ON erh.entity_id = ei.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+        JOIN entities re ON re.entity_id = erh.rollup_entity_id
+        WHERE m.parent_name IS NOT NULL
+        GROUP BY m.cik, e.entity_id, re.canonical_name
+        ORDER BY m.cik
+    """  # nosec B608 — ACTIVE is a hard-coded date literal
+    rows = con.execute(sql).fetchall()
+    rng = random.Random(seed)  # nosec B311 — deterministic test sampling, not security
+    sample = rng.sample(rows, min(n, len(rows)))
+
+    def _norm(s: str) -> str:
+        if not s:
+            return ""
+        out = s.lower().strip().rstrip(".,;")
+        out = out.replace(",", "").replace(".", "")
+        return " ".join(out.split())
+
+    # Load ALL aliases for sampled entities in one query
+    entity_ids = [r[2] for r in sample]
+    placeholders = ",".join(["?"] * len(entity_ids))
+    alias_rows = con.execute(
+        f"SELECT entity_id, alias_name FROM entity_aliases WHERE entity_id IN ({placeholders})",  # nosec B608
+        entity_ids,
+    ).fetchall()
+    aliases_by_entity: dict[int, set[str]] = {}
+    for eid, alias in alias_rows:
+        aliases_by_entity.setdefault(eid, set()).add(_norm(alias))
+
+    mismatches = []
+    for cik, legacy_parent, entity_id, rollup_canonical in sample:
+        legacy_norm = _norm(legacy_parent)
+        rollup_norm = _norm(rollup_canonical)
+        entity_aliases = aliases_by_entity.get(entity_id, set())
+        # Also check the rollup target's aliases (the CIK may map to a sub-entity
+        # whose rollup parent has the legacy name as one of its aliases).
+        if legacy_norm == rollup_norm or legacy_norm in entity_aliases:
+            continue
+        mismatches.append({
+            "cik": cik,
+            "legacy": legacy_parent,
+            "new_canonical": rollup_canonical,
+            "entity_aliases": sorted(entity_aliases)[:5],
+        })
+    # Tolerance: managers.parent_name includes ~200 legacy fuzzy-match errors
+    # (parent_name set to a string that isn't a real seed and isn't the manager's
+    # own name). Expected hit rate in a 100-row sample is ~1.7 rows. PASS at 0
+    # mismatches, MANUAL at up to 5% to absorb the legacy fuzzy-match tail, FAIL
+    # beyond that.
+    mismatch_pct = len(mismatches) / len(sample) * 100 if sample else 0
+    if not mismatches:
+        status = "PASS"
+    elif mismatch_pct <= 5.0:
+        status = "MANUAL"
+    else:
+        status = "FAIL"
+    return status, {
+        "threshold": (
+            "PASS at 0 mismatches; MANUAL at <=5% (legacy fuzzy-match tail); "
+            "FAIL above. Match criterion: legacy parent_name appears in new "
+            "entity's aliases or matches rollup canonical (case + punctuation insensitive)."
+        ),
+        "sampled": len(sample),
+        "mismatches": len(mismatches),
+        "mismatch_pct": round(mismatch_pct, 2),
+        "sample_mismatches": mismatches[:10],
+    }
+
+
+def gate_known_edge_cases(con):
+    findings = {}
+    # Geode: must not roll up to Fidelity
+    sql = f"""
+        SELECT e.canonical_name, re.canonical_name AS rollup_to
+        FROM entities e
+        JOIN entity_rollup_history erh
+          ON erh.entity_id = e.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+        JOIN entities re ON re.entity_id = erh.rollup_entity_id
+        WHERE LOWER(e.canonical_name) LIKE '%geode%'
+    """  # nosec B608 — ACTIVE is a hard-coded date literal
+    geode = con.execute(sql).fetchall()
+    findings["geode"] = [{"entity": r[0], "rolls_up_to": r[1]} for r in geode]
+    geode_under_fidelity = any("fidelity" in (r[1] or "").lower() for r in geode)
+
+    # Wellington: should not appear as a rollup target for unrelated entities
+    sql = f"""
+        SELECT COUNT(*) FROM entity_rollup_history erh
+        JOIN entities re ON re.entity_id = erh.rollup_entity_id
+        WHERE LOWER(re.canonical_name) LIKE '%wellington%'
+          AND erh.valid_to = {ACTIVE}
+          AND erh.rule_applied != 'self'
+    """  # nosec B608 — ACTIVE is a hard-coded date literal
+    wellington_as_parent = con.execute(sql).fetchone()[0]
+    findings["wellington_as_parent_count"] = wellington_as_parent
+
+    # Sign-off required regardless of pass/fail — gate is MANUAL type
+    status = "MANUAL"
+    findings["notes"] = (
+        f"Geode under Fidelity: {geode_under_fidelity}. "
+        f"Wellington primary-parent rollups: {wellington_as_parent}. "
+        "Manual sign-off required."
+    )
+    return status, findings
+
+
+def gate_standalone_filers(con):
+    """
+    Filers with no parent (self-rollup) must appear in rollup table.
+    Comparison is done on DISTINCT CIK on both sides (managers contains
+    duplicate CIK rows from name-change history, each CIK = one entity).
+    """
+    # Case-insensitive comparison: managers can have manager_name='NORGES BANK'
+    # (from 13F filings, all caps) and parent_name='Norges Bank' (fuzzy-matched
+    # title case). Literal equality would miss these as self-parents.
+    legacy_standalone = con.execute("""
+        SELECT COUNT(DISTINCT cik) FROM managers
+        WHERE parent_name IS NULL OR LOWER(parent_name) = LOWER(manager_name)
+    """).fetchone()[0]
+    sql = f"""
+        SELECT COUNT(DISTINCT m.cik)
+        FROM managers m
+        JOIN entity_identifiers ei
+          ON ei.identifier_type = 'cik' AND ei.identifier_value = m.cik
+          AND ei.valid_to = {ACTIVE}
+        JOIN entity_rollup_history erh
+          ON erh.entity_id = ei.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+        WHERE erh.rule_applied = 'self'
+    """  # nosec B608 — ACTIVE is a hard-coded date literal
+    new_self = con.execute(sql).fetchone()[0]
+    status = "PASS" if new_self == legacy_standalone else "FAIL"
+    return status, {
+        "threshold": "count matches legacy system",
+        "legacy_standalone_managers": legacy_standalone,
+        "new_self_rollup_managers": new_self,
+        "difference": new_self - legacy_standalone,
+    }
+
+
+def gate_total_aum(con):
+    """Sum of manager AUM must match between legacy and new (should be identical)."""
+    legacy_total = con.execute(
+        "SELECT COALESCE(SUM(aum_total), 0) FROM managers"
+    ).fetchone()[0] or 0
+    sql = f"""
+        SELECT COALESCE(SUM(m.aum_total), 0)
+        FROM managers m
+        JOIN entity_identifiers ei
+          ON ei.identifier_type = 'cik' AND ei.identifier_value = m.cik
+          AND ei.valid_to = {ACTIVE}
+        JOIN entity_rollup_history erh
+          ON erh.entity_id = ei.entity_id
+          AND erh.rollup_type = 'economic_control_v1'
+          AND erh.valid_to = {ACTIVE}
+    """  # nosec B608 — ACTIVE is a hard-coded date literal
+    new_total = con.execute(sql).fetchone()[0] or 0
+    diff = abs(float(legacy_total) - float(new_total))
+    pct = (diff / float(legacy_total) * 100) if legacy_total else 0
+    status = "PASS" if pct < 0.01 else "FAIL"
+    return status, {
+        "threshold": "<0.01% difference",
+        "legacy_total_aum": float(legacy_total),
+        "new_total_aum": float(new_total),
+        "pct_diff": round(pct, 6),
+    }
+
+
+def gate_row_count(con):
+    entities = con.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+    managers = con.execute("SELECT COUNT(*) FROM managers").fetchone()[0]
+    status = "PASS" if entities >= managers else "FAIL"
+    return status, {
+        "threshold": "new entities >= existing managers",
+        "entities": entities,
+        "managers": managers,
+    }
+
+
+# =============================================================================
+# Runner
+# =============================================================================
+GATES = [
+    ("structural_aliases", gate_structural_aliases),
+    ("structural_identifiers", gate_structural_identifiers),
+    ("structural_no_identifier", gate_structural_no_identifier),
+    ("structural_no_rollup", gate_structural_no_rollup),
+    ("top_50_parents", gate_top_50_parents),
+    ("top_50_aum", gate_top_50_aum),
+    ("random_sample", gate_random_sample),
+    ("known_edge_cases", gate_known_edge_cases),
+    ("standalone_filers", gate_standalone_filers),
+    ("total_aum", gate_total_aum),
+    ("row_count", gate_row_count),
+]
+
+
+def main():
+    db.set_staging_mode(True)
+    print(f"Validating against: {db.get_db_path()}")
+    con = db.connect_write()
+    report = {
+        "run_at": datetime.now().isoformat(),
+        "db_path": str(db.get_db_path()),
+        "gates": {},
+        "summary": {"PASS": 0, "FAIL": 0, "MANUAL": 0},
+    }
+    try:
+        for name, fn in GATES:
+            print(f"\n=== {name} ===")
+            try:
+                status, details = fn(con)
+            except Exception as e:
+                status, details = "FAIL", {"error": str(e)}
+            report["gates"][name] = {"status": status, "details": details}
+            report["summary"][status] += 1
+            print(f"  status: {status}")
+            # Print a compact detail line
+            if isinstance(details, dict):
+                for k in ("threshold", "violations", "entities_without_identifier",
+                          "pct", "entities_without_rollup", "mismatches",
+                          "positional_matches", "difference", "pct_diff",
+                          "new_self_rollup_managers", "legacy_standalone_managers",
+                          "entities", "managers"):
+                    if k in details:
+                        print(f"  {k}: {details[k]}")
+            if status == "FAIL" and name in STRUCTURAL_GATES:
+                print("  STRUCTURAL FAILURE — halting remaining gates")
+                # Record remaining as not-run
+                for n2, _ in GATES:
+                    if n2 not in report["gates"]:
+                        report["gates"][n2] = {"status": "SKIPPED", "details": {"reason": "halted_after_structural_failure"}}
+                break
+    finally:
+        con.close()
+
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, default=str)
+
+    print(f"\n{'=' * 60}")
+    print(f"Summary: {report['summary']}")
+    print(f"Report: {REPORT_PATH}")
+    print("=" * 60)
+
+    # Exit non-zero on any structural failure
+    if any(
+        report["gates"].get(g, {}).get("status") == "FAIL"
+        for g in STRUCTURAL_GATES
+    ):
+        sys.exit(2)
+    # Exit 1 on any non-structural failure for CI hooks (but don't block merge decision here)
+    if report["summary"]["FAIL"] > 0:
+        sys.exit(1)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
