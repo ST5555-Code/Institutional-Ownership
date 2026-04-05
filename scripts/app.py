@@ -921,10 +921,12 @@ def api_fund_behavioral_profile():
 @app.route('/api/ownership_trend_summary')
 def api_ownership_trend_summary():
     ticker = request.args.get('ticker', '').upper().strip()
+    level = request.args.get('level', 'parent').strip()
+    ao = request.args.get('active_only', '').strip() == 'true'
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = ownership_trend_summary(ticker)
+        result = ownership_trend_summary(ticker, level=level, active_only=ao)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -948,10 +950,12 @@ def api_cohort_analysis():
 @app.route('/api/holder_momentum')
 def api_holder_momentum():
     ticker = request.args.get('ticker', '').upper().strip()
+    level = request.args.get('level', 'parent').strip()
+    ao = request.args.get('active_only', '').strip() == 'true'
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = holder_momentum(ticker)
+        result = holder_momentum(ticker, level=level, active_only=ao)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500

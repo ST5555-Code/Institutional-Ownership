@@ -1902,6 +1902,7 @@ function _renderShortAnalysis(data) {
         const table = _flowTable(nportDetail, [
             {key: 'fund_name', label: 'Fund', type: 'text'},
             {key: 'family_name', label: 'Family', type: 'text'},
+            {key: 'type', label: 'Type', type: 'text'},
             {key: 'short_shares', label: 'Short Shares', type: 'shares'},
             {key: 'short_value', label: 'Short Value', type: 'dollar'},
             {key: 'pct_of_nav', label: '% of NAV', type: 'pct'},
@@ -1915,6 +1916,7 @@ function _renderShortAnalysis(data) {
         tableWrap.appendChild(sectionHeader('Institutions Both Long & Short'));
         const table = _flowTable(crossRef, [
             {key: 'institution', label: 'Institution', type: 'text'},
+            {key: 'type', label: 'Type', type: 'text'},
             {key: 'long_shares', label: 'Long Shares', type: 'shares'},
             {key: 'long_value', label: 'Long Value', type: 'dollar'},
             {key: 'short_shares', label: 'Short Shares', type: 'shares'},
@@ -1931,6 +1933,7 @@ function _renderShortAnalysis(data) {
         const table = _flowTable(shortOnly, [
             {key: 'fund_name', label: 'Fund', type: 'text'},
             {key: 'family_name', label: 'Family', type: 'text'},
+            {key: 'type', label: 'Type', type: 'text'},
             {key: 'short_shares', label: 'Short Shares', type: 'shares'},
             {key: 'short_value', label: 'Short Value', type: 'dollar'},
             {key: 'fund_aum_mm', label: 'Fund AUM ($M)', type: 'num'},
@@ -1945,7 +1948,9 @@ function _renderShortAnalysis(data) {
         const table = document.createElement('table');
         table.className = 'data-table'; table.style.tableLayout = 'fixed';
         const colgroup = document.createElement('colgroup');
-        [null].concat(qs.map(() => Math.floor(60 / qs.length) + '%')).forEach(w => {
+        // Fund (flex), Type, then quarter columns
+        const qWidth = Math.floor(55 / qs.length) + '%';
+        [null, '8%'].concat(qs.map(() => qWidth)).forEach(w => {
             const cg = document.createElement('col');
             if (w) cg.style.width = w;
             colgroup.appendChild(cg);
@@ -1954,6 +1959,7 @@ function _renderShortAnalysis(data) {
         const thead = document.createElement('thead');
         const hr = document.createElement('tr');
         const thFund = document.createElement('th'); thFund.textContent = 'Fund'; hr.appendChild(thFund);
+        const thType = document.createElement('th'); thType.textContent = 'Type'; thType.style.textAlign = 'left'; hr.appendChild(thType);
         qs.forEach(q => { const th = document.createElement('th'); th.textContent = q; th.style.textAlign = 'right'; hr.appendChild(th); });
         thead.appendChild(hr); table.appendChild(thead);
         const tbody = document.createElement('tbody');
@@ -1965,6 +1971,10 @@ function _renderShortAnalysis(data) {
             tdN.textContent = row.fund_name || '';
             tdN.title = row.fund_name || '';
             tr.appendChild(tdN);
+            const tdT = document.createElement('td');
+            tdT.textContent = row.type || '';
+            tdT.style.fontSize = '11px';
+            tr.appendChild(tdT);
             qs.forEach(q => {
                 const td = document.createElement('td');
                 td.style.textAlign = 'right';
@@ -2045,10 +2055,16 @@ async function loadShortSqueeze() {
 // Ownership Trend tab (3 sub-views)
 // ---------------------------------------------------------------------------
 let _otSubView = 'summary';  // 'summary' | 'changes'
+let _otLevel = 'parent';  // 'parent' | 'fund'
+let _otActiveOnly = false;
 
 async function loadOwnershipTrend() {
     clearError(); tableWrap.innerHTML = '';
-    // Render sub-view selector (2 views: Summary + Cohort combined, and Holder Changes)
+
+    // Sub-view bar + level toggle
+    const barWrap = document.createElement('div');
+    barWrap.style.cssText = 'display:flex;align-items:center;gap:16px;flex-wrap:wrap;';
+
     const bar = document.createElement('div');
     bar.className = 'sub-view-bar';
     ['summary', 'changes'].forEach(v => {
@@ -2058,24 +2074,45 @@ async function loadOwnershipTrend() {
         btn.addEventListener('click', () => { _otSubView = v; loadOwnershipTrend(); });
         bar.appendChild(btn);
     });
-    tableWrap.appendChild(bar);
+    barWrap.appendChild(bar);
+
+    // Level toggle (By Parent / By Fund)
+    const lvlToggle = document.createElement('div');
+    lvlToggle.className = 'register-view-toggle';
+    [['parent', 'By Parent'], ['fund', 'By Fund']].forEach(([v, txt]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-toggle' + (_otLevel === v ? ' active' : '');
+        btn.textContent = txt;
+        btn.onclick = () => { _otLevel = v; loadOwnershipTrend(); };
+        lvlToggle.appendChild(btn);
+    });
+    barWrap.appendChild(lvlToggle);
+
+    if (_otLevel === 'fund') {
+        const aoBtn = document.createElement('button');
+        aoBtn.className = 'btn btn-toggle' + (_otActiveOnly ? ' active' : '');
+        aoBtn.textContent = 'Active Only';
+        aoBtn.onclick = () => { _otActiveOnly = !_otActiveOnly; loadOwnershipTrend(); };
+        barWrap.appendChild(aoBtn);
+    }
+
+    tableWrap.appendChild(barWrap);
 
     if (_otSubView === 'summary') {
         await loadOTSummary();
         // Also load cohort inline below summary
         await loadOTCohort();
     } else {
-        // Holder Momentum — full year share history per parent, collapsible to funds
+        // Holder Momentum — full year share history
         showSpinner();
         try {
-            const res = await fetch(`/api/holder_momentum?ticker=${currentTicker}`);
+            const ao = _otActiveOnly && _otLevel === 'fund' ? '&active_only=true' : '';
+            const res = await fetch(`/api/holder_momentum?ticker=${currentTicker}&level=${_otLevel}${ao}`);
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
             const data = await res.json();
             hideSpinner();
-            const savedBar = tableWrap.querySelector('.sub-view-bar');
             currentData = data;
             _renderMomentum(data);
-            if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
         } catch (e) { hideSpinner(); showError(e.message); }
     }
 }
@@ -2083,13 +2120,12 @@ async function loadOwnershipTrend() {
 async function loadOTSummary() {
     showSpinner();
     try {
-        const res = await fetch(`/api/ownership_trend_summary?ticker=${currentTicker}`);
+        const ao = _otActiveOnly && _otLevel === 'fund' ? '&active_only=true' : '';
+        const res = await fetch(`/api/ownership_trend_summary?ticker=${currentTicker}&level=${_otLevel}${ao}`);
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
         const data = await res.json();
         hideSpinner();
-        const savedBar = tableWrap.querySelector('.sub-view-bar');
         renderOTSummary(data);
-        if (savedBar) tableWrap.insertBefore(savedBar, tableWrap.firstChild);
     } catch (e) { hideSpinner(); showError(e.message); }
 }
 

@@ -1075,17 +1075,87 @@ def query2(ticker):
 
 
 
-def holder_momentum(ticker):
-    """Full-year share momentum for top 25 parents, with fund-level children.
-    Returns shares per quarter for each parent and up to 10 N-PORT funds per parent
-    (union of top 5 from each quarter to capture movement).
+def holder_momentum(ticker, level='parent', active_only=False):
+    """Full-year share momentum.
+    level='parent': top 25 13F parents with collapsible N-PORT children.
+    level='fund': top 25 individual N-PORT funds (flat).
     """
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
-        qs = QUARTERS  # e.g. ['2025Q1','2025Q2','2025Q3','2025Q4']
+        qs = QUARTERS
         q_placeholders = ','.join([f"'{q}'" for q in qs])
 
+        # --- Fund-level branch ---
+        if level == 'fund':
+            # Fetch more funds than needed, then filter by classification
+            limit = 100 if active_only else 25
+            top_funds = con.execute(f"""
+                SELECT fh.fund_name, SUM(fh.market_value_usd) as val
+                FROM fund_holdings fh
+                WHERE fh.ticker = ? AND fh.quarter = '{LQ}'
+                GROUP BY fh.fund_name
+                ORDER BY val DESC NULLS LAST LIMIT {limit}
+            """, [ticker]).fetchdf()
+
+            if top_funds.empty:
+                return []
+
+            # Filter to active-only using name-based classification
+            if active_only:
+                top_funds = top_funds[top_funds['fund_name'].apply(
+                    lambda n: _classify_fund_type(n) == 'active'
+                )].head(25).reset_index(drop=True)
+            else:
+                top_funds = top_funds.head(25).reset_index(drop=True)
+
+            if top_funds.empty:
+                return []
+
+            fund_names = top_funds['fund_name'].tolist()
+            ph_f = ','.join(['?'] * len(fund_names))
+            fund_df = con.execute(f"""
+                SELECT fund_name, quarter, SUM(shares_or_principal) as shares
+                FROM fund_holdings
+                WHERE ticker = ?
+                  AND quarter IN ({q_placeholders})
+                  AND fund_name IN ({ph_f})
+                GROUP BY fund_name, quarter
+            """, [ticker] + fund_names).fetchdf()
+
+            fund_data = {}
+            for _, r in fund_df.iterrows():
+                fn = r['fund_name']
+                if fn not in fund_data:
+                    fund_data[fn] = {}
+                fund_data[fn][r['quarter']] = float(r['shares'] or 0)
+
+            results = []
+            for rank, (_, frow) in enumerate(top_funds.iterrows(), 1):
+                fn = frow['fund_name']
+                qshares = fund_data.get(fn, {})
+                first_s = next((qshares.get(q) for q in qs if qshares.get(q)), 0)
+                last_s = qshares.get(qs[-1], 0)
+                chg = last_s - first_s
+                chg_pct = round(chg / first_s * 100, 1) if first_s > 0 else None
+                # Use name-based classification (is_actively_managed is unreliable)
+                fund_type = _classify_fund_type(fn)
+                row = {
+                    'rank': rank,
+                    'institution': fn,
+                    'type': fund_type,
+                    'is_parent': False,
+                    'child_count': 0,
+                    'level': 0,
+                    'change': chg,
+                    'change_pct': chg_pct,
+                }
+                for q in qs:
+                    row[q] = qshares.get(q)
+                results.append(row)
+            return results
+
+        # --- Parent-level branch (original logic) ---
         # Top 25 parents by latest quarter value
         top_parents = con.execute(f"""
             SELECT COALESCE(inst_parent_name, manager_name) as parent_name,
@@ -2099,8 +2169,11 @@ def query16(ticker):
 # ---------------------------------------------------------------------------
 
 
-def ownership_trend_summary(ticker):
-    """Aggregated institutional ownership trend across all quarters."""
+def ownership_trend_summary(ticker, level='parent', active_only=False):
+    """Aggregated institutional ownership trend across all quarters.
+    level: 'parent' (13F) or 'fund' (N-PORT).
+    active_only: fund level — only include funds classified as active.
+    """
     con = get_db()
     try:
         float_row = con.execute(
@@ -2108,15 +2181,52 @@ def ownership_trend_summary(ticker):
         ).fetchone()
         float_shares = float_row[0] if float_row and float_row[0] else None
 
-        df = con.execute("""
-            SELECT quarter,
-                   SUM(shares) as total_inst_shares,
-                   SUM(market_value_usd) as total_inst_value,
-                   COUNT(DISTINCT COALESCE(inst_parent_name, manager_name)) as holder_count,
-                   SUM(CASE WHEN manager_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
-                   SUM(CASE WHEN manager_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
-            FROM holdings WHERE ticker = ? GROUP BY quarter ORDER BY quarter
-        """, [ticker]).fetchdf()
+        if level == 'fund':
+            # Fund-level: aggregate from fund_holdings
+            # Note: fund_universe.is_actively_managed is unreliable (N21 audit item).
+            # Use fund name keywords via _classify_fund_type() for passive/active split.
+            raw_df = con.execute("""
+                SELECT fh.quarter, fh.fund_name,
+                       SUM(fh.shares_or_principal) as shares,
+                       SUM(fh.market_value_usd) as value
+                FROM fund_holdings fh
+                WHERE fh.ticker = ? AND fh.market_value_usd > 0
+                GROUP BY fh.quarter, fh.fund_name
+                ORDER BY fh.quarter
+            """, [ticker]).fetchdf()
+
+            # Aggregate per quarter with keyword-based active/passive split
+            quarter_agg = {}
+            for _, r in raw_df.iterrows():
+                fund_type = _classify_fund_type(r['fund_name'])
+                if active_only and fund_type != 'active':
+                    continue
+                q = r['quarter']
+                if q not in quarter_agg:
+                    quarter_agg[q] = {
+                        'quarter': q, 'total_inst_shares': 0, 'total_inst_value': 0,
+                        'holder_count': 0, 'active_value': 0, 'passive_value': 0,
+                    }
+                quarter_agg[q]['total_inst_shares'] += float(r['shares'] or 0)
+                quarter_agg[q]['total_inst_value'] += float(r['value'] or 0)
+                quarter_agg[q]['holder_count'] += 1
+                if fund_type == 'passive':
+                    quarter_agg[q]['passive_value'] += float(r['value'] or 0)
+                else:
+                    quarter_agg[q]['active_value'] += float(r['value'] or 0)
+
+            import pandas as pd
+            df = pd.DataFrame(list(quarter_agg.values())).sort_values('quarter').reset_index(drop=True)
+        else:
+            df = con.execute("""
+                SELECT quarter,
+                       SUM(shares) as total_inst_shares,
+                       SUM(market_value_usd) as total_inst_value,
+                       COUNT(DISTINCT COALESCE(inst_parent_name, manager_name)) as holder_count,
+                       SUM(CASE WHEN manager_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
+                       SUM(CASE WHEN manager_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
+                FROM holdings WHERE ticker = ? GROUP BY quarter ORDER BY quarter
+            """, [ticker]).fetchdf()
 
         rows = df_to_records(df)
         prev_shares = None
@@ -2155,7 +2265,7 @@ def ownership_trend_summary(ticker):
             trend = '\u2191 Accumulating' if pct > 0.005 else ('\u2193 Distributing' if pct < -0.005 else '\u2192 Stable')
             summary = {'trend': trend, 'total_shares_added': total_added, 'total_dollar_flow': total_flow, 'net_new_holders': net_new}
 
-        return {'quarters': rows, 'summary': summary}
+        return {'quarters': rows, 'summary': summary, 'level': level}
     finally:
         pass  # connection managed by thread-local cache
 
@@ -3158,12 +3268,14 @@ def short_interest_analysis(ticker):
                        SUM(ABS(shares_or_principal)) as short_shares,
                        SUM(ABS(market_value_usd)) as short_value,
                        MAX(quarter) as quarter,
-                       MAX(fund_aum_mm) as fund_aum_mm
+                       MAX(fund_aum_mm) as fund_aum_mm,
+                       MAX(is_active) as is_active
                 FROM (
                     SELECT fh.fund_name, fh.family_name,
                            fh.shares_or_principal, fh.market_value_usd,
                            fh.quarter, fh.series_id,
-                           fu.total_net_assets / 1e6 as fund_aum_mm
+                           fu.total_net_assets / 1e6 as fund_aum_mm,
+                           CAST(fu.is_actively_managed AS INTEGER) as is_active
                     FROM fund_holdings fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.ticker = ? AND fh.shares_or_principal < 0
@@ -3187,6 +3299,8 @@ def short_interest_analysis(ticker):
                 aum = r.get('fund_aum_mm')
                 val2 = r.get('short_value')
                 r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
+                # fund_universe.is_actively_managed is unreliable, use name-based classification
+                r['type'] = _classify_fund_type(r.get('fund_name') or '')
         except Exception:
             pass
         result['nport_detail'] = nport_detail
@@ -3195,21 +3309,23 @@ def short_interest_analysis(ticker):
         nport_by_fund = []
         try:
             fund_hist = con.execute("""
-                SELECT fund_name, quarter, SUM(ABS(shares_or_principal)) as short_shares
-                FROM fund_holdings
-                WHERE ticker = ? AND shares_or_principal < 0
-                GROUP BY fund_name, quarter
-                ORDER BY fund_name, quarter
+                SELECT fh.fund_name, fh.quarter,
+                       SUM(ABS(fh.shares_or_principal)) as short_shares,
+                       MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
+                FROM fund_holdings fh
+                LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+                WHERE fh.ticker = ? AND fh.shares_or_principal < 0
+                GROUP BY fh.fund_name, fh.quarter
+                ORDER BY fh.fund_name, fh.quarter
             """, [ticker]).fetchdf()
-            # Pivot: fund → {quarter: shares}
+            # Pivot: fund → {quarter: shares, type}
             funds_seen = {}
             for _, r in fund_hist.iterrows():
                 fn = r['fund_name']
                 if fn not in funds_seen:
-                    funds_seen[fn] = {'fund_name': fn}
+                    funds_seen[fn] = {'fund_name': fn, 'type': _classify_fund_type(fn)}
                 funds_seen[fn][r['quarter']] = float(r['short_shares'])
             nport_by_fund = list(funds_seen.values())
-            # Sort by latest quarter shares
             nport_by_fund.sort(key=lambda x: x.get(LQ, 0), reverse=True)
         except Exception:
             pass
@@ -3234,7 +3350,8 @@ def short_interest_analysis(ticker):
             # Long from 13F
             long_df = con.execute(f"""
                 SELECT COALESCE(inst_parent_name, manager_name) as parent,
-                       SUM(shares) as long_shares, SUM(market_value_live) as long_value
+                       SUM(shares) as long_shares, SUM(market_value_live) as long_value,
+                       MAX(manager_type) as manager_type
                 FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
                 GROUP BY parent
             """, [ticker]).fetchdf()
@@ -3285,6 +3402,7 @@ def short_interest_analysis(ticker):
                 net_pct = round((ls - ss) / ls * 100, 1) if ls > 0 else 0
                 cross_ref.append({
                     'institution': parent,
+                    'type': lrow.get('manager_type') or 'unknown',
                     'long_shares': ls, 'long_value': lv,
                     'short_shares': ss, 'short_value': sv,
                     'net_exposure_pct': net_pct,
@@ -3302,12 +3420,14 @@ def short_interest_analysis(ticker):
                        MAX(family_name) as family_name,
                        SUM(short_shares) as short_shares,
                        SUM(short_value) as short_value,
-                       MAX(fund_aum_mm) as fund_aum_mm
+                       MAX(fund_aum_mm) as fund_aum_mm,
+                       MAX(is_active) as is_active
                 FROM (
                     SELECT fh.fund_name, fh.family_name, fh.series_id,
                            SUM(ABS(fh.shares_or_principal)) as short_shares,
                            SUM(ABS(fh.market_value_usd)) as short_value,
-                           MAX(fu.total_net_assets) / 1e6 as fund_aum_mm
+                           MAX(fu.total_net_assets) / 1e6 as fund_aum_mm,
+                           MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
                     FROM fund_holdings fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{LQ}'
@@ -3338,6 +3458,7 @@ def short_interest_analysis(ticker):
                     short_only.append({
                         'fund_name': r['fund_name'],
                         'family_name': r['family_name'],
+                        'type': _classify_fund_type(r['fund_name']),
                         'short_shares': ss,
                         'short_value': sv,
                         'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,
