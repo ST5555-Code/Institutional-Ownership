@@ -101,6 +101,7 @@ def reset_entity_tables(con):
         "entity_classification_history",
         "entity_aliases",
         "entity_relationships",
+        "entity_identifiers_staging",
         "entity_identifiers",
         "entities",
     ]:
@@ -702,6 +703,110 @@ def step7_compute_rollups(con):
 
 
 # =============================================================================
+# Step 8 — Replay persistent overrides after rebuild
+# =============================================================================
+def replay_persistent_overrides(con):
+    """
+    Replay all still_valid=TRUE overrides from entity_overrides_persistent
+    after a --reset rebuild. Resolves entity_id from CIK at replay time
+    (since entity_ids change across rebuilds).
+
+    Supported actions: reclassify, alias_add, merge.
+    """
+    try:
+        overrides = con.execute("""
+            SELECT override_id, entity_cik, action, field, old_value, new_value, reason, analyst
+            FROM entity_overrides_persistent
+            WHERE still_valid = TRUE
+            ORDER BY override_id
+        """).fetchall()
+    except Exception:
+        # Table might not exist yet (first run after schema update)
+        return
+
+    if not overrides:
+        logger.info("[step 8] no persistent overrides to replay")
+        return
+
+    logger.info("[step 8] replaying %d persistent overrides", len(overrides))
+    applied = 0
+    skipped = 0
+
+    for oid, cik, action, field, _old, new_val, reason, analyst in overrides:
+        # Resolve entity_id from CIK (entity_ids change across rebuilds)
+        entity = con.execute("""
+            SELECT entity_id FROM entity_identifiers
+            WHERE identifier_type = 'cik' AND identifier_value = ?
+              AND valid_to = DATE '9999-12-31'
+        """, [cik]).fetchone()
+        if not entity:
+            logger.warning("[step 8] override %d: CIK %s not found, skipping", oid, cik)
+            skipped += 1
+            continue
+        entity_id = entity[0]
+
+        try:
+            if action == "reclassify" and field == "classification":
+                con.execute("""
+                    UPDATE entity_classification_history SET valid_to = CURRENT_DATE
+                    WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+                """, [entity_id])
+                con.execute("""
+                    INSERT INTO entity_classification_history
+                      (entity_id, classification, is_activist, confidence, source,
+                       is_inferred, valid_from, valid_to)
+                    VALUES (?, ?, FALSE, 'exact', 'manual_override', FALSE,
+                            CURRENT_DATE, DATE '9999-12-31')
+                """, [entity_id, new_val])
+                applied += 1
+            elif action == "alias_add":
+                con.execute("""
+                    INSERT INTO entity_aliases
+                      (entity_id, alias_name, alias_type, is_preferred, preferred_key,
+                       source_table, is_inferred, valid_from, valid_to)
+                    VALUES (?, ?, 'brand', FALSE, NULL, 'manual_override', FALSE,
+                            CURRENT_DATE, DATE '9999-12-31')
+                    ON CONFLICT DO NOTHING
+                """, [entity_id, new_val])
+                applied += 1
+            elif action == "merge":
+                # new_val = parent CIK; resolve to entity_id
+                parent = con.execute("""
+                    SELECT entity_id FROM entity_identifiers
+                    WHERE identifier_type = 'cik' AND identifier_value = ?
+                      AND valid_to = DATE '9999-12-31'
+                """, [new_val]).fetchone()
+                if parent:
+                    import entity_sync  # noqa: E402
+                    entity_sync.insert_relationship_idempotent(
+                        con, parent[0], entity_id, "parent_brand", "control",
+                        True, "exact", "manual_override", is_inferred=False,
+                    )
+                    con.execute("""
+                        UPDATE entity_rollup_history SET valid_to = CURRENT_DATE
+                        WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                          AND valid_to = DATE '9999-12-31'
+                    """, [entity_id])
+                    con.execute("""
+                        INSERT INTO entity_rollup_history
+                          (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                           confidence, valid_from, valid_to)
+                        VALUES (?, ?, 'economic_control_v1', 'manual_override',
+                                'exact', CURRENT_DATE, DATE '9999-12-31')
+                    """, [entity_id, parent[0]])
+                    applied += 1
+                else:
+                    skipped += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.warning("[step 8] override %d failed: %s", oid, str(e)[:100])
+            skipped += 1
+
+    logger.info("[step 8] overrides replayed: %d applied, %d skipped", applied, skipped)
+
+
+# =============================================================================
 # Main
 # =============================================================================
 def refresh_reference_tables(con):
@@ -763,6 +868,9 @@ def main():
         step5_populate_aliases(con, seed_map, seeds, manager_rows, fund_rows)
         step6_populate_classifications(con, seeds, seed_map, manager_rows, fund_rows)
         step7_compute_rollups(con)
+
+        # Step 8: Replay persistent overrides (survive --reset)
+        replay_persistent_overrides(con)
 
         # Summary counts
         logger.info("-" * 72)

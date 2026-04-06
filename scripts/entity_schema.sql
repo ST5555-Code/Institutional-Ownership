@@ -74,9 +74,9 @@ CREATE TABLE IF NOT EXISTS entity_relationships (
     parent_entity_id     BIGINT NOT NULL REFERENCES entities(entity_id),
     child_entity_id      BIGINT NOT NULL REFERENCES entities(entity_id),
     relationship_type    VARCHAR NOT NULL
-        CHECK (relationship_type IN ('wholly_owned','fund_sponsor','sub_adviser','parent_brand','joint_venture')),
+        CHECK (relationship_type IN ('wholly_owned','fund_sponsor','sub_adviser','parent_brand','joint_venture','mutual_structure')),
     control_type         VARCHAR NOT NULL
-        CHECK (control_type IN ('control','advisory','brand')),
+        CHECK (control_type IN ('control','advisory','brand','mutual')),
     is_primary           BOOLEAN NOT NULL DEFAULT FALSE,
     primary_parent_key   BIGINT,  -- app-maintained: = child_entity_id iff is_primary, else NULL
     confidence           VARCHAR NOT NULL
@@ -200,6 +200,29 @@ CREATE TABLE IF NOT EXISTS entity_identifiers_staging (
 CREATE INDEX IF NOT EXISTS idx_eis_pending ON entity_identifiers_staging(review_status, created_at);
 CREATE INDEX IF NOT EXISTS idx_eis_identifier ON entity_identifiers_staging(identifier_type, identifier_value);
 CREATE INDEX IF NOT EXISTS idx_eis_entity ON entity_identifiers_staging(entity_id);
+
+-- -----------------------------------------------------------------------------
+-- entity_overrides_persistent — survives --reset rebuilds
+-- -----------------------------------------------------------------------------
+-- Phase 3.5: manual corrections that must be replayed after every
+-- build_entities.py --reset. Same format as the CSV upload to
+-- POST /admin/entity_override, plus applied_at and still_valid.
+-- build_entities.py replays all still_valid=TRUE rows after rebuild.
+CREATE TABLE IF NOT EXISTS entity_overrides_persistent (
+    override_id    BIGINT PRIMARY KEY DEFAULT nextval('identifier_staging_id_seq'),
+    entity_cik     VARCHAR,          -- CIK of the target entity (used to re-resolve entity_id after rebuild)
+    action         VARCHAR NOT NULL,  -- reclassify|alias_add|merge
+    field          VARCHAR,
+    old_value      VARCHAR,
+    new_value      VARCHAR NOT NULL,
+    reason         VARCHAR,
+    analyst        VARCHAR,
+    still_valid    BOOLEAN NOT NULL DEFAULT TRUE,
+    applied_at     TIMESTAMP DEFAULT NOW(),
+    created_at     TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eop_valid ON entity_overrides_persistent(still_valid);
 
 -- -----------------------------------------------------------------------------
 -- entity_current — denormalized current-state view

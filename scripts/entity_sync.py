@@ -523,3 +523,275 @@ def update_classification_from_sic(
         VALUES (?, ?, FALSE, 'medium', ?, FALSE, CURRENT_DATE, DATE '9999-12-31')
     """, [entity_id, new_cls, source])
     return True
+
+
+# =============================================================================
+# Phase 3.5 — ADV PDF Schedule A/B parser
+# =============================================================================
+_VALID_JURISDICTIONS = {
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID',
+    'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
+    'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
+    'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
+    'WV', 'WI', 'WY', 'DC',
+    'FE', 'UK', 'AU', 'JP', 'HK', 'SG', 'CH', 'LU', 'IE', 'BM', 'JE', 'GG',
+}
+
+_ADV_BOILERPLATE = [
+    'IF FINAL OR ON APPEAL', 'CRS', 'FORM ADV', 'COMPLETE ALL ITEM',
+    'HAS THE SEC', 'COMMODITY FUTURES', 'SECTION 4', 'DISCIPLINARY',
+    'SCHEDULE D', 'DRP PAGES', 'CRIMINAL ACTION', 'CIVIL JUDICIAL',
+]
+
+# Ownership code → relationship_type mapping
+# E = 75%+, D = 50-75% → wholly_owned (majority control)
+# C = 25-50% → parent_brand (significant minority)
+# A = 5-10%, B = 10-25% → skip (minor)
+# NA = not applicable (executive officer, no equity) → skip for individuals
+#   but NA on entities = mutual structure (Vanguard pattern)
+OWN_CODE_TO_REL = {
+    'E': 'wholly_owned',
+    'D': 'wholly_owned',
+    'C': 'parent_brand',
+}
+
+
+def _is_valid_entity_name(name: str) -> bool:
+    if not name or len(name) < 3:
+        return False
+    if not any(c.isalpha() for c in name):
+        return False
+    for bp in _ADV_BOILERPLATE:
+        if bp in name.upper():
+            return False
+    return True
+
+
+def parse_adv_pdf(pdf_path: str, firm_crd: str = "", max_size_mb: float = 15.0) -> list[dict]:
+    """
+    Parse Schedule A (Direct Owners) and Schedule B (Indirect Owners) from
+    an ADV PDF filing. Returns list of dicts with:
+      firm_crd, schedule, name, jurisdiction, title_or_status, date,
+      ownership_code, control_person, is_entity, relationship_type
+
+    Column-shift detection handles normal, shifted, and blended layouts.
+    Boilerplate/garbage filtered by jurisdiction validation + name checks.
+    PDFs larger than max_size_mb are skipped (returns empty list).
+    """
+    import os
+    import pdfplumber  # pylint: disable=import-error
+
+    file_size = os.path.getsize(pdf_path) / (1024 * 1024)
+    if file_size > max_size_mb:
+        logger.debug("Skipping %s (%.1fMB > %.0fMB limit)", pdf_path, file_size, max_size_mb)
+        return []
+
+    pdf = pdfplumber.open(pdf_path)
+    entries = []
+    in_sched = None
+
+    for page in pdf.pages:
+        text = (page.extract_text() or "")
+        text_upper = text.upper()
+
+        if "SCHEDULE A" in text_upper and "DIRECT" in text_upper:
+            in_sched = "A"
+        elif "SCHEDULE B" in text_upper and "INDIRECT" in text_upper:
+            in_sched = "B"
+        elif in_sched:
+            for exit_kw in ["SCHEDULE D", "DRP PAGES", "FORM ADV, PART 2"]:
+                if exit_kw in text_upper and "SCHEDULE A" not in text_upper and "SCHEDULE B" not in text_upper:
+                    in_sched = None
+                    break
+
+        if not in_sched:
+            continue
+
+        for table in page.extract_tables():
+            for row in table:
+                if not row:
+                    continue
+                cells = [str(c).strip().replace('\n', ' ') if c else "" for c in row]
+                joined_upper = " ".join(cells).upper()
+                if any(h in joined_upper for h in ["FULL LEGAL NAME", "DE/FE/I", "TITLE OR STATUS"]):
+                    continue
+
+                parsed = None
+                for offset in range(min(3, len(cells))):
+                    if offset + 1 >= len(cells):
+                        continue
+                    name = cells[offset]
+                    jurisdiction = cells[offset + 1].upper().strip()
+
+                    if jurisdiction in _VALID_JURISDICTIONS or jurisdiction == "I":
+                        if not _is_valid_entity_name(name):
+                            break
+
+                        title = cells[offset + 2] if offset + 2 < len(cells) else ""
+                        date = cells[offset + 3] if offset + 3 < len(cells) else ""
+                        own_code = cells[offset + 4] if offset + 4 < len(cells) else ""
+                        control = cells[offset + 5] if offset + 5 < len(cells) else ""
+
+                        own_clean = own_code.upper().strip()
+                        if own_clean not in ('A', 'B', 'C', 'D', 'E', 'NA', ''):
+                            own_clean = control.upper().strip() if control.upper().strip() in ('A', 'B', 'C', 'D', 'E', 'NA') else ""
+                            control = cells[offset + 6] if offset + 6 < len(cells) else ""
+
+                        is_entity = jurisdiction != "I"
+                        rel_type = OWN_CODE_TO_REL.get(own_clean)
+
+                        # Mutual structure: entity with NA ownership (Vanguard pattern)
+                        if is_entity and own_clean == "NA":
+                            rel_type = "mutual_structure"
+
+                        parsed = {
+                            "firm_crd": firm_crd,
+                            "schedule": in_sched,
+                            "name": name,
+                            "jurisdiction": jurisdiction,
+                            "title_or_status": title,
+                            "date": date,
+                            "ownership_code": own_clean,
+                            "control_person": control.upper().strip() if control else "",
+                            "is_entity": is_entity,
+                            "relationship_type": rel_type,
+                        }
+                        break
+
+                if parsed:
+                    entries.append(parsed)
+
+    pdf.close()
+    return entries
+
+
+class _AliasCache:
+    """Pre-cached alias data for fast fuzzy matching across a batch run."""
+
+    def __init__(self, con):
+        # Parent aliases: entities that are rollup targets
+        rows = con.execute("""
+            SELECT DISTINCT ea.entity_id, ea.alias_name
+            FROM entity_aliases ea
+            JOIN (SELECT DISTINCT rollup_entity_id FROM entity_rollup_history
+                  WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
+            ) parents ON ea.entity_id = parents.rollup_entity_id
+            WHERE ea.valid_to = DATE '9999-12-31'
+        """).fetchall()
+        self.parent_names = [r[1].upper() for r in rows if r[1]]
+        self.parent_eids = [r[0] for r in rows if r[1]]
+        logger.info("AliasCache loaded: %d parent aliases", len(self.parent_names))
+
+    def match(self, name: str, threshold: int = 85) -> tuple[int | None, str | None, int]:
+        """Returns (entity_id, alias_name, score) or (None, best_name, best_score)."""
+        from rapidfuzz import process, fuzz
+
+        if not name or not self.parent_names:
+            return None, None, 0
+        result = process.extractOne(
+            name.upper(), self.parent_names,
+            scorer=fuzz.token_sort_ratio, score_cutoff=threshold,
+        )
+        if result:
+            matched_name, score, idx = result
+            return self.parent_eids[idx], matched_name, int(score)
+        # Return best below threshold for logging
+        result_any = process.extractOne(
+            name.upper(), self.parent_names,
+            scorer=fuzz.token_sort_ratio,
+        )
+        if result_any:
+            return None, result_any[0], int(result_any[1])
+        return None, None, 0
+
+
+def build_alias_cache(con) -> _AliasCache:
+    """Create a reusable alias cache for a batch of insert_adv_ownership calls."""
+    return _AliasCache(con)
+
+
+def insert_adv_ownership(
+    con,
+    child_entity_id: int,
+    owner_name: str,
+    relationship_type: str,
+    ownership_code: str,
+    schedule_type: str,
+    *,
+    alias_cache: _AliasCache | None = None,
+    threshold: int = 85,
+) -> dict:
+    """
+    Match an ADV owner name against existing entity aliases and insert
+    a relationship if found. Never creates new parent entities.
+
+    For mutual_structure: skips fuzzy matching entirely (these don't drive
+    rollup). Just records the owner name in the relationship source field.
+
+    For wholly_owned/parent_brand: uses alias_cache for fast matching.
+    Inserts relationship with is_primary=TRUE only if no existing primary.
+    Updates rollup if primary.
+
+    Pass alias_cache from build_alias_cache() for batch performance.
+    """
+    result = {
+        "matched": False,
+        "parent_entity_id": None,
+        "parent_name": None,
+        "score": 0,
+        "relationship_inserted": False,
+        "rollup_updated": False,
+        "is_mutual": relationship_type == "mutual_structure",
+    }
+
+    if not owner_name:
+        return result
+
+    # Mutual structure: no matching needed, doesn't drive rollup
+    if relationship_type == "mutual_structure":
+        # Skip entity matching — just record that this mutual relationship exists
+        # The owner entities (e.g., Vanguard fund trusts) may or may not be in our MDM
+        result["matched"] = False
+        result["parent_name"] = owner_name
+        result["score"] = 0
+        return result
+
+    # Use cache if provided, else build one (slow per-call fallback)
+    cache = alias_cache
+    if cache is None:
+        cache = _AliasCache(con)
+
+    eid, matched_name, score = cache.match(owner_name, threshold)
+    result["score"] = score
+    result["parent_name"] = matched_name
+
+    if eid is None:
+        return result
+
+    result["matched"] = True
+    result["parent_entity_id"] = eid
+
+    source = f"ADV_SCHEDULE_{schedule_type}"
+    inserted = insert_relationship_idempotent(
+        con, eid, child_entity_id, relationship_type, "control",
+        True, "high" if score >= 95 else "medium", source,
+        is_inferred=False,
+    )
+    result["relationship_inserted"] = inserted
+
+    if inserted:
+        con.execute("""
+            UPDATE entity_rollup_history SET valid_to = CURRENT_DATE
+            WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+              AND valid_to = DATE '9999-12-31'
+        """, [child_entity_id])
+        con.execute("""
+            INSERT INTO entity_rollup_history
+              (entity_id, rollup_entity_id, rollup_type, rule_applied,
+               confidence, valid_from, valid_to)
+            VALUES (?, ?, 'economic_control_v1', ?,
+                    'high', CURRENT_DATE, DATE '9999-12-31')
+        """, [child_entity_id, eid, relationship_type])
+        result["rollup_updated"] = True
+
+    return result

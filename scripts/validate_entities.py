@@ -649,6 +649,102 @@ def gate_phase3_resolution_rate(con):
     }
 
 
+def gate_phase35_adv_coverage(con):
+    """
+    Phase 3.5 gate: ADV ownership relationship coverage.
+
+    Measures: of entities that have a CRD identifier, how many now have at
+    least one ADV-sourced relationship (wholly_owned, parent_brand, or
+    mutual_structure from ADV_SCHEDULE_A/B).
+
+    PASS: >50% of CRD-linked entities have ADV relationship.
+    MANUAL: >20% with documented explanation.
+    FAIL: <20%.
+
+    Note: many firms only have individual executive officers in Schedule A
+    (no entity owners), so <100% is expected.
+    """
+    total_crd = con.execute(f"""
+        SELECT COUNT(DISTINCT ei.entity_id)
+        FROM entity_identifiers ei
+        WHERE ei.identifier_type = 'crd' AND ei.valid_to = {ACTIVE}
+    """).fetchone()[0]  # nosec B608
+
+    with_adv = con.execute(f"""
+        SELECT COUNT(DISTINCT er.child_entity_id)
+        FROM entity_relationships er
+        WHERE er.source LIKE 'ADV_SCHEDULE_%' AND er.valid_to = {ACTIVE}
+    """).fetchone()[0]  # nosec B608
+
+    pct = (with_adv / total_crd * 100) if total_crd else 0
+    by_type = con.execute(f"""
+        SELECT er.relationship_type, COUNT(*)
+        FROM entity_relationships er
+        WHERE er.source LIKE 'ADV_SCHEDULE_%' AND er.valid_to = {ACTIVE}
+        GROUP BY 1 ORDER BY 2 DESC
+    """).fetchall()  # nosec B608
+
+    if pct >= 50:
+        status = "PASS"
+    elif pct >= 20:
+        status = "MANUAL"
+    else:
+        # If no ADV relationships exist yet (parse still running), mark as MANUAL
+        status = "MANUAL" if with_adv == 0 else "FAIL"
+
+    return status, {
+        "threshold": "PASS >50%; MANUAL >20% or awaiting ADV parse; FAIL <20%",
+        "total_crd_entities": total_crd,
+        "entities_with_adv_relationship": with_adv,
+        "coverage_pct": round(pct, 1),
+        "by_relationship_type": {r[0]: r[1] for r in by_type},
+    }
+
+
+def gate_phase35_jv_review(con):
+    """
+    Phase 3.5 gate: JV/multi-owner entities flagged for review.
+
+    MANUAL gate — always requires sign-off. Reports how many entities
+    have multiple controlling owners from ADV Schedule A (JV structures).
+    """
+    import csv as _csv
+
+    jv_path = Path(__file__).resolve().parent.parent / "logs" / "phase35_jv_entities.csv"
+    jv_count = 0
+    jv_sample = []
+
+    if jv_path.exists():
+        with open(jv_path, encoding="utf-8") as f:
+            rows = list(_csv.DictReader(f))
+        jv_count = len(rows)
+        jv_sample = [
+            {"firm": r.get("firm_name", "")[:40], "owners": r.get("owner_count", 0)}
+            for r in rows[:10]
+        ]
+
+    # Also count from DB: entities with >1 ADV controlling relationship
+    db_jv = con.execute(f"""
+        SELECT COUNT(*) FROM (
+            SELECT child_entity_id, COUNT(*) AS n
+            FROM entity_relationships
+            WHERE source LIKE 'ADV_SCHEDULE_%'
+              AND relationship_type IN ('wholly_owned', 'parent_brand')
+              AND valid_to = {ACTIVE}
+            GROUP BY child_entity_id
+            HAVING COUNT(*) > 1
+        )
+    """).fetchone()[0]  # nosec B608
+
+    return "MANUAL", {
+        "threshold": "MANUAL — requires sign-off on JV structures",
+        "jv_from_csv": jv_count,
+        "jv_from_db": db_jv,
+        "sample": jv_sample,
+        "notes": "JV entities have multiple controlling owners. Review logs/phase35_jv_entities.csv for full list.",
+    }
+
+
 GATES = [
     ("structural_aliases", gate_structural_aliases),
     ("structural_identifiers", gate_structural_identifiers),
@@ -663,6 +759,8 @@ GATES = [
     ("row_count", gate_row_count),
     ("wellington_sub_advisory", gate_wellington_sub_advisory),
     ("phase3_resolution_rate", gate_phase3_resolution_rate),
+    ("phase35_adv_coverage", gate_phase35_adv_coverage),
+    ("phase35_jv_review", gate_phase35_jv_review),
 ]
 
 

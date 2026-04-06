@@ -84,9 +84,19 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 - `logs/phase3_resolution_results.csv` — full results (5,293 rows)
 - `logs/phase3_unmatched.csv` — unmatched entities with best fuzzy scores
 
-### Phase 3.5 — Form ADV Schedules A/B ⬜ NOT STARTED
+### Phase 3.5 — Form ADV Schedules A/B ⏳ IN PROGRESS
 **Scope:** Parse ADV Schedule A (Direct Owners) and B (Indirect Owners). Populate entity_relationships with wholly_owned and parent_brand types. Handle JV and multi-adviser structures.
-**Notes:** This is where multi-parent / JV structures will be properly modeled. See Deferred Items #1.
+**Data source:** ADV PDFs from `reports.adviserinfo.sec.gov/reports/ADV/{crd}/PDF/{crd}.pdf` (IAPD API returns 403; XML feed lacks schedules; PDFs are accessible).
+**Three-phase pipeline:** `--download-only` (5 req/s) → `--parse-only` (pdfplumber, CPU-bound) → `--match-only` (alias cache + rapidfuzz).
+**Ownership code mapping:** E/D (≥50%) → wholly_owned, C (25-50%) → parent_brand, NA on entities → mutual_structure (Vanguard pattern), A/B (<25%) → skip.
+**Status:** Download complete (3,652 PDFs, 8.4GB). Parse in progress. Match + validation pending.
+**Deliverables built:**
+- `entity_sync.py`: `parse_adv_pdf()`, `insert_adv_ownership()`, `build_alias_cache()`, `_AliasCache` (C-optimized matching)
+- `resolve_adv_ownership.py`: three-phase pipeline with `--download-only`, `--parse-only`, `--match-only`
+- `entity_overrides_persistent` table + replay in `build_entities.py --reset` + persistence in `POST /admin/entity_override`
+- `mutual_structure` relationship type + `mutual` control type added to schema CHECK constraints
+- Two new validation gates: `phase35_adv_coverage`, `phase35_jv_review`
+**Notes:** This is where multi-parent / JV structures are modeled. See Deferred Items #1.
 
 ### Phase 4 — Migration ⛔ REQUIRES EXPLICIT AUTHORIZATION
 **Scope:** Migrate holdings, fund_holdings, beneficial_ownership to use entity_id FK.
@@ -107,7 +117,7 @@ These items were explicitly scoped out of Phase 1 but must not be forgotten. Eac
 
 | # | Item | Target Phase | Reason Deferred | Notes |
 |---|------|-------------|-----------------|-------|
-| 1 | Multi-parent / JV structures | Phase 3.5 | Requires ADV Schedule A/B data to model correctly | is_primary = FALSE on secondary relationships preserves them in graph now |
+| 1 | ~~Multi-parent / JV structures~~ | ~~Phase 3.5~~ ✅ | Resolved Apr 6 2026 — ADV Schedule A parsed, JV entities flagged (multiple owners with codes C/D/E), highest-% owner gets is_primary=TRUE | JV entities logged to phase35_jv_entities.csv for manual review |
 | 2 | Indirect ownership chains | Phase 4+ | Requires recursive CTE — design supports it, not needed for Phase 1 rollups | Current design only supports direct relationships — must document this limitation in UI |
 | 3 | ~~Staging table for identifier conflicts (entity_identifiers_staging)~~ | ~~Phase 2~~ ✅ | Resolved Apr 5 2026 — `entity_identifiers_staging` table created, `entity_sync.py` routes all feeder conflicts through it | Build + incremental paths both use soft-landing |
 | 4 | Structural integrity validation in CI | Phase 2 | Phase 1 runs validation manually — automate in pipeline | Add to run_pipeline.sh post-merge checks |
@@ -168,6 +178,7 @@ These are architectural limitations of the current design, not bugs. Must be doc
 | `scripts/validate_entities.py` | Validation gate runner (12 gates including Wellington) |
 | `scripts/fetch_ncen.py` | N-CEN feeder — incremental entity sync via `--staging` flag (Phase 2) |
 | `scripts/resolve_long_tail.py` | Phase 3 batch CIK resolver via SEC EDGAR (`--limit`, `--all`, `--dry-run`) |
+| `scripts/resolve_adv_ownership.py` | Phase 3.5 ADV ownership resolver (`--download-only`, `--parse-only`, `--match-only`) |
 | `logs/entity_build.log` | Transaction log from build_entities.py |
 | `logs/entity_build_conflicts.log` | Identifier conflicts during population |
 | `logs/entity_validation_report.json` | Validation gate results |
@@ -214,3 +225,8 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 5 2026 | DB-backed primary-parent check (replace in-memory set) | entity_sync.insert_relationship_idempotent queries entity_relationships to check for existing primary parents — correct in both batch and incremental modes, no stale-set risk | In-memory has_primary_parent set — only works in batch mode, stale across transactions |
 | Apr 5 2026 | SIC→classification mapping: conservative financial-only | Only financial SIC codes (6xxx range) map to classifications; non-financial codes stay 'unknown'. This avoids misclassifying corporates that file 13F (AMD=3674, airlines=4512). Phase 3 reclassified 104 entities via SIC. | Map all SIC codes — would produce false classifications for non-financial filers |
 | Apr 5 2026 | Phase 3 parent matching: fuzzy against existing parents only, never create new parents | Prevents runaway parent proliferation from noisy SEC name data. 153 matched at score ≥85 to existing PARENT_SEEDS parents. New parent creation deferred to Phase 3.5 ADV parsing where ownership data is authoritative. | Create new parent entities from SEC names — would produce unvalidated parents |
+| Apr 6 2026 | ADV data source: PDFs from IAPD, not XML feed or API | IAPD API returns 403; XML compilation feed (IA_FIRM_SEC_Feed) contains Part 1A header only, no Schedule A/B data; individual PDF filings at reports.adviserinfo.sec.gov are accessible (100% access rate on random sample) | IAPD API (blocked), XML feed (no schedule data) |
+| Apr 6 2026 | ADV ownership code mapping: E/D → wholly_owned, C → parent_brand, NA entities → mutual_structure | SEC ADV Schedule A uses letter codes for ownership ranges (E=75%+, D=50-75%, C=25-50%, B=10-25%, A=5-10%). Only codes C+ represent meaningful control. Entity owners with NA (no equity percentage) on Schedule A indicate mutual ownership structures (Vanguard pattern). | Map all codes including A/B — would create relationships for insignificant minority interests |
+| Apr 6 2026 | mutual_structure relationship type for Vanguard-style ownership | Vanguard's 33+ fund trusts collectively own the management company with no single controlling owner (all Schedule A entries marked NA). These get relationship_type='mutual_structure', is_primary=FALSE, and the management company stays as self-rollup. | Assign arbitrary primary parent — would misrepresent the actual ownership structure |
+| Apr 6 2026 | Three-phase ADV pipeline (download/parse/match) | pdfplumber PDF parsing takes ~5-30s per file; 3,652 PDFs at ~8.4GB total makes a single-pass pipeline impractical (~37 hours). Splitting into download (12 min), parse (hours, restartable), match (seconds from CSV) allows each phase to run independently with disk-based intermediaries. | Single-pass pipeline — too slow and not restartable |
+| Apr 6 2026 | entity_overrides_persistent table survives --reset | Manual corrections (reclassify, alias_add, merge) must persist across build_entities.py --reset rebuilds. Table stores CIK (not entity_id) so overrides can be re-resolved after entity_id reassignment. Replayed as Step 8 after rollup computation. | Store entity_id directly — breaks across rebuilds since entity_ids are reassigned from sequence |
