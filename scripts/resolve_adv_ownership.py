@@ -24,6 +24,12 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# Ensure progress output is visible in background/redirected runs
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+elif not sys.stdout.isatty():
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -302,13 +308,19 @@ def main():
     args = ap.parse_args()
 
     db.set_staging_mode(True)
-    con = db.connect_write()
 
+    # Open DB only when needed — parse-only reads local files and should NOT
+    # hold the DuckDB write lock for hours (blocks all other DB operations).
     print("Phase 3.5 — resolve_adv_ownership.py")
     print(f"  DB: {db.get_db_path()}")
     print(f"  started: {datetime.now().isoformat()}")
 
+    # Get targets (brief DB read, then close)
+    con = db.connect_write()
     targets = get_adv_targets(con)
+    con.close()
+    del con
+
     limit = None if args.all else (args.limit or 50)
     print(f"  targets: {len(targets)}, limit: {limit or 'all'}")
 
@@ -317,10 +329,13 @@ def main():
         run_download(targets, limit)
     elif args.parse_only:
         print("\n--- PHASE 2: PARSE ---")
+        # No DB connection needed — reads local PDFs, writes CSV
         run_parse(targets, limit)
     elif args.match_only:
         print("\n--- PHASE 3: MATCH ---")
+        con = db.connect_write()
         run_match(con)
+        con.close()
     else:
         # Full run: all three phases
         print("\n--- PHASE 1: DOWNLOAD ---")
@@ -328,9 +343,9 @@ def main():
         print("\n--- PHASE 2: PARSE ---")
         run_parse(targets, limit)
         print("\n--- PHASE 3: MATCH ---")
+        con = db.connect_write()
         run_match(con)
-
-    con.close()
+        con.close()
     print("\nDone.")
 
 

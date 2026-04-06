@@ -27,10 +27,17 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+# Ensure progress output is visible in background/redirected runs
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+elif not sys.stdout.isatty():
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
