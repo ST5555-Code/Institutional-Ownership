@@ -46,6 +46,7 @@ RESULTS_CSV = LOG_DIR / "phase35_resolution_results.csv"
 JV_CSV = LOG_DIR / "phase35_jv_entities.csv"
 UNMATCHED_CSV = LOG_DIR / "phase35_unmatched_owners.csv"
 OVERSIZED_CSV = LOG_DIR / "phase35_oversized.csv"
+TIMEDOUT_CSV = LOG_DIR / "phase35_timed_out.csv"
 
 PDF_BASE_URL = "https://reports.adviserinfo.sec.gov/reports/ADV"
 RATE_LIMIT = 0.2  # 5 req/s
@@ -120,7 +121,7 @@ CSV_FIELDNAMES = [
 ]
 
 
-def _parse_with_timeout(pdf_path, firm_crd, timeout_sec=PARSE_TIMEOUT):
+def _parse_with_timeout(pdf_path, firm_crd, timeout_sec=30):
     """Parse a PDF with a timeout. Returns entries or empty list on timeout."""
     import signal
 
@@ -138,7 +139,7 @@ def _parse_with_timeout(pdf_path, firm_crd, timeout_sec=PARSE_TIMEOUT):
         signal.signal(signal.SIGALRM, old)
 
 
-def run_parse(targets, limit=None):
+def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT):
     """
     Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
 
@@ -172,6 +173,7 @@ def run_parse(targets, limit=None):
     timed_out = 0
     total_rows = 0
     oversized = []
+    timed_out_list = []
     t0 = time.time()
 
     try:
@@ -193,15 +195,19 @@ def run_parse(targets, limit=None):
                 continue
 
             try:
-                entries = _parse_with_timeout(pdf_path, firm_crd=crd)
+                entries = _parse_with_timeout(pdf_path, firm_crd=crd, timeout_sec=timeout)
             except Exception:
                 parse_errors += 1
                 continue
 
             if not entries:
                 # Could be timeout or genuinely empty schedule
-                if file_mb > 5:
+                if file_mb > 3:
                     timed_out += 1
+                    timed_out_list.append({
+                        "crd": crd, "firm_name": name, "size_mb": round(file_mb, 1),
+                        "timeout_sec": timeout,
+                    })
                 continue
 
             parsed += 1
@@ -226,6 +232,14 @@ def run_parse(targets, limit=None):
         csv_file.close()
 
     elapsed = time.time() - t0
+
+    # Write timed-out log (for retry with higher timeout)
+    if timed_out_list:
+        with open(TIMEDOUT_CSV, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=["crd", "firm_name", "size_mb", "timeout_sec"])
+            w.writeheader()
+            w.writerows(timed_out_list)
+        print(f"  Timed out CRDs: {TIMEDOUT_CSV} ({len(timed_out_list)} firms — retry with higher --timeout)")
 
     # Write oversized log
     if oversized:
@@ -375,6 +389,7 @@ def main():
     ap.add_argument("--download-only", action="store_true", help="Phase 1: download PDFs only")
     ap.add_argument("--parse-only", action="store_true", help="Phase 2: parse local PDFs to CSV only")
     ap.add_argument("--match-only", action="store_true", help="Phase 3: entity match from CSV only")
+    ap.add_argument("--timeout", type=int, default=30, help="Per-PDF parse timeout in seconds (default 30)")
     args = ap.parse_args()
 
     db.set_staging_mode(True)
@@ -394,13 +409,14 @@ def main():
     limit = None if args.all else (args.limit or 50)
     print(f"  targets: {len(targets)}, limit: {limit or 'all'}")
 
+    parse_timeout = args.timeout
+
     if args.download_only:
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)
     elif args.parse_only:
-        print("\n--- PHASE 2: PARSE ---")
-        # No DB connection needed — reads local PDFs, writes CSV
-        run_parse(targets, limit)
+        print(f"\n--- PHASE 2: PARSE (timeout={parse_timeout}s) ---")
+        run_parse(targets, limit, timeout=parse_timeout)
     elif args.match_only:
         print("\n--- PHASE 3: MATCH ---")
         con = db.connect_write()
@@ -411,7 +427,7 @@ def main():
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)
         print("\n--- PHASE 2: PARSE ---")
-        run_parse(targets, limit)
+        run_parse(targets, limit, timeout=parse_timeout)
         print("\n--- PHASE 3: MATCH ---")
         con = db.connect_write()
         run_match(con)
