@@ -111,52 +111,121 @@ def run_download(targets, limit=None):
 # =========================================================================
 # Phase 2: Parse
 # =========================================================================
+PARSE_TIMEOUT = 30  # seconds per PDF — skip if pdfplumber hangs
+
+CSV_FIELDNAMES = [
+    "firm_crd", "firm_name", "entity_id", "schedule", "name", "jurisdiction",
+    "title_or_status", "date", "ownership_code", "control_person",
+    "is_entity", "relationship_type",
+]
+
+
+def _parse_with_timeout(pdf_path, firm_crd, timeout_sec=PARSE_TIMEOUT):
+    """Parse a PDF with a timeout. Returns entries or empty list on timeout."""
+    import signal
+
+    def _handler(_signum, _frame):
+        raise TimeoutError(f"PDF parse exceeded {timeout_sec}s")
+
+    old = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(timeout_sec)
+    try:
+        return entity_sync.parse_adv_pdf(pdf_path, firm_crd=firm_crd, max_size_mb=MAX_SIZE_MB)
+    except TimeoutError:
+        return []
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+
 def run_parse(targets, limit=None):
-    """Parse local PDFs → adv_schedules.csv. No network calls."""
+    """
+    Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
+
+    Incremental: writes each firm's results to CSV immediately after parsing.
+    Resumable: loads already-parsed CRDs from existing CSV at startup, skips them.
+    Timeout: skips any PDF that takes >30s to parse.
+    """
     work = targets if limit is None else targets[:limit]
-    all_rows = []
+
+    # Resume: load CRDs already in the CSV
+    already_parsed: set[str] = set()
+    csv_exists = SCHEDULES_CSV.exists() and SCHEDULES_CSV.stat().st_size > 0
+    if csv_exists:
+        with open(SCHEDULES_CSV, encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                already_parsed.add(row.get("firm_crd", ""))
+        print(f"  Resuming: {len(already_parsed)} CRDs already in CSV, skipping")
+
+    # Open CSV in append mode (or write mode if new)
+    csv_mode = "a" if csv_exists else "w"
+    csv_file = open(SCHEDULES_CSV, csv_mode, newline="", encoding="utf-8")  # noqa: SIM115
+    writer = csv.DictWriter(csv_file, fieldnames=CSV_FIELDNAMES)
+    if not csv_exists:
+        writer.writeheader()
+
     parsed = 0
     skipped_size = 0
     skipped_missing = 0
+    skipped_done = 0
     parse_errors = 0
+    timed_out = 0
+    total_rows = 0
     oversized = []
     t0 = time.time()
 
-    for i, (crd, name, eid) in enumerate(work):
-        pdf_path = str(PDF_DIR / f"{crd}.pdf")
-        if not os.path.exists(pdf_path):
-            skipped_missing += 1
-            continue
+    try:
+        for i, (crd, name, eid) in enumerate(work):
+            # Resume check
+            if crd in already_parsed:
+                skipped_done += 1
+                continue
 
-        file_mb = os.path.getsize(pdf_path) / (1024 * 1024)
-        if file_mb > MAX_SIZE_MB:
-            skipped_size += 1
-            oversized.append({"crd": crd, "firm_name": name, "size_mb": round(file_mb, 1)})
-            continue
+            pdf_path = str(PDF_DIR / f"{crd}.pdf")
+            if not os.path.exists(pdf_path):
+                skipped_missing += 1
+                continue
 
-        try:
-            entries = entity_sync.parse_adv_pdf(pdf_path, firm_crd=crd, max_size_mb=MAX_SIZE_MB)
+            file_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+            if file_mb > MAX_SIZE_MB:
+                skipped_size += 1
+                oversized.append({"crd": crd, "firm_name": name, "size_mb": round(file_mb, 1)})
+                continue
+
+            try:
+                entries = _parse_with_timeout(pdf_path, firm_crd=crd)
+            except Exception:
+                parse_errors += 1
+                continue
+
+            if not entries:
+                # Could be timeout or genuinely empty schedule
+                if file_mb > 5:
+                    timed_out += 1
+                continue
+
+            parsed += 1
+            # Write immediately — no data loss on crash
             for e in entries:
-                all_rows.append({"firm_crd": crd, "firm_name": name, "entity_id": eid, **e})
-            if entries:
-                parsed += 1
-        except Exception:
-            parse_errors += 1
+                row = {"firm_crd": crd, "firm_name": name, "entity_id": eid}
+                for field in CSV_FIELDNAMES[3:]:
+                    row[field] = e.get(field, "")
+                writer.writerow(row)
+                total_rows += 1
+            csv_file.flush()
 
-        if (i + 1) % 100 == 0 or i < 3:
-            elapsed = time.time() - t0
-            rate = (i + 1) / elapsed if elapsed > 0 else 0
-            print(f"  [{i+1}/{len(work)}] parsed={parsed} errors={parse_errors} oversized={skipped_size} ({rate:.1f}/s)")
+            if (i + 1) % 100 == 0 or i < 3:
+                elapsed = time.time() - t0
+                rate = (i + 1 - skipped_done) / elapsed if elapsed > 0 else 0
+                print(
+                    f"  [{i+1}/{len(work)}] parsed={parsed} rows={total_rows} "
+                    f"errors={parse_errors} timeout={timed_out} "
+                    f"oversized={skipped_size} ({rate:.1f}/s)"
+                )
+    finally:
+        csv_file.close()
 
     elapsed = time.time() - t0
-
-    # Write schedules CSV
-    if all_rows:
-        fieldnames = list(all_rows[0].keys())
-        with open(SCHEDULES_CSV, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames)
-            w.writeheader()
-            w.writerows(all_rows)
 
     # Write oversized log
     if oversized:
@@ -165,11 +234,12 @@ def run_parse(targets, limit=None):
             w.writeheader()
             w.writerows(oversized)
 
-    entities_found = sum(1 for r in all_rows if r.get("is_entity") == True)  # noqa: E712
-    print(f"\n  Parse complete: {parsed} PDFs → {len(all_rows)} rows ({entities_found} entity owners)")
-    print(f"  Skipped: {skipped_size} oversized (>{MAX_SIZE_MB}MB), {skipped_missing} missing, {parse_errors} errors")
+    print(f"\n  Parse complete: {parsed} PDFs → {total_rows} rows")
+    print(f"  Resumed: {skipped_done} already done")
+    print(f"  Skipped: {skipped_size} oversized, {skipped_missing} missing, {timed_out} timed out")
+    print(f"  Errors: {parse_errors}")
     print(f"  Output: {SCHEDULES_CSV} ({elapsed:.0f}s)")
-    return {"parsed": parsed, "rows": len(all_rows), "entities": entities_found, "oversized": skipped_size}
+    return {"parsed": parsed, "rows": total_rows, "oversized": skipped_size}
 
 
 # =========================================================================
