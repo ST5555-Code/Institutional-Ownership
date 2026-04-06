@@ -292,3 +292,234 @@ def sync_from_ncen_row(
 
     result["relationship_inserted"] = inserted
     return result
+
+
+# =============================================================================
+# Phase 3 — SEC company search resolver
+# =============================================================================
+SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
+
+
+def resolve_cik_via_sec(cik: str, session=None) -> dict | None:
+    """
+    Resolve a CIK via SEC EDGAR submissions API.
+
+    Calls https://data.sec.gov/submissions/CIK{padded}.json and extracts:
+      name, sic, sicDescription, category, stateOfIncorporation
+
+    Rate limit: caller is responsible for throttling to 5 req/s.
+    Returns dict on success, None on failure (404, timeout, parse error).
+    """
+    import time
+
+    padded = str(cik).zfill(10)
+    url = f"https://data.sec.gov/submissions/CIK{padded}.json"
+
+    requester = session
+    if requester is None:
+        import requests
+        requester = requests
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = requester.get(url, headers=SEC_HEADERS, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "cik": cik,
+                    "name": data.get("name"),
+                    "sic": data.get("sic"),
+                    "sicDescription": data.get("sicDescription"),
+                    "category": data.get("category"),
+                    "stateOfIncorporation": data.get("stateOfIncorporation"),
+                    "entityType": data.get("entityType"),
+                    "tickers": data.get("tickers", []),
+                }
+            if resp.status_code == 404:
+                return None
+            if resp.status_code in (429, 503):
+                wait = 2 ** (attempt + 1)
+                logger.debug("SEC %s for CIK %s, retrying in %ss", resp.status_code, cik, wait)
+                time.sleep(wait)
+                continue
+        except Exception as e:
+            logger.debug("SEC request failed for CIK %s: %s", cik, str(e)[:100])
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+    return None
+
+
+# =============================================================================
+# Phase 3 — SIC → classification mapper
+# =============================================================================
+_SIC_CLASSIFICATION_MAP = {
+    # State commercial banks
+    range(6020, 6030): "active",
+    # Savings institutions
+    range(6030, 6037): "active",
+    # Security brokers and dealers
+    (6211,): "active",
+    # Investment advice
+    (6282,): "active",
+    # Investment offices NEC (holding companies, family offices, hedge funds)
+    (6726,): "hedge_fund",
+    # Finance services
+    (6199,): "active",
+    # Insurance
+    range(6310, 6400): "active",
+    # Trusts
+    range(6710, 6727): "active",
+}
+
+
+def classify_from_sic(sic_code: str | int | None) -> str:
+    """
+    Map a SIC code to an entity classification.
+
+    Returns one of: 'active', 'hedge_fund', 'unknown'.
+    Financial SIC codes (6xxx) are mapped to specific classifications.
+    Non-financial or unrecognized codes return 'unknown'.
+    """
+    if not sic_code:
+        return "unknown"
+    try:
+        code = int(sic_code)
+    except (ValueError, TypeError):
+        return "unknown"
+    for sic_range, classification in _SIC_CLASSIFICATION_MAP.items():
+        if code in sic_range:
+            return classification
+    return "unknown"
+
+
+# =============================================================================
+# Phase 3 — Parent matcher (fuzzy match against existing parent aliases)
+# =============================================================================
+def attempt_parent_match(
+    con,
+    entity_id: int,
+    resolved_name: str,
+    *,
+    threshold: int = 85,
+) -> dict:
+    """
+    Attempt to match a resolved entity name against existing parent entities'
+    aliases using fuzzy matching (rapidfuzz token_sort_ratio).
+
+    Only matches against entities that ARE rollup targets for at least one
+    other entity (i.e., actual parents in entity_rollup_history), to avoid
+    matching against random standalone filers.
+
+    If match found (score >= threshold):
+      - Inserts entity_relationship (parent_brand, control, is_primary=TRUE)
+      - Returns {"matched": True, "parent_entity_id": ..., "parent_name": ..., "score": ...}
+    If no match:
+      - Returns {"matched": False, "best_name": ..., "best_score": ...}
+
+    Never creates new parent entities.
+    """
+    from rapidfuzz import fuzz
+
+    if not resolved_name:
+        return {"matched": False, "best_name": None, "best_score": 0}
+
+    # Check if this entity already has a non-self rollup parent
+    existing = con.execute("""
+        SELECT rollup_entity_id FROM entity_rollup_history
+        WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+          AND valid_to = DATE '9999-12-31' AND rule_applied != 'self'
+    """, [entity_id]).fetchone()
+    if existing:
+        return {"matched": True, "parent_entity_id": existing[0],
+                "parent_name": "(already matched)", "score": 100, "skipped": True}
+
+    # Load aliases of entities that are actual parents (rollup targets)
+    parent_aliases = con.execute("""
+        SELECT DISTINCT ea.entity_id, ea.alias_name
+        FROM entity_aliases ea
+        JOIN (
+            SELECT DISTINCT rollup_entity_id
+            FROM entity_rollup_history
+            WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
+        ) parents ON ea.entity_id = parents.rollup_entity_id
+        WHERE ea.valid_to = DATE '9999-12-31'
+    """).fetchall()
+
+    resolved_upper = resolved_name.upper()
+    best_score = 0
+    best_parent_id = None
+    best_parent_name = None
+
+    for parent_eid, alias_name in parent_aliases:
+        score = fuzz.token_sort_ratio(resolved_upper, (alias_name or "").upper())
+        if score > best_score:
+            best_score = score
+            best_parent_id = parent_eid
+            best_parent_name = alias_name
+
+    if best_score >= threshold and best_parent_id is not None:
+        inserted = insert_relationship_idempotent(
+            con, best_parent_id, entity_id, "parent_brand", "control",
+            True, "medium", "fuzzy_match", is_inferred=False,
+        )
+        if inserted:
+            # Update rollup: close old self-rollup, insert parent rollup
+            con.execute("""
+                UPDATE entity_rollup_history
+                SET valid_to = CURRENT_DATE
+                WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                  AND valid_to = DATE '9999-12-31'
+            """, [entity_id])
+            con.execute("""
+                INSERT INTO entity_rollup_history
+                  (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                   confidence, valid_from, valid_to)
+                VALUES (?, ?, 'economic_control_v1', 'parent_brand',
+                        'medium', CURRENT_DATE, DATE '9999-12-31')
+            """, [entity_id, best_parent_id])
+        return {
+            "matched": True,
+            "parent_entity_id": best_parent_id,
+            "parent_name": best_parent_name,
+            "score": best_score,
+        }
+
+    return {
+        "matched": False,
+        "best_name": best_parent_name,
+        "best_score": best_score,
+    }
+
+
+def update_classification_from_sic(
+    con, entity_id: int, sic_code: str | int | None, source: str = "SEC_SIC",
+) -> bool:
+    """
+    Update entity_classification_history if current classification is 'unknown'
+    and SIC code maps to a known classification. SCD Type 2: closes old row,
+    inserts new row. Returns True if updated.
+    """
+    new_cls = classify_from_sic(sic_code)
+    if new_cls == "unknown":
+        return False
+
+    current = con.execute("""
+        SELECT classification FROM entity_classification_history
+        WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+    """, [entity_id]).fetchone()
+    if not current or current[0] != "unknown":
+        return False
+
+    con.execute("""
+        UPDATE entity_classification_history
+        SET valid_to = CURRENT_DATE
+        WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+    """, [entity_id])
+    con.execute("""
+        INSERT INTO entity_classification_history
+          (entity_id, classification, is_activist, confidence, source,
+           is_inferred, valid_from, valid_to)
+        VALUES (?, ?, FALSE, 'medium', ?, FALSE, CURRENT_DATE, DATE '9999-12-31')
+    """, [entity_id, new_cls, source])
+    return True
