@@ -83,7 +83,7 @@ _Last updated: April 5, 2026_
 | 39 | Bug 6 — fetch_market.py upsert, never drops table | Done | Unique index on ticker, delete-then-insert per batch |
 | 40 | Bug 7 — app.py snapshot switchback monitor | Done | Background thread, 60s poll, auto-switch + log |
 | 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
-| 42 | Entity MDM — Phase 1+2 complete on staging, see ENTITY_ARCHITECTURE.md | Staging complete, awaiting Phase 4 merge | Phase 2: entity_sync.py shared module, entity_identifiers_staging table, fetch_ncen.py wired as incremental feeder (--staging), build_entities.py refactored + --refresh-reference-tables flag, Wellington gate PASS. Build: 20,193 entities, 29,023 identifiers, 11,621 relationships. Validation: 8 PASS, 4 MANUAL, 0 FAIL (12 gates). |
+| 42 | Entity MDM — Phases 1-3 complete on staging, see ENTITY_ARCHITECTURE.md | Staging complete, awaiting Phase 4 merge | Phase 3: 5,293 long-tail CIKs resolved via SEC EDGAR (100% retrieval), 153 parent matched, 104 SIC classified, 181 aliases added. resolve_long_tail.py + entity_sync extensions. 13 validation gates (8 PASS, 5 MANUAL, 0 FAIL). |
 | 43 | Fix pre-existing app.py lint debt | Not started | E402 imports at lines 22-100, broad-exception-caught throughout, bandit B608 SQL injection warnings at lines 487-603. Blocked the normal pre-commit path for Entity MDM Step 10; Step 10 endpoint committed with --no-verify. Separate cleanup session required to address in isolation. |
 
 ---

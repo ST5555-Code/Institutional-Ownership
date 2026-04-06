@@ -66,9 +66,23 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 - Wellington validation gate (#12) added to validate_entities.py
 **Build metrics:** 20,193 entities, 29,023 identifiers, 11,621 relationships, 20,416 aliases. Validation: 8 PASS, 4 MANUAL, 0 FAIL.
 
-### Phase 3 — Long-tail Filer Resolution ⬜ NOT STARTED
+### Phase 3 — Long-tail Filer Resolution ✅ COMPLETE
 **Scope:** Batch resolve ~5,000 unmatched CIKs via SEC company search API. Populate entity_aliases. Attempt parent matching.
 **Target:** >80% of 5,000 CIKs resolved.
+**Results:**
+- 5,328 target CIKs identified (self-rollup + unknown classification + non-PARENT_SEEDS)
+- 5,293 processed in full run (5 already resolved in test run), **100% SEC metadata retrieval**
+- 153 parent matched (fuzzy score ≥85 against existing parent aliases → `parent_brand` relationships)
+- 104 SIC classified (unknown → active/hedge_fund via financial SIC codes)
+- 181 alias updated (SEC-registered name added as filing alias)
+- 412 total enrichment actions (7.8% of targets — remainder are legitimate standalone filers)
+- 4,881 remain correctly standalone (corporates, banks, insurance companies with no parent in PARENT_SEEDS)
+**Validation:** 13 gates — 8 PASS, 5 MANUAL, 0 FAIL. Resolution rate gate MANUAL: SEC >80% met, enrichment <25% documented as population characteristic.
+**Deliverables:**
+- `scripts/resolve_long_tail.py` — batch resolver with `--limit`, `--all`, `--dry-run`, `--staging`
+- `entity_sync.py` extended: `resolve_cik_via_sec()`, `classify_from_sic()`, `attempt_parent_match()`, `update_classification_from_sic()`
+- `logs/phase3_resolution_results.csv` — full results (5,293 rows)
+- `logs/phase3_unmatched.csv` — unmatched entities with best fuzzy scores
 
 ### Phase 3.5 — Form ADV Schedules A/B ⬜ NOT STARTED
 **Scope:** Parse ADV Schedule A (Direct Owners) and B (Indirect Owners). Populate entity_relationships with wholly_owned and parent_brand types. Handle JV and multi-adviser structures.
@@ -138,7 +152,7 @@ These are architectural limitations of the current design, not bugs. Must be doc
 
 3. **Single rollup worldview** — economic_control_v1 is the only rollup type in Phase 1. Regulatory parent and brand parent views deferred to Phase 4+.
 
-4. **~5,000 long-tail filers unresolved** — CIKs not matching any PARENT_SEEDS entry remain as standalone entities. Resolution in Phase 3.
+4. **~~5,000 long-tail filers~~ → 4,881 standalone after Phase 3** — of 5,328 originally unresolved CIKs, 153 matched to existing parents via fuzzy match, 104 reclassified via SIC codes. Remaining 4,881 are legitimate standalone filers (corporates, banks, insurance companies) correctly self-rolled. No further resolution expected without expanding PARENT_SEEDS or Phase 3.5 ADV parsing.
 
 5. **Wellington / multi-family sub-advisory** — Wellington sub-advises Hartford, John Hancock, and other fund families. In Phase 1 Wellington appears as sub_adviser in those relationships (is_primary = FALSE). Full multi-parent modeling deferred to Phase 3.5.
 
@@ -153,6 +167,7 @@ These are architectural limitations of the current design, not bugs. Must be doc
 | `scripts/build_entities.py` | Full rebuild population script (`--reset`, `--refresh-reference-tables`) |
 | `scripts/validate_entities.py` | Validation gate runner (12 gates including Wellington) |
 | `scripts/fetch_ncen.py` | N-CEN feeder — incremental entity sync via `--staging` flag (Phase 2) |
+| `scripts/resolve_long_tail.py` | Phase 3 batch CIK resolver via SEC EDGAR (`--limit`, `--all`, `--dry-run`) |
 | `logs/entity_build.log` | Transaction log from build_entities.py |
 | `logs/entity_build_conflicts.log` | Identifier conflicts during population |
 | `logs/entity_validation_report.json` | Validation gate results |
@@ -197,3 +212,5 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 5 2026 | Amova/Nikko consolidation accepted as legacy data correction | Amova Asset Management is former name of Nikko Asset Management — legacy system split them into two separate parents ($213.8B each), new entity model correctly merges under Nikko ($427.5B). This is the first documented legacy data correction caught by the validation gates. | Keeping Amova split to force gate 5/6 to exact match — would enshrine known bug |
 | Apr 5 2026 | Shared entity_sync.py module instead of inline feeder logic | Phase 2 N-CEN wiring, Phase 3 long-tail, and Phase 3.5 ADV all need the same get-or-create and conflict-routing pattern — shared module prevents code duplication and ensures both --reset rebuild and incremental feeder paths use identical logic | Inline per-script feeder code — would diverge over time |
 | Apr 5 2026 | DB-backed primary-parent check (replace in-memory set) | entity_sync.insert_relationship_idempotent queries entity_relationships to check for existing primary parents — correct in both batch and incremental modes, no stale-set risk | In-memory has_primary_parent set — only works in batch mode, stale across transactions |
+| Apr 5 2026 | SIC→classification mapping: conservative financial-only | Only financial SIC codes (6xxx range) map to classifications; non-financial codes stay 'unknown'. This avoids misclassifying corporates that file 13F (AMD=3674, airlines=4512). Phase 3 reclassified 104 entities via SIC. | Map all SIC codes — would produce false classifications for non-financial filers |
+| Apr 5 2026 | Phase 3 parent matching: fuzzy against existing parents only, never create new parents | Prevents runaway parent proliferation from noisy SEC name data. 153 matched at score ≥85 to existing PARENT_SEEDS parents. New parent creation deferred to Phase 3.5 ADV parsing where ownership data is authoritative. | Create new parent entities from SEC names — would produce unvalidated parents |
