@@ -26,7 +26,7 @@ from queries import (
     get_cusip, clean_for_json, df_to_records,
     query1, query2, query3, query4, query5,
     query6, query7, query8, query9, query10,
-    query11, query12, query13, query14, query15, query16,
+    query11, query12, query14, query15, query16,
     ownership_trend_summary, cohort_analysis, flow_analysis, holder_momentum,
     short_interest_analysis, portfolio_context,
     get_summary, _cross_ownership_query,
@@ -35,7 +35,7 @@ from queries import (
 QUERY_FUNCTIONS = {
     1: query1, 2: query2, 3: query3, 4: query4, 5: query5,
     6: query6, 7: query7, 8: query8, 9: query9, 10: query10,
-    11: query11, 12: query12, 13: query13, 14: query14, 15: query15,
+    11: query11, 12: query12, 14: query14, 15: query15,
     16: query16,
 }
 
@@ -896,6 +896,25 @@ def api_admin_entity_override():
                     skipped.append({'row': row_num, 'reason': f'unsupported action: {action}'})
                     continue
 
+                # Persist override for replay after --reset rebuilds
+                # Look up CIK for this entity (used to re-resolve after rebuild)
+                cik_row = con.execute(
+                    """SELECT identifier_value FROM entity_identifiers
+                       WHERE entity_id = ? AND identifier_type = 'cik'
+                         AND valid_to = DATE '9999-12-31' LIMIT 1""",
+                    [entity_id],
+                ).fetchone()
+                entity_cik = cik_row[0] if cik_row else str(entity_id)
+                try:
+                    con.execute(
+                        """INSERT INTO entity_overrides_persistent
+                           (entity_cik, action, field, old_value, new_value, reason, analyst)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        [entity_cik, action, field, old_value, new_value, reason, analyst],
+                    )
+                except Exception:
+                    pass  # table might not exist in older staging DBs
+
                 # Audit log append
                 with open(log_path, 'a') as f:
                     f.write(
@@ -1381,15 +1400,57 @@ def api_short_long():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/short_squeeze')
-def api_short_squeeze():
-    """Short squeeze candidates: high crowding + high short interest."""
+
+
+@app.route('/api/sector_flows')
+def api_sector_flows():
+    """Multi-quarter institutional money flows by GICS sector."""
     try:
-        from queries import get_short_squeeze_candidates
-        result = get_short_squeeze_candidates()
-        return jsonify({'candidates': result})
+        from queries import get_sector_flows
+        active_only = request.args.get('active_only', '0') == '1'
+        result = get_sector_flows(active_only=active_only)
+        return jsonify(result)
     except Exception as e:
-        app.logger.error(f"short_squeeze error: {e}")
+        app.logger.error(f"sector_flows error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sector_flow_movers')
+def api_sector_flow_movers():
+    """Top buyers/sellers for one sector in one quarter transition."""
+    try:
+        from queries import get_sector_flow_movers
+        q_from = request.args.get('from', '').strip()
+        q_to = request.args.get('to', '').strip()
+        sector = request.args.get('sector', '').strip()
+        active_only = request.args.get('active_only', '0') == '1'
+        level = request.args.get('level', 'parent').strip()
+        if not q_from or not q_to or not sector:
+            return jsonify({'error': 'Missing required params: from, to, sector'}), 400
+        result = get_sector_flow_movers(q_from, q_to, sector,
+                                        active_only=active_only, level=level)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"sector_flow_movers error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sector_flow_detail')
+def api_sector_flow_detail():
+    """Full cross-quarter detail for one sector: inflow/outflow/net + top movers."""
+    try:
+        from queries import get_sector_flow_detail
+        sector = request.args.get('sector', '').strip()
+        active_only = request.args.get('active_only', '0') == '1'
+        level = request.args.get('level', 'parent').strip()
+        if not sector:
+            return jsonify({'error': 'Missing sector param'}), 400
+        rank_by = request.args.get('rank_by', 'total').strip()
+        result = get_sector_flow_detail(sector, active_only=active_only,
+                                         level=level, rank_by=rank_by)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"sector_flow_detail error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1578,8 +1639,8 @@ def api_query(qnum):
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
 
-    # Queries 13 and 15 do not require a ticker
-    if qnum not in (13, 15) and not ticker:
+    # Query 15 does not require a ticker
+    if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
 
     try:
@@ -1591,9 +1652,6 @@ def api_query(qnum):
             if not data.get('positions'):
                 return jsonify({'error': f'No holdings found for CIK {cik}'}), 404
             return jsonify(data)
-        elif qnum == 13:
-            sector = request.args.get('sector', '').strip() or None
-            data = fn(ticker or None, sector=sector)
         elif qnum == 15:
             data = fn(ticker or None)
         else:
@@ -1623,7 +1681,7 @@ def api_export(qnum):
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
 
-    if qnum not in (13, 15) and not ticker:
+    if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
 
     try:
@@ -1631,9 +1689,6 @@ def api_export(qnum):
         if qnum == 7:
             fund_name = request.args.get('fund_name', '').strip() or None
             data = fn(ticker, cik=cik or None, fund_name=fund_name)
-        elif qnum == 13:
-            sector = request.args.get('sector', '').strip() or None
-            data = fn(ticker or None, sector=sector)
         elif qnum == 15:
             data = fn(ticker or None)
         else:
