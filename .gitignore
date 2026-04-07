@@ -5,6 +5,9 @@ data/raw/
 data/extracted/
 data/market/
 data/nport_raw/
+data/cache/adv_pdfs/
+data/cache/adv_parse_w*.csv
+data/cache/adv_parsed.txt
 
 # Outputs — generated files
 outputs/

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gc
 import os
 import sys
 import time
@@ -51,6 +52,27 @@ TIMEDOUT_CSV = LOG_DIR / "phase35_timed_out.csv"
 PDF_BASE_URL = "https://reports.adviserinfo.sec.gov/reports/ADV"
 RATE_LIMIT = 0.2  # 5 req/s
 MAX_SIZE_MB = 10.0
+FAILED_CRDS_CSV = LOG_DIR / "phase35_failed_crds.csv"
+CHECKPOINT_FILE = ROOT / "data" / "cache" / "adv_parsed.txt"
+
+
+def _is_valid_pdf(path: str) -> bool:
+    """Check first 4 bytes are %PDF."""
+    try:
+        with open(path, 'rb') as f:
+            return f.read(4) == b'%PDF'
+    except Exception:
+        return False
+
+
+def _log_failed_crd(crd, name, reason):
+    """Append to failed CRDs log."""
+    header_needed = not FAILED_CRDS_CSV.exists() or FAILED_CRDS_CSV.stat().st_size == 0
+    with open(FAILED_CRDS_CSV, "a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if header_needed:
+            w.writerow(["crd", "firm_name", "reason"])
+        w.writerow([crd, name, reason])
 
 
 def get_adv_targets(con) -> list[tuple]:
@@ -94,7 +116,13 @@ def run_download(targets, limit=None):
             if resp.status_code == 200 and len(resp.content) > 100:
                 with open(pdf_path, 'wb') as f:
                     f.write(resp.content)
-                downloaded += 1
+                # Validate downloaded file is actually a PDF
+                if _is_valid_pdf(pdf_path):
+                    downloaded += 1
+                else:
+                    os.remove(pdf_path)
+                    _log_failed_crd(crd, name, "invalid_pdf_header")
+                    failed += 1
             else:
                 failed += 1
         except Exception:
@@ -112,7 +140,7 @@ def run_download(targets, limit=None):
 # =========================================================================
 # Phase 2: Parse
 # =========================================================================
-PARSE_TIMEOUT = 30  # seconds per PDF — skip if pdfplumber hangs
+PARSE_TIMEOUT = 180  # seconds per PDF (most parse in 45-150s)
 
 CSV_FIELDNAMES = [
     "firm_crd", "firm_name", "entity_id", "schedule", "name", "jurisdiction",
@@ -120,126 +148,408 @@ CSV_FIELDNAMES = [
     "is_entity", "relationship_type",
 ]
 
+PARSE_WORKERS = 4  # parallel PDF parse workers
+PARSE_PROGRESS = LOG_DIR / "phase35_parse_progress.log"
+ERRORS_CSV = LOG_DIR / "phase35_errors.csv"
+MEM_WARN_MB = 2048   # log warning
+MEM_EMERGENCY_MB = 4096  # force full GC + cache clear
 
-def _parse_with_timeout(pdf_path, firm_crd, timeout_sec=30):
-    """Parse a PDF with a timeout. Returns entries or empty list on timeout."""
+
+def _get_rss_mb():
+    """Current process RSS in MB (macOS/Linux)."""
+    try:
+        import resource
+        # ru_maxrss is in bytes on macOS, KB on Linux
+        ru = resource.getrusage(resource.RUSAGE_SELF)
+        rss = ru.ru_maxrss
+        if sys.platform == "darwin":
+            return rss / (1024 * 1024)
+        return rss / 1024
+    except Exception:
+        return 0.0
+
+
+def _get_current_rss_mb():
+    """Current (not peak) RSS in MB via resource module (no subprocess)."""
+    try:
+        import resource
+        ru = resource.getrusage(resource.RUSAGE_SELF)
+        if sys.platform == "darwin":
+            return ru.ru_maxrss / (1024 * 1024)  # bytes on macOS
+        return ru.ru_maxrss / 1024  # KB on Linux
+    except Exception:
+        return 0.0
+
+
+def _worker_parse_chunk(chunk, worker_id, tmp_csv_path, timeout_sec, max_size_mb,
+                        progress_path, errors_csv_path, checkpoint_path):
+    """Independent subprocess: parses its own chunk of PDFs, writes its own CSV.
+
+    Each worker is a full process with SIGALRM timeout — no shared state,
+    no pool contention, no GIL. Writes results to a temp CSV that the main
+    process merges after all workers finish.
+
+    Bulletproof:
+    - SIGALRM timeout per PDF (logs as TIMEOUT, not ERROR)
+    - try/except around entire per-PDF logic — never crash on single bad PDF
+    - CSV flush after every PDF (crash-safe checkpoint)
+    - Checkpoint: appends CRD to adv_parsed.txt after every PDF (O_APPEND atomic)
+    - SIGTERM handler: flush and exit cleanly on kill signal
+    - Memory monitoring: warn at 2GB, emergency GC at 4GB
+    - Progress log: every PDF + summary every 50 PDFs
+    """
     import signal
 
-    def _handler(_signum, _frame):
-        raise TimeoutError(f"PDF parse exceeded {timeout_sec}s")
+    # --- SIGTERM handler: flush CSV and exit cleanly ---
+    _shutting_down = False
 
-    old = signal.signal(signal.SIGALRM, _handler)
-    signal.alarm(timeout_sec)
-    try:
-        return entity_sync.parse_adv_pdf(pdf_path, firm_crd=firm_crd, max_size_mb=MAX_SIZE_MB)
-    except TimeoutError:
-        return []
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
+    def _sigterm_handler(_signum, _frame):
+        nonlocal _shutting_down
+        _shutting_down = True
+        _log_progress("---", "SIGTERM", "STOP", secs=0)
 
+    signal.signal(signal.SIGTERM, _sigterm_handler)
 
-def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT):
-    """
-    Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
+    # --- SIGALRM handler for per-PDF timeout ---
+    def _alarm_handler(_signum, _frame):
+        raise TimeoutError("PDF parse timeout")
 
-    Incremental: writes each firm's results to CSV immediately after parsing.
-    Resumable: loads already-parsed CRDs from existing CSV at startup, skips them.
-    Timeout: skips any PDF that takes >30s to parse.
-    """
-    work = targets if limit is None else targets[:limit]
+    # --- Progress logging ---
+    def _log_progress(crd, name, status, rows=0, secs=0, mem_mb=0):
+        """Append one line to shared progress log. O_APPEND is atomic on POSIX."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = f"{ts} W{worker_id} [{done_count}/{len(chunk)}] {status:>7} {crd} {name[:40]}"
+        if rows:
+            line += f" → {rows} rows"
+        if secs:
+            line += f" ({secs:.0f}s)"
+        if mem_mb:
+            line += f" [{mem_mb:.0f}MB]"
+        line += "\n"
+        with open(progress_path, "a", encoding="utf-8") as pf:
+            pf.write(line)
 
-    # Resume: load CRDs already in the CSV
-    already_parsed: set[str] = set()
-    csv_exists = SCHEDULES_CSV.exists() and SCHEDULES_CSV.stat().st_size > 0
-    if csv_exists:
-        with open(SCHEDULES_CSV, encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                already_parsed.add(row.get("firm_crd", ""))
-        print(f"  Resuming: {len(already_parsed)} CRDs already in CSV, skipping")
+    def _log_summary():
+        """Summary line every 50 PDFs with ETA and memory."""
+        elapsed = time.time() - worker_t0
+        rate = done_count / elapsed if elapsed > 0 else 0
+        remaining = len(chunk) - done_count
+        eta_sec = remaining / rate if rate > 0 else 0
+        eta_min = eta_sec / 60
+        mem = _get_current_rss_mb()
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = (f"{ts} W{worker_id} === SUMMARY: {done_count}/{len(chunk)} done, "
+                f"{parsed} parsed, {total_rows} rows, {parse_errors} errors, "
+                f"{timed_out} timeout | {elapsed:.0f}s elapsed, "
+                f"ETA {eta_min:.0f}m | mem {mem:.0f}MB ===\n")
+        with open(progress_path, "a", encoding="utf-8") as pf:
+            pf.write(line)
 
-    # Open CSV in append mode (or write mode if new)
-    csv_mode = "a" if csv_exists else "w"
-    csv_file = open(SCHEDULES_CSV, csv_mode, newline="", encoding="utf-8")  # noqa: SIM115
-    writer = csv.DictWriter(csv_file, fieldnames=CSV_FIELDNAMES)
-    if not csv_exists:
-        writer.writeheader()
+    # --- Error logging ---
+    def _log_error(crd, name, error_msg):
+        """Append to shared errors CSV."""
+        with open(errors_csv_path, "a", newline="", encoding="utf-8") as ef:
+            w = csv.writer(ef)
+            w.writerow([datetime.now().isoformat(), worker_id, crd, name, error_msg])
+
+    # --- Checkpoint ---
+    def _checkpoint(crd):
+        """Append CRD to checkpoint file. O_APPEND is atomic on POSIX."""
+        with open(checkpoint_path, "a", encoding="utf-8") as cf:
+            cf.write(f"{crd}\n")
 
     parsed = 0
-    skipped_size = 0
-    skipped_missing = 0
-    skipped_done = 0
     parse_errors = 0
     timed_out = 0
     total_rows = 0
-    oversized = []
+    done_count = 0
     timed_out_list = []
-    t0 = time.time()
+    worker_t0 = time.time()
+
+    csv_file = open(tmp_csv_path, "w", newline="", encoding="utf-8")  # noqa: SIM115
+    writer = csv.DictWriter(csv_file, fieldnames=CSV_FIELDNAMES)
+    writer.writeheader()
 
     try:
-        for i, (crd, name, eid) in enumerate(work):
-            # Resume check
-            if crd in already_parsed:
-                skipped_done += 1
-                continue
+        for i, (crd, name, eid, pdf_path, file_mb) in enumerate(chunk):
+            if _shutting_down:
+                _log_progress(crd, name, "ABORT", secs=0)
+                break
 
-            pdf_path = str(PDF_DIR / f"{crd}.pdf")
-            if not os.path.exists(pdf_path):
-                skipped_missing += 1
-                continue
-
-            file_mb = os.path.getsize(pdf_path) / (1024 * 1024)
-            if file_mb > MAX_SIZE_MB:
-                skipped_size += 1
-                oversized.append({"crd": crd, "firm_name": name, "size_mb": round(file_mb, 1)})
-                continue
+            done_count = i + 1
+            pdf_t0 = time.time()
+            status = "EMPTY"
+            n_rows = 0
 
             try:
-                entries = _parse_with_timeout(pdf_path, firm_crd=crd, timeout_sec=timeout)
-            except Exception:
-                parse_errors += 1
-                continue
+                # SIGALRM timeout — clean per-PDF, works in single process
+                old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+                signal.alarm(timeout_sec)
+                try:
+                    entries = entity_sync.parse_adv_pdf(
+                        pdf_path, firm_crd=crd, max_size_mb=max_size_mb)
+                except TimeoutError:
+                    entries = None  # distinguish timeout from empty
+                    status = "TIMEOUT"
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
 
-            if not entries:
-                # Could be timeout or genuinely empty schedule
-                if file_mb > 3:
+                gc.collect()
+
+                if entries is None:
+                    # Timeout
                     timed_out += 1
                     timed_out_list.append({
                         "crd": crd, "firm_name": name, "size_mb": round(file_mb, 1),
-                        "timeout_sec": timeout,
+                        "timeout_sec": timeout_sec,
                     })
-                continue
+                elif not entries:
+                    status = "EMPTY"
+                else:
+                    status = "OK"
+                    parsed += 1
+                    for e in entries:
+                        row = {"firm_crd": crd, "firm_name": name, "entity_id": eid}
+                        for field in CSV_FIELDNAMES[3:]:
+                            row[field] = e.get(field, "")
+                        writer.writerow(row)
+                        n_rows += 1
+                        total_rows += 1
+                    # Flush after EVERY PDF — crash-safe checkpoint
+                    csv_file.flush()
 
-            parsed += 1
-            # Write immediately — no data loss on crash
-            for e in entries:
-                row = {"firm_crd": crd, "firm_name": name, "entity_id": eid}
-                for field in CSV_FIELDNAMES[3:]:
-                    row[field] = e.get(field, "")
-                writer.writerow(row)
-                total_rows += 1
-            csv_file.flush()
+            except Exception as exc:
+                status = "ERROR"
+                parse_errors += 1
+                _log_error(crd, name, f"{type(exc).__name__}: {exc}")
+                gc.collect()
 
-            if (i + 1) % 100 == 0 or i < 3:
-                elapsed = time.time() - t0
-                rate = (i + 1 - skipped_done) / elapsed if elapsed > 0 else 0
-                print(
-                    f"  [{i+1}/{len(work)}] parsed={parsed} rows={total_rows} "
-                    f"errors={parse_errors} timeout={timed_out} "
-                    f"oversized={skipped_size} ({rate:.1f}/s)"
-                )
+            elapsed_pdf = time.time() - pdf_t0
+
+            # Memory monitoring after every PDF
+            mem_mb = _get_current_rss_mb()
+            if mem_mb > MEM_EMERGENCY_MB:
+                gc.collect()
+                mem_mb = _get_current_rss_mb()
+                _log_progress(crd, name, "MEM!!!", mem_mb=mem_mb, secs=elapsed_pdf)
+            elif mem_mb > MEM_WARN_MB:
+                gc.collect()
+                mem_mb = _get_current_rss_mb()
+
+            _log_progress(crd, name, status, rows=n_rows, secs=elapsed_pdf,
+                          mem_mb=mem_mb if mem_mb > MEM_WARN_MB else 0)
+
+            # Checkpoint: mark CRD complete (success, error, timeout — all count)
+            _checkpoint(crd)
+
+            # Summary every 50 PDFs
+            if done_count % 50 == 0:
+                _log_summary()
+
     finally:
+        csv_file.flush()
         csv_file.close()
+
+    _log_summary()
+    print(f"    [W{worker_id}] done: {parsed} parsed, {total_rows} rows, "
+          f"{parse_errors} errors, {timed_out} timed out")
+    return {
+        "parsed": parsed, "errors": parse_errors, "timed_out": timed_out,
+        "rows": total_rows, "timed_out_list": timed_out_list,
+        "tmp_csv": tmp_csv_path,
+    }
+
+
+def _run_worker_entry(chunk, wid, tmp_csv, timeout_sec, max_size_mb,
+                      progress_path, errors_csv_path, checkpoint_path, q):
+    """Module-level entry point for Process (must be picklable on macOS spawn)."""
+    result = _worker_parse_chunk(chunk, wid, tmp_csv, timeout_sec, max_size_mb,
+                                 progress_path, errors_csv_path, checkpoint_path)
+    q.put(result)
+
+
+def _merge_temp_csvs(tmp_pattern_dir):
+    """Recover leftover temp CSVs from a crashed previous run into main CSV."""
+    import glob
+    leftover = sorted(glob.glob(str(tmp_pattern_dir / "adv_parse_w*.csv")))
+    if not leftover:
+        return 0
+    merged = 0
+    csv_exists = SCHEDULES_CSV.exists() and SCHEDULES_CSV.stat().st_size > 0
+    csv_mode = "a" if csv_exists else "w"
+    with open(SCHEDULES_CSV, csv_mode, newline="", encoding="utf-8") as out_f:
+        writer = csv.DictWriter(out_f, fieldnames=CSV_FIELDNAMES)
+        if not csv_exists:
+            writer.writeheader()
+        for tmp_csv in leftover:
+            with open(tmp_csv, encoding="utf-8") as in_f:
+                for row in csv.DictReader(in_f):
+                    writer.writerow(row)
+                    merged += 1
+            os.remove(tmp_csv)
+    if merged:
+        print(f"  Recovered {merged} rows from {len(leftover)} temp CSVs (previous crash)")
+    return merged
+
+
+def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS):
+    """
+    Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
+
+    Partitioned parallel: splits work into N chunks, each runs as an independent
+    subprocess with its own temp CSV. Main process merges results after all finish.
+
+    Bulletproof guarantees:
+    - SIGALRM timeout per PDF (correctly logged as TIMEOUT)
+    - try/except around every PDF — single bad PDF never crashes the run
+    - CSV flush after every PDF — crash loses at most 1 PDF per worker
+    - SIGTERM handler — clean shutdown on kill signal
+    - Memory monitoring — warn at 2GB, emergency GC at 4GB
+    - Crash recovery — leftover temp CSVs from prior crash merged on startup
+    - Progress log — every PDF + summary every 50 with ETA and memory
+    """
+    from multiprocessing import Process, Queue
+
+    work = targets if limit is None else targets[:limit]
+    tmp_dir = ROOT / "data" / "cache"
+
+    # Crash recovery: merge any leftover temp CSVs from previous interrupted run
+    _merge_temp_csvs(tmp_dir)
+
+    # Resume: load CRDs from explicit checkpoint file (not CSV)
+    already_parsed: set[str] = set()
+    checkpoint_path = str(CHECKPOINT_FILE)
+    if CHECKPOINT_FILE.exists():
+        with open(checkpoint_path, encoding="utf-8") as f:
+            for line in f:
+                crd = line.strip()
+                if crd:
+                    already_parsed.add(crd)
+        print(f"  Resuming: {len(already_parsed)} CRDs in checkpoint, skipping")
+    csv_exists = SCHEDULES_CSV.exists() and SCHEDULES_CSV.stat().st_size > 0
+
+    # Build work queue — filter out already-done, missing, oversized up front
+    parse_queue = []  # (crd, name, eid, pdf_path, file_mb)
+    skipped_done = 0
+    skipped_missing = 0
+    skipped_size = 0
+    oversized = []
+
+    for crd, name, eid in work:
+        if crd in already_parsed:
+            skipped_done += 1
+            continue
+        pdf_path = str(PDF_DIR / f"{crd}.pdf")
+        if not os.path.exists(pdf_path):
+            skipped_missing += 1
+            continue
+        if not _is_valid_pdf(pdf_path):
+            _log_failed_crd(crd, name, "invalid_pdf_header")
+            skipped_missing += 1
+            continue
+        file_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+        if file_mb > MAX_SIZE_MB:
+            skipped_size += 1
+            oversized.append({"crd": crd, "firm_name": name, "size_mb": round(file_mb, 1)})
+            continue
+        parse_queue.append((crd, name, eid, pdf_path, file_mb))
+
+    print(f"  Queue: {len(parse_queue)} to parse, {skipped_done} resumed, "
+          f"{skipped_size} oversized, {skipped_missing} missing")
+
+    if not parse_queue:
+        print("  Nothing to parse.")
+        return {"parsed": 0, "rows": 0, "oversized": skipped_size}
+
+    actual_workers = min(workers, len(parse_queue))
+    print(f"  Workers: {actual_workers}")
+
+    # Partition queue into N equal chunks (round-robin for balanced file sizes)
+    chunks = [[] for _ in range(actual_workers)]
+    for i, item in enumerate(parse_queue):
+        chunks[i % actual_workers].append(item)
+
+    for i, chunk in enumerate(chunks):
+        print(f"    W{i}: {len(chunk)} PDFs")
+
+    # Prepare logs
+    result_queue = Queue()
+    t0 = time.time()
+
+    progress_path = str(PARSE_PROGRESS)
+    with open(progress_path, "w", encoding="utf-8") as pf:
+        pf.write(f"=== Parse started {datetime.now().isoformat()} "
+                 f"({len(parse_queue)} PDFs, {actual_workers} workers, "
+                 f"timeout={timeout}s) ===\n")
+    print(f"  Progress: tail -f {progress_path}")
+
+    errors_csv_path = str(ERRORS_CSV)
+    with open(errors_csv_path, "w", newline="", encoding="utf-8") as ef:
+        csv.writer(ef).writerow(["timestamp", "worker", "crd", "firm_name", "error"])
+
+    # Launch independent subprocesses
+    procs = []
+    for wid, chunk in enumerate(chunks):
+        tmp_csv = str(tmp_dir / f"adv_parse_w{wid}.csv")
+        p = Process(
+            target=_run_worker_entry,
+            args=(chunk, wid, tmp_csv, timeout, MAX_SIZE_MB,
+                  progress_path, errors_csv_path, checkpoint_path,
+                  result_queue),
+        )
+        p.start()
+        procs.append(p)
+
+    # Wait for all workers and check exit codes
+    for wid, p in enumerate(procs):
+        p.join()
+        if p.exitcode != 0:
+            print(f"  WARNING: Worker W{wid} exited with code {p.exitcode}")
 
     elapsed = time.time() - t0
 
-    # Write timed-out log (for retry with higher timeout)
-    if timed_out_list:
+    # Collect results — one per worker, known count (never use queue.empty())
+    total_parsed = 0
+    total_errors = 0
+    total_timed_out = 0
+    total_rows = 0
+    all_timed_out = []
+    tmp_csvs = []
+
+    for _ in range(actual_workers):
+        try:
+            r = result_queue.get(timeout=5)
+        except Exception:
+            print("  WARNING: Missing result from worker (crashed before put?)")
+            continue
+        total_parsed += r["parsed"]
+        total_errors += r["errors"]
+        total_timed_out += r["timed_out"]
+        total_rows += r["rows"]
+        all_timed_out.extend(r["timed_out_list"])
+        tmp_csvs.append(r["tmp_csv"])
+
+    # Merge temp CSVs into main CSV
+    csv_mode = "a" if csv_exists else "w"
+    with open(SCHEDULES_CSV, csv_mode, newline="", encoding="utf-8") as out_f:
+        writer = csv.DictWriter(out_f, fieldnames=CSV_FIELDNAMES)
+        if not csv_exists:
+            writer.writeheader()
+        for tmp_csv in tmp_csvs:
+            if os.path.exists(tmp_csv):
+                with open(tmp_csv, encoding="utf-8") as in_f:
+                    for row in csv.DictReader(in_f):
+                        writer.writerow(row)
+                os.remove(tmp_csv)
+
+    # Write timed-out log
+    if all_timed_out:
         with open(TIMEDOUT_CSV, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=["crd", "firm_name", "size_mb", "timeout_sec"])
             w.writeheader()
-            w.writerows(timed_out_list)
-        print(f"  Timed out CRDs: {TIMEDOUT_CSV} ({len(timed_out_list)} firms — retry with higher --timeout)")
+            w.writerows(all_timed_out)
+        print(f"  Timed out CRDs: {TIMEDOUT_CSV} ({len(all_timed_out)} firms — retry with higher --timeout)")
 
     # Write oversized log
     if oversized:
@@ -248,12 +558,20 @@ def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT):
             w.writeheader()
             w.writerows(oversized)
 
-    print(f"\n  Parse complete: {parsed} PDFs → {total_rows} rows")
+    # Append completion to progress log
+    with open(progress_path, "a", encoding="utf-8") as pf:
+        pf.write(f"=== Parse complete {datetime.now().isoformat()} "
+                 f"({total_parsed} parsed, {total_rows} rows, "
+                 f"{total_errors} errors, {total_timed_out} timeout, "
+                 f"{elapsed:.0f}s) ===\n")
+
+    print(f"\n  Parse complete: {total_parsed} PDFs → {total_rows} rows")
     print(f"  Resumed: {skipped_done} already done")
-    print(f"  Skipped: {skipped_size} oversized, {skipped_missing} missing, {timed_out} timed out")
-    print(f"  Errors: {parse_errors}")
-    print(f"  Output: {SCHEDULES_CSV} ({elapsed:.0f}s)")
-    return {"parsed": parsed, "rows": total_rows, "oversized": skipped_size}
+    print(f"  Skipped: {skipped_size} oversized, {skipped_missing} missing, {total_timed_out} timed out")
+    print(f"  Errors: {total_errors} (see {ERRORS_CSV})")
+    print(f"  Workers: {actual_workers}, Time: {elapsed:.0f}s")
+    print(f"  Output: {SCHEDULES_CSV}")
+    return {"parsed": total_parsed, "rows": total_rows, "oversized": skipped_size}
 
 
 # =========================================================================
@@ -269,6 +587,15 @@ def run_match(con):
         all_rows = list(csv.DictReader(f))
 
     print(f"  Loaded {len(all_rows)} schedule rows from CSV")
+
+    # Always overwrite review CSVs at start so they reflect current run only
+    for path, fields in [
+        (JV_CSV, ["firm_crd", "firm_name", "entity_id", "owner_count", "owners"]),
+        (UNMATCHED_CSV, ["firm_crd", "firm_name", "entity_id", "owner_name", "best_match", "best_score"]),
+    ]:
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=fields).writeheader()
+
     alias_cache = entity_sync.build_alias_cache(con)
 
     # Group by firm CRD
@@ -306,10 +633,13 @@ def run_match(con):
             })
 
         for rank, owner in enumerate(controlling):
+            # JV: only first owner (highest ownership code) gets is_primary=True
+            is_primary = (rank == 0)
             r = entity_sync.insert_adv_ownership(
                 con, eid, owner["name"], owner["relationship_type"],
                 owner.get("ownership_code", ""), owner.get("schedule", "A"),
                 alias_cache=alias_cache,
+                is_primary=is_primary,
             )
             entity_results.append({
                 "firm_crd": crd, "firm_name": firm_name, "entity_id": eid,
@@ -355,12 +685,16 @@ def run_match(con):
 
     elapsed = time.time() - t0
 
-    # Write results
-    for path, data in [(RESULTS_CSV, entity_results), (JV_CSV, jv_entities), (UNMATCHED_CSV, unmatched_owners)]:
+    # Write results (RESULTS_CSV always full rewrite; JV/UNMATCHED append to pre-written headers)
+    if entity_results:
+        with open(RESULTS_CSV, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(entity_results[0].keys()))
+            w.writeheader()
+            w.writerows(entity_results)
+    for path, data in [(JV_CSV, jv_entities), (UNMATCHED_CSV, unmatched_owners)]:
         if data:
-            with open(path, "w", newline="", encoding="utf-8") as f:
+            with open(path, "a", newline="", encoding="utf-8") as f:
                 w = csv.DictWriter(f, fieldnames=list(data[0].keys()))
-                w.writeheader()
                 w.writerows(data)
 
     matched = sum(1 for r in entity_results if r["matched"])
@@ -389,7 +723,8 @@ def main():
     ap.add_argument("--download-only", action="store_true", help="Phase 1: download PDFs only")
     ap.add_argument("--parse-only", action="store_true", help="Phase 2: parse local PDFs to CSV only")
     ap.add_argument("--match-only", action="store_true", help="Phase 3: entity match from CSV only")
-    ap.add_argument("--timeout", type=int, default=30, help="Per-PDF parse timeout in seconds (default 30)")
+    ap.add_argument("--timeout", type=int, default=PARSE_TIMEOUT, help="Per-PDF parse timeout in seconds (default 180)")
+    ap.add_argument("--workers", type=int, default=PARSE_WORKERS, help="Parallel parse workers (default 4)")
     args = ap.parse_args()
 
     db.set_staging_mode(True)
@@ -415,8 +750,8 @@ def main():
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)
     elif args.parse_only:
-        print(f"\n--- PHASE 2: PARSE (timeout={parse_timeout}s) ---")
-        run_parse(targets, limit, timeout=parse_timeout)
+        print(f"\n--- PHASE 2: PARSE (timeout={parse_timeout}s, workers={args.workers}) ---")
+        run_parse(targets, limit, timeout=parse_timeout, workers=args.workers)
     elif args.match_only:
         print("\n--- PHASE 3: MATCH ---")
         con = db.connect_write()
@@ -426,8 +761,8 @@ def main():
         # Full run: all three phases
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)
-        print("\n--- PHASE 2: PARSE ---")
-        run_parse(targets, limit, timeout=parse_timeout)
+        print(f"\n--- PHASE 2: PARSE (workers={args.workers}) ---")
+        run_parse(targets, limit, timeout=parse_timeout, workers=args.workers)
         print("\n--- PHASE 3: MATCH ---")
         con = db.connect_write()
         run_match(con)

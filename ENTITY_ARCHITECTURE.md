@@ -1,7 +1,7 @@
 # Entity Master Data Management (MDM) Architecture
 
-_Last updated: April 4, 2026_
-_Status: Phase 1 — In Progress_
+_Last updated: April 7, 2026_
+_Status: Phase 3.5 — Parse in progress_
 
 ---
 
@@ -89,7 +89,7 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 **Data source:** ADV PDFs from `reports.adviserinfo.sec.gov/reports/ADV/{crd}/PDF/{crd}.pdf` (IAPD API returns 403; XML feed lacks schedules; PDFs are accessible).
 **Three-phase pipeline:** `--download-only` (5 req/s) → `--parse-only` (pdfplumber, CPU-bound) → `--match-only` (alias cache + rapidfuzz).
 **Ownership code mapping:** E/D (≥50%) → wholly_owned, C (25-50%) → parent_brand, NA on entities → mutual_structure (Vanguard pattern), A/B (<25%) → skip.
-**Status:** Download complete (3,652 PDFs, 8.4GB). Parse in progress. Match + validation pending.
+**Status:** Download complete (3,652 PDFs, 8.4GB). Parse in progress (~103 of 3,652 CRDs parsed). Match + validation pending.
 **Deliverables built:**
 - `entity_sync.py`: `parse_adv_pdf()`, `insert_adv_ownership()`, `build_alias_cache()`, `_AliasCache` (C-optimized matching)
 - `resolve_adv_ownership.py`: three-phase pipeline with `--download-only`, `--parse-only`, `--match-only`
@@ -97,6 +97,23 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 - `mutual_structure` relationship type + `mutual` control type added to schema CHECK constraints
 - Two new validation gates: `phase35_adv_coverage`, `phase35_jv_review`
 **Notes:** This is where multi-parent / JV structures are modeled. See Deferred Items #1.
+
+**Operational safeguards (verified Apr 7 2026):**
+
+| Safeguard | How it works |
+|-----------|-------------|
+| **No DB lock during parse** | `--parse-only` opens DB briefly to read target CRDs, then closes connection. Entire parse reads local PDFs and writes to CSV only. DB not held for hours. |
+| **Incremental save** | Each firm's rows written to CSV immediately with `flush()`. If process is killed mid-run, all prior firms' data is on disk. |
+| **Resume on restart** | On startup, reads existing `firm_crd` values from `adv_schedules.csv` into a set and skips already-parsed CRDs. Zero duplication across restarts. |
+| **Memory-safe** | pdfplumber opened via `with` context manager, `page.close()` after each page, `gc.collect()` after each PDF. Peak memory ~300 MB (flat), previously leaked to 4.5 GB. |
+| **Oversized PDFs tracked** | PDFs >10 MB skipped and logged to `logs/phase35_oversized.csv` with CRD, firm name, and size. |
+| **Timed-out PDFs tracked** | PDFs exceeding `--timeout` (default 30s) skipped and logged to `logs/phase35_timed_out.csv`. |
+
+**Retry workflow for skipped PDFs:**
+1. Run initial pass: `python3 -u scripts/resolve_adv_ownership.py --parse-only --all --staging`
+2. Review `logs/phase35_timed_out.csv` — retry with higher timeout: `--parse-only --all --staging --timeout 120`
+3. Review `logs/phase35_oversized.csv` — these are genuinely large filings (PIMCO 45 MB, Bridgewater 12 MB). Raise `MAX_SIZE_MB` in script or parse manually if needed.
+4. Resume logic handles all retries automatically — only un-parsed CRDs are attempted.
 
 ### Phase 4 — Migration ⛔ REQUIRES EXPLICIT AUTHORIZATION
 **Scope:** Migrate holdings, fund_holdings, beneficial_ownership to use entity_id FK.

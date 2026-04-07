@@ -202,7 +202,19 @@ def log_identifier_conflict(
     *,
     notes: str | None = None,
 ) -> int:
-    """Insert a row into entity_identifiers_staging. Returns staging_id."""
+    """Insert a row into entity_identifiers_staging. Returns staging_id.
+    Skips if identical pending conflict already exists."""
+    existing = con.execute(
+        """SELECT staging_id FROM entity_identifiers_staging
+           WHERE entity_id = ? AND identifier_type = ? AND identifier_value = ?
+             AND review_status = 'pending'""",
+        [entity_id, id_type, str(id_value)],
+    ).fetchone()
+    if existing:
+        logger.debug("staging_duplicate_skipped entity=%s type=%s value=%s",
+                      entity_id, id_type, id_value)
+        return existing[0]
+
     sid = con.execute("SELECT nextval('identifier_staging_id_seq')").fetchone()[0]
     con.execute(
         """INSERT INTO entity_identifiers_staging
@@ -402,6 +414,7 @@ def attempt_parent_match(
     resolved_name: str,
     *,
     threshold: int = 85,
+    alias_cache: _AliasCache | None = None,
 ) -> dict:
     """
     Attempt to match a resolved entity name against existing parent entities'
@@ -434,29 +447,44 @@ def attempt_parent_match(
         return {"matched": True, "parent_entity_id": existing[0],
                 "parent_name": "(already matched)", "score": 100, "skipped": True}
 
-    # Load aliases of entities that are actual parents (rollup targets)
-    parent_aliases = con.execute("""
-        SELECT DISTINCT ea.entity_id, ea.alias_name
-        FROM entity_aliases ea
-        JOIN (
-            SELECT DISTINCT rollup_entity_id
-            FROM entity_rollup_history
-            WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
-        ) parents ON ea.entity_id = parents.rollup_entity_id
-        WHERE ea.valid_to = DATE '9999-12-31'
-    """).fetchall()
+    # Use alias_cache if provided, else load from DB
+    parent_aliases = []
+    if alias_cache is not None:
+        cache = alias_cache
+    else:
+        # Load aliases with deterministic ORDER BY
+        parent_aliases = con.execute("""
+            SELECT DISTINCT ea.entity_id, ea.alias_name
+            FROM entity_aliases ea
+            JOIN (
+                SELECT DISTINCT rollup_entity_id
+                FROM entity_rollup_history
+                WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
+            ) parents ON ea.entity_id = parents.rollup_entity_id
+            WHERE ea.valid_to = DATE '9999-12-31'
+            ORDER BY ea.entity_id, ea.alias_name
+        """).fetchall()
+        cache = None  # signal to use manual loop below
 
     resolved_upper = resolved_name.upper()
     best_score = 0
     best_parent_id = None
     best_parent_name = None
 
-    for parent_eid, alias_name in parent_aliases:
-        score = fuzz.token_sort_ratio(resolved_upper, (alias_name or "").upper())
-        if score > best_score:
-            best_score = score
-            best_parent_id = parent_eid
-            best_parent_name = alias_name
+    if cache is not None:
+        # Use cached match with deterministic tiebreaker
+        eid, matched_name, score = cache.match(resolved_name, threshold)
+        best_score = score
+        best_parent_name = matched_name
+        best_parent_id = eid
+    else:
+        # Manual loop with deterministic tiebreaker: score DESC, entity_id ASC
+        for parent_eid, alias_name in parent_aliases:
+            score = fuzz.token_sort_ratio(resolved_upper, (alias_name or "").upper())
+            if score > best_score or (score == best_score and parent_eid < (best_parent_id or float('inf'))):
+                best_score = score
+                best_parent_id = parent_eid
+                best_parent_name = alias_name
 
     if best_score >= threshold and best_parent_id is not None:
         inserted = insert_relationship_idempotent(
@@ -464,20 +492,32 @@ def attempt_parent_match(
             True, "medium", "fuzzy_match", is_inferred=False,
         )
         if inserted:
-            # Update rollup: close old self-rollup, insert parent rollup
-            con.execute("""
-                UPDATE entity_rollup_history
-                SET valid_to = CURRENT_DATE
-                WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
-                  AND valid_to = DATE '9999-12-31'
-            """, [entity_id])
-            con.execute("""
-                INSERT INTO entity_rollup_history
-                  (entity_id, rollup_entity_id, rollup_type, rule_applied,
-                   confidence, valid_from, valid_to)
-                VALUES (?, ?, 'economic_control_v1', 'parent_brand',
-                        'medium', CURRENT_DATE, DATE '9999-12-31')
-            """, [entity_id, best_parent_id])
+            # Atomic SCD close+open for rollup history
+            con.begin()
+            try:
+                has_active = con.execute("""
+                    SELECT 1 FROM entity_rollup_history
+                    WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                      AND valid_to = DATE '9999-12-31'
+                """, [entity_id]).fetchone()
+                if has_active:
+                    con.execute("""
+                        UPDATE entity_rollup_history
+                        SET valid_to = CURRENT_DATE
+                        WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                          AND valid_to = DATE '9999-12-31'
+                    """, [entity_id])
+                con.execute("""
+                    INSERT INTO entity_rollup_history
+                      (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                       confidence, valid_from, valid_to)
+                    VALUES (?, ?, 'economic_control_v1', 'parent_brand',
+                            'medium', CURRENT_DATE, DATE '9999-12-31')
+                """, [entity_id, best_parent_id])
+                con.commit()
+            except Exception:
+                con.rollback()
+                raise
         return {
             "matched": True,
             "parent_entity_id": best_parent_id,
@@ -511,17 +551,29 @@ def update_classification_from_sic(
     if not current or current[0] != "unknown":
         return False
 
-    con.execute("""
-        UPDATE entity_classification_history
-        SET valid_to = CURRENT_DATE
-        WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
-    """, [entity_id])
-    con.execute("""
-        INSERT INTO entity_classification_history
-          (entity_id, classification, is_activist, confidence, source,
-           is_inferred, valid_from, valid_to)
-        VALUES (?, ?, FALSE, 'medium', ?, FALSE, CURRENT_DATE, DATE '9999-12-31')
-    """, [entity_id, new_cls, source])
+    # Atomic SCD close+open with self-heal
+    con.begin()
+    try:
+        has_active = con.execute("""
+            SELECT 1 FROM entity_classification_history
+            WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+        """, [entity_id]).fetchone()
+        if has_active:
+            con.execute("""
+                UPDATE entity_classification_history
+                SET valid_to = CURRENT_DATE
+                WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+            """, [entity_id])
+        con.execute("""
+            INSERT INTO entity_classification_history
+              (entity_id, classification, is_activist, confidence, source,
+               is_inferred, valid_from, valid_to)
+            VALUES (?, ?, FALSE, 'medium', ?, FALSE, CURRENT_DATE, DATE '9999-12-31')
+        """, [entity_id, new_cls, source])
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
     return True
 
 
@@ -586,82 +638,87 @@ def parse_adv_pdf(pdf_path: str, firm_crd: str = "", max_size_mb: float = 15.0) 
         logger.debug("Skipping %s (%.1fMB > %.0fMB limit)", pdf_path, file_size, max_size_mb)
         return []
 
-    pdf = pdfplumber.open(pdf_path)
     entries = []
     in_sched = None
 
-    for page in pdf.pages:
-        text = (page.extract_text() or "")
-        text_upper = text.upper()
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = (page.extract_text() or "")
+            text_upper = text.upper()
 
-        if "SCHEDULE A" in text_upper and "DIRECT" in text_upper:
-            in_sched = "A"
-        elif "SCHEDULE B" in text_upper and "INDIRECT" in text_upper:
-            in_sched = "B"
-        elif in_sched:
-            for exit_kw in ["SCHEDULE D", "DRP PAGES", "FORM ADV, PART 2"]:
-                if exit_kw in text_upper and "SCHEDULE A" not in text_upper and "SCHEDULE B" not in text_upper:
-                    in_sched = None
-                    break
-
-        if not in_sched:
-            continue
-
-        for table in page.extract_tables():
-            for row in table:
-                if not row:
-                    continue
-                cells = [str(c).strip().replace('\n', ' ') if c else "" for c in row]
-                joined_upper = " ".join(cells).upper()
-                if any(h in joined_upper for h in ["FULL LEGAL NAME", "DE/FE/I", "TITLE OR STATUS"]):
-                    continue
-
-                parsed = None
-                for offset in range(min(3, len(cells))):
-                    if offset + 1 >= len(cells):
-                        continue
-                    name = cells[offset]
-                    jurisdiction = cells[offset + 1].upper().strip()
-
-                    if jurisdiction in _VALID_JURISDICTIONS or jurisdiction == "I":
-                        if not _is_valid_entity_name(name):
-                            break
-
-                        title = cells[offset + 2] if offset + 2 < len(cells) else ""
-                        date = cells[offset + 3] if offset + 3 < len(cells) else ""
-                        own_code = cells[offset + 4] if offset + 4 < len(cells) else ""
-                        control = cells[offset + 5] if offset + 5 < len(cells) else ""
-
-                        own_clean = own_code.upper().strip()
-                        if own_clean not in ('A', 'B', 'C', 'D', 'E', 'NA', ''):
-                            own_clean = control.upper().strip() if control.upper().strip() in ('A', 'B', 'C', 'D', 'E', 'NA') else ""
-                            control = cells[offset + 6] if offset + 6 < len(cells) else ""
-
-                        is_entity = jurisdiction != "I"
-                        rel_type = OWN_CODE_TO_REL.get(own_clean)
-
-                        # Mutual structure: entity with NA ownership (Vanguard pattern)
-                        if is_entity and own_clean == "NA":
-                            rel_type = "mutual_structure"
-
-                        parsed = {
-                            "firm_crd": firm_crd,
-                            "schedule": in_sched,
-                            "name": name,
-                            "jurisdiction": jurisdiction,
-                            "title_or_status": title,
-                            "date": date,
-                            "ownership_code": own_clean,
-                            "control_person": control.upper().strip() if control else "",
-                            "is_entity": is_entity,
-                            "relationship_type": rel_type,
-                        }
+            if "SCHEDULE A" in text_upper and "DIRECT" in text_upper:
+                in_sched = "A"
+            elif "SCHEDULE B" in text_upper and "INDIRECT" in text_upper:
+                in_sched = "B"
+            elif in_sched:
+                for exit_kw in ["SCHEDULE D", "DRP PAGES", "FORM ADV, PART 2"]:
+                    if exit_kw in text_upper and "SCHEDULE A" not in text_upper and "SCHEDULE B" not in text_upper:
+                        in_sched = None
                         break
 
-                if parsed:
-                    entries.append(parsed)
+            if not in_sched:
+                page.close()
+                continue
 
-    pdf.close()
+            for table in page.extract_tables():
+                for row in table:
+                    if not row:
+                        continue
+                    cells = [str(c).strip().replace('\n', ' ') if c else "" for c in row]
+                    joined_upper = " ".join(cells).upper()
+                    if any(h in joined_upper for h in ["FULL LEGAL NAME", "DE/FE/I", "TITLE OR STATUS"]):
+                        continue
+
+                    parsed = None
+                    for offset in range(min(3, len(cells))):
+                        if offset + 1 >= len(cells):
+                            continue
+                        name = cells[offset]
+                        jurisdiction = cells[offset + 1].upper().strip()
+
+                        if jurisdiction in _VALID_JURISDICTIONS or jurisdiction == "I":
+                            if not _is_valid_entity_name(name):
+                                continue  # try next offset, don't discard row
+
+                            title = cells[offset + 2] if offset + 2 < len(cells) else ""
+                            date = cells[offset + 3] if offset + 3 < len(cells) else ""
+                            own_code = cells[offset + 4] if offset + 4 < len(cells) else ""
+                            control = cells[offset + 5] if offset + 5 < len(cells) else ""
+
+                            own_clean = own_code.upper().strip()
+                            if own_clean not in ('A', 'B', 'C', 'D', 'E', 'NA', ''):
+                                own_clean = control.upper().strip() if control.upper().strip() in ('A', 'B', 'C', 'D', 'E', 'NA') else ""
+                                control = cells[offset + 6] if offset + 6 < len(cells) else ""
+
+                            is_entity = jurisdiction != "I"
+                            rel_type = OWN_CODE_TO_REL.get(own_clean)
+
+                            # Mutual structure: entity with NA ownership (Vanguard pattern)
+                            if is_entity and own_clean == "NA":
+                                rel_type = "mutual_structure"
+
+                            parsed = {
+                                "firm_crd": firm_crd,
+                                "schedule": in_sched,
+                                "name": name,
+                                "jurisdiction": jurisdiction,
+                                "title_or_status": title,
+                                "date": date,
+                                "ownership_code": own_clean,
+                                "control_person": control.upper().strip() if control else "",
+                                "is_entity": is_entity,
+                                "relationship_type": rel_type,
+                            }
+                            if offset > 0:
+                                logger.debug("shifted_row offset=%d crd=%s name=%s",
+                                             offset, firm_crd, name)
+                            break
+
+                    if parsed:
+                        entries.append(parsed)
+
+            page.close()
+
     return entries
 
 
@@ -670,6 +727,7 @@ class _AliasCache:
 
     def __init__(self, con):
         # Parent aliases: entities that are rollup targets
+        # ORDER BY ensures deterministic iteration order
         rows = con.execute("""
             SELECT DISTINCT ea.entity_id, ea.alias_name
             FROM entity_aliases ea
@@ -677,32 +735,41 @@ class _AliasCache:
                   WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
             ) parents ON ea.entity_id = parents.rollup_entity_id
             WHERE ea.valid_to = DATE '9999-12-31'
+            ORDER BY ea.entity_id, ea.alias_name
         """).fetchall()
         self.parent_names = [r[1].upper() for r in rows if r[1]]
         self.parent_eids = [r[0] for r in rows if r[1]]
         logger.info("AliasCache loaded: %d parent aliases", len(self.parent_names))
 
     def match(self, name: str, threshold: int = 85) -> tuple[int | None, str | None, int]:
-        """Returns (entity_id, alias_name, score) or (None, best_name, best_score)."""
+        """Returns (entity_id, alias_name, score) or (None, best_name, best_score).
+
+        Deterministic tiebreaker: score DESC → entity_id ASC.
+        """
         from rapidfuzz import process, fuzz
 
         if not name or not self.parent_names:
             return None, None, 0
-        result = process.extractOne(
+
+        # Get top N candidates and apply deterministic tiebreaker
+        results = process.extract(
             name.upper(), self.parent_names,
-            scorer=fuzz.token_sort_ratio, score_cutoff=threshold,
+            scorer=fuzz.token_sort_ratio, limit=5,
         )
-        if result:
-            matched_name, score, idx = result
-            return self.parent_eids[idx], matched_name, int(score)
-        # Return best below threshold for logging
-        result_any = process.extractOne(
-            name.upper(), self.parent_names,
-            scorer=fuzz.token_sort_ratio,
-        )
-        if result_any:
-            return None, result_any[0], int(result_any[1])
-        return None, None, 0
+        if not results:
+            return None, None, 0
+
+        # Tiebreaker: score DESC, entity_id ASC
+        candidates = [
+            (matched_name, int(score), self.parent_eids[idx])
+            for matched_name, score, idx in results
+        ]
+        candidates.sort(key=lambda x: (-x[1], x[2]))
+
+        best_name, best_score, best_eid = candidates[0]
+        if best_score >= threshold:
+            return best_eid, best_name, best_score
+        return None, best_name, best_score
 
 
 def build_alias_cache(con) -> _AliasCache:
@@ -720,17 +787,18 @@ def insert_adv_ownership(
     *,
     alias_cache: _AliasCache | None = None,
     threshold: int = 85,
+    is_primary: bool = True,
 ) -> dict:
     """
     Match an ADV owner name against existing entity aliases and insert
     a relationship if found. Never creates new parent entities.
 
-    For mutual_structure: skips fuzzy matching entirely (these don't drive
-    rollup). Just records the owner name in the relationship source field.
+    For mutual_structure: inserts relationship with is_primary=False,
+    control_type='mutual'. Entity keeps self-rollup.
 
     For wholly_owned/parent_brand: uses alias_cache for fast matching.
-    Inserts relationship with is_primary=TRUE only if no existing primary.
-    Updates rollup if primary.
+    Inserts relationship with is_primary per caller (JV: only rank 0 is primary).
+    Updates rollup only if primary.
 
     Pass alias_cache from build_alias_cache() for batch performance.
     """
@@ -747,13 +815,23 @@ def insert_adv_ownership(
     if not owner_name:
         return result
 
-    # Mutual structure: no matching needed, doesn't drive rollup
+    # Mutual structure: attempt match but never set is_primary, never update rollup
     if relationship_type == "mutual_structure":
-        # Skip entity matching — just record that this mutual relationship exists
-        # The owner entities (e.g., Vanguard fund trusts) may or may not be in our MDM
-        result["matched"] = False
-        result["parent_name"] = owner_name
-        result["score"] = 0
+        cache = alias_cache if alias_cache is not None else _AliasCache(con)
+        eid, matched_name, score = cache.match(owner_name, threshold)
+        result["score"] = score
+        result["parent_name"] = matched_name or owner_name
+
+        if eid is not None:
+            result["matched"] = True
+            result["parent_entity_id"] = eid
+            source = f"ADV_SCHEDULE_{schedule_type}"
+            inserted = insert_relationship_idempotent(
+                con, eid, child_entity_id, "mutual_structure", "mutual",
+                False, "medium", source, is_inferred=False,
+            )
+            result["relationship_inserted"] = inserted
+            # No rollup update — entity keeps self-rollup
         return result
 
     # Use cache if provided, else build one (slow per-call fallback)
@@ -774,24 +852,37 @@ def insert_adv_ownership(
     source = f"ADV_SCHEDULE_{schedule_type}"
     inserted = insert_relationship_idempotent(
         con, eid, child_entity_id, relationship_type, "control",
-        True, "high" if score >= 95 else "medium", source,
+        is_primary, "high" if score >= 95 else "medium", source,
         is_inferred=False,
     )
     result["relationship_inserted"] = inserted
 
-    if inserted:
-        con.execute("""
-            UPDATE entity_rollup_history SET valid_to = CURRENT_DATE
-            WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
-              AND valid_to = DATE '9999-12-31'
-        """, [child_entity_id])
-        con.execute("""
-            INSERT INTO entity_rollup_history
-              (entity_id, rollup_entity_id, rollup_type, rule_applied,
-               confidence, valid_from, valid_to)
-            VALUES (?, ?, 'economic_control_v1', ?,
-                    'high', CURRENT_DATE, DATE '9999-12-31')
-        """, [child_entity_id, eid, relationship_type])
+    if inserted and is_primary:
+        # Atomic SCD close+open for rollup history with self-heal
+        con.begin()
+        try:
+            has_active = con.execute("""
+                SELECT 1 FROM entity_rollup_history
+                WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                  AND valid_to = DATE '9999-12-31'
+            """, [child_entity_id]).fetchone()
+            if has_active:
+                con.execute("""
+                    UPDATE entity_rollup_history SET valid_to = CURRENT_DATE
+                    WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                      AND valid_to = DATE '9999-12-31'
+                """, [child_entity_id])
+            con.execute("""
+                INSERT INTO entity_rollup_history
+                  (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                   confidence, valid_from, valid_to)
+                VALUES (?, ?, 'economic_control_v1', ?,
+                        'high', CURRENT_DATE, DATE '9999-12-31')
+            """, [child_entity_id, eid, relationship_type])
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
         result["rollup_updated"] = True
 
     return result

@@ -141,6 +141,9 @@ def main():
     unmatched_rows = []
     t0 = time.time()
 
+    # Pre-load alias cache once for the entire batch (Bug 6: eliminates O(n×m) DB queries)
+    alias_cache = entity_sync.build_alias_cache(con) if not args.dry_run else None
+
     for i, (cik, entity_id, canonical_name) in enumerate(targets):
         # Progress
         if (i + 1) % 25 == 0 or i < 3:
@@ -184,7 +187,8 @@ def main():
 
         if not args.dry_run:
             # Attempt parent match
-            match = entity_sync.attempt_parent_match(con, entity_id, sec_name)
+            match = entity_sync.attempt_parent_match(con, entity_id, sec_name,
+                                                      alias_cache=alias_cache)
             if match.get("matched"):
                 row["parent_matched"] = True
                 row["parent_name"] = match.get("parent_name")
