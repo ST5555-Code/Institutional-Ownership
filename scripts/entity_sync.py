@@ -137,6 +137,9 @@ def get_or_create_fund_entity(
 # =============================================================================
 # Relationship insertion
 # =============================================================================
+_LEGACY_SOURCES = frozenset({"parent_bridge", "fuzzy_match"})
+
+
 def insert_relationship_idempotent(
     con,
     parent_id: int,
@@ -148,29 +151,59 @@ def insert_relationship_idempotent(
     source: str,
     *,
     is_inferred: bool = True,
+    match_score: int = 0,
 ) -> bool:
     """
     Insert an entity_relationship row if one doesn't already exist for this
     (parent, child, type) combination. Returns True if inserted.
 
-    For primary relationships: checks DB for an existing active primary parent
-    on this child. If one exists from a different source, logs conflict and
-    skips. This replaces the in-memory has_primary_parent set from Phase 1
-    with a DB query, making it safe for both batch and incremental paths.
+    Evidence resolution policy for primary relationships:
+    - ADV score ≥90 AND existing source is parent_bridge/fuzzy_match →
+      ADV supersedes: close old, insert new (resolution_policy='adv_supersedes_legacy')
+    - Existing source is wholly_owned (prior ADV) → keep existing
+      (resolution_policy='adv_deferred_to_existing')
+    - ADV score <90 → keep existing (resolution_policy='adv_deferred_to_existing')
+    - No existing primary → insert new (resolution_policy='adv_new_relationship')
     """
+    is_adv = source.startswith("ADV_SCHEDULE_")
+    resolution_policy = "adv_new_relationship" if is_adv else None
+
     if is_primary:
         existing_primary = con.execute(
-            """SELECT parent_entity_id, source FROM entity_relationships
+            """SELECT parent_entity_id, source, relationship_id
+               FROM entity_relationships
                WHERE child_entity_id = ? AND is_primary = TRUE
                  AND valid_to = DATE '9999-12-31'""",
             [child_id],
         ).fetchone()
         if existing_primary:
-            logger.debug(
-                "primary_parent_exists child=%s existing_parent=%s new_parent=%s",
-                child_id, existing_primary[0], parent_id,
-            )
-            return False
+            existing_parent, existing_source, existing_rid = existing_primary
+            if is_adv and match_score >= 90 and existing_source in _LEGACY_SOURCES:
+                # ADV supersedes legacy source — close old, insert new
+                con.begin()
+                try:
+                    con.execute("""
+                        UPDATE entity_relationships SET valid_to = CURRENT_DATE
+                        WHERE relationship_id = ? AND valid_to = DATE '9999-12-31'
+                    """, [existing_rid])
+                    con.commit()
+                except Exception:
+                    con.rollback()
+                    raise
+                resolution_policy = "adv_supersedes_legacy"
+                logger.info(
+                    "adv_supersedes child=%s old_parent=%s(%s) new_parent=%s score=%s",
+                    child_id, existing_parent, existing_source, parent_id, match_score,
+                )
+            else:
+                # Keep existing — defer
+                if is_adv:
+                    resolution_policy = "adv_deferred_to_existing"
+                logger.debug(
+                    "primary_parent_exists child=%s existing_parent=%s new_parent=%s policy=%s",
+                    child_id, existing_parent, parent_id, resolution_policy,
+                )
+                return False
 
     rid = con.execute("SELECT nextval('relationship_id_seq')").fetchone()[0]
     primary_key = child_id if is_primary else None
@@ -452,16 +485,12 @@ def attempt_parent_match(
     if alias_cache is not None:
         cache = alias_cache
     else:
-        # Load aliases with deterministic ORDER BY
+        # Load all entity aliases with deterministic ORDER BY
         parent_aliases = con.execute("""
             SELECT DISTINCT ea.entity_id, ea.alias_name
             FROM entity_aliases ea
-            JOIN (
-                SELECT DISTINCT rollup_entity_id
-                FROM entity_rollup_history
-                WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
-            ) parents ON ea.entity_id = parents.rollup_entity_id
             WHERE ea.valid_to = DATE '9999-12-31'
+              AND ea.alias_name IS NOT NULL AND ea.alias_name != ''
             ORDER BY ea.entity_id, ea.alias_name
         """).fetchall()
         cache = None  # signal to use manual loop below
@@ -680,15 +709,40 @@ def parse_adv_pdf(pdf_path: str, firm_crd: str = "", max_size_mb: float = 15.0) 
                             if not _is_valid_entity_name(name):
                                 continue  # try next offset, don't discard row
 
-                            title = cells[offset + 2] if offset + 2 < len(cells) else ""
-                            date = cells[offset + 3] if offset + 3 < len(cells) else ""
-                            own_code = cells[offset + 4] if offset + 4 < len(cells) else ""
-                            control = cells[offset + 5] if offset + 5 < len(cells) else ""
+                            # Scan remaining cells for ownership code and other fields
+                            # instead of fixed positions (handles extra/missing cells)
+                            rest = [c.strip() for c in cells[offset + 2:]]
+                            own_clean = ""
+                            control = ""
+                            title = ""
+                            date_val = ""
 
-                            own_clean = own_code.upper().strip()
-                            if own_clean not in ('A', 'B', 'C', 'D', 'E', 'NA', ''):
-                                own_clean = control.upper().strip() if control.upper().strip() in ('A', 'B', 'C', 'D', 'E', 'NA') else ""
-                                control = cells[offset + 6] if offset + 6 < len(cells) else ""
+                            # Find ownership code by scanning for valid code
+                            own_idx = -1
+                            for ri, val in enumerate(rest):
+                                v = val.upper().strip()
+                                if v in ('A', 'B', 'C', 'D', 'E', 'NA'):
+                                    own_clean = v
+                                    own_idx = ri
+                                    break
+
+                            if own_idx >= 0:
+                                # Everything before ownership code is title + date
+                                pre = rest[:own_idx]
+                                # Date is the cell just before ownership code (MM/YYYY pattern)
+                                # Title is everything before that
+                                if pre:
+                                    date_val = pre[-1]
+                                    title = " ".join(p for p in pre[:-1] if p)
+                                # Control person is the cell after ownership code
+                                if own_idx + 1 < len(rest):
+                                    ctrl = rest[own_idx + 1].upper().strip()
+                                    if ctrl in ('Y', 'N'):
+                                        control = ctrl
+                            else:
+                                # No ownership code found — take positional fallback
+                                title = rest[0] if len(rest) > 0 else ""
+                                date_val = rest[1] if len(rest) > 1 else ""
 
                             is_entity = jurisdiction != "I"
                             rel_type = OWN_CODE_TO_REL.get(own_clean)
@@ -703,9 +757,9 @@ def parse_adv_pdf(pdf_path: str, firm_crd: str = "", max_size_mb: float = 15.0) 
                                 "name": name,
                                 "jurisdiction": jurisdiction,
                                 "title_or_status": title,
-                                "date": date,
+                                "date": date_val,
                                 "ownership_code": own_clean,
-                                "control_person": control.upper().strip() if control else "",
+                                "control_person": control,
                                 "is_entity": is_entity,
                                 "relationship_type": rel_type,
                             }
@@ -726,20 +780,20 @@ class _AliasCache:
     """Pre-cached alias data for fast fuzzy matching across a batch run."""
 
     def __init__(self, con):
-        # Parent aliases: entities that are rollup targets
-        # ORDER BY ensures deterministic iteration order
+        # All entities with active aliases — not restricted to rollup parents.
+        # This allows matching against any entity in the MDM (subsidiaries,
+        # fund families, etc.) not just those already serving as rollup targets.
+        # ORDER BY ensures deterministic iteration order.
         rows = con.execute("""
             SELECT DISTINCT ea.entity_id, ea.alias_name
             FROM entity_aliases ea
-            JOIN (SELECT DISTINCT rollup_entity_id FROM entity_rollup_history
-                  WHERE rule_applied != 'self' AND valid_to = DATE '9999-12-31'
-            ) parents ON ea.entity_id = parents.rollup_entity_id
             WHERE ea.valid_to = DATE '9999-12-31'
+              AND ea.alias_name IS NOT NULL AND ea.alias_name != ''
             ORDER BY ea.entity_id, ea.alias_name
         """).fetchall()
         self.parent_names = [r[1].upper() for r in rows if r[1]]
         self.parent_eids = [r[0] for r in rows if r[1]]
-        logger.info("AliasCache loaded: %d parent aliases", len(self.parent_names))
+        logger.info("AliasCache loaded: %d entity aliases (full universe)", len(self.parent_names))
 
     def match(self, name: str, threshold: int = 85) -> tuple[int | None, str | None, int]:
         """Returns (entity_id, alias_name, score) or (None, best_name, best_score).
@@ -853,7 +907,7 @@ def insert_adv_ownership(
     inserted = insert_relationship_idempotent(
         con, eid, child_entity_id, relationship_type, "control",
         is_primary, "high" if score >= 95 else "medium", source,
-        is_inferred=False,
+        is_inferred=False, match_score=score,
     )
     result["relationship_inserted"] = inserted
 

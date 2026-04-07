@@ -393,7 +393,8 @@ def _merge_temp_csvs(tmp_pattern_dir):
     return merged
 
 
-def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS):
+def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS,
+              max_size_mb=MAX_SIZE_MB):
     """
     Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
 
@@ -449,7 +450,7 @@ def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS)
             skipped_missing += 1
             continue
         file_mb = os.path.getsize(pdf_path) / (1024 * 1024)
-        if file_mb > MAX_SIZE_MB:
+        if file_mb > max_size_mb:
             skipped_size += 1
             oversized.append({"crd": crd, "firm_name": name, "size_mb": round(file_mb, 1)})
             continue
@@ -588,6 +589,23 @@ def run_match(con):
 
     print(f"  Loaded {len(all_rows)} schedule rows from CSV")
 
+    # Ensure deduplicated staging review view exists
+    con.execute("""
+        CREATE OR REPLACE VIEW entity_identifiers_staging_review AS
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY entity_id, identifier_type, identifier_value, review_status
+                    ORDER BY confidence DESC, created_at DESC
+                ) AS rn
+            FROM entity_identifiers_staging
+        )
+        SELECT staging_id, entity_id, identifier_type, identifier_value,
+               confidence, source, conflict_reason, existing_entity_id,
+               review_status, reviewed_by, reviewed_at, notes, created_at
+        FROM ranked WHERE rn = 1
+    """)
+
     # Always overwrite review CSVs at start so they reflect current run only
     for path, fields in [
         (JV_CSV, ["firm_crd", "firm_name", "entity_id", "owner_count", "owners"]),
@@ -723,6 +741,7 @@ def main():
     ap.add_argument("--download-only", action="store_true", help="Phase 1: download PDFs only")
     ap.add_argument("--parse-only", action="store_true", help="Phase 2: parse local PDFs to CSV only")
     ap.add_argument("--match-only", action="store_true", help="Phase 3: entity match from CSV only")
+    ap.add_argument("--oversized", action="store_true", help="Phase 2b: parse oversized PDFs from phase35_oversized.csv (300s timeout, 1 worker)")
     ap.add_argument("--timeout", type=int, default=PARSE_TIMEOUT, help="Per-PDF parse timeout in seconds (default 180)")
     ap.add_argument("--workers", type=int, default=PARSE_WORKERS, help="Parallel parse workers (default 4)")
     args = ap.parse_args()
@@ -746,7 +765,20 @@ def main():
 
     parse_timeout = args.timeout
 
-    if args.download_only:
+    if args.oversized:
+        print("\n--- PHASE 2b: OVERSIZED PARSE (timeout=300s, workers=1) ---")
+        if not OVERSIZED_CSV.exists():
+            print("  ERROR: phase35_oversized.csv not found. Run main parse first.")
+        else:
+            with open(OVERSIZED_CSV, encoding="utf-8") as f:
+                oversized_crds = {r["crd"] for r in csv.DictReader(f)}
+            # Build target list filtered to oversized CRDs only
+            oversized_targets = [(crd, name, eid) for crd, name, eid in targets
+                                 if crd in oversized_crds]
+            print(f"  Oversized targets: {len(oversized_targets)} of {len(oversized_crds)} in CSV")
+            run_parse(oversized_targets, limit=None, timeout=300, workers=1,
+                      max_size_mb=200)
+    elif args.download_only:
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)
     elif args.parse_only:

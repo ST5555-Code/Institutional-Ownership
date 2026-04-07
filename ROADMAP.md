@@ -85,8 +85,11 @@ _Last updated: April 6, 2026_
 | 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
 | 42 | Entity MDM — Phases 1-3 complete on staging, see ENTITY_ARCHITECTURE.md | Staging complete, awaiting Phase 4 merge | Phase 3: 5,293 long-tail CIKs resolved via SEC EDGAR (100% retrieval), 153 parent matched, 104 SIC classified, 181 aliases added. resolve_long_tail.py + entity_sync extensions. 13 validation gates (8 PASS, 5 MANUAL, 0 FAIL). |
 | 43 | Fix pre-existing app.py lint debt | Not started | E402 imports at lines 22-100, broad-exception-caught throughout, bandit B608 SQL injection warnings at lines 487-603. Blocked the normal pre-commit path for Entity MDM Step 10; Step 10 endpoint committed with --no-verify. Separate cleanup session required to address in isolation. |
-| 44 | Entity MDM Phase 3.5 — ADV ownership parse | In progress | 3,652 ADV PDFs downloaded (8.4 GB). Partitioned parallel parse (4 workers, 180s timeout, ~20s/PDF effective). Memory-safe (300 MB/worker flat), crash-resilient (flush every PDF, SIGTERM handler, temp CSV recovery). 335 of 3,652 CRDs parsed so far. 113 oversized (>10 MB), 2 timed out at 180s. Full run ETA ~4.7h. See ENTITY_ARCHITECTURE.md for full details. |
-| 45 | PyMuPDF rewrite for ADV parser | Future | Proof-of-concept: pymupdf text extraction is 196x faster than pdfplumber (4.5s vs 888s on 14 PDFs). Would require rewriting `parse_adv_pdf()` from table-based parsing to line-by-line state machine on pymupdf `get_text()` output. ~1-2h effort. Would cut full parse from ~4.7h to <5 min. Also enables parsing the 113 oversized PDFs (PIMCO 45 MB, Oaktree 61 MB, etc.) that pdfplumber can't handle. |
+| 44 | Entity MDM Phase 3.5 — ADV ownership parse | In progress | 455 of 3,652 CRDs parsed, 3,272 rows. Match: 87 matched, 85 relationships inserted (was 12/8 before fix). Scan-based parser, expanded alias universe, evidence resolution policy, oversized flag, staging dedup view. See ENTITY_ARCHITECTURE.md for full deferred list (D1-D11). |
+| 45 | PyMuPDF rewrite for ADV parser | Phase 3.5b | 196x speed improvement. See ENTITY_ARCHITECTURE.md D2. |
+| 46 | Phase 3.5 fixes complete | Done | Parser ownership_code fix (scan-based), match universe expansion (all aliases), evidence resolution policy (ADV supersedes legacy at ≥90), `--oversized` flag (300s/1 worker), staging dedup view. Matched 87 owners (was 12). |
+| 47 | Phase 3.5b planned | Not started | pymupdf rewrite, parse optimization, IAPD API retry, labeled accuracy audit, oversized PDF pass. Blocked on Phase 3.5 full run completing. |
+| 48 | Phase 4 blocked | Blocked | Requires Phase 3.5 full run complete + validation gates pass. |
 
 ---
 
