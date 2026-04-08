@@ -183,13 +183,13 @@ These items were explicitly scoped out of Phase 1 but must not be forgotten. Eac
 | 8 | True historical data pre-2000 | Never/Optional | No historical filing data available — synthetic inception date is correct choice | is_inferred = TRUE clearly marks these |
 | 9 | Full indirect ownership / voting control computation | Phase 4+ | Requires recursive graph traversal — not needed for current use cases | Design supports via recursive CTE when needed |
 | 10 | Multiple rollup worldviews (regulatory_parent, brand_parent) | Phase 4+ | economic_control_v1 sufficient for current analysis | rollup_type field already supports this without schema changes |
-| D1 | Labeled accuracy audit — 50-100 sampled ADV filings stratified by matched/unmatched/oversized/timeout | Phase 3.5 post-run | Quantifies true error bars on ownership graph before Phase 4 migration |
+| ~~D1~~ | ~~Labeled accuracy audit~~ ✅ | ~~Phase 3.5 post-run~~ | Completed Apr 8 2026. 90 PDFs sampled across 6 strata. 75% parser agreement on comparable files. Zero false positives. Pymupdf recall gap confined to Schedule B indirect owners. See `data/reference/adv_accuracy_audit.csv`. |
 | D2 | pymupdf parser rewrite — 196x speed improvement, cuts full run from 4.7h to ~90min | Phase 3.5b | Requires rewriting table parser to use regex on pymupdf text output |
 | D3 | Parse tail optimization — p95 parse time 158s | Phase 3.5b | Acceptable now, will matter at scale |
 | D4 | Match quality benchmark — 209 unmatched rows scored 50-69, 39 scored 70-84 near threshold | Phase 3.5 post-run | Cannot trust ADV coverage rate as quality signal until benchmark done |
 | D5 | IAPD API access — Schedule A/B via live API blocked (403) | Phase 3.5b | Resume when SEC opens API |
 | D6 | ADV filing date tracking — current snapshots have no filing date context | Phase 4 | Important for point-in-time historical accuracy |
-| D7 | Oversized PDF pass — 113 PDFs >10MB, `--oversized` flag, 300s timeout, single worker | Phase 3.5 post-run | Run after main parse completes |
+| ~~D7~~ | ~~Oversized PDF pass~~ ✅ | ~~Phase 3.5 post-run~~ | Completed Apr 8 2026. 112 PDFs parsed via pymupdf in 391s. 15,902 rows. Full 100% CRD coverage achieved. |
 | D8 | Rollup worldviews — regulatory_parent, brand_parent | Phase 4+ | economic_control_v1 sufficient now |
 | D9 | Recursive indirect ownership chains | Phase 4+ | Design supports via recursive CTE |
 | D10 | Admin UI for entity_identifiers_staging review | Phase 3.5b | Defer until override volume exceeds 500 entries |

@@ -89,8 +89,10 @@ _Last updated: April 6, 2026_
 | 45 | PyMuPDF parser for ADV | Done | 100-400x faster than pdfplumber. 88.3% recall, 99.5% accuracy, +1,151 net entities. Handles all oversized PDFs. Used as primary in `--refresh` mode. pdfplumber retained as fallback. |
 | 46 | ADV pipeline hardening | Done | Atomic SCD, deterministic matching, duplicate staging guard, PDF validation, explicit checkpoint, alias cache reuse, evidence resolution policy, scan-based ownership code extraction, expanded match universe (all aliases). |
 | 47 | Interactive entity review tool | Done | `data/reference/adv_entity_review.html` — 1,926 unresolved CRDs, 20,416 searchable aliases, pre-populated recommendations, export to `adv_manual_adds.csv`. |
-| 48 | Phase 3.5 deferred items | Not started | D1-D11 in ENTITY_ARCHITECTURE.md. Key: labeled accuracy audit (D1), pymupdf recall improvement (D2 — at 88.3%, targeting 95%), IAPD API retry (D5), admin UI for staging review (D10). |
-| 49 | Phase 4 — Migration | Blocked | Requires Phase 3.5 validation gates pass + manual review of 1,926 unresolved CRDs. See ENTITY_ARCHITECTURE.md Phase 4 section. |
+| 48 | Phase 3.5 deferred items | Partially done | D1 ✅ (accuracy audit), D7 ✅ (oversized pass). Remaining: D2 (pymupdf recall 88→95%), D4 (match quality benchmark), D5 (IAPD API), D10 (admin UI), D11 (auto-promoter). |
+| 49 | D1 accuracy audit | Done | 90 PDFs, 6 strata. 75% parser agreement, zero false positives. Pymupdf recall gap = Schedule B indirect owners. |
+| 50 | Entity review complete | Done | 1,926 CRDs triaged: 99 wired to parents, 1,827 confirmed independent. 12 new entities created. 174 orphan subsidiaries consolidated. DBA/legal name check added to QC. |
+| 51 | Phase 4 — Migration | Ready to scope | Phase 3.5 complete. 12,862 relationships, 20,205 entities. Accuracy audit passed. Manual review done. See ENTITY_ARCHITECTURE.md Phase 4 section for dual-write migration plan. |
 
 ---
 
