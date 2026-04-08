@@ -137,7 +137,8 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 3. **Same city + same state** → likely same firm, auto-wire
 4. **Different states** → different firms regardless of name score, skip
 5. **IAPD API blocked (403)** — use local adv_managers data for city/state/legal name verification
-6. **Manual review items** export to `adv_manual_adds.csv` via interactive HTML tool
+6. **DBA/legal name mismatch** — firm_name ≠ legal_name (score <80) signals holding company or DBA structure. Flagged in `--qc` report and `logs/phase35_legal_name_review.csv`. Example: ETF Architect (firm) = Empowered Funds LLC (legal), Brown Advisory = Signature Financial Management Inc.
+7. **Manual review items** export to `adv_manual_adds.csv` via interactive HTML tool
 
 **Update workflow:**
 ```bash
@@ -252,6 +253,8 @@ These are architectural limitations of the current design, not bugs. Must be doc
 | `data/cache/adv_pdfs/` | Cached ADV PDFs (3,654 files, 8.4 GB, gitignored) |
 | `logs/phase35_parse_progress.log` | Real-time parse progress (`tail -f`) |
 | `logs/phase35_qc_report.csv` | QC issues (CRDs with 0 entity owners, missing codes) |
+| `logs/phase35_legal_name_review.csv` | DBA/legal name mismatches — firms where firm_name ≠ legal_name (holding company signal) |
+| `data/reference/adv_legal_name_review.csv` | Full legal name review (1,828 firms with match scores) |
 | `logs/phase35_errors.csv` | Parse errors with timestamps and tracebacks |
 | `logs/phase35_timed_out.csv` | PDFs that exceeded timeout |
 | `logs/phase35_oversized.csv` | PDFs exceeding size limit |

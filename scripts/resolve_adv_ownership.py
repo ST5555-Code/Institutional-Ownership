@@ -804,6 +804,49 @@ def run_qc():
     else:
         print("  No QC issues found.")
 
+    # Legal name mismatch check — DBA names signal holding company structures
+    legal_review_csv = LOG_DIR / "phase35_legal_name_review.csv"
+    try:
+        from rapidfuzz import fuzz as _qc_fuzz
+        con = db.connect_write()
+        adv_firms = con.execute("""
+            SELECT crd_number, firm_name, legal_name, city, state, adv_5f_raum
+            FROM adv_managers WHERE crd_number IS NOT NULL
+        """).fetchall()
+        con.close()
+
+        dba_rows = []
+        for crd_num, firm, legal, city, state, aum_val in adv_firms:
+            if not firm or not legal:
+                continue
+            if str(crd_num) not in zero_entity_crds:
+                continue
+            score = _qc_fuzz.token_sort_ratio(firm.upper(), legal.upper())
+            if score < 80:
+                dba_rows.append({
+                    "crd": crd_num, "firm_name": firm, "legal_name": legal,
+                    "city": city or "", "state": state or "",
+                    "aum_billions": round(float(aum_val) / 1e9, 2) if aum_val else 0,
+                    "name_match_score": round(score),
+                })
+
+        dba_rows.sort(key=lambda x: -x["aum_billions"])
+        if dba_rows:
+            with open(legal_review_csv, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=list(dba_rows[0].keys()))
+                w.writeheader()
+                w.writerows(dba_rows)
+            print(f"  DBA/legal name mismatches: {len(dba_rows)} firms")
+            print(f"    Written to: {legal_review_csv}")
+            if dba_rows:
+                print("    Top 5 by AUM:")
+                for dr in dba_rows[:5]:
+                    print(f"      {dr['crd']:>6} ${dr['aum_billions']:>7}B  {dr['firm_name'][:30]:30s} legal: {dr['legal_name'][:35]}")
+        else:
+            print("  No DBA/legal name mismatches found.")
+    except Exception as exc:
+        print(f"  Legal name check skipped: {exc}")
+
     # Check for checkpoint coverage
     if CHECKPOINT_FILE.exists():
         with open(CHECKPOINT_FILE, encoding="utf-8") as f:
