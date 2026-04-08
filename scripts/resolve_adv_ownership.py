@@ -495,7 +495,7 @@ def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS,
         tmp_csv = str(tmp_dir / f"adv_parse_w{wid}.csv")
         p = Process(
             target=_run_worker_entry,
-            args=(chunk, wid, tmp_csv, timeout, MAX_SIZE_MB,
+            args=(chunk, wid, tmp_csv, timeout, max_size_mb,
                   progress_path, errors_csv_path, checkpoint_path,
                   result_queue),
         )
