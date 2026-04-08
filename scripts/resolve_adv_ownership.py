@@ -739,6 +739,241 @@ def run_match(con):
 
 
 # =========================================================================
+# Quality Control
+# =========================================================================
+QC_CSV = LOG_DIR / "phase35_qc_report.csv"
+MANUAL_CSV = ROOT / "data" / "reference" / "adv_manual_adds.csv"
+
+
+def run_qc():
+    """Quality control report on current parsed data."""
+    if not SCHEDULES_CSV.exists():
+        print("  ERROR: adv_schedules.csv not found.")
+        return
+
+    with open(SCHEDULES_CSV, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    crds = set(r["firm_crd"] for r in rows)
+    entities = [r for r in rows if r["is_entity"] == "True"
+                and r.get("ownership_code") and r.get("relationship_type") not in (None, "", "None")]
+    entities_no_code = [r for r in rows if r["is_entity"] == "True"
+                        and r.get("relationship_type") not in (None, "", "None")
+                        and not r.get("ownership_code")]
+
+    # CRDs with zero entity owners (unresolved — candidates for manual review)
+    from collections import Counter
+    entity_crds = set(r["firm_crd"] for r in entities)
+    zero_entity_crds = crds - entity_crds
+
+    # Ownership code distribution
+    code_dist = Counter(r["ownership_code"] for r in entities)
+
+    print("=== QUALITY CONTROL REPORT ===")
+    print(f"  Total rows: {len(rows)}")
+    print(f"  Distinct CRDs: {len(crds)}")
+    print(f"  Entity owners with code: {len(entities)}")
+    print(f"  Entity owners missing code: {len(entities_no_code)}")
+    print(f"  CRDs with ≥1 entity owner: {len(entity_crds)}")
+    print(f"  CRDs with 0 entity owners: {len(zero_entity_crds)} (candidates for manual review)")
+    print(f"  Ownership code distribution: {dict(code_dist.most_common())}")
+    print()
+
+    # Write QC CSV: CRDs with issues
+    qc_rows = []
+    for crd in sorted(zero_entity_crds):
+        crd_rows = [r for r in rows if r["firm_crd"] == crd]
+        firm_name = crd_rows[0]["firm_name"] if crd_rows else ""
+        total = len(crd_rows)
+        qc_rows.append({
+            "crd": crd, "firm_name": firm_name, "total_rows": total,
+            "entity_owners": 0, "issue": "no_entity_owners",
+        })
+    for r in entities_no_code:
+        qc_rows.append({
+            "crd": r["firm_crd"], "firm_name": r["firm_name"], "total_rows": 1,
+            "entity_owners": 1, "issue": "missing_ownership_code",
+        })
+
+    if qc_rows:
+        with open(QC_CSV, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(qc_rows[0].keys()))
+            w.writeheader()
+            w.writerows(qc_rows)
+        print(f"  QC issues written to: {QC_CSV} ({len(qc_rows)} rows)")
+    else:
+        print("  No QC issues found.")
+
+    # Check for checkpoint coverage
+    if CHECKPOINT_FILE.exists():
+        with open(CHECKPOINT_FILE, encoding="utf-8") as f:
+            ckpt = set(ln.strip() for ln in f if ln.strip())
+        print(f"  Checkpoint: {len(ckpt)} CRDs")
+    print()
+    return zero_entity_crds
+
+
+def run_manual_add(manual_csv_path):
+    """Add manual entity entries from CSV to adv_schedules.csv.
+
+    CSV format: crd,name,jurisdiction,ownership_code,relationship_type,notes
+    Entries are appended to adv_schedules.csv and logged.
+    """
+    if not os.path.exists(manual_csv_path):
+        print(f"  ERROR: {manual_csv_path} not found.")
+        return
+
+    with open(manual_csv_path, encoding="utf-8") as f:
+        manual_rows = list(csv.DictReader(f))
+
+    if not manual_rows:
+        print("  No manual entries to add.")
+        return
+
+    # Need entity_id lookup
+    db.set_staging_mode(True)
+    con = db.connect_write()
+    targets = get_adv_targets(con)
+    con.close()
+    crd_to_eid = {crd: eid for crd, _name, eid in targets}
+
+    added = 0
+    skipped = 0
+    csv_exists = SCHEDULES_CSV.exists() and SCHEDULES_CSV.stat().st_size > 0
+
+    with open(SCHEDULES_CSV, "a", newline="", encoding="utf-8") as out_f:
+        writer = csv.DictWriter(out_f, fieldnames=CSV_FIELDNAMES)
+        if not csv_exists:
+            writer.writeheader()
+
+        for r in manual_rows:
+            crd = r.get("crd", "").strip()
+            if not crd or crd not in crd_to_eid:
+                print(f"  SKIP: CRD {crd} not in targets")
+                skipped += 1
+                continue
+
+            eid = crd_to_eid[crd]
+            own_code = r.get("ownership_code", "").upper().strip()
+            jurisdiction = r.get("jurisdiction", "DE").upper().strip()
+            is_entity = jurisdiction != "I"
+
+            from entity_sync import OWN_CODE_TO_REL
+            rel_type = r.get("relationship_type", "")
+            if not rel_type:
+                rel_type = OWN_CODE_TO_REL.get(own_code, "")
+                if is_entity and own_code == "NA":
+                    rel_type = "mutual_structure"
+
+            writer.writerow({
+                "firm_crd": crd,
+                "firm_name": r.get("firm_name", ""),
+                "entity_id": eid,
+                "schedule": "MANUAL",
+                "name": r.get("name", ""),
+                "jurisdiction": jurisdiction,
+                "title_or_status": r.get("title", ""),
+                "date": "",
+                "ownership_code": own_code,
+                "control_person": r.get("control_person", ""),
+                "is_entity": is_entity,
+                "relationship_type": rel_type,
+            })
+            added += 1
+
+    print(f"  Manual adds: {added} added, {skipped} skipped")
+    print(f"  Output: {SCHEDULES_CSV}")
+
+
+def run_refresh(targets, workers, timeout):
+    """Full refresh: pymupdf primary → pdfplumber fallback on gaps → match.
+
+    1. Clear checkpoint for full re-parse
+    2. pymupdf on all targets (4 workers, fast)
+    3. Identify CRDs with 0 entity owners
+    4. pdfplumber on those CRDs only (4 workers, slower)
+    5. Merge, deduplicate
+    6. Run match
+    """
+    print("\n--- REFRESH PHASE 1: PYMUPDF (all targets) ---")
+    # Clear checkpoint for fresh run
+    if CHECKPOINT_FILE.exists():
+        os.remove(CHECKPOINT_FILE)
+
+    # Back up existing CSV
+    if SCHEDULES_CSV.exists():
+        backup = str(SCHEDULES_CSV) + ".bak"
+        import shutil
+        shutil.copy2(SCHEDULES_CSV, backup)
+        print(f"  Backed up CSV to {backup}")
+        os.remove(SCHEDULES_CSV)
+
+    run_parse(targets, limit=None, timeout=timeout, workers=workers,
+              max_size_mb=200, use_pymupdf=True)
+
+    # Identify CRDs with 0 entity owners
+    with open(SCHEDULES_CSV, encoding="utf-8") as f:
+        pymupdf_rows = list(csv.DictReader(f))
+    entity_crds = set(
+        r["firm_crd"] for r in pymupdf_rows
+        if r["is_entity"] == "True" and r.get("ownership_code")
+        and r.get("relationship_type") not in (None, "", "None")
+    )
+    all_crds = set(r["firm_crd"] for r in pymupdf_rows)
+    gap_crds = all_crds - entity_crds
+    print(f"\n  pymupdf: {len(all_crds)} CRDs, {len(entity_crds)} with entities, {len(gap_crds)} gaps")
+
+    if gap_crds:
+        print(f"\n--- REFRESH PHASE 2: PDFPLUMBER FALLBACK ({len(gap_crds)} CRDs) ---")
+        # Clear checkpoint for fallback CRDs
+        if CHECKPOINT_FILE.exists():
+            with open(CHECKPOINT_FILE, encoding="utf-8") as f:
+                ckpt = set(ln.strip() for ln in f if ln.strip())
+            # Remove gap CRDs from checkpoint so pdfplumber can parse them
+            keep = [c for c in ckpt if c not in gap_crds]
+            with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+                for c in keep:
+                    f.write(c + "\n")
+
+        gap_targets = [(crd, name, eid) for crd, name, eid in targets
+                       if crd in gap_crds]
+        run_parse(gap_targets, limit=None, timeout=timeout, workers=workers,
+                  use_pymupdf=False)
+
+        # Deduplicate CSV
+        with open(SCHEDULES_CSV, encoding="utf-8") as f:
+            all_rows = list(csv.DictReader(f))
+        seen = set()
+        unique = []
+        for r in all_rows:
+            key = tuple(r.values())
+            if key not in seen:
+                seen.add(key)
+                unique.append(r)
+        if len(unique) < len(all_rows):
+            with open(SCHEDULES_CSV, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+                w.writeheader()
+                w.writerows(unique)
+            print(f"  Deduped: {len(all_rows)} → {len(unique)}")
+
+    # Add manual entries if file exists
+    if MANUAL_CSV.exists():
+        print("\n--- REFRESH PHASE 2b: MANUAL ADDS ---")
+        run_manual_add(str(MANUAL_CSV))
+
+    # QC report
+    print("\n--- REFRESH PHASE 3: QUALITY CONTROL ---")
+    run_qc()
+
+    # Match
+    print("\n--- REFRESH PHASE 4: MATCH ---")
+    con = db.connect_write()
+    run_match(con)
+    con.close()
+
+
+# =========================================================================
 # Main
 # =========================================================================
 def main():
@@ -749,7 +984,10 @@ def main():
     ap.add_argument("--download-only", action="store_true", help="Phase 1: download PDFs only")
     ap.add_argument("--parse-only", action="store_true", help="Phase 2: parse local PDFs to CSV only")
     ap.add_argument("--match-only", action="store_true", help="Phase 3: entity match from CSV only")
-    ap.add_argument("--oversized", action="store_true", help="Phase 2b: parse oversized PDFs from phase35_oversized.csv (300s timeout, 1 worker)")
+    ap.add_argument("--oversized", action="store_true", help="Phase 2b: parse oversized PDFs (pymupdf, 300s, 1 worker)")
+    ap.add_argument("--refresh", action="store_true", help="Full refresh: pymupdf primary (4 workers) → pdfplumber fallback on gaps → match")
+    ap.add_argument("--qc", action="store_true", help="Quality control report on current parsed data")
+    ap.add_argument("--manual-add", type=str, default=None, help="CSV file of manual entity additions (crd,name,jurisdiction,ownership_code)")
     ap.add_argument("--timeout", type=int, default=PARSE_TIMEOUT, help="Per-PDF parse timeout in seconds (default 180)")
     ap.add_argument("--workers", type=int, default=PARSE_WORKERS, help="Parallel parse workers (default 4)")
     args = ap.parse_args()
@@ -773,7 +1011,16 @@ def main():
 
     parse_timeout = args.timeout
 
-    if args.oversized:
+    if args.qc:
+        print("\n--- QUALITY CONTROL ---")
+        run_qc()
+    elif args.manual_add:
+        print("\n--- MANUAL ADD ---")
+        run_manual_add(args.manual_add)
+    elif args.refresh:
+        print(f"\n--- FULL REFRESH (workers={args.workers}) ---")
+        run_refresh(targets, args.workers, parse_timeout)
+    elif args.oversized:
         print("\n--- PHASE 2b: OVERSIZED PARSE (timeout=300s, workers=1) ---")
         if not OVERSIZED_CSV.exists():
             print("  ERROR: phase35_oversized.csv not found. Run main parse first.")
