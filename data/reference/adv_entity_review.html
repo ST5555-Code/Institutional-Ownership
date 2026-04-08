@@ -134,6 +134,7 @@ select.cell-select {
     <option value="has_rec">Has Recommendation</option>
   </select>
   <button class="btn-export" onclick="exportCSV()">Export CSV</button>
+  <button style="padding:6px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;background:#27ae60;color:#fff" onclick="approveAllVisible()">Approve All Visible</button>
   <button class="btn-reset" onclick="resetAll()">Reset All</button>
   <select id="sortBy" onchange="currentPage=0;render()" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px"><option value="aum">Sort: AUM desc</option><option value="crd">Sort: CRD</option><option value="name">Sort: Name</option></select>
   <span class="source-label" id="sourceLabel">Source: embedded data (loading...)</span>
@@ -403,7 +404,8 @@ function updateExtraHeaders() {
 function getFiltered() {
   const q = document.getElementById("searchBox").value.toLowerCase().trim();
   const sf = document.getElementById("statusFilter").value;
-  return ITEMS.map((it, i) => ({ ...it, _idx: i })).filter(it => {
+  const sortBy = document.getElementById("sortBy") ? document.getElementById("sortBy").value : "aum";
+  var result = ITEMS.map((it, i) => ({ ...it, _idx: i })).filter(it => {
     if (q && !(it.crd + "").includes(q) && !(it.firm_name || "").toLowerCase().includes(q)) return false;
     const s = state[it._idx].status;
     if (sf === "pending" && s !== "pending") return false;
@@ -412,6 +414,10 @@ function getFiltered() {
     if (sf === "has_rec" && !it.recommendation) return false;
     return true;
   });
+  if (sortBy === "aum") result.sort((a, b) => (b.aum_billions || 0) - (a.aum_billions || 0));
+  else if (sortBy === "name") result.sort((a, b) => (a.firm_name || "").localeCompare(b.firm_name || ""));
+  else if (sortBy === "crd") result.sort((a, b) => (a.crd || "").localeCompare(b.crd || ""));
+  return result;
 }
 
 function updateStats() {
@@ -534,6 +540,18 @@ function escAttr(s) { return s == null ? '' : String(s).replace(/&/g,'&amp;').re
 
 function setStatus(i, status) {
   state[i].status = status;
+  render();
+}
+
+function approveAllVisible() {
+  const count = filtered.length;
+  const pending = filtered.filter(it => state[it._idx].status === "pending").length;
+  if (!confirm("Approve " + pending + " pending items out of " + count + " visible?")) return;
+  filtered.forEach(it => {
+    if (state[it._idx].status === "pending") {
+      state[it._idx].status = "approved";
+    }
+  });
   render();
 }
 
