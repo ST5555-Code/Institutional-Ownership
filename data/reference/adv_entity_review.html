@@ -93,11 +93,23 @@ select.cell-select {
 .page-info { font-size: 13px; color: #666; }
 .btn-csv { background: #2980b9; color: #fff; }
 .btn-csv:hover { background: #2471a3; }
-.source-label { font-size: 12px; color: #666; margin-left: auto; padding: 2px 8px; background: #f0f0f0; border-radius: 3px; }
+.source-label { font-size: 13px; color: #fff; margin-left: auto; padding: 4px 12px; background: #1E2846; border-radius: 4px; font-weight: bold; }
+.source-label.csv-loaded { background: #27ae60; }
 .extra-col { background: #f8f9fa; font-size: 12px; color: #555; }
+#loadingOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(30,40,70,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #fff; font-family: Arial; }
+#loadingOverlay .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loadingOverlay .msg { font-size: 16px; font-weight: bold; }
+#loadingOverlay .sub { font-size: 13px; color: #aab; margin-top: 6px; }
 </style>
 </head>
 <body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="msg" id="loadingMsg">Loading embedded data...</div>
+  <div class="sub" id="loadingSub">20,416 entity aliases + 1,926 review items</div>
+</div>
 
 <h1>ADV Entity Ownership Review &mdash; Phase 3.5</h1>
 
@@ -207,14 +219,24 @@ function initState() {
   });
 }
 
+function showLoading(msg, sub) {
+  const overlay = document.getElementById("loadingOverlay");
+  if (msg) document.getElementById("loadingMsg").textContent = msg;
+  if (sub) document.getElementById("loadingSub").textContent = sub;
+  overlay.style.display = "flex";
+}
+function hideLoading() {
+  document.getElementById("loadingOverlay").style.display = "none";
+}
+
 function updateSourceLabel() {
   const el = document.getElementById("sourceLabel");
   if (csvSourceName) {
-    el.textContent = "Source: " + csvSourceName + " (" + ITEMS.length + " items)";
-    el.style.background = "#d6eaf8";
+    el.textContent = "CSV: " + csvSourceName + " (" + ITEMS.length + " items)";
+    el.className = "source-label csv-loaded";
   } else {
-    el.textContent = "Source: embedded data (" + EMBEDDED_ITEM_COUNT + " items)";
-    el.style.background = "#f0f0f0";
+    el.textContent = "Embedded: " + EMBEDDED_ITEM_COUNT + " items";
+    el.className = "source-label";
   }
 }
 
@@ -262,6 +284,7 @@ function parseCSV(text) {
 function handleCSVUpload(input) {
   const file = input.files[0];
   if (!file) return;
+  showLoading("Loading " + file.name + "...", "Parsing CSV data");
   const reader = new FileReader();
   reader.onload = function(e) {
     const rows = parseCSV(e.target.result);
@@ -345,6 +368,7 @@ function handleCSVUpload(input) {
     currentPage = 0;
     updateExtraHeaders();
     render();
+    setTimeout(hideLoading, 100);
   };
   reader.readAsText(file);
   input.value = "";
@@ -581,6 +605,7 @@ document.getElementById("searchBox").addEventListener("input", function() { curr
 document.getElementById("statusFilter").addEventListener("change", function() { currentPage = 0; render(); });
 
 render();
+setTimeout(hideLoading, 200);
 </script>
 </body>
 </html>
