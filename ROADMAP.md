@@ -85,11 +85,12 @@ _Last updated: April 6, 2026_
 | 41 | Chart.js fix — setTimeout 100ms before chart init | Done | Lets DOM render canvas before Chart.js init |
 | 42 | Entity MDM — Phases 1-3 complete on staging, see ENTITY_ARCHITECTURE.md | Staging complete, awaiting Phase 4 merge | Phase 3: 5,293 long-tail CIKs resolved via SEC EDGAR (100% retrieval), 153 parent matched, 104 SIC classified, 181 aliases added. resolve_long_tail.py + entity_sync extensions. 13 validation gates (8 PASS, 5 MANUAL, 0 FAIL). |
 | 43 | Fix pre-existing app.py lint debt | Not started | E402 imports at lines 22-100, broad-exception-caught throughout, bandit B608 SQL injection warnings at lines 487-603. Blocked the normal pre-commit path for Entity MDM Step 10; Step 10 endpoint committed with --no-verify. Separate cleanup session required to address in isolation. |
-| 44 | Entity MDM Phase 3.5 — ADV ownership parse | In progress | 455 of 3,652 CRDs parsed, 3,272 rows. Match: 87 matched, 85 relationships inserted (was 12/8 before fix). Scan-based parser, expanded alias universe, evidence resolution policy, oversized flag, staging dedup view. See ENTITY_ARCHITECTURE.md for full deferred list (D1-D11). |
-| 45 | PyMuPDF rewrite for ADV parser | Phase 3.5b | 196x speed improvement. See ENTITY_ARCHITECTURE.md D2. |
-| 46 | Phase 3.5 fixes complete | Done | Parser ownership_code fix (scan-based), match universe expansion (all aliases), evidence resolution policy (ADV supersedes legacy at ≥90), `--oversized` flag (300s/1 worker), staging dedup view. Matched 87 owners (was 12). |
-| 47 | Phase 3.5b planned | Not started | pymupdf rewrite, parse optimization, IAPD API retry, labeled accuracy audit, oversized PDF pass. Blocked on Phase 3.5 full run completing. |
-| 48 | Phase 4 blocked | Blocked | Requires Phase 3.5 full run complete + validation gates pass. |
+| 44 | Entity MDM Phase 3.5 — ADV ownership | Done | 3,585 CRDs parsed (98.2%), 26,822 rows, 1,059 relationships. Dual-parser: pymupdf primary (88.3% recall, 99.5% accuracy, 20 min) + pdfplumber fallback. `--refresh` mode for updates (4 workers). QC report, manual adds, interactive review HTML. See ENTITY_ARCHITECTURE.md. |
+| 45 | PyMuPDF parser for ADV | Done | 100-400x faster than pdfplumber. 88.3% recall, 99.5% accuracy, +1,151 net entities. Handles all oversized PDFs. Used as primary in `--refresh` mode. pdfplumber retained as fallback. |
+| 46 | ADV pipeline hardening | Done | Atomic SCD, deterministic matching, duplicate staging guard, PDF validation, explicit checkpoint, alias cache reuse, evidence resolution policy, scan-based ownership code extraction, expanded match universe (all aliases). |
+| 47 | Interactive entity review tool | Done | `data/reference/adv_entity_review.html` — 1,926 unresolved CRDs, 20,416 searchable aliases, pre-populated recommendations, export to `adv_manual_adds.csv`. |
+| 48 | Phase 3.5 deferred items | Not started | D1-D11 in ENTITY_ARCHITECTURE.md. Key: labeled accuracy audit (D1), pymupdf recall improvement (D2 — at 88.3%, targeting 95%), IAPD API retry (D5), admin UI for staging review (D10). |
+| 49 | Phase 4 — Migration | Blocked | Requires Phase 3.5 validation gates pass + manual review of 1,926 unresolved CRDs. See ENTITY_ARCHITECTURE.md Phase 4 section. |
 
 ---
 
@@ -150,6 +151,12 @@ _Last updated: April 6, 2026_
 | 2026-04-06 | Sector Rotation tab redesign (H15) | Multi-quarter institutional money flow analysis by GICS sector. Financial-statement layout showing active dollar flows (shares × price, stripping price effects) across all quarter transitions. Expandable detail: top 5 net buyers/sellers per sector per quarter. By Parent/By Fund + Active Only toggles. Pre-aggregated holdings prevent cross-product inflation. Short Squeeze tab removed (broken SQL + stale data). |
 | 2026-04-06 | Period-accurate pct_of_float (H14) | New `shares_outstanding_history` table (317K facts, 4,450 tickers). DuckDB ASOF JOIN matches each holding to period-correct SEC shares. GOOGL 2020 pct_of_float corrected from 0.4% to 7.3% (20:1 split). `build_shares_history.py` script with `--update-holdings` flag. |
 | 2026-04-06 | Peer Rotation tab | Per-ticker substitution analysis within sector. Shows subject vs sector flow summary with grouped bar chart, substitution waterfall chart (top 5 peer swaps), industry + broader sector peer tables with expandable entity detail, top 5 sector movers with horizontal bar chart, and top 10 entity rotation stories. Three Chart.js charts. By Parent/By Fund + Active Only toggles. N-PORT fund-level support. New `get_peer_rotation()` + `get_peer_rotation_detail()` in queries.py, `/api/peer_rotation` + `/api/peer_rotation_detail` endpoints. |
+| 2026-04-07 | Phase 3.5 parse hardening | Memory leak fix (4.5GB→300MB), parallel parse (4 workers), SIGALRM timeout (180s), crash resilience (checkpoint file, SIGTERM handler, temp CSV recovery), progress logging. 6 bug fixes: atomic SCD, deterministic matching, duplicate staging guard, PDF validation, explicit checkpoint, alias cache reuse. |
+| 2026-04-07 | Phase 3.5 full parse run | 3,026 PDFs parsed in 9.8h (4 workers, pdfplumber). 21,695 rows, 833 relationships. |
+| 2026-04-07 | Phase 3.5 parser fixes | Scan-based ownership_code extraction, expanded match universe (all aliases not just rollup parents), evidence resolution policy (ADV supersedes legacy at score ≥90). Match: 12→895 owners, 8→833 relationships. |
+| 2026-04-08 | PyMuPDF parser | 100-400x faster. 88.3% recall, 99.5% accuracy vs pdfplumber. Parsed all 112 oversized PDFs in 391s (pdfplumber: 0 in 8h). 15,902 new rows. Full coverage: 3,585 CRDs (98.2%). |
+| 2026-04-08 | Phase 3.5 match on full data | 1,059 ADV relationships in DB (350 wholly_owned primary, 157 mutual_structure, 56 parent_brand). 825 JV structures. SCD integrity: 0 broken. |
+| 2026-04-08 | --refresh mode + QC + manual adds | Dual-parser pipeline (pymupdf primary → pdfplumber fallback, 4 workers, ~25 min). QC report (1,926 CRDs with 0 entity owners). Manual adds via CSV. Interactive review HTML (1,926 items, 20,416 searchable aliases). |
 
 ---
 

@@ -84,36 +84,64 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 - `logs/phase3_resolution_results.csv` — full results (5,293 rows)
 - `logs/phase3_unmatched.csv` — unmatched entities with best fuzzy scores
 
-### Phase 3.5 — Form ADV Schedules A/B ⏳ IN PROGRESS
+### Phase 3.5 — Form ADV Schedules A/B ✅ COMPLETE
 **Scope:** Parse ADV Schedule A (Direct Owners) and B (Indirect Owners). Populate entity_relationships with wholly_owned and parent_brand types. Handle JV and multi-adviser structures.
 **Data source:** ADV PDFs from `reports.adviserinfo.sec.gov/reports/ADV/{crd}/PDF/{crd}.pdf` (IAPD API returns 403; XML feed lacks schedules; PDFs are accessible).
-**Three-phase pipeline:** `--download-only` (5 req/s) → `--parse-only` (pdfplumber, CPU-bound) → `--match-only` (alias cache + rapidfuzz).
 **Ownership code mapping:** E/D (≥50%) → wholly_owned, C (25-50%) → parent_brand, NA on entities → mutual_structure (Vanguard pattern), A/B (<25%) → skip.
-**Status:** Download complete (3,652 PDFs, 8.4GB). Parse in progress (~103 of 3,652 CRDs parsed). Match + validation pending.
-**Deliverables built:**
-- `entity_sync.py`: `parse_adv_pdf()`, `insert_adv_ownership()`, `build_alias_cache()`, `_AliasCache` (C-optimized matching)
-- `resolve_adv_ownership.py`: three-phase pipeline with `--download-only`, `--parse-only`, `--match-only`
-- `entity_overrides_persistent` table + replay in `build_entities.py --reset` + persistence in `POST /admin/entity_override`
-- `mutual_structure` relationship type + `mutual` control type added to schema CHECK constraints
-- Two new validation gates: `phase35_adv_coverage`, `phase35_jv_review`
-**Notes:** This is where multi-parent / JV structures are modeled. See Deferred Items #1.
 
-**Operational safeguards (verified Apr 7 2026):**
+**Results (Apr 8 2026):**
+- 3,585 of 3,652 CRDs parsed (98.2%), 26,822 rows in `adv_schedules.csv`
+- 1,059 ADV relationships inserted (350 wholly_owned primary, 475 wholly_owned secondary, 157 mutual_structure, 56 parent_brand)
+- 825 JV structures identified, 297 rollups updated
+- SCD integrity: 0 broken, 0 duplicate rollups
+
+**Dual-parser architecture:**
+- **pymupdf** (primary): `parse_adv_pdf_pymupdf()` — 100-400x faster than pdfplumber, no size limit. 88.3% recall vs pdfplumber, 99.5% code accuracy, +1,151 net entity gain. Handles all oversized PDFs (PIMCO 45MB in 20s).
+- **pdfplumber** (fallback): `parse_adv_pdf()` — retained as legacy parser for CRDs where pymupdf finds 0 entity owners (~5% gap). Higher recall on some text layouts.
+- **`--refresh` mode**: runs pymupdf on all targets (4 workers, ~20 min), then pdfplumber fallback on gaps, then match. Standard workflow for updates.
+
+**Quality control:**
+- `--qc` report: 1,659 CRDs with ≥1 entity owner, 1,926 with 0 (mostly individual-only firms)
+- `logs/phase35_qc_report.csv`: all CRDs with issues for review
+- `data/reference/adv_entity_review.html`: interactive review tool (1,926 items, 20,416 searchable aliases, pre-populated recommendations)
+- `data/reference/adv_manual_adds.csv`: manual entity additions, auto-loaded during `--refresh`
+
+**Deliverables:**
+- `entity_sync.py`: `parse_adv_pdf()`, `parse_adv_pdf_pymupdf()`, `insert_adv_ownership()`, `build_alias_cache()`, `_AliasCache`
+- `resolve_adv_ownership.py`: full pipeline with `--download-only`, `--parse-only`, `--match-only`, `--oversized`, `--refresh`, `--qc`, `--manual-add`
+- `entity_overrides_persistent` table + replay in `build_entities.py --reset`
+- `mutual_structure` relationship type + `mutual` control type in schema
+- `entity_identifiers_staging_review` deduplicated view
+- Evidence resolution policy: ADV supersedes legacy sources at score ≥90
+
+**Operational safeguards:**
 
 | Safeguard | How it works |
 |-----------|-------------|
-| **No DB lock during parse** | `--parse-only` opens DB briefly to read target CRDs, then closes connection. Entire parse reads local PDFs and writes to CSV only. DB not held for hours. |
-| **Incremental save** | Each firm's rows written to CSV immediately with `flush()`. If process is killed mid-run, all prior firms' data is on disk. |
-| **Resume on restart** | On startup, reads existing `firm_crd` values from `adv_schedules.csv` into a set and skips already-parsed CRDs. Zero duplication across restarts. |
-| **Memory-safe** | pdfplumber opened via `with` context manager, `page.close()` after each page, `gc.collect()` after each PDF. Peak memory ~300 MB (flat), previously leaked to 4.5 GB. |
-| **Oversized PDFs tracked** | PDFs >10 MB skipped and logged to `logs/phase35_oversized.csv` with CRD, firm name, and size. |
-| **Timed-out PDFs tracked** | PDFs exceeding `--timeout` (default 30s) skipped and logged to `logs/phase35_timed_out.csv`. |
+| **No DB lock during parse** | `--parse-only` opens DB briefly to read target CRDs, then closes. Parse reads local PDFs + writes CSV only. |
+| **Checkpoint file** | `data/cache/adv_parsed.txt` — append-only, one CRD per line after every PDF (success/error/timeout). Survives crashes. |
+| **Partitioned parallel** | 4 independent worker processes, each with own temp CSV. Workers never block each other. |
+| **SIGALRM timeout** | 180s default. Clean per-PDF timeout in each worker process. |
+| **SIGTERM handler** | Workers flush CSV and exit cleanly on kill signal. |
+| **Memory-safe** | pdfplumber: context manager + page.close() + gc.collect() (300 MB/worker). pymupdf: no leak. |
+| **Crash recovery** | Leftover temp CSVs merged on restart. Checkpoint prevents re-parsing. |
+| **PDF validation** | `%PDF` header check on download and before parse. Invalid files logged to `phase35_failed_crds.csv`. |
+| **Atomic SCD** | `begin()/commit()` around all rollup close+open pairs with self-heal on rerun. |
+| **Deterministic matching** | Score DESC → entity_id ASC tiebreaker. All alias queries ORDER BY entity_id, alias_name. |
 
-**Retry workflow for skipped PDFs:**
-1. Run initial pass: `python3 -u scripts/resolve_adv_ownership.py --parse-only --all --staging`
-2. Review `logs/phase35_timed_out.csv` — retry with higher timeout: `--parse-only --all --staging --timeout 120`
-3. Review `logs/phase35_oversized.csv` — these are genuinely large filings (PIMCO 45 MB, Bridgewater 12 MB). Raise `MAX_SIZE_MB` in script or parse manually if needed.
-4. Resume logic handles all retries automatically — only un-parsed CRDs are attempted.
+**Update workflow:**
+```bash
+# Full refresh (standard for updates)
+python3 scripts/resolve_adv_ownership.py --refresh --staging --all
+
+# Manual review
+open data/reference/adv_entity_review.html  # review in browser, export CSV
+# Place exported CSV at data/reference/adv_manual_adds.csv
+python3 scripts/resolve_adv_ownership.py --refresh --staging --all  # picks up manual adds
+
+# Quality check
+python3 scripts/resolve_adv_ownership.py --qc --staging
+```
 
 ### Phase 4 — Migration ⛔ REQUIRES EXPLICIT AUTHORIZATION
 **Scope:** Migrate holdings, fund_holdings, beneficial_ownership to use entity_id FK.
@@ -201,12 +229,25 @@ These are architectural limitations of the current design, not bugs. Must be doc
 | File | Purpose |
 |------|---------|
 | `scripts/entity_schema.sql` | Complete DDL for all tables, sequences, indexes, view, staging table |
-| `scripts/entity_sync.py` | Shared feeder module — entity lookup, creation, conflict routing (Phase 2) |
+| `scripts/entity_sync.py` | Shared feeder module — entity lookup, creation, conflict routing, ADV parsers (pdfplumber + pymupdf) |
 | `scripts/build_entities.py` | Full rebuild population script (`--reset`, `--refresh-reference-tables`) |
 | `scripts/validate_entities.py` | Validation gate runner (12 gates including Wellington) |
 | `scripts/fetch_ncen.py` | N-CEN feeder — incremental entity sync via `--staging` flag (Phase 2) |
 | `scripts/resolve_long_tail.py` | Phase 3 batch CIK resolver via SEC EDGAR (`--limit`, `--all`, `--dry-run`) |
-| `scripts/resolve_adv_ownership.py` | Phase 3.5 ADV ownership resolver (`--download-only`, `--parse-only`, `--match-only`) |
+| `scripts/resolve_adv_ownership.py` | Phase 3.5 ADV ownership resolver (`--refresh`, `--parse-only`, `--match-only`, `--oversized`, `--qc`, `--manual-add`) |
+| `data/reference/adv_schedules.csv` | Parsed ADV Schedule A/B data (26,822 rows, 3,585 CRDs) |
+| `data/reference/adv_manual_adds.csv` | Manual entity additions (auto-loaded during `--refresh`) |
+| `data/reference/adv_entity_review.html` | Interactive review tool for unresolved CRDs (1,926 items, 20,416 searchable aliases) |
+| `data/cache/adv_parsed.txt` | Checkpoint file — one CRD per line, append-only |
+| `data/cache/adv_pdfs/` | Cached ADV PDFs (3,654 files, 8.4 GB, gitignored) |
+| `logs/phase35_parse_progress.log` | Real-time parse progress (`tail -f`) |
+| `logs/phase35_qc_report.csv` | QC issues (CRDs with 0 entity owners, missing codes) |
+| `logs/phase35_errors.csv` | Parse errors with timestamps and tracebacks |
+| `logs/phase35_timed_out.csv` | PDFs that exceeded timeout |
+| `logs/phase35_oversized.csv` | PDFs exceeding size limit |
+| `logs/phase35_resolution_results.csv` | Match phase results |
+| `logs/phase35_jv_entities.csv` | JV structures identified |
+| `logs/phase35_unmatched_owners.csv` | Unmatched owners with best fuzzy scores |
 | `logs/entity_build.log` | Transaction log from build_entities.py |
 | `logs/entity_build_conflicts.log` | Identifier conflicts during population |
 | `logs/entity_validation_report.json` | Validation gate results |
