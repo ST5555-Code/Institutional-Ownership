@@ -1,1 +1,18 @@
 crd,firm_name,name,jurisdiction,ownership_code,relationship_type,control_person,title,notes
+104555,STRATEGIC ADVISERS LLC,FMR LLC,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=11 score=100. Source: external review.
+105764,MELLON INVESTMENTS CORPORATION,The Bank of New York Mellon Corporation,DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=83). Needs alias add or threshold adjustment.
+105642,"BNY MELLON INVESTMENT ADVISER, INC.",The Bank of New York Mellon Corporation,DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=83). Needs alias add or threshold adjustment.
+104652,JANUS HENDERSON INVESTORS,Janus Henderson Group plc,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=1399 score=100. Source: external review.
+106435,MANULIFE INVESTMENT MANAGEMENT (US) LLC,Manulife Financial Corporation,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=8994 score=86. Source: external review.
+10409,"MML INVESTORS SERVICES, LLC",Massachusetts Mutual Life Insurance Company,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=10715 score=93. Source: external review.
+105169,PACIFIC LIFE FUND ADVISORS LLC,Pacific Life Insurance Company,DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=75). Needs alias add or threshold adjustment.
+106108,BNY ADVISORS,The Bank of New York Mellon Corporation,DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=83). Needs alias add or threshold adjustment.
+104948,HIGHLAND ASSOCIATES INC,Regions Financial Corporation,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=6150 score=86. Source: external review.
+106523,MUTUAL OF AMERICA CAPITAL MANAGEMENT LLC,Mutual of America Life Insurance Company,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=5099 score=93. Source: external review.
+171412,ETF ARCHITECT,"Alpha Architect, LLC",DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=66). Needs alias add or threshold adjustment.
+107689,ROYCE INVESTMENT PARTNERS,"Franklin Resources, Inc.",DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=4805 score=95. Source: external review.
+106237,"AVANTAX PLANNING PARTNERS, INC.",Cetera Financial Group,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=10470 score=86. Source: external review.
+128591,"SCHNEIDER DOWNS WEALTH MANAGEMENT ADVISORS, LP","Schneider Downs & Co., Inc.",DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=70). Needs alias add or threshold adjustment.
+107545,THIRD AVENUE MANAGEMENT LLC,Affiliated Managers Group,DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=27 score=100. Source: external review.
+105963,"TETON ADVISORS, LLC","Teton Advisors, Inc.",DE,E,wholly_owned,Y,,High confidence enrichment. Matched eid=6991 score=100. Source: external review.
+107420,"MAGELLAN INVESTMENT PARTNERS NORTH AMERICA, INC.",Magellan Financial Group,DE,E,wholly_owned,Y,,High confidence enrichment. NO ALIAS MATCH (best=81). Needs alias add or threshold adjustment.
