@@ -182,7 +182,8 @@ def _get_current_rss_mb():
 
 
 def _worker_parse_chunk(chunk, worker_id, tmp_csv_path, timeout_sec, max_size_mb,
-                        progress_path, errors_csv_path, checkpoint_path):
+                        progress_path, errors_csv_path, checkpoint_path,
+                        use_pymupdf=False):
     """Independent subprocess: parses its own chunk of PDFs, writes its own CSV.
 
     Each worker is a full process with SIGALRM timeout — no shared state,
@@ -197,6 +198,7 @@ def _worker_parse_chunk(chunk, worker_id, tmp_csv_path, timeout_sec, max_size_mb
     - SIGTERM handler: flush and exit cleanly on kill signal
     - Memory monitoring: warn at 2GB, emergency GC at 4GB
     - Progress log: every PDF + summary every 50 PDFs
+    - use_pymupdf: use fast pymupdf parser instead of pdfplumber (for oversized)
     """
     import signal
 
@@ -286,8 +288,12 @@ def _worker_parse_chunk(chunk, worker_id, tmp_csv_path, timeout_sec, max_size_mb
                 old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
                 signal.alarm(timeout_sec)
                 try:
-                    entries = entity_sync.parse_adv_pdf(
-                        pdf_path, firm_crd=crd, max_size_mb=max_size_mb)
+                    if use_pymupdf:
+                        entries = entity_sync.parse_adv_pdf_pymupdf(
+                            pdf_path, firm_crd=crd)
+                    else:
+                        entries = entity_sync.parse_adv_pdf(
+                            pdf_path, firm_crd=crd, max_size_mb=max_size_mb)
                 except TimeoutError:
                     entries = None  # distinguish timeout from empty
                     status = "TIMEOUT"
@@ -362,10 +368,12 @@ def _worker_parse_chunk(chunk, worker_id, tmp_csv_path, timeout_sec, max_size_mb
 
 
 def _run_worker_entry(chunk, wid, tmp_csv, timeout_sec, max_size_mb,
-                      progress_path, errors_csv_path, checkpoint_path, q):
+                      progress_path, errors_csv_path, checkpoint_path,
+                      use_pymupdf, q):
     """Module-level entry point for Process (must be picklable on macOS spawn)."""
     result = _worker_parse_chunk(chunk, wid, tmp_csv, timeout_sec, max_size_mb,
-                                 progress_path, errors_csv_path, checkpoint_path)
+                                 progress_path, errors_csv_path, checkpoint_path,
+                                 use_pymupdf)
     q.put(result)
 
 
@@ -394,7 +402,7 @@ def _merge_temp_csvs(tmp_pattern_dir):
 
 
 def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS,
-              max_size_mb=MAX_SIZE_MB):
+              max_size_mb=MAX_SIZE_MB, use_pymupdf=False):
     """
     Parse local PDFs → adv_schedules.csv. No network calls, no DB connection.
 
@@ -497,7 +505,7 @@ def run_parse(targets, limit=None, timeout=PARSE_TIMEOUT, workers=PARSE_WORKERS,
             target=_run_worker_entry,
             args=(chunk, wid, tmp_csv, timeout, max_size_mb,
                   progress_path, errors_csv_path, checkpoint_path,
-                  result_queue),
+                  use_pymupdf, result_queue),
         )
         p.start()
         procs.append(p)
@@ -777,7 +785,7 @@ def main():
                                  if crd in oversized_crds]
             print(f"  Oversized targets: {len(oversized_targets)} of {len(oversized_crds)} in CSV")
             run_parse(oversized_targets, limit=None, timeout=300, workers=1,
-                      max_size_mb=200)
+                      max_size_mb=200, use_pymupdf=True)
     elif args.download_only:
         print("\n--- PHASE 1: DOWNLOAD ---")
         run_download(targets, limit)

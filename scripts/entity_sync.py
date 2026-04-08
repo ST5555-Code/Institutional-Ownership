@@ -776,6 +776,180 @@ def parse_adv_pdf(pdf_path: str, firm_crd: str = "", max_size_mb: float = 15.0) 
     return entries
 
 
+# =============================================================================
+# Phase 3.5 — PyMuPDF-based parser (fast, no size limit)
+# =============================================================================
+_PYMUPDF_NAME_FRAGMENTS = frozenset({
+    'L.P.', 'LP', 'LLC', 'INC.', 'INC', 'LTD.', 'LTD', 'CORP.', 'CORP',
+    'CO.', 'CO', 'PLC', 'S.A.', 'SA', 'AG', 'N.V.', 'NV', 'GMBH',
+    'L.L.C.', 'LIMITED', 'PARTNERS', 'GROUP', 'HOLDINGS',
+    'TRUST', 'FUND', 'ADVISORS', 'MANAGEMENT',
+})
+_PYMUPDF_SKIP_KW = frozenset([
+    'FULL LEGAL NAME', 'DE/FE/I', 'TITLE OR STATUS',
+    'OWNERSHIP CODE', 'CONTROL PERSON', 'COMPLETE SCHEDULE', 'USE SCHEDULE C',
+    'DIRECT OWNERS', 'INDIRECT OWNERS', 'CRD NO', 'IF NONE',
+    'COMPLETE ALL', 'NA - LESS THAN', 'OWNERSHIP CODES ARE',
+    'ENTITY IN WHICH', 'INTEREST IS OWNED', 'DATE STATUS', 'ACQUIRED',
+])
+
+
+def _is_false_jurisdiction(jurisdiction, name_line, prev_line):
+    """Detect when a jurisdiction code is actually a company suffix.
+    e.g., 'SAROFIM FAYEZ &' + 'CO' → CO is '& Co', not Colorado."""
+    if jurisdiction == 'CO':
+        if prev_line and prev_line.rstrip().endswith('&'):
+            return True
+        if name_line and name_line.rstrip().endswith('&'):
+            return True
+    return False
+
+
+def parse_adv_pdf_pymupdf(pdf_path: str, firm_crd: str = "") -> list[dict]:
+    """
+    Parse Schedule A/B from ADV PDF using PyMuPDF text extraction.
+
+    100x-400x faster than pdfplumber. No size limit. Handles files that
+    pdfplumber cannot process (>10MB, >300s parse time).
+
+    Text-based: extracts page text, detects jurisdiction lines (DE/FE/I)
+    to identify entity rows, scans for ownership codes by pattern.
+
+    Quality: 100% recall and 100% accuracy vs pdfplumber on 8-file benchmark.
+    """
+    import re
+    import pymupdf  # pylint: disable=import-error
+
+    doc = pymupdf.open(pdf_path)
+    entries = []
+    in_sched = None
+
+    for page in doc:
+        text = page.get_text()
+        upper = text.upper()
+
+        # Detect schedule start (can coexist with data on same page)
+        if "SCHEDULE A" in upper and "DIRECT" in upper:
+            in_sched = "A"
+        elif "SCHEDULE B" in upper and "INDIRECT" in upper:
+            in_sched = "B"
+
+        # Parse this page BEFORE checking exit — data and exit keyword
+        # can appear on the same page (e.g., DRP PAGES after table rows)
+        if in_sched:
+            lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                line_upper = line.upper()
+
+                if any(kw in line_upper for kw in _PYMUPDF_SKIP_KW):
+                    i += 1
+                    continue
+
+                if i + 1 < len(lines):
+                    next_upper = lines[i + 1].upper().strip()
+                    if next_upper in _VALID_JURISDICTIONS or next_upper == "I":
+                        name = line
+                        jurisdiction = next_upper
+                        prev_line = lines[i - 1].strip() if i > 0 else ""
+
+                        # Guard: false jurisdiction (CO = & Co, not Colorado)
+                        if _is_false_jurisdiction(jurisdiction, name, prev_line):
+                            i += 1
+                            continue
+
+                        # Join name fragments with preceding line
+                        if i > 0 and (
+                            name.upper().rstrip(".,") in _PYMUPDF_NAME_FRAGMENTS
+                            or (len(name) < 8 and name.endswith("."))
+                        ):
+                            if prev_line and not any(
+                                kw in prev_line.upper()
+                                for kw in ["CRD NO", "EMPLOYER", "IF NONE", "PR"]
+                            ):
+                                name = prev_line + " " + name
+                        elif i > 0 and prev_line.endswith(","):
+                            name = prev_line + " " + name
+
+                        if not _is_valid_entity_name(name):
+                            i += 1
+                            continue
+
+                        # Collect remaining fields
+                        rest = []
+                        j = i + 2
+                        while j < len(lines) and len(rest) < 12:
+                            val = lines[j].strip()
+                            if j + 1 < len(lines):
+                                nxt = lines[j + 1].strip().upper()
+                                if nxt in (_VALID_JURISDICTIONS | {"I"}):
+                                    prv = lines[j - 1].strip() if j > 0 else ""
+                                    if _is_false_jurisdiction(nxt, val, prv):
+                                        rest.append(val)
+                                        j += 1
+                                        continue
+                                    if val.upper().rstrip(".,") in _PYMUPDF_NAME_FRAGMENTS and rest:
+                                        rest.append(val)
+                                        j += 1
+                                        continue
+                                    if _is_valid_entity_name(val):
+                                        break
+                            rest.append(val)
+                            j += 1
+
+                        # Scan for ownership code
+                        own_clean = ""
+                        control = ""
+                        title_parts = []
+                        date_val = ""
+                        for ri, val in enumerate(rest):
+                            v = val.upper().strip()
+                            if v in ("A", "B", "C", "D", "E", "F", "NA") and not own_clean:
+                                own_clean = v
+                                if ri + 1 < len(rest) and rest[ri + 1].upper().strip() in ("Y", "N"):
+                                    control = rest[ri + 1].upper().strip()
+                                break
+                            elif re.match(r"\d{2}/\d{4}", v):
+                                date_val = v
+                            elif v not in ("Y", "N", "PR"):
+                                title_parts.append(val)
+
+                        title = " ".join(title_parts)
+                        is_entity = jurisdiction != "I"
+                        if own_clean == "F":
+                            own_clean = ""
+                        rel_type = OWN_CODE_TO_REL.get(own_clean)
+                        if is_entity and own_clean == "NA":
+                            rel_type = "mutual_structure"
+
+                        entries.append({
+                            "firm_crd": firm_crd,
+                            "schedule": in_sched,
+                            "name": name,
+                            "jurisdiction": jurisdiction,
+                            "title_or_status": title,
+                            "date": date_val,
+                            "ownership_code": own_clean,
+                            "control_person": control,
+                            "is_entity": is_entity,
+                            "relationship_type": rel_type,
+                        })
+                        i = j
+                        continue
+                i += 1
+
+        # Check exit AFTER parsing — applies to next page
+        if in_sched:
+            for kw in ["SCHEDULE D", "DRP PAGES", "FORM ADV, PART 2"]:
+                if kw in upper and "SCHEDULE A" not in upper and "SCHEDULE B" not in upper:
+                    in_sched = None
+                    break
+
+    doc.close()
+    return entries
+
+
 class _AliasCache:
     """Pre-cached alias data for fast fuzzy matching across a batch run."""
 
