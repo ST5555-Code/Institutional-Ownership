@@ -859,18 +859,45 @@ def parse_adv_pdf_pymupdf(pdf_path: str, firm_crd: str = "") -> list[dict]:
                             i += 1
                             continue
 
-                        # Join name fragments with preceding line
-                        if i > 0 and (
-                            name.upper().rstrip(".,") in _PYMUPDF_NAME_FRAGMENTS
-                            or (len(name) < 8 and name.endswith("."))
-                        ):
-                            if prev_line and not any(
-                                kw in prev_line.upper()
-                                for kw in ["CRD NO", "EMPLOYER", "IF NONE", "PR"]
-                            ):
-                                name = prev_line + " " + name
-                        elif i > 0 and prev_line.endswith(","):
-                            name = prev_line + " " + name
+                        # Multi-line name assembly: join fragments going back up to 3 lines.
+                        # Handles: "THE KEITH A. HEICHEL" / "IRREVOCABLE TRUST DATED" / "2020" / DE
+                        # and:     "OAKTREE CAPITAL GROUP HOLDINGS," / "L.P." / DE
+                        _stop_kw = frozenset(["CRD NO", "EMPLOYER", "IF NONE"])
+                        _continuation_kw = frozenset([
+                            "TRUST", "DATED", "IRREVOCABLE", "REVOCABLE",
+                            "HOLDINGS", "PARTNERS", "INVESTMENT", "ADVISORS",
+                        ])
+                        lookback = 0
+                        while lookback < 4 and i - lookback > 0:
+                            cur = name if lookback == 0 else lines[i - lookback].strip()
+                            cur_up = cur.upper().rstrip(".,")
+                            is_fragment = (
+                                cur_up in _PYMUPDF_NAME_FRAGMENTS
+                                or (len(cur) < 8 and cur.endswith("."))
+                                or cur.isdigit()  # year like "2020"
+                                or any(kw in cur_up for kw in _continuation_kw)
+                                or (lookback == 0 and not _is_valid_entity_name(name))
+                            )
+                            # Also join if name is technically valid but very short
+                            # (e.g., "LLC" passes validation but is clearly a fragment)
+                            if not is_fragment and lookback == 0 and len(name) < 12:
+                                is_fragment = True
+                            if not is_fragment:
+                                break
+                            prev = lines[i - lookback - 1].strip()
+                            if any(kw in prev.upper() for kw in _stop_kw):
+                                break
+                            # Don't go past ownership data (Y/N, codes, dates)
+                            if prev.upper().strip() in ("Y", "N") or prev.strip().isdigit():
+                                break
+                            name = prev + " " + name
+                            lookback += 1
+
+                        # Also join when prev line ends with comma (continuation)
+                        if i - lookback > 0 and not _is_valid_entity_name(name):
+                            prev = lines[i - lookback - 1].strip()
+                            if prev.endswith(","):
+                                name = prev + " " + name
 
                         if not _is_valid_entity_name(name):
                             i += 1
@@ -889,7 +916,14 @@ def parse_adv_pdf_pymupdf(pdf_path: str, firm_crd: str = "") -> list[dict]:
                                         rest.append(val)
                                         j += 1
                                         continue
-                                    if val.upper().rstrip(".,") in _PYMUPDF_NAME_FRAGMENTS and rest:
+                                    val_up = val.upper().rstrip(".,")
+                                    # Fragment before jurisdiction could be part of next
+                                    # entity OR part of current rest. Check if preceding
+                                    # line is a plausible entity name start.
+                                    if val_up in _PYMUPDF_NAME_FRAGMENTS or val.isdigit():
+                                        if j > 0 and _is_valid_entity_name(prv):
+                                            # prev line + fragment = next entity → stop
+                                            break
                                         rest.append(val)
                                         j += 1
                                         continue
