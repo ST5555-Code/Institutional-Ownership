@@ -128,6 +128,16 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 | **PDF validation** | `%PDF` header check on download and before parse. Invalid files logged to `phase35_failed_crds.csv`. |
 | **Atomic SCD** | `begin()/commit()` around all rollup close+open pairs with self-heal on rerun. |
 | **Deterministic matching** | Score DESC → entity_id ASC tiebreaker. All alias queries ORDER BY entity_id, alias_name. |
+| **Firm identity verification** | `verify_firm_identity()` checks city, state, legal name from adv_managers before wiring name-similar entities. Prevents false merges (e.g., two "Capstone Wealth Management" firms in different states). |
+| **Name normalization** | `_normalize_entity_name()` standardizes Corp/Corporation, Inc/Incorporated, Co/Company, Ltd/Limited before fuzzy matching. Eliminates suffix-only mismatches. |
+
+**Validation rules for entity linking:**
+1. **Name similarity alone is insufficient** — firms with score ≥85 but different states/cities are NOT wired
+2. **Same legal name + same state** → confirmed same firm, auto-wire
+3. **Same city + same state** → likely same firm, auto-wire
+4. **Different states** → different firms regardless of name score, skip
+5. **IAPD API blocked (403)** — use local adv_managers data for city/state/legal name verification
+6. **Manual review items** export to `adv_manual_adds.csv` via interactive HTML tool
 
 **Update workflow:**
 ```bash
@@ -303,3 +313,6 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 7 2026 | Expanded match universe: all entity aliases, not just rollup parents | Original _AliasCache only loaded aliases of entities serving as rollup targets. This missed subsidiaries and entities that could serve as parents but hadn't been wired yet. Expanded to all entities with active aliases. Match count improved 12 → 87 (7.25x). HSBC, BNP Paribas, Federated Hermes all now match. | Restrict to rollup parents — missed valid matches because the parent hadn't been wired yet |
 | Apr 7 2026 | Scan-based ownership code extraction in ADV parser | Fixed-position column extraction failed when pdfplumber inserted extra empty cells (Fayez Sarofim PDF). New approach scans remaining cells after jurisdiction for valid ownership code pattern (A-E, NA) instead of fixed offset. Zero missing ownership codes on entity rows. | Fixed-position extraction — fragile across PDF layouts |
 | Apr 7 2026 | Deduplicated staging review view (entity_identifiers_staging_review) | Raw entity_identifiers_staging table preserved as full audit trail (316 rows). View deduplicates on (entity_id, identifier_type, identifier_value, review_status) keeping highest confidence + most recent. Reduces pending review from 316 to 280 items. All QA queries use view. | DELETE duplicates from table — destroys audit trail |
+| Apr 8 2026 | Firm identity verification before wiring name-similar entities | `verify_firm_identity()` checks city, state, and legal name from adv_managers before wiring entities matched by name similarity. Caught 3 false positives in orphan scan: Capstone (PA vs OR), Compass Financial (SD vs FL), Cornerstone Wealth (MO vs OH, different legal names). Name similarity score alone is insufficient — many small RIAs share generic names. IAPD API blocked (403); local adv_managers data used instead. | Wire based on name score only — produces false merges between unrelated firms in different states |
+| Apr 8 2026 | Entity name normalization for fuzzy matching | `_normalize_entity_name()` standardizes Corp/Corporation → CORP, Inc/Incorporated → INC, Co/Company → CO, Ltd/Limited → LTD before fuzzy matching. Eliminates suffix-only mismatches: BNY Mellon 83→100, Franklin Resources 83→97, MassMutual 93→100. Applied to both alias cache and query names. | Raw string matching — false mismatches on identical entities with different legal suffixes |
+| Apr 8 2026 | Orphan subsidiary scan as standard pipeline step | Full-dataset scan of self-rollup entities against parent entities by name similarity + firm identity verification. Found 158 genuine orphans (same firm, different entity_ids from 13F vs N-CEN registration paths). Consolidated Dimensional ($836B), Lord Abbett ($270B), Thornburg ($45B), Sarofim ($35B) and 150+ others. | Manual discovery only — orphans accumulate silently as new entities enter via different feeders |

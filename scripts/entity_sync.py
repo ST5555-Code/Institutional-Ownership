@@ -984,6 +984,54 @@ def parse_adv_pdf_pymupdf(pdf_path: str, firm_crd: str = "") -> list[dict]:
     return entries
 
 
+def verify_firm_identity(con, crd1: str, crd2: str) -> dict:
+    """Verify whether two CRDs represent the same or related firms.
+
+    Checks city, state, legal name, and address from adv_managers.
+    Returns dict with 'same_firm' bool and evidence fields.
+    Used to filter false positives from name-similarity matching.
+    """
+    rows = {}
+    for crd in [crd1, crd2]:
+        row = con.execute("""
+            SELECT crd_number, firm_name, legal_name, city, state, address
+            FROM adv_managers WHERE crd_number = ?
+        """, [crd]).fetchone()
+        if row:
+            rows[crd] = {
+                "firm_name": row[1] or "",
+                "legal_name": row[2] or "",
+                "city": (row[3] or "").upper().strip(),
+                "state": (row[4] or "").upper().strip(),
+                "address": (row[5] or "").upper().strip(),
+            }
+
+    if len(rows) < 2:
+        return {"same_firm": False, "reason": "missing_adv_data"}
+
+    r1, r2 = rows[crd1], rows[crd2]
+
+    # Same state + same city = likely same firm
+    same_state = r1["state"] == r2["state"] and r1["state"]
+    same_city = r1["city"] == r2["city"] and r1["city"]
+    same_legal = r1["legal_name"].upper() == r2["legal_name"].upper()
+
+    if same_legal and same_state:
+        return {"same_firm": True, "reason": "same_legal_name_and_state",
+                "detail": f"{r1['legal_name']} in {r1['state']}"}
+    if same_state and same_city:
+        return {"same_firm": True, "reason": "same_city_and_state",
+                "detail": f"{r1['city']}, {r1['state']}"}
+    if not same_state:
+        return {"same_firm": False, "reason": "different_states",
+                "detail": f"{r1['state']} vs {r2['state']}"}
+    if not same_city:
+        return {"same_firm": False, "reason": "different_cities",
+                "detail": f"{r1['city']}, {r1['state']} vs {r2['city']}, {r2['state']}"}
+
+    return {"same_firm": False, "reason": "inconclusive"}
+
+
 def _normalize_entity_name(name: str) -> str:
     """Normalize common legal suffixes for fuzzy matching.
 
