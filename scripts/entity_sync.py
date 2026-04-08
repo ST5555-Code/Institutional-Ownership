@@ -984,13 +984,33 @@ def parse_adv_pdf_pymupdf(pdf_path: str, firm_crd: str = "") -> list[dict]:
     return entries
 
 
+def _normalize_entity_name(name: str) -> str:
+    """Normalize common legal suffixes for fuzzy matching.
+
+    Corp/Corporation/Incorporated → CORP, Company/Co → CO,
+    Limited → LTD, L.L.C. → LLC. Removes trailing punctuation.
+    """
+    import re
+    s = name.upper().strip()
+    # Standardize suffixes (order matters — longest first)
+    s = re.sub(r'\bINCORPORATED\b', 'INC', s)
+    s = re.sub(r'\bCORPORATION\b', 'CORP', s)
+    s = re.sub(r'\bCOMPANY\b', 'CO', s)
+    s = re.sub(r'\bLIMITED\b', 'LTD', s)
+    s = re.sub(r'\bL\.L\.C\.', 'LLC', s)
+    s = re.sub(r'\bL\.P\.', 'LP', s)
+    # Remove trailing punctuation
+    s = s.rstrip('.,;')
+    # Collapse whitespace
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
 class _AliasCache:
     """Pre-cached alias data for fast fuzzy matching across a batch run."""
 
     def __init__(self, con):
         # All entities with active aliases — not restricted to rollup parents.
-        # This allows matching against any entity in the MDM (subsidiaries,
-        # fund families, etc.) not just those already serving as rollup targets.
         # ORDER BY ensures deterministic iteration order.
         rows = con.execute("""
             SELECT DISTINCT ea.entity_id, ea.alias_name
@@ -999,13 +1019,16 @@ class _AliasCache:
               AND ea.alias_name IS NOT NULL AND ea.alias_name != ''
             ORDER BY ea.entity_id, ea.alias_name
         """).fetchall()
-        self.parent_names = [r[1].upper() for r in rows if r[1]]
+        # Store both raw and normalized names for matching
+        self.parent_names_raw = [r[1].upper() for r in rows if r[1]]
+        self.parent_names = [_normalize_entity_name(r[1]) for r in rows if r[1]]
         self.parent_eids = [r[0] for r in rows if r[1]]
         logger.info("AliasCache loaded: %d entity aliases (full universe)", len(self.parent_names))
 
     def match(self, name: str, threshold: int = 85) -> tuple[int | None, str | None, int]:
         """Returns (entity_id, alias_name, score) or (None, best_name, best_score).
 
+        Normalizes Corp/Corporation/Company/Co/etc before matching.
         Deterministic tiebreaker: score DESC → entity_id ASC.
         """
         from rapidfuzz import process, fuzz
@@ -1013,18 +1036,22 @@ class _AliasCache:
         if not name or not self.parent_names:
             return None, None, 0
 
+        # Normalize query name
+        query = _normalize_entity_name(name)
+
         # Get top N candidates and apply deterministic tiebreaker
         results = process.extract(
-            name.upper(), self.parent_names,
+            query, self.parent_names,
             scorer=fuzz.token_sort_ratio, limit=5,
         )
         if not results:
             return None, None, 0
 
         # Tiebreaker: score DESC, entity_id ASC
+        # Return raw (un-normalized) name for display
         candidates = [
-            (matched_name, int(score), self.parent_eids[idx])
-            for matched_name, score, idx in results
+            (self.parent_names_raw[idx], int(score), self.parent_eids[idx])
+            for _matched_name, score, idx in results
         ]
         candidates.sort(key=lambda x: (-x[1], x[2]))
 
