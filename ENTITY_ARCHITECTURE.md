@@ -1,7 +1,7 @@
 # Entity Master Data Management (MDM) Architecture
 
-_Last updated: April 7, 2026_
-_Status: Phase 3.5 — Parse in progress_
+_Last updated: April 8, 2026_
+_Status: Phase 3.5 — Complete. Phase 4 ready to scope._
 
 ---
 
@@ -48,7 +48,7 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 
 ## Implementation Phases
 
-### Phase 1 — Build and Seed ⏳ IN PROGRESS
+### Phase 1 — Build and Seed ✅ COMPLETE
 **Scope:** Create all tables, seed top 50 parents, populate from existing data, run validation gates.
 **Status:** Prompt sent to Claude Code. Awaiting completion.
 **Validation gate:** All 11 gates must pass before merge to production.
@@ -91,8 +91,12 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 
 **Results (Apr 8 2026):**
 - 3,585 of 3,652 CRDs parsed (98.2%), 26,822 rows in `adv_schedules.csv`
-- 1,059 ADV relationships inserted (350 wholly_owned primary, 475 wholly_owned secondary, 157 mutual_structure, 56 parent_brand)
+- 12,862 total relationships in DB (1,095 from ADV parse, 36 manual, 174 orphan scan, 11,557 from prior phases)
+- 20,205 total entities (12 new parent entities created: Pacific Life, Magellan Financial, Stowers Institute, TA Associates, Virtus, Himalaya Capital, F-Prime, Stonegate, Ward Ferry, Intl Assets Advisory, Distillate Capital, Leuthold Group)
 - 825 JV structures identified, 297 rollups updated
+- 174 orphan subsidiaries consolidated (Dimensional $836B, Lord Abbett $270B, Thornburg $45B, Sarofim $35B, and 150+ others)
+- 1,926 unresolved CRDs triaged: 99 wired to parents, 1,827 confirmed independent
+- D1 accuracy audit: 90 PDFs, 6 strata, zero false positives, 75% parser agreement
 - SCD integrity: 0 broken, 0 duplicate rollups
 
 **Dual-parser architecture:**

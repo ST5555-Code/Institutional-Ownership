@@ -159,6 +159,13 @@ _Last updated: April 6, 2026_
 | 2026-04-08 | PyMuPDF parser | 100-400x faster. 88.3% recall, 99.5% accuracy vs pdfplumber. Parsed all 112 oversized PDFs in 391s (pdfplumber: 0 in 8h). 15,902 new rows. Full coverage: 3,585 CRDs (98.2%). |
 | 2026-04-08 | Phase 3.5 match on full data | 1,059 ADV relationships in DB (350 wholly_owned primary, 157 mutual_structure, 56 parent_brand). 825 JV structures. SCD integrity: 0 broken. |
 | 2026-04-08 | --refresh mode + QC + manual adds | Dual-parser pipeline (pymupdf primary → pdfplumber fallback, 4 workers, ~25 min). QC report (1,926 CRDs with 0 entity owners). Manual adds via CSV. Interactive review HTML (1,926 items, 20,416 searchable aliases). |
+| 2026-04-08 | External review import | 17 high-confidence + 20 medium corporate parents wired. 12 new parent entities created (Pacific Life, Stowers Institute, TA Associates, Virtus, Himalaya Capital, F-Prime, etc.). Total: 36 manual relationships, $3.8T AUM covered. |
+| 2026-04-08 | Orphan subsidiary scan | Full dataset scan: 11,644 self-rollup entities vs 866 parents. 174 orphans wired (Dimensional $836B, Lord Abbett $270B, Thornburg $45B, 150+ others). Firm identity verification prevents false merges. |
+| 2026-04-08 | Entity review complete | 1,926 unresolved CRDs triaged: 99 wired, 1,827 confirmed independent. Baillie Gifford Overseas ($163B) → Baillie Gifford & Co. |
+| 2026-04-08 | D1 accuracy audit | 90 PDFs, 6 strata. Zero false positives. 75% parser agreement on comparable files. Pymupdf recall gap = Schedule B indirect owners. |
+| 2026-04-08 | DBA/legal name check | 236 firms flagged where firm_name ≠ legal_name. Integrated into --qc pipeline. Catches holding company structures missed by ADV parser. |
+| 2026-04-08 | Name normalization | Corp/Corporation, Inc/Incorporated, Co/Company standardized before fuzzy matching. BNY Mellon 83→100, Franklin Resources 83→97. |
+| 2026-04-08 | Phase 3.5 complete | 12,862 relationships, 20,205 entities. All deferred items (D1, D7) resolved. Phase 4 ready to scope. |
 
 ---
 
