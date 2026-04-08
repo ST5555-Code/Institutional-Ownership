@@ -469,6 +469,9 @@ function render() {
     // Firm name
     tr.innerHTML += '<td>' + esc(it.firm_name) + '</td>';
 
+    // AUM
+    tr.innerHTML += '<td style="font-weight:bold;color:#1E2846">' + (it.aum_billions ? '$' + it.aum_billions + 'B' : '') + '</td>';
+
     // Parsed info
     tr.innerHTML += '<td>' + it.total_rows + ' rows / ' + it.entities_found + ' ent / ' + it.individuals_found + ' ind</td>';
 
