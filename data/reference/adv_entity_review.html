@@ -537,7 +537,7 @@ function aliasSearch(input, idx) {
   const q = input.value.toLowerCase().trim();
   const dd = document.getElementById("alias-dd-" + idx);
   if (q.length < 2) { dd.style.display = "none"; return; }
-  const matches = ALIASES.filter(a => a.name.toLowerCase().includes(q)).slice(0, 30);
+  const als = getAliases(); const lc = als._lc; const matches = []; for(let i=0;i<lc.length&&matches.length<30;i++){if(lc[i].includes(q))matches.push(als[i]);}
   if (!matches.length) { dd.style.display = "none"; return; }
   dd.innerHTML = matches.map(a =>
     '<div onclick="selectAlias(' + idx + ',' + a.id + ',this)" data-name="' + escAttr(a.name.trim()) + '">' + esc(a.name.trim()) + ' <span style="color:#888">(eid:' + a.id + ')</span></div>'
