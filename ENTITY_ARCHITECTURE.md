@@ -44,6 +44,27 @@ This document tracks the design, implementation status, deferred items, and vali
 ### Rollup Type
 All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews (regulatory_parent_v1, brand_parent_v1) can coexist via this field without schema changes.
 
+### Rollup Policy — Operating Asset Manager Rule
+**Rollup targets must be operating asset managers only.** The rollup chain stops at the top-level entity that actually manages money and files 13F/N-PORT.
+
+Non-operating ownership entities stay in the relationship graph as informational records but **never drive rollup**:
+- **PE firms** (TA Associates, Bain Capital) — own managers through fund structures, not as operators
+- **Insurance companies** (Pacific Life, MassMutual) — own subsidiaries but the subsidiary is the operating manager
+- **Foundations** (Stowers Institute) — endowment ownership, not asset management
+- **Holding companies** (Stonegate, International Assets Advisory) — financial holding, not operating
+- **VC firms** (F-Prime, DAG Ventures) — fund-level ownership
+
+**Examples:**
+- American Century self-rollups (not → Stowers Institute foundation)
+- Russell Investments self-rollups (not → TA Associates PE fund)
+- Pacific Life Fund Advisors self-rollups (not → Pacific Life Insurance Company)
+- Envestnet self-rollups (not → Bain Capital Fund XIII)
+
+**What drives rollup:**
+- `fund_sponsor` — fund series → operating adviser (from N-CEN)
+- `wholly_owned` — subsidiary manager → parent manager (from ADV Schedule A)
+- `orphan_scan` — duplicate entities consolidated by name similarity
+
 ---
 
 ## Implementation Phases
@@ -91,13 +112,19 @@ All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews 
 
 **Results (Apr 8 2026):**
 - 3,585 of 3,652 CRDs parsed (98.2%), 26,822 rows in `adv_schedules.csv`
-- 12,862 total relationships in DB (1,095 from ADV parse, 36 manual, 174 orphan scan, 11,557 from prior phases)
-- 20,205 total entities (12 new parent entities created: Pacific Life, Magellan Financial, Stowers Institute, TA Associates, Virtus, Himalaya Capital, F-Prime, Stonegate, Ward Ferry, Intl Assets Advisory, Distillate Capital, Leuthold Group)
-- 825 JV structures identified, 297 rollups updated
-- 174 orphan subsidiaries consolidated (Dimensional $836B, Lord Abbett $270B, Thornburg $45B, Sarofim $35B, and 150+ others)
+- 13,541 total active relationships in DB
+- 20,205 total entities (12 new parent entities created)
+- 825 JV structures identified
+- 858 N-PORT orphan fund series wired to parent advisers (920 → 62, 99.3% coverage)
+- 174 orphan subsidiaries consolidated via name similarity scan
+- All multi-level rollup chains flattened (every entity points directly to ultimate parent)
+- 23 circular rollup pairs broken (duplicate entities like Vanguard Group ↔ Vanguard Group Inc)
 - 1,926 unresolved CRDs triaged: 99 wired to parents, 1,827 confirmed independent
+- Rollup policy enforced: only operating asset managers as rollup targets
+- Classification sync: 974 unknowns classified from ADV strategy, 204 corrections validated
 - D1 accuracy audit: 90 PDFs, 6 strata, zero false positives, 75% parser agreement
-- SCD integrity: 0 broken, 0 duplicate rollups
+- SCD integrity: 0 broken, 0 duplicate rollups, 0 circular references, 0 multi-level chains
+- Staging queue: 0 pending (3,503 informational entries auto-resolved)
 
 **Dual-parser architecture:**
 - **pymupdf** (primary): `parse_adv_pdf_pymupdf()` — 100-400x faster than pdfplumber, no size limit. 88.3% recall vs pdfplumber, 99.5% code accuracy, +1,151 net entity gain. Handles all oversized PDFs (PIMCO 45MB in 20s).
@@ -323,3 +350,7 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 8 2026 | Firm identity verification before wiring name-similar entities | `verify_firm_identity()` checks city, state, and legal name from adv_managers before wiring entities matched by name similarity. Caught 3 false positives in orphan scan: Capstone (PA vs OR), Compass Financial (SD vs FL), Cornerstone Wealth (MO vs OH, different legal names). Name similarity score alone is insufficient — many small RIAs share generic names. IAPD API blocked (403); local adv_managers data used instead. | Wire based on name score only — produces false merges between unrelated firms in different states |
 | Apr 8 2026 | Entity name normalization for fuzzy matching | `_normalize_entity_name()` standardizes Corp/Corporation → CORP, Inc/Incorporated → INC, Co/Company → CO, Ltd/Limited → LTD before fuzzy matching. Eliminates suffix-only mismatches: BNY Mellon 83→100, Franklin Resources 83→97, MassMutual 93→100. Applied to both alias cache and query names. | Raw string matching — false mismatches on identical entities with different legal suffixes |
 | Apr 8 2026 | Orphan subsidiary scan as standard pipeline step | Full-dataset scan of self-rollup entities against parent entities by name similarity + firm identity verification. Found 158 genuine orphans (same firm, different entity_ids from 13F vs N-CEN registration paths). Consolidated Dimensional ($836B), Lord Abbett ($270B), Thornburg ($45B), Sarofim ($35B) and 150+ others. | Manual discovery only — orphans accumulate silently as new entities enter via different feeders |
+| Apr 8 2026 | N-PORT orphan series wiring via fund family name | 858 of 920 orphan fund series wired to parent advisers using fund_holdings.family_name → entity alias matching. Coverage 89.2% → 99.3%. Major consolidations: BlackRock/iShares (278), State Street/SPDR (80), Fidelity (67), Allspring (27), T. Rowe Price, BNY Mellon, DWS, and 30+ others. | Leave orphan series as independent — fragments parent-level ownership analysis |
+| Apr 8 2026 | Circular rollup pair resolution | 23 circular pairs found where duplicate entities pointed at each other (Vanguard eid=1 ↔ Vanguard Group Inc eid=4375). Canonical parent chosen by child count. All circles broken, all multi-level chains flattened to one-hop. | Leave cycles — produces infinite loops in rollup queries |
+| Apr 8 2026 | Operating Asset Manager rollup policy | Rollup targets must be operating asset managers only. PE funds, insurance companies, foundations, VC firms, and holding companies recorded in relationship graph but never drive rollup. American Century self-rollups (not → Stowers), Russell self-rollups (not → TA Associates), Pacific Life Fund Advisors self-rollups (not → Pacific Life Insurance). Ownership ≠ operational control for rollup purposes. | Roll up to ultimate owner — would attribute 13F holdings to PE funds and insurance companies that don't manage money |
+| Apr 8 2026 | Classification sync from ADV strategy_inferred | 974 unknowns classified, 204 corrections validated. Misclassified PE fixed: Thrivent, Muzinich, Bridges → active. fund_sponsor control_type standardized to advisory. Staging queue cleared (3,503 informational entries rejected). | Leave classifications from Phase 1 only — misses ADV data that's already in the DB |
