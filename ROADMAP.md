@@ -92,7 +92,8 @@ _Last updated: April 6, 2026_
 | 48 | Phase 3.5 deferred items | Partially done | D1 ✅ (accuracy audit), D7 ✅ (oversized pass). Remaining: D2 (pymupdf recall 88→95%), D4 (match quality benchmark), D5 (IAPD API), D10 (admin UI), D11 (auto-promoter). |
 | 49 | D1 accuracy audit | Done | 90 PDFs, 6 strata. 75% parser agreement, zero false positives. Pymupdf recall gap = Schedule B indirect owners. |
 | 50 | Entity review complete | Done | 1,926 CRDs triaged: 99 wired to parents, 1,827 confirmed independent. 12 new entities created. 174 orphan subsidiaries consolidated. DBA/legal name check added to QC. |
-| 51 | Phase 4 — Migration | Ready to scope | Phase 3.5 complete. 12,862 relationships, 20,205 entities. Accuracy audit passed. Manual review done. See ENTITY_ARCHITECTURE.md Phase 4 section for dual-write migration plan. |
+| 51 | Phase 4 — Migration | Ready to scope | Phase 3.5 complete. 13,541 relationships, 20,205 entities. 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected). Accuracy audit passed. Manual review done. See ENTITY_ARCHITECTURE.md Phase 4 section for dual-write migration plan. |
+| 52 | Phase 4 post-cutover: brand 13F consolidation | Deferred | Wire T. Rowe Price, MFS, Neuberger Berman, HSBC 13F filer CIKs to their respective brand phantom parents. Currently 13F filers self-rollup correctly but don't consolidate with N-PORT fund series under brand parent. Enhancement not integrity issue — deferred until after Phase 4 cutover. |
 
 ---
 
