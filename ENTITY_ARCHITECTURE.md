@@ -190,7 +190,7 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 **Migration approach:** Dual-write → shadow reads → parity validation → cutover. NOT a fast table swap.
 
 **Pre-conditions (must complete before Phase 4 starts):**
-1. ~~Validation gate failures resolved~~ ✅ Done — 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected), rollup chains flattened, circles broken
+1. ~~Validation gate failures resolved~~ ✅ Done — 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected), rollup chains flattened, circles broken. Gate thresholds updated: 0 FAILs, 8 PASS, 7 MANUAL (all documented).
 2. **N15 — Fidelity international sub-adviser deduplication** — HK/Japan/UK sub-advisers inflate Fidelity to 110%. Must resolve before 13F→entity_id mapping.
 3. **R1/R2/R3 — 13D/G data quality audit** — assess pct_owned coverage, name matching to 13F parents, dedup amendments, standardize filer names. Required before beneficial_ownership gets entity_id FK.
 4. **Item 43 — app.py lint debt fix** — E402 imports, broad-exception-caught, bandit B608. Blocks normal pre-commit path for app.py changes needed during migration.
