@@ -166,6 +166,11 @@ _Last updated: April 6, 2026_
 | 2026-04-08 | DBA/legal name check | 236 firms flagged where firm_name ≠ legal_name. Integrated into --qc pipeline. Catches holding company structures missed by ADV parser. |
 | 2026-04-08 | Name normalization | Corp/Corporation, Inc/Incorporated, Co/Company standardized before fuzzy matching. BNY Mellon 83→100, Franklin Resources 83→97. |
 | 2026-04-08 | Phase 3.5 complete | 12,862 relationships, 20,205 entities. All deferred items (D1, D7) resolved. Phase 4 ready to scope. |
+| 2026-04-08 | N-PORT orphan cleanup | 858 of 920 orphan fund series wired (99.3%). BlackRock/iShares 278, SPDR 80, Fidelity 67, Allspring 27, and 30+ others. $337B → $2.4B remaining. |
+| 2026-04-08 | Rollup chain flatten + circle fix | 23 circular pairs broken (Vanguard↔Vanguard Group Inc, etc.). All multi-level chains flattened to one-hop. Zero remaining chains. |
+| 2026-04-08 | Classification sync | 974 unknowns classified from ADV strategy_inferred. 204 corrections (active→hedge_fund/PE). 5 PE misclassifications fixed. Unknown: 7,607→6,633. |
+| 2026-04-08 | Operating AM rollup policy | Only asset managers as rollup targets. PE, insurance, foundation, VC unwired: Stowers (117 children), Pacific Life (63), TA Associates (40), DAG Ventures (3). |
+| 2026-04-08 | Final data quality audit | 0 chains, 0 circles, 0 SCD breaks, 0 multi-primary, 0 orphan rels, 0 duplicate IDs, 0 pending staging. 13,541 active relationships. |
 
 ---
 

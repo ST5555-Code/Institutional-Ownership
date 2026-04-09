@@ -10,10 +10,10 @@ _Source: 13f_staging.duckdb Entity MDM (Phase 3.5 complete)_
 | Metric | Count |
 |--------|-------|
 | Total entities | 20,205 |
-| Rolls up to parent | 8,652 (42.8%) |
-| Self-rollup (independent) | 11,485 (56.9%) |
-| Unique parent entities | 813 |
-| Total relationships | 12,862 |
+| Rolls up to parent | 9,258 (45.8%) |
+| Self-rollup (independent) | 10,947 (54.2%) |
+| Unique parent entities | 708 |
+| Total relationships | 13,541 |
 
 ---
 
@@ -38,8 +38,8 @@ _Source: 13f_staging.duckdb Entity MDM (Phase 3.5 complete)_
 | Status | Count | % |
 |--------|-------|---|
 | Total N-PORT entities | 8,547 | 100% |
-| Rolls up to parent | 7,627 | 89.2% |
-| Self-rollup (orphan) | 920 | 10.8% |
+| Rolls up to parent | 8,269 | 96.7% |
+| Self-rollup (orphan) | 278 | 3.3% |
 
 **Impact:** 920 fund series don't roll up to their adviser/sponsor. In shareholder analysis, these funds appear as independent holders rather than under their managing firm.
 
@@ -142,7 +142,7 @@ These are the largest self-rollup filers. Most are correctly independent — sov
 ## Phase 4 Implications
 
 Before migrating to entity_id FK in holdings tables:
-1. Wire the 920 N-PORT orphan series to their advisers
+1. ~~Wire the 920 N-PORT orphan series~~ Done (858 wired, 99.3% coverage)
 2. Verify top 50 self-rollup 13F filers are correctly independent
 3. Add international parent entities for foreign subsidiaries filing US 13F
 4. The $26.2T in self-rollup holdings is mostly correct — sovereign funds, pension funds, and independent managers should NOT be consolidated
