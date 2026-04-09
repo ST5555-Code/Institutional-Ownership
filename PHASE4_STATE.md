@@ -94,3 +94,17 @@ Item 1 result: **0 FAILs, 8 PASS, 7 MANUAL**
 ## Migration Approach
 
 New data primary, old data shadow. App switches to entity-backed tables immediately. Old tables kept as `_legacy` for 2-week validation.
+
+## AUM Parity Check (2026-04-09)
+
+Entity rollup vs parent_bridge string matching — top 50 tickers by AUM:
+- **50/50 match at 0.00% difference**
+- Total AUM checked: ~$27T across top 50 tickers
+- Entity system consolidates to fewer parents (merges subsidiaries) but dollar totals identical
+- Example: NVDA — PB 5,585 parents $3,090B → Entity 5,483 parents $3,090B
+
+## Entity Rollup Sync (2026-04-09)
+
+- 87 self-rollup → parent wires synced from parent_bridge (Items 3+4 international/top-50 work)
+- Entity child→parent: 9,348 (was 9,261)
+- 15 remaining "gap" are correctly self-rolling parent entities
