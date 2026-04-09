@@ -188,6 +188,14 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 ### Phase 4 — Migration ⛔ REQUIRES EXPLICIT AUTHORIZATION
 **Scope:** Migrate holdings, fund_holdings, beneficial_ownership to use entity_id FK.
 **Migration approach:** Dual-write → shadow reads → parity validation → cutover. NOT a fast table swap.
+
+**Pre-conditions (must complete before Phase 4 starts):**
+1. ~~Validation gate failures resolved~~ ✅ Done — 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected), rollup chains flattened, circles broken
+2. **N15 — Fidelity international sub-adviser deduplication** — HK/Japan/UK sub-advisers inflate Fidelity to 110%. Must resolve before 13F→entity_id mapping.
+3. **R1/R2/R3 — 13D/G data quality audit** — assess pct_owned coverage, name matching to 13F parents, dedup amendments, standardize filer names. Required before beneficial_ownership gets entity_id FK.
+4. **Item 43 — app.py lint debt fix** — E402 imports, broad-exception-caught, bandit B608. Blocks normal pre-commit path for app.py changes needed during migration.
+5. **N21 TODOs a/b/c — investor type classification** — PARENT_SEEDS expansion 50→250 (reduces 40% NULL manager_type rate), spot-validate 100 largest holders across 10 benchmark tickers, add classification_source column for provenance tracking.
+
 **Stages:**
 1. Create holdings_v2 with entity_id FK, backfill, build indexes
 2. Shadow reads — run both queries, compare results, log discrepancies (2 weeks)

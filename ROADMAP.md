@@ -323,10 +323,17 @@ _Last updated: April 6, 2026_
 9. ~~N14 — Geode/Fidelity sub-adviser exclusion~~ Done
 10. ~~U1 — N-PORT coverage disclaimer tooltip~~ Done
 11. ~~P4 — iShares Trust N-PORT~~ Done
-12. **N15 — International sub-adviser deduplication** (Fidelity HK/Japan/UK inflate to 110%)
+**PRE-PHASE 4 REQUIRED:**
+12. **N15 — Fidelity international sub-adviser deduplication** (HK/Japan/UK inflate to 110%)
 13. **R1/R2/R3 — 13D/G data quality audit + cleanup** — assess pct_owned coverage, name matching, dedup amendments, standardize filer names
-14. **M1/M2/M3 — Monthly N-PORT update flow design** — define cadence, monthly→quarterly rollup, fund→parent reconciliation
-15. R4-R6 — 13D/G Register integration (pending R1-R3 results)
-16. M4-M6 — Incremental N-PORT update implementation
-17. Refresh readonly snapshot
-18. Items N4-N10 as capacity allows
+14. **Item 43 — app.py lint debt fix** — E402 imports, broad-exception-caught, bandit B608. Blocks normal pre-commit for app.py changes.
+15. **N21 TODOs a/b/c — investor type classification** — PARENT_SEEDS expansion 50→250, spot-validate 100 largest holders, add classification_source column
+
+**POST-PHASE 4:**
+16. M1/M2/M3 — Monthly N-PORT update flow design — design decisions, not migration blockers
+17. R4/R5/R6 — 13D/G Register integration — UI integration, pending Phase 4 cutover
+18. M4/M5/M6 — Incremental N-PORT updates — operational cadence, implement after cutover
+19. H16 — Pre-computed entity×ticker flow cache — performance enhancement
+20. U6, U8, N17, N18, N19, N22, N23 — UI/UX enhancements
+21. Refresh readonly snapshot
+22. Items N4-N10 as capacity allows
