@@ -15,7 +15,12 @@ Run: python3 scripts/fetch_13dg.py                          # Full build
      python3 scripts/fetch_13dg.py --test                   # 5 test tickers
 """
 
-import argparse, csv, os, re, time, threading
+import argparse
+import csv
+import os
+import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -68,16 +73,26 @@ def _retry_edgar(fn, label="", max_retries=5):
 # ---------------------------------------------------------------------------
 
 def _clean_text(raw):
-    """Strip HTML tags and entities from filing text."""
+    """Strip HTML tags and entities from filing text.
+    Also fixes spaced digits (e.g., '2 2 . 7' -> '22.7') which appear
+    in some EDGAR filings due to HTML table cell formatting."""
     if len(raw) > 2_000_000:
         raw = raw[:2_000_000]
     text = re.sub(r"<[^>]+>", " ", raw)
     for old, new in [("&nbsp;", " "), ("&#160;", " "), ("&#xa0;", " "),
                      ("&amp;", "&"), ("&#38;", "&"), ("&lt;", "<"), ("&gt;", ">"),
-                     ("&ldquo;", '"'), ("&rdquo;", '"'), ("&lsquo;", "'"), ("&rsquo;", "'")]:
+                     ("&ldquo;", '"'), ("&rdquo;", '"'), ("&lsquo;", "'"),
+                     ("&rsquo;", "'"), ("&sect;", "§"),
+                     ("&#x2013;", "-"), ("&#x2014;", "-"),
+                     ("&#x2610;", " "), ("&#xA0;", " ")]:
         text = text.replace(old, new)
+    text = re.sub(r"&#x[0-9a-fA-F]+;", " ", text)
     text = re.sub(r"&#\d+;", " ", text)
     text = re.sub(r"&\w+;", " ", text)
+    # Fix spaced digits: '2 2 . 7' -> '22.7' (SoftBank/INTR format)
+    text = re.sub(r"(\d)\s+(\d)", r"\1\2", text)
+    text = re.sub(r"(\d)\s+(\d)", r"\1\2", text)  # second pass
+    text = re.sub(r"(\d)\s*\.\s*(\d)", r"\1.\2", text)
     return re.sub(r"\s+", " ", text)
 
 
@@ -89,30 +104,70 @@ def _extract_fields(text, filing_type):
     m = re.search(r"CUSIP\s*(?:No\.?|Number|#)?\s*[:\s]*([A-Z0-9]{6,9})", text, re.I)
     if m: result["cusip"] = m.group(1).strip()
 
-    for pat in [r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?9[\)]?\s+(\d+[\.,]?\d*)\s*%",
-                r"Item\s*11[\s.:]+(\d+[\.,]?\d*)\s*%",
-                r"Percent\s+of\s+Class[:\s]+(\d+[\.,]?\d*)\s*%",
-                r"PERCENT\s+OF\s+CLASS[\s.:]*(\d+[\.,]?\d*)\s*%",
-                # 13D cover page: Row 11 value on next line or after whitespace
-                r"(?:11|Row\s*11)[.\s]*PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?(?:9|11)[\)]?[^%\d]{0,40}(\d+[\.,]?\d*)\s*%",
-                # 13D cover page: "11" row with just the percentage value nearby
-                r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(]?(?:9|11)[\)]?\D{0,60}?(\d{1,3}[\.,]?\d*)\s*%",
-                # Bare "Percent of Class" followed by number (possibly multi-line)
-                r"Percent\s+of\s+Class\D{0,30}?(\d{1,3}[\.,]\d+)\s*%",
-                # SC 13D/A XML-style or table: percentage near "percent" keyword
-                r"(?:percent|pct|%)\s+(?:of\s+)?class\D{0,40}?(\d{1,3}[\.,]\d+)\s*%"]:
+    # pct_owned patterns — covers 13G (Row 9), 13D (Row 13), compact, and TR-1 formats
+    for pat in [
+            # 13G verbose: 'PERCENT OF CLASS REPRESENTED BY AMOUNT IN ROW (9): 5.3%'
+            r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+AMOUNT\s+IN\s+ROW\s*[\(\[]?9[\)\]]?[\s.:]*(\d+[\.,]?\d*)\s*%",
+            # 13D Row 13: '13 PERCENT OF CLASS REPRESENTED BY AMOUNT IN ROW (11) 18.6%'
+            r"13[\.\s]*PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+(?:AMOUNT\s+IN\s+)?ROW\s*[\(\[]?11[\)\]]?\s*(\d+[\.,]?\d*)\s*%",
+            # Generic with wide gap: 'PERCENT OF CLASS REPRESENTED BY...ROW (11) (see Item 5) 9.2%'
+            r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+(?:AMOUNT\s+IN\s+)?ROW\s*[\(\[]?(?:9|11)[\)\]]?\D{0,80}?(\d{1,3}[\.,]?\d*)\s*%",
+            # Compact 13G: 'Item 11: Percent of Class Owned: 8.1%'
+            r"Item\s*11[\s.:]+(?:Percent|Pct)\s+of\s+Class\s+(?:Owned|Represented)\D{0,20}?(\d+[\.,]?\d*)\s*%",
+            # Item 11 bare: 'Item 11  5.3%'
+            r"Item\s*11[\s.:]+(\d+[\.,]?\d*)\s*%",
+            # Bare: 'Percent of Class Owned: 5.3%' or 'Percentage of Class Represented...'
+            r"(?:Percent|PERCENT|Pct|Percentage)\s+of\s+(?:the\s+)?Class\s*(?:Owned|Represented)?[\s.:]*(\d+[\.,]?\d*)\s*%",
+            # 'Percentage of Class Represented by Amount in Row (9): 9.99%'
+            r"Percentage\s+of\s+Class\s+Represented\s+by\s+Amount\s+in\s+Row\s*[\(\[]?(?:9|11)[\)\]]?[\s.:]*(\d+[\.,]?\d*)\s*%",
+            # Broader: 'percent of class' with number within 60 chars
+            r"percent\s+of\s+class\D{0,60}?(\d{1,3}\.\d+)\s*%",
+            # TR-1 (UK format): 'Resulting situation ... 26.95%'
+            r"(?:Resulting|New)\s+(?:situation|percentage)[^%]{0,100}?(\d+[\.,]\d+)\s*%",
+            # No % sign: 'PERCENT OF CLASS...28.4 (1)' (SCWO format)
+            r"PERCENT\s+OF\s+CLASS\s+REPRESENTED\s+BY\s+(?:AMOUNT\s+IN\s+)?ROW\s*[\(\[]?(?:9|11)[\)\]]?\D{0,60}?(\d{1,3}[\.,]\d+)",
+            # Entity-name prefix: 'Camber Capital Management LP - 12.25%'
+            r"(?:Percent|Percentage)\s+of\s+Class\s+Represented\s+by\s+Amount\s+in\s+Row\s*[\(\[]?(?:9|11)[\)\]]?\D{5,80}?(\d+[\.,]\d+)\s*%",
+    ]:
         m = re.search(pat, text, re.I)
         if m:
-            try: result["pct_owned"] = float(m.group(1).replace(",", ""))
+            try:
+                val = float(m.group(1).replace(",", ""))
+                if 0 <= val <= 100:
+                    result["pct_owned"] = val
             except ValueError: pass
             break
 
-    for pat in [r"(?:Item\s*9|AGGREGATE\s+AMOUNT\s+BENEFICIALLY\s+OWNED)[\s.:]*(?:BY\s+EACH\s+REPORTING\s+PERSON)?\s*([\d,]+)",
-                r"Amount\s+Beneficially\s+Owned[:\s]*([\d,]+)",
-                r"Item\s+9[:\s]+([\d,]+)"]:
+    # shares_owned patterns — AGGREGATE AMOUNT is authoritative, voting power is fallback.
+    # Order matters: AGGREGATE first (most reliable), then SHARED, then SOLE last
+    # (SOLE can be 0 when all shares are shared — AGGREGATE captures the real total).
+    for pat in [
+            # 13D/G verbose: 'AGGREGATE AMOUNT BENEFICIALLY OWNED BY EACH REPORTING PERSON: (1) 11,265,678'
+            # (?:\(\d+\)\s*)? strips footnote refs like (1) before the number
+            r"AGGREGATE\s+AMOUNT\s+BENEFICIALLY\s+OWNED\s+BY\s+EACH\s+REPORTING\s+PERSON[\s.:]*(?:\(\d+\)\s*)?(\d[\d,]+)",
+            # With row number prefix: '9. AGGREGATE AMOUNT...'
+            r"(?:9|11)[\.\s]+AGGREGATE\s+AMOUNT\s+BENEFICIALLY\s+OWNED[^0-9]{0,60}?(\d[\d,]+)",
+            # Compact 13G: 'Item 9: Aggregate Amount Owned: 3,007,507' or '...3,250,000 shares'
+            r"Item\s*9[\s.:]+Aggregate\s+Amount\s+(?:Beneficially\s+)?Owned[\s.:]*(\d[\d,]*)",
+            # Row 9 with entity name: 'Aggregate Amount...Camber Capital — 3,250,000 shares'
+            r"Aggregate\s+Amount\s+(?:Beneficially\s+)?Owned\s+by\s+Each\s+Reporting\s+Person\D{0,80}?([\d,]{4,})\s*(?:shares)?",
+            # Item 9 with just number: 'Item 9  1,234,567'
+            r"Item\s*9[\s.:]+(\d[\d,]{2,})",
+            # Generic: 'Amount Beneficially Owned: 1,234,567'
+            r"Amount\s+(?:Beneficially\s+)?Owned[\s.:]*(\d[\d,]+)",
+            # Fallback: SHARED VOTING/DISPOSITIVE (captures cases where sole=0)
+            r"SHARED\s+(?:VOTING|DISPOSITIVE)\s+POWER[\s.:]*(\d[\d,]+)",
+            # Last resort: SOLE VOTING (can be 0 — only used if nothing above matched)
+            r"SOLE\s+VOTING\s+POWER[\s.:]*(\d[\d,]+)",
+    ]:
         m = re.search(pat, text, re.I)
         if m:
-            try: result["shares_owned"] = int(m.group(1).replace(",", ""))
+            try:
+                val = int(m.group(1).replace(",", ""))
+                # QC: reject tiny values (row numbers, footnotes) —
+                # real share positions are >= 100. val=0 is allowed for exits.
+                if val == 0 or val >= 100:
+                    result["shares_owned"] = val
             except ValueError: pass
             break
 
@@ -123,8 +178,11 @@ def _extract_fields(text, filing_type):
         if m:
             ds = m.group(1).strip()
             for fmt in ["%B %d, %Y", "%B %d %Y", "%m/%d/%Y", "%Y-%m-%d"]:
-                try: result["report_date"] = datetime.strptime(ds, fmt).strftime("%Y-%m-%d"); break
-                except ValueError: pass
+                try:
+                    result["report_date"] = datetime.strptime(ds, fmt).strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    pass
             break
 
     if "13D" in filing_type:
@@ -716,8 +774,8 @@ def run_update():
     print(f"Latest filing: {last_date}")
 
     # Get tickers we care about
-    target_set = set(get_target_tickers(con))
-    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}
+    get_target_tickers(con)  # warm cache
+    cusip_map = {r[0]: r[1] for r in con.execute("SELECT ticker, cusip FROM securities WHERE ticker IS NOT NULL").fetchall()}  # noqa: F841
 
     # Use edgar.get_filings to scan recent filings globally
     from datetime import date
@@ -814,8 +872,8 @@ def _seed_test_db():
     for table in ["holdings", "securities", "managers", "market_data", "filings",
                    "fund_holdings", "fund_universe"]:
         try:
-            df = prod.execute(f"SELECT * FROM {table}").fetchdf()
-            test.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
+            df = prod.execute(f"SELECT * FROM {table}").fetchdf()  # noqa: F841
+            test.execute(f"CREATE TABLE {table} AS SELECT * FROM df")  # uses df via DuckDB binding
         except Exception:
             pass
     prod.close()

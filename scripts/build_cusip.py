@@ -195,41 +195,43 @@ def enrich_with_openfigi(df_cusips):
     return all_results
 
 
-def enrich_with_yfinance(tickers):
-    """Get sector, exchange, and other metadata from yfinance."""
-    import yfinance as yf
+def enrich_with_yahoo(tickers):
+    """Get sector, industry, exchange for a list of tickers via YahooClient.
 
-    print(f"\nEnriching {len(tickers):,} tickers with yfinance metadata...")
+    (Formerly `enrich_with_yfinance` — migrated to direct Yahoo JSON API to
+    bypass yfinance rate limits. Same return shape.)
+    """
+    from yahoo_client import YahooClient
 
+    print(f"\nEnriching {len(tickers):,} tickers with Yahoo metadata...")
+
+    yc = YahooClient()
     results = {}
-    batch_size = 100
     ticker_list = list(tickers)
 
-    for i in range(0, len(ticker_list), batch_size):
-        batch = ticker_list[i:i + batch_size]
+    for i, tkr in enumerate(ticker_list, 1):
         try:
-            # Use download to validate tickers exist
-            for tkr in batch:
-                try:
-                    info = yf.Ticker(tkr).info
-                    if info and info.get("regularMarketPrice"):
-                        results[tkr] = {
-                            "sector": info.get("sector", ""),
-                            "industry": info.get("industry", ""),
-                            "exchange": info.get("exchange", ""),
-                            "market_cap": info.get("marketCap", 0),
-                            "sic_code": None,  # yfinance doesn't always provide SIC
-                        }
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"    yfinance batch error: {e}")
+            m = yc.fetch_metadata(tkr)
+            if m and m.get("price"):
+                results[tkr] = {
+                    "sector":   m.get("sector") or "",
+                    "industry": m.get("industry") or "",
+                    "exchange": m.get("exchange") or "",
+                    "market_cap": m.get("market_cap") or 0,  # approximate; authoritative market_cap is computed in fetch_market.py
+                    "sic_code": None,
+                }
+        except Exception:
+            pass
 
-        if (i + batch_size) % 500 == 0:
-            print(f"    Processed {min(i + batch_size, len(ticker_list)):,}/{len(ticker_list):,} ({len(results):,} enriched)")
+        if i % 100 == 0:
+            print(f"    Processed {i:,}/{len(ticker_list):,} ({len(results):,} enriched)")
 
-    print(f"  yfinance enrichment: {len(results):,} tickers enriched")
+    print(f"  Yahoo enrichment: {len(results):,} tickers enriched")
     return results
+
+
+# Backwards-compatible alias — other callers may reference the old name.
+enrich_with_yfinance = enrich_with_yahoo
 
 
 def build_securities_table(con, df_cusips, figi_results):
@@ -295,7 +297,7 @@ def build_securities_table(con, df_cusips, figi_results):
             correct = str(correct).strip()
             mask = df_sec["cusip"] == cusip
             if mask.any():
-                old = df_sec.loc[mask, "ticker"].iloc[0]
+                # old = df_sec.loc[mask, "ticker"].iloc[0]
                 df_sec.loc[mask, "ticker"] = correct
                 applied += 1
             else:

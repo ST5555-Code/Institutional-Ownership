@@ -18,7 +18,7 @@ from datetime import datetime
 
 import duckdb
 
-from db import PROD_DB, STAGING_DB, BASE_DIR
+from db import PROD_DB, STAGING_DB
 
 # Table definitions: name → primary key column(s)
 TABLE_KEYS = {
@@ -34,6 +34,7 @@ TABLE_KEYS = {
     "lei_reference": ["lei"],
     "peer_groups": None,  # small reference table — replace entirely
     "market_data": ["ticker"],
+    "shares_outstanding_history": ["ticker", "as_of_date"],
     "investor_flows": None,  # rebuilt by compute_flows — replace entirely
     "ticker_flow_stats": None,  # rebuilt — replace entirely
     "positions": None,  # rebuilt by unify_positions — replace entirely
@@ -67,21 +68,36 @@ def get_columns(con, table):
 
 
 def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
-    """Merge one table from staging to production. Returns (added, replaced, unchanged)."""
+    """Merge one table from staging to production. Returns (added, replaced, unchanged).
+
+    Column matching is done BY NAME, not by position. When staging has columns
+    that production lacks (new schema additions), the caller is expected to have
+    already ALTER'd production. When production has columns staging lacks, those
+    are left NULL on newly-inserted rows.
+    """
     staging_count = count_rows(staging_con, table)
     if staging_count == 0:
         return 0, 0, 0
 
     prod_count_before = count_rows(prod_con, table)
-    columns = get_columns(staging_con, table)
+    staging_cols = get_columns(staging_con, table)
+    prod_cols = get_columns(prod_con, table)
 
-    if not columns:
+    if not staging_cols:
         return 0, 0, 0
+
+    # Intersect: merge only columns that exist in both DBs. Columns only in
+    # staging are silently dropped (warn caller via print). Columns only in
+    # production are preserved (left untouched for replaced rows via UPDATE
+    # semantics; left NULL on newly inserted rows).
+    shared_cols = [c for c in staging_cols if c in prod_cols]
+    staging_only = [c for c in staging_cols if c not in prod_cols]
+    if staging_only:
+        print(f"    WARNING: {table} — staging has columns missing in production: {staging_only}")
+        print("             These columns will NOT be merged. ALTER production first.")
 
     if dry_run:
         if pk_cols:
-            # Count how many staging rows exist in production
-            col_list = ", ".join(columns)
             pk_where = " AND ".join(f"s.{c} = p.{c}" for c in pk_cols)
             try:
                 existing = prod_con.execute(f"""
@@ -96,14 +112,13 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
             new = staging_count - existing
             return new, existing, 0
         else:
-            # Replace-type table
             return staging_count, 0, prod_count_before
 
-    # Actual merge
+    # Actual merge — explicit column names on both sides, name-matched
+    col_names = ", ".join(shared_cols)
+    select_cols = ", ".join(shared_cols)  # same list both sides — names match by name
+
     if pk_cols:
-        # INSERT OR REPLACE using primary key
-        col_list = ", ".join(columns)
-        # Delete matching rows from production, then insert all from staging
         pk_where = " AND ".join(f"p.{c} = s.{c}" for c in pk_cols)
         prod_con.execute(f"""
             DELETE FROM {table} p
@@ -113,8 +128,8 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
             )
         """)
         prod_con.execute(f"""
-            INSERT INTO {table}
-            SELECT {col_list} FROM staging_db.{table}
+            INSERT INTO {table} ({col_names})
+            SELECT {select_cols} FROM staging_db.{table}
         """)
         prod_count_after = count_rows(prod_con, table)
         added = prod_count_after - prod_count_before
@@ -122,14 +137,13 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
         return max(added, 0), max(replaced, 0), 0
     else:
         # Replace entire table — drop and recreate from staging
-        col_list = ", ".join(columns)
         try:
             prod_con.execute(f"DROP TABLE IF EXISTS {table}")
         except Exception:
             pass
         prod_con.execute(f"""
             CREATE TABLE {table} AS
-            SELECT {col_list} FROM staging_db.{table}
+            SELECT {select_cols} FROM staging_db.{table}
         """)
         return staging_count, 0, 0
 
@@ -150,7 +164,7 @@ def main():
         return
 
     print(f"{'='*60}")
-    print(f"Merge Staging → Production")
+    print("Merge Staging → Production")
     print(f"{'='*60}")
     print(f"  Staging:    {STAGING_DB}")
     print(f"  Production: {PROD_DB}")

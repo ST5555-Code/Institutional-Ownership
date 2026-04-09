@@ -191,18 +191,19 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 
 **Pre-conditions (must complete before Phase 4 starts):**
 1. ~~Validation gate failures resolved~~ ✅ Done — 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected), rollup chains flattened, circles broken. Gate thresholds updated: 0 FAILs, 8 PASS, 7 MANUAL (all documented).
-2. **N15 — Fidelity international sub-adviser deduplication** — HK/Japan/UK sub-advisers inflate Fidelity to 110%. Must resolve before 13F→entity_id mapping.
-3. **R1/R2/R3 — 13D/G data quality audit** — assess pct_owned coverage, name matching to 13F parents, dedup amendments, standardize filer names. Required before beneficial_ownership gets entity_id FK.
-4. **Item 43 — app.py lint debt fix** — E402 imports, broad-exception-caught, bandit B608. Blocks normal pre-commit path for app.py changes needed during migration.
-5. **N21 TODOs a/b/c — investor type classification** — PARENT_SEEDS expansion 50→250 (reduces 40% NULL manager_type rate), spot-validate 100 largest holders across 10 benchmark tickers, add classification_source column for provenance tracking.
+2. ~~N15 — Fidelity international sub-adviser deduplication~~ ✅ Done — series-level dedup verified in all 4 N-PORT rollup queries. Geode exclusion active. 174 shared series correctly handled. ~116% ratio is structural (monthly MAX vs quarter-end). No code changes needed.
+3. ~~R1/R2/R3 — 13D/G data quality audit~~ ✅ Done — 51,905 rows, pct_null=0, shares_null=1, duplicates=0. Started at 96% pct null / 16.5% shares null. 8,227 duplicates removed, 20,000+ agent names resolved, 1,287 exits validated, 928 suspects rescanned, parser hardened in all 3 scripts. DATA QUALITY: CLEAN. See PRE_PHASE4_STATUS.md Item 6.
+4. ~~Item 43 — app.py lint debt fix~~ ✅ Done — flake8 0 issues, bandit 0 high/B608. Pre-commit unblocked.
+5. ~~N21 TODOs a/b/c — investor type classification~~ ✅ Done — 14 categories, 8,639 managers, $67.3T, 0 NULL. ALL categories reviewed 1-by-1 with confidence scoring. 177 LOW>$10B manually fixed. Pension/insurance separated from passive ($1.4T moved). Activist expanded to 31 per industry reference. Fund-level: 5,717 series via S&P500 + 8-index correlation.
 
-**Stages:**
-1. Create holdings_v2 with entity_id FK, backfill, build indexes
-2. Shadow reads — run both queries, compare results, log discrepancies (2 weeks)
-3. Parity validation — zero unexplained differences, manual sign-off
-4. Cutover — switch reads to holdings_v2, keep holdings as fallback 30 days
-5. Cleanup — rename tables, upgrade entity_current to MATERIALIZED VIEW, add REFRESH to run_pipeline.sh
-**Rollback:** holdings_legacy retained 30 days post-cutover.
+**Stages (revised 2026-04-09 — new data primary, old data shadow):**
+1. Create holdings_v2 with entity_id FK, backfill from entity_identifiers, build indexes
+2. Switch app.py to use holdings_v2 as primary — new data serves all queries immediately
+3. Rename old tables to _legacy suffix — keep for shadow validation
+4. Shadow validation (2 weeks) — log discrepancies between new rollup and legacy rollup
+5. After sign-off — drop _legacy tables, upgrade entity_current to MATERIALIZED VIEW, add REFRESH to run_pipeline.sh
+**Rationale:** New entity data has higher quality (reviewed classifications, clean parent wiring, deduplicated). No reason to serve stale data while validating.
+**Rollback:** _legacy tables retained 30 days. If critical issue found, rename back.
 
 ---
 

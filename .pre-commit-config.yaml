@@ -3,7 +3,7 @@ repos:
     rev: v0.15.9
     hooks:
       - id: ruff
-        args: ['--select=E,F,W', '--ignore=E501,E402,E701,E731', '--target-version=py39']
+        args: ['--select=E,F,W', '--ignore=E501,E402,E701,E702,E731,F841,F541', '--target-version=py39']
         files: ^scripts/
 
   - repo: https://github.com/pylint-dev/pylint

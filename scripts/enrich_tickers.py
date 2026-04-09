@@ -297,17 +297,22 @@ def update_securities(con, all_matches):
 
 
 def fetch_market_for_new_tickers(con, new_tickers):
-    """Run yfinance for newly resolved tickers only."""
-    import yfinance as yf
+    """Fetch market data for newly resolved tickers via YahooClient + SEC XBRL.
+
+    Canonical sources:
+      - price, sector, industry, 52w, volume: YahooClient (/v7 batch + /v10 per-symbol)
+      - shares_outstanding: SEC XBRL (authoritative, 10-K/10-Q cover)
+      - market_cap: computed as shares_outstanding × price_live
+    """
     from datetime import datetime
+    from yahoo_client import YahooClient
+    from sec_shares_client import SECSharesClient
 
     print(f"\nFetching market data for {len(new_tickers):,} new tickers...")
 
-    # Get existing tickers in market_data
     existing = set(con.execute(
         "SELECT ticker FROM market_data"
     ).fetchdf()["ticker"].tolist())
-
     to_fetch = sorted(new_tickers - existing)
     print(f"  After removing already-fetched: {len(to_fetch):,} tickers to fetch")
 
@@ -315,65 +320,62 @@ def fetch_market_for_new_tickers(con, new_tickers):
         print("  Nothing to fetch.")
         return 0
 
+    yc = YahooClient()
+    sc = SECSharesClient()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # Pass 1: batch quotes for prices (fast, 150/call)
+    quotes = {}
+    for i in range(0, len(to_fetch), 150):
+        chunk = to_fetch[i:i + 150]
+        try:
+            quotes.update(yc.fetch_quote_batch(chunk))
+        except Exception as e:
+            print(f"    batch {i} err: {e}")
+
+    # Pass 2: per-symbol metadata for sector/industry/float
     records = []
     failed = []
-    batch_size = 50
-
-    for i in range(0, len(to_fetch), batch_size):
-        batch = to_fetch[i:i + batch_size]
-        batch_str = " ".join(batch)
-
+    for idx, tkr_str in enumerate(to_fetch, 1):
         try:
-            data = yf.Tickers(batch_str)
-            for tkr_str in batch:
-                try:
-                    tkr = data.tickers.get(tkr_str)
-                    if tkr is None:
-                        failed.append(tkr_str)
-                        continue
+            m = yc.fetch_metadata(tkr_str)
+            q = quotes.get(tkr_str, {})
+            price = (m or {}).get("price") or q.get("price")
+            if not price:
+                failed.append(tkr_str)
+                continue
+            sec = sc.fetch(tkr_str) or {}
+            shares_out = sec.get("shares_outstanding")
+            market_cap = (shares_out * price) if (shares_out and price) else None
+            records.append({
+                "ticker":              tkr_str,
+                "price_live":          price,
+                "market_cap":          market_cap,
+                "float_shares":        (m or {}).get("float_shares"),
+                "shares_outstanding":  shares_out,
+                "fifty_two_week_high": (m or {}).get("fifty_two_week_high") or q.get("fifty_two_week_high"),
+                "fifty_two_week_low":  (m or {}).get("fifty_two_week_low")  or q.get("fifty_two_week_low"),
+                "avg_volume_30d":      (m or {}).get("avg_volume_30d") or q.get("avg_volume_30d"),
+                "sector":              (m or {}).get("sector"),
+                "industry":            (m or {}).get("industry"),
+                "exchange":            (m or {}).get("exchange") or q.get("exchange"),
+                "fetch_date":          today,
+            })
+        except Exception:
+            failed.append(tkr_str)
 
-                    info = tkr.info
-                    if not info or not info.get("regularMarketPrice"):
-                        failed.append(tkr_str)
-                        continue
-
-                    record = {
-                        "ticker": tkr_str,
-                        "price_live": info.get("regularMarketPrice") or info.get("currentPrice"),
-                        "market_cap": info.get("marketCap"),
-                        "float_shares": info.get("floatShares"),
-                        "shares_outstanding": info.get("sharesOutstanding"),
-                        "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
-                        "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
-                        "avg_volume_30d": info.get("averageVolume"),
-                        "sector": info.get("sector"),
-                        "industry": info.get("industry"),
-                        "exchange": info.get("exchange"),
-                        "fetch_date": datetime.now().strftime("%Y-%m-%d"),
-                        "price_2025Q1": None,
-                        "price_2025Q2": None,
-                        "price_2025Q3": None,
-                        "price_2025Q4": None,
-                    }
-                    records.append(record)
-                except Exception:
-                    failed.append(tkr_str)
-        except Exception as e:
-            failed.extend(batch)
-
-        if (i + batch_size) % 200 == 0:
-            print(f"    Processed {min(i + batch_size, len(to_fetch)):,}/{len(to_fetch):,} "
-                  f"({len(records):,} success, {len(failed):,} failed)")
-
-        time.sleep(0.2)
+        if idx % 100 == 0:
+            print(f"    [{idx:,}/{len(to_fetch):,}] ok={len(records):,} failed={len(failed):,}")
 
     print(f"\n  New market data fetched: {len(records):,}")
     print(f"  Failed: {len(failed):,}")
 
     if records:
         df_new = pd.DataFrame(records)
-        # Append to market_data
-        con.execute("INSERT INTO market_data SELECT * FROM df_new")
+        con.register("df_new", df_new)
+        cols = ",".join(records[0].keys())
+        con.execute(f"INSERT INTO market_data ({cols}) SELECT {cols} FROM df_new")
+        con.unregister("df_new")
         print(f"  Appended {len(records):,} rows to market_data")
 
     return len(records)
@@ -435,7 +437,7 @@ def main():
     update_securities(con, all_matches)
 
     # Fetch market data for new tickers
-    new_mkt = fetch_market_for_new_tickers(con, new_tickers)
+    fetch_market_for_new_tickers(con, new_tickers)
 
     # Update holdings live values
     update_holdings_live(con)

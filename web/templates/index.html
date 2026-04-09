@@ -24,42 +24,58 @@
 
     <!-- Summary Card -->
     <div id="summary-card" class="summary-card hidden">
-        <div class="summary-grid">
-            <div class="summary-item">
-                <span class="summary-label">Company</span>
-                <span class="summary-value" id="sum-company">—</span>
+        <div class="summary-top">
+            <div class="summary-stats">
+                <div class="summary-grid summary-row-1">
+                    <div class="summary-item summary-company">
+                        <span class="summary-label">Company</span>
+                        <span class="summary-value" id="sum-company">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Price</span>
+                        <span class="summary-value" id="sum-price">—</span>
+                        <span class="summary-sub" id="sum-price-date"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Market Cap</span>
+                        <span class="summary-value" id="sum-mktcap">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Inst. Holdings</span>
+                        <span class="summary-value" id="sum-holdings">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">% Held by Inst.</span>
+                        <span class="summary-value" id="sum-float">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Active</span>
+                        <span class="summary-value" id="sum-active">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Passive</span>
+                        <span class="summary-value" id="sum-passive">—</span>
+                    </div>
+                </div>
+                <div class="summary-grid summary-row-2">
+                    <div class="summary-item">
+                        <span class="summary-label"># Institutions</span>
+                        <span class="summary-value" id="sum-holders">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Latest Quarter</span>
+                        <span class="summary-value" id="sum-quarter">—</span>
+                    </div>
+                    <div class="summary-item" title="Covers mutual funds and ETFs filing N-PORT. Some ETF holdings (certain iShares, Vanguard ETFs) may not be available. Sub-adviser positions deduplicated to avoid double-counting.">
+                        <span class="summary-label" style="cursor:help;border-bottom:1px dotted #999;"># Funds (N-PORT)</span>
+                        <span class="summary-value" id="sum-nport">—</span>
+                    </div>
+                </div>
             </div>
-            <div class="summary-item">
-                <span class="summary-label">Latest Quarter</span>
-                <span class="summary-value" id="sum-quarter">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Inst. Holdings</span>
-                <span class="summary-value" id="sum-holdings">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">% Float Held</span>
-                <span class="summary-value" id="sum-float">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Holders</span>
-                <span class="summary-value" id="sum-holders">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Active / Passive</span>
-                <span class="summary-value" id="sum-split">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Market Cap</span>
-                <span class="summary-value" id="sum-mktcap">—</span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Price</span>
-                <span class="summary-value" id="sum-price">—</span>
-            </div>
-            <div class="summary-item" title="Covers mutual funds and ETFs filing N-PORT. Some ETF holdings (certain iShares, Vanguard ETFs) may not be available. Sub-adviser positions deduplicated to avoid double-counting.">
-                <span class="summary-label" style="cursor:help;border-bottom:1px dotted #999;">N-PORT Coverage</span>
-                <span class="summary-value" id="sum-nport">—</span>
+            <div class="summary-bar-wrap" id="sum-bar-wrap">
+                <span class="summary-label">Ownership Mix</span>
+                <div class="type-bar" id="sum-type-bar"></div>
+                <div class="type-bar-legend" id="sum-type-legend"></div>
             </div>
         </div>
     </div>
@@ -75,8 +91,8 @@
             <button class="tab" data-tab="activist">Activist</button>
             <button class="tab" data-tab="fund-portfolio">Fund Portfolio</button>
             <button class="tab" data-tab="cross-ownership">Cross-Ownership</button>
-            <button class="tab" data-tab="short-squeeze">Short Squeeze</button>
             <button class="tab" data-tab="sector-rotation">Sector Rotation</button>
+            <button class="tab" data-tab="peer-rotation">Peer Rotation</button>
             <!-- AUM now shown on Register tab -->
         </div>
 

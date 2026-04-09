@@ -3,7 +3,7 @@
 auto_resolve.py — Automatically resolve CUSIP-to-ticker gaps.
 
 Finds CUSIPs with no ticker or non-functional ticker (no market_data),
-attempts resolution via SEC JSON, EDGAR search, and yfinance,
+attempts resolution via SEC JSON, EDGAR search, and Yahoo,
 then routes results to auto-apply (high confidence) or pending review.
 
 Run: python3 scripts/auto_resolve.py
@@ -209,41 +209,34 @@ def resolve_method_b(gaps, already_resolved):
 
 
 def resolve_method_c(gaps, already_resolved):
-    """Method C: yfinance name search for remaining unresolved CUSIPs."""
-    import yfinance as yf
+    """Method C: Yahoo name search for remaining unresolved CUSIPs."""
+    from yahoo_client import YahooClient
 
     remaining = gaps[~gaps["cusip"].isin(already_resolved)]
     results = {}
+    yc = YahooClient()
 
     for _, row in remaining.head(20).iterrows():  # Cap at 20 — slow
         cusip = row["cusip"]
         name = str(row["issuer_name"])
-        # Construct candidate from first two words
         words = normalize_name(name).split()
         if len(words) < 1:
             continue
-        candidate = words[0] if len(words) == 1 else " ".join(words[:2])
-        # Try as ticker directly (sometimes the name IS the ticker)
         candidate_ticker = words[0][:5]  # First word, max 5 chars
 
-        try:
-            tkr = yf.Ticker(candidate_ticker)
-            info = tkr.info
-            if info and info.get("regularMarketPrice"):
-                yf_name = info.get("longName", "") or info.get("shortName", "")
-                score = fuzz.token_sort_ratio(normalize_name(yf_name), normalize_name(name))
-                if score >= REVIEW_THRESHOLD:
-                    results[cusip] = {
-                        "candidate": candidate_ticker,
-                        "method": "yfinance_name",
-                        "match_name": yf_name,
-                        "match_score": score,
-                    }
-        except Exception:
-            pass
-        time.sleep(0.3)
+        m = yc.fetch_metadata(candidate_ticker)
+        if m and m.get("price"):
+            yf_name = m.get("long_name") or m.get("short_name") or ""
+            score = fuzz.token_sort_ratio(normalize_name(yf_name), normalize_name(name))
+            if score >= REVIEW_THRESHOLD:
+                results[cusip] = {
+                    "candidate": candidate_ticker,
+                    "method": "yahoo_name",
+                    "match_name": yf_name,
+                    "match_score": score,
+                }
 
-    print(f"  Method C (yfinance): {len(results)} matches")
+    print(f"  Method C (Yahoo): {len(results)} matches")
     return results
 
 
@@ -251,10 +244,30 @@ def resolve_method_c(gaps, already_resolved):
 # Step 3 — Validate candidates
 # =========================================================================
 def validate_candidates(all_candidates, gaps):
-    """Validate every candidate ticker via yfinance. Return scored results."""
-    import yfinance as yf
+    """Validate every candidate ticker via YahooClient. Return scored results.
 
+    Validation signals (not persisted — transient sanity check):
+      - price must be > 0
+      - market_cap: used ONLY to reject micro-cap candidates for large positions.
+        Uses Yahoo's quote market_cap here because this is a fast sanity filter,
+        not a persisted value. The authoritative DB market_cap is computed
+        elsewhere as SEC shares × Yahoo price.
+      - name: fuzzy-match Yahoo longName against issuer_name.
+    """
+    from yahoo_client import YahooClient
+
+    yc = YahooClient()
     validated = []
+
+    # Batch-fetch quotes (price + market_cap) for all candidates in one pass
+    candidate_list = [info["candidate"] for info in all_candidates.values()]
+    quote_map = {}
+    for i in range(0, len(candidate_list), 150):
+        chunk = candidate_list[i:i + 150]
+        try:
+            quote_map.update(yc.fetch_quote_batch(chunk))
+        except Exception:
+            pass
 
     for cusip, info in all_candidates.items():
         candidate = info["candidate"]
@@ -268,12 +281,11 @@ def validate_candidates(all_candidates, gaps):
         score = info.get("match_score", 0)
         reason = ""
 
-        try:
-            tkr = yf.Ticker(candidate)
-            fast = tkr.fast_info
-            price = getattr(fast, "last_price", None)
-            mktcap = getattr(fast, "market_cap", None)
+        q = quote_map.get(candidate, {})
+        price = q.get("price")
+        mktcap = q.get("market_cap")
 
+        try:
             if price and price > 0 and mktcap and mktcap > 0:
                 # Hard rejection: micro-cap candidate for large institutional position
                 if mktcap < MIN_MKTCAP_FOR_LARGE_POSITION and filed_value > MAX_FILED_FOR_MICROCAP:
@@ -286,12 +298,14 @@ def validate_candidates(all_candidates, gaps):
                         "confidence": confidence, "confidence_score": 0,
                         "filed_value": filed_value, "reason": reason,
                     })
-                    time.sleep(0.25)
                     continue
 
-                # Validate name match
-                full_info = tkr.info
-                yf_name = full_info.get("longName", "") or full_info.get("shortName", "")
+                # Fuzzy name match via long/short name from batch quote
+                yf_name = q.get("long_name") or q.get("short_name") or ""
+                if not yf_name:
+                    # Fall back to per-symbol metadata if batch didn't include names
+                    m = yc.fetch_metadata(candidate) or {}
+                    yf_name = m.get("long_name") or m.get("short_name") or ""
                 name_score = fuzz.token_sort_ratio(
                     normalize_name(yf_name), normalize_name(issuer_name)
                 )
@@ -307,12 +321,10 @@ def validate_candidates(all_candidates, gaps):
                     reason = f"Fuzzy score {score} below review threshold ({REVIEW_THRESHOLD})"
             else:
                 confidence = "REJECT"
-                reason = "yfinance validation failed: no price or market cap"
+                reason = "Yahoo validation failed: no price or market cap"
         except Exception as e:
             confidence = "REJECT"
-            reason = f"yfinance error: {e}"
-
-        time.sleep(0.25)
+            reason = f"Yahoo error: {e}"
 
         validated.append({
             "cusip": cusip,
@@ -460,56 +472,73 @@ def route_results(validated, unresolved_cusips, gaps, con):
 # Step 5 — Fetch market data for auto-applied tickers
 # =========================================================================
 def fetch_market_data(auto_applied, con):
-    """Fetch yfinance market data for newly applied tickers."""
-    import yfinance as yf
+    """Fetch market data for newly applied tickers via YahooClient + SEC XBRL.
+
+    market_cap is computed as SEC shares_outstanding × Yahoo price_live.
+    """
+    from yahoo_client import YahooClient
+    from sec_shares_client import SECSharesClient
 
     new_tickers = [v["candidate_ticker"] for v in auto_applied]
     if not new_tickers:
         return
 
+    yc = YahooClient()
+    sc = SECSharesClient()
+    today = datetime.now().strftime("%Y-%m-%d")
+
     print(f"\n  Fetching market data for {len(new_tickers)} auto-applied tickers...")
     for tkr_str in new_tickers:
-        existing = con.execute(f"SELECT COUNT(*) FROM market_data WHERE ticker = '{tkr_str}'").fetchone()[0]
+        existing = con.execute(
+            "SELECT COUNT(*) FROM market_data WHERE ticker = ?", [tkr_str]
+        ).fetchone()[0]
         if existing > 0:
             continue
         try:
-            tkr = yf.Ticker(tkr_str)
-            info = tkr.info
-            if info and info.get("regularMarketPrice"):
-                rec = {
-                    "ticker": tkr_str,
-                    "price_live": info.get("regularMarketPrice"),
-                    "market_cap": info.get("marketCap"),
-                    "float_shares": info.get("floatShares"),
-                    "shares_outstanding": info.get("sharesOutstanding"),
-                    "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
-                    "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
-                    "avg_volume_30d": info.get("averageVolume"),
-                    "sector": info.get("sector"),
-                    "industry": info.get("industry"),
-                    "exchange": info.get("exchange"),
-                    "fetch_date": datetime.now().strftime("%Y-%m-%d"),
-                    "price_2025Q1": None, "price_2025Q2": None,
-                    "price_2025Q3": None, "price_2025Q4": None,
-                }
-                df = pd.DataFrame([rec])
-                con.execute("INSERT INTO market_data SELECT * FROM df")
+            m = yc.fetch_metadata(tkr_str)
+            if not m or not m.get("price"):
+                continue
+            sec = sc.fetch(tkr_str) or {}
+            shares_out = sec.get("shares_outstanding")
+            price = m.get("price")
+            market_cap = (shares_out * price) if (shares_out and price) else None
+
+            rec = {
+                "ticker":              tkr_str,
+                "price_live":          price,
+                "market_cap":          market_cap,
+                "float_shares":        m.get("float_shares"),
+                "shares_outstanding":  shares_out,
+                "fifty_two_week_high": m.get("fifty_two_week_high"),
+                "fifty_two_week_low":  m.get("fifty_two_week_low"),
+                "avg_volume_30d":      m.get("avg_volume_30d"),
+                "sector":              m.get("sector"),
+                "industry":            m.get("industry"),
+                "exchange":            m.get("exchange"),
+                "fetch_date":          today,
+            }
+            df = pd.DataFrame([rec])
+            con.register("df_new", df)
+            cols = ",".join(rec.keys())
+            con.execute(f"INSERT INTO market_data ({cols}) SELECT {cols} FROM df_new")
+            con.unregister("df_new")
         except Exception:
             pass
-        time.sleep(0.3)
 
     # Update holdings
-    tickers_str = ",".join(f"'{t}'" for t in new_tickers)
+    placeholders = ",".join(["?"] * len(new_tickers))
     con.execute(f"""
         UPDATE holdings h SET market_value_live = h.shares * m.price_live
-        FROM market_data m WHERE h.ticker = m.ticker AND h.ticker IN ({tickers_str})
-          AND h.market_value_live IS NULL
-    """)
+        FROM market_data m WHERE h.ticker = m.ticker
+          AND h.ticker IN ({placeholders}) AND h.market_value_live IS NULL
+    """, new_tickers)
     con.execute(f"""
-        UPDATE holdings h SET pct_of_float = ROUND(h.shares * 100.0 / m.float_shares, 4)
-        FROM market_data m WHERE h.ticker = m.ticker AND m.float_shares > 0
-          AND h.ticker IN ({tickers_str}) AND h.pct_of_float IS NULL
-    """)
+        UPDATE holdings h SET pct_of_float = ROUND(
+            h.shares * 100.0 / COALESCE(m.shares_outstanding, m.float_shares), 4)
+        FROM market_data m WHERE h.ticker = m.ticker
+          AND COALESCE(m.shares_outstanding, m.float_shares) > 0
+          AND h.ticker IN ({placeholders}) AND h.pct_of_float IS NULL
+    """, new_tickers)
 
 
 # =========================================================================

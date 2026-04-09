@@ -85,6 +85,88 @@ function fmtNum(val) {
 }
 
 // ---------------------------------------------------------------------------
+// Ownership mix stacked bar
+// ---------------------------------------------------------------------------
+const _typeColors = {
+    active:             '#4caf50',
+    passive:            '#2196f3',
+    hedge_fund:         '#9c27b0',
+    quantitative:       '#7c4dff',
+    mixed:              '#ff9800',
+    activist:           '#f44336',
+    SWF:                '#00838f',
+    strategic:          '#795548',
+    private_equity:     '#546e7a',
+    wealth_management:  '#8d6e63',
+    endowment_foundation:'#a1887f',
+    pension_insurance:  '#78909c',
+    venture_capital:    '#607d8b',
+    multi_strategy:     '#ab47bc',
+    unknown:            '#bdbdbd',
+};
+const _typeLabels = {
+    active: 'Active', passive: 'Passive', hedge_fund: 'Hedge Fund',
+    quantitative: 'Quant', mixed: 'Mixed', activist: 'Activist',
+    SWF: 'SWF', strategic: 'Strategic', private_equity: 'PE',
+    wealth_management: 'Wealth Mgmt', endowment_foundation: 'Endow.',
+    pension_insurance: 'Pension', venture_capital: 'VC',
+    multi_strategy: 'Multi-Strat', unknown: 'Other',
+};
+
+function _buildTypeBar(breakdown, total) {
+    const bar = document.getElementById('sum-type-bar');
+    const legend = document.getElementById('sum-type-legend');
+    bar.innerHTML = ''; legend.innerHTML = '';
+    if (!breakdown.length || !total) return;
+
+    // Group small slices (<2%) into Other
+    const MIN_PCT = 2;
+    let items = [];
+    let otherVal = 0;
+    breakdown.forEach(b => {
+        const pct = b.value / total * 100;
+        if (pct >= MIN_PCT) {
+            items.push({type: b.type, value: b.value, pct});
+        } else {
+            otherVal += b.value;
+        }
+    });
+    if (otherVal > 0) {
+        items.push({type: 'unknown', value: otherVal, pct: otherVal / total * 100});
+    }
+
+    // Build bar segments
+    items.forEach(item => {
+        const seg = document.createElement('div');
+        seg.className = 'type-bar-seg';
+        seg.style.width = item.pct.toFixed(1) + '%';
+        seg.style.background = _typeColors[item.type] || '#bdbdbd';
+        const label = (_typeLabels[item.type] || item.type);
+        // Show % on all segments; show $ only for active and passive
+        let text = Math.round(item.pct) + '%';
+        if (item.pct >= 5) {
+            seg.innerHTML = `<span class="type-bar-label">${text}</span>`;
+        }
+        seg.title = `${label}: ${fmtDollars(item.value)} (${item.pct.toFixed(1)}%)`;
+        bar.appendChild(seg);
+    });
+
+    // Legend below bar: label + $ for active/passive, label + % for others
+    items.forEach(item => {
+        const label = _typeLabels[item.type] || item.type;
+        const el = document.createElement('span');
+        el.className = 'type-bar-legend-item';
+        const swatch = `<span class="type-bar-swatch" style="background:${_typeColors[item.type] || '#bdbdbd'}"></span>`;
+        if (item.type === 'active' || item.type === 'passive') {
+            el.innerHTML = `${swatch}${label} ${fmtDollars(item.value)}`;
+        } else {
+            el.innerHTML = `${swatch}${label} ${Math.round(item.pct)}%`;
+        }
+        legend.appendChild(el);
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Autocomplete
 // ---------------------------------------------------------------------------
 async function loadTickers() {
@@ -198,16 +280,32 @@ async function loadTicker() {
         if (!res.ok) throw new Error('No data');
         const s = await res.json();
         document.getElementById('sum-company').textContent = s.company_name || ticker;
-        document.getElementById('sum-quarter').textContent = s.latest_quarter || '\u2014';
+        document.getElementById('sum-price').textContent = s.price != null ? '$' + s.price.toFixed(2) : '\u2014';
+        document.getElementById('sum-price-date').textContent = s.price_date || '';
+        document.getElementById('sum-mktcap').innerHTML = fmtDollars(s.market_cap);
         document.getElementById('sum-holdings').innerHTML = fmtDollars(s.total_value);
         document.getElementById('sum-float').innerHTML = fmtPct(s.total_pct_float);
+
+        // Active / Passive with $ and %
+        const activeVal = s.active_value || 0;
+        const passiveVal = s.passive_value || 0;
+        const totalVal = s.total_value || (activeVal + passiveVal) || 0;
+        if (totalVal > 0) {
+            const activePct = (activeVal / totalVal * 100).toFixed(0);
+            const passivePct = (passiveVal / totalVal * 100).toFixed(0);
+            document.getElementById('sum-active').innerHTML = fmtDollars(activeVal) + ' <span style="color:#888;font-size:11px;">(' + activePct + '%)</span>';
+            document.getElementById('sum-passive').innerHTML = fmtDollars(passiveVal) + ' <span style="color:#888;font-size:11px;">(' + passivePct + '%)</span>';
+        } else {
+            document.getElementById('sum-active').textContent = '\u2014';
+            document.getElementById('sum-passive').textContent = '\u2014';
+        }
+
+        // Row 2
         document.getElementById('sum-holders').textContent = s.num_holders != null ? s.num_holders.toLocaleString() : '\u2014';
-        document.getElementById('sum-mktcap').innerHTML = fmtDollars(s.market_cap);
-        document.getElementById('sum-price').textContent = s.price != null ? '$' + s.price.toFixed(2) : '\u2014';
-        // N-PORT coverage with latest filing date
+        document.getElementById('sum-quarter').textContent = s.latest_quarter || '\u2014';
         const nportEl = document.getElementById('sum-nport');
-        if (s.nport_coverage != null) {
-            let txt = s.nport_coverage + '% (' + s.nport_funds + ' funds)';
+        if (s.nport_funds != null && s.nport_funds > 0) {
+            let txt = s.nport_funds.toLocaleString() + ' funds';
             if (s.nport_latest_date) {
                 txt += '<br><span style="font-size:10px;color:#888;">as of ' + s.nport_latest_date + '</span>';
             }
@@ -216,20 +314,15 @@ async function loadTicker() {
             nportEl.textContent = '\u2014';
         }
 
-        // Active/Passive split
-        const activeVal = s.active_value || 0;
-        const passiveVal = s.passive_value || 0;
-        const total = activeVal + passiveVal;
-        if (total > 0) {
-            document.getElementById('sum-split').textContent =
-                `${fmtDollars(activeVal)} / ${fmtDollars(passiveVal)}`;
-        } else {
-            document.getElementById('sum-split').textContent = '\u2014';
-        }
+        // Stacked ownership mix bar
+        _buildTypeBar(s.type_breakdown || [], totalVal);
     } catch (e) {
         document.getElementById('sum-company').textContent = ticker;
-        ['sum-quarter','sum-holdings','sum-float','sum-holders','sum-split','sum-mktcap','sum-price','sum-nport']
+        ['sum-quarter','sum-holdings','sum-float','sum-holders','sum-active','sum-passive','sum-mktcap','sum-price','sum-nport']
             .forEach(id => document.getElementById(id).textContent = '\u2014');
+        document.getElementById('sum-price-date').textContent = '';
+        document.getElementById('sum-type-bar').innerHTML = '';
+        document.getElementById('sum-type-legend').innerHTML = '';
     }
 
     // Load current tab
@@ -243,7 +336,7 @@ async function loadTicker() {
 const TAB_QUERY_MAP = {
     'register': 1,
     'fund-portfolio': 7, 'cross-ownership': 8,
-    'sector-rotation': 9, 'aum': 14,
+    'aum': 14,
 };
 
 function switchTab(tabId) {
@@ -279,10 +372,12 @@ function switchTab(tabId) {
         loadConviction();
     } else if (tabId === 'crowding') {
         loadCrowding();
-    } else if (tabId === 'short-squeeze') {
-        loadShortSqueeze();
     } else if (tabId === 'peer-matrix') {
         loadHeatmap();
+    } else if (tabId === 'sector-rotation') {
+        loadSectorRotation();
+    } else if (tabId === 'peer-rotation') {
+        loadPeerRotation();
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
     }
@@ -453,12 +548,6 @@ const QUERY_COLUMNS = {
         {key: 'overlap_pct',    label: 'Overlap %',      type: 'pct'},
         {key: 'total_value',    label: 'Total Value',    type: 'dollar'},
     ],
-    9: [
-        {key: 'sector',       label: 'Sector',       type: 'text'},
-        {key: 'num_stocks',   label: 'Stocks',       type: 'num'},
-        {key: 'sector_value', label: 'Sector Value', type: 'dollar'},
-        {key: 'pct_of_total', label: '% of Total',   type: 'pct'},
-    ],
     10: [
         {key: 'manager_name',      label: 'Manager',      type: 'text'},
         {key: 'manager_type',      label: 'Type',         type: 'text'},
@@ -480,16 +569,6 @@ const QUERY_COLUMNS = {
         {key: 'total_pct_float', label: '% Float',      type: 'pct'},
         {key: 'cumulative_pct',  label: 'Cumulative %', type: 'pct'},
         {key: 'total_shares',    label: 'Shares',       type: 'shares'},
-    ],
-    13: [
-        {key: 'ticker',         label: 'Ticker',   type: 'text'},
-        {key: 'issuer_name',    label: 'Issuer',   type: 'text'},
-        {key: 'buyers',         label: 'Buyers',   type: 'num'},
-        {key: 'sellers',        label: 'Sellers',  type: 'num'},
-        {key: 'new_positions',  label: 'New',      type: 'num'},
-        {key: 'net_flow',       label: 'Net',      type: 'num'},
-        {key: 'buy_pct',        label: 'Buy%',     type: 'pct'},
-        {key: 'q4_total_value', label: 'Q4 Value', type: 'dollar'},
     ],
     14: [
         {key: 'manager_name',    label: 'Manager',       type: 'text'},
@@ -2028,34 +2107,800 @@ async function loadCrowding() {
 }
 
 // ---------------------------------------------------------------------------
-// Short Squeeze tab — shows candidates with high short + high inst ownership
+// Sector Rotation tab — multi-quarter institutional money flows by sector
 // ---------------------------------------------------------------------------
-async function loadShortSqueeze() {
+let _srActiveOnly = false;
+let _srLevel = 'parent';
+let _srRankBy = 'total';  // 'total' | 'latest'
+let _srData = null;
+let _srExpandedSector = null;
+
+function _fmtFlow(val) {
+    if (val == null || isNaN(val)) return '\u2014';
+    const abs = Math.abs(val);
+    let num;
+    if (abs >= 1e12) num = '$' + (abs / 1e12).toFixed(1) + 'T';
+    else if (abs >= 1e9)  num = '$' + (abs / 1e9).toFixed(1) + 'B';
+    else if (abs >= 1e6)  num = '$' + (abs / 1e6).toFixed(0) + 'M';
+    else if (abs >= 1e3)  num = '$' + (abs / 1e3).toFixed(0) + 'K';
+    else num = '$' + abs.toFixed(0);
+    // Negatives in red parentheses, positives with +
+    return val < 0 ? '<span class="flow-negative">(' + num + ')</span>' : '+' + num;
+}
+
+function _flowClass(val) {
+    if (val == null || val === 0) return '';
+    return val > 0 ? 'flow-positive' : 'flow-negative';
+}
+
+async function loadSectorRotation() {
     showSpinner(); clearError(); tableWrap.innerHTML = '';
     try {
-        const res = await fetch('/api/short_squeeze');
+        const url = `/api/sector_flows?active_only=${_srActiveOnly ? 1 : 0}&level=${_srLevel}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        _srData = await res.json();
+        hideSpinner();
+        _srExpandedSector = null;
+        _renderSectorRotation();
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function _renderSectorRotation() {
+    const data = _srData;
+    if (!data || !data.sectors) return;
+    const wrap = tableWrap;
+    wrap.innerHTML = '';
+
+    // Filter bar
+    const bar = document.createElement('div');
+    bar.className = 'register-filter-bar';
+    bar.innerHTML = `
+        <div class="register-view-toggle">
+            <button class="btn btn-sm ${_srLevel === 'parent' ? 'btn-primary' : 'btn-secondary'}" data-sr-level="parent">By Parent</button>
+            <button class="btn btn-sm ${_srLevel === 'fund' ? 'btn-primary' : 'btn-secondary'}" data-sr-level="fund">By Fund</button>
+        </div>
+        <div class="register-view-toggle">
+            <span style="font-size:11px;color:#888;margin-right:4px;">Rank by:</span>
+            <button class="btn btn-sm ${_srRankBy === 'total' ? 'btn-primary' : 'btn-secondary'}" data-sr-rank="total">Full Year</button>
+            <button class="btn btn-sm ${_srRankBy === 'latest' ? 'btn-primary' : 'btn-secondary'}" data-sr-rank="latest">Last Quarter</button>
+        </div>
+        <button class="btn btn-sm ${_srActiveOnly ? 'btn-primary' : 'btn-secondary'}" id="sr-active-toggle">Active Only</button>
+    `;
+    wrap.appendChild(bar);
+    // Re-expand helper: re-renders and re-opens the same sector
+    function _reExpandIfOpen(settingFn) {
+        settingFn();
+        const wasExpanded = _srExpandedSector;
+        _srExpandedSector = null;
+        _renderSectorRotation();
+        if (wasExpanded) {
+            setTimeout(() => {
+                const row = wrap.querySelector(`tr[data-sector="${CSS.escape(wasExpanded)}"]`);
+                if (row) row.click();
+            }, 50);
+        }
+    }
+
+    bar.querySelectorAll('[data-sr-level]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _srLevel = btn.dataset.srLevel;
+            loadSectorRotation();  // re-fetch: different data source (13F vs N-PORT)
+        });
+    });
+    bar.querySelectorAll('[data-sr-rank]').forEach(btn => {
+        btn.addEventListener('click', () => _reExpandIfOpen(() => { _srRankBy = btn.dataset.srRank; }));
+    });
+    bar.querySelector('#sr-active-toggle').addEventListener('click', () => {
+        _srActiveOnly = !_srActiveOnly;
+        loadSectorRotation();
+    });
+
+    if (!data.periods.length) {
+        wrap.innerHTML += '<div class="no-data">No quarter data available for sector flow analysis.</div>';
+        return;
+    }
+
+    // Sort sectors by selected ranking
+    const sortKey = _srRankBy === 'latest' ? 'latest_net' : 'total_net';
+    data.sectors.sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
+
+    // Build table
+    const table = document.createElement('table');
+    table.className = 'data-table sector-flow-table';
+
+    // Colgroup
+    const cg = document.createElement('colgroup');
+    cg.innerHTML = '<col style="width:3%"><col style="width:3%"><col style="width:auto">';
+    data.periods.forEach(() => { cg.innerHTML += '<col style="width:13%">'; });
+    cg.innerHTML += '<col style="width:13%">';
+    table.appendChild(cg);
+
+    // Header
+    const thead = document.createElement('thead');
+    let hrow = '<tr><th></th><th class="col-right">#</th><th class="col-left">Sector</th>';
+    data.periods.forEach(p => { hrow += `<th class="col-right">${p.label}</th>`; });
+    hrow += '<th class="col-right">Total</th></tr>';
+    thead.innerHTML = hrow;
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement('tbody');
+
+    // Compute grand totals while building rows
+    const grandTotals = {};
+    let grandNet = 0;
+    data.periods.forEach(p => { grandTotals[`${p.from}_${p.to}`] = 0; });
+
+    data.sectors.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'sector-flow-row';
+        tr.dataset.sector = s.sector;
+        tr.style.cursor = 'pointer';
+
+        let cells = `<td class="toggle-arrow-cell"><span class="toggle-arrow">\u25B6</span></td>`;
+        cells += `<td class="col-right" style="color:#888;font-size:12px;">${idx + 1}</td>`;
+        cells += `<td class="col-left"><strong>${s.sector}</strong></td>`;
+
+        data.periods.forEach(p => {
+            const pk = `${p.from}_${p.to}`;
+            const net = (s.flows[pk] || {}).net || 0;
+            grandTotals[pk] += net;
+            cells += `<td class="col-right">${_fmtFlow(net)}</td>`;
+        });
+
+        grandNet += (s.total_net || 0);
+        cells += `<td class="col-right"><strong>${_fmtFlow(s.total_net)}</strong></td>`;
+        tr.innerHTML = cells;
+        tbody.appendChild(tr);
+
+        tr.addEventListener('click', () => _toggleSectorDetail(s.sector, tr, tbody));
+    });
+
+    // Grand totals row
+    const totRow = document.createElement('tr');
+    totRow.className = 'register-totals-row';
+    let totCells = '<td></td><td></td><td class="col-left"><strong>Total' +
+        (_srActiveOnly ? ' (Active)' : ' (All Managers)') + '</strong></td>';
+    data.periods.forEach(p => {
+        const pk = `${p.from}_${p.to}`;
+        const v = grandTotals[pk];
+        totCells += `<td class="col-right"><strong>${_fmtFlow(v)}</strong></td>`;
+    });
+    totCells += `<td class="col-right"><strong>${_fmtFlow(grandNet)}</strong></td>`;
+    totRow.innerHTML = totCells;
+    tbody.appendChild(totRow);
+
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+}
+
+async function _toggleSectorDetail(sector, parentRow, tbody) {
+    // Collapse if already expanded
+    const existing = tbody.querySelectorAll(`.sector-detail-row[data-sector="${CSS.escape(sector)}"]`);
+    if (existing.length) {
+        existing.forEach(r => r.remove());
+        parentRow.querySelector('.toggle-arrow').style.transform = 'rotate(0deg)';
+        _srExpandedSector = null;
+        return;
+    }
+    // Collapse any other expanded sector
+    tbody.querySelectorAll('.sector-detail-row').forEach(r => r.remove());
+    tbody.querySelectorAll('.toggle-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
+
+    parentRow.querySelector('.toggle-arrow').style.transform = 'rotate(90deg)';
+    _srExpandedSector = sector;
+
+    // Loading placeholder
+    const loadRow = document.createElement('tr');
+    loadRow.className = 'sector-detail-row';
+    loadRow.dataset.sector = sector;
+    const loadTd = document.createElement('td');
+    loadTd.colSpan = 3 + _srData.periods.length + 1;
+    loadTd.innerHTML = '<div class="sector-detail-loading">Loading...</div>';
+    loadRow.appendChild(loadTd);
+    parentRow.after(loadRow);
+
+    try {
+        const url = `/api/sector_flow_detail?sector=${encodeURIComponent(sector)}` +
+            `&active_only=${_srActiveOnly ? 1 : 0}&level=${_srLevel}&rank_by=${_srRankBy}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+
+        loadRow.remove();
+        const pks = d.periods.map(p => `${p.from}_${p.to}`);
+
+        // Helper: build a detail row with values aligned to quarter columns
+        function makeDetailRow(label, valsByPk, totalVal, extraClass) {
+            const tr = document.createElement('tr');
+            tr.className = 'sector-detail-row';
+            if (extraClass) tr.classList.add(extraClass);
+            tr.dataset.sector = sector;
+            let cells = `<td></td><td></td><td class="col-left sector-detail-label">${label}</td>`;
+            pks.forEach(pk => {
+                const v = (valsByPk && valsByPk[pk]) || 0;
+                cells += `<td class="col-right">${_fmtFlow(v)}</td>`;
+            });
+            const tv = totalVal || 0;
+            cells += `<td class="col-right"><strong>${_fmtFlow(tv)}</strong></td>`;
+            tr.innerHTML = cells;
+            return tr;
+        }
+
+        // Helper: section label row (spans all columns)
+        function makeLabelRow(label) {
+            const tr = document.createElement('tr');
+            tr.className = 'sector-detail-row sector-detail-sep';
+            tr.dataset.sector = sector;
+            const numCols = 3 + pks.length + 1;  // arrow + rank + sector + periods + total
+            tr.innerHTML = `<td></td><td colspan="${numCols - 1}" class="col-left sector-section-label">${label}</td>`;
+            return tr;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        // Helper: apply box border classes to a group of rows
+        function applyBox(rows, boxClass) {
+            rows.forEach((r, i) => {
+                r.classList.add(boxClass);
+                if (i === 0) r.classList.add('box-first');
+                if (i === rows.length - 1) r.classList.add('box-last');
+            });
+        }
+
+        // Inflow / Outflow / Net rows — blue border box
+        const flowRows = [
+            makeDetailRow('Inflow', d.inflows, d.inflows.total),
+            makeDetailRow('Outflow', d.outflows, d.outflows.total),
+            makeDetailRow('<strong>Net</strong>', d.nets, d.nets.total),
+        ];
+        applyBox(flowRows, 'box-flow');
+        flowRows.forEach(r => fragment.appendChild(r));
+
+        // Top 5 Buying — green border box
+        const buyLabel = makeLabelRow('Top 5 Buying');
+        const buyRows = [buyLabel];
+        (d.top_buyers || []).forEach(b => {
+            buyRows.push(makeDetailRow(b.institution || '', b.flows, b.total));
+        });
+        applyBox(buyRows, 'box-buyers');
+        buyRows.forEach(r => fragment.appendChild(r));
+
+        // Top 5 Selling — red border box
+        const sellLabel = makeLabelRow('Top 5 Selling');
+        const sellRows = [sellLabel];
+        (d.top_sellers || []).forEach(s => {
+            sellRows.push(makeDetailRow(s.institution || '', s.flows, s.total));
+        });
+        applyBox(sellRows, 'box-sellers');
+        sellRows.forEach(r => fragment.appendChild(r));
+
+        parentRow.after(fragment);
+    } catch (e) {
+        loadRow.querySelector('td').innerHTML = `<div class="sector-detail-error">Error: ${e.message}</div>`;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Peer Rotation tab — per-ticker substitution analysis within sector
+// ---------------------------------------------------------------------------
+let _prLevel = 'parent';
+let _prActiveOnly = false;
+let _prData = null;
+let _prCharts = [];  // track Chart.js instances for cleanup
+
+function _prDestroyCharts() {
+    _prCharts.forEach(c => { try { c.destroy(); } catch(_){} });
+    _prCharts = [];
+}
+
+async function loadPeerRotation() {
+    showSpinner(); clearError(); tableWrap.innerHTML = '';
+    _prDestroyCharts();
+    if (!currentTicker) {
+        hideSpinner();
+        tableWrap.innerHTML = '<div class="no-data">Enter a ticker above, then click Peer Rotation.</div>';
+        return;
+    }
+    try {
+        const url = `/api/peer_rotation?ticker=${currentTicker}&level=${_prLevel}&active_only=${_prActiveOnly ? 1 : 0}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        _prData = await res.json();
+        if (_prData.error) throw new Error(_prData.error);
+        hideSpinner();
+        _renderPeerRotation();
+    } catch (e) { hideSpinner(); showError(e.message); }
+}
+
+function _renderPeerRotation() {
+    const d = _prData;
+    if (!d || !d.subject) return;
+    const wrap = tableWrap;
+    wrap.innerHTML = '';
+    _prDestroyCharts();
+
+    const pks = d.periods.map(p => `${p.from}_${p.to}`);
+
+    // --- Filter bar ---
+    const bar = document.createElement('div');
+    bar.className = 'register-filter-bar';
+    bar.innerHTML = `
+        <div class="register-view-toggle">
+            <button class="btn btn-sm ${_prLevel === 'parent' ? 'btn-primary' : 'btn-secondary'}" data-pr-level="parent">By Parent</button>
+            <button class="btn btn-sm ${_prLevel === 'fund' ? 'btn-primary' : 'btn-secondary'}" data-pr-level="fund">By Fund</button>
+        </div>
+        <button class="btn btn-sm ${_prActiveOnly ? 'btn-primary' : 'btn-secondary'}" id="pr-active-toggle">Active Only</button>
+    `;
+    wrap.appendChild(bar);
+    bar.querySelectorAll('[data-pr-level]').forEach(btn => {
+        btn.addEventListener('click', () => { _prLevel = btn.dataset.prLevel; loadPeerRotation(); });
+    });
+    bar.querySelector('#pr-active-toggle').addEventListener('click', () => {
+        _prActiveOnly = !_prActiveOnly; loadPeerRotation();
+    });
+
+    // --- Subject label ---
+    const subjLabel = document.createElement('div');
+    subjLabel.style.cssText = 'padding:8px 14px;font-size:14px;';
+    subjLabel.innerHTML = `<strong>${d.subject.ticker}</strong> &mdash; ${d.subject.industry || '\u2014'} | ${d.subject.sector || '\u2014'}`;
+    wrap.appendChild(subjLabel);
+
+    // === SECTION 1: Subject vs Sector Summary ===
+    _prBuildSummarySection(wrap, d, pks);
+
+    // === SECTION 2: Substitution Waterfall Chart ===
+    _prBuildWaterfallChart(wrap, d);
+
+    // === SECTION 3: Industry Peer Substitutions ===
+    if (d.industry_substitutions && d.industry_substitutions.length) {
+        _prBuildSubsTable(wrap, d, pks, 'industry',
+            `Industry Peer Substitutions \u2014 ${d.subject.industry || 'Same Industry'}`,
+            d.industry_substitutions);
+    }
+
+    // === SECTION 4: Sector Peer Substitutions ===
+    if (d.sector_substitutions && d.sector_substitutions.length) {
+        _prBuildSubsTable(wrap, d, pks, 'sector',
+            `Sector Peer Substitutions \u2014 ${d.subject.sector || 'Same Sector'} (broader)`,
+            d.sector_substitutions);
+    }
+
+    // === SECTION 5: Top 5 Sector Movers ===
+    _prBuildMoversSection(wrap, d, pks);
+
+    // === SECTION 6: Entity Rotation Stories ===
+    _prBuildEntityStories(wrap, d);
+}
+
+// --- Section 1: Summary table + grouped bar chart ---
+function _prBuildSummarySection(wrap, d, pks) {
+    const sec = document.createElement('div');
+    sec.style.cssText = 'display:flex;gap:16px;padding:0 14px 8px;align-items:flex-start;flex-wrap:wrap;';
+
+    // Table side
+    const tblWrap = document.createElement('div');
+    tblWrap.style.cssText = 'flex:1;min-width:400px;';
+    const table = document.createElement('table');
+    table.className = 'data-table';
+
+    // Header
+    let hdr = '<thead><tr><th class="col-left">Metric</th>';
+    d.periods.forEach(p => { hdr += `<th class="col-right">${p.label}</th>`; });
+    hdr += '<th class="col-right">Total</th></tr></thead>';
+    table.innerHTML = hdr;
+
+    const tbody = document.createElement('tbody');
+    // Subject flow row
+    _prSummaryRow(tbody, `${d.subject.ticker} Flow`, d.subject_flows, pks);
+    // Sector flow row
+    _prSummaryRow(tbody, `${d.subject.sector} Flow`, d.sector_flows, pks);
+    // % of Sector row
+    const pctRow = document.createElement('tr');
+    let pctCells = `<td class="col-left">${d.subject.ticker} % of Sector</td>`;
+    pks.forEach(pk => {
+        const v = (d.subject_pct_of_sector || {})[pk];
+        pctCells += `<td class="col-right">${v != null ? v.toFixed(1) + '%' : '\u2014'}</td>`;
+    });
+    const totPct = (d.subject_pct_of_sector || {}).total;
+    pctCells += `<td class="col-right"><strong>${totPct != null ? totPct.toFixed(1) + '%' : '\u2014'}</strong></td>`;
+    pctRow.innerHTML = pctCells;
+    tbody.appendChild(pctRow);
+
+    table.appendChild(tbody);
+    tblWrap.appendChild(table);
+    sec.appendChild(tblWrap);
+
+    // Chart side — grouped bar chart
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'chart-card';
+    chartDiv.style.cssText = 'flex:0 0 300px;height:250px;';
+    const canvas = document.createElement('canvas');
+    chartDiv.appendChild(canvas);
+    sec.appendChild(chartDiv);
+    wrap.appendChild(sec);
+
+    setTimeout(() => {
+        const labels = d.periods.map(p => p.label);
+        const subjVals = pks.map(pk => ((d.subject_flows || {})[pk] || {}).net || 0);
+        const sectVals = pks.map(pk => ((d.sector_flows || {})[pk] || {}).net || 0);
+        // Scale sector down if it dwarfs subject
+        const maxSubj = Math.max(...subjVals.map(Math.abs), 1);
+        const maxSect = Math.max(...sectVals.map(Math.abs), 1);
+        const useSecondary = maxSect > maxSubj * 10;
+
+        const chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: d.subject.ticker,
+                        data: subjVals.map(v => v / 1e6),
+                        backgroundColor: '#1E2846',
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: d.subject.sector,
+                        data: sectVals.map(v => v / 1e6),
+                        backgroundColor: '#b0c4de',
+                        yAxisID: useSecondary ? 'y1' : 'y',
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 11 } } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(0) + 'M' } },
+                },
+                scales: {
+                    y: {
+                        position: 'left',
+                        ticks: { callback: v => '$' + v + 'M', font: { size: 10 } },
+                    },
+                    ...(useSecondary ? {
+                        y1: {
+                            position: 'right',
+                            ticks: { callback: v => '$' + v + 'M', font: { size: 10 } },
+                            grid: { drawOnChartArea: false },
+                        }
+                    } : {}),
+                    x: { ticks: { font: { size: 10 } } },
+                },
+            }
+        });
+        _prCharts.push(chart);
+    }, 100);
+}
+
+function _prSummaryRow(tbody, label, flowsObj, pks) {
+    const tr = document.createElement('tr');
+    let cells = `<td class="col-left">${label}</td>`;
+    pks.forEach(pk => {
+        const net = (flowsObj[pk] || {}).net || 0;
+        cells += `<td class="col-right">${_fmtFlow(net)}</td>`;
+    });
+    const total = (flowsObj.total || {}).net || 0;
+    cells += `<td class="col-right"><strong>${_fmtFlow(total)}</strong></td>`;
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+}
+
+// --- Section 2: Substitution waterfall chart ---
+function _prBuildWaterfallChart(wrap, d) {
+    const subs = [...(d.industry_substitutions || []), ...(d.sector_substitutions || [])];
+    if (!subs.length) return;
+    // Take top 5 by magnitude
+    const top5 = subs.slice(0, 5);
+    if (!top5.length) return;
+
+    const secDiv = document.createElement('div');
+    secDiv.style.cssText = 'padding:0 14px 8px;';
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'sector-section-label';
+    sectionLabel.style.cssText = 'padding:8px 0 4px;';
+    sectionLabel.textContent = 'Top Substitution Pairs';
+    secDiv.appendChild(sectionLabel);
+
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'chart-card';
+    chartDiv.style.height = '220px';
+    const canvas = document.createElement('canvas');
+    chartDiv.appendChild(canvas);
+    secDiv.appendChild(chartDiv);
+    wrap.appendChild(secDiv);
+
+    setTimeout(() => {
+        const labels = top5.map(s => s.ticker);
+        const peerFlows = top5.map(s => (s.net_peer_flow || 0) / 1e6);
+        const contraFlows = top5.map(s => (s.contra_subject_flow || 0) / 1e6);
+
+        const chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Peer Flow',
+                        data: peerFlows,
+                        backgroundColor: peerFlows.map(v => v >= 0 ? '#2e7d32' : '#c62828'),
+                    },
+                    {
+                        label: `Contra ${d.subject.ticker} Flow`,
+                        data: contraFlows,
+                        backgroundColor: contraFlows.map(v => v >= 0 ? '#81c784' : '#ef9a9a'),
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 11 } } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.parsed.x.toFixed(0) + 'M' } },
+                },
+                scales: {
+                    x: { ticks: { callback: v => '$' + v + 'M', font: { size: 10 } } },
+                    y: { ticks: { font: { size: 11 } } },
+                },
+            }
+        });
+        _prCharts.push(chart);
+    }, 100);
+}
+
+// --- Section 3/4: Substitution tables ---
+function _prBuildSubsTable(wrap, d, pks, type, title, subs) {
+    const secDiv = document.createElement('div');
+    secDiv.style.cssText = 'padding:0 14px 12px;';
+
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'sector-section-label';
+    sectionLabel.style.cssText = 'padding:8px 0 4px;';
+    sectionLabel.textContent = title;
+    secDiv.appendChild(sectionLabel);
+
+    const table = document.createElement('table');
+    table.className = 'data-table';
+
+    let hdr = '<thead><tr><th class="col-left" style="width:3%"></th>';
+    hdr += '<th class="col-right" style="width:3%">#</th>';
+    hdr += '<th class="col-left">Peer</th>';
+    hdr += '<th class="col-left">Industry</th>';
+    hdr += '<th class="col-left">Direction</th>';
+    hdr += '<th class="col-right">Net Peer Flow</th>';
+    hdr += `<th class="col-right">Contra ${d.subject.ticker}</th>`;
+    hdr += '<th class="col-right"># Funds</th>';
+    hdr += '</tr></thead>';
+    table.innerHTML = hdr;
+
+    const tbody = document.createElement('tbody');
+    subs.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'sector-flow-row';
+        tr.style.cursor = 'pointer';
+        tr.dataset.peer = s.ticker;
+
+        const dirLabel = s.direction === 'replacing'
+            ? `Replacing ${d.subject.ticker}` : `Replaced by ${d.subject.ticker}`;
+        const dirColor = s.direction === 'replacing' ? '#c62828' : '#2e7d32';
+
+        tr.innerHTML = `
+            <td class="toggle-arrow-cell"><span class="toggle-arrow">\u25B6</span></td>
+            <td class="col-right" style="color:#888;font-size:12px;">${idx + 1}</td>
+            <td class="col-left"><strong>${s.ticker}</strong></td>
+            <td class="col-left" style="font-size:12px;color:#666;">${s.industry || '\u2014'}</td>
+            <td class="col-left" style="color:${dirColor};font-size:12px;">${dirLabel}</td>
+            <td class="col-right">${_fmtFlow(s.net_peer_flow)}</td>
+            <td class="col-right">${_fmtFlow(s.contra_subject_flow)}</td>
+            <td class="col-right">${s.num_entities || 0}</td>
+        `;
+        tbody.appendChild(tr);
+
+        tr.addEventListener('click', () => _togglePeerDetail(d.subject.ticker, s.ticker, tr, tbody));
+    });
+
+    table.appendChild(tbody);
+    secDiv.appendChild(table);
+    wrap.appendChild(secDiv);
+}
+
+async function _togglePeerDetail(ticker, peer, parentRow, tbody) {
+    const existing = tbody.querySelectorAll(`.sector-detail-row[data-peer="${CSS.escape(peer)}"]`);
+    if (existing.length) {
+        existing.forEach(r => r.remove());
+        parentRow.querySelector('.toggle-arrow').style.transform = 'rotate(0deg)';
+        return;
+    }
+    // Collapse any other
+    tbody.querySelectorAll('.sector-detail-row').forEach(r => r.remove());
+    tbody.querySelectorAll('.toggle-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
+    parentRow.querySelector('.toggle-arrow').style.transform = 'rotate(90deg)';
+
+    const loadRow = document.createElement('tr');
+    loadRow.className = 'sector-detail-row';
+    loadRow.dataset.peer = peer;
+    const loadTd = document.createElement('td');
+    loadTd.colSpan = 8;
+    loadTd.innerHTML = '<div class="sector-detail-loading">Loading...</div>';
+    loadRow.appendChild(loadTd);
+    parentRow.after(loadRow);
+
+    try {
+        const url = `/api/peer_rotation_detail?ticker=${ticker}&peer=${peer}` +
+            `&active_only=${_prActiveOnly ? 1 : 0}&level=${_prLevel}`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        hideSpinner();
-        const wrap = tableWrap;
-        if (data.candidates && data.candidates.length) {
-            const info = document.createElement('div');
-            info.style.cssText = 'padding:12px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;margin-bottom:16px;font-size:13px;';
-            info.innerHTML = '<b>Short Squeeze Candidates:</b> Tickers with high short interest (>15%) and high institutional ownership. Squeeze Score = Short% x Institutional/Float ratio.';
-            wrap.appendChild(info);
-            wrap.appendChild(buildSimpleTable(data.candidates, [
-                {key: 'ticker', label: 'Ticker', type: 'text'},
-                {key: 'max_short_pct', label: 'Short %', type: 'pct'},
-                {key: 'inst_pct_float', label: 'Inst % Float', type: 'pct'},
-                {key: 'squeeze_score', label: 'Squeeze Score', type: 'num'},
-                {key: 'num_holders', label: 'Holders', type: 'num'},
-                {key: 'total_value', label: 'Inst Value', type: 'dollar'},
-                {key: 'market_cap', label: 'Market Cap', type: 'dollar'},
-            ]));
-        } else {
-            wrap.innerHTML = '<div class="no-data">No short squeeze candidates found (requires short_interest data with >15% short).</div>';
-        }
-    } catch (e) { hideSpinner(); showError(e.message); }
+        loadRow.remove();
+
+        const fragment = document.createDocumentFragment();
+        // Header row
+        const hdrRow = document.createElement('tr');
+        hdrRow.className = 'sector-detail-row sector-detail-sep';
+        hdrRow.dataset.peer = peer;
+        hdrRow.innerHTML = `<td></td><td colspan="7" class="col-left sector-section-label">Entity Detail: ${ticker} \u2194 ${peer}</td>`;
+        fragment.appendChild(hdrRow);
+
+        (data.entities || []).slice(0, 10).forEach(ent => {
+            const tr = document.createElement('tr');
+            tr.className = 'sector-detail-row';
+            tr.dataset.peer = peer;
+            tr.innerHTML = `
+                <td></td><td></td>
+                <td class="col-left sector-detail-label">${ent.entity}</td>
+                <td></td><td></td>
+                <td class="col-right">${_fmtFlow(ent.peer_flow)}</td>
+                <td class="col-right">${_fmtFlow(ent.subject_flow)}</td>
+                <td></td>
+            `;
+            fragment.appendChild(tr);
+        });
+
+        parentRow.after(fragment);
+    } catch (e) {
+        loadRow.querySelector('td').innerHTML = `<div class="sector-detail-error">Error: ${e.message}</div>`;
+    }
+}
+
+// --- Section 5: Top 5 Sector Movers ---
+function _prBuildMoversSection(wrap, d, pks) {
+    const movers = d.top_sector_movers || [];
+    if (!movers.length) return;
+
+    const secDiv = document.createElement('div');
+    secDiv.style.cssText = 'padding:0 14px 12px;';
+
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'sector-section-label';
+    sectionLabel.style.cssText = 'padding:8px 0 4px;';
+    sectionLabel.textContent = `Top Movers \u2014 ${d.subject.sector}`;
+    secDiv.appendChild(sectionLabel);
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;';
+
+    // Table
+    const tblWrap = document.createElement('div');
+    tblWrap.style.cssText = 'flex:1;min-width:300px;';
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = `<thead><tr>
+        <th class="col-right">#</th>
+        <th class="col-left">Ticker</th>
+        <th class="col-left">Industry</th>
+        <th class="col-right">Net Flow</th>
+        <th class="col-right">Inflow</th>
+        <th class="col-right">Outflow</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    movers.forEach(m => {
+        const tr = document.createElement('tr');
+        if (m.is_subject) tr.className = 'peer-highlight';
+        tr.innerHTML = `
+            <td class="col-right" style="color:#888;font-size:12px;">${m.is_subject ? '\u2605' : m.rank}</td>
+            <td class="col-left"><strong>${m.ticker}</strong></td>
+            <td class="col-left" style="font-size:12px;color:#666;">${m.industry || '\u2014'}</td>
+            <td class="col-right ${_flowClass(m.net_flow)}">${_fmtFlow(m.net_flow)}</td>
+            <td class="col-right">${_fmtFlow(m.inflow)}</td>
+            <td class="col-right">${_fmtFlow(m.outflow)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tblWrap.appendChild(table);
+    inner.appendChild(tblWrap);
+
+    // Horizontal bar chart
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'chart-card';
+    chartDiv.style.cssText = 'flex:0 0 300px;height:220px;';
+    const canvas = document.createElement('canvas');
+    chartDiv.appendChild(canvas);
+    inner.appendChild(chartDiv);
+
+    secDiv.appendChild(inner);
+    wrap.appendChild(secDiv);
+
+    setTimeout(() => {
+        const labels = movers.map(m => (m.is_subject ? '\u2605 ' : '') + m.ticker);
+        const vals = movers.map(m => (m.net_flow || 0) / 1e6);
+        const bgColors = movers.map(m => {
+            if (m.is_subject) return '#1E2846';
+            return (m.net_flow || 0) >= 0 ? '#2e7d32' : '#c62828';
+        });
+
+        const chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: vals,
+                    backgroundColor: bgColors,
+                    borderWidth: movers.map(m => m.is_subject ? 2 : 0),
+                    borderColor: '#1E2846',
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.x.toFixed(0) + 'M' } },
+                },
+                scales: {
+                    x: { ticks: { callback: v => '$' + v + 'M', font: { size: 10 } } },
+                    y: { ticks: { font: { size: 11 } } },
+                },
+            }
+        });
+        _prCharts.push(chart);
+    }, 100);
+}
+
+// --- Section 6: Entity Rotation Stories ---
+function _prBuildEntityStories(wrap, d) {
+    const stories = d.entity_stories || [];
+    if (!stories.length) return;
+
+    const secDiv = document.createElement('div');
+    secDiv.style.cssText = 'padding:0 14px 12px;';
+
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'sector-section-label';
+    sectionLabel.style.cssText = 'padding:8px 0 4px;';
+    sectionLabel.textContent = 'Top 10 Entity Rotation Stories';
+    secDiv.appendChild(sectionLabel);
+
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = `<thead><tr>
+        <th class="col-right">#</th>
+        <th class="col-left">Entity</th>
+        <th class="col-right">${d.subject.ticker} Flow</th>
+        <th class="col-right">Sector Flow</th>
+        <th class="col-left">Top Contra-Peers</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    stories.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+        const contra = (s.top_contra_peers || []).map(p =>
+            `<span class="${_flowClass(p.flow)}">${p.ticker} ${_fmtFlow(p.flow)}</span>`
+        ).join(', ');
+        tr.innerHTML = `
+            <td class="col-right" style="color:#888;font-size:12px;">${idx + 1}</td>
+            <td class="col-left">${s.entity}</td>
+            <td class="col-right ${_flowClass(s.subject_flow)}">${_fmtFlow(s.subject_flow)}</td>
+            <td class="col-right ${_flowClass(s.sector_flow)}">${_fmtFlow(s.sector_flow)}</td>
+            <td class="col-left" style="font-size:12px;">${contra || '\u2014'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    secDiv.appendChild(table);
+    wrap.appendChild(secDiv);
 }
 
 // ---------------------------------------------------------------------------

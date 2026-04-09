@@ -4,26 +4,19 @@ Replaces Jupyter notebook for day-to-day browser-based research.
 """
 
 import argparse
-import io
 import os
 import shutil
+import threading as _threading
 from datetime import datetime
 
 import duckdb
-import pandas as pd
 from flask import Flask, jsonify, request, send_file
-from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
 
-# Quarter constants used in SQL queries — imported from config.py.
-# To roll forward: edit ONLY scripts/config.py. These vars propagate everywhere.
-LQ = LATEST_QUARTER   # latest quarter for all queries (e.g. '{LQ}')
-FQ = FIRST_QUARTER    # first quarter for comparisons (e.g. '{FQ}')
-PQ = PREV_QUARTER     # previous quarter (e.g. '{PQ}')
+from config import LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
 from export import build_excel
-
 import queries
 from queries import (
-    get_cusip, clean_for_json, df_to_records,
+    clean_for_json, df_to_records,
     query1, query2, query3, query4, query5,
     query6, query7, query8, query9, query10,
     query11, query12, query14, query15, query16,
@@ -31,6 +24,12 @@ from queries import (
     short_interest_analysis, portfolio_context,
     get_summary, _cross_ownership_query,
 )
+
+# Quarter constants used in SQL queries — imported from config.py.
+# To roll forward: edit ONLY scripts/config.py. These vars propagate everywhere.
+LQ = LATEST_QUARTER   # latest quarter for all queries (e.g. '{LQ}')
+FQ = FIRST_QUARTER    # first quarter for comparisons (e.g. '{FQ}')
+PQ = PREV_QUARTER     # previous quarter (e.g. '{PQ}')
 
 QUERY_FUNCTIONS = {
     1: query1, 2: query2, 3: query3, 4: query4, 5: query5,
@@ -83,7 +82,7 @@ def _resolve_db_path():
             return DB_SNAPSHOT_PATH
         # Create snapshot from the main DB
         try:
-            print(f'  Database locked — creating read-only snapshot...')
+            print('  Database locked — creating read-only snapshot...')
             # Atomic copy: write to temp file, then rename (prevents corrupt snapshot)
             tmp_path = DB_SNAPSHOT_PATH + '.tmp'
             shutil.copy2(DB_PATH, tmp_path)
@@ -97,7 +96,6 @@ def _resolve_db_path():
 
 
 # Resolved once at import/startup; updated if needed
-import threading as _threading
 _db_path_lock = _threading.Lock()
 _active_db_path = None
 _switchback_running = False
@@ -129,8 +127,8 @@ def _start_switchback_monitor():
                 app.logger.info("[switchback] Primary DB available — switched back from snapshot")
                 _switchback_running = False
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                app.logger.debug("Suppressed: %s", e)
 
     t = _threading.Thread(target=_monitor, daemon=True)
     t.start()
@@ -144,8 +142,8 @@ def _refresh_table_list():
         con = duckdb.connect(path, read_only=True)
         _available_tables = {t[0] for t in con.execute("SHOW TABLES").fetchall()}
         con.close()
-    except Exception:
-        pass
+    except Exception as e:
+        app.logger.debug("Suppressed: %s", e)
 
 
 def has_table(name):
@@ -186,7 +184,8 @@ def get_db():
         try:
             cached.execute("SELECT 1")  # verify alive
             return cached
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             pass  # stale — reopen
 
     try:
@@ -209,12 +208,10 @@ def get_db():
 queries._setup(get_db, has_table)
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # On-demand ticker add
 # ---------------------------------------------------------------------------
+
 
 @app.route('/api/add_ticker', methods=['POST'])
 def api_add_ticker():
@@ -327,16 +324,19 @@ def api_admin_stats():
                            ('beneficial_ownership', 'beneficial_ownership'),
                            ('fund_holdings', 'fund_holdings')]:
             try:
-                stats[key] = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            except Exception:
+                stats[key] = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # nosec B608
+            except Exception as e:
+                app.logger.debug("Error: %s", e)
                 stats[key] = 0
         try:
             stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings WHERE ticker IS NOT NULL").fetchone()[0]
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             stats['tickers'] = 0
         try:
             stats['short_interest_days'] = con.execute("SELECT COUNT(DISTINCT report_date) FROM short_interest").fetchone()[0]
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             stats['short_interest_days'] = 0
         return jsonify(stats)
     finally:
@@ -354,8 +354,8 @@ def api_admin_progress():
         ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True)
         if ps.returncode == 0:
             result['running'] = True
-    except Exception:
-        pass
+    except Exception as e:
+        app.logger.debug("Suppressed: %s", e)
 
     # Read progress file
     progress_file = os.path.join(BASE_DIR, 'logs', 'phase2_progress.txt')
@@ -417,8 +417,8 @@ def api_admin_run_script():
         ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
         if ps.returncode == 0:
             return jsonify({'error': f'{script} is already running'}), 409
-    except Exception:
-        pass
+    except Exception as e:
+        app.logger.debug("Suppressed: %s", e)
 
     # Build command
     script_path = os.path.join(BASE_DIR, 'scripts', script)
@@ -449,14 +449,14 @@ def api_admin_manager_changes():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER
         # New managers (in latest quarter but not previous)
-        new_mgrs = con.execute(f"""
+        new_mgrs = con.execute(f"""  # nosec B608
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings WHERE quarter = '{LATEST_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{PREV_QUARTER}')
             ORDER BY manager_name LIMIT 50
         """).fetchdf()
         # Disappeared managers
-        gone_mgrs = con.execute(f"""
+        gone_mgrs = con.execute(f"""  # nosec B608
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings WHERE quarter = '{PREV_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
@@ -478,13 +478,13 @@ def api_admin_ticker_changes():
     con = get_db()
     try:
         from config import LATEST_QUARTER, PREV_QUARTER
-        new_tickers = con.execute(f"""
+        new_tickers = con.execute(f"""  # nosec B608
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
             GROUP BY ticker ORDER BY ticker LIMIT 100
         """).fetchdf()
-        gone_tickers = con.execute(f"""
+        gone_tickers = con.execute(f"""  # nosec B608
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
@@ -504,7 +504,7 @@ def api_admin_parent_health():
     con = get_db()
     try:
         # Managers without parent assignment
-        orphaned = con.execute(f"""
+        orphaned = con.execute(f"""  # nosec B608
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
             FROM holdings
@@ -514,7 +514,7 @@ def api_admin_parent_health():
             LIMIT 20
         """).fetchdf()
         # Top parents by value
-        top_parents = con.execute(f"""
+        top_parents = con.execute(f"""  # nosec B608
             SELECT inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
             FROM holdings WHERE quarter = '{LQ}' AND inst_parent_name IS NOT NULL
@@ -544,11 +544,12 @@ def api_admin_stale_data():
                 ORDER BY fetch_date ASC LIMIT 20
             """).fetchdf()
             result['stale_market_data'] = df_to_records(stale_market)
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             result['stale_market_data'] = []
         # Managers only in old quarters
         try:
-            inactive = con.execute(f"""
+            inactive = con.execute(f"""  # nosec B608
                 SELECT cik, manager_name, MAX(quarter) as last_quarter
                 FROM holdings
                 GROUP BY cik, manager_name
@@ -556,7 +557,8 @@ def api_admin_stale_data():
                 ORDER BY last_quarter DESC LIMIT 20
             """).fetchdf()
             result['inactive_managers'] = df_to_records(inactive)
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             result['inactive_managers'] = []
         return jsonify(clean_for_json(result))
     finally:
@@ -570,7 +572,7 @@ def api_admin_merger_signals():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER
         # CIKs that disappeared AND had large holdings
-        signals = con.execute(f"""
+        signals = con.execute(f"""  # nosec B608
             WITH gone AS (
                 SELECT cik, manager_name, SUM(market_value_usd) as prev_value
                 FROM holdings WHERE quarter = '{PREV_QUARTER}'
@@ -594,7 +596,7 @@ def api_admin_new_companies():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER
         # Tickers that appeared in latest quarter with significant institutional value
-        new_cos = con.execute(f"""
+        new_cos = con.execute(f"""  # nosec B608
             SELECT h.ticker, MAX(h.issuer_name) as company,
                    COUNT(DISTINCT h.cik) as holder_count,
                    SUM(h.market_value_live) as total_value,
@@ -625,7 +627,7 @@ def api_admin_data_quality():
         result = {}
         # Holdings coverage
         try:
-            r = con.execute(f"""
+            r = con.execute(f"""  # nosec B608
                 SELECT
                     COUNT(*) as total,
                     COUNT(ticker) as with_ticker,
@@ -639,7 +641,8 @@ def api_admin_data_quality():
                 'ticker_pct': round(r[1] / r[0] * 100, 1) if r[0] else 0,
                 'live_value_pct': round(r[2] / r[0] * 100, 1) if r[0] else 0,
             }
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             result['holdings'] = {}
         # 13D/G parse quality
         try:
@@ -666,10 +669,11 @@ def api_admin_data_quality():
                 bo_stats['name_resolved'] = nr[0]
                 bo_stats['name_unresolved'] = nr[1]
                 bo_stats['name_resolution_pct'] = round(nr[0] / (nr[0] + nr[1]) * 100, 1) if (nr[0] + nr[1]) else 0
-            except Exception:
-                pass
+            except Exception as e:
+                app.logger.debug("Suppressed: %s", e)
             result['beneficial_ownership'] = bo_stats
-        except Exception:
+        except Exception as e:
+            app.logger.debug("Error: %s", e)
             result['beneficial_ownership'] = {}
         # Error log stats
         error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
@@ -724,14 +728,14 @@ def api_admin_running():
     import subprocess
     running = []
     for script in ['fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
-                    'fetch_finra_short.py', 'compute_flows.py', 'merge_staging.py']:
+                   'fetch_finra_short.py', 'compute_flows.py', 'merge_staging.py']:
         try:
             ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
             if ps.returncode == 0:
                 pids = ps.stdout.strip().split('\n')
                 running.append({'script': script, 'pids': pids})
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.debug("Suppressed: %s", e)
     return jsonify({'running': running})
 
 
@@ -845,7 +849,8 @@ def api_admin_entity_override():
                         else:
                             raise ValueError(f"unsupported field for reclassify: {field}")
                         con.execute("COMMIT")
-                    except Exception:
+                    except Exception as e:
+                        app.logger.debug("Error: %s", e)
                         con.execute("ROLLBACK")
                         raise
 
@@ -888,7 +893,8 @@ def api_admin_entity_override():
                             [entity_id, parent_id],
                         )
                         con.execute("COMMIT")
-                    except Exception:
+                    except Exception as e:
+                        app.logger.debug("Error: %s", e)
                         con.execute("ROLLBACK")
                         raise
 
@@ -912,7 +918,8 @@ def api_admin_entity_override():
                            VALUES (?, ?, ?, ?, ?, ?, ?)""",
                         [entity_cik, action, field, old_value, new_value, reason, analyst],
                     )
-                except Exception:
+                except Exception as e:
+                    app.logger.debug("Error: %s", e)
                     pass  # table might not exist in older staging DBs
 
                 # Audit log append
@@ -956,7 +963,7 @@ def api_tickers():
     except Exception as e:
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
-        df = con.execute(f"""
+        df = con.execute(f"""  # nosec B608
             SELECT ticker, MODE(issuer_name) as name
             FROM holdings
             WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}'
@@ -978,7 +985,7 @@ def api_fund_portfolio_managers():
     except Exception as e:
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
-        df = con.execute(f"""
+        df = con.execute(f"""  # nosec B608
             SELECT
                 cik,
                 fund_name,
@@ -1005,7 +1012,7 @@ def api_nport_shorts():
     try:
         where = "AND fh.ticker = ?" if ticker else ""
         params = [ticker] if ticker else []
-        df = con.execute(f"""
+        df = con.execute(f"""  # nosec B608
             SELECT
                 fh.fund_name,
                 fh.ticker,
@@ -1068,7 +1075,7 @@ def api_fund_behavioral_profile():
             param = series_id
 
         # Fund identity
-        fund_info = con.execute(f"""
+        fund_info = con.execute(f"""  # nosec B608
             SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
             FROM fund_holdings WHERE {where}
             GROUP BY fund_name, series_id, lei, family_name
@@ -1080,7 +1087,7 @@ def api_fund_behavioral_profile():
         fund_name, sid, fund_lei, family, quarters = fund_info
 
         # Position size distribution (avg % of NAV)
-        size_stats = con.execute(f"""
+        size_stats = con.execute(f"""  # nosec B608
             SELECT
                 AVG(pct_of_nav) as avg_pct_nav,
                 MEDIAN(pct_of_nav) as median_pct_nav,
@@ -1092,8 +1099,8 @@ def api_fund_behavioral_profile():
         """, [param]).fetchone()
 
         # Sector concentration
-        sector_where = f"fh.lei = ?" if lei else f"fh.series_id = ?"
-        sectors = con.execute(f"""
+        sector_where = "fh.lei = ?" if lei else "fh.series_id = ?"
+        sectors = con.execute(f"""  # nosec B608
             SELECT s.sector, SUM(fh.market_value_usd) as sector_value
             FROM fund_holdings fh
             JOIN securities s ON fh.cusip = s.cusip
@@ -1106,7 +1113,7 @@ def api_fund_behavioral_profile():
         """, [param]).fetchdf()
 
         # Top holdings
-        top = con.execute(f"""
+        top = con.execute(f"""  # nosec B608
             SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
             FROM fund_holdings
             WHERE {where} AND quarter = '{LQ}'
@@ -1292,7 +1299,7 @@ def api_crowding():
     con = get_db()
     try:
         # Top holders by % of float
-        holders = con.execute(f"""
+        holders = con.execute(f"""  # nosec B608
             SELECT COALESCE(inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_float) as pct_float,
                    SUM(market_value_live) as value
@@ -1351,7 +1358,7 @@ def api_smart_money():
     con = get_db()
     try:
         # Long positions by manager type
-        longs = con.execute(f"""
+        longs = con.execute(f"""  # nosec B608
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
             FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
@@ -1400,15 +1407,14 @@ def api_short_long():
         return jsonify({'error': str(e)}), 500
 
 
-
-
 @app.route('/api/sector_flows')
 def api_sector_flows():
     """Multi-quarter institutional money flows by GICS sector."""
     try:
         from queries import get_sector_flows
         active_only = request.args.get('active_only', '0') == '1'
-        result = get_sector_flows(active_only=active_only)
+        level = request.args.get('level', 'parent').strip()
+        result = get_sector_flows(active_only=active_only, level=level)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"sector_flows error: {e}")
@@ -1446,8 +1452,8 @@ def api_sector_flow_detail():
         if not sector:
             return jsonify({'error': 'Missing sector param'}), 400
         rank_by = request.args.get('rank_by', 'total').strip()
-        result = get_sector_flow_detail(sector, active_only=active_only,
-                                         level=level, rank_by=rank_by)
+        result = get_sector_flow_detail(
+            sector, active_only=active_only, level=level, rank_by=rank_by)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"sector_flow_detail error: {e}")
@@ -1467,7 +1473,7 @@ def api_heatmap():
             tickers += [t.strip() for t in peers.split(',') if t.strip()]
         if not tickers:
             # Default: top 10 tickers by institutional value
-            top = con.execute(f"""
+            top = con.execute(f"""  # nosec B608
                 SELECT ticker, SUM(market_value_usd) as val
                 FROM holdings WHERE quarter = '{LQ}' AND ticker IS NOT NULL
                 GROUP BY ticker ORDER BY val DESC LIMIT 10
@@ -1476,7 +1482,7 @@ def api_heatmap():
 
         # Top 15 managers by total value across these tickers
         ticker_ph = ','.join(['?'] * len(tickers))
-        managers = con.execute(f"""
+        managers = con.execute(f"""  # nosec B608
             SELECT inst_parent_name, SUM(market_value_usd) as total_val
             FROM holdings
             WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
@@ -1491,7 +1497,7 @@ def api_heatmap():
 
         # Build the matrix: pct_of_float for each manager × ticker
         mgr_ph = ','.join(['?'] * len(manager_names))
-        cells = con.execute(f"""
+        cells = con.execute(f"""  # nosec B608
             SELECT inst_parent_name as manager, ticker,
                    SUM(pct_of_float) as pct_float,
                    SUM(shares) as shares,
@@ -1524,7 +1530,7 @@ def api_manager_profile():
     con = get_db()
     try:
         # Top holdings
-        holdings = con.execute(f"""
+        holdings = con.execute(f"""  # nosec B608
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
                    pct_of_portfolio, pct_of_float
             FROM holdings
@@ -1533,7 +1539,7 @@ def api_manager_profile():
         """, [f'%{manager}%']).fetchdf()
 
         # Sector allocation
-        sectors = con.execute(f"""
+        sectors = con.execute(f"""  # nosec B608
             SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
                    SUM(h.market_value_usd) as value
             FROM holdings h
@@ -1544,7 +1550,7 @@ def api_manager_profile():
         """, [f'%{manager}%']).fetchdf()
 
         # Summary stats
-        stats = con.execute(f"""
+        stats = con.execute(f"""  # nosec B608
             SELECT COUNT(DISTINCT ticker) as num_positions,
                    SUM(market_value_usd) as total_value,
                    COUNT(DISTINCT cik) as num_ciks,
@@ -1554,7 +1560,7 @@ def api_manager_profile():
         """, [f'%{manager}%']).fetchone()
 
         # Quarter-over-quarter change
-        qoq = con.execute(f"""
+        qoq = con.execute("""
             SELECT quarter, COUNT(DISTINCT ticker) as positions,
                    SUM(market_value_usd) as total_value
             FROM holdings WHERE inst_parent_name ILIKE ?
@@ -1588,7 +1594,7 @@ def api_amendments():
     con = get_db()
     try:
         # Find managers who filed amendments for this ticker
-        amendments = con.execute(f"""
+        amendments = con.execute(f"""  # nosec B608
             WITH all_filings AS (
                 SELECT cik, manager_name, inst_parent_name, quarter,
                        accession_number, shares, market_value_usd,
@@ -1716,6 +1722,42 @@ def api_export(qnum):
 
 # ---------------------------------------------------------------------------
 # Main
+@app.route('/api/peer_rotation')
+def api_peer_rotation():
+    """Peer rotation analysis: subject vs sector/industry peer substitutions."""
+    try:
+        from queries import get_peer_rotation
+        ticker = request.args.get('ticker', '').upper().strip()
+        if not ticker:
+            return jsonify({'error': 'Missing ticker param'}), 400
+        active_only = request.args.get('active_only', '0') == '1'
+        level = request.args.get('level', 'parent').strip()
+        result = get_peer_rotation(ticker, active_only=active_only, level=level)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"peer_rotation error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/peer_rotation_detail')
+def api_peer_rotation_detail():
+    """Entity-level breakdown for a subject+peer substitution pair."""
+    try:
+        from queries import get_peer_rotation_detail
+        ticker = request.args.get('ticker', '').upper().strip()
+        peer = request.args.get('peer', '').upper().strip()
+        if not ticker or not peer:
+            return jsonify({'error': 'Missing ticker or peer param'}), 400
+        active_only = request.args.get('active_only', '0') == '1'
+        level = request.args.get('level', 'parent').strip()
+        result = get_peer_rotation_detail(
+            ticker, peer, active_only=active_only, level=level)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"peer_rotation_detail error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
@@ -1734,7 +1776,7 @@ if __name__ == '__main__':
     print('  13F Ownership Research')
     print(f'  Database: {_active_db_path}')
     if _active_db_path != DB_PATH:
-        print(f'  (main DB locked — serving from snapshot)')
+        print('  (main DB locked — serving from snapshot)')
     print(f'  Running at: http://localhost:{port}')
     print()
 

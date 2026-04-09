@@ -6,7 +6,6 @@ Run: python3 scripts/approve_overrides.py
 """
 
 import os
-import time
 from datetime import datetime
 
 import pandas as pd
@@ -87,57 +86,83 @@ def apply_override(row, con):
 
 
 def fetch_market_for_tickers(tickers, con):
-    """Fetch yfinance market data for approved tickers."""
-    import yfinance as yf
+    """Fetch market data for approved tickers via YahooClient + SEC XBRL.
+
+    Uses the canonical sources for this project:
+      - Prices, sector, industry, 52w, volume: YahooClient (/v10/quoteSummary)
+      - shares_outstanding: SEC XBRL (authoritative, from 10-K/10-Q cover)
+      - market_cap: computed as shares_outstanding × price_live (SEC × Yahoo)
+    """
+    from yahoo_client import YahooClient
+    from sec_shares_client import SECSharesClient
 
     if not tickers:
         return
 
+    yc = YahooClient()
+    sc = SECSharesClient()
+    today = datetime.now().strftime("%Y-%m-%d")
+
     print(f"\nFetching market data for {len(tickers)} approved tickers...")
     for tkr_str in tickers:
-        existing = con.execute(f"SELECT COUNT(*) FROM market_data WHERE ticker = '{tkr_str}'").fetchone()[0]
+        existing = con.execute(
+            "SELECT COUNT(*) FROM market_data WHERE ticker = ?", [tkr_str]
+        ).fetchone()[0]
         if existing > 0:
             continue
         try:
-            tkr = yf.Ticker(tkr_str)
-            info = tkr.info
-            if info and info.get("regularMarketPrice"):
-                rec = {
-                    "ticker": tkr_str,
-                    "price_live": info.get("regularMarketPrice"),
-                    "market_cap": info.get("marketCap"),
-                    "float_shares": info.get("floatShares"),
-                    "shares_outstanding": info.get("sharesOutstanding"),
-                    "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
-                    "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
-                    "avg_volume_30d": info.get("averageVolume"),
-                    "sector": info.get("sector"),
-                    "industry": info.get("industry"),
-                    "exchange": info.get("exchange"),
-                    "fetch_date": datetime.now().strftime("%Y-%m-%d"),
-                    "price_2025Q1": None, "price_2025Q2": None,
-                    "price_2025Q3": None, "price_2025Q4": None,
-                }
-                df = pd.DataFrame([rec])
-                con.execute("INSERT INTO market_data SELECT * FROM d")
-                mc = f"${info['marketCap']/1e9:.0f}B" if info.get("marketCap") else "N/A"
-                print(f"  {tkr_str}: ${info['regularMarketPrice']:.2f}, mktcap {mc}")
+            m = yc.fetch_metadata(tkr_str)
+            if not m or not m.get("price"):
+                print(f"  {tkr_str}: no Yahoo price")
+                continue
+            sec = sc.fetch(tkr_str) or {}
+            shares_out = sec.get("shares_outstanding")
+            price = m.get("price")
+            market_cap = (shares_out * price) if (shares_out and price) else None
+
+            rec = {
+                "ticker":              tkr_str,
+                "price_live":          price,
+                "market_cap":          market_cap,
+                "float_shares":        m.get("float_shares"),
+                "shares_outstanding":  shares_out,
+                "fifty_two_week_high": m.get("fifty_two_week_high"),
+                "fifty_two_week_low":  m.get("fifty_two_week_low"),
+                "avg_volume_30d":      m.get("avg_volume_30d"),
+                "sector":              m.get("sector"),
+                "industry":            m.get("industry"),
+                "exchange":            m.get("exchange"),
+                "fetch_date":          today,
+            }
+            df = pd.DataFrame([rec])
+            con.register("df_new", df)
+            # Upsert: delete any existing row, then insert only matching columns
+            con.execute("DELETE FROM market_data WHERE ticker = ?", [tkr_str])
+            cols = ",".join(rec.keys())
+            con.execute(f"INSERT INTO market_data ({cols}) SELECT {cols} FROM df_new")
+            con.unregister("df_new")
+
+            mc = fmt_dollars(market_cap) if market_cap else "N/A"
+            print(f"  {tkr_str}: ${price:.2f}, mktcap {mc} (shares src: {'SEC' if shares_out else 'none'})")
         except Exception as e:
             print(f"  {tkr_str}: FAILED ({e})")
-        time.sleep(0.3)
 
-    # Update holdings
-    tickers_str = ",".join(f"'{t}'" for t in tickers)
-    con.execute("""
+    # Update holdings — use shares_outstanding (SEC) with float_shares fallback
+    placeholders = ",".join(["?"] * len(tickers))
+    con.execute(f"""
         UPDATE holdings h SET market_value_live = h.shares * m.price_live
-        FROM market_data m WHERE h.ticker = m.ticker AND h.ticker IN ({tickers_str})
+        FROM market_data m WHERE h.ticker = m.ticker
+          AND h.ticker IN ({placeholders})
           AND h.market_value_live IS NULL
-    """)
-    con.execute("""
-        UPDATE holdings h SET pct_of_float = ROUND(h.shares * 100.0 / m.float_shares, 4)
-        FROM market_data m WHERE h.ticker = m.ticker AND m.float_shares > 0
-          AND h.ticker IN ({tickers_str}) AND h.pct_of_float IS NULL
-    """)
+    """, tickers)
+    con.execute(f"""
+        UPDATE holdings h SET pct_of_float = ROUND(
+            h.shares * 100.0 / COALESCE(m.shares_outstanding, m.float_shares), 4)
+        FROM market_data m WHERE h.ticker = m.ticker
+          AND COALESCE(m.shares_outstanding, m.float_shares) > 0
+          AND h.ticker IN ({placeholders})
+          AND h.pct_of_float IS NULL
+    """, tickers)
 
 
 def main():
