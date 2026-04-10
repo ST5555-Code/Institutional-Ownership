@@ -92,7 +92,7 @@ Non-operating ownership entities stay in the relationship graph as informational
 
 ### Classification Categories
 
-`entity_classification_history.classification` — 16 active values (as of 2026-04-10, post-Section 3 L4 audit). No DB-level CHECK constraint; values enforced by `build_entities.py` and `validate_entities.py`.
+`entity_classification_history.classification` — 15 active values (as of 2026-04-10, post-Section 3 L4 audit). No DB-level CHECK constraint; values enforced by `build_entities.py` and `validate_entities.py`.
 
 | Classification | Definition | Top examples |
 |---|---|---|
