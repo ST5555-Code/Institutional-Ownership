@@ -320,16 +320,16 @@ def api_admin_stats():
     con = get_db()
     try:
         stats = {}
-        for table, key in [('holdings', 'holdings'), ('managers', 'managers'),
-                           ('beneficial_ownership', 'beneficial_ownership'),
-                           ('fund_holdings', 'fund_holdings')]:
+        for table, key in [('holdings_v2', 'holdings'), ('managers', 'managers'),
+                           ('beneficial_ownership_v2', 'beneficial_ownership'),
+                           ('fund_holdings_v2', 'fund_holdings')]:
             try:
                 stats[key] = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # nosec B608
             except Exception as e:
                 app.logger.debug("Error: %s", e)
                 stats[key] = 0
         try:
-            stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings WHERE ticker IS NOT NULL").fetchone()[0]
+            stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings_v2 WHERE ticker IS NOT NULL").fetchone()[0]
         except Exception as e:
             app.logger.debug("Error: %s", e)
             stats['tickers'] = 0
@@ -451,15 +451,15 @@ def api_admin_manager_changes():
         # New managers (in latest quarter but not previous)
         new_mgrs = con.execute(f"""  # nosec B608
             SELECT DISTINCT cik, manager_name, manager_type
-            FROM holdings WHERE quarter = '{LATEST_QUARTER}'
-              AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{PREV_QUARTER}')
+            FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}'
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}')
             ORDER BY manager_name LIMIT 50
         """).fetchdf()
         # Disappeared managers
         gone_mgrs = con.execute(f"""  # nosec B608
             SELECT DISTINCT cik, manager_name, manager_type
-            FROM holdings WHERE quarter = '{PREV_QUARTER}'
-              AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
+            FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}')
             ORDER BY manager_name LIMIT 50
         """).fetchdf()
         return jsonify(clean_for_json({
@@ -480,14 +480,14 @@ def api_admin_ticker_changes():
         from config import LATEST_QUARTER, PREV_QUARTER
         new_tickers = con.execute(f"""  # nosec B608
             SELECT DISTINCT ticker, MAX(issuer_name) as company
-            FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
-              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
+            FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
             GROUP BY ticker ORDER BY ticker LIMIT 100
         """).fetchdf()
         gone_tickers = con.execute(f"""  # nosec B608
             SELECT DISTINCT ticker, MAX(issuer_name) as company
-            FROM holdings WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
-              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
+            FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
             GROUP BY ticker ORDER BY ticker LIMIT 100
         """).fetchdf()
         return jsonify(clean_for_json({
@@ -507,7 +507,7 @@ def api_admin_parent_health():
         orphaned = con.execute(f"""  # nosec B608
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
-            FROM holdings
+            FROM holdings_v2
             WHERE quarter = '{LQ}' AND inst_parent_name IS NULL
             GROUP BY cik, manager_name, manager_type
             ORDER BY total_value DESC NULLS LAST
@@ -515,10 +515,10 @@ def api_admin_parent_health():
         """).fetchdf()
         # Top parents by value
         top_parents = con.execute(f"""  # nosec B608
-            SELECT inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
+            SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
-            FROM holdings WHERE quarter = '{LQ}' AND inst_parent_name IS NOT NULL
-            GROUP BY inst_parent_name
+            FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
+            GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_value DESC NULLS LAST LIMIT 20
         """).fetchdf()
         return jsonify(clean_for_json({
@@ -551,7 +551,7 @@ def api_admin_stale_data():
         try:
             inactive = con.execute(f"""  # nosec B608
                 SELECT cik, manager_name, MAX(quarter) as last_quarter
-                FROM holdings
+                FROM holdings_v2
                 GROUP BY cik, manager_name
                 HAVING MAX(quarter) < '{PQ}'
                 ORDER BY last_quarter DESC LIMIT 20
@@ -575,8 +575,8 @@ def api_admin_merger_signals():
         signals = con.execute(f"""  # nosec B608
             WITH gone AS (
                 SELECT cik, manager_name, SUM(market_value_usd) as prev_value
-                FROM holdings WHERE quarter = '{PREV_QUARTER}'
-                  AND cik NOT IN (SELECT DISTINCT cik FROM holdings WHERE quarter = '{LATEST_QUARTER}')
+                FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
+                  AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}')
                 GROUP BY cik, manager_name
                 HAVING SUM(market_value_usd) > 1000000
             )
@@ -601,11 +601,11 @@ def api_admin_new_companies():
                    COUNT(DISTINCT h.cik) as holder_count,
                    SUM(h.market_value_live) as total_value,
                    MAX(m.sector) as sector
-            FROM holdings h
+            FROM holdings_v2 h
             LEFT JOIN market_data m ON h.ticker = m.ticker
             WHERE h.quarter = '{LATEST_QUARTER}' AND h.ticker IS NOT NULL
               AND h.ticker NOT IN (
-                  SELECT DISTINCT ticker FROM holdings
+                  SELECT DISTINCT ticker FROM holdings_v2
                   WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
               )
             GROUP BY h.ticker
@@ -633,7 +633,7 @@ def api_admin_data_quality():
                     COUNT(ticker) as with_ticker,
                     COUNT(market_value_live) as with_live_value,
                     COUNT(pct_of_float) as with_float_pct
-                FROM holdings WHERE quarter = '{LQ}'
+                FROM holdings_v2 WHERE quarter = '{LQ}'
             """).fetchone()
             result['holdings'] = {
                 'total': r[0], 'with_ticker': r[1],
@@ -652,7 +652,7 @@ def api_admin_data_quality():
                     COUNT(shares_owned) as with_shares,
                     COUNT(CASE WHEN filer_name IS NULL OR filer_name = ''
                                OR regexp_matches(filer_name, '^\\d{7,10}$') THEN 1 END) as unknown_filers
-                FROM beneficial_ownership
+                FROM beneficial_ownership_v2
             """).fetchone()
             bo_stats = {
                 'total': r[0], 'with_pct': r[1], 'with_shares': r[2],
@@ -664,7 +664,7 @@ def api_admin_data_quality():
                 nr = con.execute("""
                     SELECT COUNT(CASE WHEN name_resolved THEN 1 END) as resolved,
                            COUNT(CASE WHEN NOT name_resolved OR name_resolved IS NULL THEN 1 END) as unresolved
-                    FROM beneficial_ownership
+                    FROM beneficial_ownership_v2
                 """).fetchone()
                 bo_stats['name_resolved'] = nr[0]
                 bo_stats['name_unresolved'] = nr[1]
@@ -965,7 +965,7 @@ def api_tickers():
     try:
         df = con.execute(f"""  # nosec B608
             SELECT ticker, MODE(issuer_name) as name
-            FROM holdings
+            FROM holdings_v2
             WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}'
             GROUP BY ticker
             ORDER BY ticker
@@ -989,10 +989,10 @@ def api_fund_portfolio_managers():
             SELECT
                 cik,
                 fund_name,
-                MAX(COALESCE(inst_parent_name, manager_name)) as inst_parent_name,
+                MAX(COALESCE(rollup_name, inst_parent_name, manager_name)) as inst_parent_name,
                 SUM(market_value_live) as position_value,
                 MAX(manager_type) as manager_type
-            FROM holdings
+            FROM holdings_v2
             WHERE ticker = ? AND quarter = '{LQ}'
               AND manager_type NOT IN ('passive')
             GROUP BY cik, fund_name
@@ -1022,7 +1022,7 @@ def api_nport_shorts():
                 fh.pct_of_nav,
                 fh.quarter,
                 fh.family_name
-            FROM fund_holdings fh
+            FROM fund_holdings_v2 fh
             WHERE fh.shares_or_principal < 0
               AND fh.asset_category IN ('EC', 'EP')
               {where}
@@ -1077,7 +1077,7 @@ def api_fund_behavioral_profile():
         # Fund identity
         fund_info = con.execute(f"""  # nosec B608
             SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
-            FROM fund_holdings WHERE {where}
+            FROM fund_holdings_v2 WHERE {where}
             GROUP BY fund_name, series_id, lei, family_name
             LIMIT 1
         """, [param]).fetchone()
@@ -1094,7 +1094,7 @@ def api_fund_behavioral_profile():
                 MAX(pct_of_nav) as max_pct_nav,
                 COUNT(DISTINCT ticker) as unique_holdings,
                 COUNT(DISTINCT quarter) as quarters_held
-            FROM fund_holdings
+            FROM fund_holdings_v2
             WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0
         """, [param]).fetchone()
 
@@ -1102,7 +1102,7 @@ def api_fund_behavioral_profile():
         sector_where = "fh.lei = ?" if lei else "fh.series_id = ?"
         sectors = con.execute(f"""  # nosec B608
             SELECT s.sector, SUM(fh.market_value_usd) as sector_value
-            FROM fund_holdings fh
+            FROM fund_holdings_v2 fh
             JOIN securities s ON fh.cusip = s.cusip
             WHERE {sector_where}
               AND fh.quarter = '{LQ}'
@@ -1115,7 +1115,7 @@ def api_fund_behavioral_profile():
         # Top holdings
         top = con.execute(f"""  # nosec B608
             SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
-            FROM fund_holdings
+            FROM fund_holdings_v2
             WHERE {where} AND quarter = '{LQ}'
             ORDER BY market_value_usd DESC NULLS LAST
             LIMIT 10
@@ -1300,10 +1300,10 @@ def api_crowding():
     try:
         # Top holders by % of float
         holders = con.execute(f"""  # nosec B608
-            SELECT COALESCE(inst_parent_name, manager_name) as holder,
+            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_float) as pct_float,
                    SUM(market_value_live) as value
-            FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY holder, manager_type
             ORDER BY pct_float DESC NULLS LAST LIMIT 20
         """, [ticker]).fetchdf()
@@ -1361,7 +1361,7 @@ def api_smart_money():
         longs = con.execute(f"""  # nosec B608
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
-            FROM holdings WHERE ticker = ? AND quarter = '{LQ}'
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
         """, [ticker]).fetchdf()
         result = {'long_by_type': df_to_records(longs)}
@@ -1381,7 +1381,7 @@ def api_smart_money():
             nport_shorts = con.execute("""
                 SELECT fund_name, shares_or_principal as shares_short,
                        market_value_usd as short_value, quarter
-                FROM fund_holdings
+                FROM fund_holdings_v2
                 WHERE ticker = ? AND shares_or_principal < 0
                   AND asset_category IN ('EC', 'EP')
                 ORDER BY market_value_usd ASC LIMIT 10
@@ -1475,7 +1475,7 @@ def api_heatmap():
             # Default: top 10 tickers by institutional value
             top = con.execute(f"""  # nosec B608
                 SELECT ticker, SUM(market_value_usd) as val
-                FROM holdings WHERE quarter = '{LQ}' AND ticker IS NOT NULL
+                FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL
                 GROUP BY ticker ORDER BY val DESC LIMIT 10
             """).fetchall()
             tickers = [r[0] for r in top]
@@ -1483,11 +1483,11 @@ def api_heatmap():
         # Top 15 managers by total value across these tickers
         ticker_ph = ','.join(['?'] * len(tickers))
         managers = con.execute(f"""  # nosec B608
-            SELECT inst_parent_name, SUM(market_value_usd) as total_val
-            FROM holdings
+            SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, SUM(market_value_usd) as total_val
+            FROM holdings_v2
             WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
-              AND inst_parent_name IS NOT NULL
-            GROUP BY inst_parent_name
+              AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
+            GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_val DESC LIMIT 15
         """, tickers).fetchall()
         manager_names = [r[0] for r in managers]
@@ -1498,15 +1498,15 @@ def api_heatmap():
         # Build the matrix: pct_of_float for each manager × ticker
         mgr_ph = ','.join(['?'] * len(manager_names))
         cells = con.execute(f"""  # nosec B608
-            SELECT inst_parent_name as manager, ticker,
+            SELECT COALESCE(rollup_name, inst_parent_name) as manager, ticker,
                    SUM(pct_of_float) as pct_float,
                    SUM(shares) as shares,
                    SUM(market_value_usd) as value
-            FROM holdings
+            FROM holdings_v2
             WHERE quarter = '{LQ}'
               AND ticker IN ({ticker_ph})
-              AND inst_parent_name IN ({mgr_ph})
-            GROUP BY inst_parent_name, ticker
+              AND COALESCE(rollup_name, inst_parent_name) IN ({mgr_ph})
+            GROUP BY COALESCE(rollup_name, inst_parent_name), ticker
         """, tickers + manager_names).fetchdf()
 
         return jsonify(clean_for_json({
@@ -1530,11 +1530,11 @@ def api_manager_profile():
     con = get_db()
     try:
         # Top holdings
-        holdings = con.execute(f"""  # nosec B608
+        top_holdings_df = con.execute(f"""  # nosec B608
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
                    pct_of_portfolio, pct_of_float
-            FROM holdings
-            WHERE quarter = '{LQ}' AND inst_parent_name ILIKE ?
+            FROM holdings_v2
+            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
             ORDER BY market_value_usd DESC LIMIT 50
         """, [f'%{manager}%']).fetchdf()
 
@@ -1542,9 +1542,9 @@ def api_manager_profile():
         sectors = con.execute(f"""  # nosec B608
             SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
                    SUM(h.market_value_usd) as value
-            FROM holdings h
+            FROM holdings_v2 h
             LEFT JOIN market_data m ON h.ticker = m.ticker
-            WHERE h.quarter = '{LQ}' AND h.inst_parent_name ILIKE ?
+            WHERE h.quarter = '{LQ}' AND COALESCE(h.rollup_name, h.inst_parent_name) ILIKE ?
               AND m.sector IS NOT NULL
             GROUP BY m.sector ORDER BY value DESC
         """, [f'%{manager}%']).fetchdf()
@@ -1555,15 +1555,15 @@ def api_manager_profile():
                    SUM(market_value_usd) as total_value,
                    COUNT(DISTINCT cik) as num_ciks,
                    MAX(manager_type) as manager_type
-            FROM holdings
-            WHERE quarter = '{LQ}' AND inst_parent_name ILIKE ?
+            FROM holdings_v2
+            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
         """, [f'%{manager}%']).fetchone()
 
         # Quarter-over-quarter change
         qoq = con.execute("""
             SELECT quarter, COUNT(DISTINCT ticker) as positions,
                    SUM(market_value_usd) as total_value
-            FROM holdings WHERE inst_parent_name ILIKE ?
+            FROM holdings_v2 WHERE COALESCE(rollup_name, inst_parent_name) ILIKE ?
             GROUP BY quarter ORDER BY quarter
         """, [f'%{manager}%']).fetchdf()
 
@@ -1573,7 +1573,7 @@ def api_manager_profile():
             'total_value': stats[1] if stats else 0,
             'num_ciks': stats[2] if stats else 0,
             'manager_type': stats[3] if stats else None,
-            'top_holdings': df_to_records(holdings),
+            'top_holdings': df_to_records(top_holdings_df),
             'sector_allocation': df_to_records(sectors),
             'quarterly_trend': df_to_records(qoq),
         }
@@ -1596,19 +1596,19 @@ def api_amendments():
         # Find managers who filed amendments for this ticker
         amendments = con.execute(f"""  # nosec B608
             WITH all_filings AS (
-                SELECT cik, manager_name, inst_parent_name, quarter,
+                SELECT cik, manager_name, rollup_name, inst_parent_name, quarter,
                        accession_number, shares, market_value_usd,
                        CASE WHEN accession_number IN (
                            SELECT accession_number FROM filings WHERE amended = true
                        ) THEN true ELSE false END as is_amended
-                FROM holdings
+                FROM holdings_v2
                 WHERE ticker = ? AND quarter = '{LQ}'
             ),
             amended_managers AS (
                 SELECT DISTINCT cik FROM filings
                 WHERE amended = true AND quarter = '{LQ}'
             )
-            SELECT a.inst_parent_name as manager, a.shares, a.market_value_usd,
+            SELECT COALESCE(a.rollup_name, a.inst_parent_name) as manager, a.shares, a.market_value_usd,
                    CASE WHEN a.cik IN (SELECT cik FROM amended_managers)
                         THEN 'Amended' ELSE 'Original' END as filing_status
             FROM all_filings a
