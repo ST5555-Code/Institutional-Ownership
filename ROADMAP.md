@@ -101,6 +101,8 @@ _Last updated: April 9, 2026 (end of pre-Phase 4 session — all items complete,
 | 51 | Phase 4 — Migration | Ready to scope | Phase 3.5 complete. 13,541 relationships, 20,205 entities. 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected). Accuracy audit passed. Manual review done. See ENTITY_ARCHITECTURE.md Phase 4 section for dual-write migration plan. |
 | 52 | Phase 4 post-cutover: brand 13F consolidation | Deferred | Wire T. Rowe Price, MFS, Neuberger Berman, HSBC 13F filer CIKs to their respective brand phantom parents. Currently 13F filers self-rollup correctly but don't consolidate with N-PORT fund series under brand parent. Enhancement not integrity issue — deferred until after Phase 4 cutover. |
 | 53 | Post-Phase 4: 13D/G entity coverage | Deferred | Expand entity_identifiers to include 13D/G filer CIKs for funds and known activists. Improves beneficial_ownership_v2 entity_id coverage from 53.7% toward 80%+. |
+| 54 | Post-Phase 4: Voya rollup wiring fix | Deferred | Voya Investment Management LLC rolling up to VVR Holdings LLC — incorrect rollup wiring. Voya should self-rollup as operating AM. Fix post-cutover: break VVR Holdings relationship, set Voya as self-rollup. Low priority — does not affect top-line AUM. |
+| 55 | Post-Phase 4: 13D/G exit validation | Deferred | Verify beneficial_ownership_current correctly marks position exits when filer drops below 5% threshold or files a final amendment. Confirm crossed_5pct flag and intent tracking are working correctly for exit scenarios. Audit top 20 known activist exits against EDGAR filings to validate. |
 
 ---
 
