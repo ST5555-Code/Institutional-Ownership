@@ -14,6 +14,19 @@ from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, SUBADV
 
 logger = logging.getLogger(__name__)
 
+# --- Rollup type parameterization ---
+VALID_ROLLUP_TYPES = {'economic_control_v1', 'decision_maker_v1'}
+
+def _rollup_col(rollup_type='economic_control_v1'):
+    """Return the rollup column name for the given rollup type.
+    economic_control_v1 -> 'rollup_name' (fund sponsor / voting)
+    decision_maker_v1   -> 'dm_rollup_name' (sub-adviser making decisions)
+    """
+    if rollup_type not in VALID_ROLLUP_TYPES:
+        raise ValueError(f'Invalid rollup_type: {rollup_type}. Must be one of {VALID_ROLLUP_TYPES}')
+    return 'dm_rollup_name' if rollup_type == 'decision_maker_v1' else 'rollup_name'
+
+
 # --- Phase 4 shadow logging ---
 _SHADOW_LOG_PATH = 'logs/phase4_shadow.log'
 
@@ -582,8 +595,9 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
 
 
 
-def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
+def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rollup_type='economic_control_v1'):
     """Get 13F filing entity child rows as fallback."""
+    rn = _rollup_col(rollup_type)
     df = con.execute(f"""
         SELECT
             h.fund_name as institution,
@@ -594,7 +608,7 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5):
         FROM holdings_v2 h
         WHERE h.quarter = '{quarter}'
           AND (h.ticker = ? OR h.cusip = ?)
-          AND COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) = ?
+          AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) = ?
         GROUP BY h.fund_name, type
         ORDER BY value_live DESC NULLS LAST
         LIMIT {int(limit)}
@@ -732,9 +746,10 @@ def df_to_records(df):
 # ---------------------------------------------------------------------------
 
 
-def query1(ticker):
+def query1(ticker, rollup_type='economic_control_v1'):
     """Current shareholder register — two-level parent/fund hierarchy.
     Batched: parents + all 13F children fetched in 2 queries total."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -743,7 +758,7 @@ def query1(ticker):
         parents = con.execute(f"""
             WITH by_fund AS (
                 SELECT
-                    COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as parent_name,
+                    COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
                     h.fund_name,
                     h.cik,
                     COALESCE(h.manager_type, 'unknown') as type,
@@ -783,9 +798,9 @@ def query1(ticker):
 
             ph_aum = ','.join(['?'] * len(parent_names))
             fallback_df = con.execute(f"""
-                SELECT COALESCE(rollup_name, inst_parent_name) as parent_name, SUM(market_value_usd) / 1e6 as val_mm
-                FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IN ({ph_aum})
-                GROUP BY COALESCE(rollup_name, inst_parent_name)
+                SELECT COALESCE({rn}, inst_parent_name) as parent_name, SUM(market_value_usd) / 1e6 as val_mm
+                FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE({rn}, inst_parent_name) IN ({ph_aum})
+                GROUP BY COALESCE({rn}, inst_parent_name)
             """, parent_names).fetchdf()
             for _, r in fallback_df.iterrows():
                 pn = r['parent_name']
@@ -798,7 +813,7 @@ def query1(ticker):
         ph = ','.join(['?'] * len(parent_names))
         all_children_df = con.execute(f"""
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as parent_name,
+                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
                 h.fund_name as institution,
                 COALESCE(h.manager_type, 'unknown') as type,
                 SUM(h.market_value_live) as value_live,
@@ -807,7 +822,7 @@ def query1(ticker):
             FROM holdings_v2 h
             WHERE h.quarter = '{LQ}'
               AND (h.ticker = ? OR h.cusip = ?)
-              AND COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) IN ({ph})
+              AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
             GROUP BY parent_name, h.fund_name, type
             ORDER BY parent_name, value_live DESC NULLS LAST
         """, [ticker, cusip] + parent_names).fetchdf()
@@ -906,7 +921,7 @@ def query1(ticker):
         all_totals_df = con.execute(f"""
             SELECT
                 COALESCE(MAX(h.manager_type), 'unknown') as type,
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as parent_name,
+                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
                 SUM(h.market_value_live) as total_value,
                 SUM(h.shares) as total_shares,
                 SUM(h.pct_of_float) as pct_float
@@ -939,14 +954,15 @@ def query1(ticker):
 
 
 
-def query2(ticker):
+def query2(ticker, rollup_type='economic_control_v1'):
     """4-quarter ownership change (Q1 vs Q4 2025)."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
         # Top 15 parents by Q4 value
         top_parents = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as parent_name,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                    SUM(market_value_live) as parent_val
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND (ticker = ? OR cusip = ?)
@@ -958,7 +974,7 @@ def query2(ticker):
         q2 = con.execute(f"""
             WITH q1_agg AS (
                 SELECT cik, manager_name,
-                       COALESCE(rollup_name, inst_parent_name, manager_name) as parent_name,
+                       COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                        MAX(manager_type) as manager_type,
                        SUM(shares) as q1_shares
                 FROM holdings_v2
@@ -967,7 +983,7 @@ def query2(ticker):
             ),
             q4_agg AS (
                 SELECT cik, manager_name,
-                       COALESCE(rollup_name, inst_parent_name, manager_name) as parent_name,
+                       COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                        MAX(manager_type) as manager_type,
                        SUM(shares) as q4_shares
                 FROM holdings_v2
@@ -1119,11 +1135,12 @@ def query2(ticker):
 
 
 
-def holder_momentum(ticker, level='parent', active_only=False):
+def holder_momentum(ticker, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Full-year share momentum.
     level='parent': top 25 13F parents with collapsible N-PORT children.
     level='fund': top 25 individual N-PORT funds (flat).
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -1192,7 +1209,7 @@ def holder_momentum(ticker, level='parent', active_only=False):
         # --- Parent-level branch (original logic) ---
         # Top 25 parents by latest quarter value
         top_parents = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as parent_name,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                    SUM(market_value_live) as parent_val
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND (ticker = ? OR cusip = ?)
@@ -1207,14 +1224,14 @@ def holder_momentum(ticker, level='parent', active_only=False):
         # Shares per quarter per parent
         ph = ','.join(['?'] * len(top_parents))
         parent_df = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as parent_name,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                    quarter,
                    SUM(shares) as shares,
                    MAX(manager_type) as type
             FROM holdings_v2
             WHERE (ticker = ? OR cusip = ?)
               AND quarter IN ({q_placeholders})
-              AND COALESCE(rollup_name, inst_parent_name, manager_name) IN ({ph})
+              AND COALESCE({rn}, inst_parent_name, manager_name) IN ({ph})
             GROUP BY parent_name, quarter
         """, [ticker, cusip] + top_parents).fetchdf()
 
@@ -1333,8 +1350,9 @@ def holder_momentum(ticker, level='parent', active_only=False):
         pass
 
 
-def query3(ticker):
+def query3(ticker, rollup_type='economic_control_v1'):
     """Active holder market cap analysis."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -1348,7 +1366,7 @@ def query3(ticker):
                 SELECT
                     h.cik,
                     MAX(h.manager_name) as manager_name,
-                    MAX(COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name)) as parent_name,
+                    MAX(COALESCE(h.{rn}, h.inst_parent_name, h.manager_name)) as parent_name,
                     MAX(h.manager_type) as manager_type,
                     SUM(h.market_value_live) as position_value,
                     SUM(h.shares) as shares,
@@ -1451,7 +1469,7 @@ def query3(ticker):
             history = con.execute("""
                 SELECT quarter, SUM(shares) as shares
                 FROM holdings_v2
-                WHERE COALESCE(rollup_name, inst_parent_name, manager_name) = ?
+                WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
                   AND ticker = ? AND shares > 0
                 GROUP BY quarter ORDER BY quarter
             """, [parent, ticker]).fetchall()
@@ -1509,11 +1527,11 @@ def query3(ticker):
                     entities = con.execute(f"""
                         SELECT fund_name, SUM(shares) as shares, SUM(market_value_live) as value
                         FROM holdings_v2
-                        WHERE COALESCE(rollup_name, inst_parent_name, manager_name) = ?
+                        WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
                           AND ticker = ? AND quarter = '{LQ}'
                           AND fund_name NOT IN (
                               SELECT DISTINCT manager_name FROM holdings_v2
-                              WHERE COALESCE(rollup_name, inst_parent_name, manager_name) = ?
+                              WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
                                 AND ticker = ? AND quarter = '{LQ}'
                               LIMIT 1
                           )
@@ -1627,14 +1645,15 @@ def query4(ticker):
 
 
 
-def query5(ticker):
+def query5(ticker, rollup_type='economic_control_v1'):
     """Quarterly share change heatmap."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
             WITH pivoted AS (
                 SELECT
-                    COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
+                    COALESCE({rn}, inst_parent_name, manager_name) as holder,
                     manager_type,
                     SUM(CASE WHEN quarter='{FQ}' THEN shares END) as q1_shares,
                     SUM(CASE WHEN quarter='{QUARTERS[1]}' THEN shares END) as q2_shares,
@@ -1936,14 +1955,15 @@ def query11(ticker):
 
 
 
-def query12(ticker):
+def query12(ticker, rollup_type='economic_control_v1'):
     """Concentration analysis — top holders cumulative % of float."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
             WITH ranked AS (
                 SELECT
-                    COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
+                    COALESCE({rn}, inst_parent_name, manager_name) as holder,
                     SUM(pct_of_float) as total_pct_float,
                     SUM(shares) as total_shares,
                     ROW_NUMBER() OVER (ORDER BY SUM(pct_of_float) DESC) as rn
@@ -2106,12 +2126,13 @@ def get_sector_flows(active_only=False, level="parent"):
         pass
 
 
-def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="parent"):
+def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Top 5 net buyers + top 5 net sellers for one sector in one quarter
     transition. Returns summary stats + two lists.
 
     level: 'parent' groups by inst_parent_name; 'fund' groups by cik/manager_name.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
@@ -2123,20 +2144,20 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
             group_expr_p = "p.cik || '|' || p.manager_name"
             group_label_p = "p.manager_name"
         else:
-            group_expr = "COALESCE(c.rollup_name, c.inst_parent_name, c.manager_name)"
+            group_expr = f"COALESCE(c.{rn}, c.inst_parent_name, c.manager_name)"
             group_label = group_expr
-            group_expr_p = "COALESCE(p.rollup_name, p.inst_parent_name, p.manager_name)"
+            group_expr_p = f"COALESCE(p.{rn}, p.inst_parent_name, p.manager_name)"
             group_label_p = group_expr_p
 
         df = con.execute(f"""
             WITH h_agg AS (
-                SELECT cik, rollup_name, inst_parent_name, manager_name, manager_type,
+                SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
                        ticker, quarter,
                        SUM(shares) AS shares,
                        SUM(market_value_usd) AS market_value_usd
                 FROM holdings_v2
                 WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
-                GROUP BY cik, rollup_name, inst_parent_name, manager_name, manager_type, ticker, quarter
+                GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
             ),
             flows AS (
                 SELECT {group_label} AS institution,
@@ -2199,13 +2220,14 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
 
 
 
-def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="total"):
+def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="total", rollup_type='economic_control_v1'):
     """Full cross-quarter detail for one sector: inflow/outflow/net per period
     + top 5 buyers and top 5 sellers with per-period breakdown.
 
     rank_by: 'total' ranks by sum across all periods; 'latest' ranks by the
     last quarter transition only.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         quarters = sorted([r[0] for r in con.execute(
@@ -2270,17 +2292,17 @@ def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="t
                 """, [sector, sector]).fetchdf()
             else:
                 # 13F holdings: group by parent institution
-                inst_expr = "COALESCE(c.rollup_name, c.inst_parent_name, c.manager_name)"
-                inst_expr_p = "COALESCE(p.rollup_name, p.inst_parent_name, p.manager_name)"
+                inst_expr = f"COALESCE(c.{rn}, c.inst_parent_name, c.manager_name)"
+                inst_expr_p = f"COALESCE(p.{rn}, p.inst_parent_name, p.manager_name)"
                 df = con.execute(f"""
                     WITH h_agg AS (
-                        SELECT cik, rollup_name, inst_parent_name, manager_name, manager_type,
+                        SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
                                ticker, quarter,
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
                         WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
-                        GROUP BY cik, rollup_name, inst_parent_name, manager_name, manager_type, ticker, quarter
+                        GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
                         SELECT {inst_expr} AS institution,
@@ -2366,13 +2388,14 @@ def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="t
         pass
 
 
-def query14(ticker):
+def query14(ticker, rollup_type='economic_control_v1'):
     """Manager AUM vs position size — consolidated with conviction data."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as manager_name,
+                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as manager_name,
                 h.manager_type,
                 h.is_activist,
                 m.aum_total / 1e9 as manager_aum_bn,
@@ -2383,7 +2406,7 @@ def query14(ticker):
             FROM holdings_v2 h
             LEFT JOIN managers m ON h.cik = m.cik
             WHERE h.ticker = ? AND h.quarter = '{LQ}'
-            GROUP BY COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
+            GROUP BY COALESCE(h.{rn}, h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
             HAVING SUM(h.market_value_live) > 0
             ORDER BY SUM(h.market_value_live) DESC NULLS LAST
             LIMIT 25
@@ -2539,11 +2562,12 @@ def query16(ticker):
 # ---------------------------------------------------------------------------
 
 
-def ownership_trend_summary(ticker, level='parent', active_only=False):
+def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Aggregated institutional ownership trend across all quarters.
     level: 'parent' (13F) or 'fund' (N-PORT).
     active_only: fund level — only include funds classified as active.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         float_row = con.execute(
@@ -2575,7 +2599,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False):
                 SELECT quarter,
                        SUM(shares) as total_inst_shares,
                        SUM(market_value_usd) as total_inst_value,
-                       COUNT(DISTINCT COALESCE(rollup_name, inst_parent_name, manager_name)) as holder_count,
+                       COUNT(DISTINCT COALESCE({rn}, inst_parent_name, manager_name)) as holder_count,
                        SUM(CASE WHEN entity_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
                        SUM(CASE WHEN entity_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
                 FROM holdings_v2 WHERE ticker = ? GROUP BY quarter ORDER BY quarter
@@ -2785,11 +2809,12 @@ def _build_cohort(q1_map, q4_map):
     return detail, summary
 
 
-def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False):
+def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Cohort retention analysis: compare two quarters.
     level: 'parent' (13F institutional) or 'fund' (N-PORT fund series).
     active_only: when level='fund', exclude passive/index funds.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         fq = from_quarter or PQ
@@ -2816,12 +2841,12 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
         else:
             # Parent-level from holdings (13F)
             q1_df = con.execute(f"""
-                SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as investor,
+                SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                        SUM(shares) as shares, SUM(market_value_usd) as value
                 FROM holdings_v2 WHERE ticker = ? AND quarter = '{fq}' GROUP BY investor
             """, [ticker]).fetchdf()
             q4_df = con.execute(f"""
-                SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as investor,
+                SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                        SUM(shares) as shares, SUM(market_value_usd) as value
                 FROM holdings_v2 WHERE ticker = ? AND quarter = '{lq}' GROUP BY investor
             """, [ticker]).fetchdf()
@@ -2842,7 +2867,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
             q_from, q_to = QUARTERS[i], QUARTERS[i + 1]
             try:
                 from_df = con.execute(f"""
-                    SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as investor,
+                    SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                            SUM(shares) as shares
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_from}'
@@ -2850,7 +2875,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 to_df = con.execute(f"""
-                    SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as investor,
+                    SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                            SUM(shares) as shares
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_to}'
@@ -2887,10 +2912,11 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
 
 
 
-def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', active_only=False):
+def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Compute buyer/seller/new/exit flows live from holdings or fund_holdings.
     Returns (buyers, sellers, new_entries, exits) lists.
     """
+    rn = _rollup_col(rollup_type)
     # Get float_shares once for fund-level % float calculation
     float_row = con.execute(
         "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
@@ -2913,14 +2939,14 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         """, [ticker]).fetchdf()
     else:
         from_df = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as entity,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
                    SUM(pct_of_float) as pct_of_float
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_from}' GROUP BY entity
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as entity,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
                    SUM(pct_of_float) as pct_of_float
@@ -3005,10 +3031,11 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     return buyers, sellers, new_entries, exits
 
 
-def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=False):
+def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Flow analysis — default QoQ (1Q = most recent quarter).
     level: 'parent' (13F) or 'fund' (N-PORT).
     """
+    rn = _rollup_col(rollup_type)
     period_map = {'4Q': FQ, '2Q': QUARTERS[1] if len(QUARTERS) > 1 else FQ, '1Q': PQ}
     quarter_from = period_map.get(period, PQ)
     quarter_to = LQ
@@ -3133,7 +3160,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                         SUM(CASE WHEN h.quarter = '{qf}' THEN h.market_value_usd ELSE 0 END) as from_v,
                         SUM(CASE WHEN h.quarter = '{qt}' THEN h.market_value_usd ELSE 0 END) as to_v
                     FROM (
-                        SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as inv, manager_type, quarter,
+                        SELECT COALESCE({rn}, inst_parent_name, manager_name) as inv, manager_type, quarter,
                                SUM(shares) as shares, SUM(market_value_usd) as market_value_usd
                         FROM holdings_v2 WHERE ticker = ? AND quarter IN ('{qf}', '{qt}')
                         GROUP BY inv, manager_type, quarter
@@ -3235,10 +3262,11 @@ def _gics_sector(yf_sector, yf_industry):
     return _YF_TO_GICS.get(yf_sector, ('Unknown', 'UNK'))
 
 
-def portfolio_context(ticker, level='parent', active_only=False):
+def portfolio_context(ticker, level='parent', active_only=False, rollup_type='economic_control_v1'):
     """Conviction tab — portfolio concentration context for top holders.
     Returns each holder's sector breakdown with emphasis on the subject ticker's sector.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -3294,7 +3322,7 @@ def portfolio_context(ticker, level='parent', active_only=False):
             """, [ticker]).fetchdf()
         else:
             top_holders_df = con.execute(f"""
-                SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
+                SELECT COALESCE({rn}, inst_parent_name, manager_name) as holder,
                        SUM(market_value_live) as val,
                        MAX(manager_type) as mtype
                 FROM holdings_v2
@@ -3328,7 +3356,7 @@ def portfolio_context(ticker, level='parent', active_only=False):
         else:
             portfolio_df = con.execute(f"""
                 SELECT
-                    COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+                    COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as holder,
                     h.ticker,
                     COALESCE(m.sector, 'Unknown') as yf_sector,
                     COALESCE(m.industry, '') as yf_industry,
@@ -3336,7 +3364,7 @@ def portfolio_context(ticker, level='parent', active_only=False):
                 FROM holdings_v2 h
                 LEFT JOIN market_data m ON h.ticker = m.ticker
                 WHERE h.quarter = '{LQ}'
-                  AND COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) IN ({ph})
+                  AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
                   AND h.market_value_live > 0
                 GROUP BY holder, h.ticker, m.sector, m.industry
             """, top_holders).fetchdf()
@@ -3574,10 +3602,11 @@ def portfolio_context(ticker, level='parent', active_only=False):
         pass
 
 
-def short_interest_analysis(ticker):
+def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
     """Comprehensive short interest analysis for a ticker.
     Combines N-PORT fund-level shorts, FINRA daily volume, and long/short cross-reference.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         result = {}
@@ -3708,7 +3737,7 @@ def short_interest_analysis(ticker):
         try:
             # Long from 13F
             long_df = con.execute(f"""
-                SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as parent,
+                SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent,
                        SUM(shares) as long_shares, SUM(market_value_live) as long_value,
                        MAX(manager_type) as manager_type
                 FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
@@ -3843,8 +3872,9 @@ def short_interest_analysis(ticker):
         pass
 
 
-def get_short_long_comparison(ticker):
+def get_short_long_comparison(ticker, rollup_type='economic_control_v1'):
     """Find managers who are long (13F) AND short (N-PORT) the same ticker."""
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         result = {'ticker': ticker, 'long_short_managers': [], 'short_only_funds': []}
@@ -3854,7 +3884,7 @@ def get_short_long_comparison(ticker):
 
         # Managers with 13F long positions
         longs = con.execute(f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as manager,
+            SELECT COALESCE({rn}, inst_parent_name, manager_name) as manager,
                    SUM(shares) as long_shares,
                    SUM(market_value_usd) as long_value,
                    manager_type
@@ -4057,12 +4087,13 @@ def _get_summary_impl(ticker):
 
 
 
-def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=25):
+def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=25, rollup_type='economic_control_v1'):
     """Shared logic for cross-ownership matrix.
 
     If anchor is set: rows = top holders of that ticker, ordered by anchor holding.
     If anchor is None: rows = top holders by total across all tickers.
     """
+    rn = _rollup_col(rollup_type)
     # Company names
     placeholders = ','.join(['?'] * len(tickers))
     names_df = con.execute(f"""
@@ -4090,7 +4121,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     df = con.execute(f"""
         WITH parent_holdings AS (
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as investor,
+                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as investor,
                 MAX(h.manager_type) as type,
                 h.ticker,
                 SUM(h.market_value_live) as holding_value
@@ -4102,7 +4133,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
         ),
         portfolio_totals AS (
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as investor,
+                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as investor,
                 SUM(h.market_value_live) as total_portfolio
             FROM holdings_v2 h
             WHERE h.quarter = '{LQ}'
@@ -4152,13 +4183,14 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
 # Peer Rotation — per-ticker substitution analysis within sector
 # ---------------------------------------------------------------------------
 
-def get_peer_rotation(ticker, active_only=False, level="parent"):
+def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Peer rotation analysis: how institutional money rotates between a
     subject ticker and its sector/industry peers across quarters.
 
     Returns subject vs sector flows, substitution peers (industry + broader
     sector), top 5 sector movers, and top 10 entity rotation stories.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         use_nport = (level == "fund")
@@ -4230,17 +4262,17 @@ def get_peer_rotation(ticker, active_only=False, level="parent"):
                     FROM flows GROUP BY entity, ticker
                 """, [sector, sector]).fetchdf()
             else:
-                inst_expr = "COALESCE(c.rollup_name, c.inst_parent_name, c.manager_name)"
-                inst_expr_p = "COALESCE(p.rollup_name, p.inst_parent_name, p.manager_name)"
+                inst_expr = f"COALESCE(c.{rn}, c.inst_parent_name, c.manager_name)"
+                inst_expr_p = f"COALESCE(p.{rn}, p.inst_parent_name, p.manager_name)"
                 df = con.execute(f"""
                     WITH h_agg AS (
-                        SELECT cik, rollup_name, inst_parent_name, manager_name, manager_type,
+                        SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
                                ticker, quarter,
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
                         WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
-                        GROUP BY cik, rollup_name, inst_parent_name, manager_name, manager_type, ticker, quarter
+                        GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
                         SELECT {inst_expr} AS entity, c.ticker,
@@ -4440,11 +4472,12 @@ def get_peer_rotation(ticker, active_only=False, level="parent"):
         pass
 
 
-def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent"):
+def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Entity-level breakdown for a specific subject+peer substitution pair.
 
     Shows which entities are driving the rotation between ticker and peer.
     """
+    rn = _rollup_col(rollup_type)
     con = get_db()
     try:
         use_nport = (level == "fund")
@@ -4509,17 +4542,17 @@ def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent"):
                     FROM flows GROUP BY entity, ticker
                 """, target_tickers).fetchdf()
             else:
-                inst_expr = "COALESCE(c.rollup_name, c.inst_parent_name, c.manager_name)"
-                inst_expr_p = "COALESCE(p.rollup_name, p.inst_parent_name, p.manager_name)"
+                inst_expr = f"COALESCE(c.{rn}, c.inst_parent_name, c.manager_name)"
+                inst_expr_p = f"COALESCE(p.{rn}, p.inst_parent_name, p.manager_name)"
                 df = con.execute(f"""
                     WITH h_agg AS (
-                        SELECT cik, rollup_name, inst_parent_name, manager_name, manager_type,
+                        SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
                                ticker, quarter,
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
                         WHERE ticker IN ({ph}) AND quarter IN ('{q_from}', '{q_to}')
-                        GROUP BY cik, rollup_name, inst_parent_name, manager_name, manager_type, ticker, quarter
+                        GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
                         SELECT {inst_expr} AS entity, c.ticker,
