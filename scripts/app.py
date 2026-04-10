@@ -994,7 +994,7 @@ def api_fund_portfolio_managers():
                 MAX(manager_type) as manager_type
             FROM holdings_v2
             WHERE ticker = ? AND quarter = '{LQ}'
-              AND manager_type NOT IN ('passive')
+              AND entity_type NOT IN ('passive')
             GROUP BY cik, fund_name
             ORDER BY position_value DESC NULLS LAST
             LIMIT 50

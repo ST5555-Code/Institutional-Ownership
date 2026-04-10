@@ -1357,7 +1357,7 @@ def query3(ticker):
                 FROM holdings_v2 h
                 WHERE h.quarter = '{LQ}'
                   AND (h.ticker = ? OR h.cusip = ?)
-                  AND h.manager_type IN ('active', 'hedge_fund', 'activist', 'quantitative')
+                  AND h.entity_type IN ('active', 'hedge_fund', 'activist', 'quantitative')
                 GROUP BY h.cik
                 ORDER BY position_value DESC NULLS LAST
                 LIMIT 15
@@ -1605,8 +1605,8 @@ def query4(ticker):
         df = con.execute(f"""
             SELECT
                 CASE
-                    WHEN manager_type = 'passive' THEN 'Passive (Index)'
-                    WHEN manager_type = 'activist' THEN 'Activist'
+                    WHEN entity_type = 'passive' THEN 'Passive (Index)'
+                    WHEN entity_type = 'activist' THEN 'Activist'
                     WHEN manager_type IN ('active', 'hedge_fund', 'quantitative') THEN 'Active'
                     ELSE 'Other/Unknown'
                 END as category,
@@ -1751,7 +1751,7 @@ def query7(ticker, cik=None, fund_name=None):
             row = con.execute(f"""
                 SELECT cik, fund_name FROM holdings_v2
                 WHERE ticker = ? AND quarter = '{LQ}'
-                  AND manager_type NOT IN ('passive')
+                  AND entity_type NOT IN ('passive')
                 ORDER BY market_value_live DESC NULLS LAST
                 LIMIT 1
             """, [ticker]).fetchone()
@@ -1873,7 +1873,7 @@ def query9(ticker):
                 SELECT DISTINCT cik
                 FROM holdings_v2
                 WHERE ticker = ? AND quarter = '{LQ}'
-                AND manager_type IN ('active', 'hedge_fund')
+                AND entity_type IN ('active', 'hedge_fund')
             )
             SELECT
                 s.sector,
@@ -1985,9 +1985,9 @@ def get_sector_flows(active_only=False, level="parent"):
             return {"periods": [], "sectors": []}
 
         pairs = [(quarters[i], quarters[i + 1]) for i in range(len(quarters) - 1)]
-        active_filter = ("AND c.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter = ("AND c.entity_type IN ('active', 'hedge_fund', 'activist')"
                          if active_only and not use_nport else "")
-        active_filter_p = ("AND p.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter_p = ("AND p.entity_type IN ('active', 'hedge_fund', 'activist')"
                            if active_only and not use_nport else "")
         sector_filter = "AND md.sector NOT IN ('', 'Derivative', 'ETF') AND md.sector IS NOT NULL"
 
@@ -2114,8 +2114,8 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
     """
     con = get_db()
     try:
-        active_filter = "AND c.manager_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-        active_filter_p = "AND p.manager_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+        active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+        active_filter_p = "AND p.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
 
         if level == "fund":
             group_expr = "c.cik || '|' || c.manager_name"
@@ -2216,8 +2216,8 @@ def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="t
                     "top_buyers": [], "top_sellers": []}
 
         pairs = [(quarters[i], quarters[i + 1]) for i in range(len(quarters) - 1)]
-        active_filter = "AND c.manager_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-        active_filter_p = "AND p.manager_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+        active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+        active_filter_p = "AND p.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
 
         use_nport = (level == "fund")
 
@@ -2576,8 +2576,8 @@ def ownership_trend_summary(ticker, level='parent', active_only=False):
                        SUM(shares) as total_inst_shares,
                        SUM(market_value_usd) as total_inst_value,
                        COUNT(DISTINCT COALESCE(rollup_name, inst_parent_name, manager_name)) as holder_count,
-                       SUM(CASE WHEN manager_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
-                       SUM(CASE WHEN manager_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
+                       SUM(CASE WHEN entity_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
+                       SUM(CASE WHEN entity_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
                 FROM holdings_v2 WHERE ticker = ? GROUP BY quarter ORDER BY quarter
             """, [ticker]).fetchdf()
 
@@ -2846,7 +2846,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                            SUM(shares) as shares
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_from}'
-                      AND manager_type NOT IN ('passive', 'unknown')
+                      AND entity_type NOT IN ('passive', 'unknown')
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 to_df = con.execute(f"""
@@ -2854,7 +2854,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                            SUM(shares) as shares
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_to}'
-                      AND manager_type NOT IN ('passive', 'unknown')
+                      AND entity_type NOT IN ('passive', 'unknown')
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 from_map = {r['investor']: float(r['shares'] or 0) for _, r in from_df.iterrows()}
@@ -3982,8 +3982,8 @@ def _get_summary_impl(ticker):
         # Active vs passive split
         split = con.execute(f"""
             SELECT
-                SUM(CASE WHEN manager_type = 'passive' THEN market_value_live ELSE 0 END) as passive_value,
-                SUM(CASE WHEN manager_type IN ('active','hedge_fund','quantitative','activist')
+                SUM(CASE WHEN entity_type = 'passive' THEN market_value_live ELSE 0 END) as passive_value,
+                SUM(CASE WHEN entity_type IN ('active','hedge_fund','quantitative','activist')
                     THEN market_value_live ELSE 0 END) as active_value
             FROM holdings_v2
             WHERE ticker = ? AND quarter = '{LQ}'
@@ -4073,7 +4073,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     """, tickers).fetchdf()
     companies = {r['ticker']: r['name'] for _, r in names_df.iterrows()}
 
-    type_filter = "AND h.manager_type NOT IN ('passive')" if active_only else ""
+    type_filter = "AND h.entity_type NOT IN ('passive')" if active_only else ""
     all_tickers_ph = ','.join(['?'] * len(tickers))
 
     pivot_cols = ', '.join(
@@ -4184,9 +4184,9 @@ def get_peer_rotation(ticker, active_only=False, level="parent"):
                     "entity_stories": []}
 
         pairs = [(quarters[i], quarters[i + 1]) for i in range(len(quarters) - 1)]
-        active_filter = ("AND c.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter = ("AND c.entity_type IN ('active', 'hedge_fund', 'activist')"
                          if active_only and not use_nport else "")
-        active_filter_p = ("AND p.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter_p = ("AND p.entity_type IN ('active', 'hedge_fund', 'activist')"
                            if active_only and not use_nport else "")
 
         # Accumulators across periods
@@ -4464,9 +4464,9 @@ def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent"):
             return {"entities": []}
 
         pairs = [(quarters[i], quarters[i + 1]) for i in range(len(quarters) - 1)]
-        active_filter = ("AND c.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter = ("AND c.entity_type IN ('active', 'hedge_fund', 'activist')"
                          if active_only and not use_nport else "")
-        active_filter_p = ("AND p.manager_type IN ('active', 'hedge_fund', 'activist')"
+        active_filter_p = ("AND p.entity_type IN ('active', 'hedge_fund', 'activist')"
                            if active_only and not use_nport else "")
 
         # Collect per-entity flows for both subject and peer across periods
