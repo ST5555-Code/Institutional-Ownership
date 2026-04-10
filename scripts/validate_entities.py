@@ -492,19 +492,28 @@ def gate_wellington_sub_advisory(con):
     Phase 2 validation gate: Wellington sub-advisory correctly modeled.
 
     Asserts:
-      (a) Fund entities rolling up to Wellington each have ncen role='adviser'
-          for a Wellington CRD. Institution entities rolling up are subsidiaries
-          from parent_bridge (not incorrectly routed sub-advised funds).
+      (a) Fund entities rolling up to Wellington under economic_control_v1
+          each have ncen role='adviser' for a Wellington CRD. Institution
+          entities rolling up are subsidiaries from parent_bridge (not
+          incorrectly routed sub-advised funds).
       (b) Wellington appears as sub_adviser with is_primary=FALSE for sub-advised
           funds — none have is_primary=TRUE when the relationship is sub_adviser.
       (c) No fund whose primary adviser is NOT Wellington incorrectly rolls up
-          to Wellington.
+          to Wellington under economic_control_v1.
+
+    NOTE: scoped to economic_control_v1 only (INF3, 2026-04-10). Under
+    decision_maker_v1, routing fund series to Wellington is the CORRECT
+    behavior — Wellington is a major external sub-adviser and DM1 deliberately
+    flattens fund series to their sub-adviser as the decision maker. Including
+    decision_maker_v1 in this gate would mis-flag those legitimate routings as
+    failures.
     """
     findings = {}
     issues = []
 
-    # --- (a) Primary rollups to Wellington: verify each is legitimate
-    # Fund rollups should match ncen adviser-role
+    # --- (a) Primary rollups to Wellington under economic_control_v1: verify
+    # each is legitimate. Fund rollups should match ncen adviser-role.
+    # decision_maker_v1 is intentionally excluded — see docstring NOTE.
     wellington_fund_rollups = con.execute(f"""
         SELECT erh.entity_id, e.canonical_name, erh.rule_applied
         FROM entity_rollup_history erh
@@ -512,6 +521,7 @@ def gate_wellington_sub_advisory(con):
         JOIN entities e ON e.entity_id = erh.entity_id
         WHERE LOWER(ew.canonical_name) LIKE '%wellington%'
           AND erh.valid_to = {ACTIVE}
+          AND erh.rollup_type = 'economic_control_v1'
           AND erh.rule_applied != 'self'
           AND e.entity_type = 'fund'
     """).fetchall()  # nosec B608
