@@ -1481,7 +1481,7 @@ def query3(ticker, rollup_type='economic_control_v1'):
             parent = row.get('parent_name') or row.get('manager_name')
 
             # Enhancement 1 — Position history (Since + Held)
-            history = con.execute("""
+            history = con.execute(f"""
                 SELECT quarter, SUM(shares) as shares
                 FROM holdings_v2
                 WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
@@ -2610,7 +2610,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
                 GROUP BY fh.quarter ORDER BY fh.quarter
             """, [ticker]).fetchdf()
         else:
-            df = con.execute("""
+            df = con.execute(f"""
                 SELECT quarter,
                        SUM(shares) as total_inst_shares,
                        SUM(market_value_usd) as total_inst_value,
