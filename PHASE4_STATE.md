@@ -79,10 +79,19 @@ Item 1 result: **0 FAILs, 8 PASS, 7 MANUAL**
 | Series ID (N-PORT funds) | 8,547 | 6,671 | 100.0% |
 | CRD (ADV advisers) | 9,341 | — | — |
 
+## Phase 4 Status
+
+**Stage 4 complete — cutover 2026-04-09.** App running on entity-backed v2 tables.
+- 8/8 parity gates pass
+- Zero 500 errors
+- Shadow log: 1,634 entries — all expected types (new_gain, legacy_only, value_diff)
+- Original tables retained for 30-day rollback
+- Stage 5 cleanup scheduled on or after 2026-05-09
+
 ## Last Commit
 
 ```
-18d88dd Update ENTITY_ARCHITECTURE.md: validation gates 0 FAILs noted in pre-conditions
+fb3c32c Phase 4 Stage 4 complete: app running on entity-backed v2 tables
 ```
 
 ## Database Paths
