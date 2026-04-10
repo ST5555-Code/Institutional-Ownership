@@ -131,7 +131,18 @@ CREATE INDEX IF NOT EXISTS idx_ea_active ON entity_aliases(entity_id, valid_to);
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS entity_classification_history (
     entity_id       BIGINT NOT NULL REFERENCES entities(entity_id),
-    classification  VARCHAR NOT NULL,  -- passive|active|mixed|quant|hedge_fund|activist|unknown
+    -- Canonical classifications (no DB-level CHECK constraint — values
+    -- enforced by build_entities.py and validate_entities.py):
+    --   passive, active, mixed, hedge_fund, market_maker, quantitative,
+    --   wealth_management, pension_insurance, endowment_foundation,
+    --   strategic, private_equity, venture_capital, activist, SWF, unknown
+    -- market_maker added 2026-04-10 (Section 3 L4 audit) to separate
+    -- pure-flow market makers (Susquehanna, Citadel Securities, Jane
+    -- Street, Virtu, IMC, Optiver, CTC, HRT, Two Sigma Securities, Flow
+    -- Traders, DRW Securities) from traditional hedge funds and quant
+    -- managers, since their reported AUM is dominated by inventory
+    -- hedging rather than directional positioning.
+    classification  VARCHAR NOT NULL,
     is_activist     BOOLEAN NOT NULL DEFAULT FALSE,
     confidence      VARCHAR NOT NULL
         CHECK (confidence IN ('exact','high','medium','low','fuzzy_match')),

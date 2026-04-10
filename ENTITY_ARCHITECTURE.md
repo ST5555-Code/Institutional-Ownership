@@ -90,6 +90,35 @@ Non-operating ownership entities stay in the relationship graph as informational
 - `wholly_owned` — subsidiary manager → parent manager (from ADV Schedule A)
 - `orphan_scan` — duplicate entities consolidated by name similarity
 
+### Classification Categories
+
+`entity_classification_history.classification` — 16 active values (as of 2026-04-10, post-Section 3 L4 audit). No DB-level CHECK constraint; values enforced by `build_entities.py` and `validate_entities.py`.
+
+| Classification | Definition | Top examples |
+|---|---|---|
+| `passive` | Pure index/ETF providers — fund or index issuers whose AUM is dominated by passive vehicles | Vanguard, BlackRock, State Street/SSGA, Geode, Northern Trust |
+| `active` | Active asset managers — discretionary security selection across mutual funds, separate accounts, or institutional mandates | Fidelity/FMR, Morgan Stanley IM, Capital Group (World/International), Wellington Management, T. Rowe Price |
+| `mixed` | Diversified financial holding companies filing 13F at the consolidated holdco level — blend of asset management, brokerage, prop trading, treasury, and (where applicable) market making | JPMorgan Chase, Bank of America, Goldman Sachs Group, UBS, RBC, BNY Mellon Corp, Wells Fargo, Barclays, Deutsche Bank, BMO, Citigroup, BNP Paribas |
+| `hedge_fund` | Discretionary or fundamental hedge fund managers — distinct from systematic market makers below | Citadel Advisors, Bridgewater, Millennium, D.E. Shaw, Renaissance Tech, Two Sigma Investments, Elliott |
+| `market_maker` | **Systematic liquidity providers — market makers, HFT firms, electronic trading firms. Structurally distinct from hedge funds and quantitative managers because reported AUM is dominated by inventory hedging rather than directional positioning. Zero N-PORT series by definition.** Added 2026-04-10 (Section 3 L4 audit). | Jane Street, Susquehanna International Group, Citadel Securities, Virtu Financial, IMC Financial Markets, Optiver, CTC Trading Group, Hudson River Trading, Two Sigma Securities, Flow Traders, DRW Securities |
+| `quantitative` | Systematic quant managers — factor-based, statistical arbitrage, model-driven discretionary | DFA, AQR, Two Sigma Investments, Acadian, Renaissance Tech (some sleeves) |
+| `wealth_management` | Independent broker-dealers, wirehouses, RIA aggregators, and platform wealth management firms | LPL Financial, Raymond James, PNC, Jones Financial, Northwestern Mutual Wealth, Edward Jones |
+| `pension_insurance` | Pension funds and insurance company general accounts that file 13F directly | CalPERS, Norges Bank, NYS Common Retirement, MetLife, Prudential, Pacific Life Insurance Company |
+| `endowment_foundation` | University endowments, hospital systems, charitable foundations, and other non-profit investment offices | Yale, Harvard, Stanford, Stowers Institute for Medical Research |
+| `strategic` | Corporate strategics filing 13F for treasury, balance-sheet, or family-office investment purposes — distinct from operating asset managers | Berkshire Hathaway, NVIDIA, Markel, Loews, Exor (Agnelli), Glencore, Amazon, Alphabet, Briar Hall, Hancock Prospecting |
+| `private_equity` | PE firms that file 13F for public equity sleeves of their funds | Brookfield Corp, Carlyle Group, Thoma Bravo, BC Partners, KKR |
+| `venture_capital` | VC firms with public-equity exposure (post-IPO holdings, growth-stage public investments) | Sequoia Capital US (SC US/E), Greylock, Lightspeed, a16z Perennial |
+| `activist` | Activist investors — concentrated positions taken to influence target company strategy. Always paired with `is_activist=TRUE` | Elliott (also hedge_fund-tagged in some contexts), Mantle Ridge, Trian Fund Management, JANA Partners |
+| `SWF` | Sovereign wealth funds | Norges Bank Investment Management, Temasek, GIC, Public Sector Pension Investment Board |
+| `unknown` | Default for entities with no resolvable signal — typically non-13F-filer entities encountered via N-CEN/managers feeds for graph completeness only. Zero AUM contribution. | (3,539 entities, all $0 AUM) |
+
+**`is_activist` boolean:** Independent of `classification`. Set to `TRUE` only when the entity is in fact an activist; classification stays as the entity's primary type. Most activists are also `hedge_fund` or `activist` classified, but the flag is the source of truth for activist filtering.
+
+**Singleton categories removed 2026-04-10 (Section 3 L4 audit):**
+- `insurance` (1 entity, Pacific Life Insurance Company) → merged into `pension_insurance`
+- `foundation` (1 entity, Stowers Institute for Medical Research) → merged into `endowment_foundation`
+- `holding_company` (2 entities) → split: Stonegate Global Financial → `strategic` (interim placeholder, flagged as DM15 candidate); International Assets Advisory LLC → `wealth_management` (independent broker-dealer/RIA platform)
+
 ---
 
 ## Implementation Phases
