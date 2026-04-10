@@ -214,6 +214,40 @@ CREATE INDEX IF NOT EXISTS idx_eis_identifier ON entity_identifiers_staging(iden
 CREATE INDEX IF NOT EXISTS idx_eis_entity ON entity_identifiers_staging(entity_id);
 
 -- -----------------------------------------------------------------------------
+-- entity_relationships_staging — soft-landing queue for relationship conflicts
+-- -----------------------------------------------------------------------------
+-- DM13 (2026-04-10): dedicated queue for ADV pre-insert verification failures
+-- and other relationship-class conflicts. Distinct from entity_identifiers_staging
+-- because the conflict shape is different — relationship conflicts are
+-- (parent, child, type) tuples, not (entity, identifier_type, value) tuples.
+--
+-- Populated by entity_sync._stage_adv_verification_failure() when
+-- _verify_adv_relationship() returns verified=False (Tier 1 AUM sanity or
+-- Tier 2 state mismatch). Future tiers (3-6) feed the same table.
+--
+-- Review workflow: pending → promoted (merged to entity_relationships) /
+-- rejected / duplicate. Reviewed by DM13 audit pass.
+CREATE TABLE IF NOT EXISTS entity_relationships_staging (
+    id                 BIGINT DEFAULT nextval('identifier_staging_id_seq'),
+    child_entity_id    BIGINT NOT NULL,
+    parent_entity_id   BIGINT,                 -- NULL if alias match itself failed
+    owner_name         VARCHAR NOT NULL,       -- raw text from ADV / source feed
+    relationship_type  VARCHAR,                -- wholly_owned|parent_brand|mutual_structure|...
+    ownership_pct      FLOAT,                  -- when known (Schedule A code translated)
+    source             VARCHAR,                -- ADV_SCHEDULE_A|ADV_SCHEDULE_B|...
+    confidence         VARCHAR,                -- low|medium|high|exact|fuzzy_match
+    conflict_reason    VARCHAR,                -- adv_ownership_verification_failed|...
+    review_status      VARCHAR DEFAULT 'pending',
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewer           VARCHAR,
+    reviewed_at        TIMESTAMP,
+    resolution         VARCHAR
+);
+
+CREATE INDEX IF NOT EXISTS idx_ers_child ON entity_relationships_staging(child_entity_id);
+CREATE INDEX IF NOT EXISTS idx_ers_status ON entity_relationships_staging(review_status);
+
+-- -----------------------------------------------------------------------------
 -- entity_overrides_persistent — survives --reset rebuilds
 -- -----------------------------------------------------------------------------
 -- Phase 3.5: manual corrections that must be replayed after every

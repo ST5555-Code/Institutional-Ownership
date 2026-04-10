@@ -1196,34 +1196,31 @@ def _stage_adv_verification_failure(
     child_entity_id: int,
     parent_entity_id: int,
     owner_name: str,
+    relationship_type: str,
     reason: str,
     schedule_type: str,
 ) -> None:
     """
-    Route a failed pre-insert verification to entity_identifiers_staging
-    for manual review. Uses identifier_type='adv_owner_ref' as a synthetic
-    bucket so operators can filter staging queue by this source.
+    Route a failed pre-insert verification to entity_relationships_staging
+    for manual review. Dedicated table (DM13) — relationship conflicts are
+    a different problem class than identifier conflicts and deserve their
+    own queue.
     """
-    next_id = con.execute(
-        "SELECT nextval('identifier_staging_id_seq')"
-    ).fetchone()[0]
     con.execute(
         """
-        INSERT INTO entity_identifiers_staging (
-            staging_id, entity_id, identifier_type, identifier_value,
-            confidence, source, conflict_reason, existing_entity_id,
-            review_status, notes
+        INSERT INTO entity_relationships_staging (
+            child_entity_id, parent_entity_id, owner_name, relationship_type,
+            source, confidence, conflict_reason, review_status
         )
-        VALUES (?, ?, 'adv_owner_ref', ?, 'low', ?,
-                'adv_ownership_verification_failed', ?, 'pending', ?)
+        VALUES (?, ?, ?, ?, ?, 'low',
+                'adv_ownership_verification_failed', 'pending')
         """,
         [
-            next_id,
             child_entity_id,
-            owner_name,
-            f"ADV_SCHEDULE_{schedule_type}",
             parent_entity_id,
-            reason,
+            owner_name,
+            relationship_type,
+            f"ADV_SCHEDULE_{schedule_type}",
         ],
     )
 
@@ -1285,7 +1282,8 @@ def insert_adv_ownership(
             )
             if not verified:
                 _stage_adv_verification_failure(
-                    con, child_entity_id, eid, owner_name, vreason, schedule_type,
+                    con, child_entity_id, eid, owner_name,
+                    "mutual_structure", vreason, schedule_type,
                 )
                 result["verification_failed"] = True
                 result["verification_reason"] = vreason
@@ -1323,7 +1321,8 @@ def insert_adv_ownership(
     )
     if not verified:
         _stage_adv_verification_failure(
-            con, child_entity_id, eid, owner_name, vreason, schedule_type,
+            con, child_entity_id, eid, owner_name,
+            relationship_type, vreason, schedule_type,
         )
         result["verification_failed"] = True
         result["verification_reason"] = vreason
