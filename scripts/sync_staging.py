@@ -161,7 +161,15 @@ def sync(tables: list[str], dry_run: bool) -> dict:
             # mirror — staging is for editing, prod's schema migration is
             # tracked separately.
             stg.execute("DROP VIEW IF EXISTS entity_current")
-            for table in reversed(db.ENTITY_TABLES):
+            # INF11 fix (2026-04-10): previously this loop iterated
+            # `db.ENTITY_TABLES` unconditionally — every entity table in
+            # staging was dropped before rebuilding only the requested
+            # subset, silently wiping any in-progress edits on tables the
+            # operator did not intend to refresh. Drop only the tables
+            # that are about to be re-CTAS'd. FK drop-order is irrelevant
+            # here because CTAS-created staging tables have no foreign key
+            # constraints (see the strategy comment above).
+            for table in reversed(tables):
                 stg.execute(f"DROP TABLE IF EXISTS {table}")
 
             for table in tables:
@@ -236,6 +244,16 @@ def main() -> None:
         tables = list(db.ENTITY_TABLES)
 
     mode = "DRY-RUN" if args.dry_run else "SYNC"
+    if args.tables and not args.dry_run:
+        untouched = [t for t in db.ENTITY_TABLES if t not in tables]
+        if untouched:
+            _log(
+                f"  PARTIAL SYNC — only dropping+re-copying {len(tables)} "
+                f"tables: {tables}"
+            )
+            _log(
+                f"  UNTOUCHED (staging edits preserved): {untouched}"
+            )
     _log(f"=== {mode} START — tables={len(tables)} ===")
     _log(f"  prod    = {db.PROD_DB}")
     _log(f"  staging = {db.STAGING_DB}")
