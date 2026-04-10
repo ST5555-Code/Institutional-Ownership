@@ -41,8 +41,33 @@ This document tracks the design, implementation status, deferred items, and vali
    - Enforced by partial unique indexes, not application logic
    - Application logic is second line of defense only
 
-### Rollup Type
-All rollups use `rollup_type = 'economic_control_v1'`. Future rollup worldviews (regulatory_parent_v1, brand_parent_v1) can coexist via this field without schema changes.
+### Rollup Types
+
+Two rollup worldviews coexist via the `rollup_type` field. Each entity has one row per type in `entity_rollup_history` (both at 20,205 rows).
+
+| Rollup Type | Purpose | Data Source | Status |
+|-------------|---------|-------------|--------|
+| `economic_control_v1` | Fund sponsor / voting authority. Rolls fund series to brand parent (who owns the fund, votes the shares). | N-CEN primary adviser, ADV Schedule A wholly_owned, parent_bridge sync, orphan_scan | Live since 2026-04-09 (Phase 4 cutover) |
+| `decision_maker_v1` | Entity making active investment decisions. Routes actively managed sub-advised funds to the sub-adviser. Passive funds copy `economic_control_v1`. | N-CEN sub-adviser relationships (2,389 routings), with intra-firm collapse | Live since 2026-04-10 |
+
+**decision_maker_v1 details:**
+- 2,389 N-CEN sub-adviser routings applied (rule: `ncen_sub_adviser`)
+- 2,371 produce a different rollup than `economic_control_v1`
+- **DM8 intra-firm fix**: 621 routings collapsed back to brand parent where sub-adviser is a wholly-owned subsidiary of the primary adviser (Fidelity HK/UK → Fidelity, DFA Australia → Dimensional, BlackRock Singapore → BlackRock, T. Rowe Price International → T. Rowe Price)
+  - 485 via shared `economic_control_v1` rollup
+  - 17 via `entity_relationships` parent links
+  - 119 via name-based brand matching
+- Top cross-firm routings visible: BlueCove ($178B from Fidelity sub-advice), GQG Partners ($107B from Goldman), Franklin Advisers ($83B from Putnam), T. Rowe Price ($88B from Fidelity Strategic Advisers), Jennison ($58B from Harbor), Sands Capital ($52B from Bessemer), Wellington ($36B from Hartford)
+
+**Global UI toggle** in app header selects between "Fund Sponsor / Voting" (`economic_control_v1`, default) and "Decision Maker" (`decision_maker_v1`). Toggle propagates via `?rollup_type=` query param to all 20+ parameterized query functions.
+
+**voting_control_v1** was designed but closed 2026-04-10 — `economic_control_v1` serves as voting proxy (fund sponsor votes shares in >95% of cases). UI label "Fund Sponsor / Voting" makes this explicit.
+
+**Pending (deferred parser work):**
+- **D12** — ADV Section 7.B sub-adviser extraction from existing PDF cache (not in current parse)
+- **D13** — N-PORT XML sub-adviser metadata extraction (not in current fetch)
+
+Future worldviews (`regulatory_parent_v1`, `brand_parent_v1`) can coexist via this field without schema changes.
 
 ### Rollup Policy — Operating Asset Manager Rule
 **Rollup targets must be operating asset managers only.** The rollup chain stops at the top-level entity that actually manages money and files 13F/N-PORT.
@@ -271,7 +296,7 @@ These are architectural limitations of the current design, not bugs. Must be doc
 
 2. **Synthetic inception dates** — all seed data uses '2000-01-01' as valid_from. True historical relationship data (pre-2000 or between 2000 and first filing date) is not available. All such records marked is_inferred = TRUE.
 
-3. **Single rollup worldview** — economic_control_v1 is the only rollup type in Phase 1. Regulatory parent and brand parent views deferred to Phase 4+.
+3. **~~Single rollup worldview~~** → **Two rollup worldviews live (2026-04-10)** — economic_control_v1 (fund sponsor / voting) and decision_maker_v1 (sub-adviser routing). Global UI toggle switches between them. Regulatory parent and brand parent views remain deferred. See "Rollup Types" section.
 
 4. **~~5,000 long-tail filers~~ → 4,881 standalone after Phase 3** — of 5,328 originally unresolved CIKs, 153 matched to existing parents via fuzzy match, 104 reclassified via SIC codes. Remaining 4,881 are legitimate standalone filers (corporates, banks, insurance companies) correctly self-rolled. No further resolution expected without expanding PARENT_SEEDS or Phase 3.5 ADV parsing.
 

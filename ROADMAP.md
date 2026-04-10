@@ -1,6 +1,34 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 9, 2026 (end of pre-Phase 4 session — all items complete, Phase 4 authorized)_
+_Last updated: April 10, 2026 — decision_maker_v1 rollup live, classification audit complete, L5 top 200 cleanup, N-PORT coverage % shipped_
+
+## Session Summary 2026-04-10
+
+**decision_maker_v1 rollup live:**
+- 2,389 N-CEN sub-adviser routings applied (`ncen_sub_adviser` rule)
+- 2,371 produce a different rollup than `economic_control_v1`
+- All 541 unique sub-advisers resolved via CRD match (100% hit rate)
+
+**DM8 intra-firm fix:**
+- 621 routings collapsed back to brand parent (Fidelity HK/UK → Fidelity, DFA Australia → Dimensional, BlackRock Singapore → BlackRock, T. Rowe Price International → T. Rowe Price)
+- Three-tier matching: shared economic rollup (485), entity_relationships parent (17), name-based brand matching (119)
+
+**N-PORT coverage %:**
+- `nport_coverage_pct`, `total_nport_aum`, `rollup_entity_id`, `rollup_name` columns added to summary_by_parent
+- Q4 rebuilt from holdings_v2 + fund_holdings_v2 with rollup-based aggregation (8,417 rows)
+- Top: Vanguard 100%, Fidelity 100%, Capital Group 100%, MFS 100%, Principal 100%
+- BlackRock 61% structural (large institutional separate account AUM not captured in N-PORT — expected, not a data quality issue)
+- Bottom: all hedge funds 0% (Citadel, DE Shaw, Jane Street, Susquehanna, Millennium, Point72)
+
+**UI enhancements:**
+- Global "Fund Sponsor / Voting" vs "Decision Maker" toggle in app header
+- N-PORT Cov. badges on Register and Conviction tabs (≥80% green, 50-79% amber, 1-49% grey)
+- L4 Fund Portfolio rollup context panel via new `/api/fund_rollup_context` endpoint
+
+**L3 classification audit:**
+- All 13 L3 entity_type categories reviewed, 900+ fixes applied
+- wealth_management grew from 294 to 1,617 CIKs as hundreds of RIAs were correctly pulled out of active/mixed/PE
+- L5 top 200 audited: Capital Group cleaned 46→8 CIKs (40 bogus "X Capital" entities extracted), Fidelity cleaned (FNF + Bancorp extracted)
 
 ---
 
