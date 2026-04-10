@@ -105,6 +105,72 @@ _Last updated: April 9, 2026 (end of pre-Phase 4 session — all items complete,
 | 53 | Post-Phase 4: 13D/G entity coverage | Done | Added 51 CIK identifiers for 13D/G filers matched by name to existing entities. Coverage: 53.7% → 77.1% (+23.4pp). Remaining unmatched are individuals, fund-level CIKs, and small filers without entity entries. |
 | 54 | Post-Phase 4: Voya rollup wiring fix | Done | Voya (eid=1591) set to self-rollup. Was rolling to VVR Holdings (eid=2110). Display name cleaned to "Voya Investment Management". |
 | 55 | Post-Phase 4: 13D/G exit validation | Done | 381 exits with pct=0% but shares>0 fixed (shares set to 0). beneficial_ownership_current rebuilt: 13,799 with prior_intent, 166 intent changes detected (92 passive→activist, 74 activist→passive). crossed_5pct flag validated: 22,349 crossed, 6,810 subsequently reduced below 5%. Exit validation confirmed correct for direct filer CIKs (4/4 verified against EDGAR). Filing agent CIK gap (902664, 1213900, 1341004) cannot be verified via standard EDGAR index path — requires filer CIK lookup. Deferred to beneficial_ownership entity coverage expansion item (#53). |
+| 56 | Decision maker and voting rollup worldviews | Not started | DM1-DM7 — see "DECISION MAKER & VOTING ROLLUP WORLDVIEWS" section below. Addresses sub-adviser policy issue surfaced in L5 audit (item 43i). |
+
+---
+
+## DECISION MAKER & VOTING ROLLUP WORLDVIEWS
+
+New rollup types to coexist alongside economic_control_v1 in entity_rollup_history.
+No schema changes required — new rows with different rollup_type values.
+
+### decision_maker_v1
+Purpose: Roll fund series up to the entity making active investment decisions,
+not the fund sponsor/brand. Enables accurate active/passive classification,
+flow analysis by actual decision-maker, and conviction scoring.
+
+Example: Vanguard Wellington Fund → Wellington Management (not Vanguard)
+Example: Hartford Growth Fund → Wellington Management (not Hartford)
+Example: Polen Capital via Gotham Trust → Polen Capital (not Gotham)
+Exception: Purely passive funds (index, ETF) with no sub-adviser → roll to
+brand/sponsor as before (economic_control_v1 = decision_maker_v1 for passive)
+
+UI: Global toggle on all tabs switching between economic_control_v1 and
+decision_maker_v1. Affects Register, Conviction, Flow Analysis, Ownership Trend,
+Cross-Ownership, Peer Matrix.
+
+Data sources (in priority order):
+Phase 1 — N-CEN sub-adviser relationships (ncen_adviser_map, already in pipeline)
+Phase 2 — ADV Schedule D Section 7.B (already parsed in adv_schedules.csv,
+           needs extraction pass — no new PDF parsing required)
+Phase 3 — N-PORT fund metadata sub-adviser fields (already in pipeline,
+           needs extraction pass)
+Deferred — Fund prospectus/SAI (N-1A) PDF parsing — comprehensive but requires
+            new PDF parsing pipeline similar to ADV work
+
+Coverage estimate:
+N-CEN only: ~60-70% of sub-advised AUM
+N-CEN + ADV Schedule D: ~85%
+N-CEN + ADV + N-PORT: ~90%+
+
+### voting_control_v1
+Purpose: Roll fund series up to the entity that votes the shares.
+Fund sponsor retains voting authority regardless of sub-adviser arrangement.
+Wellington decides to buy/sell Vanguard fund equity — Vanguard votes the shares.
+
+Example: Vanguard Wellington Fund → Vanguard (voting), Wellington (decision)
+Example: Hartford Growth Fund → Hartford Funds Management (voting), Wellington (decision)
+
+Use case: Activist defense — understanding who will vote on a hostile bid,
+board composition, or say-on-pay. Decision-maker view understates voting bloc
+of large fund families. Voting view correctly shows Vanguard/BlackRock/State
+Street controlling proxy votes even when sub-advisers manage the money.
+
+Data source: Same as economic_control_v1 (fund sponsor = primary adviser on N-CEN).
+voting_control_v1 ≈ economic_control_v1 for most funds.
+Exceptions: pure trust sponsors (Gotham-type) where voting authority
+passes to sub-adviser — needs case-by-case review.
+
+### Implementation sequence
+| # | Item | Priority | Notes |
+|---|------|----------|-------|
+| DM1 | Build decision_maker_v1 rollup — Phase 1 (N-CEN) | High | Query ncen_adviser_map for sub-adviser relationships. For each fund series where sub-adviser exists AND primary adviser is not a major operating AM (not in top 50 PARENT_SEEDS), insert entity_rollup_history rows with rollup_type='decision_maker_v1' pointing to sub-adviser entity. Passive funds (is_actively_managed=FALSE) copy economic_control_v1 rollup unchanged. |
+| DM2 | Build decision_maker_v1 rollup — Phase 2 (ADV Schedule D) | High | Extract Section 7.B sub-adviser relationships from adv_schedules.csv. No new PDF parsing — data already exists. Wire additional fund series not covered by N-CEN. |
+| DM3 | Build decision_maker_v1 rollup — Phase 3 (N-PORT metadata) | Medium | Extract sub-adviser fields from fund_holdings metadata. Fill remaining gaps after DM1+DM2. |
+| DM4 | Global UI toggle — AUM view vs Decision Maker view | High | Add rollup_type selector to app.py config. Pass rollup_type parameter to all 34 query functions in queries.py. Toggle affects Register, Conviction, Flow Analysis, Ownership Trend, Cross-Ownership, Peer Matrix simultaneously. Default: economic_control_v1. |
+| DM5 | Build voting_control_v1 rollup | Medium | For most funds: copy economic_control_v1. For pure trust sponsor cases (Gotham-type): voting authority passes to sub-adviser — same logic as decision_maker_v1 for those cases. Add voting_control_v1 toggle as third option in UI selector. |
+| DM6 | N-1A prospectus/SAI parsing pipeline | Low | Comprehensive sub-adviser coverage via fund prospectus. Requires new PDF parsing pipeline similar to ADV work. Deferred until DM1-DM3 coverage assessed. Add to pipeline backlog after Phase 3.5b. |
+| DM7 | Coverage report and validation | High | After DM1-DM3: report coverage % by rollup type, AUM under each rollup, top 20 decision-maker re-routings with before/after. Validate Wellington/Vanguard, Polen/Gotham, Hartford/Wellington cases explicitly. |
 
 ---
 
