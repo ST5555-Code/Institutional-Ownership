@@ -84,6 +84,30 @@ REFERENCE_TABLES = [
     "fund_holdings", "fund_universe", "adv_managers", "parent_bridge",
 ]
 
+# Entity tables — the entire entity MDM layer. The staging workflow
+# (sync_staging.py / diff_staging.py / promote_staging.py) operates
+# on exactly this list. Order matters for restore: parents before children
+# so FKs resolve. entities is the root.
+ENTITY_TABLES = [
+    "entities",
+    "entity_identifiers",
+    "entity_relationships",
+    "entity_aliases",
+    "entity_classification_history",
+    "entity_rollup_history",
+    "entity_identifiers_staging",
+    "entity_relationships_staging",
+    "entity_overrides_persistent",
+]
+
+# Sequences associated with entity tables. Must be reset to MAX(id)+1
+# after any sync/promote/restore so subsequent inserts don't collide.
+ENTITY_SEQUENCES = [
+    ("entity_id_seq", "entities", "entity_id"),
+    ("relationship_id_seq", "entity_relationships", "relationship_id"),
+    ("identifier_staging_id_seq", "entity_identifiers_staging", "staging_id"),
+]
+
 
 def seed_staging():
     """Copy reference tables from production to staging DB for read access.

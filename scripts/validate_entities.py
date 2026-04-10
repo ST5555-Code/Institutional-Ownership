@@ -2,19 +2,22 @@
 """
 Entity MDM Phase 1 — validate_entities.py
 
-Runs all 11 validation gates against the staging entity tables and produces
+Runs all validation gates against the entity tables and produces
 logs/entity_validation_report.json. Exits non-zero if any structural gate
 (1-4) fails — those are zero-tolerance and block merge to production.
 
 "Currently active" means valid_to = '9999-12-31' (sentinel date).
 
 Usage:
-  python scripts/validate_entities.py           # run against staging
+  python scripts/validate_entities.py           # production (default)
+  python scripts/validate_entities.py --staging # staging DB
+  python scripts/validate_entities.py --prod    # explicit production
 """
 from __future__ import annotations
 
 # pylint: disable=too-many-locals,too-many-statements,broad-exception-caught
 
+import argparse
 import json
 import random
 import sys
@@ -810,7 +813,18 @@ GATES = [
 
 
 def main():
-    db.set_staging_mode(True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--staging", action="store_true",
+                        help="run against the staging DB (data/13f_staging.duckdb)")
+    target.add_argument("--prod", action="store_true",
+                        help="run against the production DB (default)")
+    args = parser.parse_args()
+
+    if args.staging:
+        db.set_staging_mode(True)
+    # else: default = production. Do not call set_staging_mode().
+
     print(f"Validating against: {db.get_db_path()}")
     con = db.connect_write()
     report = {

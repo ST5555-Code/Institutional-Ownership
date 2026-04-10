@@ -117,3 +117,18 @@ Entity rollup vs parent_bridge string matching — top 50 tickers by AUM:
 - 87 self-rollup → parent wires synced from parent_bridge (Items 3+4 international/top-50 work)
 - Entity child→parent: 9,348 (was 9,261)
 - 15 remaining "gap" are correctly self-rolling parent entities
+
+## Post-Phase 4 Maintenance Workflow (added 2026-04-10)
+
+Post-Phase 4 maintenance follows the staging workflow defined in
+`ENTITY_ARCHITECTURE.md` → **Operational Procedures**. All entity fixes
+(DM12, DM13, DM14, DM15, L4/L5 audits, ADV pre-insert verification fallouts,
+etc.) go through staging before production via:
+
+```
+sync_staging.py → [edits] → validate_entities.py --staging →
+diff_staging.py → [human review] → promote_staging.py --approved →
+validate_entities.py
+```
+
+Quick reference: `MAINTENANCE.md` in the project root.

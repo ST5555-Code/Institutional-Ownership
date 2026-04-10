@@ -236,6 +236,82 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 
 ---
 
+## Operational Procedures
+
+_Effective: April 10, 2026_
+
+All entity changes — fixes, audits, pipeline updates, maintenance — go through
+staging before production. No exceptions.
+
+### Standard workflow for every entity change session
+
+1. **SYNC**     — `python3 scripts/sync_staging.py`
+2. **WORK**     — apply all changes in `data/13f_staging.duckdb` only
+3. **VALIDATE** — `python3 scripts/validate_entities.py --staging`
+4. **DIFF**     — `python3 scripts/diff_staging.py`
+5. **REVIEW**   — review diff in conversation before proceeding
+6. **APPROVE**  — explicit authorization required
+7. **PROMOTE**  — `python3 scripts/promote_staging.py --approved`
+8. **VERIFY**   — `python3 scripts/validate_entities.py`  *(default = production)*
+9. **COMMIT**   — git commit with session summary
+
+### What goes through staging (mandatory)
+
+- All entity relationship changes (entity_relationships)
+- All classification changes (entity_classification_history)
+- All sub-adviser routing changes (DM12, DM13, DM14, DM15)
+- All rollup corrections (entity_rollup_history)
+- All `build_entities.py` runs
+- All ADV / N-CEN / pipeline updates that touch entity tables
+- All audit fix batches (L4, L5, any future layers)
+- Manual entity overrides (entity_overrides_persistent)
+
+### What does NOT need staging
+
+- `holdings_v2`, `fund_holdings_v2` backfill — derives from entity tables, re-stamped after promotion
+- Market data, price data, 13F position data
+- Non-entity pipeline tables (beneficial_ownership, fetched_tickers_13dg, market_data, etc.)
+  → these go through `merge_staging.py` (separate workflow)
+
+### Validation gate exit codes
+
+`validate_entities.py` distinguishes failure severity:
+
+| Exit | Meaning | promote_staging.py behavior |
+|------|---------|----------------------------|
+| `0` | All gates green | promotion proceeds |
+| `1` | Non-structural FAIL (e.g. wellington_sub_advisory) | promotion proceeds; printed for review |
+| `2` | Structural FAIL (PK / FK / orphan) | **auto-rollback to snapshot** |
+
+### Rollback options
+
+- **Promotion snapshot** (intra-DB tables in production):
+  `python3 scripts/rollback_promotion.py --restore SNAPSHOT_ID`
+- **Full DB restore** from EXPORT DATABASE backup:
+  ```
+  python3 scripts/backup_db.py --list
+  # then duckdb data/13f.duckdb -c "IMPORT DATABASE 'data/backups/...'"
+  ```
+- **SCD Type 2 history** — query entity tables at any historical `valid_from` for point-in-time view (not a rollback, but proves what was true when)
+
+### Monthly maintenance checklist
+
+- `python3 scripts/backup_db.py` — full DB backup
+- `python3 scripts/validate_entities.py` — production health check
+- Review `manual_routing_review` gate output for overdue routings
+- `python3 scripts/diff_staging.py` — confirm staging matches production at month boundary
+
+### Schema drift caveat (Apr 10 2026)
+
+Production currently has a degraded schema relative to `entity_schema.sql`:
+- `entities` and other tables were created without `PRIMARY KEY` / `NOT NULL` constraints
+- `entity_overrides_persistent` is declared in the schema but not yet created in production
+- Some `entity_identifiers` rows have NULL `confidence` despite the schema's `NOT NULL` declaration
+
+`sync_staging.py` works around this by using `CREATE TABLE AS SELECT` to mirror production's column structure rather than re-applying `entity_schema.sql`. Staging therefore inherits the same constraint-free schema. Hardening the production schema is tracked separately and is out of scope for the staging framework.
+
+---
+
 ## Deferred Items
 
 These items were explicitly scoped out of Phase 1 but must not be forgotten. Each has a target phase.
@@ -393,3 +469,5 @@ UI for overrides: deferred until override volume exceeds ~500 entries or additio
 | Apr 8 2026 | Operating Asset Manager rollup policy | Rollup targets must be operating asset managers only. PE funds, insurance companies, foundations, VC firms, and holding companies recorded in relationship graph but never drive rollup. American Century self-rollups (not → Stowers), Russell self-rollups (not → TA Associates), Pacific Life Fund Advisors self-rollups (not → Pacific Life Insurance). Ownership ≠ operational control for rollup purposes. | Roll up to ultimate owner — would attribute 13F holdings to PE funds and insurance companies that don't manage money |
 | Apr 8 2026 | Classification sync from ADV strategy_inferred | 974 unknowns classified, 204 corrections validated. Misclassified PE fixed: Thrivent, Muzinich, Bridges → active. fund_sponsor control_type standardized to advisory. Staging queue cleared (3,503 informational entries rejected). | Leave classifications from Phase 1 only — misses ADV data that's already in the DB |
 | Apr 10 2026 | routing_confidence + review_due_date on entity_rollup_history | Manual sub-adviser routings (umbrella trust fixes, name-based matches, orphan scans) need periodic review as fund sub-adviser relationships change over time. Three tiers: high (N-CEN/ADV/self-rollup — authoritative), medium (fuzzy match, name similarity, inferred), low (manual, manual_umbrella_trust). Annual review is forced via `validate_entities.py` manual_routing_review MANUAL gate when `review_due_date < CURRENT_DATE`. Staleness between N-CEN refreshes and manual overrides is logged by `fetch_ncen.check_routing_drift()` to `logs/ncen_routing_drift.log` so operators see when a manual routing contradicts the latest N-CEN filing. | Rely on one-time manual fixes without review cadence — routings silently go stale as advisers change sub-advisers |
+| Apr 10 2026 | Pre-insert ADV verification (DM13 Phase 1) | ADV alias-cache fuzzy matches can silently bind a child entity to a similarly-named but unrelated parent (e.g., Securian Asset Management → Sterling Financial Group, $43.8B firm wired under a $16M Pasadena RIA). `entity_sync._verify_adv_relationship()` runs Tier 1 (parent ADV AUM ≥ 50% of child) and Tier 2 (state match) before insert; failures land in `entity_relationships_staging` with `conflict_reason='adv_ownership_verification_failed'` for operator review. Tiers 3-6 (EDGAR full-text, CRD cross-reference, OpenCorporates, web search) deferred to DM13 batch audit. | Trust the alias-cache score alone — produces silent false matches that propagate via `transitive_flatten` to child fund series and corrupt rollups under both economic_control_v1 and decision_maker_v1. |
+| Apr 10 2026 | All entity changes go through staging (Operational Procedures) | Entity edits are high-stakes — a single bad UPDATE can poison rollups across millions of holdings rows and the rebuild path costs hours. Staging-first workflow gives the operator a chance to inspect the diff before changes touch production, an automatic intra-DB snapshot for fast rollback on validation failure, and a validate_entities.py exit-code contract (rc=2 structural FAIL → auto-rollback, rc=1 non-structural → human review, rc=0 clean) that distinguishes hard schema violations from transient gate noise. CTAS is used for the sync because production has a degraded constraint-free schema relative to entity_schema.sql; faithful mirroring beats schema strictness for the diff use case. Staging schema mismatch with prod is documented and accepted. | Edit production directly — every previous bad ADV match (Securian/Sterling, NYL/Millennium, Engaged/Harbor, etc.) would have been caught by the diff-review step. The cost of one extra command is far smaller than the cost of an undetected wrong rollup propagating through holdings_v2. |
