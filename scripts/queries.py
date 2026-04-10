@@ -809,6 +809,20 @@ def query1(ticker, rollup_type='economic_control_v1'):
         except Exception:
             pass
 
+        # N-PORT coverage % per parent (from summary_by_parent)
+        coverage_map = {}
+        try:
+            cov_df = con.execute(f"""
+                SELECT inst_parent_name, nport_coverage_pct
+                FROM summary_by_parent
+                WHERE quarter = '{LQ}' AND inst_parent_name IN ({ph_aum})
+            """, parent_names).fetchdf()
+            coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
+                            for _, r in cov_df.iterrows()
+                            if r['nport_coverage_pct'] is not None}
+        except Exception:
+            pass
+
         # Query 2: ALL 13F children for all parents in one pass
         ph = ','.join(['?'] * len(parent_names))
         all_children_df = con.execute(f"""
@@ -892,6 +906,7 @@ def query1(ticker, rollup_type='economic_control_v1'):
                 'pct_float': parent['pct_float'],
                 'aum': parent_aum,
                 'pct_aum': parent_pct_aum,
+                'nport_cov': coverage_map.get(pname),
                 'type': parent['type'],
                 'is_parent': has_nport and len(children_to_show) > 0,
                 'child_count': len(children_to_show),
