@@ -1265,6 +1265,37 @@ button[data-tab-id].active {
 /* Peer Rotation — highlight subject row in movers table */
 .peer-highlight td { background-color: #e8f0f8 !important; font-weight: 600; }
 
+/* Rollup type selector (Fund Sponsor / Voting vs Decision Maker) */
+.rollup-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+}
+.rollup-selector .rollup-label {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    margin: 0;
+}
+.rollup-selector select {
+    background: #fff;
+    color: var(--oxford-blue);
+    border: 1px solid #001530;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.rollup-selector select:hover { border-color: #003566; }
+.rollup-selector select:focus { outline: 2px solid #80bfff; outline-offset: 1px; }
+
 /* Print styles for PDF export */
 @media print {
     .tab-bar, .action-bar, .search-container, #print-btn,

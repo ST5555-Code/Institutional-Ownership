@@ -18,6 +18,13 @@
                     <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
                 </div>
                 <button id="load-btn" class="btn btn-primary">Load</button>
+                <div class="rollup-selector" title="Switch between fund sponsor (who owns shares + votes) and decision maker (who makes investment decisions — routes sub-advised funds to the actual sub-adviser)">
+                    <label for="rollup-type-select" class="rollup-label">View:</label>
+                    <select id="rollup-type-select" onchange="setRollupType(this.value)">
+                        <option value="economic_control_v1">Fund Sponsor / Voting</option>
+                        <option value="decision_maker_v1">Decision Maker</option>
+                    </select>
+                </div>
             </div>
         </div>
     </header>

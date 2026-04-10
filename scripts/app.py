@@ -23,7 +23,18 @@ from queries import (
     ownership_trend_summary, cohort_analysis, flow_analysis, holder_momentum,
     short_interest_analysis, portfolio_context,
     get_summary, _cross_ownership_query,
+    VALID_ROLLUP_TYPES,
 )
+
+
+def _get_rollup_type(req):
+    """Extract rollup_type query parameter, validated against VALID_ROLLUP_TYPES.
+    Default: 'economic_control_v1' (fund sponsor / voting view).
+    """
+    rt = req.args.get('rollup_type', 'economic_control_v1').strip()
+    if rt not in VALID_ROLLUP_TYPES:
+        rt = 'economic_control_v1'
+    return rt
 
 # Quarter constants used in SQL queries — imported from config.py.
 # To roll forward: edit ONLY scripts/config.py. These vars propagate everywhere.
@@ -1145,10 +1156,11 @@ def api_ownership_trend_summary():
     ticker = request.args.get('ticker', '').upper().strip()
     level = request.args.get('level', 'parent').strip()
     ao = request.args.get('active_only', '').strip() == 'true'
+    rt = _get_rollup_type(request)
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = ownership_trend_summary(ticker, level=level, active_only=ao)
+        result = ownership_trend_summary(ticker, level=level, active_only=ao, rollup_type=rt)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1160,10 +1172,11 @@ def api_cohort_analysis():
     from_q = request.args.get('from', '').strip() or None
     level = request.args.get('level', 'parent').strip()
     active_only = request.args.get('active_only', '').strip() == 'true'
+    rt = _get_rollup_type(request)
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = cohort_analysis(ticker, from_quarter=from_q, level=level, active_only=active_only)
+        result = cohort_analysis(ticker, from_quarter=from_q, level=level, active_only=active_only, rollup_type=rt)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1174,10 +1187,11 @@ def api_holder_momentum():
     ticker = request.args.get('ticker', '').upper().strip()
     level = request.args.get('level', 'parent').strip()
     ao = request.args.get('active_only', '').strip() == 'true'
+    rt = _get_rollup_type(request)
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = holder_momentum(ticker, level=level, active_only=ao)
+        result = holder_momentum(ticker, level=level, active_only=ao, rollup_type=rt)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1190,10 +1204,11 @@ def api_flow_analysis():
     peers = request.args.get('peers', '').upper().strip() or None
     level = request.args.get('level', 'parent').strip()
     ao = request.args.get('active_only', '').strip() == 'true'
+    rt = _get_rollup_type(request)
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = flow_analysis(ticker, period=period, peers=peers, level=level, active_only=ao)
+        result = flow_analysis(ticker, period=period, peers=peers, level=level, active_only=ao, rollup_type=rt)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1206,6 +1221,7 @@ def api_cross_ownership():
     anchor = request.args.get('anchor', '').upper().strip()
     active_only = request.args.get('active_only', 'false').lower() == 'true'
     limit = int(request.args.get('limit', 25))
+    rt = _get_rollup_type(request)
     if not tickers_raw:
         return jsonify({'error': 'Missing tickers parameter'}), 400
     tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
@@ -1217,7 +1233,8 @@ def api_cross_ownership():
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
         return jsonify(_cross_ownership_query(con, tickers, anchor=anchor,
-                                              active_only=active_only, limit=limit))
+                                              active_only=active_only, limit=limit,
+                                              rollup_type=rt))
     finally:
         con.close()
 
@@ -1228,6 +1245,7 @@ def api_cross_ownership_top():
     tickers_raw = request.args.get('tickers', '').upper().strip()
     active_only = request.args.get('active_only', 'false').lower() == 'true'
     limit = int(request.args.get('limit', 25))
+    rt = _get_rollup_type(request)
     if not tickers_raw:
         return jsonify({'error': 'Missing tickers parameter'}), 400
     tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
@@ -1237,7 +1255,8 @@ def api_cross_ownership_top():
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
         return jsonify(_cross_ownership_query(con, tickers, anchor=None,
-                                              active_only=active_only, limit=limit))
+                                              active_only=active_only, limit=limit,
+                                              rollup_type=rt))
     finally:
         con.close()
 
@@ -1330,7 +1349,8 @@ def api_portfolio_context():
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = portfolio_context(ticker, level=level, active_only=ao)
+        rt = _get_rollup_type(request)
+        result = portfolio_context(ticker, level=level, active_only=ao, rollup_type=rt)
         return jsonify(clean_for_json(result))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1433,8 +1453,10 @@ def api_sector_flow_movers():
         level = request.args.get('level', 'parent').strip()
         if not q_from or not q_to or not sector:
             return jsonify({'error': 'Missing required params: from, to, sector'}), 400
+        rt = _get_rollup_type(request)
         result = get_sector_flow_movers(q_from, q_to, sector,
-                                        active_only=active_only, level=level)
+                                        active_only=active_only, level=level,
+                                        rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"sector_flow_movers error: {e}")
@@ -1452,8 +1474,10 @@ def api_sector_flow_detail():
         if not sector:
             return jsonify({'error': 'Missing sector param'}), 400
         rank_by = request.args.get('rank_by', 'total').strip()
+        rt = _get_rollup_type(request)
         result = get_sector_flow_detail(
-            sector, active_only=active_only, level=level, rank_by=rank_by)
+            sector, active_only=active_only, level=level, rank_by=rank_by,
+            rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"sector_flow_detail error: {e}")
@@ -1644,10 +1668,14 @@ def api_query(qnum):
         return jsonify({'error': f'Invalid query number: {qnum}'}), 400
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
+    rt = _get_rollup_type(request)
 
     # Query 15 does not require a ticker
     if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
+
+    # Functions that accept rollup_type (must match queries.py parameterized set)
+    _rt_aware = {1, 2, 3, 5, 12, 14}
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
@@ -1660,6 +1688,8 @@ def api_query(qnum):
             return jsonify(data)
         elif qnum == 15:
             data = fn(ticker or None)
+        elif qnum in _rt_aware:
+            data = fn(ticker, rollup_type=rt)
         else:
             data = fn(ticker)
 
@@ -1732,7 +1762,8 @@ def api_peer_rotation():
             return jsonify({'error': 'Missing ticker param'}), 400
         active_only = request.args.get('active_only', '0') == '1'
         level = request.args.get('level', 'parent').strip()
-        result = get_peer_rotation(ticker, active_only=active_only, level=level)
+        rt = _get_rollup_type(request)
+        result = get_peer_rotation(ticker, active_only=active_only, level=level, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"peer_rotation error: {e}")
@@ -1750,8 +1781,9 @@ def api_peer_rotation_detail():
             return jsonify({'error': 'Missing ticker or peer param'}), 400
         active_only = request.args.get('active_only', '0') == '1'
         level = request.args.get('level', 'parent').strip()
+        rt = _get_rollup_type(request)
         result = get_peer_rotation_detail(
-            ticker, peer, active_only=active_only, level=level)
+            ticker, peer, active_only=active_only, level=level, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"peer_rotation_detail error: {e}")

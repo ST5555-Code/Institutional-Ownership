@@ -15,6 +15,29 @@ let sortDir = 'asc';
 const _sortState = {};  // per-tab sort state: tabId → {col, dir}
 let autocompleteIdx = -1;     // keyboard selection index
 
+// Rollup type — 'economic_control_v1' (Fund Sponsor/Voting) or 'decision_maker_v1'
+let currentRollupType = 'economic_control_v1';
+
+function setRollupType(type) {
+    if (type !== 'economic_control_v1' && type !== 'decision_maker_v1') return;
+    currentRollupType = type;
+    // Reload current tab with new rollup type
+    if (currentTicker) {
+        const activeTab = document.querySelector('.tab-link.active');
+        if (activeTab) activeTab.click();
+    }
+}
+
+// Auto-append rollup_type to all /api/ fetch calls
+const _origFetch = window.fetch;
+window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.startsWith('/api/') && !url.includes('rollup_type=')) {
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}rollup_type=${currentRollupType}`;
+    }
+    return _origFetch(url, opts);
+};
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
