@@ -493,6 +493,8 @@ const QUERY_COLUMNS = {
         {key: 'pct_float',   label: '% Float',      type: 'pct',   group: '_ticker_'},
         {key: 'aum',         label: 'AUM ($M)',     type: 'num',    group: 'Fund'},
         {key: 'pct_aum',     label: '% of AUM',    type: 'pct',    group: 'Fund'},
+        {key: 'nport_cov',   label: 'N-PORT Cov.',  type: 'nport_badge', group: 'Fund',
+         tooltip: "% of this manager's total 13F AUM visible at fund series level via N-PORT. High = fund-level drill-down available."},
         {key: 'type',        label: 'Type',         type: 'text',   group: 'Fund'},
     ],
     16: [
@@ -519,6 +521,8 @@ const QUERY_COLUMNS = {
         {key: 'pct_of_portfolio',  label: '% Portfolio',    type: 'pct'},
         {key: 'pct_of_float',     label: '% Float',         type: 'pct'},
         {key: 'mktcap_percentile', label: 'MktCap Pctile', type: 'pct'},
+        {key: 'nport_cov',        label: 'N-PORT Cov.',     type: 'nport_badge',
+         tooltip: "% of this manager's total 13F AUM visible at fund series level via N-PORT. High = fund-level drill-down available."},
         {key: 'manager_type',     label: 'Type',            type: 'text'},
         {key: 'direction',        label: 'Direction',       type: 'text'},
         {key: 'since',            label: 'Since',           type: 'text'},
@@ -623,6 +627,8 @@ function inferColMeta(col) {
         result = {w: '100px', align: 'right', visual: 'shares'};
     else if (col.type === 'pct')
         result = {w: '95px', align: 'right', visual: 'pct'};
+    else if (col.type === 'nport_badge')
+        result = {w: '100px', align: 'center', visual: 'nport_badge'};
 
     // 2. Pattern matching on key and label for text/num columns
     else if (/^(#|rank|rn)$/.test(l) || /^rank$/.test(k))
@@ -904,6 +910,7 @@ function renderHierarchicalTable(data, cols, qnum, hasHierarchy, hasSections, co
         th.classList.add('col-' + meta.align);
         th.textContent = col.label;
         th.dataset.colIdx = ci;
+        if (col.tooltip) th.title = col.tooltip;
         const arrow = document.createElement('span');
         arrow.className = 'sort-arrow';
         th.appendChild(arrow);
@@ -3701,6 +3708,7 @@ function _formatCellValue(val, type) {
     if (type === 'shares') return fmtShares(val);
     if (type === 'pct') return fmtPct(val);
     if (type === 'num') return fmtNum(val);
+    if (type === 'nport_badge') return fmtNportBadge(val);
     const s = String(val);
     return s.length > 120 ? s.slice(0, 120) + '…' : s;
 }
@@ -4324,6 +4332,41 @@ function renderQuery7(data) {
             });
         }
     }
+
+    // Fund rollup context panel — insert between stats header and table
+    if (stats.cik) {
+        fetch(`/api/fund_rollup_context?cik=${stats.cik}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(ctx => {
+                if (!ctx || (!ctx.economic_sponsor && !ctx.decision_maker)) return;
+                const panel = document.createElement('div');
+                panel.className = 'fund-rollup-context';
+                if (ctx.same) {
+                    panel.innerHTML = `
+                        <div class="rollup-row">
+                            <span class="rollup-type-label">Fund Sponsor</span>
+                            <span class="rollup-type-value">${ctx.economic_sponsor || '\u2014'}</span>
+                        </div>`;
+                } else {
+                    panel.innerHTML = `
+                        <div class="rollup-row">
+                            <span class="rollup-type-label">Fund Sponsor / Voting</span>
+                            <span class="rollup-type-value">${ctx.economic_sponsor || '\u2014'}</span>
+                        </div>
+                        <div class="rollup-row">
+                            <span class="rollup-type-label">Decision Maker</span>
+                            <span class="rollup-type-value">${ctx.decision_maker || '\u2014'}</span>
+                        </div>`;
+                }
+                const statsHeader = tableWrap.querySelector('.portfolio-stats');
+                if (statsHeader) {
+                    statsHeader.after(panel);
+                } else {
+                    tableWrap.insertBefore(panel, tableWrap.firstChild);
+                }
+            })
+            .catch(() => {/* silent fail — context panel is optional */});
+    }
 }
 
 /**
@@ -4339,15 +4382,28 @@ function formatCell(val, type) {
         case 'change':  return (typeof val === 'number') ? fmtShares(val) : String(val);
         case 'num':
         case 'rank':    return fmtNum(val);
+        case 'nport_badge': return fmtNportBadge(val);
         default:        return String(val);
     }
+}
+
+/** Render N-PORT coverage % as color-coded badge.
+ *  ≥80% green, 50-79% amber, 1-49% grey, 0/null no badge. */
+function fmtNportBadge(val) {
+    if (val == null || val === 0) return '\u2014';
+    const pct = Number(val);
+    if (isNaN(pct)) return '\u2014';
+    let cls = 'nport-badge nport-grey';
+    if (pct >= 80) cls = 'nport-badge nport-green';
+    else if (pct >= 50) cls = 'nport-badge nport-amber';
+    return `<span class="${cls}">${Math.round(pct)}%</span>`;
 }
 
 /** Resolve the best format type for a column — prefers visual over col.type. */
 function fmtType(col) {
     const meta = inferColMeta(col);
     // Visual types that map directly to formatters
-    if (['dollar','shares','pct','change','num','rank'].includes(meta.visual)) {
+    if (['dollar','shares','pct','change','num','rank','nport_badge'].includes(meta.visual)) {
         return meta.visual;
     }
     // Fall back to the declared data type

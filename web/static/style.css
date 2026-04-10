@@ -1265,6 +1265,61 @@ button[data-tab-id].active {
 /* Peer Rotation — highlight subject row in movers table */
 .peer-highlight td { background-color: #e8f0f8 !important; font-weight: 600; }
 
+/* N-PORT coverage badges — Register and Conviction tabs */
+.nport-badge {
+    display: inline-block;
+    min-width: 48px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.2px;
+}
+.nport-badge.nport-green {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.nport-badge.nport-amber {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+.nport-badge.nport-grey {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+
+/* Fund rollup context panel — L4 Fund Portfolio */
+.fund-rollup-context {
+    border-left: 4px solid var(--oxford-blue);
+    background: #f8fafc;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    border-radius: 0 4px 4px 0;
+}
+.fund-rollup-context .rollup-row {
+    display: flex;
+    gap: 16px;
+    align-items: baseline;
+    padding: 2px 0;
+}
+.fund-rollup-context .rollup-type-label {
+    color: #555;
+    font-weight: 600;
+    min-width: 180px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.fund-rollup-context .rollup-type-value {
+    color: var(--oxford-blue);
+    font-weight: 500;
+}
+
 /* Rollup type selector (Fund Sponsor / Voting vs Decision Maker) */
 .rollup-selector {
     display: inline-flex;

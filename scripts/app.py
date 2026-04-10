@@ -986,6 +986,70 @@ def api_tickers():
         con.close()
 
 
+@app.route('/api/fund_rollup_context')
+def api_fund_rollup_context():
+    """Return economic and decision-maker rollup names for a given CIK or series_id.
+    Used by L4 Fund Portfolio tab to show rollup context panel above holdings table.
+    """
+    cik = request.args.get('cik', '').strip()
+    series_id = request.args.get('series_id', '').strip()
+    if not cik and not series_id:
+        return jsonify({'error': 'Missing cik or series_id parameter'}), 400
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        # Resolve entity_id from cik or series_id
+        if cik:
+            row = con.execute("""
+                SELECT entity_id FROM entity_identifiers
+                WHERE identifier_value = ? AND identifier_type = 'cik'
+                  AND valid_to = '9999-12-31' LIMIT 1
+            """, [cik]).fetchone()
+        else:
+            row = con.execute("""
+                SELECT entity_id FROM entity_identifiers
+                WHERE identifier_value = ? AND identifier_type = 'series_id'
+                  AND valid_to = '9999-12-31' LIMIT 1
+            """, [series_id]).fetchone()
+
+        if not row:
+            return jsonify({'error': 'Entity not found', 'cik': cik, 'series_id': series_id}), 404
+
+        entity_id = row[0]
+
+        # Get economic_control_v1 rollup
+        ec = con.execute("""
+            SELECT ea.alias_name FROM entity_rollup_history erh
+            LEFT JOIN entity_aliases ea ON erh.rollup_entity_id = ea.entity_id
+                AND ea.is_preferred = TRUE AND ea.valid_to = '9999-12-31'
+            WHERE erh.entity_id = ? AND erh.rollup_type = 'economic_control_v1'
+              AND erh.valid_to = '9999-12-31'
+        """, [entity_id]).fetchone()
+
+        # Get decision_maker_v1 rollup
+        dm = con.execute("""
+            SELECT ea.alias_name FROM entity_rollup_history erh
+            LEFT JOIN entity_aliases ea ON erh.rollup_entity_id = ea.entity_id
+                AND ea.is_preferred = TRUE AND ea.valid_to = '9999-12-31'
+            WHERE erh.entity_id = ? AND erh.rollup_type = 'decision_maker_v1'
+              AND erh.valid_to = '9999-12-31'
+        """, [entity_id]).fetchone()
+
+        ec_name = ec[0] if ec else None
+        dm_name = dm[0] if dm else None
+
+        return jsonify({
+            'entity_id': entity_id,
+            'economic_sponsor': ec_name,
+            'decision_maker': dm_name,
+            'same': ec_name == dm_name,
+        })
+    finally:
+        con.close()
+
+
 @app.route('/api/fund_portfolio_managers')
 def api_fund_portfolio_managers():
     ticker = request.args.get('ticker', '').upper().strip()

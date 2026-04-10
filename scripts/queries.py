@@ -1476,9 +1476,26 @@ def query3(ticker, rollup_type='economic_control_v1'):
             except Exception as e:
                 logger.error(f"[query3 nport batch] {e}", exc_info=True)
 
+        # N-PORT coverage % per parent (from summary_by_parent)
+        coverage_map = {}
+        if parent_names:
+            try:
+                ph_cov = ','.join(['?'] * len(parent_names))
+                cov_df = con.execute(f"""
+                    SELECT inst_parent_name, nport_coverage_pct
+                    FROM summary_by_parent
+                    WHERE quarter = '{LQ}' AND inst_parent_name IN ({ph_cov})
+                """, parent_names).fetchdf()
+                coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
+                                for _, r in cov_df.iterrows()
+                                if r['nport_coverage_pct'] is not None}
+            except Exception:
+                pass
+
         results = []
         for row in records:
             parent = row.get('parent_name') or row.get('manager_name')
+            row['nport_cov'] = coverage_map.get(parent)
 
             # Enhancement 1 — Position history (Since + Held)
             history = con.execute(f"""
