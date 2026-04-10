@@ -185,25 +185,29 @@ python3 scripts/resolve_adv_ownership.py --refresh --staging --all  # picks up m
 python3 scripts/resolve_adv_ownership.py --qc --staging
 ```
 
-### Phase 4 — Migration ⛔ REQUIRES EXPLICIT AUTHORIZATION
+### Phase 4 — Migration ✅ STAGE 4 COMPLETE (cutover 2026-04-09)
 **Scope:** Migrate holdings, fund_holdings, beneficial_ownership to use entity_id FK.
-**Migration approach:** Dual-write → shadow reads → parity validation → cutover. NOT a fast table swap.
+**Migration approach:** New data primary, old data shadow. App switched to entity-backed v2 tables.
 
-**Pre-conditions (must complete before Phase 4 starts):**
+**Pre-conditions (all complete):**
 1. ~~Validation gate failures resolved~~ ✅ Done — 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected), rollup chains flattened, circles broken. Gate thresholds updated: 0 FAILs, 8 PASS, 7 MANUAL (all documented).
 2. ~~N15 — Fidelity international sub-adviser deduplication~~ ✅ Done — series-level dedup verified in all 4 N-PORT rollup queries. Geode exclusion active. 174 shared series correctly handled. ~116% ratio is structural (monthly MAX vs quarter-end). No code changes needed.
 3. ~~R1/R2/R3 — 13D/G data quality audit~~ ✅ Done — 51,905 rows, pct_null=0, shares_null=1, duplicates=0. Started at 96% pct null / 16.5% shares null. 8,227 duplicates removed, 20,000+ agent names resolved, 1,287 exits validated, 928 suspects rescanned, parser hardened in all 3 scripts. DATA QUALITY: CLEAN. See PRE_PHASE4_STATUS.md Item 6.
 4. ~~Item 43 — app.py lint debt fix~~ ✅ Done — flake8 0 issues, bandit 0 high/B608. Pre-commit unblocked.
 5. ~~N21 TODOs a/b/c — investor type classification~~ ✅ Done — 14 categories, 8,639 managers, $67.3T, 0 NULL. ALL categories reviewed 1-by-1 with confidence scoring. 177 LOW>$10B manually fixed. Pension/insurance separated from passive ($1.4T moved). Activist expanded to 31 per industry reference. Fund-level: 5,717 series via S&P500 + 8-index correlation.
 
-**Stages (revised 2026-04-09 — new data primary, old data shadow):**
-1. Create holdings_v2 with entity_id FK, backfill from entity_identifiers, build indexes
-2. Switch app.py to use holdings_v2 as primary — new data serves all queries immediately
-3. Rename old tables to _legacy suffix — keep for shadow validation
-4. No fixed window — legacy tables retained 30 days post-cutover. Background log reviewed periodically. Cutover authorized when log shows only expected discrepancies (name_change, new_gain).
-5. After sign-off — drop _legacy tables, upgrade entity_current to MATERIALIZED VIEW, add REFRESH to run_pipeline.sh
-**Rationale:** New entity data has higher quality (reviewed classifications, clean parent wiring, deduplicated). No reason to serve stale data while validating.
-**Rollback:** _legacy tables retained 30 days post-cutover. If critical issue found, rename back.
+**Stages completed:**
+1. ✅ Entity tables copied to production, holdings_v2/fund_holdings_v2/beneficial_ownership_v2 created with entity_id FK, 100% entity coverage, 100% rollup coverage
+2. ✅ App switched to v2 tables — all 34 query functions updated, COALESCE(rollup_name, inst_parent_name) pattern, shadow logging on 5 key endpoints
+3. ✅ Parity validation — 8/8 gates pass: row_count exact, entity/rollup coverage 100%, total AUM 0.00% diff, top 50 entity AUM 0.00% diff, 10/10 known merges, shadow log clean
+4. ✅ Cutover authorized 2026-04-09 — app running cleanly on v2 tables, zero 500 errors, shadow log shows only expected discrepancies (new_gain, legacy_only name changes, value_diff consolidation)
+5. ⏳ Stage 5 cleanup — legacy tables retained 30 days. Rename to _legacy scheduled on or after 2026-05-09. Requires explicit authorization.
+
+**Rollup wiring fixes applied during migration:**
+- Northern Trust (eid=4435), Wellington (eid=11220), Franklin (eid=4805), Dimensional (eid=5026), Ameriprise (eid=10178), First Trust (eid=136) — corrected from subsidiary-rollup to self-rollup
+- Display names updated: ALL CAPS legal names → curated proper-case display names for top 25 parents
+
+**Rollback:** Original holdings, fund_holdings, beneficial_ownership tables untouched. Instant rollback by reverting queries.py to pre-Stage 2 commit.
 
 ---
 
