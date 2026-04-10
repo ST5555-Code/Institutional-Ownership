@@ -100,6 +100,7 @@ _Last updated: April 9, 2026 (end of pre-Phase 4 session — all items complete,
 | 50 | Entity review complete | Done | 1,926 CRDs triaged: 99 wired to parents, 1,827 confirmed independent. 12 new entities created. 174 orphan subsidiaries consolidated. DBA/legal name check added to QC. |
 | 51 | Phase 4 — Migration | Ready to scope | Phase 3.5 complete. 13,541 relationships, 20,205 entities. 10 phantom PARENT_SEEDS merged into real CIK filers ($16.2T corrected). Accuracy audit passed. Manual review done. See ENTITY_ARCHITECTURE.md Phase 4 section for dual-write migration plan. |
 | 52 | Phase 4 post-cutover: brand 13F consolidation | Deferred | Wire T. Rowe Price, MFS, Neuberger Berman, HSBC 13F filer CIKs to their respective brand phantom parents. Currently 13F filers self-rollup correctly but don't consolidate with N-PORT fund series under brand parent. Enhancement not integrity issue — deferred until after Phase 4 cutover. |
+| 53 | Post-Phase 4: 13D/G entity coverage | Deferred | Expand entity_identifiers to include 13D/G filer CIKs for funds and known activists. Improves beneficial_ownership_v2 entity_id coverage from 53.7% toward 80%+. |
 
 ---
 
