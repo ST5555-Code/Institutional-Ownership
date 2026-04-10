@@ -188,6 +188,62 @@ def parse_ncen_xml(xml_content, filing_info):
 
 
 # ---------------------------------------------------------------------------
+# Routing drift check
+# ---------------------------------------------------------------------------
+
+def check_routing_drift(con):
+    """Compare current N-CEN sub-advisers against manual decision_maker_v1 routings.
+    Log any series where N-CEN now shows a different sub-adviser than our manual
+    routing so human reviewers can update manual fixes when source data changes.
+    """
+    import os
+    from datetime import datetime
+
+    try:
+        drifted = con.execute("""
+            SELECT
+                erh.entity_id,
+                ei.identifier_value AS series_id,
+                ea_current.alias_name AS current_routing,
+                ncen.adviser_name AS ncen_current,
+                erh.rule_applied,
+                erh.review_due_date
+            FROM entity_rollup_history erh
+            JOIN entity_aliases ea_current
+                ON erh.rollup_entity_id = ea_current.entity_id
+                AND ea_current.is_preferred = TRUE
+                AND ea_current.valid_to = '9999-12-31'
+            JOIN entity_identifiers ei
+                ON erh.entity_id = ei.entity_id
+                AND ei.identifier_type = 'series_id'
+                AND ei.valid_to = '9999-12-31'
+            LEFT JOIN ncen_adviser_map ncen
+                ON ei.identifier_value = ncen.series_id
+                AND ncen.role = 'subadviser'
+            WHERE erh.rollup_type = 'decision_maker_v1'
+              AND erh.routing_confidence IN ('low', 'medium')
+              AND erh.valid_to = '9999-12-31'
+              AND ncen.adviser_name IS NOT NULL
+              AND LOWER(TRIM(ea_current.alias_name)) != LOWER(TRIM(ncen.adviser_name))
+        """).fetchall()
+    except Exception as e:
+        print(f"  check_routing_drift: skipped ({e})")
+        return
+
+    if not drifted:
+        print("  No drift detected — manual routings still match N-CEN")
+        return
+
+    os.makedirs('logs', exist_ok=True)
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with open('logs/ncen_routing_drift.log', 'a', encoding='utf-8') as f:
+        for row in drifted:
+            entity_id, series_id, current, ncen_current, rule, due = row
+            f.write(f"{ts}|{entity_id}|{series_id}|{current}|{ncen_current}|{rule}|{due}\n")
+    print(f"  Drift detected: {len(drifted)} series — logged to logs/ncen_routing_drift.log")
+
+
+# ---------------------------------------------------------------------------
 # Database operations
 # ---------------------------------------------------------------------------
 
@@ -374,6 +430,10 @@ def run(test_mode=False, staging=False):
     # Update managers table
     print("\nUpdating managers.adviser_cik...")
     update_managers_adviser_cik(con)
+
+    # Check for routing drift against manual decision_maker_v1 routings
+    print("\nChecking routing drift against manual sub-adviser routings...")
+    check_routing_drift(con)
 
     # Summary
     total = con.execute("SELECT COUNT(*) FROM ncen_adviser_map").fetchone()[0]

@@ -149,17 +149,29 @@ CREATE TABLE IF NOT EXISTS entity_classification_history (
 -- entity_rollup_history — persisted rollup outcomes (rollup as data, not logic)
 -- -----------------------------------------------------------------------------
 -- All aggregation queries join this table — never entity_relationships directly.
--- Different rollup worldviews coexist via rollup_type (economic_control_v1 in Phase 1).
+-- Two rollup worldviews coexist via rollup_type:
+--   economic_control_v1 — fund sponsor / voting authority (default)
+--   decision_maker_v1   — entity making active investment decisions (sub-adviser routing)
+-- routing_confidence tracks data source quality:
+--   high   — N-CEN, ADV Schedule A/B, self-rollup (authoritative)
+--   medium — fuzzy match, name similarity, orphan scan, inferred
+--   low    — manual, manual_umbrella_trust (needs periodic review)
+-- review_due_date forces annual re-validation of low/medium routings via
+-- validate_entities.py manual_routing_review gate.
 CREATE TABLE IF NOT EXISTS entity_rollup_history (
-    entity_id         BIGINT NOT NULL REFERENCES entities(entity_id),
-    rollup_entity_id  BIGINT NOT NULL REFERENCES entities(entity_id),
-    rollup_type       VARCHAR NOT NULL DEFAULT 'economic_control_v1',
-    rule_applied      VARCHAR,  -- wholly_owned|fund_sponsor|priority_rank|self
-    confidence        VARCHAR NOT NULL
+    entity_id           BIGINT NOT NULL REFERENCES entities(entity_id),
+    rollup_entity_id    BIGINT NOT NULL REFERENCES entities(entity_id),
+    rollup_type         VARCHAR NOT NULL DEFAULT 'economic_control_v1',
+    rule_applied        VARCHAR,  -- wholly_owned|fund_sponsor|priority_rank|self|ncen_sub_adviser|aicf_fix|intra_firm_collapsed
+    source              VARCHAR,  -- N-CEN|ADV_SCHEDULE_A|ADV_SCHEDULE_B|self|orphan_scan|inferred|manual|manual_umbrella_trust
+    confidence          VARCHAR NOT NULL
         CHECK (confidence IN ('exact','high','medium','low','fuzzy_match')),
-    valid_from        DATE NOT NULL DEFAULT DATE '2000-01-01',
-    valid_to          DATE NOT NULL DEFAULT DATE '9999-12-31',
-    computed_at       TIMESTAMP DEFAULT NOW(),
+    routing_confidence  VARCHAR DEFAULT 'high'  -- high|medium|low
+        CHECK (routing_confidence IN ('high','medium','low')),
+    review_due_date     DATE,  -- NULL for high confidence; annual review for low/medium
+    valid_from          DATE NOT NULL DEFAULT DATE '2000-01-01',
+    valid_to            DATE NOT NULL DEFAULT DATE '9999-12-31',
+    computed_at         TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (entity_id, rollup_type, valid_from),
     -- ux_rollup_active: one active rollup per (entity, type)
     UNIQUE (entity_id, rollup_type, valid_to)

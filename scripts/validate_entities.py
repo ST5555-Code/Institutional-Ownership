@@ -757,6 +757,38 @@ def gate_phase35_jv_review(con):
     }
 
 
+def gate_manual_routing_review(con):
+    """Flag manual/medium-confidence rollup routings that are past their
+    review_due_date. PASS if 0 overdue, MANUAL if any exist (force human review).
+    Applies to both economic_control_v1 and decision_maker_v1.
+    """
+    try:
+        overdue = con.execute("""
+            SELECT COUNT(*) FROM entity_rollup_history
+            WHERE routing_confidence IN ('medium', 'low')
+              AND review_due_date IS NOT NULL
+              AND review_due_date < CURRENT_DATE
+              AND valid_to = '9999-12-31'
+        """).fetchone()[0]
+
+        total_review = con.execute("""
+            SELECT COUNT(*) FROM entity_rollup_history
+            WHERE routing_confidence IN ('medium', 'low')
+              AND review_due_date IS NOT NULL
+              AND valid_to = '9999-12-31'
+        """).fetchone()[0]
+    except Exception as e:
+        return "MANUAL", {"error": str(e), "threshold": "columns not present"}
+
+    status = "PASS" if overdue == 0 else "MANUAL"
+    return status, {
+        "threshold": "0 overdue manual routings; MANUAL if >0",
+        "total_manual_routings": total_review,
+        "overdue": overdue,
+        "notes": "Manual routings (umbrella trust fixes, name-based matches) require annual review as source data changes.",
+    }
+
+
 GATES = [
     ("structural_aliases", gate_structural_aliases),
     ("structural_identifiers", gate_structural_identifiers),
@@ -773,6 +805,7 @@ GATES = [
     ("phase3_resolution_rate", gate_phase3_resolution_rate),
     ("phase35_adv_coverage", gate_phase35_adv_coverage),
     ("phase35_jv_review", gate_phase35_jv_review),
+    ("manual_routing_review", gate_manual_routing_review),
 ]
 
 
