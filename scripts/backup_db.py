@@ -6,8 +6,21 @@ Used as a belt-and-suspenders safety net around any risky entity
 mutation. Backups are stored under data/backups/ as DuckDB EXPORT
 DATABASE directories (one per snapshot, fully self-contained).
 
+Backups run MANUALLY, not on a schedule. Every invocation prompts for
+confirmation before doing anything (because EXPORT DATABASE scans the
+whole DB and writes ~3 GB of parquet — not something you want triggered
+by accident). Pass --no-confirm to bypass the prompt for scripted /
+automated runs.
+
+When to back up:
+  - Before any DM13 / DM14 / DM15 audit pass
+  - Before Stage 5 cleanup (on or after 2026-05-09)
+  - Before any non-routine entity migration
+  - At analyst discretion before risky manual edits
+
 Usage:
-  python3 scripts/backup_db.py                   # take a backup
+  python3 scripts/backup_db.py                   # take a backup (prompts)
+  python3 scripts/backup_db.py --no-confirm      # skip prompt (scripted)
   python3 scripts/backup_db.py --list            # list existing backups
   python3 scripts/backup_db.py --staging         # back up the staging DB
 """
@@ -61,7 +74,18 @@ def list_backups() -> None:
         print(f"{name:<40}  {size:>10}  {mtime:<20}")
 
 
-def take_backup(staging: bool) -> Path:
+def confirm_backup(backup_dir: Path, src_size_gb: float) -> None:
+    """Interactive confirmation prompt before any backup. Bypassed by --no-confirm."""
+    print(f"About to create full DB backup at: {backup_dir}")
+    print(f"  source size:    ~{src_size_gb:.1f} GB")
+    print(f"  this scans the entire DB and writes ~{src_size_gb * 0.4:.1f} GB of parquet")
+    response = input("Confirm backup? (yes/no): ").strip().lower()
+    if response != "yes":
+        print("Backup cancelled.")
+        sys.exit(0)
+
+
+def take_backup(staging: bool, no_confirm: bool) -> Path:
     import duckdb
 
     src = db.STAGING_DB if staging else db.PROD_DB
@@ -76,6 +100,10 @@ def take_backup(staging: bool) -> Path:
     if dest.exists():
         print(f"ERROR: backup directory already exists: {dest}", file=sys.stderr)
         sys.exit(2)
+
+    src_size_gb = os.path.getsize(src) / (1024 ** 3)
+    if not no_confirm:
+        confirm_backup(dest, src_size_gb)
 
     print(f"Backing up {src} → {dest}")
     print("(EXPORT DATABASE — this scans the entire DB; please wait)")
@@ -100,12 +128,15 @@ def main() -> None:
     p.add_argument("--list", action="store_true", help="list existing backups")
     p.add_argument("--staging", action="store_true",
                    help="back up the staging DB instead of production")
+    p.add_argument("--no-confirm", action="store_true",
+                   help="bypass the interactive confirmation prompt "
+                        "(for scripted / automated use)")
     args = p.parse_args()
 
     if args.list:
         list_backups()
         return
-    take_backup(staging=args.staging)
+    take_backup(staging=args.staging, no_confirm=args.no_confirm)
 
 
 if __name__ == "__main__":

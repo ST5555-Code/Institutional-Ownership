@@ -285,21 +285,41 @@ staging before production. No exceptions.
 
 ### Rollback options
 
-- **Promotion snapshot** (intra-DB tables in production):
+- **Promotion snapshot** (intra-DB tables in production, automatic):
   `python3 scripts/rollback_promotion.py --restore SNAPSHOT_ID`
-- **Full DB restore** from EXPORT DATABASE backup:
+- **Full DB restore** from EXPORT DATABASE backup (manual, see backup protocol below):
   ```
   python3 scripts/backup_db.py --list
   # then duckdb data/13f.duckdb -c "IMPORT DATABASE 'data/backups/...'"
   ```
 - **SCD Type 2 history** — query entity tables at any historical `valid_from` for point-in-time view (not a rollback, but proves what was true when)
 
+### Backup protocol
+
+`backup_db.py` runs **manually**, never on a schedule. Every invocation
+prompts for confirmation before doing anything (EXPORT DATABASE scans
+the entire DB and writes ~3 GB of parquet — not something you want
+triggered by accident). Pass `--no-confirm` to bypass the prompt for
+scripted / automated runs.
+
+When to back up:
+
+- Before any DM13 / DM14 / DM15 audit pass
+- Before Stage 5 cleanup (on or after 2026-05-09)
+- Before any non-routine entity migration
+- At analyst discretion before risky manual edits
+
+Backups are NOT part of the monthly maintenance checklist — promotion
+snapshots taken automatically by `promote_staging.py` already cover
+day-to-day rollback needs. Full backups are reserved for known-risky
+sessions where the snapshot mechanism alone isn't enough insurance.
+
 ### Monthly maintenance checklist
 
-- `python3 scripts/backup_db.py` — full DB backup
-- `python3 scripts/validate_entities.py` — production health check
+- `python3 scripts/validate_entities.py` — production health check (expect 1 non-structural FAIL on `wellington_sub_advisory` until INF3 lands)
 - Review `manual_routing_review` gate output for overdue routings
 - `python3 scripts/diff_staging.py` — confirm staging matches production at month boundary
+- (Backups are NOT monthly — see Backup protocol above)
 
 ### Schema drift caveat (Apr 10 2026)
 

@@ -39,11 +39,8 @@ git commit -am "..."
 Run on the first of each month:
 
 ```bash
-# Full DuckDB EXPORT DATABASE backup
-python3 scripts/backup_db.py
-python3 scripts/backup_db.py --list
-
 # Production health check
+# (Expect 1 non-structural FAIL on wellington_sub_advisory until INF3 lands.)
 python3 scripts/validate_entities.py
 
 # Review unreviewed staging diffs (if any)
@@ -53,6 +50,41 @@ ls -lt logs/staging_diff_*.txt | head -5
 # (look for the manual_routing_review gate row in the report)
 cat logs/entity_validation_report.json | python3 -m json.tool | grep -A3 manual_routing_review
 ```
+
+**Backups are NOT part of monthly maintenance.** See "Backup Protocol" below.
+
+## Backup Protocol
+
+`backup_db.py` runs **manually**, never on a schedule. Every invocation
+prompts for confirmation before doing anything — pass `--no-confirm` to
+bypass for scripted / automated use.
+
+```bash
+# Take a backup (interactive prompt)
+python3 scripts/backup_db.py
+
+# Bypass the prompt (scripted)
+python3 scripts/backup_db.py --no-confirm
+
+# List existing backups
+python3 scripts/backup_db.py --list
+
+# Back up the staging DB instead of production
+python3 scripts/backup_db.py --staging
+```
+
+**When to back up:**
+
+- Before any DM13 / DM14 / DM15 audit pass
+- Before Stage 5 cleanup (on or after 2026-05-09)
+- Before any non-routine entity migration
+- At analyst discretion before risky manual edits
+
+Day-to-day entity edits do NOT require full backups — `promote_staging.py`
+takes an automatic intra-DB snapshot of every entity table before applying
+changes, and auto-rolls back on structural validation failure. Full
+backups are reserved for known-risky sessions where the snapshot
+mechanism alone isn't enough insurance.
 
 ## Rollback Procedures
 
