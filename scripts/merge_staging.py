@@ -6,10 +6,21 @@ All fetch scripts write to data/13f_staging.duckdb. This script merges
 staging → production using INSERT OR REPLACE keyed on each table's
 primary key. Production DB is only locked during the merge (seconds).
 
-Run: python3 scripts/merge_staging.py --all                     # Merge all tables
-     python3 scripts/merge_staging.py --tables beneficial_ownership,fetched_tickers_13dg
-     python3 scripts/merge_staging.py --all --dry-run            # Show what would change
-     python3 scripts/merge_staging.py --all --drop-staging       # Delete staging after merge
+IMPORTANT — prefer --tables over --all. `--all` merges every table
+present in the staging DB, including reference tables seeded by
+`db.seed_staging()` (holdings, managers, fund_holdings, market_data,
+adv_managers, filings, securities, parent_bridge) and any entity
+tables left over from a prior `sync_staging.py` run. For tables not
+in `TABLE_KEYS`, the merge path does a full DROP + CREATE TABLE AS
+SELECT, which would silently revert any concurrent prod writes or
+promote in-progress entity staging edits bypassing the INF1 staging
+workflow. `--all` now requires an explicit `--i-really-mean-all`
+acknowledgement (INF10, 2026-04-10).
+
+Run: python3 scripts/merge_staging.py --tables beneficial_ownership,short_interest
+     python3 scripts/merge_staging.py --tables X --dry-run
+     python3 scripts/merge_staging.py --tables X --drop-staging
+     python3 scripts/merge_staging.py --all --i-really-mean-all    # destructive, see above
 """
 
 import argparse
@@ -21,14 +32,23 @@ import duckdb
 from db import PROD_DB, STAGING_DB
 
 # Table definitions: name → primary key column(s)
+#
+# Semantics:
+#   pk_cols = [col, ...]  → DELETE+INSERT by PK (upsert). Safe, idempotent.
+#   pk_cols = None        → DROP TABLE + CREATE TABLE AS SELECT (full replace).
+#                           Use only for rebuilt / derived tables where the
+#                           staging copy is authoritative for the whole table.
+#
+# Warning: `None` means FULL REPLACEMENT, not "append." Any comment that
+# says otherwise is wrong — see the merge_table() else-branch below.
 TABLE_KEYS = {
     "beneficial_ownership": ["accession_number"],
-    "beneficial_ownership_current": None,  # rebuilt, not merged — replace entirely
+    "beneficial_ownership_current": None,  # rebuilt downstream — full replace
     "fetched_tickers_13dg": ["ticker"],
     "listed_filings_13dg": ["accession_number"],
     "short_interest": ["ticker", "report_date"],
-    "ncen_adviser_map": None,  # no PK — append-only
-    "fund_holdings": None,  # large table — append new rows by (series_id, quarter, cusip)
+    "ncen_adviser_map": None,  # rebuilt from N-CEN fetch — full replace
+    "fund_holdings": None,  # rebuilt from N-PORT fetch — full replace
     "fund_universe": ["series_id"],
     "fund_classes": ["class_id"],
     "lei_reference": ["lei"],
@@ -139,8 +159,8 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
         # Replace entire table — drop and recreate from staging
         try:
             prod_con.execute(f"DROP TABLE IF EXISTS {table}")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"    WARNING: DROP TABLE {table} failed ({e}); continuing")
         prod_con.execute(f"""
             CREATE TABLE {table} AS
             SELECT {select_cols} FROM staging_db.{table}
@@ -150,7 +170,18 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Merge staging DB into production")
-    parser.add_argument("--all", action="store_true", help="Merge all tables")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Merge every table in staging. DESTRUCTIVE — requires --i-really-mean-all.",
+    )
+    parser.add_argument(
+        "--i-really-mean-all",
+        action="store_true",
+        dest="confirm_all",
+        help="Acknowledge that --all merges every staging table including reference "
+             "tables and can overwrite prod with staging state. Required with --all.",
+    )
     parser.add_argument("--tables", type=str, help="Comma-separated table names to merge")
     parser.add_argument("--dry-run", action="store_true", help="Show what would change without writing")
     parser.add_argument("--drop-staging", action="store_true", help="Delete staging DB after successful merge")
@@ -158,6 +189,21 @@ def main():
 
     if not args.all and not args.tables:
         parser.error("Specify --all or --tables")
+
+    # INF10 guardrail (2026-04-10): `--all` used to be the default call
+    # from run_pipeline.sh, and would silently full-replace every table
+    # in staging — including reference tables like holdings, managers,
+    # fund_holdings, market_data (tables not in TABLE_KEYS hit the
+    # drop+recreate branch of merge_table()). The pipeline now names
+    # tables explicitly; anyone still reaching for --all must opt in
+    # explicitly to make the scope visible at the call site.
+    if args.all and not args.confirm_all and not args.dry_run:
+        parser.error(
+            "--all is destructive: it full-replaces every non-PK staging table "
+            "(holdings, managers, entities, ...). Pass --i-really-mean-all to "
+            "acknowledge, or use --tables <name,...> for a targeted merge. "
+            "--dry-run bypasses this check for inspection."
+        )
 
     if not os.path.exists(STAGING_DB):
         print(f"No staging DB found at {STAGING_DB}")
@@ -223,8 +269,8 @@ def main():
                     columns = get_columns(staging_con, table)
                     col_list = ", ".join(columns)
                     prod_con.execute(f"CREATE TABLE {table} AS SELECT {col_list} FROM staging_db.{table} WHERE 1=0")
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"    WARNING: pre-create of empty {table} failed ({e}); continuing")
 
         try:
             added, replaced, prev = merge_table(prod_con, staging_con, table, pk_cols, dry_run=args.dry_run)

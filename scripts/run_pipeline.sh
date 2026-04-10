@@ -48,7 +48,23 @@ python3 -u scripts/fetch_13dg.py --staging --phase3-only "$@" 2>&1 | tee logs/ph
 phase_end "Phase 3"
 
 phase_start "Merge staging → production"
-python3 -u scripts/merge_staging.py --all --drop-staging 2>&1 | tee logs/merge.log
+# INF10 fix (2026-04-10): previously this step ran `merge_staging.py --all
+# --drop-staging`, which merges every table currently present in staging.
+# Staging normally contains the reference tables seeded by seed_staging()
+# (holdings, managers, fund_holdings, market_data, adv_managers, filings,
+# securities, parent_bridge) plus any entity tables left over from a prior
+# sync_staging run — and for any table not in merge_staging.TABLE_KEYS the
+# merge path does a full DROP+CREATE TABLE AS SELECT, replacing prod with
+# whatever is in staging. Common case was a no-op because seed_staging copies
+# from prod at pipeline start, but any concurrent prod write between seed
+# and merge silently reverted, and any in-progress entity staging edits
+# would have been promoted bypassing the INF1 workflow.
+#
+# Name the 13D/G output tables explicitly. If future pipelines grow new
+# output tables, add them here — do not revert to `--all`.
+python3 -u scripts/merge_staging.py \
+  --tables beneficial_ownership,beneficial_ownership_current,fetched_tickers_13dg,listed_filings_13dg,short_interest,ncen_adviser_map \
+  --drop-staging 2>&1 | tee logs/merge.log
 phase_end "Merge"
 
 echo ""
