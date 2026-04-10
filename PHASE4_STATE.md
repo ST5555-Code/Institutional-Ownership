@@ -93,7 +93,7 @@ Item 1 result: **0 FAILs, 8 PASS, 7 MANUAL**
 
 ## Migration Approach
 
-New data primary, old data shadow. App switches to entity-backed tables immediately. Old tables kept as `_legacy` for 2-week validation.
+New data primary, old data shadow. App switches to entity-backed tables after pre-cutover scan passes. Legacy tables retained 30 days post-cutover, no fixed validation window — cutover authorized when background log is clean.
 
 ## AUM Parity Check (2026-04-09)
 

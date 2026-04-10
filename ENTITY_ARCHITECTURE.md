@@ -200,10 +200,10 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 1. Create holdings_v2 with entity_id FK, backfill from entity_identifiers, build indexes
 2. Switch app.py to use holdings_v2 as primary — new data serves all queries immediately
 3. Rename old tables to _legacy suffix — keep for shadow validation
-4. Shadow validation (2 weeks) — log discrepancies between new rollup and legacy rollup
+4. No fixed window — legacy tables retained 30 days post-cutover. Background log reviewed periodically. Cutover authorized when log shows only expected discrepancies (name_change, new_gain).
 5. After sign-off — drop _legacy tables, upgrade entity_current to MATERIALIZED VIEW, add REFRESH to run_pipeline.sh
 **Rationale:** New entity data has higher quality (reviewed classifications, clean parent wiring, deduplicated). No reason to serve stale data while validating.
-**Rollback:** _legacy tables retained 30 days. If critical issue found, rename back.
+**Rollback:** _legacy tables retained 30 days post-cutover. If critical issue found, rename back.
 
 ---
 
