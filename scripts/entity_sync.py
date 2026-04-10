@@ -1168,7 +1168,25 @@ def _verify_adv_relationship(
     child_adv = _lookup_adv_row(con, child_entity_id)
     parent_adv = _lookup_adv_row(con, parent_entity_id)
 
-    # Tier 1 — AUM sanity
+    # Tier 1a — Parent existence (INF5 fix, 2026-04-10). The parent of an
+    # ADV_SCHEDULE_A relationship should be locatable in adv_managers via
+    # its CIK/CRD. Absence is itself a verification failure: in the L5
+    # batch 1 audit, 5 of 6 known-bad ADV mis-matches (AGF→Ally Bridge,
+    # Cairn→CI Investments, Americana→&Partners, Edgewood→GoodHaven,
+    # Huntington→Linscomb) had parents that were legacy-managers-feed
+    # entities with no ADV registration. The previous guard only fired
+    # when both sides had an ADV row with AUM populated, so these
+    # silently passed Tier 1 and landed in production. Legit non-adviser
+    # parents (individuals, trusts, pure holdcos) will now route to the
+    # staging queue for manual review — the correct default.
+    if parent_adv is None:
+        return (
+            False,
+            "low",
+            "tier1_parent_not_in_adv_managers",
+        )
+
+    # Tier 1b — AUM sanity
     if child_adv and parent_adv and child_adv["aum"] and parent_adv["aum"]:
         if parent_adv["aum"] < child_adv["aum"] * 0.5:
             return (
