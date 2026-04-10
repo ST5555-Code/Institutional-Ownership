@@ -18,7 +18,11 @@ repos:
     rev: 1.8.3
     hooks:
       - id: bandit
-        args: [-r, --skip=B101,B608]
+        # Quote the --skip value: in YAML flow style the comma is a list
+        # separator, so `[--skip=B101,B608]` parses as three items and
+        # bandit sees `B608` as a positional file path, silently dropping
+        # the B608 skip. Quoting keeps the comma inside the scalar.
+        args: [-r, "--skip=B101,B608"]
         files: ^scripts/
 
 # NOTE: semgrep not included — broken install on Python 3.9/macOS
