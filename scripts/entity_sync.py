@@ -1114,6 +1114,120 @@ def build_alias_cache(con) -> _AliasCache:
     return _AliasCache(con)
 
 
+def _lookup_adv_row(con, entity_id: int) -> dict | None:
+    """
+    Return dict(aum, state, city) for an entity by walking
+    entity_identifiers (cik/crd) → adv_managers. None if not found.
+    """
+    row = con.execute(
+        """
+        SELECT am.adv_5f_raum, am.state, am.city
+        FROM entity_identifiers ei
+        JOIN adv_managers am
+          ON (ei.identifier_type = 'cik' AND ei.identifier_value = am.cik)
+          OR (ei.identifier_type = 'crd' AND ei.identifier_value = am.crd_number)
+        WHERE ei.entity_id = ?
+          AND ei.valid_to = DATE '9999-12-31'
+        ORDER BY am.adv_5f_raum DESC NULLS LAST
+        LIMIT 1
+        """,
+        [entity_id],
+    ).fetchone()
+    if not row:
+        return None
+    return {"aum": row[0], "state": row[1], "city": row[2]}
+
+
+def _verify_adv_relationship(
+    con,
+    child_entity_id: int,
+    parent_entity_id: int,
+    owner_name: str,
+) -> tuple[bool, str, str]:
+    """
+    Pre-insert verification for ADV ownership relationships.
+
+    Two tiers run synchronously against adv_managers:
+      Tier 1 — AUM sanity: parent AUM must be ≥ 50% of child AUM.
+               A holding company smaller than half the subsidiary is
+               almost always a false match (e.g., Sterling $16M RIA
+               "owning" Securian $43.8B).
+      Tier 2 — State match: if both parent and child have a state on
+               file, they must share it. Subsidiaries occasionally
+               relocate, so a city-only match still passes.
+
+    Tiers 3-6 (EDGAR search, CRD cross-ref, OpenCorporates, web search)
+    are out of scope for DM13 Phase 1 — deferred.
+
+    Returns (verified, confidence_label, reason).
+      verified=False  → caller should route to entity_identifiers_staging
+                         with conflict_reason='adv_ownership_verification_failed'
+                         instead of inserting the relationship.
+      verified=True   → caller may proceed with the normal insert path.
+    """
+    child_adv = _lookup_adv_row(con, child_entity_id)
+    parent_adv = _lookup_adv_row(con, parent_entity_id)
+
+    # Tier 1 — AUM sanity
+    if child_adv and parent_adv and child_adv["aum"] and parent_adv["aum"]:
+        if parent_adv["aum"] < child_adv["aum"] * 0.5:
+            return (
+                False,
+                "low",
+                f"tier1_aum_mismatch: parent ${parent_adv['aum']/1e6:.1f}M "
+                f"< 50% of child ${child_adv['aum']/1e6:.1f}M",
+            )
+
+    # Tier 2 — State match (only fail if both sides have a state)
+    if child_adv and parent_adv and child_adv["state"] and parent_adv["state"]:
+        if child_adv["state"] != parent_adv["state"]:
+            return (
+                False,
+                "low",
+                f"tier2_state_mismatch: parent {parent_adv['state']} vs "
+                f"child {child_adv['state']}",
+            )
+
+    return (True, "medium", "passed_tier1_tier2")
+
+
+def _stage_adv_verification_failure(
+    con,
+    child_entity_id: int,
+    parent_entity_id: int,
+    owner_name: str,
+    reason: str,
+    schedule_type: str,
+) -> None:
+    """
+    Route a failed pre-insert verification to entity_identifiers_staging
+    for manual review. Uses identifier_type='adv_owner_ref' as a synthetic
+    bucket so operators can filter staging queue by this source.
+    """
+    next_id = con.execute(
+        "SELECT nextval('identifier_staging_id_seq')"
+    ).fetchone()[0]
+    con.execute(
+        """
+        INSERT INTO entity_identifiers_staging (
+            staging_id, entity_id, identifier_type, identifier_value,
+            confidence, source, conflict_reason, existing_entity_id,
+            review_status, notes
+        )
+        VALUES (?, ?, 'adv_owner_ref', ?, 'low', ?,
+                'adv_ownership_verification_failed', ?, 'pending', ?)
+        """,
+        [
+            next_id,
+            child_entity_id,
+            owner_name,
+            f"ADV_SCHEDULE_{schedule_type}",
+            parent_entity_id,
+            reason,
+        ],
+    )
+
+
 def insert_adv_ownership(
     con,
     child_entity_id: int,
@@ -1162,6 +1276,21 @@ def insert_adv_ownership(
         if eid is not None:
             result["matched"] = True
             result["parent_entity_id"] = eid
+
+            # DM13 pre-insert verification also applies to mutual_structure
+            # relationships — even though they don't update rollup, a false
+            # match still pollutes the graph and confuses transitive rules.
+            verified, _vconf, vreason = _verify_adv_relationship(
+                con, child_entity_id, eid, owner_name,
+            )
+            if not verified:
+                _stage_adv_verification_failure(
+                    con, child_entity_id, eid, owner_name, vreason, schedule_type,
+                )
+                result["verification_failed"] = True
+                result["verification_reason"] = vreason
+                return result
+
             source = f"ADV_SCHEDULE_{schedule_type}"
             inserted = insert_relationship_idempotent(
                 con, eid, child_entity_id, "mutual_structure", "mutual",
@@ -1185,6 +1314,20 @@ def insert_adv_ownership(
 
     result["matched"] = True
     result["parent_entity_id"] = eid
+
+    # DM13 pre-insert verification: AUM sanity + state match against
+    # adv_managers. Prevents Securian/Sterling-style false matches where
+    # alias cache picks a similarly-named but unrelated entity.
+    verified, _vconf, vreason = _verify_adv_relationship(
+        con, child_entity_id, eid, owner_name,
+    )
+    if not verified:
+        _stage_adv_verification_failure(
+            con, child_entity_id, eid, owner_name, vreason, schedule_type,
+        )
+        result["verification_failed"] = True
+        result["verification_reason"] = vreason
+        return result
 
     source = f"ADV_SCHEDULE_{schedule_type}"
     inserted = insert_relationship_idempotent(
