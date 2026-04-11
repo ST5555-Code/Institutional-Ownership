@@ -1,7 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import './index.css'
 import { TwoCompanyOverlap } from './components/TwoCompanyOverlap'
+
+ModuleRegistry.registerModules([AllCommunityModule])
 
 let _root: ReturnType<typeof ReactDOM.createRoot> | null = null
 
