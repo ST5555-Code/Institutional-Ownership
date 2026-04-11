@@ -197,6 +197,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
       style={{ height: `${36 + 15 * 36 + 2 * 36}px`, width: '100%' }}
     >
       <AgGridReact<TotalRow>
+        theme="legacy"
         rowData={display}
         columnDefs={colDefs}
         pinnedBottomRowData={pinnedBottom}
