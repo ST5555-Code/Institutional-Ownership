@@ -376,6 +376,15 @@ function switchTab(tabId) {
     managerSelector.classList.add('hidden');
     coPanel.classList.add('hidden');
 
+    // Any tab other than 'two-co-overlap' must deactivate the tco panel and
+    // restore results-area. The tco IIFE publishes its deactivator as a
+    // window global; calling it unconditionally here (before the routing
+    // switch) simplifies every leaf branch below — they no longer need to
+    // know the tco panel exists.
+    if (tabId !== 'two-co-overlap' && typeof window._tcoDeactivate === 'function') {
+        window._tcoDeactivate();
+    }
+
     // Route to the right loader
     if (tabId === 'fund-portfolio') {
         managerSelector.classList.remove('hidden');
@@ -402,14 +411,17 @@ function switchTab(tabId) {
     } else if (tabId === 'peer-rotation') {
         loadPeerRotation();
     } else if (tabId === 'two-co-overlap') {
-        // Wired to the tco IIFE via a window global — same per-tab loader
-        // pattern every other branch uses.
+        // Explicit results-area hide for defense-in-depth — tcoActivate()
+        // does the same but keeping this in switchTab matches the pattern
+        // used for fund-portfolio / cross-ownership show/hide. If the tco
+        // IIFE fails to boot for any reason, results-area still disappears.
+        const resultsArea = document.getElementById('results-area');
+        const actionBar = document.querySelector('.action-bar');
+        if (resultsArea) resultsArea.style.display = 'none';
+        if (actionBar) actionBar.style.display = 'none';
         if (typeof window.loadTwoCoOverlap === 'function') window.loadTwoCoOverlap();
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
-        if (typeof window._tcoDeactivate === 'function') window._tcoDeactivate();
-    } else if (typeof window._tcoDeactivate === 'function') {
-        window._tcoDeactivate();
     }
 }
 
@@ -5651,12 +5663,12 @@ loadTickers();
         const resultsArea = document.getElementById('results-area');
         const actionBar   = document.querySelector('.action-bar');
         if (panel) panel.style.display = 'none';
-        if (resultsArea && resultsArea.style.display === 'none') {
-            resultsArea.style.display = '';
-        }
-        if (actionBar && actionBar.style.display === 'none') {
-            actionBar.style.display = '';
-        }
+        // Unconditionally clear inline display so results-area falls back to
+        // its stylesheet-default (block). The earlier guarded form only
+        // restored when the current value was 'none', which could race
+        // against a tab switch that didn't go through tcoActivate first.
+        if (resultsArea) resultsArea.style.display = '';
+        if (actionBar)   actionBar.style.display = '';
     }
 
     // ── quarter buttons ────────────────────────────────────────────────────
