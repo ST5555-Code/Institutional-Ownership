@@ -99,7 +99,7 @@ def _resolve_db_path():
         con.close()
         return DB_PATH
     except Exception as e:
-        app.logger.warning(f"[_resolve_db_path] Main DB locked: {e}")
+        app.logger.warning("[_resolve_db_path] Main DB locked: %s", e)
         if os.path.exists(DB_SNAPSHOT_PATH):
             return DB_SNAPSHOT_PATH
         raise RuntimeError(
@@ -120,13 +120,13 @@ _available_tables = set()
 
 def _start_switchback_monitor():
     """Background thread: check every 60s if primary DB is available again."""
-    global _switchback_running
+    global _switchback_running  # pylint: disable=global-statement
     if _switchback_running:
         return
     _switchback_running = True
 
     def _monitor():
-        global _active_db_path, _switchback_running
+        global _active_db_path, _switchback_running  # pylint: disable=global-statement
         import time as _time
         while True:
             _time.sleep(60)
@@ -152,7 +152,7 @@ def _start_switchback_monitor():
 
 def _refresh_table_list():
     """Cache available table names."""
-    global _available_tables
+    global _available_tables  # pylint: disable=global-statement
     try:
         path = _active_db_path or _resolve_db_path()
         con = duckdb.connect(path, read_only=True)
@@ -171,7 +171,7 @@ def has_table(name):
 
 def _init_db_path():
     """Resolve the database path at startup."""
-    global _active_db_path
+    global _active_db_path  # pylint: disable=global-statement
     _active_db_path = _resolve_db_path()
     _refresh_table_list()
     if _active_db_path != DB_PATH:
@@ -184,7 +184,7 @@ _conn_local = _threading.local()
 def get_db():
     """Get a read-only DuckDB connection. Uses thread-local cache to avoid
     reopening on every request. Caller should NOT close it."""
-    global _active_db_path
+    global _active_db_path  # pylint: disable=global-statement
     with _db_path_lock:
         if _active_db_path is None:
             _active_db_path = _resolve_db_path()
@@ -202,7 +202,7 @@ def get_db():
             return cached
         except Exception as e:
             app.logger.debug("Error: %s", e)
-            pass  # stale — reopen
+            # stale — reopen below
 
     try:
         con = duckdb.connect(path, read_only=True)
@@ -210,7 +210,7 @@ def get_db():
         _conn_local.path = path
         return con
     except Exception as e:
-        app.logger.warning(f"[get_db] Connection stale, re-resolving: {e}")
+        app.logger.warning("[get_db] Connection stale, re-resolving: %s", e)
         with _db_path_lock:
             _active_db_path = _resolve_db_path()
             path = _active_db_path
@@ -221,7 +221,7 @@ def get_db():
 
 
 # Initialize queries module with DB access functions
-queries._setup(get_db, has_table)
+queries._setup(get_db, has_table)  # pylint: disable=protected-access
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ def api_add_ticker():
             shares_out = sec.get('shares_outstanding')
             market_cap = (shares_out * price) if (shares_out and price) else None
             con = duckdb.connect(PROD_DB)
-            from datetime import datetime
+            from datetime import datetime  # pylint: disable=reimported
             now = datetime.now().strftime('%Y-%m-%d')
             con.execute("""
                 INSERT OR REPLACE INTO market_data (ticker, price_live, market_cap,
@@ -296,7 +296,7 @@ def api_add_ticker():
 
         # Step 3: Fetch 13D/G filings
         try:
-            import edgar
+            import edgar  # pylint: disable=import-error
             edgar.set_identity("serge.tismen@gmail.com")
             company = edgar.Company(ticker)
             filing_count = 0
@@ -362,12 +362,12 @@ def api_admin_stats():
 @app.route('/api/admin/progress')
 def api_admin_progress():
     """Check if a pipeline is running and return progress."""
-    import subprocess
+    import subprocess  # nosec B404
     result = {'running': False}
 
     # Check for running fetch_13dg process
     try:
-        ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True)
+        ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
         if ps.returncode == 0:
             result['running'] = True
     except Exception as e:
@@ -376,7 +376,7 @@ def api_admin_progress():
     # Read progress file
     progress_file = os.path.join(BASE_DIR, 'logs', 'phase2_progress.txt')
     try:
-        with open(progress_file) as f:
+        with open(progress_file, encoding='utf-8') as f:
             lines = f.read().strip().split('\n')
             if lines:
                 result['progress_line'] = lines[0].strip()
@@ -401,7 +401,7 @@ def api_admin_errors():
     """Return recent errors from fetch_13dg_errors.csv."""
     error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
     try:
-        with open(error_file) as f:
+        with open(error_file, encoding='utf-8') as f:
             lines = f.readlines()
         # Return last 20 lines
         recent = ''.join(lines[-20:]) if len(lines) > 20 else ''.join(lines)
@@ -413,7 +413,7 @@ def api_admin_errors():
 @app.route('/api/admin/run_script', methods=['POST'])
 def api_admin_run_script():
     """Run a pipeline script in the background. Returns immediately."""
-    import subprocess
+    import subprocess  # nosec B404
     data = request.json or {}
     script = data.get('script', '')
     flags = data.get('flags', [])
@@ -430,7 +430,7 @@ def api_admin_run_script():
 
     # Check if already running
     try:
-        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
+        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
         if ps.returncode == 0:
             return jsonify({'error': f'{script} is already running'}), 409
     except Exception as e:
@@ -446,8 +446,8 @@ def api_admin_run_script():
     # Run in background
     log_name = script.replace('.py', '').replace('.sh', '')
     log_path = os.path.join(BASE_DIR, 'logs', f'{log_name}_run.log')
-    with open(log_path, 'w') as log_file:
-        proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=BASE_DIR)
+    with open(log_path, 'w', encoding='utf-8') as log_file:
+        proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=BASE_DIR)  # nosec B603
 
     return jsonify({
         'status': 'started',
@@ -463,7 +463,7 @@ def api_admin_manager_changes():
     """D2: Detect manager changes across quarters — new, disappeared, name changes."""
     con = get_db()
     try:
-        from config import LATEST_QUARTER, PREV_QUARTER
+        from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # New managers (in latest quarter but not previous)
         new_mgrs = con.execute(f"""  # nosec B608
             SELECT DISTINCT cik, manager_name, manager_type
@@ -493,7 +493,7 @@ def api_admin_ticker_changes():
     """D3: Detect ticker changes — new tickers, disappeared tickers."""
     con = get_db()
     try:
-        from config import LATEST_QUARTER, PREV_QUARTER
+        from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         new_tickers = con.execute(f"""  # nosec B608
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
@@ -586,7 +586,7 @@ def api_admin_merger_signals():
     """D6: Detect potential mergers — CIK disappears + another CIK's holdings jump."""
     con = get_db()
     try:
-        from config import LATEST_QUARTER, PREV_QUARTER
+        from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # CIKs that disappeared AND had large holdings
         signals = con.execute(f"""  # nosec B608
             WITH gone AS (
@@ -610,7 +610,7 @@ def api_admin_new_companies():
     """D7: New companies with institutional interest — recent entries."""
     con = get_db()
     try:
-        from config import LATEST_QUARTER, PREV_QUARTER
+        from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # Tickers that appeared in latest quarter with significant institutional value
         new_cos = con.execute(f"""  # nosec B608
             SELECT h.ticker, MAX(h.issuer_name) as company,
@@ -694,7 +694,7 @@ def api_admin_data_quality():
         # Error log stats
         error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
         try:
-            with open(error_file) as f:
+            with open(error_file, encoding='utf-8') as f:
                 error_count = sum(1 for _ in f) - 1
             result['fetch_errors'] = error_count
         except FileNotFoundError:
@@ -720,12 +720,12 @@ def api_admin_quarter_config():
 @app.route('/api/admin/staging_preview')
 def api_admin_staging_preview():
     """F5: Preview what merge_staging would do (dry-run)."""
-    import subprocess
+    import subprocess  # nosec B404
     script_path = os.path.join(BASE_DIR, 'scripts', 'merge_staging.py')
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec  # bandit B607 + B603 — known partial-path subprocess
             ['python3', script_path, '--all', '--dry-run'],
-            capture_output=True, text=True, timeout=30, cwd=BASE_DIR,
+            capture_output=True, text=True, timeout=30, cwd=BASE_DIR, check=False,
         )
         return jsonify({
             'output': result.stdout,
@@ -741,12 +741,12 @@ def api_admin_staging_preview():
 @app.route('/api/admin/running')
 def api_admin_running():
     """List currently running pipeline scripts."""
-    import subprocess
+    import subprocess  # nosec B404
     running = []
     for script in ['fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
                    'fetch_finra_short.py', 'compute_flows.py', 'merge_staging.py']:
         try:
-            ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True)
+            ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
             if ps.returncode == 0:
                 pids = ps.stdout.strip().split('\n')
                 running.append({'script': script, 'pids': pids})
@@ -936,10 +936,10 @@ def api_admin_entity_override():
                     )
                 except Exception as e:
                     app.logger.debug("Error: %s", e)
-                    pass  # table might not exist in older staging DBs
+                    # table might not exist in older staging DBs
 
                 # Audit log append
-                with open(log_path, 'a') as f:
+                with open(log_path, 'a', encoding='utf-8') as f:
                     f.write(
                         f"{datetime.now().isoformat()}\tentity_id={entity_id}\taction={action}"
                         f"\tfield={field}\told={old_value}\tnew={new_value}"
@@ -1492,7 +1492,7 @@ def api_short_long():
         result = get_short_long_comparison(ticker)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"short_long error for {ticker}: {e}")
+        app.logger.error("short_long error for %s: %s", ticker, e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1506,7 +1506,7 @@ def api_sector_flows():
         result = get_sector_flows(active_only=active_only, level=level)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"sector_flows error: {e}")
+        app.logger.error("sector_flows error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1528,7 +1528,7 @@ def api_sector_flow_movers():
                                         rollup_type=rt)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"sector_flow_movers error: {e}")
+        app.logger.error("sector_flow_movers error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1549,7 +1549,7 @@ def api_sector_flow_detail():
             rollup_type=rt)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"sector_flow_detail error: {e}")
+        app.logger.error("sector_flow_detail error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1608,7 +1608,7 @@ def api_heatmap():
             'cells': df_to_records(cells),
         }))
     except Exception as e:
-        app.logger.error(f"heatmap error: {e}")
+        app.logger.error("heatmap error: %s", e)
         return jsonify({'error': str(e)}), 500
     finally:
         con.close()
@@ -1672,7 +1672,7 @@ def api_manager_profile():
         }
         return jsonify(clean_for_json(result))
     except Exception as e:
-        app.logger.error(f"manager_profile error: {e}")
+        app.logger.error("manager_profile error: %s", e)
         return jsonify({'error': str(e)}), 500
     finally:
         con.close()
@@ -1714,7 +1714,7 @@ def api_amendments():
             'amendments': df_to_records(amendments),
         }))
     except Exception as e:
-        app.logger.error(f"amendments error: {e}")
+        app.logger.error("amendments error: %s", e)
         return jsonify({'error': str(e)}), 500
     finally:
         con.close()
@@ -1833,7 +1833,7 @@ def _eg_quarter(req):
     to LATEST_QUARTER if missing or unrecognized."""
     # QUARTERS and LATEST_QUARTER are imported at module level (line 15) — no
     # local reimport needed.
-    q = (req.args.get('quarter') or '').strip()
+    q = (req.args.get('quarter') or '').strip()  # nosec B113 — Flask request, not requests lib
     from config import QUARTERS as _QUARTERS  # local alias keeps lookup explicit
     return q if q in _QUARTERS else LATEST_QUARTER
 
@@ -2044,7 +2044,7 @@ def api_peer_rotation():
         result = get_peer_rotation(ticker, active_only=active_only, level=level, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"peer_rotation error: {e}")
+        app.logger.error("peer_rotation error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -2064,7 +2064,7 @@ def api_peer_rotation_detail():
             ticker, peer, active_only=active_only, level=level, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
-        app.logger.error(f"peer_rotation_detail error: {e}")
+        app.logger.error("peer_rotation_detail error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -2080,7 +2080,7 @@ if __name__ == '__main__':
 
     # Resolve database path at startup (creates snapshot if main DB is locked)
     _init_db_path()
-    queries._setup(get_db, has_table)
+    queries._setup(get_db, has_table)  # pylint: disable=protected-access
 
     print()
     print('  13F Ownership Research')
@@ -2090,4 +2090,4 @@ if __name__ == '__main__':
     print(f'  Running at: http://localhost:{port}')
     print()
 
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=False)  # nosec B104 — dev/Render server bind

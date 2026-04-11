@@ -53,7 +53,7 @@ def log_shadow_diff(endpoint, ticker, quarter, new_results, con):
                     new_map[name] = val
 
             ts = _time.strftime('%Y-%m-%d %H:%M:%S')
-            with open(_SHADOW_LOG_PATH, 'a') as f:
+            with open(_SHADOW_LOG_PATH, 'a', encoding='utf-8') as f:
                 for parent, aum in new_map.items():
                     if parent not in legacy:
                         f.write(f"{ts}|{endpoint}|{ticker}|{quarter}|new_gain|{parent}|{aum}|0|100\n")
@@ -64,7 +64,7 @@ def log_shadow_diff(endpoint, ticker, quarter, new_results, con):
                     if parent not in new_map:
                         f.write(f"{ts}|{endpoint}|{ticker}|{quarter}|legacy_only|{parent}|0|{aum}|100\n")
         except Exception as e:
-            logger.debug(f"Shadow diff error: {e}")
+            logger.debug("Shadow diff error: %s", e)
 
     threading.Thread(target=_compare, daemon=True).start()
 
@@ -96,7 +96,7 @@ _has_table = None
 
 def _setup(get_db_fn, has_table_fn):
     """Called by app.py at startup to inject DB access functions."""
-    global _get_db, _has_table
+    global _get_db, _has_table  # pylint: disable=global-statement
     _get_db = get_db_fn
     _has_table = has_table_fn
 
@@ -383,7 +383,7 @@ def get_nport_position(family_patterns, ticker, quarter, con):
                 'source': 'N-PORT',
             }
     except Exception as e:
-        logger.error(f"[get_nport_position] {e}", exc_info=True)
+        logger.error("[get_nport_position] %s", e, exc_info=True)
     return None
 
 
@@ -406,7 +406,7 @@ def get_nport_coverage(ticker, quarter, con):
         if result and result[0]:
             return {'nport_total_value': float(result[0]), 'nport_fund_count': int(result[1])}
     except Exception as e:
-        logger.error(f"[get_nport_coverage] {e}", exc_info=True)
+        logger.error("[get_nport_coverage] %s", e, exc_info=True)
     return {'nport_total_value': None, 'nport_fund_count': 0}
 
 
@@ -539,7 +539,7 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
                            'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT'})
         return result
     except Exception as e:
-        logger.error(f"[get_nport_children] {e}", exc_info=True)
+        logger.error("[get_nport_children] %s", e, exc_info=True)
         return None
 
 
@@ -590,7 +590,7 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
             })
         return result
     except Exception as e:
-        logger.error(f"[get_nport_children_q2] {e}", exc_info=True)
+        logger.error("[get_nport_children_q2] %s", e, exc_info=True)
         return None
 
 
@@ -659,7 +659,7 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
                  'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
                  'source': f"N-PORT ({r.get('role', 'adviser')})"} for r in rows]
     except Exception as e:
-        logger.error(f"[get_nport_children_ncen] {e}", exc_info=True)
+        logger.error("[get_nport_children_ncen] %s", e, exc_info=True)
         return None
 
 
@@ -701,7 +701,7 @@ def _clean_val(v):
     if v is None:
         return None
     if isinstance(v, float):
-        import math
+        import math  # pylint: disable=reimported
         if math.isnan(v) or math.isinf(v):
             return None
     # numpy scalar types — convert to native Python
@@ -710,7 +710,7 @@ def _clean_val(v):
         if isinstance(v, (np.integer,)):
             return int(v)
         if isinstance(v, (np.floating,)):
-            import math
+            import math  # pylint: disable=reimported
             if math.isnan(v) or math.isinf(v):
                 return None
             return float(v)
@@ -806,7 +806,7 @@ def query1(ticker, rollup_type='economic_control_v1'):
                 pn = r['parent_name']
                 if pn not in aum_map and r['val_mm'] and r['val_mm'] > 0:
                     aum_map[pn] = int(r['val_mm'])
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         # N-PORT coverage % per parent (from summary_by_parent)
@@ -820,7 +820,7 @@ def query1(ticker, rollup_type='economic_control_v1'):
             coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                             for _, r in cov_df.iterrows()
                             if r['nport_coverage_pct'] is not None}
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         # Query 2: ALL 13F children for all parents in one pass
@@ -869,7 +869,7 @@ def query1(ticker, rollup_type='economic_control_v1'):
                         for k in kids:
                             k['type'] = _classify_fund_type(k.get('institution'))
                         nport_by_parent[pname] = kids
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
         # Build results — prefer N-PORT children, supplement with 13F entities
@@ -1474,7 +1474,7 @@ def query3(ticker, rollup_type='economic_control_v1'):
                                     })
                                     seen.add(k[0])
             except Exception as e:
-                logger.error(f"[query3 nport batch] {e}", exc_info=True)
+                logger.error("[query3 nport batch] %s", e, exc_info=True)
 
         # N-PORT coverage % per parent (from summary_by_parent)
         coverage_map = {}
@@ -1489,7 +1489,7 @@ def query3(ticker, rollup_type='economic_control_v1'):
                 coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                                 for _, r in cov_df.iterrows()
                                 if r['nport_coverage_pct'] is not None}
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
         results = []
@@ -1580,7 +1580,7 @@ def query3(ticker, rollup_type='economic_control_v1'):
                                     'fund_name': e[0], 'shares': e[1],
                                     'value': e[2], 'note': note,
                                 })
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
             all_children = nport_children + entity_children
@@ -2934,7 +2934,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                     'active_holders_from': len(from_map),
                     'active_holders_to': len(to_map),
                 })
-            except Exception:
+            except Exception:  # nosec B110
                 pass
         summary['econ_retention_trend'] = econ_retention_trend
 
@@ -3172,7 +3172,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ORDER BY quarter_from
             """, [ticker]).fetchdf()
             flow_trend = df_to_records(trend_df)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         # QoQ chart data: compute flow intensity & churn for each sequential quarter pair
@@ -3232,7 +3232,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                     'churn_nonpassive': round(ch_np, 6),
                     'churn_active': round(ch_act, 6),
                 })
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
         return clean_for_json({
@@ -3256,7 +3256,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
         if level == 'parent':
             try:
                 log_shadow_diff('flow_analysis', ticker, LQ, buyers + sellers, con)
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
 
@@ -3336,7 +3336,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 for sec, wt in bw:
                     if sec not in mkt_weights:
                         mkt_weights[sec] = float(wt)
-        except Exception:
+        except Exception:  # nosec B110
             pass
         subj_spx_weight = mkt_weights.get(subj_gics_sector, None)
 
@@ -3533,7 +3533,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                         for k in kids:
                             if k.get('institution'):
                                 all_child_funds.add(k['institution'])
-                except Exception:
+                except Exception:  # nosec B112
                     continue
 
             if all_child_funds:
@@ -3675,7 +3675,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                     shares = r.get('short_shares') or 0
                     if shares > 0:
                         r['short_value'] = shares * live_price
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['nport_trend'] = nport_trend
 
@@ -3721,7 +3721,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                 r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
                 # Name-based classification for consistent type display
                 r['type'] = _classify_fund_type(r.get('fund_name') or '')
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['nport_detail'] = nport_detail
 
@@ -3747,7 +3747,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                 funds_seen[fn][r['quarter']] = float(r['short_shares'])
             nport_by_fund = list(funds_seen.values())
             nport_by_fund.sort(key=lambda x: x.get(LQ, 0), reverse=True)
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['nport_by_fund'] = nport_by_fund
 
@@ -3760,7 +3760,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                 ORDER BY report_date
             """, [ticker]).fetchdf()
             short_volume = df_to_records(sv_df)
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['short_volume'] = short_volume
 
@@ -3828,7 +3828,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                     'net_exposure_pct': net_pct,
                 })
             cross_ref.sort(key=lambda x: x['short_shares'], reverse=True)
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['cross_ref'] = cross_ref
 
@@ -3883,7 +3883,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1'):
                         'short_value': sv,
                         'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,
                     })
-        except Exception:
+        except Exception:  # nosec B110
             pass
         result['short_only_funds'] = short_only
 
@@ -3926,7 +3926,7 @@ def get_short_long_comparison(ticker, rollup_type='economic_control_v1'):
         """, [ticker]).fetchdf()
 
         # N-PORT short positions (negative shares = short)
-        shorts = con.execute(f"""
+        shorts = con.execute("""
             SELECT fh.fund_name,
                    nam.adviser_name,
                    ABS(fh.shares_or_principal) as short_shares,
@@ -4085,7 +4085,7 @@ def _get_summary_impl(ticker):
             """, [ticker]).fetchone()
             if nd and nd[0]:
                 nport_date = str(nd[0])[:10]  # YYYY-MM-DD
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         result = {
@@ -4140,7 +4140,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     all_tickers_ph = ','.join(['?'] * len(tickers))
 
     pivot_cols = ', '.join(
-        "SUM(CASE WHEN ph.ticker = '{}' THEN ph.holding_value END) AS \"{}\"".format(t, t)
+        "SUM(CASE WHEN ph.ticker = '{}' THEN ph.holding_value END) AS \"{}\"".format(t, t)  # pylint: disable=duplicate-string-formatting-argument
         for t in tickers
     )
     total_expr = ' + '.join('COALESCE("{}", 0)'.format(t) for t in tickers)
