@@ -15,9 +15,8 @@ export function CompanyCard() {
     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
       <span style={{ fontWeight: 700, fontSize: '15px', color: '#ffffff' }}>{company.ticker}</span>
       <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{company.company_name}</span>
-      {company.exchange && <span style={{ color: '#64748b', fontSize: '11px' }}>{company.exchange}</span>}
-      {company.mkt_cap != null && <span style={{ color: '#94a3b8', fontSize: '12px' }}>{fmt(company.mkt_cap)}</span>}
-      <span style={{ color: '#64748b', fontSize: '11px' }}>{company.quarter}</span>
+      {company.market_cap != null && <span style={{ color: '#94a3b8', fontSize: '12px' }}>{fmt(company.market_cap)}</span>}
+      <span style={{ color: '#64748b', fontSize: '11px' }}>{company.latest_quarter}</span>
     </div>
   )
 }
