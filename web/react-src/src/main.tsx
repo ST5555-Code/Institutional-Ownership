@@ -21,6 +21,9 @@ function mountTco(ticker: string) {
 ;(window as any).tcoActivate = mountTco
 ;(window as any).tcoMount = mountTco
 
-// Auto-mount on load if element present
+// Auto-mount on load if element present. If switchTab fired before this
+// bundle parsed, it stashed the current ticker on window.__tcoPendingTicker.
+const pendingTicker = (window as any).__tcoPendingTicker || ''
+;(window as any).__tcoPendingTicker = undefined
 const existingRoot = document.getElementById('tco-react-root')
-if (existingRoot) mountTco('')
+if (existingRoot) mountTco(pendingTicker)

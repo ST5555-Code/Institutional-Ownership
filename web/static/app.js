@@ -426,9 +426,12 @@ function switchTab(tabId) {
         const actionBar = document.querySelector('.action-bar');
         if (resultsArea) resultsArea.classList.add('hidden');
         if (actionBar) actionBar.classList.add('hidden');
+        const ticker = (document.getElementById('ticker-input') || {}).value || '';
         if (typeof window.tcoActivate === 'function') {
-            const ticker = (document.getElementById('ticker-input') || {}).value || '';
             window.tcoActivate(ticker);
+        } else {
+            // Bundle not parsed yet — stash ticker for auto-mount to pick up.
+            window.__tcoPendingTicker = ticker;
         }
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
