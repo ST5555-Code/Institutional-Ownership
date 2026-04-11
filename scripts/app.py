@@ -2056,6 +2056,32 @@ def api_two_company_overlap():
         con.close()
 
 
+@app.route('/api/two_company_subject')
+def api_two_company_subject():
+    """Return top 50 holders for subject ticker only — used for immediate
+    tab load before the user selects a second company. Same payload shape
+    as /api/two_company_overlap with all sec_* fields set to None."""
+    from config import QUARTERS as _QUARTERS
+    subject = request.args.get('subject', '').upper().strip()
+    quarter = request.args.get('quarter', '').strip() or LATEST_QUARTER
+    if quarter not in _QUARTERS:
+        quarter = LATEST_QUARTER
+    if not subject:
+        return jsonify({'error': 'Missing subject ticker'}), 400
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        result = queries.get_two_company_subject(subject, quarter, con)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        app.logger.error("two_company_subject error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
 @app.route('/api/entity_resolve')
 def api_entity_resolve():
     """Resolve any entity_id to its canonical institution root.

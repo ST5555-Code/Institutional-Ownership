@@ -5329,3 +5329,116 @@ def get_two_company_overlap(subject, second, quarter, con):
         'fund': fund,
         'meta': meta,
     })
+
+
+def get_two_company_subject(subject, quarter, con):
+    """Subject-only variant of get_two_company_overlap.
+
+    Used by the 2 Companies Overlap tab for the immediate first render when
+    no second ticker has been selected yet. Returns the same payload shape
+    as get_two_company_overlap — {'institutional': [...], 'fund': [...],
+    'meta': {...}} — with every `sec_*` field set to None so the frontend
+    can render "—" placeholders in the second-company columns. The subject
+    panels are top 50 holders ordered by dollar value, same as the overlap
+    endpoint's left-hand side.
+    """
+    # --- Float shares for percent-of-float computation -------------------
+    float_row = con.execute(
+        "SELECT float_shares FROM market_data WHERE ticker = ?",
+        [subject],
+    ).fetchone()
+    subj_float = float_row[0] if float_row else None
+    if not subj_float:
+        subj_float = None
+
+    # --- Institutional panel (top 50 holders of subject) -----------------
+    inst_rows = con.execute("""
+        SELECT
+            COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+            MAX(h.manager_type) as manager_type,
+            SUM(h.shares) as subj_shares,
+            SUM(h.market_value_live) as subj_dollars
+        FROM holdings_v2 h
+        WHERE h.ticker = ?
+          AND h.quarter = ?
+          AND h.market_value_live > 0
+        GROUP BY holder
+        ORDER BY subj_dollars DESC
+        LIMIT 50
+    """, [subject, quarter]).fetchall()
+
+    institutional = []
+    for r in inst_rows:
+        holder, mtype, subj_shares, subj_dollars = r
+        subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
+        subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
+        institutional.append({
+            'holder': holder,
+            'manager_type': mtype,
+            'subj_shares': subj_shares_f,
+            'subj_dollars': subj_dollars_f,
+            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'sec_shares': None,
+            'sec_dollars': None,
+            'sec_pct_float': None,
+            'is_overlap': False,
+        })
+
+    # --- Fund panel (top 50 fund series by NAV position in subject) ------
+    fund_rows = con.execute("""
+        SELECT
+            fh.fund_name as holder,
+            fh.series_id,
+            fh.family_name,
+            SUM(fh.shares_or_principal) as subj_shares,
+            SUM(fh.market_value_usd)    as subj_dollars
+        FROM fund_holdings_v2 fh
+        WHERE fh.ticker = ?
+          AND fh.quarter = ?
+          AND fh.market_value_usd > 0
+        GROUP BY fh.fund_name, fh.series_id, fh.family_name
+        ORDER BY subj_dollars DESC
+        LIMIT 50
+    """, [subject, quarter]).fetchall()
+
+    fund = []
+    for r in fund_rows:
+        holder, series_id, family_name, subj_shares, subj_dollars = r
+        subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
+        subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
+        fund.append({
+            'holder': holder,
+            'series_id': series_id,
+            'family_name': family_name,
+            'subj_shares': subj_shares_f,
+            'subj_dollars': subj_dollars_f,
+            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'sec_shares': None,
+            'sec_dollars': None,
+            'sec_pct_float': None,
+            'is_overlap': False,
+        })
+
+    # --- Meta block ------------------------------------------------------
+    name_row = con.execute("""
+        SELECT MODE(issuer_name) as name
+        FROM holdings_v2
+        WHERE ticker = ? AND quarter = ?
+    """, [subject, quarter]).fetchone()
+    subject_name = name_row[0] if name_row else None
+
+    meta = {
+        'subject': subject,
+        'second': None,
+        'quarter': quarter,
+        'subj_float': subj_float,
+        'sec_float': None,
+        'subject_name': subject_name,
+        'second_name': None,
+    }
+
+    return clean_for_json({
+        'institutional': institutional,
+        'fund': fund,
+        'meta': meta,
+    })
