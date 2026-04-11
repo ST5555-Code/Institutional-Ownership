@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-11 (session end, HEAD: fdda6b2)_
+_Last updated: 2026-04-11 (session end, HEAD: a0f26c1)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `fdda6b2`
+- **HEAD:** `a0f26c1`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (2000+ lines) + `scripts/admin_bp.py` (admin Blueprint, gated by `ENABLE_ADMIN` + `ADMIN_TOKEN`, INF12)
@@ -450,9 +450,18 @@ area. Shell `#0a0f1e`, sidebar `#0d1526` (active `#1a2a4a`), accent
 gold `#f5a623`, content `#f4f6f9`, cards `#ffffff`. Oxford Blue
 `#002147` and Glacier Blue `#4A90D9` retained for legacy components.
 
-**Do NOT build yet** (explicitly deferred): Playwright visual
-regression, `/api/admin/*` token handling, activist red highlight
-styling, Short Interest tab content.
+**Do NOT build yet** (explicitly deferred):
+- **Playwright visual regression testing** — add when **3+ tabs
+  migrated**, not before. Too much churn on the shell in Phase 1 to
+  lock screenshots in early.
+- `/api/admin/*` token handling in the React fetch layer (INF12
+  landed the server-side gating; client side still needs the
+  `X-Admin-Token` header helper ported from `admin.html`'s
+  `adminFetch()`).
+- Activist flag as red highlight on Register + Conviction rows
+  (styling only, not a tab).
+- Short Interest tab content (tab placeholder still fine — the
+  data pipeline exists in Flask).
 
 ### UI tweaks still pending
 
