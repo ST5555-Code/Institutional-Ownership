@@ -5830,7 +5830,7 @@ loadTickers();
     function _tcoSetLoading() {
         ['tco-inst-body', 'tco-fund-body'].forEach(function (id) {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#888;">Loading…</td></tr>';
+            if (el) el.innerHTML = '<tr><td colspan="7" style="padding:12px; text-align:center; color:#888;">Loading…</td></tr>';
         });
         ['tco-inst-foot', 'tco-fund-foot'].forEach(function (id) {
             const el = document.getElementById(id);
@@ -5864,7 +5864,7 @@ loadTickers();
         const display = rows.slice(0, 15);
 
         if (!display.length) {
-            tbody.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#888;">No data</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:12px; text-align:center; color:#888;">No data</td></tr>';
             if (tfoot) tfoot.innerHTML = '';
             const emptySum = document.getElementById('tco-' + type + '-summary');
             if (emptySum) emptySum.style.display = 'none';
@@ -5892,7 +5892,6 @@ loadTickers();
                 + '<td style="width:16px;"></td>'
                 + '<td style="text-align:right; padding-right:4px; width:62px;">' + sval + '</td>'
                 + '<td style="text-align:right; width:62px;">' + cval + '</td>'
-                + '<td style="width:3px;"></td>'
                 + '</tr>';
         }).join('');
 
@@ -5912,7 +5911,6 @@ loadTickers();
                     + '<td style="width:16px;"></td>'
                     + '<td style="text-align:right; padding-right:4px; width:62px;">$' + _fmtM(t.sumSval) + '</td>'
                     + '<td style="text-align:right; width:62px;">' + (t.sumCval > 0 ? '$' + _fmtM(t.sumCval) : '\u2014') + '</td>'
-                    + '<td style="width:3px;"></td>'
                     + '</tr>';
             }).join('');
         }
