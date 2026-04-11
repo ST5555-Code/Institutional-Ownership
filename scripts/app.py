@@ -1949,6 +1949,33 @@ def api_entity_graph():
         con.close()
 
 
+@app.route('/api/two_company_overlap')
+def api_two_company_overlap():
+    """Two Companies Overlap tab — institutional and fund-level holder comparison."""
+    # QUARTERS lives in config; aliased locally to avoid a reimport warning
+    # against the LATEST_QUARTER import at module top.
+    from config import QUARTERS as _QUARTERS
+    subject = request.args.get('subject', '').upper().strip()
+    second = request.args.get('second', '').upper().strip()
+    quarter = request.args.get('quarter', '').strip() or LATEST_QUARTER
+    if quarter not in _QUARTERS:
+        quarter = LATEST_QUARTER
+    if not subject or not second:
+        return jsonify({'error': 'Missing subject or second ticker'}), 400
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        result = queries.get_two_company_overlap(subject, second, quarter, con)
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        app.logger.error("two_company_overlap error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
 @app.route('/api/entity_resolve')
 def api_entity_resolve():
     """Resolve any entity_id to its canonical institution root.

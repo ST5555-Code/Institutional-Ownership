@@ -5149,3 +5149,183 @@ def _eg_fmt_aum_label(val):
     if a >= 1e3:
         return f'${v / 1e3:.0f}K'
     return f'${v:.0f}'
+
+
+# ---------------------------------------------------------------------------
+# Two Companies Overlap tab
+# ---------------------------------------------------------------------------
+#
+# Pairwise institutional + fund-level holder comparison between a Subject
+# ticker and a Second ticker for a given quarter. Returns top-50 holders of
+# the Subject (institutional and fund panels) annotated with the Second
+# company's position size for each shared holder, plus a meta block carrying
+# float shares and issuer names. % of float is computed in Python from
+# market_data.float_shares (null-safe — never divides by zero).
+#
+# The frontend renders this as two side-by-side tables and a small overlap
+# summary that's computed entirely client-side from the 50-row arrays
+# (no second API call).
+
+
+def get_two_company_overlap(subject, second, quarter, con):
+    """Compare institutional + fund holders of two tickers in a single quarter.
+
+    Returns: {'institutional': [...], 'fund': [...], 'meta': {...}}
+    """
+    # --- 3a. Float shares for both tickers (null-safe) -------------------
+    float_rows = con.execute("""
+        SELECT ticker, float_shares
+        FROM market_data
+        WHERE ticker IN (?, ?)
+    """, [subject, second]).fetchall()
+    float_map = {row[0]: row[1] for row in float_rows}
+    subj_float = float_map.get(subject)
+    sec_float = float_map.get(second)
+    # Treat 0 the same as null — guards the per-row pct_float division below.
+    if not subj_float:
+        subj_float = None
+    if not sec_float:
+        sec_float = None
+
+    # --- 3b. Institutional panel (top 50 by Subject $) -------------------
+    inst_rows = con.execute("""
+        WITH subj_holders AS (
+            SELECT
+                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+                MAX(h.manager_type) as manager_type,
+                SUM(h.shares) as subj_shares,
+                SUM(h.market_value_live) as subj_dollars
+            FROM holdings_v2 h
+            WHERE h.ticker = ?
+              AND h.quarter = ?
+              AND h.market_value_live > 0
+            GROUP BY holder
+        ),
+        sec_holders AS (
+            SELECT
+                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+                SUM(h.shares) as sec_shares,
+                SUM(h.market_value_live) as sec_dollars
+            FROM holdings_v2 h
+            WHERE h.ticker = ?
+              AND h.quarter = ?
+              AND h.market_value_live > 0
+            GROUP BY holder
+        )
+        SELECT
+            s.holder,
+            s.manager_type,
+            s.subj_shares,
+            s.subj_dollars,
+            COALESCE(p.sec_shares, 0)   as sec_shares,
+            COALESCE(p.sec_dollars, 0)  as sec_dollars
+        FROM subj_holders s
+        LEFT JOIN sec_holders p ON p.holder = s.holder
+        ORDER BY s.subj_dollars DESC
+        LIMIT 50
+    """, [subject, quarter, second, quarter]).fetchall()
+
+    institutional = []
+    for r in inst_rows:
+        holder, mtype, subj_shares, subj_dollars, sec_shares, sec_dollars = r
+        subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
+        sec_shares_f = float(sec_shares) if sec_shares is not None else 0.0
+        subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
+        sec_dollars_f = float(sec_dollars) if sec_dollars is not None else 0.0
+        institutional.append({
+            'holder': holder,
+            'manager_type': mtype,
+            'subj_shares': subj_shares_f,
+            'subj_dollars': subj_dollars_f,
+            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'sec_shares': sec_shares_f,
+            'sec_dollars': sec_dollars_f,
+            'sec_pct_float': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
+        })
+
+    # --- 3c. Fund panel (top 50 by Subject $) ----------------------------
+    fund_rows = con.execute("""
+        WITH subj_funds AS (
+            SELECT
+                fh.fund_name as holder,
+                fh.series_id,
+                fh.family_name,
+                SUM(fh.shares_or_principal) as subj_shares,
+                SUM(fh.market_value_usd)    as subj_dollars
+            FROM fund_holdings_v2 fh
+            WHERE fh.ticker = ?
+              AND fh.quarter = ?
+              AND fh.market_value_usd > 0
+            GROUP BY fh.fund_name, fh.series_id, fh.family_name
+        ),
+        sec_funds AS (
+            SELECT
+                fh.fund_name as holder,
+                fh.series_id,
+                SUM(fh.shares_or_principal) as sec_shares,
+                SUM(fh.market_value_usd)    as sec_dollars
+            FROM fund_holdings_v2 fh
+            WHERE fh.ticker = ?
+              AND fh.quarter = ?
+              AND fh.market_value_usd > 0
+            GROUP BY fh.fund_name, fh.series_id
+        )
+        SELECT
+            s.holder,
+            s.series_id,
+            s.family_name,
+            s.subj_shares,
+            s.subj_dollars,
+            COALESCE(p.sec_shares, 0)  as sec_shares,
+            COALESCE(p.sec_dollars, 0) as sec_dollars
+        FROM subj_funds s
+        LEFT JOIN sec_funds p ON p.series_id = s.series_id
+        ORDER BY s.subj_dollars DESC
+        LIMIT 50
+    """, [subject, quarter, second, quarter]).fetchall()
+
+    fund = []
+    for r in fund_rows:
+        holder, series_id, family_name, subj_shares, subj_dollars, sec_shares, sec_dollars = r
+        subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
+        sec_shares_f = float(sec_shares) if sec_shares is not None else 0.0
+        subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
+        sec_dollars_f = float(sec_dollars) if sec_dollars is not None else 0.0
+        fund.append({
+            'holder': holder,
+            'series_id': series_id,
+            'family_name': family_name,
+            'subj_shares': subj_shares_f,
+            'subj_dollars': subj_dollars_f,
+            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'sec_shares': sec_shares_f,
+            'sec_dollars': sec_dollars_f,
+            'sec_pct_float': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
+        })
+
+    # --- 3d. Meta block --------------------------------------------------
+    name_rows = con.execute("""
+        SELECT ticker, MODE(issuer_name) as name
+        FROM holdings_v2
+        WHERE ticker IN (?, ?) AND quarter = ?
+        GROUP BY ticker
+    """, [subject, second, quarter]).fetchall()
+    name_map = {row[0]: row[1] for row in name_rows}
+
+    meta = {
+        'subject': subject,
+        'second': second,
+        'quarter': quarter,
+        'subj_float': subj_float,
+        'sec_float': sec_float,
+        'subject_name': name_map.get(subject),
+        'second_name': name_map.get(second),
+    }
+
+    return clean_for_json({
+        'institutional': institutional,
+        'fund': fund,
+        'meta': meta,
+    })

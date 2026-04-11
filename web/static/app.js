@@ -5565,3 +5565,270 @@ loadTickers();
         _boot();
     }
 })();
+
+
+// ===========================================================================
+// Two Companies Overlap tab — appended self-contained module
+// ===========================================================================
+//
+// All identifiers are `tco`-prefixed. Reuses existing fmtDollars / _negWrap
+// helpers from earlier in this file. Tab activation is wired without
+// modifying the existing switchTab() function — same pattern as the
+// Entity Graph IIFE above.
+
+(function () {
+    'use strict';
+
+    let tcoQuartersLoaded = false;
+
+    function _tcoBindTabActivation() {
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function () {
+                if (tab.dataset.tab === 'two-co-overlap') {
+                    tcoActivate();
+                } else {
+                    tcoDeactivate();
+                }
+            });
+        });
+    }
+
+    function tcoActivate() {
+        const panel = document.getElementById('two-co-overlap-tab');
+        const resultsArea = document.getElementById('results-area');
+        const actionBar = document.querySelector('.action-bar');
+        const managerSel = document.getElementById('manager-selector');
+        const coPanelEl = document.getElementById('cross-ownership-panel');
+        const egPanel = document.getElementById('entity-graph-tab');
+        if (panel) panel.style.display = '';
+        if (resultsArea) resultsArea.style.display = 'none';
+        if (actionBar) actionBar.style.display = 'none';
+        if (managerSel) managerSel.classList.add('hidden');
+        if (coPanelEl) coPanelEl.classList.add('hidden');
+        if (egPanel) egPanel.classList.add('hidden');
+
+        tcoEnsureQuarters();
+    }
+
+    function tcoDeactivate() {
+        const panel = document.getElementById('two-co-overlap-tab');
+        if (panel) panel.style.display = 'none';
+        // results-area / action-bar restore is handled by the regular
+        // tab-click handler if a non-eg / non-tco tab is selected. The
+        // entity-graph IIFE manages its own panel.
+        const resultsArea = document.getElementById('results-area');
+        const actionBar = document.querySelector('.action-bar');
+        if (resultsArea && resultsArea.style.display === 'none') {
+            resultsArea.style.display = '';
+        }
+        if (actionBar && actionBar.style.display === 'none') {
+            actionBar.style.display = '';
+        }
+    }
+
+    async function tcoEnsureQuarters() {
+        const sel = document.getElementById('tco-quarter');
+        if (!sel || tcoQuartersLoaded) return;
+        try {
+            const res = await fetch('/api/admin/quarter_config');
+            if (!res.ok) throw new Error('quarter_config HTTP ' + res.status);
+            const data = await res.json();
+            const quarters = (data && data.quarters) || [];
+            const ordered = quarters.slice().reverse();
+            sel.innerHTML = '';
+            ordered.forEach((q, i) => {
+                const opt = document.createElement('option');
+                opt.value = q;
+                opt.textContent = q;
+                if (i === 0) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            tcoQuartersLoaded = true;
+        } catch (e) {
+            console.error('[Two Companies Overlap] failed to load quarters:', e);
+            tcoShowError('Failed to load quarter list: ' + e.message);
+        }
+    }
+
+    function tcoShowError(msg) {
+        const el = document.getElementById('tco-error');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    async function tcoLoad() {
+        const subject = document.getElementById('tco-subject').value.trim().toUpperCase();
+        const second  = document.getElementById('tco-second').value.trim().toUpperCase();
+        const quarter = document.getElementById('tco-quarter').value;
+        if (!subject || !second) {
+            tcoShowError('Enter both tickers.');
+            return;
+        }
+        tcoShowError('');
+        document.getElementById('tco-summary').style.display = 'none';
+        document.getElementById('tco-inst-body').innerHTML = '<tr><td colspan="5" style="padding:12px;">Loading…</td></tr>';
+        document.getElementById('tco-fund-body').innerHTML = '<tr><td colspan="5" style="padding:12px;">Loading…</td></tr>';
+        document.getElementById('tco-inst-foot').innerHTML = '';
+        document.getElementById('tco-fund-foot').innerHTML = '';
+
+        try {
+            const resp = await fetch(
+                `/api/two_company_overlap?subject=${encodeURIComponent(subject)}&second=${encodeURIComponent(second)}&quarter=${encodeURIComponent(quarter)}`
+            );
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                tcoShowError(err.error || ('Server error: HTTP ' + resp.status));
+                document.getElementById('tco-inst-body').innerHTML = '';
+                document.getElementById('tco-fund-body').innerHTML = '';
+                return;
+            }
+            const data = await resp.json();
+            tcoRender(data);
+        } catch (e) {
+            tcoShowError('Request failed: ' + e.message);
+        }
+    }
+
+    function tcoRender(data) {
+        // Update column header labels with the actual ticker symbols
+        document.getElementById('tco-subj-label-inst').textContent = '(' + (data.meta.subject || '') + ')';
+        document.getElementById('tco-sec-label-inst').textContent  = '(' + (data.meta.second || '') + ')';
+        document.getElementById('tco-subj-label-fund').textContent = '(' + (data.meta.subject || '') + ')';
+        document.getElementById('tco-sec-label-fund').textContent  = '(' + (data.meta.second || '') + ')';
+
+        tcoRenderPanel('inst', data.institutional || [], data.meta);
+        tcoRenderPanel('fund', data.fund || [],          data.meta);
+        tcoRenderSummary(data.institutional || [], data.fund || [], data.meta);
+    }
+
+    function tcoFmtPct(val) {
+        if (val == null) return '\u2014';
+        return val.toFixed(2) + '%';
+    }
+
+    function _tcoEsc(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function _tcoTruncate(s, n) {
+        if (s == null) return '';
+        return s.length > n ? s.slice(0, n) + '…' : s;
+    }
+
+    function tcoRenderPanel(type, rows, _meta) {
+        const body = document.getElementById('tco-' + type + '-body');
+        const foot = document.getElementById('tco-' + type + '-foot');
+        if (!body || !foot) return;
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" style="padding:12px; color:#888;">No data available</td></tr>';
+            foot.innerHTML = '';
+            return;
+        }
+
+        const display = rows.slice(0, 25);
+        const html = display.map(r => {
+            const bg = r.is_overlap ? ' style="background:rgba(74, 144, 217, 0.08);"' : '';
+            const fullName = r.holder || '';
+            const truncated = _tcoTruncate(fullName, 35);
+            return '<tr' + bg + '>' +
+                '<td title="' + _tcoEsc(fullName) + '">' + _tcoEsc(truncated) + '</td>' +
+                '<td style="text-align:right;">' + tcoFmtPct(r.subj_pct_float) + '</td>' +
+                '<td style="text-align:right;">' + tcoFmtPct(r.sec_pct_float) + '</td>' +
+                '<td style="text-align:right;">' + fmtDollars(r.subj_dollars) + '</td>' +
+                '<td style="text-align:right;">' + (r.sec_dollars === 0 ? '\u2014' : fmtDollars(r.sec_dollars)) + '</td>' +
+                '</tr>';
+        }).join('');
+        body.innerHTML = html;
+
+        // Tfoot — totals across the 25 displayed rows. % sums skip nulls.
+        let subjPctSum = 0, secPctSum = 0, subjDolSum = 0, secDolSum = 0;
+        let subjPctAny = false, secPctAny = false;
+        display.forEach(r => {
+            if (r.subj_pct_float != null) { subjPctSum += r.subj_pct_float; subjPctAny = true; }
+            if (r.sec_pct_float  != null) { secPctSum  += r.sec_pct_float;  secPctAny  = true; }
+            subjDolSum += (r.subj_dollars || 0);
+            secDolSum  += (r.sec_dollars  || 0);
+        });
+        foot.innerHTML =
+            '<tr style="font-weight:600; border-top:2px solid #ccc;">' +
+            '<td>Top 25 Total</td>' +
+            '<td style="text-align:right;">' + (subjPctAny ? subjPctSum.toFixed(2) + '%' : '\u2014') + '</td>' +
+            '<td style="text-align:right;">' + (secPctAny  ? secPctSum.toFixed(2)  + '%' : '\u2014') + '</td>' +
+            '<td style="text-align:right;">' + fmtDollars(subjDolSum) + '</td>' +
+            '<td style="text-align:right;">' + fmtDollars(secDolSum) + '</td>' +
+            '</tr>';
+    }
+
+    function tcoRenderSummary(instRows, _fundRows, meta) {
+        // The Overlap Summary table is computed entirely client-side from
+        // the institutional 50-row array. Two cohort sizes (top 25, top 50).
+        const subj = meta.subject || 'Subject';
+        const sec  = meta.second  || 'Second';
+
+        document.getElementById('tco-sum-col1').textContent =
+            '% of ' + sec + ' float held by ' + subj + ' top N';
+        document.getElementById('tco-sum-col2').textContent =
+            '% of ' + subj + ' float held by ' + sec + ' top N';
+
+        const cohorts = [25, 50];
+        const bodyRows = cohorts.map(n => {
+            // Subject's top-N institutional holders (already ordered DESC)
+            const subjTop = instRows.slice(0, n);
+            const overlap = subjTop.filter(r => r.is_overlap === true);
+            const overlapCount = overlap.length;
+            // % of Second float held by Subject's top N (sum the overlap rows)
+            const pctSecBySubj = overlap.reduce((acc, r) => {
+                return acc + (r.sec_pct_float != null ? r.sec_pct_float : 0);
+            }, 0);
+            // % of Subject float held by Second's top N — re-rank the same
+            // 50-row array by sec_dollars DESC and take the top N.
+            const secTop = instRows.slice().sort((a, b) => (b.sec_dollars || 0) - (a.sec_dollars || 0)).slice(0, n);
+            const pctSubjBySec = secTop.reduce((acc, r) => {
+                return acc + (r.subj_pct_float != null ? r.subj_pct_float : 0);
+            }, 0);
+
+            return '<tr>' +
+                '<td>Top ' + n + '</td>' +
+                '<td style="text-align:right;">' + overlapCount + '</td>' +
+                '<td style="text-align:right;">' + pctSecBySubj.toFixed(2) + '%</td>' +
+                '<td style="text-align:right;">' + pctSubjBySec.toFixed(2) + '%</td>' +
+                '</tr>';
+        }).join('');
+
+        document.getElementById('tco-summary-body').innerHTML = bodyRows;
+        document.getElementById('tco-summary').style.display = '';
+    }
+
+    function _tcoBindControls() {
+        const loadBtn = document.getElementById('tco-load-btn');
+        if (loadBtn) loadBtn.addEventListener('click', tcoLoad);
+
+        ['tco-subject', 'tco-second'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); tcoLoad(); }
+                });
+            }
+        });
+    }
+
+    function _tcoBoot() {
+        _tcoBindTabActivation();
+        _tcoBindControls();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _tcoBoot);
+    } else {
+        _tcoBoot();
+    }
+})();
