@@ -284,13 +284,13 @@
           <!-- Controls row -->
           <div class="controls-row" style="display:flex; gap:12px; align-items:flex-end; margin-bottom:16px;">
             <div>
-              <label class="control-label">Subject</label>
+              <label class="control-label">Subject (auto)</label>
               <input type="text" id="tco-subject" placeholder="e.g. EQT"
                      class="ticker-input" style="width:100px; text-transform:uppercase;">
             </div>
             <div>
-              <label class="control-label">Second Company</label>
-              <input type="text" id="tco-second" placeholder="e.g. AR"
+              <label class="control-label">Second Ticker</label>
+              <input type="text" id="tco-second" placeholder="e.g. RRC"
                      class="ticker-input" style="width:100px; text-transform:uppercase;">
             </div>
             <div>
@@ -314,15 +314,35 @@
                 <table id="tco-inst-table" class="data-table" style="width:100%;">
                   <thead>
                     <tr>
-                      <th style="text-align:left;">Holder</th>
-                      <th style="text-align:right;">% Float<br><span id="tco-subj-label-inst" style="font-weight:400;"></span></th>
-                      <th style="text-align:right;">% Float<br><span id="tco-sec-label-inst"  style="font-weight:400;"></span></th>
-                      <th style="text-align:right;">$ Subject</th>
-                      <th style="text-align:right;">$ Second</th>
+                      <th rowspan="2" style="text-align:right; width:40px;">#</th>
+                      <th rowspan="2" style="text-align:left; min-width:220px; width:40%;">Holder</th>
+                      <th colspan="2" style="text-align:center; border-bottom:1px solid #ddd;">% Owned</th>
+                      <th colspan="2" style="text-align:center; border-bottom:1px solid #ddd;">Value</th>
+                    </tr>
+                    <tr>
+                      <th id="tco-inst-subj-h1" style="text-align:right; min-width:80px;"></th>
+                      <th id="tco-inst-sec-h1"  style="text-align:right; min-width:80px;"></th>
+                      <th id="tco-inst-subj-h2" style="text-align:right; min-width:90px;"></th>
+                      <th id="tco-inst-sec-h2"  style="text-align:right; min-width:90px;"></th>
                     </tr>
                   </thead>
                   <tbody id="tco-inst-body"></tbody>
                   <tfoot id="tco-inst-foot"></tfoot>
+                </table>
+              </div>
+
+              <!-- Institutional overlap summary -->
+              <div id="tco-inst-summary" style="margin-top:12px; display:none;">
+                <table id="tco-inst-summary-table" class="data-table" style="width:100%; font-size:12px;">
+                  <thead>
+                    <tr>
+                      <th>Cohort</th>
+                      <th style="text-align:right;">Overlap Holders</th>
+                      <th id="tco-inst-sum-col1" style="text-align:right;"></th>
+                      <th id="tco-inst-sum-col2" style="text-align:right;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="tco-inst-summary-body"></tbody>
                 </table>
               </div>
             </div>
@@ -339,37 +359,39 @@
                 <table id="tco-fund-table" class="data-table" style="width:100%;">
                   <thead>
                     <tr>
-                      <th style="text-align:left;">Fund</th>
-                      <th style="text-align:right;">% Float<br><span id="tco-subj-label-fund" style="font-weight:400;"></span></th>
-                      <th style="text-align:right;">% Float<br><span id="tco-sec-label-fund"  style="font-weight:400;"></span></th>
-                      <th style="text-align:right;">$ Subject</th>
-                      <th style="text-align:right;">$ Second</th>
+                      <th rowspan="2" style="text-align:right; width:40px;">#</th>
+                      <th rowspan="2" style="text-align:left; min-width:220px; width:40%;">Fund</th>
+                      <th colspan="2" style="text-align:center; border-bottom:1px solid #ddd;">% Owned</th>
+                      <th colspan="2" style="text-align:center; border-bottom:1px solid #ddd;">Value</th>
+                    </tr>
+                    <tr>
+                      <th id="tco-fund-subj-h1" style="text-align:right; min-width:80px;"></th>
+                      <th id="tco-fund-sec-h1"  style="text-align:right; min-width:80px;"></th>
+                      <th id="tco-fund-subj-h2" style="text-align:right; min-width:90px;"></th>
+                      <th id="tco-fund-sec-h2"  style="text-align:right; min-width:90px;"></th>
                     </tr>
                   </thead>
                   <tbody id="tco-fund-body"></tbody>
                   <tfoot id="tco-fund-foot"></tfoot>
                 </table>
               </div>
+
+              <!-- Fund overlap summary -->
+              <div id="tco-fund-summary" style="margin-top:12px; display:none;">
+                <table id="tco-fund-summary-table" class="data-table" style="width:100%; font-size:12px;">
+                  <thead>
+                    <tr>
+                      <th>Cohort</th>
+                      <th style="text-align:right;">Overlap Holders</th>
+                      <th id="tco-fund-sum-col1" style="text-align:right;"></th>
+                      <th id="tco-fund-sum-col2" style="text-align:right;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="tco-fund-summary-body"></tbody>
+                </table>
+              </div>
             </div>
 
-          </div>
-
-          <!-- Summary bar -->
-          <div id="tco-summary" style="margin-top:24px; display:none;">
-            <h3 style="font-size:14px; font-weight:600; color:#002147; margin-bottom:8px;">
-              Overlap Summary
-            </h3>
-            <table id="tco-summary-table" class="data-table" style="width:auto;">
-              <thead>
-                <tr>
-                  <th>Cohort</th>
-                  <th>Overlap Holders</th>
-                  <th id="tco-sum-col1"></th>
-                  <th id="tco-sum-col2"></th>
-                </tr>
-              </thead>
-              <tbody id="tco-summary-body"></tbody>
-            </table>
           </div>
 
           <div id="tco-error" style="display:none; color:red; margin-top:12px;"></div>

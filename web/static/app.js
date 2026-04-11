@@ -5607,6 +5607,15 @@ loadTickers();
         if (coPanelEl) coPanelEl.classList.add('hidden');
         if (egPanel) egPanel.classList.add('hidden');
 
+        // Auto-fill subject from the main header ticker input if available
+        // and the subject field is still empty. Overwriting is avoided so a
+        // user mid-edit is not clobbered by re-clicking the tab.
+        const mainTickerEl = document.getElementById('ticker-input');
+        const subjInput = document.getElementById('tco-subject');
+        if (subjInput && !subjInput.value && mainTickerEl && mainTickerEl.value) {
+            subjInput.value = mainTickerEl.value.trim().toUpperCase();
+        }
+
         tcoEnsureQuarters();
     }
 
@@ -5666,9 +5675,13 @@ loadTickers();
             return;
         }
         tcoShowError('');
-        document.getElementById('tco-summary').style.display = 'none';
-        document.getElementById('tco-inst-body').innerHTML = '<tr><td colspan="5" style="padding:12px;">Loading…</td></tr>';
-        document.getElementById('tco-fund-body').innerHTML = '<tr><td colspan="5" style="padding:12px;">Loading…</td></tr>';
+        // Hide both per-panel summaries until the new data arrives
+        const instSum = document.getElementById('tco-inst-summary');
+        const fundSum = document.getElementById('tco-fund-summary');
+        if (instSum) instSum.style.display = 'none';
+        if (fundSum) fundSum.style.display = 'none';
+        document.getElementById('tco-inst-body').innerHTML = '<tr><td colspan="6" style="padding:12px;">Loading…</td></tr>';
+        document.getElementById('tco-fund-body').innerHTML = '<tr><td colspan="6" style="padding:12px;">Loading…</td></tr>';
         document.getElementById('tco-inst-foot').innerHTML = '';
         document.getElementById('tco-fund-foot').innerHTML = '';
 
@@ -5691,15 +5704,10 @@ loadTickers();
     }
 
     function tcoRender(data) {
-        // Update column header labels with the actual ticker symbols
-        document.getElementById('tco-subj-label-inst').textContent = '(' + (data.meta.subject || '') + ')';
-        document.getElementById('tco-sec-label-inst').textContent  = '(' + (data.meta.second || '') + ')';
-        document.getElementById('tco-subj-label-fund').textContent = '(' + (data.meta.subject || '') + ')';
-        document.getElementById('tco-sec-label-fund').textContent  = '(' + (data.meta.second || '') + ')';
-
+        // Grouped header labels and per-panel summaries are now updated
+        // inside tcoRenderPanel() itself.
         tcoRenderPanel('inst', data.institutional || [], data.meta);
         tcoRenderPanel('fund', data.fund || [],          data.meta);
-        tcoRenderSummary(data.institutional || [], data.fund || [], data.meta);
     }
 
     function tcoFmtPct(val) {
@@ -5722,79 +5730,111 @@ loadTickers();
         return s.length > n ? s.slice(0, n) + '…' : s;
     }
 
-    function tcoRenderPanel(type, rows, _meta) {
+    function tcoRenderPanel(type, rows, meta) {
         const body = document.getElementById('tco-' + type + '-body');
         const foot = document.getElementById('tco-' + type + '-foot');
         if (!body || !foot) return;
 
+        // Grouped header ticker labels
+        const s = meta.subject || '';
+        const c = meta.second || '';
+        const pfx = 'tco-' + type;
+        const h1s = document.getElementById(pfx + '-subj-h1');
+        const h1c = document.getElementById(pfx + '-sec-h1');
+        const h2s = document.getElementById(pfx + '-subj-h2');
+        const h2c = document.getElementById(pfx + '-sec-h2');
+        if (h1s) h1s.textContent = s;
+        if (h1c) h1c.textContent = c;
+        if (h2s) h2s.textContent = s;
+        if (h2c) h2c.textContent = c;
+
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="5" style="padding:12px; color:#888;">No data available</td></tr>';
+            body.innerHTML = '<tr><td colspan="6" style="padding:12px; color:#888; text-align:center;">No data available</td></tr>';
             foot.innerHTML = '';
+            // Hide the summary block for empty datasets
+            const emptySum = document.getElementById(pfx + '-summary');
+            if (emptySum) emptySum.style.display = 'none';
             return;
         }
 
-        const display = rows.slice(0, 25);
-        const html = display.map(r => {
+        // Top 15 rows displayed; summary still uses the full 50-row array.
+        const display = rows.slice(0, 15);
+        body.innerHTML = display.map((r, idx) => {
             const bg = r.is_overlap ? ' style="background:rgba(74, 144, 217, 0.08);"' : '';
-            const fullName = r.holder || '';
-            const truncated = _tcoTruncate(fullName, 35);
+            const fullName = r.holder || '\u2014';
+            // Subject % — null → em dash; 0 still shows as 0.00% (rare)
+            const spct = (r.subj_pct_float != null)
+                ? r.subj_pct_float.toFixed(2) + '%'
+                : '\u2014';
+            // Second % — em dash when sec_shares is falsy (zero / null),
+            // even if sec_pct_float rounded to 0.00
+            const cpct = (r.sec_pct_float != null && r.sec_shares > 0)
+                ? r.sec_pct_float.toFixed(2) + '%'
+                : '\u2014';
+            const sdol = (r.subj_dollars && r.subj_dollars > 0) ? fmtDollars(r.subj_dollars) : '\u2014';
+            const cdol = (r.sec_dollars  && r.sec_dollars  > 0) ? fmtDollars(r.sec_dollars)  : '\u2014';
             return '<tr' + bg + '>' +
-                '<td title="' + _tcoEsc(fullName) + '">' + _tcoEsc(truncated) + '</td>' +
-                '<td style="text-align:right;">' + tcoFmtPct(r.subj_pct_float) + '</td>' +
-                '<td style="text-align:right;">' + tcoFmtPct(r.sec_pct_float) + '</td>' +
-                '<td style="text-align:right;">' + fmtDollars(r.subj_dollars) + '</td>' +
-                '<td style="text-align:right;">' + (r.sec_dollars === 0 ? '\u2014' : fmtDollars(r.sec_dollars)) + '</td>' +
+                '<td style="text-align:right; color:#888; padding-right:8px;">' + (idx + 1) + '</td>' +
+                '<td title="' + _tcoEsc(fullName) + '">' + _tcoEsc(fullName) + '</td>' +
+                '<td style="text-align:right;">' + spct + '</td>' +
+                '<td style="text-align:right;">' + cpct + '</td>' +
+                '<td style="text-align:right;">' + sdol + '</td>' +
+                '<td style="text-align:right;">' + cdol + '</td>' +
                 '</tr>';
         }).join('');
-        body.innerHTML = html;
 
-        // Tfoot — totals across the 25 displayed rows. % sums skip nulls.
+        // Tfoot — totals across the 15 displayed rows. Second-column sums
+        // only include rows where the second company actually holds shares.
         let subjPctSum = 0, secPctSum = 0, subjDolSum = 0, secDolSum = 0;
-        let subjPctAny = false, secPctAny = false;
         display.forEach(r => {
-            if (r.subj_pct_float != null) { subjPctSum += r.subj_pct_float; subjPctAny = true; }
-            if (r.sec_pct_float  != null) { secPctSum  += r.sec_pct_float;  secPctAny  = true; }
+            if (r.subj_pct_float != null) subjPctSum += r.subj_pct_float;
+            if (r.sec_pct_float  != null && r.sec_shares > 0) secPctSum += r.sec_pct_float;
             subjDolSum += (r.subj_dollars || 0);
-            secDolSum  += (r.sec_dollars  || 0);
+            if (r.sec_dollars && r.sec_dollars > 0) secDolSum += r.sec_dollars;
         });
         foot.innerHTML =
-            '<tr style="font-weight:600; border-top:2px solid #ccc;">' +
-            '<td>Top 25 Total</td>' +
-            '<td style="text-align:right;">' + (subjPctAny ? subjPctSum.toFixed(2) + '%' : '\u2014') + '</td>' +
-            '<td style="text-align:right;">' + (secPctAny  ? secPctSum.toFixed(2)  + '%' : '\u2014') + '</td>' +
+            '<tr style="font-weight:600; border-top:2px solid #002147;">' +
+            '<td></td>' +
+            '<td>Top 15 Total</td>' +
+            '<td style="text-align:right;">' + subjPctSum.toFixed(2) + '%</td>' +
+            '<td style="text-align:right;">' + (secPctSum > 0 ? secPctSum.toFixed(2) + '%' : '\u2014') + '</td>' +
             '<td style="text-align:right;">' + fmtDollars(subjDolSum) + '</td>' +
-            '<td style="text-align:right;">' + fmtDollars(secDolSum) + '</td>' +
+            '<td style="text-align:right;">' + (secDolSum > 0 ? fmtDollars(secDolSum) : '\u2014') + '</td>' +
             '</tr>';
+
+        // Render the per-panel summary (Top 25 / Top 50) below this table
+        tcoRenderPanelSummary(type, rows, meta);
     }
 
-    function tcoRenderSummary(instRows, _fundRows, meta) {
-        // The Overlap Summary table is computed entirely client-side from
-        // the institutional 50-row array. Two cohort sizes (top 25, top 50).
-        const subj = meta.subject || 'Subject';
-        const sec  = meta.second  || 'Second';
+    function tcoRenderPanelSummary(type, rows, meta) {
+        const summaryDiv  = document.getElementById('tco-' + type + '-summary');
+        const summaryBody = document.getElementById('tco-' + type + '-summary-body');
+        if (!summaryDiv || !summaryBody) return;
 
-        document.getElementById('tco-sum-col1').textContent =
-            '% of ' + sec + ' float held by ' + subj + ' top N';
-        document.getElementById('tco-sum-col2').textContent =
-            '% of ' + subj + ' float held by ' + sec + ' top N';
+        const s = meta.subject || 'Subject';
+        const c = meta.second  || 'Second';
+        const col1 = document.getElementById('tco-' + type + '-sum-col1');
+        const col2 = document.getElementById('tco-' + type + '-sum-col2');
+        if (col1) col1.textContent = '% of ' + c + ' float held by ' + s + ' top N';
+        if (col2) col2.textContent = '% of ' + s + ' float held by ' + c + ' top N';
 
         const cohorts = [25, 50];
-        const bodyRows = cohorts.map(n => {
-            // Subject's top-N institutional holders (already ordered DESC)
-            const subjTop = instRows.slice(0, n);
-            const overlap = subjTop.filter(r => r.is_overlap === true);
-            const overlapCount = overlap.length;
-            // % of Second float held by Subject's top N (sum the overlap rows)
-            const pctSecBySubj = overlap.reduce((acc, r) => {
-                return acc + (r.sec_pct_float != null ? r.sec_pct_float : 0);
+        const bodyHtml = cohorts.map(n => {
+            // Subject's top-N (already ordered DESC by subj_dollars)
+            const subjTop = rows.slice(0, n);
+            const overlapRows = subjTop.filter(r => r.is_overlap === true);
+            const overlapCount = overlapRows.length;
+            // % of Second float held by Subject's top N overlap rows — only
+            // count rows where the second actually has shares.
+            const pctSecBySubj = overlapRows.reduce((acc, r) => {
+                return acc + (r.sec_pct_float != null && r.sec_shares > 0 ? r.sec_pct_float : 0);
             }, 0);
-            // % of Subject float held by Second's top N — re-rank the same
-            // 50-row array by sec_dollars DESC and take the top N.
-            const secTop = instRows.slice().sort((a, b) => (b.sec_dollars || 0) - (a.sec_dollars || 0)).slice(0, n);
+            // % of Subject float held by Second's top N — re-rank the full
+            // 50-row array by sec_dollars DESC, take top N, sum subj_pct_float.
+            const secTop = rows.slice().sort((a, b) => (b.sec_dollars || 0) - (a.sec_dollars || 0)).slice(0, n);
             const pctSubjBySec = secTop.reduce((acc, r) => {
                 return acc + (r.subj_pct_float != null ? r.subj_pct_float : 0);
             }, 0);
-
             return '<tr>' +
                 '<td>Top ' + n + '</td>' +
                 '<td style="text-align:right;">' + overlapCount + '</td>' +
@@ -5803,8 +5843,8 @@ loadTickers();
                 '</tr>';
         }).join('');
 
-        document.getElementById('tco-summary-body').innerHTML = bodyRows;
-        document.getElementById('tco-summary').style.display = '';
+        summaryBody.innerHTML = bodyHtml;
+        summaryDiv.style.display = 'block';
     }
 
     function _tcoBindControls() {
