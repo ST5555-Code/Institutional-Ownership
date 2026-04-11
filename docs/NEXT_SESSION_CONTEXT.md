@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-11 (session end, HEAD: 292feba)_
+_Last updated: 2026-04-11 (session end, HEAD: 59410e7)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `292feba`
+- **HEAD:** `59410e7`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (2000+ lines)
@@ -39,8 +39,8 @@ each working session so the top block stays current.
 
 ## Last session (2026-04-11) — what shipped
 
-22 commits from baseline `56bfa3f` → `292feba`. Three main deliverables
-plus a critical bug fix.
+26 commits from baseline `56bfa3f` → `59410e7`. Four main deliverables,
+a critical bug fix, and an entity-override persistence pass.
 
 ### 1. Entity Graph tab (`a028153`, `9080885`)
 
@@ -112,6 +112,54 @@ plus a critical bug fix.
 - Added `SMOKE TEST` marker comment above `api_tickers` route in
   `app.py` so future smoke tests always include `/api/tickers` in
   their curl set — the gap that let this bug live for weeks
+
+### 4. INF9 Route A — 24 reclassify overrides persisted (`b53e3fa`)
+
+- **Scope narrowed from 39 → 24** after reading
+  `replay_persistent_overrides()` in `build_entities.py`. The replay
+  function supports exactly three action types:
+  `reclassify classification`, `alias_add`, `merge → economic_control_v1`,
+  and it hard-codes `is_activist=FALSE`. Not every Apr-10 fix maps.
+- **24 rows written** to `data/13f_staging.duckdb`
+  `entity_overrides_persistent` covering the full Section 3 L4 audit
+  reclassify fixes: 23 `market_maker` reclassifications (Susquehanna ×3,
+  Jane Street ×7, Optiver ×3, SIG ×2, CTC, Citadel Securities, DRW,
+  Flow Traders, HRT, IMC, Two Sigma Securities, Virtu) + 1
+  `SC US (TTGP) → venture_capital` (= Sequoia Capital US).
+- All 24 CIKs pre-validated to resolve against
+  `entity_identifiers` at commit time. Staging validation:
+  **9 PASS / 0 FAIL / 7 MANUAL** — no regression.
+  `diff_staging.py` reports 0 line-level changes across the 6 diffed
+  table categories (the overrides table is not yet in diff coverage
+  — tracked as INF9e).
+- **Remaining gaps decomposed into 5 follow-ups**, all in
+  `ROADMAP.md` under INFRASTRUCTURE:
+  - **INF9a** — extend replay for `is_activist=TRUE` (2 Apr-10 flag
+    fixes: Mantle Ridge LP FALSE→TRUE, Triangle Securities Wealth
+    TRUE→FALSE). Schema change on `entity_overrides_persistent`
+    required.
+  - **INF9b** — add `rollup_type` column to override row so `merge`
+    can target `decision_maker_v1` (13 DM12 sub-adviser routings).
+  - **INF9c** — add `delete_relationship` / suppress_edge action,
+    OR port ADV-style Tier 1+2 verifier to the `parent_bridge`
+    loader (28 L5 deletions; ADV subset already backstopped by INF5,
+    parent_bridge subset still exposed).
+  - **INF9d** — CIK-less entities (3 orphans: Pacific Life, Stowers
+    Institute, Stonegate Global Financial; + 1 CRD-only:
+    International Assets Advisory) can't be reached by the current
+    CIK-keyed replay. Schema option: replace `entity_cik` with
+    `(identifier_type, identifier_value)` pair.
+  - **INF9e** — extend `diff_staging.py` + `promote_staging.py` to
+    cover the overrides table, and create the table in prod via DDL
+    migration from `entity_schema.sql`. Until this lands, the 24
+    rows live in staging only.
+- **INF9 is no longer the hard gate on `build_entities.py --reset`
+  in the strict sense** — 24 rows are safely persisted in staging,
+  and a staging `--reset` cycle would replay them correctly. But a
+  **prod `--reset` is still blocked**, now by the combination of
+  INF9a–e rather than by a single "write 39 rows" task. Root reason
+  unchanged (manual fixes not yet replayable end-to-end across a
+  rebuild); task has been decomposed into an honest shape.
 
 ### Bonus: INF14 pre-commit wall paid down (`f272570`)
 
@@ -259,12 +307,29 @@ recognizes for the nosec suppression; Python compiles
 - **INF4/6/7/8 fragmentation cleanups.** Loomis Sayles (INF4),
   Tortoise Capital (INF6), eid 2218 Soros/VSS identity confusion
   (INF7 — HIGH priority), Trian (INF8).
-- **INF9 — blocks next `build_entities.py --reset`.** 39 manual
-  2026-04-10 session fixes live as direct rows in
-  `entity_rollup_history` / `entity_classification_history` but NOT in
-  `entity_overrides_persistent`. A `--reset` would wipe them. Required
-  action before any reset: write 39 rows to
-  `entity_overrides_persistent` with source/reason/analyst.
+- **INF9 / 9a / 9b / 9c / 9d / 9e — prod `--reset` still blocked.**
+  Route A landed 2026-04-11 (`b53e3fa`): 24 Section 3 L4 reclassify
+  overrides written to staging `entity_overrides_persistent`. That
+  subset is replayable today. Five follow-ups gate a full prod
+  `--reset`:
+  - **INF9a** — `is_activist` flag (2 Apr-10 rows, Mantle Ridge +
+    Triangle Securities Wealth). Needs schema column + replay
+    extension.
+  - **INF9b** — `rollup_type` on `merge` so DM12 routings can target
+    `decision_maker_v1` (13 rows).
+  - **INF9c** — `delete_relationship` action OR parent_bridge
+    verifier to cover the 28 L5 deletion subset not backstopped by
+    INF5.
+  - **INF9d** — replace `entity_cik` with
+    `(identifier_type, identifier_value)` pair so CIK-less entities
+    (4 rows) are reachable. Three of the four are orphan entities
+    with no feeder backing at all and need a separate
+    `manual_entities_preserve` mechanism.
+  - **INF9e** — extend `diff_staging.py` + `promote_staging.py` +
+    prod DDL so the 24 staged rows can actually reach prod. Without
+    this, INF9 Route A is staging-local indefinitely.
+  - Staging `--reset` would work today and validate replay. A
+    **prod** `--reset` must wait until all five follow-ups land.
 
 ### Data quality follow-ups
 
@@ -319,8 +384,11 @@ pre-commit run bandit --files scripts/app.py scripts/queries.py
   COMPLETED with date and details.
 - Entity changes go through the staging workflow (INF1):
   `sync_staging.py` → `diff_staging.py` → `promote_staging.py`.
-- Never touch INF9 entity overrides until they're persisted to
-  `entity_overrides_persistent` — any `--reset` will wipe them.
+- Entity overrides: Route A reclassify rows are in staging
+  `entity_overrides_persistent` (24 rows, commit `b53e3fa`). Five
+  categories are still NOT persisted — see INF9a–e. A **prod**
+  `--reset` still wipes anything not covered. A **staging** `--reset`
+  would replay Route A correctly.
 - Read files **in full** before editing — no partial reads on first
   touch of a file you intend to modify.
 - Confirm destructive actions before running (kill, `rm`, `git reset
@@ -353,6 +421,10 @@ pre-commit run bandit --files scripts/app.py scripts/queries.py
 ## Session ledger (commits since 2026-04-11 start)
 
 ```
+59410e7 2 Companies Overlap: locked width spec, Active Only, summary card
+f0bcc14 2 Companies Overlap: fix two regressions from c7feb65
+c7feb65 2 Companies Overlap: polish pass (HTML renderers, headers, layout, z-index)
+b53e3fa INF9 Route A: persist 24 reclassify overrides to staging entity_overrides_persistent
 292feba ROADMAP: add 2026-04-11 session entries (Entity Graph, 2 Companies Overlap, B608 fix)
 33a39f9 2 Companies Overlap: per-panel active-only toggles + wider header search
 de09d87 2 Companies Overlap: 1-decimal totals + owned-by cohort labels, wider header ticker input
