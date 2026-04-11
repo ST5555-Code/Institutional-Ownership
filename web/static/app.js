@@ -4932,3 +4932,636 @@ function clearError() { errorMsg.classList.add('hidden'); errorMsg.textContent =
 // Init
 // ---------------------------------------------------------------------------
 loadTickers();
+
+
+// ===========================================================================
+// Entity Graph tab — appended self-contained module
+// ===========================================================================
+//
+// All identifiers are `eg`-prefixed to avoid collisions with the rest of the
+// page. The Entity Graph tab is independent of currentTicker — it activates
+// the institution → filer → fund hierarchy view via vis.js. Tab activation
+// is handled here without modifying the existing switchTab() function.
+//
+// External endpoints used:
+//   GET /api/admin/quarter_config           → quarter list (existing endpoint)
+//   GET /api/entity_search?q=               → institution dropdown
+//   GET /api/entity_children?entity_id=&level=filer|fund&quarter=
+//   GET /api/entity_graph?entity_id=&quarter=&depth=&include_sub_advisers=&top_n_funds=
+
+(function () {
+    'use strict';
+
+    // -------- DOM refs (resolved at first tab activation, not page load) ----
+    let egInitialized = false;
+    let egInstInput, egInstDropdown, egInstHidden;
+    let egFilerSelect, egFundSelect, egQuarterSelect;
+    let egBreadcrumb, egNetworkEl, egLegend, egErrorEl;
+
+    // -------- Module state --------------------------------------------------
+    let egNetwork = null;
+    let egNodesDS = null;        // vis.DataSet for nodes (allows incremental adds)
+    let egEdgesDS = null;        // vis.DataSet for edges
+    let egCurrentGraph = null;   // last fetched graph payload
+    let egCurrentInst = null;    // {entity_id, display_name}
+    let egCurrentFiler = null;   // {entity_id, display_name}
+    let egCurrentFund = null;    // {entity_id, display_name}
+    let egQuarter = '';          // selected quarter string
+    let egSearchDebounce = null;
+    let egSearchAbort = null;
+    let egAutocompleteIdx = -1;
+
+    // ------------------------------------------------------------------------
+    // Tab activation — wired without touching switchTab().
+    // The default tab handler at line ~409 calls switchTab(tabId); switchTab
+    // has no branch for 'entity-graph' so it falls through harmlessly. This
+    // listener runs alongside it and handles panel show/hide.
+    // ------------------------------------------------------------------------
+    function _bindTabActivation() {
+        const allTabs = document.querySelectorAll('.tab');
+        allTabs.forEach(tab => {
+            tab.addEventListener('click', function () {
+                if (tab.dataset.tab === 'entity-graph') {
+                    egActivate();
+                } else {
+                    egDeactivate();
+                }
+            });
+        });
+    }
+
+    function egActivate() {
+        // Reveal panel, hide the regular results area + action bar
+        const tabPanel = document.getElementById('entity-graph-tab');
+        const resultsArea = document.getElementById('results-area');
+        const actionBar = document.querySelector('.action-bar');
+        const managerSel = document.getElementById('manager-selector');
+        const coPanelEl = document.getElementById('cross-ownership-panel');
+        if (tabPanel) tabPanel.classList.remove('hidden');
+        if (resultsArea) resultsArea.style.display = 'none';
+        if (actionBar) actionBar.style.display = 'none';
+        if (managerSel) managerSel.classList.add('hidden');
+        if (coPanelEl) coPanelEl.classList.add('hidden');
+
+        // Lazy init on first activation
+        if (!egInitialized) {
+            egInit();
+        }
+    }
+
+    function egDeactivate() {
+        const tabPanel = document.getElementById('entity-graph-tab');
+        const resultsArea = document.getElementById('results-area');
+        const actionBar = document.querySelector('.action-bar');
+        if (tabPanel) tabPanel.classList.add('hidden');
+        if (resultsArea) resultsArea.style.display = '';
+        if (actionBar) actionBar.style.display = '';
+    }
+
+    // ------------------------------------------------------------------------
+    // One-time init: resolve DOM refs, wire handlers, load quarters, render
+    // legend.
+    // ------------------------------------------------------------------------
+    function egInit() {
+        egInstInput     = document.getElementById('eg-institution-input');
+        egInstDropdown  = document.getElementById('eg-institution-dropdown');
+        egInstHidden    = document.getElementById('eg-institution-id');
+        egFilerSelect   = document.getElementById('eg-filer-select');
+        egFundSelect    = document.getElementById('eg-fund-select');
+        egQuarterSelect = document.getElementById('eg-quarter-select');
+        egBreadcrumb    = document.getElementById('eg-breadcrumb');
+        egNetworkEl     = document.getElementById('eg-network');
+        egLegend        = document.getElementById('eg-legend');
+        egErrorEl       = document.getElementById('eg-error');
+
+        if (!egInstInput || !egNetworkEl) {
+            console.error('[Entity Graph] DOM refs missing — aborting init');
+            return;
+        }
+
+        egInstInput.addEventListener('input', egOnSearchInput);
+        egInstInput.addEventListener('keydown', egOnSearchKeydown);
+        egInstDropdown.addEventListener('click', egOnSearchSelect);
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.eg-input-wrap')) egHideSearchDropdown();
+        });
+
+        egFilerSelect.addEventListener('change', egOnFilerChange);
+        egFundSelect.addEventListener('change', egOnFundChange);
+        egQuarterSelect.addEventListener('change', egOnQuarterChange);
+
+        // Suppress browser context menu on the canvas (acts as reset highlight)
+        egNetworkEl.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            egResetHighlight();
+        });
+
+        egRenderLegend();
+        egLoadQuarters();
+
+        egInitialized = true;
+    }
+
+    // ------------------------------------------------------------------------
+    // Quarter selector — populated from /api/admin/quarter_config
+    // ------------------------------------------------------------------------
+    async function egLoadQuarters() {
+        try {
+            const res = await fetch('/api/admin/quarter_config');
+            if (!res.ok) throw new Error('quarter_config HTTP ' + res.status);
+            const data = await res.json();
+            const quarters = (data && data.quarters) || [];
+            // Latest quarter is the LAST element in config.QUARTERS — show
+            // newest first in the dropdown.
+            const ordered = quarters.slice().reverse();
+            egQuarterSelect.innerHTML = '';
+            ordered.forEach((q, i) => {
+                const opt = document.createElement('option');
+                opt.value = q;
+                opt.textContent = q;
+                if (i === 0) opt.selected = true;
+                egQuarterSelect.appendChild(opt);
+            });
+            egQuarterSelect.disabled = false;
+            egQuarter = ordered[0] || '';
+        } catch (e) {
+            console.error('[Entity Graph] failed to load quarters:', e);
+            egShowError('Failed to load quarter list: ' + e.message);
+        }
+    }
+
+    function egOnQuarterChange() {
+        egQuarter = egQuarterSelect.value;
+        // Re-render the graph if an institution is currently loaded
+        if (egCurrentInst) {
+            egRenderGraph(egCurrentInst.entity_id);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Institution type-ahead
+    // ------------------------------------------------------------------------
+    function egOnSearchInput() {
+        const q = egInstInput.value.trim();
+        egAutocompleteIdx = -1;
+        if (egSearchDebounce) clearTimeout(egSearchDebounce);
+        if (q.length < 2) {
+            egHideSearchDropdown();
+            return;
+        }
+        egSearchDebounce = setTimeout(() => egDoSearch(q), 250);
+    }
+
+    async function egDoSearch(q) {
+        try {
+            if (egSearchAbort) egSearchAbort.abort();
+            egSearchAbort = new AbortController();
+            const res = await fetch('/api/entity_search?q=' + encodeURIComponent(q),
+                                    { signal: egSearchAbort.signal });
+            if (!res.ok) throw new Error('search HTTP ' + res.status);
+            const items = await res.json();
+            egShowSearchDropdown(items);
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('[Entity Graph] search error:', e);
+            }
+        }
+    }
+
+    function egShowSearchDropdown(items) {
+        if (!Array.isArray(items) || items.length === 0) {
+            egInstDropdown.innerHTML = '<div class="eg-autocomplete-item" style="color:#999;cursor:default;">No matches</div>';
+            egInstDropdown.classList.remove('hidden');
+            return;
+        }
+        egInstDropdown.innerHTML = items.map((it, i) =>
+            `<div class="eg-autocomplete-item${i === egAutocompleteIdx ? ' selected' : ''}" data-eid="${it.entity_id}" data-name="${egEscape(it.display_name)}">
+                <span class="eg-ac-name">${egEscape(it.display_name)}</span>
+                <span class="eg-ac-meta">${egEscape(it.entity_type || '')}${it.classification ? ' · ' + egEscape(it.classification) : ''}</span>
+            </div>`
+        ).join('');
+        egInstDropdown.classList.remove('hidden');
+    }
+
+    function egHideSearchDropdown() {
+        if (!egInstDropdown) return;
+        egInstDropdown.classList.add('hidden');
+        egInstDropdown.innerHTML = '';
+        egAutocompleteIdx = -1;
+    }
+
+    function egOnSearchKeydown(e) {
+        const items = egInstDropdown.querySelectorAll('.eg-autocomplete-item[data-eid]');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            egAutocompleteIdx = Math.min(egAutocompleteIdx + 1, items.length - 1);
+            items.forEach((el, i) => el.classList.toggle('selected', i === egAutocompleteIdx));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            egAutocompleteIdx = Math.max(egAutocompleteIdx - 1, 0);
+            items.forEach((el, i) => el.classList.toggle('selected', i === egAutocompleteIdx));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (egAutocompleteIdx >= 0 && items[egAutocompleteIdx]) {
+                egPickInstitution(items[egAutocompleteIdx]);
+            }
+        } else if (e.key === 'Escape') {
+            egHideSearchDropdown();
+        }
+    }
+
+    function egOnSearchSelect(e) {
+        const item = e.target.closest('.eg-autocomplete-item[data-eid]');
+        if (item) egPickInstitution(item);
+    }
+
+    function egPickInstitution(itemEl) {
+        const eid = parseInt(itemEl.dataset.eid, 10);
+        const name = itemEl.dataset.name;
+        egCurrentInst = { entity_id: eid, display_name: name };
+        egCurrentFiler = null;
+        egCurrentFund = null;
+        egInstInput.value = name;
+        egInstHidden.value = String(eid);
+        egHideSearchDropdown();
+        egLoadFilerChildren(eid);
+        egRenderGraph(eid);
+    }
+
+    // ------------------------------------------------------------------------
+    // Cascading dropdowns
+    // ------------------------------------------------------------------------
+    async function egLoadFilerChildren(entityId) {
+        try {
+            const res = await fetch(`/api/entity_children?entity_id=${entityId}&level=filer&quarter=${encodeURIComponent(egQuarter)}`);
+            if (!res.ok) throw new Error('filer HTTP ' + res.status);
+            const items = await res.json();
+            egFilerSelect.innerHTML = '<option value="">— all filers —</option>' +
+                items.map(it => {
+                    const aum = it.aum != null ? ' (' + egFormatAUM(it.aum) + ')' : '';
+                    return `<option value="${it.entity_id}" data-name="${egEscape(it.display_name)}">${egEscape(it.display_name)}${aum}</option>`;
+                }).join('');
+            egFilerSelect.disabled = false;
+            // Reset fund select
+            egFundSelect.innerHTML = '<option value="">— select filer first —</option>';
+            egFundSelect.disabled = true;
+        } catch (e) {
+            console.error('[Entity Graph] filer load error:', e);
+            egShowError('Failed to load filers: ' + e.message);
+        }
+    }
+
+    async function egOnFilerChange() {
+        const eid = egFilerSelect.value;
+        if (!eid) {
+            egCurrentFiler = null;
+            egFundSelect.innerHTML = '<option value="">— select filer first —</option>';
+            egFundSelect.disabled = true;
+            egUpdateBreadcrumb();
+            return;
+        }
+        const opt = egFilerSelect.options[egFilerSelect.selectedIndex];
+        egCurrentFiler = { entity_id: parseInt(eid, 10), display_name: opt.dataset.name };
+
+        // Funds attach to the institution root in this data model — load
+        // funds for the institution rather than the selected filer.
+        const rootId = egCurrentInst ? egCurrentInst.entity_id : eid;
+        try {
+            const res = await fetch(`/api/entity_children?entity_id=${rootId}&level=fund&quarter=${encodeURIComponent(egQuarter)}&top_n=200`);
+            if (!res.ok) throw new Error('fund HTTP ' + res.status);
+            const data = await res.json();
+            const children = (data && data.children) || [];
+            egFundSelect.innerHTML = '<option value="">— all funds —</option>' +
+                children.map(it => {
+                    const nav = it.nav != null ? ' (' + egFormatAUM(it.nav) + ')' : '';
+                    return `<option value="${it.entity_id}" data-name="${egEscape(it.display_name)}">${egEscape(it.display_name)}${nav}</option>`;
+                }).join('');
+            egFundSelect.disabled = false;
+            egCurrentFund = null;
+            egUpdateBreadcrumb();
+        } catch (e) {
+            console.error('[Entity Graph] fund load error:', e);
+            egShowError('Failed to load funds: ' + e.message);
+        }
+    }
+
+    function egOnFundChange() {
+        const eid = egFundSelect.value;
+        if (!eid) {
+            egCurrentFund = null;
+            egUpdateBreadcrumb();
+            return;
+        }
+        const opt = egFundSelect.options[egFundSelect.selectedIndex];
+        egCurrentFund = { entity_id: parseInt(eid, 10), display_name: opt.dataset.name };
+        egUpdateBreadcrumb();
+        // Highlight the selected fund node in the existing graph
+        egHighlightNodeById('fund-' + eid);
+    }
+
+    // ------------------------------------------------------------------------
+    // Graph rendering
+    // ------------------------------------------------------------------------
+    async function egRenderGraph(entityId) {
+        egClearError();
+        try {
+            const url = `/api/entity_graph?entity_id=${entityId}&depth=2&include_sub_advisers=true&top_n_funds=20&quarter=${encodeURIComponent(egQuarter)}`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'graph HTTP ' + res.status);
+            }
+            const data = await res.json();
+            egCurrentGraph = data;
+            egInitNetwork(data);
+            egUpdateBreadcrumb();
+        } catch (e) {
+            console.error('[Entity Graph] render error:', e);
+            egShowError('Failed to render graph: ' + e.message);
+        }
+    }
+
+    function egInitNetwork(data) {
+        if (typeof vis === 'undefined') {
+            egShowError('vis-network library failed to load — check CDN access');
+            return;
+        }
+        // Tear down any existing instance to avoid leaks
+        if (egNetwork) {
+            try { egNetwork.destroy(); } catch (e) { /* noop */ }
+            egNetwork = null;
+        }
+        egNodesDS = new vis.DataSet(data.nodes || []);
+        egEdgesDS = new vis.DataSet(data.edges || []);
+
+        const options = {
+            layout: {
+                hierarchical: {
+                    direction: 'LR',
+                    sortMethod: 'directed',
+                    levelSeparation: 220,
+                    nodeSpacing: 100,
+                    treeSpacing: 150,
+                },
+            },
+            physics: { enabled: false },
+            edges: {
+                smooth: { type: 'cubicBezier', forceDirection: 'horizontal' },
+            },
+            nodes: {
+                shape: 'box',
+                font: { size: 12, face: 'Arial', multi: false },
+                borderWidth: 1,
+                widthConstraint: { maximum: 180 },
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100,
+                multiselect: false,
+            },
+        };
+
+        egNetwork = new vis.Network(egNetworkEl, { nodes: egNodesDS, edges: egEdgesDS }, options);
+
+        egNetwork.on('click', function (params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const connected = egNetwork.getConnectedNodes(nodeId);
+                egHighlightNeighborhood(nodeId, connected);
+                egSyncDropdownsFromNode(nodeId);
+            } else {
+                egResetHighlight();
+            }
+        });
+
+        egNetwork.on('doubleClick', function (params) {
+            if (params.nodes.length > 0) {
+                egToggleExpand(params.nodes[0]);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------------
+    // Highlighting
+    // ------------------------------------------------------------------------
+    function _origColors(node) {
+        // Read original color out of the dataset, since vis mutates on update.
+        return node._origColor || node.color;
+    }
+
+    function egHighlightNeighborhood(nodeId, connectedIds) {
+        if (!egNodesDS) return;
+        const keep = new Set([nodeId, ...(connectedIds || [])]);
+        const updates = [];
+        egNodesDS.forEach(n => {
+            const isOn = keep.has(n.id);
+            updates.push({
+                id: n.id,
+                opacity: isOn ? 1.0 : 0.25,
+            });
+        });
+        egNodesDS.update(updates);
+
+        const edgeUpdates = [];
+        egEdgesDS.forEach(e => {
+            const isOn = keep.has(e.from) && keep.has(e.to);
+            edgeUpdates.push({
+                id: e.id,
+                color: { color: isOn ? (e.color && e.color.color) || '#002147' : '#dddddd' },
+            });
+        });
+        egEdgesDS.update(edgeUpdates);
+    }
+
+    function egResetHighlight() {
+        if (!egNodesDS || !egCurrentGraph) return;
+        // Restore from the original payload
+        egNodesDS.update(egCurrentGraph.nodes.map(n => ({ id: n.id, opacity: 1.0 })));
+        egEdgesDS.update(egCurrentGraph.edges.map(e => ({ id: e.id, color: e.color })));
+    }
+
+    function egHighlightNodeById(nodeId) {
+        if (!egNetwork || !egNodesDS) return;
+        if (!egNodesDS.get(nodeId)) return;
+        const connected = egNetwork.getConnectedNodes(nodeId);
+        egHighlightNeighborhood(nodeId, connected);
+        egNetwork.focus(nodeId, { scale: 1.0, animation: { duration: 300 } });
+    }
+
+    // ------------------------------------------------------------------------
+    // Expand truncated fund list (double-click on expand_trigger)
+    // ------------------------------------------------------------------------
+    async function egToggleExpand(nodeId) {
+        const node = egNodesDS.get(nodeId);
+        if (!node || node.node_type !== 'expand_trigger') return;
+        const filerEid = node.filer_entity_id;
+        if (!filerEid) return;
+        try {
+            const res = await fetch(`/api/entity_children?entity_id=${filerEid}&level=fund&quarter=${encodeURIComponent(egQuarter)}&top_n=10000`);
+            if (!res.ok) throw new Error('expand HTTP ' + res.status);
+            const data = await res.json();
+            const children = (data && data.children) || [];
+            const existingIds = new Set();
+            egNodesDS.forEach(n => existingIds.add(n.id));
+            const newNodes = [];
+            const newEdges = [];
+            children.forEach(c => {
+                const fid = 'fund-' + c.entity_id;
+                if (existingIds.has(fid)) return;
+                newNodes.push({
+                    id: fid,
+                    label: c.display_name + '\n' + egFormatAUM(c.nav),
+                    title: c.display_name + '<br>Series ID: ' + (c.series_id || '—') + '<br>Fund NAV: ' + egFormatAUM(c.nav),
+                    level: 2,
+                    node_type: 'fund',
+                    entity_id: c.entity_id,
+                    series_id: c.series_id,
+                    aum: c.nav,
+                    color: { background: '#2E7D32', border: '#1B5E20' },
+                    font: { color: '#FFFFFF' },
+                });
+                newEdges.push({
+                    from: 'inst-' + filerEid,
+                    to: fid,
+                    arrows: 'to',
+                    dashes: false,
+                    color: { color: '#002147' },
+                    relationship_type: 'fund_sponsor',
+                });
+            });
+            // Remove the trigger node + its edge
+            egNodesDS.remove(nodeId);
+            const removeEdges = [];
+            egEdgesDS.forEach(e => { if (e.to === nodeId || e.from === nodeId) removeEdges.push(e.id); });
+            removeEdges.forEach(eid => egEdgesDS.remove(eid));
+
+            egNodesDS.add(newNodes);
+            egEdgesDS.add(newEdges);
+        } catch (e) {
+            console.error('[Entity Graph] expand error:', e);
+            egShowError('Failed to expand: ' + e.message);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Click → sync dropdowns + breadcrumb
+    // ------------------------------------------------------------------------
+    function egSyncDropdownsFromNode(nodeId) {
+        if (!egNodesDS) return;
+        const node = egNodesDS.get(nodeId);
+        if (!node) return;
+        if (node.node_type === 'fund') {
+            // Find the fund in the dropdown if present, set selection
+            for (let i = 0; i < egFundSelect.options.length; i++) {
+                if (parseInt(egFundSelect.options[i].value, 10) === node.entity_id) {
+                    egFundSelect.selectedIndex = i;
+                    egCurrentFund = { entity_id: node.entity_id, display_name: node.display_name };
+                    break;
+                }
+            }
+        } else if (node.node_type === 'filer') {
+            for (let i = 0; i < egFilerSelect.options.length; i++) {
+                if (parseInt(egFilerSelect.options[i].value, 10) === node.entity_id) {
+                    egFilerSelect.selectedIndex = i;
+                    egCurrentFiler = { entity_id: node.entity_id, display_name: node.display_name };
+                    break;
+                }
+            }
+        }
+        egUpdateBreadcrumb();
+    }
+
+    function egUpdateBreadcrumb() {
+        if (!egBreadcrumb) return;
+        const parts = [];
+        if (egCurrentInst) parts.push(egEscape(egCurrentInst.display_name));
+        if (egCurrentFiler && egCurrentFiler.entity_id !== (egCurrentInst && egCurrentInst.entity_id)) {
+            parts.push(egEscape(egCurrentFiler.display_name));
+        }
+        if (egCurrentFund) parts.push(egEscape(egCurrentFund.display_name));
+        if (egQuarter) parts.push('<span style="color:#888;">' + egEscape(egQuarter) + '</span>');
+        egBreadcrumb.innerHTML = parts.length
+            ? parts.join('<span class="eg-bc-sep">›</span>')
+            : '<span style="color:#aaa;">Search for an institution to begin.</span>';
+    }
+
+    // ------------------------------------------------------------------------
+    // Legend
+    // ------------------------------------------------------------------------
+    function egRenderLegend() {
+        if (!egLegend) return;
+        egLegend.innerHTML = `
+            <div class="eg-legend-item"><span class="eg-legend-swatch" style="background:#002147;"></span>Institution</div>
+            <div class="eg-legend-item"><span class="eg-legend-swatch" style="background:#4A90D9;"></span>13F Filer</div>
+            <div class="eg-legend-item"><span class="eg-legend-swatch" style="background:#2E7D32;"></span>Fund Series</div>
+            <div class="eg-legend-item"><span class="eg-legend-swatch" style="background:#C9B99A;"></span>Sub-adviser</div>
+            <div class="eg-legend-item"><span class="eg-legend-line"></span>Ownership / sponsor</div>
+            <div class="eg-legend-item"><span class="eg-legend-line dashed"></span>Sub-adviser relationship</div>
+        `;
+    }
+
+    // ------------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------------
+    function egFormatAUM(val) {
+        if (val == null) return '\u2014';
+        const num = Number(val);
+        if (!isFinite(num) || num === 0) return '\u2014';
+        const a = Math.abs(num);
+        if (a >= 1e12) return '$' + (num / 1e12).toFixed(1) + 'T';
+        if (a >= 1e9)  return '$' + (num / 1e9).toFixed(1) + 'B';
+        if (a >= 1e6)  return '$' + (num / 1e6).toFixed(0) + 'M';
+        if (a >= 1e3)  return '$' + (num / 1e3).toFixed(0) + 'K';
+        return '$' + num.toFixed(0);
+    }
+
+    function egEscape(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function egShowError(msg) {
+        if (!egErrorEl) return;
+        egErrorEl.textContent = msg;
+        egErrorEl.classList.remove('hidden');
+    }
+
+    function egClearError() {
+        if (!egErrorEl) return;
+        egErrorEl.textContent = '';
+        egErrorEl.classList.add('hidden');
+    }
+
+    // ------------------------------------------------------------------------
+    // Bootstrap — wire tab activation as soon as DOM is ready, and respect
+    // ?tab=entity-graph to allow direct navigation without first loading a
+    // ticker (since the tab bar is gated behind a ticker load otherwise).
+    // ------------------------------------------------------------------------
+    function _boot() {
+        _bindTabActivation();
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'entity-graph') {
+            // Force-reveal the tab container
+            const tabContainer = document.getElementById('tab-container');
+            const emptyState = document.getElementById('empty-state');
+            if (tabContainer) tabContainer.classList.remove('hidden');
+            if (emptyState) emptyState.classList.add('hidden');
+            // Mark the tab active
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            const egTab = document.querySelector('.tab[data-tab="entity-graph"]');
+            if (egTab) egTab.classList.add('active');
+            egActivate();
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _boot);
+    } else {
+        _boot();
+    }
+})();

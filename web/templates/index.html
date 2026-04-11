@@ -6,6 +6,123 @@
     <title>13F Institutional Ownership Research</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <!-- Entity Graph tab — vis.js network (vendored locally, see web/static/vendor/) -->
+    <script src="/static/vendor/vis-network.min.js"></script>
+    <link href="/static/vendor/vis-network.min.css" rel="stylesheet">
+    <style>
+        /* Entity Graph tab — scoped styles, no impact on other tabs */
+        .entity-graph-tab.hidden { display: none; }
+        .entity-graph-tab { padding: 0 16px 16px; }
+        .eg-controls-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .eg-dropdown-group { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+        .eg-dropdown-group:first-child { min-width: 260px; }
+        .eg-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .eg-input-wrap { position: relative; }
+        #eg-institution-input,
+        #eg-filer-select,
+        #eg-fund-select,
+        #eg-quarter-select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            background: #fff;
+            box-sizing: border-box;
+        }
+        #eg-institution-input:focus { outline: 2px solid #4A90D9; outline-offset: -1px; }
+        #eg-filer-select:disabled,
+        #eg-fund-select:disabled { background: #f5f5f5; color: #999; }
+        .eg-autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 280px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            z-index: 1000;
+        }
+        .eg-autocomplete-dropdown.hidden { display: none; }
+        .eg-autocomplete-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .eg-autocomplete-item:hover,
+        .eg-autocomplete-item.selected { background: #e8f0fa; }
+        .eg-autocomplete-item .eg-ac-name { color: #002147; font-weight: 500; }
+        .eg-autocomplete-item .eg-ac-meta { color: #888; font-size: 11px; }
+        .eg-breadcrumb {
+            font-size: 12px;
+            color: #555;
+            padding: 6px 0;
+            min-height: 20px;
+        }
+        .eg-breadcrumb .eg-bc-sep { color: #aaa; margin: 0 6px; }
+        .eg-network {
+            width: 100%;
+            height: 650px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .eg-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 10px 0;
+            font-size: 11px;
+            color: #555;
+        }
+        .eg-legend-item { display: flex; align-items: center; gap: 6px; }
+        .eg-legend-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            border: 1px solid rgba(0,0,0,0.15);
+        }
+        .eg-legend-line {
+            display: inline-block;
+            width: 24px;
+            height: 0;
+            border-top: 2px solid #002147;
+        }
+        .eg-legend-line.dashed { border-top-style: dashed; border-top-color: #C9B99A; }
+        .eg-error {
+            color: #b00020;
+            background: #fdecea;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .eg-error.hidden { display: none; }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -100,6 +217,7 @@
             <button class="tab" data-tab="cross-ownership">Cross-Ownership</button>
             <button class="tab" data-tab="sector-rotation">Sector Rotation</button>
             <button class="tab" data-tab="peer-rotation">Peer Rotation</button>
+            <button class="tab" data-tab="entity-graph">Entity Graph</button>
             <!-- AUM now shown on Register tab -->
         </div>
 
@@ -157,6 +275,42 @@
             <label for="manager-dropdown">Select Manager:</label>
             <select id="manager-dropdown"></select>
             <button id="load-portfolio-btn" class="btn btn-primary">Load Portfolio</button>
+        </div>
+
+        <!-- Entity Graph tab panel -->
+        <div id="entity-graph-tab" class="entity-graph-tab hidden">
+            <div class="eg-controls-row">
+                <div class="eg-dropdown-group">
+                    <label class="eg-label">Institution</label>
+                    <div class="eg-input-wrap">
+                        <input type="text" id="eg-institution-input" placeholder="Search institution..." autocomplete="off" spellcheck="false">
+                        <div id="eg-institution-dropdown" class="eg-autocomplete-dropdown hidden"></div>
+                    </div>
+                    <input type="hidden" id="eg-institution-id">
+                </div>
+                <div class="eg-dropdown-group">
+                    <label class="eg-label">13F Filer</label>
+                    <select id="eg-filer-select" disabled>
+                        <option value="">— select institution first —</option>
+                    </select>
+                </div>
+                <div class="eg-dropdown-group">
+                    <label class="eg-label">Fund Series</label>
+                    <select id="eg-fund-select" disabled>
+                        <option value="">— select filer first —</option>
+                    </select>
+                </div>
+                <div class="eg-dropdown-group">
+                    <label class="eg-label">Quarter</label>
+                    <select id="eg-quarter-select" disabled>
+                        <option value="">—</option>
+                    </select>
+                </div>
+            </div>
+            <div id="eg-breadcrumb" class="eg-breadcrumb"></div>
+            <div id="eg-network" class="eg-network"></div>
+            <div id="eg-legend" class="eg-legend"></div>
+            <div id="eg-error" class="eg-error hidden"></div>
         </div>
 
         <!-- Results area -->

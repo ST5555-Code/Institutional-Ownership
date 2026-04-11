@@ -5,7 +5,6 @@ Replaces Jupyter notebook for day-to-day browser-based research.
 
 import argparse
 import os
-import shutil
 import threading as _threading
 from datetime import datetime
 
@@ -79,8 +78,21 @@ def _resolve_db_path():
     """Return the best available database path.
 
     Try the main database first (read_only=True). If it is locked by a writer
-    (e.g. fetch_nport.py), fall back to a snapshot copy so the web app can
-    still serve data while the pipeline runs.
+    (e.g. fetch_nport.py), fall back to a pre-existing snapshot so the web
+    app can still serve data while the pipeline runs.
+
+    INF13 (2026-04-10): The hot-path snapshot creation via `shutil.copy2`
+    has been removed. A byte-level copy of a live DuckDB file can capture
+    torn pages / an inconsistent WAL section — DuckDB uses a single-file
+    format where writers append to the WAL portion, so a file-level copy
+    taken during concurrent writes is not guaranteed consistent.
+
+    Snapshot creation is now exclusively the job of `scripts/refresh_snapshot.sh`,
+    which uses DuckDB's own `COPY FROM DATABASE` command (MVCC-safe, reads
+    through a consistent view). `run_pipeline.sh` already calls
+    `refresh_snapshot.sh` after every pipeline run, so in steady state a
+    valid snapshot always exists. On a fresh deployment with no snapshot
+    yet, run `scripts/refresh_snapshot.sh` once manually.
     """
     try:
         con = duckdb.connect(DB_PATH, read_only=True)
@@ -88,22 +100,15 @@ def _resolve_db_path():
         return DB_PATH
     except Exception as e:
         app.logger.warning(f"[_resolve_db_path] Main DB locked: {e}")
-        # Main DB is locked — use or create a snapshot
         if os.path.exists(DB_SNAPSHOT_PATH):
             return DB_SNAPSHOT_PATH
-        # Create snapshot from the main DB
-        try:
-            print('  Database locked — creating read-only snapshot...')
-            # Atomic copy: write to temp file, then rename (prevents corrupt snapshot)
-            tmp_path = DB_SNAPSHOT_PATH + '.tmp'
-            shutil.copy2(DB_PATH, tmp_path)
-            os.replace(tmp_path, DB_SNAPSHOT_PATH)
-            print(f'  Snapshot ready: {DB_SNAPSHOT_PATH}')
-            return DB_SNAPSHOT_PATH
-        except Exception as e2:
-            raise RuntimeError(
-                f'Cannot open database (locked) and cannot create snapshot: {e2}'
-            )
+        raise RuntimeError(
+            f"Cannot open {DB_PATH} (locked: {e}) and no snapshot found at "
+            f"{DB_SNAPSHOT_PATH}. Run `scripts/refresh_snapshot.sh` to create "
+            f"one. INF13: the app no longer creates snapshots in the hot path "
+            f"because a byte-level copy of a live DuckDB file can capture "
+            f"torn pages."
+        ) from e
 
 
 # Resolved once at import/startup; updated if needed
@@ -1812,6 +1817,136 @@ def api_export(qnum):
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Entity Graph tab (Institution → Filer → Fund visualization)
+# ---------------------------------------------------------------------------
+# All three routes follow the existing pattern: get_db() → query → jsonify().
+# `quarter` is required by /api/entity_children and /api/entity_graph and is
+# always taken from the client (Quarter selector). Defaults to LATEST_QUARTER
+# only if the client omits it. No raw SQL lives here — see queries.py.
+
+
+def _eg_quarter(req):
+    """Validate the `quarter` query param against config.QUARTERS, falling back
+    to LATEST_QUARTER if missing or unrecognized."""
+    # QUARTERS and LATEST_QUARTER are imported at module level (line 15) — no
+    # local reimport needed.
+    q = (req.args.get('quarter') or '').strip()
+    from config import QUARTERS as _QUARTERS  # local alias keeps lookup explicit
+    return q if q in _QUARTERS else LATEST_QUARTER
+
+
+@app.route('/api/entity_search')
+def api_entity_search():
+    """Type-ahead search for the Institution dropdown. Searches rollup parents
+    only (entity_id = rollup_entity_id). Requires q ≥ 2 chars."""
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        results = queries.search_entity_parents(q, con)
+        return jsonify(queries.clean_for_json(results))
+    except Exception as e:
+        app.logger.error("entity_search error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
+@app.route('/api/entity_children')
+def api_entity_children():
+    """Cascading dropdown population. `level` is 'filer' or 'fund'.
+    Filer level returns CIK-bearing descendants (tree walk, fallback to self).
+    Fund level returns series_id-bearing children with NAV from fund_universe.
+    """
+    entity_id = (request.args.get('entity_id') or '').strip()
+    level = (request.args.get('level') or 'filer').strip()
+    if not entity_id:
+        return jsonify({'error': 'Missing entity_id parameter'}), 400
+    try:
+        eid = int(entity_id)
+    except ValueError:
+        return jsonify({'error': f'Invalid entity_id: {entity_id}'}), 400
+
+    quarter = _eg_quarter(request)
+
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        if level == 'filer':
+            data = queries.get_entity_filer_children(eid, quarter, con)
+            return jsonify(queries.clean_for_json(data))
+        elif level == 'fund':
+            try:
+                top_n = int(request.args.get('top_n', '0'))
+            except ValueError:
+                top_n = 0
+            # top_n = 0 means "all" — use a high cap to avoid runaway payloads.
+            if top_n <= 0:
+                top_n = 10000
+            data = queries.get_entity_fund_children(eid, top_n, con)
+            return jsonify(queries.clean_for_json(data))
+        else:
+            return jsonify({'error': f'Invalid level: {level}'}), 400
+    except Exception as e:
+        app.logger.error("entity_children error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
+@app.route('/api/entity_graph')
+def api_entity_graph():
+    """Main graph data endpoint — returns {nodes, edges, metadata} for vis.js.
+
+    The selected entity is resolved to its institution root (via rollup_entity_id),
+    filer children are walked from there, fund children come from the institution
+    root (funds attach at the institution level in this data model), and
+    sub-advisers are pulled per fund when include_sub_advisers=true.
+    """
+    entity_id = (request.args.get('entity_id') or '').strip()
+    if not entity_id:
+        return jsonify({'error': 'Missing entity_id parameter'}), 400
+    try:
+        eid = int(entity_id)
+    except ValueError:
+        return jsonify({'error': f'Invalid entity_id: {entity_id}'}), 400
+
+    quarter = _eg_quarter(request)
+    try:
+        depth = int(request.args.get('depth', '2'))
+    except ValueError:
+        depth = 2
+    include_sub = (request.args.get('include_sub_advisers', 'true').lower() != 'false')
+    try:
+        top_n_funds = int(request.args.get('top_n_funds', '20'))
+    except ValueError:
+        top_n_funds = 20
+    if top_n_funds <= 0:
+        top_n_funds = 20
+
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        data = queries.build_entity_graph(eid, quarter, depth, include_sub, top_n_funds, con)
+        if isinstance(data, dict) and data.get('error'):
+            return jsonify(data), 404
+        return jsonify(queries.clean_for_json(data))
+    except Exception as e:
+        app.logger.error("entity_graph error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
 
 
 # ---------------------------------------------------------------------------
