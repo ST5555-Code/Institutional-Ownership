@@ -411,14 +411,13 @@ function switchTab(tabId) {
     } else if (tabId === 'peer-rotation') {
         loadPeerRotation();
     } else if (tabId === 'two-co-overlap') {
-        // Explicit results-area hide for defense-in-depth — tcoActivate()
-        // does the same but keeping this in switchTab matches the pattern
-        // used for fund-portfolio / cross-ownership show/hide. If the tco
-        // IIFE fails to boot for any reason, results-area still disappears.
+        // Defense-in-depth — .hidden class (display:none !important) can't
+        // be overridden by the Entity Graph IIFE's inline-style clearing
+        // that fires from its parallel tab-click listener.
         const resultsArea = document.getElementById('results-area');
         const actionBar = document.querySelector('.action-bar');
-        if (resultsArea) resultsArea.style.display = 'none';
-        if (actionBar) actionBar.style.display = 'none';
+        if (resultsArea) resultsArea.classList.add('hidden');
+        if (actionBar) actionBar.classList.add('hidden');
         if (typeof window.loadTwoCoOverlap === 'function') window.loadTwoCoOverlap();
     } else if (currentQuery > 0) {
         loadQuery(currentQuery);
@@ -5630,9 +5629,14 @@ loadTickers();
         const managerSel  = document.getElementById('manager-selector');
         const coPanelEl   = document.getElementById('cross-ownership-panel');
         const egPanel     = document.getElementById('entity-graph-tab');
-        if (panel)       panel.style.display = '';
-        if (resultsArea) resultsArea.style.display = 'none';
-        if (actionBar)   actionBar.style.display = 'none';
+        // Use .hidden class (display:none !important) rather than inline
+        // style. The Entity Graph IIFE's parallel tab-click listener also
+        // toggles results-area/action-bar via inline style, and whichever
+        // handler runs second wins. The .hidden class has !important so it
+        // cannot be overridden by egDeactivate's `style.display = ''`.
+        if (panel)       panel.classList.remove('hidden');
+        if (resultsArea) resultsArea.classList.add('hidden');
+        if (actionBar)   actionBar.classList.add('hidden');
         if (managerSel)  managerSel.classList.add('hidden');
         if (coPanelEl)   coPanelEl.classList.add('hidden');
         if (egPanel)     egPanel.classList.add('hidden');
@@ -5662,13 +5666,18 @@ loadTickers();
         const panel       = document.getElementById('two-co-overlap-tab');
         const resultsArea = document.getElementById('results-area');
         const actionBar   = document.querySelector('.action-bar');
-        if (panel) panel.style.display = 'none';
-        // Unconditionally clear inline display so results-area falls back to
-        // its stylesheet-default (block). The earlier guarded form only
-        // restored when the current value was 'none', which could race
-        // against a tab switch that didn't go through tcoActivate first.
-        if (resultsArea) resultsArea.style.display = '';
-        if (actionBar)   actionBar.style.display = '';
+        // Symmetric with tcoActivate — toggle .hidden class rather than
+        // inline style. Also clear any stale inline display left by the
+        // Entity Graph IIFE so stylesheet rules take over.
+        if (panel)       panel.classList.add('hidden');
+        if (resultsArea) {
+            resultsArea.classList.remove('hidden');
+            resultsArea.style.display = '';
+        }
+        if (actionBar) {
+            actionBar.classList.remove('hidden');
+            actionBar.style.display = '';
+        }
     }
 
     // ── quarter buttons ────────────────────────────────────────────────────
