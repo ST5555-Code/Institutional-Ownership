@@ -5872,13 +5872,13 @@ loadTickers();
                 ? '$' + _fmtM(r.sec_dollars) : '\u2014';
 
             return '<tr style="' + bg + '">'
-                + '<td style="text-align:center; color:#888; width:32px;">' + (i + 1) + '</td>'
-                + '<td style="min-width:180px;" title="' + _tcoEsc(name) + '">' + _tcoEsc(name) + '</td>'
-                + '<td style="text-align:right; padding-right:4px;">' + spct + '</td>'
-                + '<td style="text-align:right; padding-right:16px;">' + cpct + '</td>'
-                + '<td style="width:16px;"></td>'
-                + '<td style="text-align:right; padding-right:4px;">' + sval + '</td>'
-                + '<td style="text-align:right;">' + cval + '</td>'
+                + '<td style="text-align:center; color:#888; width:40px; min-width:40px;">' + (i + 1) + '</td>'
+                + '<td style="width:220px; min-width:220px;" title="' + _tcoEsc(name) + '">' + _tcoEsc(name) + '</td>'
+                + '<td style="text-align:right; padding-right:4px; width:62px; min-width:62px;">' + spct + '</td>'
+                + '<td style="text-align:right; padding-right:4px; width:62px; min-width:62px;">' + cpct + '</td>'
+                + '<td style="width:16px; min-width:16px;"></td>'
+                + '<td style="text-align:right; padding-right:4px; width:72px; min-width:72px;">' + sval + '</td>'
+                + '<td style="text-align:right; width:72px; min-width:72px;">' + cval + '</td>'
                 + '</tr>';
         }).join('');
 
