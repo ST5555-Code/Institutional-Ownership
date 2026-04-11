@@ -16,12 +16,15 @@
 }
 
 .ag-theme-alpine .ag-header-group-cell {
-  /* Match the ticker-row header so the two rows read as one band */
+  /* Match the ticker-row header so the two rows read as one band.
+     No border-bottom — AG Grid's default .ag-header border-bottom
+     provides the single separator between header and body; adding
+     a second border between group row and ticker row created a
+     visible double-line artifact. */
   background-color: #003366 !important;
   color: #ffffff !important;
   font-weight: 700;
   font-size: 11px;
-  border-bottom: 2px solid rgba(255,255,255,0.4) !important;
   justify-content: center !important;
 }
 
