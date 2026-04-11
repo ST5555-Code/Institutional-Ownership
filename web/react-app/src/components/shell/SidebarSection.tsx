@@ -10,7 +10,7 @@ export function SidebarSection({ title, children }: Props) {
         padding: '10px 16px 4px',
         fontSize: '10px', fontWeight: 700,
         letterSpacing: '0.08em',
-        color: '#4a5568', textTransform: 'uppercase'
+        color: 'var(--accent-gold)', textTransform: 'uppercase'
       }}>
         {title}
       </div>

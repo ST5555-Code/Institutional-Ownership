@@ -8,9 +8,9 @@ export function Sidebar() {
       backgroundColor: 'var(--sidebar-bg)',
       height: '100vh', overflowY: 'auto',
       borderRight: '1px solid #1e2d47',
-      paddingTop: '8px'
+      paddingTop: '20px'
     }}>
-      <SidebarSection title="Overall Market">
+      <SidebarSection title="Market Snapshot & Trends">
         <SidebarItem id="sector-rotation" label="Sector Rotation" />
         <SidebarItem id="entity-graph" label="Entity Graph" />
       </SidebarSection>
