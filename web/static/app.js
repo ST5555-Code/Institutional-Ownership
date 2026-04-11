@@ -5818,7 +5818,7 @@ loadTickers();
     function _tcoSetLoading() {
         ['tco-inst-body', 'tco-fund-body'].forEach(function (id) {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<tr><td colspan="7" style="padding:12px; text-align:center; color:#888;">Loading…</td></tr>';
+            if (el) el.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#888;">Loading…</td></tr>';
         });
         ['tco-inst-foot', 'tco-fund-foot'].forEach(function (id) {
             const el = document.getElementById(id);
@@ -5852,7 +5852,7 @@ loadTickers();
         const display = rows.slice(0, 15);
 
         if (!display.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="padding:12px; text-align:center; color:#888;">No data</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#888;">No data</td></tr>';
             if (tfoot) tfoot.innerHTML = '';
             const emptySum = document.getElementById('tco-' + type + '-summary');
             if (emptySum) emptySum.style.display = 'none';
@@ -5872,37 +5872,37 @@ loadTickers();
                 ? '$' + _fmtM(r.sec_dollars) : '\u2014';
 
             return '<tr style="' + bg + '">'
-                + '<td style="text-align:center; color:#888; width:40px; min-width:40px;">' + (i + 1) + '</td>'
-                + '<td style="width:220px; min-width:220px;" title="' + _tcoEsc(name) + '">' + _tcoEsc(name) + '</td>'
-                + '<td style="text-align:right; padding-right:4px; width:62px; min-width:62px;">' + spct + '</td>'
-                + '<td style="text-align:right; padding-right:4px; width:62px; min-width:62px;">' + cpct + '</td>'
-                + '<td style="width:16px; min-width:16px;"></td>'
-                + '<td style="text-align:right; padding-right:4px; width:72px; min-width:72px;">' + sval + '</td>'
-                + '<td style="text-align:right; width:72px; min-width:72px;">' + cval + '</td>'
+                + '<td style="text-align:center; color:#888; width:36px;">' + (i + 1) + '</td>'
+                + '<td style="width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"'
+                + ' title="' + _tcoEsc(name) + '">' + _tcoEsc(name) + '</td>'
+                + '<td style="text-align:right; padding-right:4px; width:62px;">' + spct + '</td>'
+                + '<td style="text-align:right; padding-right:4px; width:62px;">' + cpct + '</td>'
+                + '<td style="width:16px;"></td>'
+                + '<td style="text-align:right; padding-right:4px; width:62px;">' + sval + '</td>'
+                + '<td style="text-align:right; width:62px;">' + cval + '</td>'
+                + '<td style="width:3px;"></td>'
                 + '</tr>';
         }).join('');
 
-        // Tfoot totals for the 15 displayed rows
+        // Tfoot — two total rows (Top 15 and Top 25), identical column layout
+        // to the body. Computed via _buildTotalsRow() over successively larger
+        // slices of the full `rows` array (not the 15-row `display` slice).
         if (tfoot) {
-            let sumSpct = 0, sumCpct = 0, sumSval = 0, sumCval = 0;
-            display.forEach(function (r) {
-                if (r.subj_pct_float != null) sumSpct += r.subj_pct_float;
-                if (hasSecond && r.sec_shares && r.sec_shares > 0 && r.sec_pct_float != null) {
-                    sumCpct += r.sec_pct_float;
-                }
-                if (r.subj_dollars && r.subj_dollars > 0) sumSval += r.subj_dollars;
-                if (hasSecond && r.sec_dollars && r.sec_dollars > 0) sumCval += r.sec_dollars;
-            });
-
-            tfoot.innerHTML = '<tr style="font-weight:600; border-top:2px solid #002147; background:#f9f9f9;">'
-                + '<td></td>'
-                + '<td>Top 15 Total</td>'
-                + '<td style="text-align:right; padding-right:4px;">' + sumSpct.toFixed(2) + '%</td>'
-                + '<td style="text-align:right; padding-right:16px;">' + (sumCpct > 0 ? sumCpct.toFixed(2) + '%' : '\u2014') + '</td>'
-                + '<td></td>'
-                + '<td style="text-align:right; padding-right:4px;">$' + _fmtM(sumSval) + '</td>'
-                + '<td style="text-align:right;">' + (sumCval > 0 ? '$' + _fmtM(sumCval) : '\u2014') + '</td>'
-                + '</tr>';
+            const t15 = _buildTotalsRow(rows, 15, hasSecond);
+            const t25 = _buildTotalsRow(rows, 25, hasSecond);
+            tfoot.innerHTML = [t15, t25].map(function (t) {
+                const borderTop = t.n === 15 ? '2px solid #002147' : '1px solid #ddd';
+                return '<tr style="font-weight:600; border-top:' + borderTop + '; background:#f9f9f9;">'
+                    + '<td style="width:36px;"></td>'
+                    + '<td style="width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Top ' + t.n + ' Total</td>'
+                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + t.sumSpct.toFixed(2) + '%</td>'
+                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + (t.sumCpct > 0 ? t.sumCpct.toFixed(2) + '%' : '\u2014') + '</td>'
+                    + '<td style="width:16px;"></td>'
+                    + '<td style="text-align:right; padding-right:4px; width:62px;">$' + _fmtM(t.sumSval) + '</td>'
+                    + '<td style="text-align:right; width:62px;">' + (t.sumCval > 0 ? '$' + _fmtM(t.sumCval) : '\u2014') + '</td>'
+                    + '<td style="width:3px;"></td>'
+                    + '</tr>';
+            }).join('');
         }
 
         // Per-panel summary
@@ -5947,6 +5947,29 @@ loadTickers();
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
+    function _buildTotalsRow(rows, n, hasSecond) {
+        // Sum % and $ columns across the top-N slice. Second-company sums
+        // only include rows where the second company actually holds shares.
+        const slice = rows.slice(0, n);
+        const sumSpct = slice.reduce(function (a, r) {
+            return a + (r.subj_pct_float || 0);
+        }, 0);
+        const sumCpct = hasSecond
+            ? slice.reduce(function (a, r) {
+                return a + (r.sec_shares > 0 && r.sec_pct_float ? r.sec_pct_float : 0);
+              }, 0)
+            : 0;
+        const sumSval = slice.reduce(function (a, r) {
+            return a + (r.subj_dollars || 0);
+        }, 0);
+        const sumCval = hasSecond
+            ? slice.reduce(function (a, r) {
+                return a + (r.sec_dollars || 0);
+              }, 0)
+            : 0;
+        return { n: n, sumSpct: sumSpct, sumCpct: sumCpct, sumSval: sumSval, sumCval: sumCval };
+    }
+
     function _fmtM(dollars) {
         // $M rounded integer with thousands separator. Empty/NaN → em dash.
         if (dollars == null || isNaN(dollars)) return '\u2014';
