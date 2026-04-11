@@ -85,15 +85,15 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
         <div className="text-sm text-gray-500 py-4">Loading…</div>
       )}
 
-      {/* Tables — fixed-basis flex panels so each one holds its full 629px
+      {/* Tables — fixed-basis flex panels so each one holds its full 689px
           table width instead of shrinking below it. Container grows to
-          content (629 + 48 gap + 629 = 1306px); on narrow viewports the
+          content (689 + 48 gap + 689 = 1426px); on narrow viewports the
           tab-container scrolls horizontally at the page level rather than
           each table developing its own internal scrollbar. */}
       {!loading && data && (
         <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
           {/* Institutional */}
-          <div style={{ flex: '0 0 629px', minWidth: 0 }}>
+          <div style={{ flex: '0 0 689px', minWidth: 0 }}>
             <div
               style={{
                 display: 'flex',
@@ -125,7 +125,7 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
           </div>
 
           {/* Fund */}
-          <div style={{ flex: '0 0 629px', minWidth: 0 }}>
+          <div style={{ flex: '0 0 689px', minWidth: 0 }}>
             <div
               style={{
                 display: 'flex',

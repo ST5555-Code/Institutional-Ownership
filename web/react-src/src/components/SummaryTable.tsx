@@ -12,39 +12,53 @@ function hasSecShares(row: OverlapRow): boolean {
   return row.sec_shares != null && row.sec_shares > 0
 }
 
-// Cohort math — symmetric, unbiased.
+// Cohort math — bidirectional "true overlap both ways".
 //
-// For each cohort size N (25, 50):
-//   1. Take the top N holders of the SUBJECT ticker (`rows` is already
-//      sorted desc by subj_dollars by the backend).
-//   2. Filter to the overlap subset — holders who also hold the second
-//      ticker (is_overlap === true on the row).
-//   3. Sum subj_pct_float across that subset      → % of subject owned
-//                                                    by the overlap
-//                                                    holders (concentration
-//                                                    within the cohort).
-//   4. Sum sec_pct_float across that same subset  → % of second owned
-//                                                    by the overlap
-//                                                    holders.
+// For each cohort size N (25, 50), we compute two independent views:
 //
-// Both percentages describe the SAME group of holders (the overlap
-// intersection inside the top N of the subject), so they're directly
-// comparable. The previous implementation re-sorted by sec_dollars and
-// took the top N of that, which was structurally biased: the backend
-// only returns the top 50 holders of the SUBJECT, so any AR-heavy holder
-// ranked below 50 in EQT was silently dropped.
+//   Direction A: "the top N holders of SUBJECT collectively own X% of SECOND"
+//     cohort = rows.slice(0, n)                        // top N by subj $
+//     overlap = cohort.filter(is_overlap)
+//     pctSecByTopSubj = sum(sec_pct_float over overlap)
+//
+//   Direction B: "the top N holders of SECOND collectively own Y% of SUBJECT"
+//     cohortBySec = rows.sort(desc by sec_dollars).slice(0, n)
+//                         .filter(is_overlap)
+//     pctSubjByTopSec = sum(subj_pct_float over cohortBySec)
+//
+// Important caveat on Direction B: the backend only returns the top 50
+// holders of the SUBJECT, so a holder who's top-N of SECOND but ranked 51+
+// in SUBJECT is invisible to us. For mega-cap overlaps dominated by
+// Vanguard / BlackRock / State Street (the same funds holding both), the
+// approximation is tight. For thin-overlap cases it understates.
 export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: Props) {
   const results = useMemo(() => {
     return [25, 50].map(n => {
-      const cohort = rows.slice(0, n)
-      const overlap = hasSecond ? cohort.filter(r => r.is_overlap) : []
-      const pctSubj = overlap.reduce(
-        (a, r) => a + (r.subj_pct_float || 0), 0
-      )
-      const pctSec = overlap.reduce(
+      // Direction A — top N by subject dollars
+      const cohortSubj = rows.slice(0, n)
+      const overlapA = hasSecond ? cohortSubj.filter(r => r.is_overlap) : []
+      const pctSecByTopSubj = overlapA.reduce(
         (a, r) => a + (hasSecShares(r) && r.sec_pct_float != null ? r.sec_pct_float : 0), 0
       )
-      return { n, overlapCount: overlap.length, pctSubj, pctSec }
+
+      // Direction B — top N by second dollars, restricted to overlap rows
+      const cohortSec = hasSecond
+        ? [...rows]
+            .sort((a, b) => (b.sec_dollars || 0) - (a.sec_dollars || 0))
+            .slice(0, n)
+            .filter(r => r.is_overlap)
+        : []
+      const pctSubjByTopSec = cohortSec.reduce(
+        (a, r) => a + (r.subj_pct_float || 0), 0
+      )
+
+      return {
+        n,
+        overlapA: overlapA.length,
+        overlapB: cohortSec.length,
+        pctSecByTopSubj,
+        pctSubjByTopSec,
+      }
     })
   }, [rows, hasSecond])
 
@@ -71,10 +85,10 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
               Overlap
             </th>
             <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              {hasSecond ? `% of ${subj} held` : '—'}
+              {hasSecond ? `% ${sec} by top ${subj}` : '—'}
             </th>
             <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              {hasSecond ? `% of ${sec} held` : '—'}
+              {hasSecond ? `% ${subj} by top ${sec}` : '—'}
             </th>
           </tr>
         </thead>
@@ -83,13 +97,13 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
             <tr key={r.n} style={{ borderBottom: '1px solid #f0f0f0' }}>
               <td style={{ padding: '4px 6px', color: '#333' }}>Top {r.n}</td>
               <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
-                {r.overlapCount}
+                {r.overlapA}
               </td>
               <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
-                {hasSecond ? r.pctSubj.toFixed(2) + '%' : '—'}
+                {hasSecond ? r.pctSecByTopSubj.toFixed(2) + '%' : '—'}
               </td>
               <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
-                {hasSecond ? r.pctSec.toFixed(2) + '%' : '—'}
+                {hasSecond ? r.pctSubjByTopSec.toFixed(2) + '%' : '—'}
               </td>
             </tr>
           ))}

@@ -26,13 +26,17 @@ interface Props {
 type TotalRow = OverlapRow & { _isTotal?: boolean }
 
 // ── locked width spec ─────────────────────────────────────────────────────
+// Widened for NVDA-class dollar values ($300B = "$300,000" in millions,
+// 7 chars + $ + padding → needs ~110px minimum). Holder column narrowed
+// slightly to compensate. Page-level horizontal scroll may appear on
+// narrow viewports — that's expected and matches "move fund right".
 const W_RANK    = 36
-const W_NAME    = 260
-const W_PCT     = 72
+const W_NAME    = 240
+const W_PCT     = 82
 const W_SPACER  = 14
-const W_DOL     = 85
+const W_DOL     = 115
 const W_TRAIL   = 5
-// Total = 36 + 260 + 72 + 72 + 14 + 85 + 85 + 5 = 629px
+// Total = 36 + 240 + 82 + 82 + 14 + 115 + 115 + 5 = 689px per table
 
 // ── locked height spec ────────────────────────────────────────────────────
 // With domLayout="autoHeight" the grid sizes itself to the sum of its
