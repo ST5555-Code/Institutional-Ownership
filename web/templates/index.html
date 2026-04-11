@@ -312,9 +312,15 @@
 
             <!-- Institutional panel -->
             <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
-              <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0 0 8px 0;">
-                Ownership Overlap by Institution
-              </h3>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px 0;">
+                <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0;">
+                  Ownership Overlap by Institution
+                </h3>
+                <label style="font-size:11px; color:#555; cursor:pointer; user-select:none;">
+                  <input type="checkbox" id="tco-inst-active-toggle" style="vertical-align:middle; margin-right:4px;">
+                  Active only
+                </label>
+              </div>
               <div id="tco-inst-wrap" style="overflow-x:auto; flex:1;">
                 <table id="tco-inst-table" class="data-table" style="width:100%; table-layout:fixed; border-collapse:collapse;">
                   <thead>
@@ -360,9 +366,15 @@
 
             <!-- Fund panel -->
             <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
-              <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0 0 8px 0;">
-                Ownership Overlap by Fund
-              </h3>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px 0;">
+                <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0;">
+                  Ownership Overlap by Fund
+                </h3>
+                <label style="font-size:11px; color:#555; cursor:pointer; user-select:none;">
+                  <input type="checkbox" id="tco-fund-active-toggle" style="vertical-align:middle; margin-right:4px;">
+                  Active only
+                </label>
+              </div>
               <div id="tco-fund-wrap" style="overflow-x:auto; flex:1;">
                 <table id="tco-fund-table" class="data-table" style="width:100%; table-layout:fixed; border-collapse:collapse;">
                   <thead>

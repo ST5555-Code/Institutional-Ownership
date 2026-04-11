@@ -5608,6 +5608,10 @@ loadTickers();
     let _tcoQuarter  = '';            // currently selected quarter
     let _tcoQuartersLoaded = false;
     let _tcoBooted   = false;         // has _tcoBoot run?
+    let _tcoLastData = null;          // cached last fetch — feeds active-only rerenders
+    let _tcoLastHasSecond = false;    // whether the cached data had a second ticker
+    let _tcoInstActiveOnly = false;   // institutional active-only toggle state
+    let _tcoFundActiveOnly = false;   // fund active-only toggle state
 
     // ── boot ───────────────────────────────────────────────────────────────
     function _tcoBoot() {
@@ -5615,6 +5619,43 @@ loadTickers();
         _tcoBooted = true;
         _buildQuarterButtons();
         _wireSecondInput();
+        _wireActiveToggles();
+    }
+
+    function _wireActiveToggles() {
+        const inst = document.getElementById('tco-inst-active-toggle');
+        const fund = document.getElementById('tco-fund-active-toggle');
+        if (inst) {
+            inst.addEventListener('change', function () {
+                _tcoInstActiveOnly = inst.checked;
+                _tcoRerender();
+            });
+        }
+        if (fund) {
+            fund.addEventListener('change', function () {
+                _tcoFundActiveOnly = fund.checked;
+                _tcoRerender();
+            });
+        }
+    }
+
+    // Re-render both panels from the cached last-fetch data, applying the
+    // current active-only toggle states. No network round-trip.
+    function _tcoRerender() {
+        if (!_tcoLastData) return;
+        _tcoRender(_tcoLastData, _tcoLastHasSecond);
+    }
+
+    // Filter helpers — institutional "active" = not passive; fund "active" =
+    // is_active !== false (unknown/null is included so we don't silently drop
+    // funds that lack a fund_universe row).
+    function _tcoFilterInst(rows) {
+        if (!_tcoInstActiveOnly) return rows;
+        return rows.filter(function (r) { return r.manager_type !== 'passive'; });
+    }
+    function _tcoFilterFund(rows) {
+        if (!_tcoFundActiveOnly) return rows;
+        return rows.filter(function (r) { return r.is_active !== false; });
     }
 
     // ── activation (called from switchTab branch) ──────────────────────────
@@ -5817,6 +5858,8 @@ loadTickers();
             .then(r => r.json())
             .then(data => {
                 if (data && data.error) { _tcoShowError(data.error); return; }
+                _tcoLastData = data;
+                _tcoLastHasSecond = false;
                 _tcoRender(data, false);
             })
             .catch(e => _tcoShowError('Request failed: ' + e.message));
@@ -5831,6 +5874,8 @@ loadTickers();
             .then(r => r.json())
             .then(data => {
                 if (data && data.error) { _tcoShowError(data.error); return; }
+                _tcoLastData = data;
+                _tcoLastHasSecond = true;
                 _tcoRender(data, true);
             })
             .catch(e => _tcoShowError('Request failed: ' + e.message));
@@ -5861,8 +5906,13 @@ loadTickers();
             _setTxt('tco-' + type + '-h-sec-val',  c || '\u2014');
         });
 
-        _tcoRenderPanel('inst', data.institutional || [], s, c, hasSecond);
-        _tcoRenderPanel('fund', data.fund          || [], s, c, hasSecond);
+        // Apply active-only filters before rendering. Summary tables also
+        // compute from the filtered array so "Top 25" means "top 25 of the
+        // active-only view" when the toggle is on.
+        const instRows = _tcoFilterInst(data.institutional || []);
+        const fundRows = _tcoFilterFund(data.fund          || []);
+        _tcoRenderPanel('inst', instRows, s, c, hasSecond);
+        _tcoRenderPanel('fund', fundRows, s, c, hasSecond);
     }
 
     function _tcoRenderPanel(type, rows, subj, sec, hasSecond) {

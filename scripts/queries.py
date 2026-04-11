@@ -5278,16 +5278,18 @@ def get_two_company_overlap(subject, second, quarter, con):
             s.subj_shares,
             s.subj_dollars,
             COALESCE(p.sec_shares, 0)  as sec_shares,
-            COALESCE(p.sec_dollars, 0) as sec_dollars
+            COALESCE(p.sec_dollars, 0) as sec_dollars,
+            fu.is_actively_managed     as is_active
         FROM subj_funds s
         LEFT JOIN sec_funds p ON p.series_id = s.series_id
+        LEFT JOIN fund_universe fu ON fu.series_id = s.series_id
         ORDER BY s.subj_dollars DESC
         LIMIT 50
     """, [subject, quarter, second, quarter]).fetchall()
 
     fund = []
     for r in fund_rows:
-        holder, series_id, family_name, subj_shares, subj_dollars, sec_shares, sec_dollars = r
+        holder, series_id, family_name, subj_shares, subj_dollars, sec_shares, sec_dollars, is_active = r
         subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
         sec_shares_f = float(sec_shares) if sec_shares is not None else 0.0
         subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
@@ -5303,6 +5305,10 @@ def get_two_company_overlap(subject, second, quarter, con):
             'sec_dollars': sec_dollars_f,
             'sec_pct_float': (sec_shares_f / sec_float * 100.0) if sec_float else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
+            # fund_universe.is_actively_managed — None if the fund isn't in
+            # fund_universe; the frontend treats None as "active" (included
+            # in active-only view) rather than silently dropping rows.
+            'is_active': bool(is_active) if is_active is not None else None,
         })
 
     # --- 3d. Meta block --------------------------------------------------
@@ -5386,24 +5392,35 @@ def get_two_company_subject(subject, quarter, con):
 
     # --- Fund panel (top 50 fund series by NAV position in subject) ------
     fund_rows = con.execute("""
+        WITH subj_funds AS (
+            SELECT
+                fh.fund_name as holder,
+                fh.series_id,
+                fh.family_name,
+                SUM(fh.shares_or_principal) as subj_shares,
+                SUM(fh.market_value_usd)    as subj_dollars
+            FROM fund_holdings_v2 fh
+            WHERE fh.ticker = ?
+              AND fh.quarter = ?
+              AND fh.market_value_usd > 0
+            GROUP BY fh.fund_name, fh.series_id, fh.family_name
+        )
         SELECT
-            fh.fund_name as holder,
-            fh.series_id,
-            fh.family_name,
-            SUM(fh.shares_or_principal) as subj_shares,
-            SUM(fh.market_value_usd)    as subj_dollars
-        FROM fund_holdings_v2 fh
-        WHERE fh.ticker = ?
-          AND fh.quarter = ?
-          AND fh.market_value_usd > 0
-        GROUP BY fh.fund_name, fh.series_id, fh.family_name
-        ORDER BY subj_dollars DESC
+            s.holder,
+            s.series_id,
+            s.family_name,
+            s.subj_shares,
+            s.subj_dollars,
+            fu.is_actively_managed as is_active
+        FROM subj_funds s
+        LEFT JOIN fund_universe fu ON fu.series_id = s.series_id
+        ORDER BY s.subj_dollars DESC
         LIMIT 50
     """, [subject, quarter]).fetchall()
 
     fund = []
     for r in fund_rows:
-        holder, series_id, family_name, subj_shares, subj_dollars = r
+        holder, series_id, family_name, subj_shares, subj_dollars, is_active = r
         subj_shares_f = float(subj_shares) if subj_shares is not None else 0.0
         subj_dollars_f = float(subj_dollars) if subj_dollars is not None else 0.0
         fund.append({
@@ -5417,6 +5434,7 @@ def get_two_company_subject(subject, quarter, con):
             'sec_dollars': None,
             'sec_pct_float': None,
             'is_overlap': False,
+            'is_active': bool(is_active) if is_active is not None else None,
         })
 
     # --- Meta block ------------------------------------------------------
