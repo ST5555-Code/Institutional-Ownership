@@ -64,7 +64,11 @@
   line-height: 32px;
 }
 
-.tco-overlap-row,
-.tco-overlap-row .ag-cell {
-  background-color: rgba(74, 144, 217, 0.18) !important;
+/* Single row-level rule only — painting both the row AND every cell
+   stacks alpha (0.18 + 0.18 ≈ 0.33 effective) and creates a visible
+   "darker strip" at the boundary of the transparent spacer columns
+   where the cell-level rule doesn't paint. Row-only + slightly higher
+   alpha keeps the tint uniform across all cells. */
+.tco-overlap-row {
+  background-color: rgba(74, 144, 217, 0.22) !important;
 }

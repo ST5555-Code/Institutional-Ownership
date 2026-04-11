@@ -35,16 +35,12 @@ const W_TRAIL   = 5
 // Total = 36 + 260 + 72 + 72 + 14 + 85 + 85 + 5 = 629px
 
 // ── locked height spec ────────────────────────────────────────────────────
+// With domLayout="autoHeight" the grid sizes itself to the sum of its
+// header + body rows + pinned rows — no outer container height, no vertical
+// scroll viewport, no internal scrollbar tracks.
 const GROUP_HEADER_H = 28
 const TICKER_HEADER_H = 28
 const ROW_H = 32
-const DATA_ROWS = 15
-const PINNED_ROWS = 2
-// +8px buffer prevents the last body row from being clipped under the
-// pinned-bottom-floating container border in some AG Grid v35 revisions.
-const TABLE_HEIGHT =
-  GROUP_HEADER_H + TICKER_HEADER_H + (DATA_ROWS + PINNED_ROWS) * ROW_H + 8
-// = 28 + 28 + 544 + 8 = 608px
 
 function hasSecShares(row: OverlapRow): boolean {
   return row.sec_shares != null && row.sec_shares > 0
@@ -78,7 +74,7 @@ export function OverlapTable({
     return rows.filter(r => r.is_active === true)
   }, [rows, activeOnly, type])
 
-  const display = filtered.slice(0, DATA_ROWS)
+  const display = filtered.slice(0, 15)
 
   // Pinned bottom: Top 15 and Top 25 totals, computed against the filtered
   // set so the visible totals line up with the visible body rows.
@@ -262,10 +258,7 @@ export function OverlapTable({
   }), [])
 
   return (
-    <div
-      className="ag-theme-alpine"
-      style={{ height: `${TABLE_HEIGHT}px`, width: '100%' }}
-    >
+    <div className="ag-theme-alpine" style={{ width: '100%' }}>
       <AgGridReact<TotalRow>
         theme="legacy"
         rowData={display}
@@ -277,9 +270,9 @@ export function OverlapTable({
         headerHeight={TICKER_HEADER_H}
         groupHeaderHeight={GROUP_HEADER_H}
         rowHeight={ROW_H}
-        suppressHorizontalScroll={false}
+        suppressHorizontalScroll={true}
         tooltipShowDelay={200}
-        domLayout="normal"
+        domLayout="autoHeight"
       />
     </div>
   )
