@@ -68,7 +68,7 @@ body {
 
 .search-input-wrap {
     position: relative;
-    flex: 1;
+    flex: 0 0 200px;
 }
 
 #ticker-input {

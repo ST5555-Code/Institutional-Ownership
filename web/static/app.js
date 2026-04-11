@@ -5916,8 +5916,8 @@ loadTickers();
                 return '<tr style="font-weight:600; border-top:' + borderTop + '; background:#f9f9f9;">'
                     + '<td style="width:36px;"></td>'
                     + '<td style="width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Top ' + t.n + ' Total</td>'
-                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + t.sumSpct.toFixed(2) + '%</td>'
-                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + (t.sumCpct > 0 ? t.sumCpct.toFixed(2) + '%' : '\u2014') + '</td>'
+                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + t.sumSpct.toFixed(1) + '%</td>'
+                    + '<td style="text-align:right; padding-right:4px; width:62px;">' + (t.sumCpct > 0 ? t.sumCpct.toFixed(1) + '%' : '\u2014') + '</td>'
                     + '<td style="width:16px;"></td>'
                     + '<td style="text-align:right; padding-right:4px; width:62px;">$' + _fmtM(t.sumSval) + '</td>'
                     + '<td style="text-align:right; width:62px;">' + (t.sumCval > 0 ? '$' + _fmtM(t.sumCval) : '\u2014') + '</td>'
@@ -5937,8 +5937,8 @@ loadTickers();
         const sc2   = document.getElementById('tco-' + type + '-scol2');
         if (!div || !tbody) return;
 
-        if (sc1) sc1.textContent = hasSecond ? ('% of ' + sec + ' float by ' + subj + ' top N') : '\u2014';
-        if (sc2) sc2.textContent = hasSecond ? ('% of ' + subj + ' float by ' + sec + ' top N') : '\u2014';
+        if (sc1) sc1.textContent = hasSecond ? ('% of ' + sec + ' owned by ' + subj) : '\u2014';
+        if (sc2) sc2.textContent = hasSecond ? ('% of ' + subj + ' owned by ' + sec) : '\u2014';
 
         const results = [25, 50].map(function (n) {
             const cohort = rows.slice(0, n);
@@ -5959,8 +5959,8 @@ loadTickers();
             return '<tr>'
                 + '<td>Top ' + r.n + '</td>'
                 + '<td style="text-align:right;">' + r.overlap + '</td>'
-                + '<td style="text-align:right;">' + (hasSecond ? r.pctSecSubj.toFixed(2) + '%' : '\u2014') + '</td>'
-                + '<td style="text-align:right;">' + (hasSecond ? r.pctSubjSec.toFixed(2) + '%' : '\u2014') + '</td>'
+                + '<td style="text-align:right;">' + (hasSecond ? r.pctSecSubj.toFixed(1) + '%' : '\u2014') + '</td>'
+                + '<td style="text-align:right;">' + (hasSecond ? r.pctSubjSec.toFixed(1) + '%' : '\u2014') + '</td>'
                 + '</tr>';
         }).join('');
 
