@@ -48,16 +48,6 @@ function fmtDollars(val: number | null | undefined): string {
   return '$' + Math.round(val / 1e6).toLocaleString('en-US')
 }
 
-// AG Grid v35 does not render HTML strings returned from cellRenderer — it
-// inserts them as text. For the pinned bottom total rows we need bold text,
-// so return a real DOM element instead of a `<span>...</span>` string.
-function boldSpan(text: string): HTMLSpanElement {
-  const el = document.createElement('span')
-  el.style.fontWeight = '600'
-  el.textContent = text
-  return el
-}
-
 export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, type }: Props) {
   const display = rows.slice(0, 15)
 
@@ -115,7 +105,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
       tooltipField: 'holder',
       cellRenderer: (params: ICellRendererParams<TotalRow>) => {
         const v = (params.value as string) || '—'
-        if (params.data?._isTotal) return boldSpan(v)
+        if (params.data?._isTotal) return <span style={{ fontWeight: 600 }}>{v}</span>
         return v
       },
     },
@@ -140,7 +130,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
             const v = p.data?._isTotal
               ? (val != null ? val.toFixed(2) + '%' : '—')
               : fmtPct(val, true)
-            return p.data?._isTotal ? boldSpan(v) : v
+            return p.data?._isTotal ? <span style={{ fontWeight: 600 }}>{v}</span> : v
           },
         },
         {
@@ -158,7 +148,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
             const v = p.data?._isTotal
               ? (val != null && val > 0 ? val.toFixed(2) + '%' : '—')
               : fmtPct(val, p.data ? hasSecShares(p.data) : false)
-            return p.data?._isTotal ? boldSpan(v) : v
+            return p.data?._isTotal ? <span style={{ fontWeight: 600 }}>{v}</span> : v
           },
         },
       ],
@@ -179,7 +169,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
           cellStyle: { textAlign: 'right', fontSize: '12px' } as CellStyle,
           cellRenderer: (p: ICellRendererParams<TotalRow>) => {
             const v = fmtDollars(p.value as number | null)
-            return p.data?._isTotal ? boldSpan(v) : v
+            return p.data?._isTotal ? <span style={{ fontWeight: 600 }}>{v}</span> : v
           },
         },
         {
@@ -194,7 +184,7 @@ export function OverlapTable({ rows, subjectTicker, secondTicker, hasSecond, typ
           cellRenderer: (p: ICellRendererParams<TotalRow>) => {
             if (!hasSecond) return '—'
             const v = fmtDollars(p.value as number | null)
-            return p.data?._isTotal ? boldSpan(v) : v
+            return p.data?._isTotal ? <span style={{ fontWeight: 600 }}>{v}</span> : v
           },
         },
       ],

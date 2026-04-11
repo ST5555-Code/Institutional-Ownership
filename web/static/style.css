@@ -155,8 +155,7 @@ body {
 }
 
 /* === Autocomplete === */
-.autocomplete-dropdown,
-#autocomplete-dropdown {
+.autocomplete-dropdown {
     position: absolute;
     top: 100%;
     left: 0;
