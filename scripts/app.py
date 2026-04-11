@@ -1002,6 +1002,8 @@ def index():
     return render_template('index.html')
 
 
+# SMOKE TEST: always include /api/tickers in post-commit curl checks — it is
+# the autocomplete root and a silent 500 here breaks the entire UI ticker search.
 @app.route('/api/tickers')
 def api_tickers():
     try:
