@@ -16,11 +16,18 @@
 }
 
 .ag-theme-alpine .ag-header-group-cell {
-  background-color: #002147 !important;
+  /* Match the ticker-row header so the two rows read as one band */
+  background-color: #003366 !important;
   color: #ffffff !important;
   font-weight: 700;
   font-size: 11px;
   border-bottom: 2px solid rgba(255,255,255,0.4) !important;
+  justify-content: center !important;
+}
+
+.ag-theme-alpine .ag-header-group-cell-label {
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 .ag-theme-alpine .ag-header-cell {
@@ -54,6 +61,7 @@
   line-height: 32px;
 }
 
-.tco-overlap-row {
-  background-color: rgba(74, 144, 217, 0.08) !important;
+.tco-overlap-row,
+.tco-overlap-row .ag-cell {
+  background-color: rgba(74, 144, 217, 0.18) !important;
 }

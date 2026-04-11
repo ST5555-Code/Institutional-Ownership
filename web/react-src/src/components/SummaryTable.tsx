@@ -28,6 +28,9 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
     })
   }, [rows, hasSecond])
 
+  const subj = subjectTicker || '—'
+  const sec = secondTicker || '—'
+
   return (
     <div
       style={{
@@ -38,28 +41,34 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
         backgroundColor: '#fafafa',
       }}
     >
-      <table className="w-full text-xs border-collapse">
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
         <thead>
-          <tr className="border-b border-gray-300">
-            <th className="text-left py-1 px-2 font-semibold text-gray-600">Cohort</th>
-            <th className="text-right py-1 px-2 font-semibold text-gray-600">Overlap</th>
-            <th className="text-right py-1 px-2 font-semibold text-gray-600">
-              % of {secondTicker || '—'} owned by {subjectTicker || '—'} top N
+          <tr style={{ borderBottom: '2px solid #002147' }}>
+            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
+              Cohort
             </th>
-            <th className="text-right py-1 px-2 font-semibold text-gray-600">
-              % of {subjectTicker || '—'} owned by {secondTicker || '—'} top N
+            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
+              Overlap
+            </th>
+            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
+              {hasSecond ? `% of ${sec} by ${subj}` : '—'}
+            </th>
+            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
+              {hasSecond ? `% of ${subj} by ${sec}` : '—'}
             </th>
           </tr>
         </thead>
         <tbody>
           {results.map(r => (
-            <tr key={r.n} className="border-b border-gray-100 hover:bg-gray-50 last:border-0">
-              <td className="py-1 px-2 text-gray-700">Top {r.n}</td>
-              <td className="text-right py-1 px-2 text-gray-700">{r.overlapCount}</td>
-              <td className="text-right py-1 px-2 text-gray-700">
+            <tr key={r.n} style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ padding: '4px 6px', color: '#333' }}>Top {r.n}</td>
+              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
+                {r.overlapCount}
+              </td>
+              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
                 {hasSecond ? r.pctSecBySubj.toFixed(2) + '%' : '—'}
               </td>
-              <td className="text-right py-1 px-2 text-gray-700">
+              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
                 {hasSecond ? r.pctSubjBySec.toFixed(2) + '%' : '—'}
               </td>
             </tr>

@@ -27,11 +27,12 @@ type TotalRow = OverlapRow & { _isTotal?: boolean }
 
 // ── locked width spec ─────────────────────────────────────────────────────
 const W_RANK    = 36
-const W_NAME    = 280
-const W_PCT     = 75
-const W_SPACER  = 16
-const W_DOL     = 90
+const W_NAME    = 260
+const W_PCT     = 72
+const W_SPACER  = 14
+const W_DOL     = 85
 const W_TRAIL   = 5
+// Total = 36 + 260 + 72 + 72 + 14 + 85 + 85 + 5 = 629px
 
 // ── locked height spec ────────────────────────────────────────────────────
 const GROUP_HEADER_H = 28
@@ -39,8 +40,11 @@ const TICKER_HEADER_H = 28
 const ROW_H = 32
 const DATA_ROWS = 15
 const PINNED_ROWS = 2
-const TABLE_HEIGHT = GROUP_HEADER_H + TICKER_HEADER_H + (DATA_ROWS + PINNED_ROWS) * ROW_H
-// = 28 + 28 + 17 * 32 = 600px
+// +8px buffer prevents the last body row from being clipped under the
+// pinned-bottom-floating container border in some AG Grid v35 revisions.
+const TABLE_HEIGHT =
+  GROUP_HEADER_H + TICKER_HEADER_H + (DATA_ROWS + PINNED_ROWS) * ROW_H + 8
+// = 28 + 28 + 544 + 8 = 608px
 
 function hasSecShares(row: OverlapRow): boolean {
   return row.sec_shares != null && row.sec_shares > 0

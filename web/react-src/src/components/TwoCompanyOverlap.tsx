@@ -87,7 +87,7 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
 
       {/* Tables — inline style so the two panels are guaranteed equal width */}
       {!loading && data && (
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
           {/* Institutional */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
