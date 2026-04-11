@@ -13,35 +13,20 @@ function hasSecShares(row: OverlapRow): boolean {
 }
 
 // Cohort math — bidirectional "true overlap both ways".
-//
-// For each cohort size N (25, 50), we compute two independent views:
-//
-//   Direction A: "the top N holders of SUBJECT collectively own X% of SECOND"
-//     cohort = rows.slice(0, n)                        // top N by subj $
-//     overlap = cohort.filter(is_overlap)
-//     pctSecByTopSubj = sum(sec_pct_float over overlap)
-//
-//   Direction B: "the top N holders of SECOND collectively own Y% of SUBJECT"
-//     cohortBySec = rows.sort(desc by sec_dollars).slice(0, n)
-//                         .filter(is_overlap)
-//     pctSubjByTopSec = sum(subj_pct_float over cohortBySec)
-//
-// Important caveat on Direction B: the backend only returns the top 50
-// holders of the SUBJECT, so a holder who's top-N of SECOND but ranked 51+
-// in SUBJECT is invisible to us. For mega-cap overlaps dominated by
-// Vanguard / BlackRock / State Street (the same funds holding both), the
-// approximation is tight. For thin-overlap cases it understates.
+// See comments in the old SummaryTable for the full derivation.
+// Direction A: top N of SUBJECT → how much of SECOND they own
+// Direction B: top N of SECOND → how much of SUBJECT they own
+//             (approximated from the top-50-subject universe the
+//              backend returns)
 export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: Props) {
   const results = useMemo(() => {
     return [25, 50].map(n => {
-      // Direction A — top N by subject dollars
       const cohortSubj = rows.slice(0, n)
       const overlapA = hasSecond ? cohortSubj.filter(r => r.is_overlap) : []
       const pctSecByTopSubj = overlapA.reduce(
         (a, r) => a + (hasSecShares(r) && r.sec_pct_float != null ? r.sec_pct_float : 0), 0
       )
 
-      // Direction B — top N by second dollars, restricted to overlap rows
       const cohortSec = hasSecond
         ? [...rows]
             .sort((a, b) => (b.sec_dollars || 0) - (a.sec_dollars || 0))
@@ -55,7 +40,6 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
       return {
         n,
         overlapA: overlapA.length,
-        overlapB: cohortSec.length,
         pctSecByTopSubj,
         pctSubjByTopSec,
       }
@@ -66,49 +50,59 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
   const sec = secondTicker || '—'
 
   return (
-    <div
-      style={{
-        marginTop: '10px',
-        border: '1px solid #e2e8f0',
-        borderRadius: '4px',
-        padding: '8px',
-        backgroundColor: '#fafafa',
-      }}
-    >
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-        <thead>
-          <tr style={{ borderBottom: '2px solid #002147' }}>
-            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              Cohort
-            </th>
-            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              Overlap
-            </th>
-            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              {hasSecond ? `% ${sec} by top ${subj}` : '—'}
-            </th>
-            <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600, color: '#555' }}>
-              {hasSecond ? `% ${subj} by top ${sec}` : '—'}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map(r => (
-            <tr key={r.n} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={{ padding: '4px 6px', color: '#333' }}>Top {r.n}</td>
-              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
-                {r.overlapA}
-              </td>
-              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
+    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {results.map(r => (
+        <div
+          key={r.n}
+          style={{
+            border: '1px solid #cbd5e0',
+            borderRadius: '4px',
+            backgroundColor: '#f7fafc',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            padding: '10px 12px',
+          }}
+        >
+          {/* Cohort header band */}
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              color: '#002147',
+              paddingBottom: '6px',
+              marginBottom: '8px',
+              borderBottom: '1px solid #cbd5e0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+            }}
+          >
+            <span>Top {r.n}</span>
+            <span style={{ fontSize: '11px', fontWeight: 500, color: '#718096' }}>
+              {hasSecond ? `${r.overlapA} overlap holders` : '—'}
+            </span>
+          </div>
+
+          {/* Metric rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#4a5568' }}>
+                % of {sec} by {subj} top {r.n}
+              </span>
+              <span style={{ color: '#002147', fontWeight: 600 }}>
                 {hasSecond ? r.pctSecByTopSubj.toFixed(2) + '%' : '—'}
-              </td>
-              <td style={{ textAlign: 'right', padding: '4px 6px', color: '#333' }}>
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#4a5568' }}>
+                % of {subj} by {sec} top {r.n}
+              </span>
+              <span style={{ color: '#002147', fontWeight: 600 }}>
                 {hasSecond ? r.pctSubjByTopSec.toFixed(2) + '%' : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

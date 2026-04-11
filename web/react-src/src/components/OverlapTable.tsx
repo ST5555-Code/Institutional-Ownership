@@ -6,6 +6,7 @@ import {
   RowClassParams,
   ICellRendererParams,
   CellStyle,
+  ValueGetterParams,
 } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -132,9 +133,24 @@ export function OverlapTable({
         maxWidth: W_RANK,
         ...fixed,
         cellStyle: { textAlign: 'center', color: '#888', fontSize: '12px' } as CellStyle,
-        cellRenderer: (params: ICellRendererParams<TotalRow>) => {
-          if (params.node.rowPinned) return ''
-          return params.node.rowIndex != null ? String(params.node.rowIndex + 1) : ''
+        // valueGetter instead of cellRenderer so AG Grid renders the
+        // returned value natively. Fallback chain handles any v35
+        // rowIndex quirks: if rowIndex is null/undefined, compute the
+        // rank from the row node's place in the data array.
+        valueGetter: (params: ValueGetterParams<TotalRow>) => {
+          if (params.node?.rowPinned) return ''
+          const idx = params.node?.rowIndex
+          if (idx != null) return idx + 1
+          // Last-ditch fallback — look up the row in the grid's rowData.
+          const data = params.data
+          if (data && params.api) {
+            let found = -1
+            params.api.forEachNode((n, i) => {
+              if (n.data === data) found = i
+            })
+            if (found >= 0) return found + 1
+          }
+          return ''
         },
       },
       {
