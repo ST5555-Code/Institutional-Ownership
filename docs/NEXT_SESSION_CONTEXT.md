@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-11 (session end, HEAD: 59410e7)_
+_Last updated: 2026-04-11 (session end, HEAD: fdda6b2)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,13 +12,15 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `59410e7`
+- **HEAD:** `fdda6b2`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
-  - Flask — `scripts/app.py` (2000+ lines)
+  - Flask — `scripts/app.py` (2000+ lines) + `scripts/admin_bp.py` (admin Blueprint, gated by `ENABLE_ADMIN` + `ADMIN_TOKEN`, INF12)
   - DuckDB — `data/13f.duckdb`
-  - Vanilla JS — `web/static/app.js` (6000+ lines)
+  - Vanilla JS — `web/static/app.js` (~5600 lines, tco IIFE removed in React port)
   - Jinja templates — `web/templates/index.html`
+  - **React POC** — `web/react-src/` (2 Companies Overlap tab, React 18 + TS + Vite + Tailwind v3 + AG Grid v35). Built bundle at `web/static/dist/tco-bundle.{js,css}`, gitignored, loaded as `<script type="module">` from `index.html`. POC is production-serving today but will be retired once the full React app (see `REACT_MIGRATION.md`) ships and cuts over.
+  - **React full-app plan** — `REACT_MIGRATION.md` at repo root. Parallel build planned at `web/react-app/` (port 5174), Zustand store, dark-navy sidebar shell, 4 nav sections / 11 tabs. Not yet scaffolded — first scaffold commit is the next session's Phase 1.
 
 ---
 
@@ -39,8 +41,33 @@ each working session so the top block stays current.
 
 ## Last session (2026-04-11) — what shipped
 
-26 commits from baseline `56bfa3f` → `59410e7`. Four main deliverables,
-a critical bug fix, and an entity-override persistence pass.
+~50 commits from baseline `56bfa3f` → `fdda6b2`. Four main deliverables
+(Entity Graph, 2 Companies Overlap vanilla JS, B608 fix, INF9 Route A),
+an INF12 admin-auth hardening pass, a **full React port** of the 2
+Companies Overlap tab (scaffold → production-ready, 16 commits), and
+the **React full-app migration plan** (`REACT_MIGRATION.md`) for the
+next session.
+
+Post-`59410e7` work that the previous version of this file missed:
+
+- **INF12 admin Blueprint** (`d51db60`, `c91afd2`) — 15 admin routes
+  moved to `scripts/admin_bp.py` under `/api/admin/*`, gated by
+  `ENABLE_ADMIN=1` + `ADMIN_TOKEN` env vars with `hmac.compare_digest`
+  token compare. `admin.html` sends `X-Admin-Token` header via
+  `adminFetch()`. Exception: `/api/admin/quarter_config` left ungated
+  because the public React UI fetches it every page load. Commit
+  message on `d51db60` has the full detail.
+
+- **2 Companies Overlap — React iteration continuation** (8 commits
+  after `59410e7`): `a5c3b99` (width/height/gap pass), `64e4692`
+  (fixed-basis flex panels + drop duplicate group header border),
+  `39c9bb9` (autoHeight + suppressHorizontalScroll, drop overlap cell
+  strip, cohort math rewrite), `013cf3b` (wider $ columns for
+  NVDA-class values, bidirectional cohort math), `ce2a356` (R1-R4
+  polish: overlap highlight selector heavier, rank valueGetter,
+  bordered summary cards, cohort number per row), `680549c` (ROADMAP
+  entry consolidating all 16 React commits), `fdda6b2`
+  (REACT_MIGRATION.md plan).
 
 ### 1. Entity Graph tab (`a028153`, `9080885`)
 
@@ -282,9 +309,150 @@ recognizes for the nosec suppression; Python compiles
   rollup_entity_id` (10,935 rows). Non-parent entities have
   `rollup_entity_id` pointing to their canonical parent.
 
+### g. React + AG Grid + Tailwind landmines (discovered during TCO port)
+
+All of these cost at least one diagnostic round-trip during the React
+port. Copy the fixes verbatim into any new React app (`web/react-app/`
+Phase 1 especially).
+
+1. **AG Grid v32+ dropped community module auto-registration.**
+   Without `ModuleRegistry.registerModules([AllCommunityModule])` at
+   the bundle boundary (top of `main.tsx`), the grid renders headers
+   only, no rows. Symptom: tab mounts, no error, no data. Fix is one
+   line in `main.tsx`, but you MUST remember to do it.
+
+2. **AG Grid v33+ Theming API conflicts with legacy CSS imports.** If
+   you import `ag-grid-community/styles/ag-grid.css` and
+   `ag-theme-alpine.css`, you MUST pass `theme="legacy"` as a prop on
+   every `<AgGridReact>`. Without it the grid errors code 240
+   ("themeQuartz default with ag-grid.css included") and may refuse
+   to commit rows. The alternative is to fully adopt the Theming API
+   and drop the CSS imports — more invasive.
+
+3. **AG Grid React wrapper treats function cellRenderers as React
+   components.** Returning an `HTMLElement` from a cellRenderer
+   throws "Objects are not valid as a React child" and crashes the
+   whole subtree. For bold pinned-row text, return JSX
+   `<span style={{fontWeight:600}}>{v}</span>` — NOT
+   `document.createElement('span')`.
+
+4. **AG Grid row class rules alpha stacking.** If both
+   `.tco-overlap-row` AND `.tco-overlap-row .ag-cell` set a
+   semi-transparent background, cells get double alpha (0.18 + 0.18
+   ≈ 0.33) while row-only areas stay at 0.18. At the spacer-column
+   boundary where the cell-level rule doesn't paint (spacers have
+   inline `cellStyle: { backgroundColor: 'transparent' }`), a visible
+   darker edge appears. Fix: row-only selector, no cell-level rule.
+
+5. **Tailwind v4 default drops `init -p`.** `npm install -D tailwindcss`
+   pulls v4 by default, which uses CSS-first config and has no
+   `init -p` command. Pin to v3 explicitly: `tailwindcss@^3`. Don't
+   fight the v4 upgrade in the middle of a migration.
+
+6. **Tailwind Preflight (`@tailwind base`) leaks globally.** If your
+   built React CSS bundle is linked from the main Flask page, the
+   preflight reset applies to EVERY input / button / select on the
+   page — not just elements inside the React root. `input { color:
+   inherit }` made the main `#ticker-input` text white (inherited
+   from `.header { color: white }`), invisible against the white
+   input background. Fix: `corePlugins: { preflight: false }` in
+   `tailwind.config.js`. The component classes (`border`, `p-4`,
+   etc.) still work without the reset.
+
+7. **Never `innerHTML = ''` a React-controlled mount element.** React
+   18's reconciler corrupts silently when the DOM it thinks it owns
+   is cleared externally. The POC's `switchTab()` deactivate block
+   used to clear `#tco-react-root.innerHTML = ''` when switching
+   away; next time React tried to render, the commit silently
+   failed (no error thrown, no visible content). Fix: hide the
+   panel via `classList.add('hidden')` only; let React keep
+   managing its subtree. Defense in depth in `main.tsx`: if the
+   mount element has been externally cleared, drop the cached
+   `_root` and recreate it.
+
+8. **Module script tags are deferred — race against tab clicks.**
+   `<script type="module">` always defers until after HTML parsing.
+   If the user clicks the 2 Companies Overlap tab BEFORE
+   `tco-bundle.js` has parsed, `window.tcoActivate` is still
+   undefined and the click is lost. Fix: stash the current ticker on
+   `window.__tcoPendingTicker` from the `switchTab` branch when
+   `tcoActivate` is not yet defined, and have `main.tsx` auto-mount
+   read and clear that pending ticker on load.
+
+9. **AG Grid internal scroll viewports.** With `domLayout="normal"`,
+   AG Grid always reserves ~17px of scrollbar track at the bottom of
+   the grid even when no scroll is needed. Combined with a slightly
+   miscalculated container height, this creates phantom
+   scrollbars. Use `domLayout="autoHeight"` +
+   `suppressHorizontalScroll={true}` to eliminate both tracks
+   entirely — the grid sizes itself exactly to its content.
+
+10. **AG Grid spacer columns: header cells inherit theme background.**
+    A top-level `ColDef` with no field / no renderer and
+    `cellStyle: { backgroundColor: 'transparent' }` renders
+    transparently in the body but its HEADER cell still picks up
+    `.ag-header-cell { background-color: #003366 }` — showing as a
+    thin blue vertical bar at the top of the column. If you add
+    spacer columns, add a `headerClass: 'tco-spacer-header'` with a
+    transparent override to silence this.
+
+### h. Inline style vs !important cascade
+
+Inline styles (via `style={...}` in React or `element.style.X` in
+JS) normally beat CSS rules. But `!important` CSS beats non-important
+inline styles. So a CSS rule like
+`.tco-overlap-row .ag-cell { background-color: X !important }` WILL
+override the spacer's inline `backgroundColor: 'transparent'`. This
+is why the double-coat overlap rule stacked on top of the spacer's
+inline transparent style.
+
 ---
 
 ## Open items you might pick up
+
+### Next direction — React full-app migration (Phase 1)
+
+**Primary next session goal.** Read `REACT_MIGRATION.md` at repo root.
+Plan is to scaffold `web/react-app/` as a parallel build alongside the
+existing Flask-served app (which stays at `:8001` untouched until cut
+over). Tech stack: React 18 + TS + Vite on port **5174** (POC uses
+5173, don't collide) + Tailwind v3 (preflight OFF) + AG Grid Community
+v35 (with `AllCommunityModule` registered + `theme="legacy"` on every
+grid) + Zustand for shared state.
+
+Phase 1 is **shell only** — no tab content. Ship:
+
+1. `web/react-app/` scaffold (Vite + TS + Tailwind + Zustand)
+2. `AppShell` + `Sidebar` (4 nav sections, 11 tab placeholders) +
+   `Header` (ticker input, company card, view toggle)
+3. `useAppStore` Zustand store — `ticker`, `company`, `quarter`,
+   `loadCompany(ticker)` that calls `/api/summary?ticker=X`
+4. Empty tab component files for all 11 tabs (just return a
+   placeholder `<div>Coming soon</div>`)
+5. Vite proxy `/api/*` → Flask `:8001`
+6. End-state smoke test: `http://localhost:5174` loads, shell
+   renders, typing a ticker in the header populates the company card
+
+The existing Flask app at `:8001` stays completely untouched through
+Phase 1. Cut over happens in a separate commit at the end of the full
+migration (all 11 tabs migrated): one-line change in `scripts/app.py`
+to serve `web/react-app/dist/index.html` instead of
+`web/templates/index.html`. Revertable in 30 seconds.
+
+**Nav structure** (from `REACT_MIGRATION.md`):
+- Overall Market: Sector Rotation, Entity Graph
+- Ownership: Register, Ownership Trend, Conviction, Fund Portfolio
+- Flow & Rotation: Flow Analysis, Peer Rotation
+- Investor Targeting: Cross-Ownership, Overlap Analysis, Short Interest
+
+**Color scheme** (Bloomberg pattern): dark navy shell + light content
+area. Shell `#0a0f1e`, sidebar `#0d1526` (active `#1a2a4a`), accent
+gold `#f5a623`, content `#f4f6f9`, cards `#ffffff`. Oxford Blue
+`#002147` and Glacier Blue `#4A90D9` retained for legacy components.
+
+**Do NOT build yet** (explicitly deferred): Playwright visual
+regression, `/api/admin/*` token handling, activist red highlight
+styling, Short Interest tab content.
 
 ### UI tweaks still pending
 
@@ -294,12 +462,12 @@ recognizes for the nosec suppression; Python compiles
 
 ### Known preexisting bugs
 
-- **INF12 — high priority before any deploy.** `/api/add_ticker`,
-  `/api/admin/run_script`, `/api/admin/entity_override` have zero
-  auth. Render deployment would expose prod writes to the internet.
-  Fix: middleware + env var token, split admin endpoints into a
-  separate Blueprint mounted only when `ENABLE_ADMIN=1`, bind to
-  `127.0.0.1` by default.
+- ~~**INF12 — high priority before any deploy.**~~ **DONE** (`d51db60`).
+  Admin Blueprint with `ENABLE_ADMIN` + `ADMIN_TOKEN` env gating,
+  `X-Admin-Token` header, `hmac.compare_digest` compare. 15 routes
+  moved to `/api/admin/*` with one exception: `/api/admin/quarter_config`
+  stays ungated because the public main UI fetches it every page load.
+  Render deployment safe.
 - **INF13 part 2.** Snapshot fallback in `_resolve_db_path` uses
   `shutil.copy2` on live DuckDB file → race with concurrent writes.
   Part 1 was the `refresh_snapshot.sh` fix (`d0677b1`); part 2 for
@@ -418,12 +586,29 @@ pre-commit run bandit --files scripts/app.py scripts/queries.py
 
 ---
 
-## Session ledger (commits since 2026-04-11 start)
+## Session ledger (commits since 2026-04-11 start, newest first)
 
 ```
+fdda6b2 Add REACT_MIGRATION.md — Phase 1 plan and architecture decisions
+680549c ROADMAP: add 2026-04-11 2 Companies Overlap React port entry
+ce2a356 2 Companies Overlap: fix R1-R4 (overlap highlight, rank, summary cards)
+013cf3b 2 Companies Overlap: wider % and $ columns + bidirectional cohort math
+39c9bb9 2 Companies Overlap: kill scrollbars, fix overlap strip, fix cohort math
+64e4692 2 Companies Overlap: fixed-basis panels + drop duplicate group header border
+c91afd2 ROADMAP: mark INF12 Done
+d51db60 INF12: admin Blueprint with token auth — gate all /api/admin/* except quarter_config
+a5c3b99 2 Companies Overlap: widths, height, gap, summary, overlap, group header
+5303b0f 2 Companies Overlap: new column widths + pinned-row overlap exclusion
 59410e7 2 Companies Overlap: locked width spec, Active Only, summary card
 f0bcc14 2 Companies Overlap: fix two regressions from c7feb65
 c7feb65 2 Companies Overlap: polish pass (HTML renderers, headers, layout, z-index)
+c2cbec1 2 Companies Overlap: stop stomping React's DOM
+71da99b 2 Companies Overlap: AG Grid theme="legacy"
+68b40ff 2 Companies Overlap: register AG Grid community modules
+cee679f 2 Companies Overlap: disable Tailwind Preflight
+d48a8fd 2 Companies Overlap: fix React bundle load race
+5a7fcde 2 Companies Overlap: React components built
+e200623 React POC scaffold: Vite + TypeScript + Tailwind + AG Grid
 b53e3fa INF9 Route A: persist 24 reclassify overrides to staging entity_overrides_persistent
 292feba ROADMAP: add 2026-04-11 session entries (Entity Graph, 2 Companies Overlap, B608 fix)
 33a39f9 2 Companies Overlap: per-panel active-only toggles + wider header search
