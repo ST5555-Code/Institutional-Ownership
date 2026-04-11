@@ -1949,6 +1949,58 @@ def api_entity_graph():
         con.close()
 
 
+@app.route('/api/entity_resolve')
+def api_entity_resolve():
+    """Resolve any entity_id to its canonical institution root.
+
+    Thin wrapper around the rollup_entity_id walk already used by
+    build_entity_graph(). Lets external tooling resolve a descendant entity
+    (a filer subsidiary, a fund series) to its top-level institution without
+    pulling the full graph payload. Returns the canonical root plus the
+    selected entity for round-tripping.
+    """
+    entity_id = (request.args.get('entity_id') or '').strip()
+    if not entity_id:
+        return jsonify({'error': 'Missing entity_id parameter'}), 400
+    try:
+        eid = int(entity_id)
+    except ValueError:
+        return jsonify({'error': f'Invalid entity_id: {entity_id}'}), 400
+
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        ent = queries.get_entity_by_id(eid, con)
+        if not ent:
+            return jsonify({'error': f'entity_id {eid} not found'}), 404
+
+        # Same rollup walk as build_entity_graph(): if rollup_entity_id is set
+        # and points elsewhere, fetch the canonical parent. Fall back to self
+        # if the parent row can't be loaded for any reason.
+        root_id = ent['rollup_entity_id'] if ent['rollup_entity_id'] else ent['entity_id']
+        root = ent if root_id == ent['entity_id'] else queries.get_entity_by_id(root_id, con)
+        if not root:
+            root = ent
+            root_id = ent['entity_id']
+
+        return jsonify(queries.clean_for_json({
+            'selected_entity_id': eid,
+            'selected_display_name': ent['display_name'],
+            'root_entity_id': root_id,
+            'root_display_name': root['display_name'],
+            'entity_type': root.get('entity_type'),
+            'classification': root.get('classification'),
+            'is_self_root': root_id == ent['entity_id'],
+        }))
+    except Exception as e:
+        app.logger.error("entity_resolve error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        con.close()
+
+
 # ---------------------------------------------------------------------------
 # Main
 @app.route('/api/peer_rotation')
