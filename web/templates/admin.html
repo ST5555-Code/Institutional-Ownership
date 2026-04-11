@@ -177,9 +177,36 @@
     </div>
 
     <script>
+    // INF12: all /api/admin/* endpoints require X-Admin-Token header.
+    // Token is prompted once and stored in localStorage under 'admin_token'.
+    // On 403 (bad token) we clear and re-prompt; on 503 (admin disabled) we
+    // surface the server message so the operator knows env vars aren't set.
+    function getAdminToken() {
+        let t = localStorage.getItem('admin_token');
+        if (!t) {
+            t = prompt('Admin token (X-Admin-Token) — set ADMIN_TOKEN env var on the server and enter it here:');
+            if (t) localStorage.setItem('admin_token', t);
+        }
+        return t || '';
+    }
+    async function adminFetch(url, opts = {}) {
+        const headers = Object.assign({}, opts.headers || {}, {
+            'X-Admin-Token': getAdminToken(),
+        });
+        const res = await fetch(url, Object.assign({}, opts, { headers }));
+        if (res.status === 403) {
+            localStorage.removeItem('admin_token');
+            throw new Error('Admin token rejected (403) — refresh to re-enter');
+        }
+        if (res.status === 503) {
+            throw new Error('Admin disabled on server (503) — set ENABLE_ADMIN=1 and ADMIN_TOKEN');
+        }
+        return res;
+    }
+
     async function loadStats() {
         try {
-            const res = await fetch('/api/admin/stats');
+            const res = await adminFetch('/api/admin/stats');
             const d = await res.json();
             document.getElementById('st-holdings').textContent = (d.holdings || 0).toLocaleString();
             document.getElementById('st-managers').textContent = (d.managers || 0).toLocaleString();
@@ -194,7 +221,7 @@
 
     async function loadProgress() {
         try {
-            const res = await fetch('/api/admin/progress');
+            const res = await adminFetch('/api/admin/progress');
             const d = await res.json();
             const badge = document.getElementById('pipeline-badge');
             const fill = document.getElementById('progress-fill');
@@ -224,7 +251,7 @@
 
     async function loadErrors() {
         try {
-            const res = await fetch('/api/admin/errors');
+            const res = await adminFetch('/api/admin/errors');
             const d = await res.json();
             const el = document.getElementById('error-log');
             el.textContent = d.errors || 'No recent errors';
@@ -243,7 +270,7 @@
         document.getElementById('add-ticker-btn').disabled = true;
 
         try {
-            const res = await fetch('/api/add_ticker', {
+            const res = await adminFetch('/api/admin/add_ticker', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ticker}),
@@ -270,7 +297,7 @@
         if (!confirm(`Run ${script} with flags: ${flags.join(' ') || '(none)'}?`)) return;
         result.innerHTML = `<span style="color:#666">Starting ${script}...</span>`;
         try {
-            const res = await fetch('/api/admin/run_script', {
+            const res = await adminFetch('/api/admin/run_script', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({script, flags}),
@@ -300,7 +327,7 @@
 
     async function loadRunning() {
         try {
-            const res = await fetch('/api/admin/running');
+            const res = await adminFetch('/api/admin/running');
             const d = await res.json();
             const el = document.getElementById('running-list');
             if (d.running.length > 0) {
@@ -313,7 +340,7 @@
 
     async function loadDataQuality() {
         try {
-            const res = await fetch('/api/admin/data_quality');
+            const res = await adminFetch('/api/admin/data_quality');
             const d = await res.json();
             if (d.holdings) {
                 document.getElementById('dq-ticker-pct').textContent = (d.holdings.ticker_pct || 0) + '%';
@@ -328,7 +355,7 @@
 
     async function loadChanges() {
         try {
-            const res = await fetch('/api/admin/manager_changes');
+            const res = await adminFetch('/api/admin/manager_changes');
             const d = await res.json();
             const newEl = document.getElementById('new-managers');
             const goneEl = document.getElementById('gone-managers');
@@ -340,7 +367,7 @@
             ).join('') || 'None';
         } catch (e) {}
         try {
-            const res = await fetch('/api/admin/ticker_changes');
+            const res = await adminFetch('/api/admin/ticker_changes');
             const d = await res.json();
             document.getElementById('new-tickers').innerHTML = (d.new_tickers || []).slice(0, 15).map(t =>
                 `<div><b>${t.ticker}</b> ${t.company || ''}</div>`
@@ -350,14 +377,14 @@
 
     async function loadSignals() {
         try {
-            const res = await fetch('/api/admin/merger_signals');
+            const res = await adminFetch('/api/admin/merger_signals');
             const d = await res.json();
             document.getElementById('merger-signals').innerHTML = (d.potential_mergers || []).slice(0, 5).map(m =>
                 `<div>${m.manager_name} — $${(m.prev_value/1e9).toFixed(1)}B</div>`
             ).join('') || 'None detected';
         } catch (e) {}
         try {
-            const res = await fetch('/api/admin/new_companies');
+            const res = await adminFetch('/api/admin/new_companies');
             const d = await res.json();
             document.getElementById('new-companies').innerHTML = (d.new_companies || []).slice(0, 10).map(c =>
                 `<div><b>${c.ticker}</b> ${c.company || ''} — ${c.holder_count} holders</div>`
