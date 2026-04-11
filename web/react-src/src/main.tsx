@@ -1,38 +1,26 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import { TwoCompanyOverlap } from './components/TwoCompanyOverlap'
 
-// Placeholder — will be replaced with TwoCompanyOverlap component
-function TcoPlaceholder() {
-  return (
-    <div className="p-6 border border-gray-200 rounded bg-white">
-      <h2 className="text-lg font-semibold" style={{ color: 'var(--oxford-blue)' }}>
-        2 Companies Overlap — React POC
-      </h2>
-      <p className="mt-2 text-sm text-gray-500">
-        React + TypeScript + Tailwind + AG Grid scaffold mounted successfully.
-      </p>
-    </div>
-  )
-}
+let _root: ReturnType<typeof ReactDOM.createRoot> | null = null
 
-// Mount function — called by existing app.js when tab activates
 function mountTco(ticker: string) {
-  const root = document.getElementById('tco-react-root')
-  if (!root) return
-  ReactDOM.createRoot(root).render(
+  const el = document.getElementById('tco-react-root')
+  if (!el) return
+  if (!_root) {
+    _root = ReactDOM.createRoot(el)
+  }
+  _root.render(
     <React.StrictMode>
-      <TcoPlaceholder />
+      <TwoCompanyOverlap subjectTicker={ticker} />
     </React.StrictMode>
   )
 }
 
-// Expose to existing vanilla JS layer
+;(window as any).tcoActivate = mountTco
 ;(window as any).tcoMount = mountTco
-;(window as any).tcoActivate = (ticker: string) => mountTco(ticker)
 
-// Auto-mount if element already exists on page load
+// Auto-mount on load if element present
 const existingRoot = document.getElementById('tco-react-root')
-if (existingRoot) {
-  mountTco('')
-}
+if (existingRoot) mountTco('')
