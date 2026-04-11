@@ -29,33 +29,43 @@ export function SummaryTable({ rows, subjectTicker, secondTicker, hasSecond }: P
   }, [rows, hasSecond])
 
   return (
-    <table className="w-full text-xs border-collapse mt-2">
-      <thead>
-        <tr className="border-b border-gray-300">
-          <th className="text-left py-1 px-2 font-semibold text-gray-600">Cohort</th>
-          <th className="text-right py-1 px-2 font-semibold text-gray-600">Overlap</th>
-          <th className="text-right py-1 px-2 font-semibold text-gray-600">
-            {hasSecond ? `% of ${secondTicker} float by ${subjectTicker} top N` : '—'}
-          </th>
-          <th className="text-right py-1 px-2 font-semibold text-gray-600">
-            {hasSecond ? `% of ${subjectTicker} float by ${secondTicker} top N` : '—'}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {results.map(r => (
-          <tr key={r.n} className="border-b border-gray-100 hover:bg-gray-50">
-            <td className="py-1 px-2 text-gray-700">Top {r.n}</td>
-            <td className="text-right py-1 px-2 text-gray-700">{r.overlapCount}</td>
-            <td className="text-right py-1 px-2 text-gray-700">
-              {hasSecond ? r.pctSecBySubj.toFixed(2) + '%' : '—'}
-            </td>
-            <td className="text-right py-1 px-2 text-gray-700">
-              {hasSecond ? r.pctSubjBySec.toFixed(2) + '%' : '—'}
-            </td>
+    <div
+      style={{
+        marginTop: '10px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '4px',
+        padding: '8px',
+        backgroundColor: '#fafafa',
+      }}
+    >
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-gray-300">
+            <th className="text-left py-1 px-2 font-semibold text-gray-600">Cohort</th>
+            <th className="text-right py-1 px-2 font-semibold text-gray-600">Overlap</th>
+            <th className="text-right py-1 px-2 font-semibold text-gray-600">
+              % of {secondTicker || '—'} owned by {subjectTicker || '—'} top N
+            </th>
+            <th className="text-right py-1 px-2 font-semibold text-gray-600">
+              % of {subjectTicker || '—'} owned by {secondTicker || '—'} top N
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {results.map(r => (
+            <tr key={r.n} className="border-b border-gray-100 hover:bg-gray-50 last:border-0">
+              <td className="py-1 px-2 text-gray-700">Top {r.n}</td>
+              <td className="text-right py-1 px-2 text-gray-700">{r.overlapCount}</td>
+              <td className="text-right py-1 px-2 text-gray-700">
+                {hasSecond ? r.pctSecBySubj.toFixed(2) + '%' : '—'}
+              </td>
+              <td className="text-right py-1 px-2 text-gray-700">
+                {hasSecond ? r.pctSubjBySec.toFixed(2) + '%' : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

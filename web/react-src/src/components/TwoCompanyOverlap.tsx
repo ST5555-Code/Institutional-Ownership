@@ -22,9 +22,29 @@ const panelTitleStyle: React.CSSProperties = {
   lineHeight: '20px',
 }
 
+interface ActiveToggleProps {
+  active: boolean
+  onToggle: () => void
+}
+
+function ActiveOnlyToggle({ active, onToggle }: ActiveToggleProps) {
+  const base =
+    'px-3 py-1 text-xs rounded border transition-colors select-none cursor-pointer'
+  const cls = active
+    ? 'bg-oxford-blue text-white border-oxford-blue'
+    : 'bg-white text-gray-600 border-gray-300 hover:border-oxford-blue'
+  return (
+    <button type="button" onClick={onToggle} className={`${base} ${cls}`}>
+      Active Only
+    </button>
+  )
+}
+
 export function TwoCompanyOverlap({ subjectTicker }: Props) {
   const [secondTicker, setSecondTicker] = useState('')
   const [quarter, setQuarter] = useState('')
+  const [instActiveOnly, setInstActiveOnly] = useState(false)
+  const [fundActiveOnly, setFundActiveOnly] = useState(false)
 
   const { data, loading, error } = useOverlapData(subjectTicker, secondTicker, quarter)
 
@@ -70,13 +90,27 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
         <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
           {/* Institutional */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={panelTitleStyle}>Ownership Overlap by Institution</h3>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <h3 style={panelTitleStyle}>Ownership Overlap by Institution</h3>
+              <ActiveOnlyToggle
+                active={instActiveOnly}
+                onToggle={() => setInstActiveOnly(v => !v)}
+              />
+            </div>
             <OverlapTable
               rows={instRows}
               subjectTicker={subjectTicker}
               secondTicker={secondTicker}
               hasSecond={hasSecond}
               type="inst"
+              activeOnly={instActiveOnly}
             />
             <SummaryTable
               rows={instRows}
@@ -88,13 +122,27 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
 
           {/* Fund */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={panelTitleStyle}>Ownership Overlap by Fund</h3>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <h3 style={panelTitleStyle}>Ownership Overlap by Fund</h3>
+              <ActiveOnlyToggle
+                active={fundActiveOnly}
+                onToggle={() => setFundActiveOnly(v => !v)}
+              />
+            </div>
             <OverlapTable
               rows={fundRows}
               subjectTicker={subjectTicker}
               secondTicker={secondTicker}
               hasSecond={hasSecond}
               type="fund"
+              activeOnly={fundActiveOnly}
             />
             <SummaryTable
               rows={fundRows}
