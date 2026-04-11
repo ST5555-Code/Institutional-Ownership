@@ -26,15 +26,12 @@ interface Props {
 type TotalRow = OverlapRow & { _isTotal?: boolean }
 
 // ── locked width spec ─────────────────────────────────────────────────────
-// 36 + 240 + 62 + 62 + 12 + 62 + 62 + 3 = 539
-const W_RANK = 36
-const W_NAME = 240
-const W_PCT = 62
-const W_GROUP_SPACER = 12
-const W_DOL = 62
-const W_TRAIL_SPACER = 3
-const TABLE_WIDTH =
-  W_RANK + W_NAME + W_PCT + W_PCT + W_GROUP_SPACER + W_DOL + W_DOL + W_TRAIL_SPACER
+const W_RANK    = 36
+const W_NAME    = 280
+const W_PCT     = 75
+const W_SPACER  = 16
+const W_DOL     = 90
+const W_TRAIL   = 5
 
 // ── locked height spec ────────────────────────────────────────────────────
 const GROUP_HEADER_H = 28
@@ -207,7 +204,7 @@ export function OverlapTable({
           },
         ],
       },
-      spacer('spacer_mid', W_GROUP_SPACER),
+      spacer('spacer_mid', W_SPACER),
       {
         headerName: 'Value ($M)',
         headerClass: 'tco-group-header',
@@ -250,18 +247,20 @@ export function OverlapTable({
           },
         ],
       },
-      spacer('spacer_trail', W_TRAIL_SPACER),
+      spacer('spacer_trail', W_TRAIL),
     ]
   }, [subjectTicker, secondTicker, hasSecond, type])
 
   const rowClassRules = useMemo(() => ({
-    'tco-overlap-row': (params: RowClassParams<TotalRow>) => !!params.data?.is_overlap,
+    'tco-overlap-row': (params: RowClassParams<TotalRow>) => {
+      return !params.node.rowPinned && !!(params.data as OverlapRow)?.is_overlap
+    },
   }), [])
 
   return (
     <div
       className="ag-theme-alpine"
-      style={{ height: `${TABLE_HEIGHT}px`, width: `${TABLE_WIDTH}px` }}
+      style={{ height: `${TABLE_HEIGHT}px`, width: '100%' }}
     >
       <AgGridReact<TotalRow>
         theme="legacy"
