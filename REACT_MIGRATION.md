@@ -5,7 +5,7 @@ _Created: 2026-04-11_
 Parallel build — new React app in web/react-app/, existing app on localhost:8001 untouched until cut over.
 
 ## Tech Stack
-- React 18 + TypeScript
+- React 19 + TypeScript
 - Vite (port 5174, proxy /api/* → Flask 8001)
 - Tailwind CSS v3
 - AG Grid Community v35
