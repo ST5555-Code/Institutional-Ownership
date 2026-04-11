@@ -30,3 +30,9 @@ __pycache__/
 data/13f_readonly.duckdb
 13f_test.duckdb
 13f_staging.duckdb
+
+# React build output
+web/static/dist/
+
+# Node modules
+web/react-src/node_modules/

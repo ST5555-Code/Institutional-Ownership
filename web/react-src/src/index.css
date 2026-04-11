@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --oxford-blue: #002147;
+  --glacier-blue: #4A90D9;
+  --sandstone: #C9B99A;
+  --overlap-highlight: rgba(74, 144, 217, 0.08);
+}

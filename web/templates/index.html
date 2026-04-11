@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>13F Institutional Ownership Research</title>
     <link rel="stylesheet" href="/static/style.css">
+    <!-- React POC bundle -->
+    <link rel="stylesheet" href="/static/dist/tco-bundle.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <!-- Entity Graph tab — vis.js network (vendored locally, see web/static/vendor/) -->
     <script src="/static/vendor/vis-network.min.js"></script>
@@ -280,147 +282,7 @@
 
         <!-- Two Companies Overlap tab panel -->
         <div id="two-co-overlap-tab" class="tab-panel hidden">
-
-          <!-- Controls row — Second Company autocomplete + Quarter buttons -->
-          <div class="controls-row" style="display:flex; gap:16px; align-items:flex-end; margin-bottom:16px; flex-wrap:wrap;">
-
-            <!-- Second company autocomplete — same pattern as Cross-Ownership -->
-            <div style="position:relative;">
-              <label class="control-label">Second Company</label>
-              <input type="text" id="tco-second-input"
-                     placeholder="Ticker or company name..."
-                     autocomplete="off"
-                     style="width:260px; padding:5px 8px; border:1px solid #ccc; border-radius:3px; font-size:13px;">
-              <div id="tco-second-dropdown"
-                   style="display:none; position:absolute; top:100%; left:0; z-index:1000;
-                          background:#fff; border:1px solid #ccc; border-radius:3px;
-                          max-height:260px; overflow-y:auto; min-width:300px; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-              </div>
-              <input type="hidden" id="tco-second-ticker">
-            </div>
-
-            <!-- Quarter buttons -->
-            <div>
-              <label class="control-label">Quarter</label>
-              <div id="tco-quarter-btns" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
-            </div>
-
-          </div>
-
-          <!-- Two panels side by side -->
-          <div style="display:flex; gap:20px; align-items:flex-start;">
-
-            <!-- Institutional panel -->
-            <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px 0;">
-                <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0;">
-                  Ownership Overlap by Institution
-                </h3>
-                <label style="font-size:11px; color:#555; cursor:pointer; user-select:none;">
-                  <input type="checkbox" id="tco-inst-active-toggle" style="vertical-align:middle; margin-right:4px;">
-                  Active only
-                </label>
-              </div>
-              <div id="tco-inst-wrap" style="overflow-x:auto; flex:1;">
-                <table id="tco-inst-table" class="data-table" style="width:100%; table-layout:fixed; border-collapse:collapse;">
-                  <thead>
-                    <tr>
-                      <th rowspan="2" style="text-align:center; width:36px; padding:6px 4px; background-clip:padding-box;">#</th>
-                      <th rowspan="2" style="text-align:left; width:240px; padding:6px 8px; background-clip:padding-box;">Holder</th>
-                      <th colspan="2" style="text-align:center; padding:4px 8px; border:none; border-bottom:2px solid #C9B99A; background-clip:padding-box;">
-                        %&nbsp;Owned
-                      </th>
-                      <th rowspan="2" style="width:16px; border:none; background-clip:padding-box;"></th>
-                      <th colspan="2" style="text-align:center; padding:4px 8px; border:none; border-bottom:2px solid #C9B99A; background-clip:padding-box;">
-                        Value&nbsp;($M)
-                      </th>
-                      <th rowspan="2" style="width:3px; border:none; background-clip:padding-box;"></th>
-                    </tr>
-                    <tr>
-                      <th id="tco-inst-h-subj-pct" style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-inst-h-sec-pct"  style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-inst-h-subj-val" style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-inst-h-sec-val"  style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="tco-inst-body"></tbody>
-                  <tfoot id="tco-inst-foot"></tfoot>
-                </table>
-              </div>
-
-              <!-- Institutional summary (Top 25 / Top 50) -->
-              <div id="tco-inst-summary" style="margin-top:10px; display:none;">
-                <table class="data-table" style="width:100%; border-collapse:collapse; font-size:12px;">
-                  <thead>
-                    <tr>
-                      <th style="text-align:left;">Cohort</th>
-                      <th style="text-align:right;">Overlap</th>
-                      <th id="tco-inst-scol1" style="text-align:right;"></th>
-                      <th id="tco-inst-scol2" style="text-align:right;"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="tco-inst-sbody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Fund panel -->
-            <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px 0;">
-                <h3 style="font-size:14px; font-weight:700; color:#002147; margin:0;">
-                  Ownership Overlap by Fund
-                </h3>
-                <label style="font-size:11px; color:#555; cursor:pointer; user-select:none;">
-                  <input type="checkbox" id="tco-fund-active-toggle" style="vertical-align:middle; margin-right:4px;">
-                  Active only
-                </label>
-              </div>
-              <div id="tco-fund-wrap" style="overflow-x:auto; flex:1;">
-                <table id="tco-fund-table" class="data-table" style="width:100%; table-layout:fixed; border-collapse:collapse;">
-                  <thead>
-                    <tr>
-                      <th rowspan="2" style="text-align:center; width:36px; padding:6px 4px; background-clip:padding-box;">#</th>
-                      <th rowspan="2" style="text-align:left; width:240px; padding:6px 8px; background-clip:padding-box;">Fund</th>
-                      <th colspan="2" style="text-align:center; padding:4px 8px; border:none; border-bottom:2px solid #C9B99A; background-clip:padding-box;">
-                        %&nbsp;Owned
-                      </th>
-                      <th rowspan="2" style="width:16px; border:none; background-clip:padding-box;"></th>
-                      <th colspan="2" style="text-align:center; padding:4px 8px; border:none; border-bottom:2px solid #C9B99A; background-clip:padding-box;">
-                        Value&nbsp;($M)
-                      </th>
-                      <th rowspan="2" style="width:3px; border:none; background-clip:padding-box;"></th>
-                    </tr>
-                    <tr>
-                      <th id="tco-fund-h-subj-pct" style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-fund-h-sec-pct"  style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-fund-h-subj-val" style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                      <th id="tco-fund-h-sec-val"  style="text-align:right; padding:4px 6px; width:62px; border:none; background-clip:padding-box;"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="tco-fund-body"></tbody>
-                  <tfoot id="tco-fund-foot"></tfoot>
-                </table>
-              </div>
-
-              <!-- Fund summary (Top 25 / Top 50) -->
-              <div id="tco-fund-summary" style="margin-top:10px; display:none;">
-                <table class="data-table" style="width:100%; border-collapse:collapse; font-size:12px;">
-                  <thead>
-                    <tr>
-                      <th style="text-align:left;">Cohort</th>
-                      <th style="text-align:right;">Overlap</th>
-                      <th id="tco-fund-scol1" style="text-align:right;"></th>
-                      <th id="tco-fund-scol2" style="text-align:right;"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="tco-fund-sbody"></tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-
-          <div id="tco-error" style="display:none; color:red; margin-top:12px;"></div>
+          <div id="tco-react-root" style="min-height:200px; padding:16px;"></div>
         </div>
 
         <!-- Entity Graph tab panel -->
@@ -476,5 +338,6 @@
     </div>
 
     <script src="/static/app.js"></script>
+    <script type="module" src="/static/dist/tco-bundle.js"></script>
 </body>
 </html>
