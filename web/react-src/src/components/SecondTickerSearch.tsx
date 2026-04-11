@@ -57,11 +57,11 @@ export function SecondTickerSearch({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-1" ref={wrapRef}>
+    <div className="flex flex-col gap-1" ref={wrapRef} style={{ position: 'relative', zIndex: 9999 }}>
       <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
         Second Company
       </label>
-      <div className="relative">
+      <div style={{ position: 'relative' }}>
         <input
           type="text"
           value={inputVal}
@@ -75,8 +75,22 @@ export function SecondTickerSearch({ value, onChange }: Props) {
           autoComplete="off"
         />
         {open && matches.length > 0 && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-72 bg-white
-                          border border-gray-200 rounded shadow-lg max-h-52 overflow-y-auto">
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              zIndex: 9999,
+              background: '#fff',
+              border: '1px solid #ccc',
+              borderRadius: '3px',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              minWidth: '280px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              marginTop: '4px',
+            }}
+          >
             {matches.map(item => (
               <div
                 key={item.ticker}

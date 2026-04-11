@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { QuarterSelector } from './QuarterSelector'
 import { SecondTickerSearch } from './SecondTickerSearch'
 import { OverlapTable } from './OverlapTable'
@@ -7,6 +7,19 @@ import { useOverlapData } from '../hooks/useOverlapData'
 
 interface Props {
   subjectTicker: string
+}
+
+// Shared panel title style so the institutional and fund panels line up
+// pixel-for-pixel, which they don't when they rely on Tailwind class
+// inheritance across two subtly different containers.
+const panelTitleStyle: React.CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 700,
+  color: '#002147',
+  margin: '0 0 8px 0',
+  padding: 0,
+  height: '20px',
+  lineHeight: '20px',
 }
 
 export function TwoCompanyOverlap({ subjectTicker }: Props) {
@@ -52,17 +65,12 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
         <div className="text-sm text-gray-500 py-4">Loading…</div>
       )}
 
-      {/* Tables */}
+      {/* Tables — inline style so the two panels are guaranteed equal width */}
       {!loading && data && (
-        <div className="flex gap-5 items-start">
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
           {/* Institutional */}
-          <div className="flex-1 min-w-0">
-            <h3
-              className="text-sm font-bold mb-2"
-              style={{ color: 'var(--oxford-blue)' }}
-            >
-              Ownership Overlap by Institution
-            </h3>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={panelTitleStyle}>Ownership Overlap by Institution</h3>
             <OverlapTable
               rows={instRows}
               subjectTicker={subjectTicker}
@@ -79,16 +87,8 @@ export function TwoCompanyOverlap({ subjectTicker }: Props) {
           </div>
 
           {/* Fund */}
-          <div className="flex-1 min-w-0">
-            <h3
-              className="text-sm font-bold mb-2"
-              style={{ color: 'var(--oxford-blue)' }}
-            >
-              Ownership Overlap by Fund
-            </h3>
-            <p className="text-xs text-gray-400 mb-1 -mt-1">
-              Coverage limited to funds filing N-PORT
-            </p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={panelTitleStyle}>Ownership Overlap by Fund</h3>
             <OverlapTable
               rows={fundRows}
               subjectTicker={subjectTicker}

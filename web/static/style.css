@@ -40,7 +40,7 @@ body {
     padding: 16px 24px;
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
 }
 
 .header-inner {
@@ -155,7 +155,8 @@ body {
 }
 
 /* === Autocomplete === */
-.autocomplete-dropdown {
+.autocomplete-dropdown,
+#autocomplete-dropdown {
     position: absolute;
     top: 100%;
     left: 0;
@@ -166,7 +167,7 @@ body {
     border: 1px solid var(--mid-grey);
     border-radius: 0 0 4px 4px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 200;
+    z-index: 9999 !important;
     display: none;
 }
 

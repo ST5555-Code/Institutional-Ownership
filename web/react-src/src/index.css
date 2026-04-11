@@ -9,29 +9,29 @@
   --overlap-highlight: rgba(74, 144, 217, 0.08);
 }
 
-/* AG Grid Oxford Blue theme overrides */
-.ag-theme-alpine .ag-header {
-  background-color: var(--oxford-blue);
-  color: white;
-  font-family: Arial, sans-serif;
-  font-size: 11px;
+/* AG Grid Oxford Blue theme — legacy mode */
+.ag-theme-alpine .ag-header-row {
+  background-color: #002147 !important;
+  color: #ffffff !important;
 }
 
 .ag-theme-alpine .ag-header-group-cell {
-  background-color: var(--oxford-blue);
-  color: white;
-  font-weight: 600;
-  border-bottom: 2px solid rgba(255,255,255,0.3);
+  background-color: #002147 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 11px;
+  border-bottom: 2px solid rgba(255,255,255,0.4) !important;
 }
 
 .ag-theme-alpine .ag-header-cell {
-  background-color: #003366;
-  color: white;
+  background-color: #003366 !important;
+  color: #ffffff !important;
   font-size: 11px;
 }
 
-.ag-theme-alpine .ag-header-cell-text {
-  color: white;
+.ag-theme-alpine .ag-header-cell-text,
+.ag-theme-alpine .ag-header-group-cell-label {
+  color: #ffffff !important;
 }
 
 .ag-theme-alpine .ag-row-even {
@@ -42,24 +42,18 @@
   background-color: #f8f9fa;
 }
 
-.ag-theme-alpine .ag-pinned-bottom-header,
-.ag-theme-alpine .ag-floating-bottom {
-  background-color: #f0f4f8;
-  border-top: 2px solid var(--oxford-blue);
+.ag-theme-alpine .ag-pinned-bottom-floating-bottom,
+.ag-theme-alpine .ag-floating-bottom-container {
+  background-color: #f0f4f8 !important;
+  border-top: 2px solid #002147 !important;
 }
 
 .ag-theme-alpine .ag-cell {
   font-family: Arial, sans-serif;
   font-size: 12px;
-  line-height: 36px;
+  line-height: 32px;
 }
 
-/* Overlap row highlight */
 .tco-overlap-row {
-  background-color: var(--overlap-highlight) !important;
-}
-
-/* Group header underline */
-.tco-group-header {
-  border-bottom: 2px solid rgba(255,255,255,0.5) !important;
+  background-color: rgba(74, 144, 217, 0.08) !important;
 }
