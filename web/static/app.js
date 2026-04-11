@@ -376,13 +376,10 @@ function switchTab(tabId) {
     managerSelector.classList.add('hidden');
     coPanel.classList.add('hidden');
 
-    // Any tab other than 'two-co-overlap' must hide the tco panel, unmount
-    // the React app (clear its root), and restore results-area + action-bar
-    // to their default visible state. Replaces the previous tco IIFE
-    // deactivator.
+    // Any tab other than 'two-co-overlap' hides the tco panel and restores
+    // results-area + action-bar. Never touch innerHTML of #tco-react-root —
+    // React owns that subtree and will be re-rendered on next activation.
     if (tabId !== 'two-co-overlap') {
-        const _tcoRoot = document.getElementById('tco-react-root');
-        if (_tcoRoot) _tcoRoot.innerHTML = '';
         const _tcoPanel = document.getElementById('two-co-overlap-tab');
         if (_tcoPanel) _tcoPanel.classList.add('hidden');
         const _tcoResults = document.getElementById('results-area');
