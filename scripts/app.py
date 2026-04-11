@@ -465,19 +465,25 @@ def api_admin_manager_changes():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # New managers (in latest quarter but not previous)
-        new_mgrs = con.execute(f"""  # nosec B608
+        new_mgrs = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}')
             ORDER BY manager_name LIMIT 50
-        """).fetchdf()
+            """
+        ).fetchdf()
         # Disappeared managers
-        gone_mgrs = con.execute(f"""  # nosec B608
+        gone_mgrs = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}')
             ORDER BY manager_name LIMIT 50
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(clean_for_json({
             'new_managers': df_to_records(new_mgrs),
             'disappeared_managers': df_to_records(gone_mgrs),
@@ -494,18 +500,24 @@ def api_admin_ticker_changes():
     con = get_db()
     try:
         from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
-        new_tickers = con.execute(f"""  # nosec B608
+        new_tickers = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
             GROUP BY ticker ORDER BY ticker LIMIT 100
-        """).fetchdf()
-        gone_tickers = con.execute(f"""  # nosec B608
+            """
+        ).fetchdf()
+        gone_tickers = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
             GROUP BY ticker ORDER BY ticker LIMIT 100
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(clean_for_json({
             'new_tickers': df_to_records(new_tickers),
             'disappeared_tickers': df_to_records(gone_tickers),
@@ -520,7 +532,9 @@ def api_admin_parent_health():
     con = get_db()
     try:
         # Managers without parent assignment
-        orphaned = con.execute(f"""  # nosec B608
+        orphaned = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
             FROM holdings_v2
@@ -528,15 +542,19 @@ def api_admin_parent_health():
             GROUP BY cik, manager_name, manager_type
             ORDER BY total_value DESC NULLS LAST
             LIMIT 20
-        """).fetchdf()
+            """
+        ).fetchdf()
         # Top parents by value
-        top_parents = con.execute(f"""  # nosec B608
+        top_parents = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
             FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_value DESC NULLS LAST LIMIT 20
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(clean_for_json({
             'orphaned_managers': df_to_records(orphaned),
             'top_parents': df_to_records(top_parents),
@@ -565,13 +583,16 @@ def api_admin_stale_data():
             result['stale_market_data'] = []
         # Managers only in old quarters
         try:
-            inactive = con.execute(f"""  # nosec B608
+            inactive = con.execute(
+                f""  # nosec B608
+                f"""
                 SELECT cik, manager_name, MAX(quarter) as last_quarter
                 FROM holdings_v2
                 GROUP BY cik, manager_name
                 HAVING MAX(quarter) < '{PQ}'
                 ORDER BY last_quarter DESC LIMIT 20
-            """).fetchdf()
+                """
+            ).fetchdf()
             result['inactive_managers'] = df_to_records(inactive)
         except Exception as e:
             app.logger.debug("Error: %s", e)
@@ -588,7 +609,9 @@ def api_admin_merger_signals():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # CIKs that disappeared AND had large holdings
-        signals = con.execute(f"""  # nosec B608
+        signals = con.execute(
+            f""  # nosec B608
+            f"""
             WITH gone AS (
                 SELECT cik, manager_name, SUM(market_value_usd) as prev_value
                 FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
@@ -597,7 +620,8 @@ def api_admin_merger_signals():
                 HAVING SUM(market_value_usd) > 1000000
             )
             SELECT * FROM gone ORDER BY prev_value DESC LIMIT 20
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(clean_for_json({
             'potential_mergers': df_to_records(signals),
         }))
@@ -612,7 +636,9 @@ def api_admin_new_companies():
     try:
         from config import LATEST_QUARTER, PREV_QUARTER  # pylint: disable=reimported
         # Tickers that appeared in latest quarter with significant institutional value
-        new_cos = con.execute(f"""  # nosec B608
+        new_cos = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT h.ticker, MAX(h.issuer_name) as company,
                    COUNT(DISTINCT h.cik) as holder_count,
                    SUM(h.market_value_live) as total_value,
@@ -627,7 +653,8 @@ def api_admin_new_companies():
             GROUP BY h.ticker
             HAVING SUM(h.market_value_live) > 10000000
             ORDER BY total_value DESC LIMIT 30
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(clean_for_json({
             'new_companies': df_to_records(new_cos),
         }))
@@ -643,14 +670,17 @@ def api_admin_data_quality():
         result = {}
         # Holdings coverage
         try:
-            r = con.execute(f"""  # nosec B608
+            r = con.execute(
+                f""  # nosec B608
+                f"""
                 SELECT
                     COUNT(*) as total,
                     COUNT(ticker) as with_ticker,
                     COUNT(market_value_live) as with_live_value,
                     COUNT(pct_of_float) as with_float_pct
                 FROM holdings_v2 WHERE quarter = '{LQ}'
-            """).fetchone()
+                """
+            ).fetchone()
             result['holdings'] = {
                 'total': r[0], 'with_ticker': r[1],
                 'with_live_value': r[2], 'with_float_pct': r[3],
@@ -979,13 +1009,16 @@ def api_tickers():
     except Exception as e:
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
-        df = con.execute(f"""  # nosec B608
+        df = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT ticker, MODE(issuer_name) as name
             FROM holdings_v2
             WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}'
             GROUP BY ticker
             ORDER BY ticker
-        """).fetchdf()
+            """
+        ).fetchdf()
         return jsonify(df_to_records(df))
     finally:
         con.close()
@@ -1065,7 +1098,9 @@ def api_fund_portfolio_managers():
     except Exception as e:
         return jsonify({'error': f'Database unavailable: {e}'}), 503
     try:
-        df = con.execute(f"""  # nosec B608
+        df = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT
                 cik,
                 fund_name,
@@ -1078,7 +1113,8 @@ def api_fund_portfolio_managers():
             GROUP BY cik, fund_name
             ORDER BY position_value DESC NULLS LAST
             LIMIT 50
-        """, [ticker]).fetchdf()
+            """, [ticker]
+        ).fetchdf()
         return jsonify(df_to_records(df))
     finally:
         con.close()
@@ -1092,7 +1128,9 @@ def api_nport_shorts():
     try:
         where = "AND fh.ticker = ?" if ticker else ""
         params = [ticker] if ticker else []
-        df = con.execute(f"""  # nosec B608
+        df = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT
                 fh.fund_name,
                 fh.ticker,
@@ -1108,7 +1146,8 @@ def api_nport_shorts():
               {where}
             ORDER BY fh.market_value_usd ASC
             LIMIT 200
-        """, params).fetchdf()
+            """, params
+        ).fetchdf()
         return jsonify(df_to_records(df))
     finally:
         con.close()
@@ -1155,19 +1194,24 @@ def api_fund_behavioral_profile():
             param = series_id
 
         # Fund identity
-        fund_info = con.execute(f"""  # nosec B608
+        fund_info = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
             FROM fund_holdings_v2 WHERE {where}
             GROUP BY fund_name, series_id, lei, family_name
             LIMIT 1
-        """, [param]).fetchone()
+            """, [param]
+        ).fetchone()
         if not fund_info:
             return jsonify({'error': 'Fund not found'}), 404
 
         fund_name, sid, fund_lei, family, quarters = fund_info
 
         # Position size distribution (avg % of NAV)
-        size_stats = con.execute(f"""  # nosec B608
+        size_stats = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT
                 AVG(pct_of_nav) as avg_pct_nav,
                 MEDIAN(pct_of_nav) as median_pct_nav,
@@ -1176,11 +1220,14 @@ def api_fund_behavioral_profile():
                 COUNT(DISTINCT quarter) as quarters_held
             FROM fund_holdings_v2
             WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0
-        """, [param]).fetchone()
+            """, [param]
+        ).fetchone()
 
         # Sector concentration
         sector_where = "fh.lei = ?" if lei else "fh.series_id = ?"
-        sectors = con.execute(f"""  # nosec B608
+        sectors = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT s.sector, SUM(fh.market_value_usd) as sector_value
             FROM fund_holdings_v2 fh
             JOIN securities s ON fh.cusip = s.cusip
@@ -1190,16 +1237,20 @@ def api_fund_behavioral_profile():
             GROUP BY s.sector
             ORDER BY sector_value DESC
             LIMIT 10
-        """, [param]).fetchdf()
+            """, [param]
+        ).fetchdf()
 
         # Top holdings
-        top = con.execute(f"""  # nosec B608
+        top = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
             FROM fund_holdings_v2
             WHERE {where} AND quarter = '{LQ}'
             ORDER BY market_value_usd DESC NULLS LAST
             LIMIT 10
-        """, [param]).fetchdf()
+            """, [param]
+        ).fetchdf()
 
         return jsonify(clean_for_json({
             'fund_name': fund_name,
@@ -1387,14 +1438,17 @@ def api_crowding():
     con = get_db()
     try:
         # Top holders by % of float
-        holders = con.execute(f"""  # nosec B608
+        holders = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_float) as pct_float,
                    SUM(market_value_live) as value
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY holder, manager_type
             ORDER BY pct_float DESC NULLS LAST LIMIT 20
-        """, [ticker]).fetchdf()
+            """, [ticker]
+        ).fetchdf()
         result = {'holders': df_to_records(holders)}
         # Short interest overlay
         if has_table('short_interest'):
@@ -1447,12 +1501,15 @@ def api_smart_money():
     con = get_db()
     try:
         # Long positions by manager type
-        longs = con.execute(f"""  # nosec B608
+        longs = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
-        """, [ticker]).fetchdf()
+            """, [ticker]
+        ).fetchdf()
         result = {'long_by_type': df_to_records(longs)}
         # Latest short volume
         if has_table('short_interest'):
@@ -1566,23 +1623,29 @@ def api_heatmap():
             tickers += [t.strip() for t in peers.split(',') if t.strip()]
         if not tickers:
             # Default: top 10 tickers by institutional value
-            top = con.execute(f"""  # nosec B608
+            top = con.execute(
+                f""  # nosec B608
+                f"""
                 SELECT ticker, SUM(market_value_usd) as val
                 FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL
                 GROUP BY ticker ORDER BY val DESC LIMIT 10
-            """).fetchall()
+                """
+            ).fetchall()
             tickers = [r[0] for r in top]
 
         # Top 15 managers by total value across these tickers
         ticker_ph = ','.join(['?'] * len(tickers))
-        managers = con.execute(f"""  # nosec B608
+        managers = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, SUM(market_value_usd) as total_val
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
               AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_val DESC LIMIT 15
-        """, tickers).fetchall()
+            """, tickers
+        ).fetchall()
         manager_names = [r[0] for r in managers]
 
         if not manager_names:
@@ -1590,7 +1653,9 @@ def api_heatmap():
 
         # Build the matrix: pct_of_float for each manager × ticker
         mgr_ph = ','.join(['?'] * len(manager_names))
-        cells = con.execute(f"""  # nosec B608
+        cells = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as manager, ticker,
                    SUM(pct_of_float) as pct_float,
                    SUM(shares) as shares,
@@ -1600,7 +1665,8 @@ def api_heatmap():
               AND ticker IN ({ticker_ph})
               AND COALESCE(rollup_name, inst_parent_name) IN ({mgr_ph})
             GROUP BY COALESCE(rollup_name, inst_parent_name), ticker
-        """, tickers + manager_names).fetchdf()
+            """, tickers + manager_names
+        ).fetchdf()
 
         return jsonify(clean_for_json({
             'tickers': tickers,
@@ -1623,16 +1689,21 @@ def api_manager_profile():
     con = get_db()
     try:
         # Top holdings
-        top_holdings_df = con.execute(f"""  # nosec B608
+        top_holdings_df = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
                    pct_of_portfolio, pct_of_float
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
             ORDER BY market_value_usd DESC LIMIT 50
-        """, [f'%{manager}%']).fetchdf()
+            """, [f'%{manager}%']
+        ).fetchdf()
 
         # Sector allocation
-        sectors = con.execute(f"""  # nosec B608
+        sectors = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
                    SUM(h.market_value_usd) as value
             FROM holdings_v2 h
@@ -1640,17 +1711,21 @@ def api_manager_profile():
             WHERE h.quarter = '{LQ}' AND COALESCE(h.rollup_name, h.inst_parent_name) ILIKE ?
               AND m.sector IS NOT NULL
             GROUP BY m.sector ORDER BY value DESC
-        """, [f'%{manager}%']).fetchdf()
+            """, [f'%{manager}%']
+        ).fetchdf()
 
         # Summary stats
-        stats = con.execute(f"""  # nosec B608
+        stats = con.execute(
+            f""  # nosec B608
+            f"""
             SELECT COUNT(DISTINCT ticker) as num_positions,
                    SUM(market_value_usd) as total_value,
                    COUNT(DISTINCT cik) as num_ciks,
                    MAX(manager_type) as manager_type
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
-        """, [f'%{manager}%']).fetchone()
+            """, [f'%{manager}%']
+        ).fetchone()
 
         # Quarter-over-quarter change
         qoq = con.execute("""
@@ -1687,7 +1762,9 @@ def api_amendments():
     con = get_db()
     try:
         # Find managers who filed amendments for this ticker
-        amendments = con.execute(f"""  # nosec B608
+        amendments = con.execute(
+            f""  # nosec B608
+            f"""
             WITH all_filings AS (
                 SELECT cik, manager_name, rollup_name, inst_parent_name, quarter,
                        accession_number, shares, market_value_usd,
@@ -1707,7 +1784,8 @@ def api_amendments():
             FROM all_filings a
             WHERE a.cik IN (SELECT cik FROM amended_managers)
             ORDER BY a.market_value_usd DESC LIMIT 30
-        """, [ticker]).fetchdf()
+            """, [ticker]
+        ).fetchdf()
 
         return jsonify(clean_for_json({
             'ticker': ticker,
