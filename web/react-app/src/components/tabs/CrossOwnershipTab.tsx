@@ -460,13 +460,15 @@ export function CrossOwnershipTab() {
                       {dataTickers.map(t => {
                         const v = inv.holdings[t]
                         const isAnchorCol = viewMode === 'anchor' && t === effectiveAnchor
-                        const isSubject = t === headerTicker
                         return (
                           <td key={t} style={{
                             ...TD_R,
+                            // Anchor column gets a subtle blue tint (skip on overlap
+                            // rows which already have their own highlight).
                             backgroundColor: isAnchorCol && !overlap ? '#e0f2fe' : undefined,
-                            fontWeight: isSubject ? 700 : undefined,
-                            color: v == null ? '#cbd5e1' : undefined,
+                            // All holding cells use the standard body text color —
+                            // same weight/color as Conviction tab for consistency.
+                            color: v == null ? '#94a3b8' : '#1e293b',
                           }}>
                             {v != null ? fmtValueMm(v) : '—'}
                           </td>
