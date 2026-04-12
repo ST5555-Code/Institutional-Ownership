@@ -1086,6 +1086,7 @@ def api_query(qnum):
         return jsonify({'error': f'Invalid query number: {qnum}'}), 400
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
+    quarter = request.args.get('quarter', LQ)
     rt = _get_rollup_type(request)
 
     # Query 15 does not require a ticker
@@ -1099,17 +1100,17 @@ def api_query(qnum):
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
             fund_name = request.args.get('fund_name', '').strip() or None
-            data = fn(ticker, cik=cik or None, fund_name=fund_name)
+            data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
             # query7 returns {stats, positions} dict
             if not data.get('positions'):
                 return jsonify({'error': f'No holdings found for CIK {cik}'}), 404
             return jsonify(data)
         elif qnum == 15:
-            data = fn(ticker or None)
+            data = fn(ticker or None, quarter=quarter)
         elif qnum in _rt_aware:
-            data = fn(ticker, rollup_type=rt)
+            data = fn(ticker, rollup_type=rt, quarter=quarter)
         else:
-            data = fn(ticker)
+            data = fn(ticker, quarter=quarter)
 
         # Empty check: list = empty if no rows; dict = only check 'rows' key
         # if the dict has one (query1/query16 structure). Other dict shapes
@@ -1134,6 +1135,7 @@ def api_export(qnum):
         return jsonify({'error': f'Invalid query number: {qnum}'}), 400
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
+    quarter = request.args.get('quarter', LQ)
 
     if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
@@ -1142,11 +1144,11 @@ def api_export(qnum):
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
             fund_name = request.args.get('fund_name', '').strip() or None
-            data = fn(ticker, cik=cik or None, fund_name=fund_name)
+            data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
         elif qnum == 15:
-            data = fn(ticker or None)
+            data = fn(ticker or None, quarter=quarter)
         else:
-            data = fn(ticker)
+            data = fn(ticker, quarter=quarter)
 
         if not data:
             return jsonify({'error': f'No data found for ticker {ticker}'}), 404
