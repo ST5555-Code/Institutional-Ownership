@@ -297,7 +297,7 @@ export function EntityGraphTab() {
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {/* ── MARKET MODE ── */}
         {viewMode === 'market' && (
-          <div style={{ padding: 16 }}>
+          <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
             {market.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading market summary…</div>}
             {market.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {market.error}</div>}
             {market.data && (
@@ -429,7 +429,7 @@ function MarketRowDetail({ data, loading, quarter }: {
   const instAum = data.nodes.find(n => n.node_type === 'institution')?.aum
 
   return (
-    <div style={{ padding: '12px 20px 16px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: '12px 20px 16px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 12, color: '#1e293b' }}>
       {/* Summary tiles */}
       <div style={{ display: 'flex', gap: 24 }}>
         <SummaryTile label="Total AUM" value={fmtAum(instAum ?? null)} />
