@@ -3330,6 +3330,39 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
         top_holders = top_holders_df['holder'].tolist()
         ph = ','.join(['?'] * len(top_holders))
 
+        # GICS sector mapping in SQL — mirrors _gics_sector() to keep row-level
+        # mapping out of Python. REIT-under-Financial-Services goes first so it
+        # wins against the plain Financial Services branch.
+        gics_case = """
+            CASE
+                WHEN m.sector = 'Financial Services' AND m.industry ILIKE '%REIT%' THEN 'Real Estate'
+                WHEN m.sector = 'Technology' THEN 'Information Technology'
+                WHEN m.sector = 'Financial Services' THEN 'Financials'
+                WHEN m.sector = 'Healthcare' THEN 'Health Care'
+                WHEN m.sector = 'Consumer Cyclical' THEN 'Consumer Discretionary'
+                WHEN m.sector = 'Consumer Defensive' THEN 'Consumer Staples'
+                WHEN m.sector = 'Basic Materials' THEN 'Materials'
+                WHEN m.sector IN ('Industrials','Energy','Communication Services','Utilities','Real Estate') THEN m.sector
+                WHEN m.sector = 'ETF' THEN 'ETF'
+                ELSE 'Unknown'
+            END AS gics_sector,
+            CASE
+                WHEN m.sector = 'Financial Services' AND m.industry ILIKE '%REIT%' THEN 'REA'
+                WHEN m.sector = 'Technology' THEN 'TEC'
+                WHEN m.sector = 'Financial Services' THEN 'FIN'
+                WHEN m.sector = 'Healthcare' THEN 'HCR'
+                WHEN m.sector = 'Industrials' THEN 'IND'
+                WHEN m.sector = 'Consumer Cyclical' THEN 'CND'
+                WHEN m.sector = 'Consumer Defensive' THEN 'CNS'
+                WHEN m.sector = 'Energy' THEN 'ENE'
+                WHEN m.sector = 'Basic Materials' THEN 'MAT'
+                WHEN m.sector = 'Communication Services' THEN 'COM'
+                WHEN m.sector = 'Utilities' THEN 'UTL'
+                WHEN m.sector = 'Real Estate' THEN 'REA'
+                WHEN m.sector = 'ETF' THEN 'ETF'
+                ELSE 'UNK'
+            END AS gics_code"""
+
         # Pull full portfolios for all top holders in one query, grouped by sector
         if level == 'fund':
             portfolio_df = con.execute(f"""
@@ -3338,6 +3371,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                     fh.ticker,
                     COALESCE(m.sector, 'Unknown') as yf_sector,
                     COALESCE(m.industry, '') as yf_industry,
+                    {gics_case},
                     SUM(fh.market_value_usd) as value
                 FROM fund_holdings_v2 fh
                 LEFT JOIN market_data m ON fh.ticker = m.ticker
@@ -3352,6 +3386,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                     h.ticker,
                     COALESCE(m.sector, 'Unknown') as yf_sector,
                     COALESCE(m.industry, '') as yf_industry,
+                    {gics_case},
                     SUM(h.market_value_live) as value
                 FROM holdings_v2 h
                 LEFT JOIN market_data m ON h.ticker = m.ticker
@@ -3362,53 +3397,55 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
             """, top_holders).fetchdf()
 
         def _compute_metrics(holder_df, subject_value):
-            """Compute all concentration metrics for a single holder's portfolio."""
+            """Compute all concentration metrics for a single holder's portfolio.
+            Vectorized: gics_sector/gics_code come pre-computed from SQL, so all
+            per-row work collapses to groupby / boolean mask / idxmax."""
             if holder_df.empty:
                 return None
             total = float(holder_df['value'].sum())
             if total <= 0:
                 return None
-            unknown_val = float(holder_df[holder_df['yf_sector'] == 'Unknown']['value'].sum())
-            etf_val = float(holder_df[holder_df['yf_sector'] == 'ETF']['value'].sum())
+
+            gics_col = holder_df['gics_sector']
+            unknown_val = float(holder_df.loc[gics_col == 'Unknown', 'value'].sum())
+            etf_val = float(holder_df.loc[gics_col == 'ETF', 'value'].sum())
             unk_pct_ = round(unknown_val / total * 100, 1)
             etf_pct_ = round(etf_val / total * 100, 1)
 
-            sector_totals_ = {}
-            for _, prow in holder_df.iterrows():
-                gics, code = _gics_sector(prow['yf_sector'], prow['yf_industry'])
-                if gics in ('Unknown', 'ETF'):
-                    continue
-                sector_totals_[(gics, code)] = sector_totals_.get((gics, code), 0) + float(prow['value'])
+            real = holder_df.loc[~gics_col.isin(['Unknown', 'ETF'])]
+            sector_sums = real.groupby(['gics_sector', 'gics_code'], sort=False)['value'].sum()
+            sorted_s = sector_sums.sort_values(ascending=False)
 
-            sorted_s = sorted(sector_totals_.items(), key=lambda x: x[1], reverse=True)
-            subj_key_ = (subj_gics_sector, subj_gics_code)
-            subj_sec_value = sector_totals_.get(subj_key_, 0)
+            subj_sec_value = float(sorted_s.get((subj_gics_sector, subj_gics_code), 0))
             subj_sec_pct = round(subj_sec_value / total * 100, 1)
+
             subj_sec_rank = None
-            for i, ((s, _), _) in enumerate(sorted_s, 1):
-                if s == subj_gics_sector:
-                    subj_sec_rank = i
-                    break
+            if len(sorted_s) > 0:
+                sec_names = sorted_s.index.get_level_values('gics_sector')
+                sec_mask = sec_names == subj_gics_sector
+                if sec_mask.any():
+                    subj_sec_rank = int(sec_mask.argmax()) + 1
 
             co_rank = None
             if subj_sec_value > 0:
-                sec_rows = holder_df[
-                    holder_df.apply(lambda r: _gics_sector(r['yf_sector'], r['yf_industry'])[0] == subj_gics_sector, axis=1)
-                ].sort_values('value', ascending=False).reset_index(drop=True)
-                for i, srow in sec_rows.iterrows():
-                    if srow['ticker'] == ticker:
-                        co_rank = i + 1
-                        break
+                sec_rows = (holder_df.loc[gics_col == subj_gics_sector]
+                            .sort_values('value', ascending=False)
+                            .reset_index(drop=True))
+                co_mask = sec_rows['ticker'] == ticker
+                if co_mask.any():
+                    co_rank = int(co_mask.idxmax()) + 1
 
             ind_rank = None
             if subj_yf_industry:
-                ind_rows = holder_df[holder_df['yf_industry'] == subj_yf_industry].sort_values('value', ascending=False).reset_index(drop=True)
-                for i, srow in ind_rows.iterrows():
-                    if srow['ticker'] == ticker:
-                        ind_rank = i + 1
-                        break
+                ind_rows = (holder_df.loc[holder_df['yf_industry'] == subj_yf_industry]
+                            .sort_values('value', ascending=False)
+                            .reset_index(drop=True))
+                ind_mask = ind_rows['ticker'] == ticker
+                if ind_mask.any():
+                    ind_rank = int(ind_mask.idxmax()) + 1
 
-            top3_ = [{'code': code, 'weight_pct': round(val / total * 100, 1)} for (_, code), val in sorted_s[:3]]
+            top3_ = [{'code': code, 'weight_pct': round(float(val) / total * 100, 1)}
+                     for (_, code), val in sorted_s.head(3).items()]
             vs_ = round(subj_sec_pct - subj_spx_weight, 1) if subj_spx_weight is not None else None
             score_ = 0
             if vs_ is not None:
@@ -3432,7 +3469,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 'co_rank_in_sector': co_rank,
                 'industry_rank': ind_rank,
                 'top3': top3_,
-                'diversity': len(sector_totals_),
+                'diversity': int(sector_sums.size),
                 'unk_pct': unk_pct_,
                 'etf_pct': etf_pct_,
             }
@@ -3505,6 +3542,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                         fh.ticker,
                         COALESCE(m.sector, 'Unknown') as yf_sector,
                         COALESCE(m.industry, '') as yf_industry,
+                        {gics_case},
                         SUM(fh.market_value_usd) as value
                     FROM fund_holdings_v2 fh
                     LEFT JOIN market_data m ON fh.ticker = m.ticker
