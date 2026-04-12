@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
+import subprocess  # nosec B404
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -261,11 +261,28 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
     con = duckdb.connect(db.PROD_DB)
     con.execute(f"ATTACH '{db.STAGING_DB}' AS stg (READ_ONLY)")
 
-    # Skip any tables that don't exist in prod (e.g.,
-    # entity_overrides_persistent, declared in schema but never created
-    # in production). They cannot be snapshotted or promoted into.
-    # The primary connection's database name is the file basename ('13f'),
-    # not 'main' — use current_database() to filter portably.
+    # INF9e: ensure entity_overrides_persistent exists in prod before the
+    # skip-check. This is the one-time DDL migration — idempotent via
+    # CREATE TABLE IF NOT EXISTS. Uses prod's degraded schema pattern
+    # (no PRIMARY KEY / DEFAULT constraints — see ENTITY_ARCHITECTURE.md).
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS entity_overrides_persistent (
+            override_id    BIGINT,
+            entity_cik     VARCHAR,
+            action         VARCHAR NOT NULL,
+            field          VARCHAR,
+            old_value      VARCHAR,
+            new_value      VARCHAR NOT NULL,
+            reason         VARCHAR,
+            analyst        VARCHAR,
+            still_valid    BOOLEAN NOT NULL DEFAULT TRUE,
+            applied_at     TIMESTAMP DEFAULT NOW(),
+            created_at     TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # Skip any tables that don't exist in prod. Now that
+    # entity_overrides_persistent is created above, it won't be skipped.
     existing_in_prod = {
         r[0] for r in con.execute(
             "SELECT table_name FROM duckdb_tables() "
@@ -285,7 +302,7 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
 
         # Step 3 — apply changes inside one transaction so the
         # whole promotion is atomic from prod's point of view
-        _log(f"  applying staging → production ...")
+        _log("  applying staging → production ...")
         con.execute("BEGIN TRANSACTION")
         try:
             for t in tables:
@@ -319,11 +336,12 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
     #   2 = at least one STRUCTURAL gate FAILed (auto-rollback — the DB
     #       is in a logically broken state)
     _log("  running validate_entities.py against production ...")
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603
         [sys.executable, "-u", "scripts/validate_entities.py", "--prod"],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        check=False,
     )
     summary["validate_returncode"] = result.returncode
     summary["validate_stdout_tail"] = "\n".join(result.stdout.splitlines()[-20:])
@@ -337,7 +355,7 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
             if line.strip():
                 _log(f"    {line}")
     elif result.returncode == 2:
-        _log(f"  validation: STRUCTURAL FAILURE (rc=2) — auto-restoring snapshot")
+        _log("  validation: STRUCTURAL FAILURE (rc=2) — auto-restoring snapshot")
         for line in result.stdout.splitlines()[-6:]:
             if line.strip():
                 _log(f"    {line}")

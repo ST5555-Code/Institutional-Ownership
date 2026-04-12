@@ -149,7 +149,7 @@ def diff_rollups(con, out: StringIO) -> dict:
     about is "did this entity's current rollup parent change". So we
     compare the active row (valid_to = 9999-12-31) on each side.
     """
-    rows = con.execute(f"""
+    rows = con.execute("""
         WITH stg_active AS (
             SELECT entity_id, rollup_type, rollup_entity_id, rule_applied,
                    source, routing_confidence
@@ -253,7 +253,7 @@ def diff_rollups(con, out: StringIO) -> dict:
 
 def diff_classifications(con, out: StringIO) -> dict:
     """Compare CURRENT classification per entity."""
-    rows = con.execute(f"""
+    rows = con.execute("""
         WITH stg_active AS (
             SELECT entity_id, classification, is_activist, confidence
             FROM stg.entity_classification_history
@@ -416,6 +416,89 @@ def diff_identifiers(con, out: StringIO) -> dict:
 # =============================================================================
 # Main
 # =============================================================================
+def diff_overrides(con, out: StringIO) -> dict:
+    """New / deleted entity_overrides_persistent rows.
+    Natural key: (entity_cik, action, field, new_value).
+    Table may be missing in prod — report the gap clearly (INF9e).
+    """
+    prod_exists = con.execute(
+        "SELECT COUNT(*) FROM duckdb_tables() "
+        "WHERE database_name = 'prod' AND table_name = 'entity_overrides_persistent'"
+    ).fetchone()[0]
+    stg_exists = con.execute(
+        "SELECT COUNT(*) FROM duckdb_tables() "
+        "WHERE database_name = 'stg' AND table_name = 'entity_overrides_persistent'"
+    ).fetchone()[0]
+
+    if not stg_exists:
+        return {"added": 0, "deleted": 0}
+
+    if not prod_exists:
+        n = con.execute(
+            "SELECT COUNT(*) FROM stg.entity_overrides_persistent"
+        ).fetchone()[0]
+        if n:
+            out.write("\n## entity_overrides_persistent\n")
+            out.write(
+                f"  TABLE MISSING IN PROD — {n} staging rows will be created on promote:\n"
+            )
+            rows = con.execute("""
+                SELECT entity_cik, action, field, new_value, analyst
+                FROM stg.entity_overrides_persistent
+                WHERE still_valid = TRUE
+                ORDER BY override_id
+            """).fetchall()
+            for cik, act, fld, nv, analyst in rows[:25]:
+                out.write(f"    + {cik}  {act} {fld or ''} → {nv}  ({analyst})\n")
+            if len(rows) > 25:
+                out.write(f"    ... and {len(rows) - 25} more\n")
+        return {"added": n, "deleted": 0}
+
+    # Both exist — diff on natural key
+    added = con.execute("""
+        SELECT s.entity_cik, s.action, s.field, s.new_value, s.analyst
+        FROM stg.entity_overrides_persistent s
+        WHERE s.still_valid = TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM prod.entity_overrides_persistent p
+            WHERE p.entity_cik = s.entity_cik
+              AND p.action = s.action
+              AND COALESCE(p.field, '') = COALESCE(s.field, '')
+              AND p.new_value = s.new_value
+              AND p.still_valid = TRUE
+          )
+    """).fetchall()
+    deleted = con.execute("""
+        SELECT p.entity_cik, p.action, p.field, p.new_value, p.analyst
+        FROM prod.entity_overrides_persistent p
+        WHERE p.still_valid = TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM stg.entity_overrides_persistent s
+            WHERE s.entity_cik = p.entity_cik
+              AND s.action = p.action
+              AND COALESCE(s.field, '') = COALESCE(p.field, '')
+              AND s.new_value = p.new_value
+              AND s.still_valid = TRUE
+          )
+    """).fetchall()
+
+    if added or deleted:
+        out.write("\n## entity_overrides_persistent\n")
+        if added:
+            out.write(f"  ADDED ({len(added)}):\n")
+            for cik, act, fld, nv, analyst in added[:25]:
+                out.write(f"    + {cik}  {act} {fld or ''} → {nv}  ({analyst})\n")
+            if len(added) > 25:
+                out.write(f"    ... and {len(added) - 25} more\n")
+        if deleted:
+            out.write(f"  DELETED ({len(deleted)}):\n")
+            for cik, act, fld, nv, analyst in deleted[:25]:
+                out.write(f"    - {cik}  {act} {fld or ''} → {nv}  ({analyst})\n")
+            if len(deleted) > 25:
+                out.write(f"    ... and {len(deleted) - 25} more\n")
+    return {"added": len(added), "deleted": len(deleted)}
+
+
 def main() -> None:
     if not Path(db.PROD_DB).exists():
         print(f"ERROR: production DB not found: {db.PROD_DB}", file=sys.stderr)
@@ -437,6 +520,7 @@ def main() -> None:
     counts["classifications"] = diff_classifications(con, body)
     counts["aliases"] = diff_aliases(con, body)
     counts["identifiers"] = diff_identifiers(con, body)
+    counts["overrides"] = diff_overrides(con, body)
     con.close()
 
     # Build the summary header
@@ -448,13 +532,15 @@ def main() -> None:
     n_ent = counts["entities"]["added"] + counts["entities"]["deleted"]
     n_alias = counts["aliases"]["added"] + counts["aliases"]["deleted"]
     n_id = counts["identifiers"]["added"] + counts["identifiers"]["deleted"]
+    n_ovr = counts["overrides"]["added"] + counts["overrides"]["deleted"]
     summary.write(f"  {n_rel} relationships changed (added/deleted)\n")
     summary.write(f"  {n_roll} rollups changed (added/deleted/retargeted/metadata)\n")
     summary.write(f"  {n_cls} classifications changed\n")
     summary.write(f"  {n_ent} entities added/deleted\n")
     summary.write(f"  {n_alias} aliases added/deleted\n")
     summary.write(f"  {n_id} identifiers added/deleted\n")
-    total = n_rel + n_roll + n_cls + n_ent + n_alias + n_id
+    summary.write(f"  {n_ovr} overrides added/deleted\n")
+    total = n_rel + n_roll + n_cls + n_ent + n_alias + n_id + n_ovr
     summary.write(f"  TOTAL line-level changes: {total}\n")
 
     out = body.getvalue() + summary.getvalue()
