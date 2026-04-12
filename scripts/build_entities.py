@@ -852,39 +852,71 @@ def replay_persistent_overrides(con):
                     skipped += 1
 
             elif action == "suppress_relationship":
-                # INF9c: close a bad relationship edge identified by CIK pair + type
+                # INF9c: close a bad relationship edge.
+                # Priority ladder: (1) parent_cik + child_cik resolve via
+                # entity_identifiers, (2) fallback to parent_entity_id +
+                # child_entity_id stored directly in the context JSON.
                 import json  # pylint: disable=import-outside-toplevel
                 ctx = json.loads(rel_ctx or '{}')
                 p_cik = ctx.get('parent_cik')
                 c_cik = ctx.get('child_cik')
                 r_type = ctx.get('relationship_type')
-                if p_cik and c_cik and r_type:
-                    p_eid = con.execute("""
+                p_eid_direct = ctx.get('parent_entity_id')
+                c_eid_direct = ctx.get('child_entity_id')
+
+                if not r_type:
+                    logger.warning(
+                        "[step 8] override %d: suppress_relationship missing relationship_type", oid,
+                    )
+                    skipped += 1
+                    continue
+
+                # Resolve parent entity_id — CIK first
+                p_eid = None
+                if p_cik:
+                    row = con.execute("""
                         SELECT entity_id FROM entity_identifiers
                         WHERE identifier_type='cik' AND identifier_value=?
                           AND valid_to=DATE '9999-12-31'
                     """, [p_cik]).fetchone()
-                    c_eid = con.execute("""
+                    if row:
+                        p_eid = row[0]
+                # entity_id fallback for PARENT_SEEDS brand ghosts with no CIK.
+                # entity_ids for PARENT_SEEDS are deterministic in practice (processed
+                # in seed list order) but not guaranteed by contract. This fallback is
+                # best-effort: works when entity_ids are stable across rebuilds,
+                # may miss if PARENT_SEEDS order changes. Better than current behavior
+                # (always skip when parent_cik is NULL).
+                if p_eid is None and p_eid_direct is not None:
+                    p_eid = int(p_eid_direct)
+
+                # Resolve child entity_id — CIK first, then fallback
+                c_eid = None
+                if c_cik:
+                    row = con.execute("""
                         SELECT entity_id FROM entity_identifiers
                         WHERE identifier_type='cik' AND identifier_value=?
                           AND valid_to=DATE '9999-12-31'
                     """, [c_cik]).fetchone()
-                    if p_eid and c_eid:
-                        con.execute("""
-                            UPDATE entity_relationships SET valid_to = CURRENT_DATE
-                            WHERE parent_entity_id = ? AND child_entity_id = ?
-                              AND relationship_type = ?
-                              AND valid_to = DATE '9999-12-31'
-                        """, [p_eid[0], c_eid[0], r_type])
-                        applied += 1
-                    else:
-                        logger.warning(
-                            "[step 8] override %d: suppress_relationship parent/child CIK not found",
-                            oid,
-                        )
-                        skipped += 1
+                    if row:
+                        c_eid = row[0]
+                if c_eid is None and c_eid_direct is not None:
+                    c_eid = int(c_eid_direct)
+
+                if p_eid is not None and c_eid is not None:
+                    con.execute("""
+                        UPDATE entity_relationships SET valid_to = CURRENT_DATE
+                        WHERE parent_entity_id = ? AND child_entity_id = ?
+                          AND relationship_type = ?
+                          AND valid_to = DATE '9999-12-31'
+                    """, [p_eid, c_eid, r_type])
+                    applied += 1
                 else:
-                    logger.warning("[step 8] override %d: suppress_relationship missing context", oid)
+                    logger.warning(
+                        "[step 8] override %d: suppress_relationship could not resolve "
+                        "parent (cik=%s, eid=%s) or child (cik=%s, eid=%s)",
+                        oid, p_cik, p_eid_direct, c_cik, c_eid_direct,
+                    )
                     skipped += 1
 
             else:
