@@ -31,22 +31,36 @@ function fmtAum(v: number | null): string {
 
 // ── React Flow: Institution + Filer graph only ─────────────────────────────
 
-function layoutFilerGraph(nodes: EntityGraphNode[]): RFNode[] {
-  // Only institution + filer nodes
+function layoutFilerGraph(nodes: EntityGraphNode[]): { rfNodes: RFNode[]; graphHeight: number } {
   const inst = nodes.filter(n => n.node_type === 'institution')
   const filers = nodes.filter(n => n.node_type === 'filer')
   const result: RFNode[] = []
+
   // Institution centered at top
   inst.forEach((n, i) => {
     result.push({ id: n.id, type: 'institution', position: { x: i * 200, y: 0 }, data: { label: n.display_name, aum: n.aum, entity_id: n.entity_id, node_type: n.node_type, classification: n.classification } })
   })
-  // Filers in a row below, centered
+
+  // Filers in a grid: max COLS_PER_ROW per row, centered
+  const COLS = Math.min(filers.length, 6)
   const X_GAP = 170
-  const totalW = (filers.length - 1) * X_GAP
+  const Y_GAP = 80
+  const rows = Math.ceil(filers.length / COLS)
+  const totalW = (COLS - 1) * X_GAP
+
   filers.forEach((n, i) => {
-    result.push({ id: n.id, type: 'filer', position: { x: i * X_GAP - totalW / 2, y: 140 }, data: { label: n.display_name, aum: n.aum, entity_id: n.entity_id, node_type: n.node_type, cik: n.id.replace('filer-', '') } })
+    const col = i % COLS
+    const row = Math.floor(i / COLS)
+    result.push({
+      id: n.id, type: 'filer',
+      position: { x: col * X_GAP - totalW / 2, y: 120 + row * Y_GAP },
+      data: { label: n.display_name, aum: n.aum, entity_id: n.entity_id, node_type: n.node_type, cik: n.id.replace('filer-', '') },
+    })
   })
-  return result
+
+  // Dynamic height: institution row + filer grid rows + padding
+  const graphHeight = Math.max(220, 120 + rows * Y_GAP + 60)
+  return { rfNodes: result, graphHeight }
 }
 
 function filerEdges(edges: EntityGraphEdge[], nodeIds: Set<string>): Edge[] {
@@ -205,14 +219,16 @@ export function EntityGraphTab() {
   // React Flow: institution + filer nodes only
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [graphHeight, setGraphHeight] = useState(220)
 
   useEffect(() => {
-    if (!data) { setNodes([]); setEdges([]); return }
+    if (!data) { setNodes([]); setEdges([]); setGraphHeight(220); return }
     const graphNodes = data.nodes.filter(n => n.node_type === 'institution' || n.node_type === 'filer')
-    const rfNodes = layoutFilerGraph(graphNodes)
+    const { rfNodes, graphHeight: h } = layoutFilerGraph(graphNodes)
     const nodeIds = new Set(graphNodes.map(n => n.id))
     setNodes(rfNodes)
     setEdges(filerEdges(data.edges, nodeIds))
+    setGraphHeight(h)
   }, [data, setNodes, setEdges])
 
   // Build fund lists from data
@@ -291,7 +307,8 @@ export function EntityGraphTab() {
         {data && !loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {/* Top: Filer graph */}
-            <div style={{ height: 280, borderBottom: '1px solid #1e2d47' }}>
+            {/* Graph height adapts to filer count: 1 filer = compact, 26 filers = taller grid */}
+            <div style={{ height: graphHeight, borderBottom: '1px solid #1e2d47', flexShrink: 0 }}>
               <ReactFlow
                 nodes={nodes} edges={edges}
                 onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
