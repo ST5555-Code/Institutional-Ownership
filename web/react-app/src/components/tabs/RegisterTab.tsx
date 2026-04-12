@@ -298,6 +298,9 @@ export function RegisterTab() {
   const [selectedInstitution, setSelectedInstitution] = useState<string | null>(
     null,
   )
+  // Controls the Port. Coverage column-header tooltip. Lives at component
+  // level so re-renders caused by other state changes don't wipe it.
+  const [portTooltipOpen, setPortTooltipOpen] = useState(false)
 
   const tableWrapRef = useRef<HTMLDivElement>(null)
 
@@ -428,7 +431,7 @@ export function RegisterTab() {
       '% Float',
       'AUM ($MM)',
       '% of AUM',
-      'N-PORT Cov',
+      'Port. Coverage',
     ]
     const rows: RegisterRow[] =
       fundView === 'fund'
@@ -603,7 +606,74 @@ export function RegisterTab() {
                 <th style={TH_RIGHT}>% Float</th>
                 <th style={TH_RIGHT}>AUM ($MM)</th>
                 <th style={TH_RIGHT}>% of AUM</th>
-                <th style={TH_STYLE}>N-PORT Cov</th>
+                <th
+                  style={TH_STYLE}
+                  onMouseEnter={() => setPortTooltipOpen(true)}
+                  onMouseLeave={() => setPortTooltipOpen(false)}
+                >
+                  {/* Inner relatively-positioned wrapper so the absolute
+                      tooltip has an unambiguous containing block (avoids
+                      any browser-specific quirks around position:sticky
+                      as a positioning context). */}
+                  <span
+                    style={{ position: 'relative', display: 'inline-block' }}
+                  >
+                    Port. Coverage
+                    {portTooltipOpen && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 1000,
+                          marginTop: 4,
+                          backgroundColor: '#0d1526',
+                          color: '#e2e8f0',
+                          fontSize: 11,
+                          lineHeight: 1.6,
+                          padding: '8px 12px',
+                          borderRadius: 4,
+                          border: '1px solid #2d3f5e',
+                          width: 200,
+                          whiteSpace: 'pre-line',
+                          textAlign: 'left',
+                          fontWeight: 400,
+                          textTransform: 'none',
+                          letterSpacing: 0,
+                          display: 'block',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'block',
+                            fontWeight: 600,
+                            marginBottom: 4,
+                          }}
+                        >
+                          Port. Coverage — % of AUM visible in N-PORT filings
+                        </span>
+                        <span style={{ display: 'block' }}>
+                          <span style={{ color: '#27AE60' }}>■</span>
+                          {' Green   ≥ 80%  High confidence'}
+                        </span>
+                        <span style={{ display: 'block' }}>
+                          <span style={{ color: '#F5A623' }}>■</span>
+                          {' Amber  50–79%  Partial coverage'}
+                        </span>
+                        <span style={{ display: 'block' }}>
+                          <span style={{ color: '#94a3b8' }}>■</span>
+                          {' Grey     1–49%  Low coverage'}
+                        </span>
+                        <span
+                          style={{ display: 'block', color: '#94a3b8' }}
+                        >
+                          {'  No badge   No N-PORT data'}
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -744,7 +814,13 @@ function renderRow(
         title={row.institution}
         onClick={canExpand ? () => toggle(key) : undefined}
       >
-        {canExpand && (
+        {/* Caret slot — always reserved for indent=0 rows so fund view,
+            hierarchy-expanded parents, and single-child parents all align
+            institution text at the same offset. Empty content when the
+            row can't expand; a real arrow when it can. Child rows
+            (indent=1) don't get this slot — they rely on paddingLeft:24
+            to land text at the same offset. */}
+        {indent === 0 && (
           <span
             style={{
               display: 'inline-block',
@@ -753,7 +829,7 @@ function renderRow(
               fontSize: 10,
             }}
           >
-            {isOpen ? '▼' : '▶'}
+            {canExpand ? (isOpen ? '▼' : '▶') : ''}
           </span>
         )}
         {row.institution}
@@ -784,7 +860,15 @@ function renderRow(
       </td>
       <td style={TD_STYLE}>
         {nport && row.nport_cov != null ? (
-          <span style={{ ...BADGE, ...nport }}>
+          <span
+            style={{
+              ...BADGE,
+              ...nport,
+              display: 'inline-block',
+              minWidth: 48,
+              textAlign: 'center',
+            }}
+          >
             {Math.round(row.nport_cov)}%
           </span>
         ) : (
