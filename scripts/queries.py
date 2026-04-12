@@ -3448,7 +3448,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                         ind_rank = i + 1
                         break
 
-            top3_ = [code for (_, code), _ in sorted_s[:3]]
+            top3_ = [{'code': code, 'weight_pct': round(val / total * 100, 1)} for (_, code), val in sorted_s[:3]]
             vs_ = round(subj_sec_pct - subj_spx_weight, 1) if subj_spx_weight is not None else None
             score_ = 0
             if vs_ is not None:

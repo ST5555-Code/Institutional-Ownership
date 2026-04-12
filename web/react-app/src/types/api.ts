@@ -221,7 +221,6 @@ export interface ConvictionRow {
   is_parent: boolean
   child_count: number
   value: number | null
-  conviction_score: number | null
   subject_sector_pct: number | null
   sector_rank: number | null
   industry_rank: number | null
@@ -230,7 +229,10 @@ export interface ConvictionRow {
   etf_pct: number | null
   unk_pct: number | null
   vs_spx: number | null
-  top3: string[]
+  // Each entry carries the GICS sector code and its weight as % of the
+  // holder's total portfolio value (excluding Unknown + ETF sectors).
+  top3: Array<{ code: string; weight_pct: number }>
+  // Score field removed — deemed too subjective for display.
   // Child rows carry their parent's institution name for filtering.
   // Not present on parent rows.
   parent_name?: string
