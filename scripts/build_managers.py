@@ -9,6 +9,8 @@ Run: python3 scripts/build_managers.py
 """
 
 import os
+import csv
+import re
 import duckdb
 import pandas as pd
 from rapidfuzz import fuzz, process
@@ -18,6 +20,60 @@ from rapidfuzz import fuzz, process
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
+
+# ---------------------------------------------------------------------------
+# INF17 Phase 3 — Brand-token verification gate
+# ---------------------------------------------------------------------------
+# rapidfuzz.fuzz.token_sort_ratio with score_cutoff=85 alone produces false
+# positives when firm names share generic corporate-suffix tokens ("LLC",
+# "Capital", "Management") without sharing any distinguishing brand tokens.
+# INF17's audit found 127 such pollutions — e.g., "SOROS FUND MANAGEMENT LLC"
+# vs "VSS FUND MANAGEMENT LLC" scored 94, well above the 85 cutoff. We add a
+# second gate: require at least one non-stopword brand token in common.
+# Stopword list kept minimal per INF17 spec; expand only if the rejection
+# log surfaces a pattern worth generalizing.
+_BRAND_STOPWORDS = frozenset({
+    "llc", "lp", "inc", "ltd", "co", "corp", "fund", "capital", "management",
+    "advisors", "partners", "holdings", "group", "the", "and", "of", "asset",
+    "investment", "financial", "services", "wealth",
+})
+
+
+def _brand_tokens(name):
+    """Return the set of non-stopword brand tokens in a firm name.
+
+    Lowercase, split on any non-alphanumeric character, drop stopwords and
+    tokens shorter than 3 chars. Used as a second gate on top of rapidfuzz
+    (INF17 Phase 3).
+    """
+    if not name:
+        return set()
+    raw = re.split(r"[^a-z0-9]+", str(name).lower())
+    return {t for t in raw if len(t) >= 3 and t not in _BRAND_STOPWORDS}
+
+
+def _brand_tokens_overlap(a, b):
+    """True if two firm names share at least one brand token after stopword removal."""
+    ta = _brand_tokens(a)
+    tb = _brand_tokens(b)
+    return bool(ta and tb and (ta & tb))
+
+
+def _city_state_compatible(filer_city, filer_state, adv_city, adv_state):
+    """True if city+state match, or if either side is missing values.
+
+    Returns False only when both sides are populated and disagree. Missing
+    values on either side short-circuit to True so we don't block matches
+    where verification data isn't available (e.g. the filer side, which
+    currently never has city/state in filings_deduped — future-proofing).
+    """
+    if not filer_city or not filer_state or not adv_city or not adv_state:
+        return True
+    return (
+        str(filer_city).strip().upper() == str(adv_city).strip().upper()
+        and str(filer_state).strip().upper() == str(adv_state).strip().upper()
+    )
+
 
 # ---------------------------------------------------------------------------
 # Top 50 institutional parent seed list
@@ -241,9 +297,9 @@ def link_cik_to_crd(con):
     """).fetchdf()
     print(f"  Filers without CRD: {len(filers_no_crd):,}")
 
-    # Get ADV firms
+    # Get ADV firms. city + state added for INF17 Phase 3 city/state gate.
     adv = con.execute("""
-        SELECT crd_number, firm_name, cik as adv_cik
+        SELECT crd_number, firm_name, cik as adv_cik, city, state
         FROM adv_managers
         WHERE firm_name IS NOT NULL
     """).fetchdf()
@@ -262,34 +318,83 @@ def link_cik_to_crd(con):
             direct_matches += 1
     print(f"  Direct CIK matches: {direct_matches}")
 
-    # Build name lookup for fuzzy matching
+    # Build name lookup for fuzzy matching. adv_by_name carries crd, city, state
+    # per firm_name so the INF17 Phase 3 gates can cross-check location.
     adv_names = adv["firm_name"].tolist()
-    adv_crd_by_name = dict(zip(adv["firm_name"], adv["crd_number"]))
+    adv_by_name = {
+        r["firm_name"]: {
+            "crd": r["crd_number"],
+            "city": r["city"],
+            "state": r["state"],
+        }
+        for _, r in adv.iterrows()
+    }
 
     # Fuzzy match remaining
     fuzzy_matches = []
     threshold = 85
-    batch_size = 500
     filers_list = filers_no_crd[~filers_no_crd["cik"].isin(adv_cik_map)].to_dict("records")
 
-    print(f"  Fuzzy matching {len(filers_list):,} filers (threshold={threshold})...")
-    for i, row in enumerate(filers_list):
-        name = str(row["manager_name"])
-        result = process.extractOne(name, adv_names, scorer=fuzz.token_sort_ratio, score_cutoff=threshold)
-        if result:
-            matched_name, score, _ = result
-            crd = adv_crd_by_name[matched_name]
-            fuzzy_matches.append({
-                "cik": row["cik"],
-                "crd_number": crd,
-                "filing_name": name,
-                "adv_name": matched_name,
-                "match_score": score,
-            })
-        if (i + 1) % 1000 == 0:
-            print(f"    Processed {i + 1:,} / {len(filers_list):,} ({len(fuzzy_matches):,} matches)")
+    # INF17 Phase 3: every candidate that clears the rapidfuzz score cutoff
+    # but fails a secondary gate is recorded to an audit CSV so the heuristic
+    # can be tuned later from real data.
+    rejections_path = os.path.join(BASE_DIR, "logs", "build_managers_rejected_crds.csv")
+    os.makedirs(os.path.dirname(rejections_path), exist_ok=True)
+    rejected_count = 0
+    with open(rejections_path, "w", encoding="utf-8", newline="") as rej_file:
+        rej_writer = csv.writer(rej_file)
+        rej_writer.writerow(
+            ["manager_cik", "manager_name", "candidate_crd", "candidate_firm", "score", "reason"]
+        )
 
-    print(f"  Fuzzy matches found: {len(fuzzy_matches):,}")
+        print(
+            f"  Fuzzy matching {len(filers_list):,} filers "
+            f"(threshold={threshold}, brand-token gate on, city/state gate on)..."
+        )
+        for i, row in enumerate(filers_list):
+            name = str(row["manager_name"])
+            result = process.extractOne(
+                name, adv_names,
+                scorer=fuzz.token_sort_ratio, score_cutoff=threshold,
+            )
+            if result:
+                matched_name, score, _ = result
+                adv_row = adv_by_name[matched_name]
+                crd = adv_row["crd"]
+
+                # Gate (a) INF17 Phase 3: brand-token overlap required.
+                if not _brand_tokens_overlap(name, matched_name):
+                    rej_writer.writerow(
+                        [row["cik"], name, crd, matched_name, score, "brand_token_mismatch"]
+                    )
+                    rejected_count += 1
+                # Gate (b) INF17 Phase 3: city+state compatibility. Short-circuits
+                # to accept when filer side lacks city/state (current pipeline
+                # state — filings_deduped has no location columns).
+                elif not _city_state_compatible(
+                    row.get("city"), row.get("state"),
+                    adv_row.get("city"), adv_row.get("state"),
+                ):
+                    rej_writer.writerow(
+                        [row["cik"], name, crd, matched_name, score, "city_state_mismatch"]
+                    )
+                    rejected_count += 1
+                else:
+                    fuzzy_matches.append({
+                        "cik": row["cik"],
+                        "crd_number": crd,
+                        "filing_name": name,
+                        "adv_name": matched_name,
+                        "match_score": score,
+                    })
+            if (i + 1) % 1000 == 0:
+                print(
+                    f"    Processed {i + 1:,} / {len(filers_list):,} "
+                    f"({len(fuzzy_matches):,} kept, {rejected_count:,} rejected)"
+                )
+
+    print(f"  Fuzzy matches found: {len(fuzzy_matches):,}  (rejected: {rejected_count:,})")
+    print(f"  Rejection log: {rejections_path}")
 
     # Save link table
     if fuzzy_matches:
@@ -413,8 +518,8 @@ def build_managers_table(con):
         con.execute("ALTER TABLE holdings ALTER COLUMN manager_type TYPE VARCHAR")
         con.execute("ALTER TABLE holdings ALTER COLUMN is_passive TYPE BOOLEAN")
         con.execute("ALTER TABLE holdings ALTER COLUMN is_activist TYPE BOOLEAN")
-    except Exception:
-        pass  # columns may already be correct type
+    except Exception:  # nosec B110 — columns may already be correct type
+        pass
     con.execute("""
         UPDATE holdings h
         SET
