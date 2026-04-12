@@ -214,7 +214,7 @@ export interface CohortAnalysisResponse {
 // active_only= query params.
 
 export interface ConvictionRow {
-  rank: number
+  rank?: number
   institution: string
   type: string
   level: number
@@ -231,6 +231,12 @@ export interface ConvictionRow {
   unk_pct: number | null
   vs_spx: number | null
   top3: string[]
+  // Child rows carry their parent's institution name for filtering.
+  // Not present on parent rows.
+  parent_name?: string
+  // N-PORT coverage — NOT returned by /api/portfolio_context today.
+  // Added so the column can render "—" until the backend adds it.
+  nport_cov?: number | null
 }
 
 export interface ConvictionResponse {
