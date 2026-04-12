@@ -1812,14 +1812,14 @@ def query7(ticker, cik=None, fund_name=None):
             fund_name = fund_name or row[1]
 
         # Build the WHERE filter — cik always, fund_name when provided
-        where = "h.cik = ? AND h.quarter = '{LQ}'"
+        where = f"h.cik = ? AND h.quarter = '{LQ}'"
         params = [cik]
         if fund_name:
             where += " AND h.fund_name = ?"
             params.append(fund_name)
 
         # Fund metadata
-        meta_where = "cik = ? AND quarter = '{LQ}'"
+        meta_where = f"cik = ? AND quarter = '{LQ}'"
         meta_params = [cik]
         if fund_name:
             meta_where += " AND fund_name = ?"

@@ -264,11 +264,8 @@ export interface FundPortfolioManager {
   position_value: number | null
 }
 
-// KNOWN BUG: /api/query7 is currently broken — queries.py:1815 uses a plain
-// string for its WHERE clause that contains the literal `'{LQ}'` instead of
-// an f-string substitution. DuckDB matches 0 rows and the route returns 404.
-// The interface below reflects the intended shape per query7() code. When
-// the bug is fixed, re-verify field names and nullability against live output.
+// Bug fixed: queries.py:1815 f-prefix was missing. Verified against live
+// response — field names and types match.
 
 export interface FundPortfolioStats {
   manager_name: string
