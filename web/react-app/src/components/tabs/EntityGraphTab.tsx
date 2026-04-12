@@ -22,7 +22,6 @@ import type { NodeProps, Node as RFNode, Edge } from 'reactflow'
 
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
-const NUM_3B = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const NUM_P1 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -244,8 +243,8 @@ export function EntityGraphTab() {
 
   function onExcel() {
     if (viewMode === 'market' && !ticker && market.data) {
-      const h = ['Rank', 'Institution', 'AUM ($B)', 'Type', 'Filers', 'Funds', 'Holdings', 'Fund Cov %']
-      const csv = [h, ...market.data.map(r => [r.rank, `"${r.institution}"`, (r.total_aum / 1e9).toFixed(3), r.manager_type || '', r.filer_count, r.fund_count, r.num_holdings, r.nport_coverage_pct ?? ''])].map(r => r.join(',')).join('\n')
+      const h = ['Rank', 'Institution', 'AUM ($MM)', 'Type', 'Filers', 'Funds', 'Holdings', 'Fund Cov %']
+      const csv = [h, ...market.data.map(r => [r.rank, `"${r.institution}"`, (r.total_aum / 1e6).toFixed(0), r.manager_type || '', r.filer_count, r.fund_count, r.num_holdings, r.nport_coverage_pct ?? ''])].map(r => r.join(',')).join('\n')
       downloadCsv(csv, 'market_summary.csv')
     } else if (viewMode === 'market' && ticker && tickerHolders.data) {
       const h = ['Rank', 'Institution', 'Type', 'Value ($MM)', '% Float', 'AUM ($MM)']
@@ -272,7 +271,7 @@ export function EntityGraphTab() {
             </button>
           ))}
         </div>
-        {viewMode === 'company' && !ticker && <EntitySearch onSelect={(id, name) => { setSelectedEntityId(id); setSelectedEntityName(name) }} />}
+        {viewMode === 'company' && <EntitySearch onSelect={(id, name) => { setSelectedEntityId(id); setSelectedEntityName(name) }} />}
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={q => { setQuarter(q); setModalEntityId(null) }} />
         {viewMode === 'company' && !ticker && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
@@ -300,7 +299,7 @@ export function EntityGraphTab() {
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                 <thead><tr>
                   <th style={{ ...TH, width: 40 }}>#</th><th style={TH}>Institution</th><th style={TH}>Type</th>
-                  <th style={TH_R}>AUM ($B)</th><th style={TH_R}>% of Total</th><th style={TH_R}>Filers</th>
+                  <th style={TH_R}>AUM ($MM)</th><th style={TH_R}>% of Total</th><th style={TH_R}>Filers</th>
                   <th style={TH_R}>Funds</th><th style={TH_R}>Holdings</th><th style={TH_R}>Fund Cov %</th>
                 </tr></thead>
                 <tbody>
@@ -314,7 +313,7 @@ export function EntityGraphTab() {
                         <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{r.rank}</td>
                         <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                         <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
-                        <td style={TD_R}>{NUM_3B.format(r.total_aum / 1e9)}</td>
+                        <td style={TD_R}>{NUM_0.format(r.total_aum / 1e6)}</td>
                         <td style={TD_R}>{NUM_P1.format(pct)}%</td>
                         <td style={TD_R}>{NUM_0.format(r.filer_count)}</td>
                         <td style={TD_R}>{NUM_0.format(r.fund_count)}</td>
@@ -326,7 +325,7 @@ export function EntityGraphTab() {
                 </tbody>
                 <tfoot><tr>
                   <td style={FC} /><td style={FC}>Top {market.data.length} Total</td><td style={FC} />
-                  <td style={FCR}>{NUM_3B.format(totalAum / 1e9)}</td><td style={FCR}>100.0%</td>
+                  <td style={FCR}>{NUM_0.format(totalAum / 1e6)}</td><td style={FCR}>100.0%</td>
                   <td style={FCR}>{NUM_0.format(totalFilers)}</td><td style={FCR}>{NUM_0.format(totalFunds)}</td>
                   <td style={FCR}>{NUM_0.format(totalHoldings)}</td><td style={FC} />
                 </tr></tfoot>
