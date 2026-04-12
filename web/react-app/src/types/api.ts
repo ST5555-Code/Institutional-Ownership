@@ -456,6 +456,79 @@ export interface CrowdingResponse {
   short_history?: CrowdingShortHistoryRow[]
 }
 
+// ── Short Analysis — /api/short_analysis?ticker=EQT ───────────────────────
+
+export interface ShortAnalysisSummary {
+  short_funds: number
+  short_shares: number
+  avg_short_vol_pct: number | null
+  cross_ref_count: number
+  quarters_available: string[]
+}
+
+export interface NportTrendRow {
+  quarter: string
+  fund_count: number
+  short_shares: number
+  short_value: number
+}
+
+export interface NportDetailRow {
+  fund_name: string
+  family_name: string | null
+  type: string | null
+  is_active: boolean
+  short_shares: number
+  short_value: number
+  fund_aum_mm: number | null
+  pct_of_nav: number | null
+  quarter: string
+  value_recomputed: boolean
+}
+
+export interface NportByFundRow {
+  fund_name: string
+  type: string | null
+  // Dynamic quarter keys (e.g. '2025Q2') with share counts
+  [quarter: string]: string | number | boolean | null | undefined
+}
+
+export interface ShortVolumeRow {
+  report_date: string
+  short_volume: number
+  total_volume: number
+  short_pct: number
+}
+
+export interface CrossRefRow {
+  institution: string
+  type: string | null
+  long_shares: number
+  long_value: number
+  short_shares: number
+  short_value: number
+  net_exposure_pct: number
+}
+
+export interface ShortOnlyFundRow {
+  fund_name: string
+  family_name: string | null
+  type: string | null
+  short_shares: number
+  short_value: number
+  fund_aum_mm: number | null
+}
+
+export interface ShortAnalysisResponse {
+  summary: ShortAnalysisSummary
+  nport_trend: NportTrendRow[]
+  nport_detail: NportDetailRow[]
+  nport_by_fund: NportByFundRow[]
+  short_volume: ShortVolumeRow[]
+  cross_ref: CrossRefRow[]
+  short_only_funds: ShortOnlyFundRow[]
+}
+
 // ── Sector Rotation — /api/sector_flows ───────────────────────────────────
 // NOTE: No /api/sector_rotation route. Real route is /api/sector_flows.
 // Returns all available quarter transitions, no quarter param.

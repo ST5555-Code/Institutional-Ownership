@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (session close, HEAD: efab352)_
+_Last updated: 2026-04-12 (Phase 2 complete, HEAD: pending)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -19,7 +19,7 @@ each working session so the top block stays current.
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — `web/static/app.js` (~5600 lines)
   - Jinja templates — `web/templates/index.html` + `web/templates/admin.html`
-  - **React full-app (in progress)** — `web/react-app/` (port 5174). Phase 2: Register + Ownership Trend + Conviction + Entity Graph tabs ported. See `REACT_MIGRATION.md`.
+  - **React full-app (Phase 2 COMPLETE)** — `web/react-app/` (port 5174). All 11 tabs ported: Register, Ownership Trend, Conviction, Fund Portfolio, Flow Analysis, Cross-Ownership, Overlap Analysis, Peer Rotation, Sector Rotation, Entity Graph, Short Interest. See `REACT_MIGRATION.md`. Next: Phase 3 visual polish → Phase 4 cut over.
 
 ---
 
@@ -84,7 +84,7 @@ This is a pipeline operation, NOT a data QC task. Do not run without explicit us
 
 ### 3. React migration — ongoing parallel workstream
 
-Phase 2 in progress: Register + Ownership Trend + Conviction + Entity Graph tabs ported. Pick next tab. See `REACT_MIGRATION.md`.
+**Phase 2 COMPLETE.** All 11 tabs ported. Next: Phase 3 (visual polish, cross-tab navigation, Playwright tests) → Phase 4 (cut over: Flask serves react-app/dist/ instead of templates/). See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
 
 ### 4. Minor follow-ups
 
