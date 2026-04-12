@@ -38,18 +38,18 @@ const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtShares(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return NUM_2.format(v)
 }
 
 function fmtValue(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   if (v >= 1000) return `$${NUM_1.format(v / 1000)}B`
   return `$${NUM_0.format(v)}M`
 }
 
 function fmtPct(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 

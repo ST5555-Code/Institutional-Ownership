@@ -22,23 +22,23 @@ const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtSharesMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return NUM_2.format(v / 1e6)
 }
 
 function fmtValueMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
 function fmtPct2(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 
 // Signed numeric formatting: +X.XX / (X.XX) with green/red coloring.
 function SignedCell({ v, decimals = 2 }: { v: number | null; decimals?: number }) {
-  if (v == null) return <>—</>
+  if (v == null || v === 0) return <>—</>
   const fmt = decimals === 2 ? NUM_2 : decimals === 1 ? NUM_1 : NUM_0
   if (v < 0)
     return <span style={{ color: '#ef4444' }}>({fmt.format(Math.abs(v))})</span>
@@ -48,7 +48,7 @@ function SignedCell({ v, decimals = 2 }: { v: number | null; decimals?: number }
 }
 
 function SignedPctCell({ v }: { v: number | null }) {
-  if (v == null) return <>—</>
+  if (v == null || v === 0) return <>—</>
   if (v < 0)
     return <span style={{ color: '#ef4444' }}>({NUM_2.format(Math.abs(v))}%)</span>
   if (v > 0)

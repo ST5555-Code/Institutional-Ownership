@@ -20,22 +20,22 @@ const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtValueMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
 function fmtPct2(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 
 function fmtInt(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return String(Math.round(v))
 }
 
 function SignedPct1({ v }: { v: number | null }) {
-  if (v == null) return <>—</>
+  if (v == null || v === 0) return <>—</>
   if (v < 0) return <span style={{ color: '#ef4444' }}>({NUM_1.format(Math.abs(v))})</span>
   if (v > 0) return <span style={{ color: '#27AE60' }}>+{NUM_1.format(v)}</span>
   return <>{NUM_1.format(v)}</>
@@ -255,7 +255,7 @@ export function ConvictionTab() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
-        .cv-row-highlight > td { background-color: #fffbeb !important; transition: background-color 0.4s ease-in-out; }
+        .cv-row-highlight > td { background-color: #fef08a !important; transition: background-color 0.4s ease-in-out; }
       `}</style>
 
       {/* Controls */}

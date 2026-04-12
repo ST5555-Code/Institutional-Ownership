@@ -13,17 +13,17 @@ const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtSharesMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return NUM_2.format(v / 1e6)
 }
 
 function fmtValueMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
 function fmtPct2(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 
@@ -204,7 +204,7 @@ export function FundPortfolioTab() {
                 {portfolio.data.positions.map(p => {
                   const isSubject = ticker && p.ticker === ticker.toUpperCase()
                   const rowBg: React.CSSProperties = isSubject
-                    ? { backgroundColor: '#fffbeb' }
+                    ? { backgroundColor: '#fef08a' }
                     : {}
                   return (
                     <tr key={p.rank} style={rowBg}>

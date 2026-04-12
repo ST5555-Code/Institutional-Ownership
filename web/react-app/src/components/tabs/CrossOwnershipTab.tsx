@@ -17,12 +17,12 @@ const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtValueMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
 function fmtPct2(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 

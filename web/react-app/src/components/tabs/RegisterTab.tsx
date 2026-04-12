@@ -19,29 +19,29 @@ const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtSharesMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return NUM_2.format(v / 1e6)
 }
 
 function fmtValueMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
 function fmtAumMm(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v)}`
 }
 
 function fmtPctFloat(v: number | null): string {
-  if (v == null) return '—'
+  if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
 
 // Defensive negative-percentage formatter kept from the prior file — query1
 // doesn't return negatives today but this helper is handy for other tabs.
 function PctCell({ v }: { v: number | null }) {
-  if (v == null) return <>—</>
+  if (v == null || v === 0) return <>—</>
   if (v < 0)
     return (
       <span style={{ color: '#c0392b' }}>({NUM_2.format(Math.abs(v))}%)</span>
@@ -520,7 +520,7 @@ export function RegisterTab() {
           .register-table-wrap { overflow: visible !important; }
         }
         .register-row-highlight > td {
-          background-color: #fffbeb !important;
+          background-color: #fef08a !important;
           transition: background-color 0.4s ease-in-out;
         }
       `}</style>
