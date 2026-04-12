@@ -10,7 +10,7 @@ import {
   getTypeStyle,
 } from '../common'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
 
@@ -200,43 +200,40 @@ function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
   const pctTip = (v: number) => `${(v * 100).toFixed(2)}%`
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-      <MiniChart title="Flow Intensity — Total" data={qoqCharts}
-        bars={[{ key: 'flow_intensity_total', name: 'Total', fill: '#002147' }]}
-        fmt={pctFmt} tip={pctTip} />
-      <MiniChart title="Flow Intensity — Active Only" data={qoqCharts}
-        bars={[{ key: 'flow_intensity_active', name: 'Active', fill: '#4A90D9' }]}
-        fmt={pctFmt} tip={pctTip} />
-      <MiniChart title="Churn — Non-Passive" data={qoqCharts}
-        bars={[{ key: 'churn_nonpassive', name: 'Non-Passive', fill: '#002147' }]}
-        fmt={pctFmt} tip={pctTip} />
-      <MiniChart title="Churn — Active" data={qoqCharts}
-        bars={[{ key: 'churn_active', name: 'Active', fill: '#f5a623' }]}
-        fmt={pctFmt} tip={pctTip} />
-    </div>
-  )
-}
+    <div style={{ display: 'flex', gap: 12 }}>
+      {/* Flow Intensity — Total + Active grouped */}
+      <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
+        <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Flow Intensity</div>
+        <div style={{ padding: '8px 8px 4px' }}>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={qoqCharts} barSize={18} barGap={2}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={pctFmt} width={44} />
+              <Tooltip formatter={pctTip} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="flow_intensity_total" name="Total" fill="#002147" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="flow_intensity_active" name="Active" fill="#4A90D9" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
-function MiniChart({ title, data, bars, fmt, tip }: {
-  title: string
-  data: QoqChartRow[]
-  bars: Array<{ key: string; name: string; fill: string }>
-  fmt: (v: number) => string
-  tip: (v: number) => string
-}) {
-  return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 8px', backgroundColor: '#fff' }}>
-      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600 }}>{title}</div>
-      <ResponsiveContainer width="100%" height={110}>
-        <BarChart data={data} barSize={14}>
-          <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-          <YAxis tick={{ fontSize: 8 }} tickFormatter={fmt} width={40} />
-          <Tooltip formatter={tip} />
-          {bars.map(b => (
-            <Bar key={b.key} dataKey={b.key} name={b.name} fill={b.fill} radius={[2, 2, 0, 0]} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+      {/* Churn — Non-Passive + Active grouped */}
+      <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
+        <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Churn</div>
+        <div style={{ padding: '8px 8px 4px' }}>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={qoqCharts} barSize={18} barGap={2}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={pctFmt} width={44} />
+              <Tooltip formatter={pctTip} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="churn_nonpassive" name="Non-Passive" fill="#002147" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="churn_active" name="Active" fill="#f5a623" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   )
 }
