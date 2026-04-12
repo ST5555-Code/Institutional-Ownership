@@ -488,6 +488,31 @@ export interface SectorFlowsResponse {
   sectors: SectorFlowRow[]
 }
 
+// ── Sector Flow Movers — /api/sector_flow_movers ──────────────────────────
+
+export interface SectorFlowMover {
+  institution: string
+  net_flow: number
+  buying: number
+  selling: number
+  positions_changed: number
+}
+
+export interface SectorFlowMoverSummary {
+  buyers: number
+  net: number
+  inflow: number
+  outflow: number
+}
+
+export interface SectorFlowMoversResponse {
+  sector: string
+  period: { from: string; to: string }
+  summary: SectorFlowMoverSummary
+  top_buyers: SectorFlowMover[]
+  top_sellers: SectorFlowMover[]
+}
+
 // ── Peer Rotation — /api/peer_rotation + /api/peer_rotation_detail ────────
 // Note: active_only param uses '1'/'0' not 'true'/'false'.
 
