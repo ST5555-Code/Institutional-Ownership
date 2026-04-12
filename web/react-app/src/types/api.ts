@@ -377,8 +377,8 @@ export interface CrossOwnershipInvestor {
   type: string
   total_across: number
   pct_of_portfolio: number | null
-  // holdings is keyed by ticker → position value
-  holdings: Record<string, number>
+  // holdings is keyed by ticker → position value (null when investor doesn't hold)
+  holdings: Record<string, number | null>
 }
 
 export interface CrossOwnershipResponse {
