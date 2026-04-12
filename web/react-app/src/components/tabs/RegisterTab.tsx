@@ -16,7 +16,7 @@ import {
 // ── Formatters ─────────────────────────────────────────────────────────────
 
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-const NUM_2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
+const NUM_2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function fmtSharesMm(v: number | null): string {
   if (v == null) return '—'
