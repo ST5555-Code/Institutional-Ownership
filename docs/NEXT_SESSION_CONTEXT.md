@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-11 (session end, HEAD: 17265a8)_
+_Last updated: 2026-04-11 (session end, HEAD: ab199e5)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `17265a8`
+- **HEAD:** `ab199e5`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines post-INF12 split) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, gated by `ENABLE_ADMIN` + `ADMIN_TOKEN`, INF12)
@@ -20,7 +20,7 @@ each working session so the top block stays current.
   - Vanilla JS — `web/static/app.js` (~5600 lines, tco IIFE removed in React POC)
   - Jinja templates — `web/templates/index.html` (Flask) + `web/templates/admin.html` (admin dashboard, now sends `X-Admin-Token` on every fetch via `adminFetch()` helper)
   - **React POC (live)** — `web/react-src/` (2 Companies Overlap tab, React 18 + TS + Vite + Tailwind v3 + AG Grid v35). Built bundle at `web/static/dist/tco-bundle.{js,css}`, gitignored, loaded as `<script type="module">` from `index.html`. Production-serving today; retires once the full React app cuts over.
-  - **React full-app (in progress)** — `web/react-app/` (port 5174) — Phase 1 shell landed (`be08feb`, `8763d56`, `e4dbfaf`), Phase 2 Register tab + shared components landed (`596dee2`, `6ea9fa5`, `14525c3`, `789aa11`, `bf81ca0`). Parallel work stream — see `REACT_MIGRATION.md` at repo root.
+  - **React full-app (in progress)** — `web/react-app/` (port 5174) — Phase 1 shell + Phase 2 Register tab complete (20 commits `c38a866`→`ab199e5`). Register tab is fully functional with 12-col fixed layout, collapsible hierarchy, fund view, shared components (QuarterSelector, RollupToggle, ActiveOnlyToggle, InvestorTypeFilter, FundViewToggle, InvestorSearchWithDropdown, ExportBar, TableFooter, ColumnGroupHeader), rollup toggle wired to API. Next: pick second tab to port. See `REACT_MIGRATION.md` at repo root.
 
 ---
 
@@ -270,7 +270,7 @@ After INF17 Phases 1-3, attention shifts to **INF4 Loomis Sayles** (highest doll
 
 ### Parallel direction — React full-app migration
 
-**Independent work stream.** Read `REACT_MIGRATION.md` at repo root. Phase 1 (scaffold + shell) landed this session (`be08feb`, `8763d56`, `e4dbfaf`). Phase 2 (Register tab + shared components: QuarterSelector, RollupToggle, ActiveOnlyToggle, InvestorTypeFilter, FundViewToggle, InvestorSearch, ExportBar, TableFooter, ColumnGroupHeader) landed (`596dee2`, `6ea9fa5`, `14525c3`, `789aa11`, `bf81ca0`).
+**Independent work stream.** Read `REACT_MIGRATION.md` at repo root. Phase 1 (scaffold + shell) and Phase 2 (Register tab + shared components) both complete. Register tab is the first fully-ported tab with all controls wired. 20 commits total from `c38a866` through `ab199e5` covering: doc fix (React 18→19), scaffold, types + Zustand store, global styles, shell components, tab placeholders, main.tsx, Recharts, endpoint type audit (`api.ts`), rollupType in store, 9 shared components, Register initial build, Register polish (shared components + sticky footer + fund view + export + investor search dropdown), column alignment fixes (table-layout: fixed + colgroup + gap columns), Port. Coverage rename + badge + tooltip, spellcheck disable on all inputs.
 
 Existing Flask app at `:8001` stays untouched through the migration. Cut over happens in a separate commit at the end (all 11 tabs migrated): one-line change in `scripts/app.py` to serve `web/react-app/dist/index.html` instead of `web/templates/index.html`. Revertable in 30 seconds.
 
@@ -381,6 +381,30 @@ python3 scripts/validate_entities.py --prod   # expect: 9 PASS / 0 FAIL / 7 MANU
 ## Session ledger (newest first — 2026-04-11 working sessions)
 
 ```
+ab199e5 Phase 2: disable spellcheck/autocorrect on all search inputs
+039c259 Phase 2: Register — insert two 120px gap columns (after Type, after %Float)
+32ba627 Phase 2: Register — Institution 440, numeric cols uniform 120, horizontal scroll fallback
+dd5a53a Phase 2: Register — pin Institution column to 220px via trailing spacer col
+10a1959 Phase 2: Register — table-layout: fixed + colgroup to stop Fund view column drift
+6364c3c Phase 2: Register fixes — fund view columns, Port. Coverage label, fixed badge width, coverage tooltip
+281cd82 Phase 2: Register polish — dark thead, child ranks 1-N, fund view columns fixed, investor search dropdown
+bf81ca0 Phase 2: Register tab polish — shared components, sticky footer, fund view, export, investor controls
+789aa11 Phase 2: fix TableFooter — sticky bottom, same font size as body, dynamic totalColumns
+14525c3 Phase 2: shared components — 9 shared components in src/components/common/
+6ea9fa5 Phase 2 infra: add rollupType to Zustand store
+596dee2 Phase 2: Register tab — top 25 holders, collapsible hierarchy, type badges, N-PORT coverage
+1ee3f35 ROADMAP: log query7 f-string bug — Fund Portfolio 404
+f15ea16 Phase 2 infra: endpoint type audit — api.ts with interfaces for all 11 tabs
+a933778 Phase 2 infra: add Recharts
+8763d56 Phase 1: sidebar section labels gold, rename section, push nav down
+be08feb Phase 1 complete: React shell live on port 5174
+e4dbfaf Phase 1 Step 7: fix CompanyData field names to match /api/summary
+c38a866 REACT_MIGRATION.md: correct React version 18 → 19
+ba4fb89 ROADMAP: mark INF17 Phase 3 Done
+0634682 INF17 Phase 3: fix build_managers.py CRD fuzzy-match — add brand-token overlap gate
+14f8250 ROADMAP: mark INF17 Phase 2 Done
+6743f11 INF17 Phase 2: self-root 5 misattributed entities from CRD pollution audit
+87bc812 docs: regenerate NEXT_SESSION_CONTEXT.md post-session
 17265a8 ROADMAP: update INF17 Phase 2 with concrete 5-entity fix list
 95b30bd ROADMAP: update INF17 with revised four-phase plan
 41f9a8c ROADMAP: add INF17 — systematic managers CRD pollution (127 rows)
