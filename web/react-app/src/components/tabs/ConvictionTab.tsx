@@ -179,12 +179,16 @@ export function ConvictionTab() {
     })
   }, [data, effectiveTypes])
 
+  // Fund view: when level=fund the API returns fund-series rows directly
+  // at level=0 (no parent/child hierarchy). Use the parent rows from the
+  // filtered groups — they ARE the fund data. Don't try to extract
+  // children (there are none when level=fund).
   const fundRows = useMemo<FundRow[]>(() => {
     if (fundView !== 'fund') return []
-    const flat: FundRow[] = []
-    for (const g of groups)
-      for (const c of g.children)
-        flat.push({ ...c, parentInstitution: g.parent.institution })
+    const flat: FundRow[] = groups.map(g => ({
+      ...g.parent,
+      parentInstitution: g.parent.institution,
+    }))
     flat.sort((a, b) => (b.value || 0) - (a.value || 0))
     return flat.map((r, i) => ({ ...r, rank: i + 1 }))
   }, [groups, fundView])
