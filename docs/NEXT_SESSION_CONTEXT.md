@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (session end, HEAD: 903e913)_
+_Last updated: 2026-04-12 (session end, HEAD: 50c9065)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `73f6acd`
+- **HEAD:** `50c9065`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -26,7 +26,7 @@ each working session so the top block stays current.
 ## First 5 minutes — read these
 
 1. **`~/ClaudeWorkspace/CLAUDE.md`** — workspace rules
-2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF17b. COMPLETED section at line ~233+.
+2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF17b. COMPLETED section at line ~240+.
 3. **`docs/PROCESS_RULES.md`** — rules for large-data scripts
 4. **`REACT_MIGRATION.md`** — React app migration plan
 5. **Auto memory** at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`
@@ -39,18 +39,21 @@ each working session so the top block stays current.
 
 | Item | Commit | Snapshot | Summary |
 |---|---|---|---|
-| **INF12** | `d51db60` | — | Admin Blueprint with token auth. 15 routes gated, `hmac.compare_digest`. |
+| **INF12** | `d51db60` | — | Admin Blueprint with token auth. 15 routes gated. |
 | **INF7** | `1a43376` | `20260411_180047` | Soros/VSS + Peter Soros/Orion fuzzy-match cleanup. 9 entity edits + 3 managers scrubs. |
 | **INF17 Phase 2** | `6743f11` | `20260411_214440` | Self-root 5 misattributed entities ($1.27B corrected). |
 | **INF17 Phase 3** | `0634682` | — | Fix `build_managers.py` fuzzy matcher: brand-token overlap gate + rejection log. |
-| **INF4** | `ff49dbc` | `20260411_221854` | Loomis Sayles merge (eid=17973→7650). 38 sub_adviser rels + 25 DM rollups transferred, DM self-root fix. |
-| **L4-2** | `a3c20e8` | `20260412_061258` | 3 classification mismatches fixed (Invesco/Nuveen/Security Investors → mixed). Geode confirmed passive. |
-| **INF6** | `eaab03b` | `20260412_063446` | Tortoise Capital merge (eid=20187→2273). 6 fund_sponsor rels + circular pair closed. |
+| **INF4** | `ff49dbc` | `20260411_221854` | Loomis Sayles merge (eid=17973→7650). 38 sub_adviser rels + 25 DM rollups, DM self-root fix. |
+| **L4-2** | `a3c20e8` | `20260412_061258` | 3 classification mismatches (Invesco/Nuveen/Security Investors → mixed). |
+| **INF6** | `eaab03b` | `20260412_063446` | Tortoise Capital merge (eid=20187→2273). 6 fund_sponsor rels + circular pair. |
 | **INF8** | `ffa9796` | `20260412_064353` | Trian merge (eid=1090+9075→107). 3 identifiers transferred, 2 rels closed. |
 | **INF4b** | `d89e663` | — | CRD normalization in entity resolver: `_normalize_crd()` + LTRIM retroactive lookup. |
-| **INF17b** (partial) | `d89e663` | — | CRD normalization in `fetch_ncen.py` adviser_cik. Brand-token gate still remaining. |
-| **INF4d** | `eddb05c` | `20260412_074237` | Boston Partners merge (eid=17933→9143). $96.58B Q4. 9 fund_sponsor + 15 sub_adviser rels + 11 DM + 9 EC rollups re-pointed. |
-| **INF4c** | `73f6acd` | `20260412_075814` | Batch merge 96 CRD-format fragmented pairs. 5,888 row ops. 41 DM self-root fixes. 15 excluded (11 CRD pollutions → INF17, 4 borderline → INF4e). |
+| **INF4d** | `eddb05c` | `20260412_074237` | Boston Partners merge (eid=17933→9143). $96.58B Q4. 24 rels + 20 rollups re-pointed. |
+| **INF4c** | `73f6acd` | `20260412_075814` | Batch merge 96 CRD-format fragmented pairs. 5,888 row ops. 41 DM self-root fixes. |
+| **INF4e** | `dba066b` | — | All 4 borderline pairs excluded as CRD pollutions → INF17 Phase 1. |
+| **L4-1** | `1e01b6b` | `20260412_085048` | 3 mixed→active (Ameriprise, PIMCO, AMG). 6 LOW_COV kept mixed. |
+| **INF17 Phase 1** | `46877c5` | — | Scrub 127 managers rows (crd_number + aum_total → NULL) + 2 Trian parent_name. |
+| **INF17b** | `4ff0006` | — | Brand-token overlap gate in `fetch_ncen.py` adviser_cik matching. |
 
 ### Production validation after all promotions: 9 PASS / 0 FAIL / 7 MANUAL
 
@@ -58,37 +61,30 @@ each working session so the top block stays current.
 
 ## Open items — current priority order
 
-### 1. INF4e — 4 borderline pairs investigation
+### 1. INF17 Phase 4 — Preserve coincidentally-correct rollups
 
-4 pairs excluded from INF4c batch because both entities have holdings but names suggest same firm: CRD 104702 WCM/WIM ($49B), CRD 122997 LongView ($9.6B), CRD 168777 Thrive/Thryve ($0.9B), CRD 309790 Wealth Mgmt Partners ($0.5B). Investigate each, then merge or exclude.
+`parent_bridge_sync` manual writes for Carillon→RJF, Nikko→Sumitomo, Martin Currie→Martin Currie Ltd BEFORE any future `build_entities.py --reset` that would break their ADV Schedule A chain (the bad CRDs are now scrubbed from `managers`, so the ADV walk can't re-derive them). Depends on INF9c `preserve_relationship` action. Without Phase 4, these entities lose their correct parent rollup on `--reset`.
 
-### 2. L4-1 — Mixed classification review (1,037 entities)
-
-Top 11 with ≥3 N-PORT series children are highest-priority review targets. 3 confirmed mis-classified as mixed that should be active (Franklin Templeton, PIMCO, Nomura).
-
-### 3. INF17 Phase 1 — Blanket managers table CRD scrub
-
-`UPDATE managers SET crd_number=NULL, aum_total=NULL WHERE cik IN (~125 CIKs)` — now includes 114 original + 11 INF4c-discovered pollutions. Also reset `manually_verified=FALSE` + scrub 2 Trian parent_name pollutions (Triangle Securities, Iron Triangle). Flows through `merge_staging.py --tables managers`. Subsumes INF16 (Soros aum_total recompute).
-
-### 4. INF17b remaining — Brand-token overlap gate for fetch_ncen.py
-
-CRD normalization done (`d89e663`). The `fuzz.token_sort_ratio ≥ 85` fuzzy match in `fetch_ncen.py:328` still lacks the brand-token overlap check. Same fix pattern as `build_managers.py` Phase 3 (`0634682`). Staging-only column so no prod impact currently.
-
-### 5. INF9e — entity_overrides_persistent diff/promote/DDL
+### 2. INF9e — entity_overrides_persistent diff/promote/DDL
 
 Extend `diff_staging.py` + `promote_staging.py` + prod DDL so the 24 INF9 Route A staged rows can reach prod. Without this, overrides are staging-local indefinitely.
 
-### 6. INF17 Phase 4 — Preserve coincidentally-correct rollups
+### 3. INF9a–d — prod `--reset` unblock (4 remaining items)
 
-`parent_bridge_sync` manual writes for Carillon→RJF, Nikko→Sumitomo, Martin Currie→Martin Currie Ltd BEFORE any CRD scrub that would break their ADV Schedule A chain. Depends on INF9c `preserve_relationship` action.
+- **INF9a** — `is_activist` flag (2 rows, Mantle Ridge + Triangle). Schema column + replay extension.
+- **INF9b** — `rollup_type` on `merge` for DM12 routings (13 rows).
+- **INF9c** — `delete_relationship` action OR parent_bridge verifier (28 L5 deletions). Also needed by INF17 Phase 4.
+- **INF9d** — CIK-less entities (4 rows, 3 orphans + 1 CRD-only).
 
-### 7. Other infrastructure
+### 4. INF13 part 2 — Snapshot fallback race condition
 
-- **INF13 part 2** — snapshot fallback `shutil.copy2` race condition
-- **INF9a–d** — prod `--reset` still blocked (is_activist, rollup_type, delete_relationship, CIK-less entities)
-- **Amundi → Amundi Taiwan rollup** — eid=830 + eid=4248, separate from CRD pollution
+`_resolve_db_path()` hot-path `shutil.copy2` on live DuckDB file. Part 1 was `refresh_snapshot.sh` fix.
 
-### 8. React migration — next tab
+### 5. Amundi → Amundi Taiwan rollup
+
+eid=830 + eid=4248 both roll to `eid=752 Amundi Taiwan Ltd.` via `parent_bridge_sync/manual`. Should roll to global Amundi SA parent. Not CRD-driven — separate manual fix.
+
+### 6. React migration — next tab
 
 Phase 2 complete (Register + Ownership Trend + Conviction). Pick next tab to port. See `REACT_MIGRATION.md`.
 
@@ -98,32 +94,29 @@ Phase 2 complete (Register + Ownership Trend + Conviction). Pick next tab to por
 
 ### a–e: Flask, IIFEs, switchTab, bandit 1.8.3, nosec B608
 
-Unchanged from prior sessions. See gotchas a–e in the previous version of this file.
+Unchanged from prior sessions. See full text in the 87bc812 version of this file.
 
 ### f. Data model traps
 
-- **`managers.aum_total`** — ~114 values are INF17-polluted (wrong firm's RAUM). Use `SUM(holdings_v2.market_value_usd)` instead.
+- **`managers.aum_total`** — 127 rows just scrubbed to NULL in INF17 Phase 1 (`46877c5`). For ALL managers, prefer holdings-derived AUM: `SUM(holdings_v2.market_value_usd) WHERE quarter = :q`.
+- **`managers.crd_number`** — same 127 rows scrubbed. After INF17 Phase 1, only CRDs that passed the brand-token overlap gate remain.
 - **`holdings_v2.cik`** — 10-digit zero-padded. Matches `entity_identifiers.identifier_value` for `cik` type.
 - **`fund_universe.is_actively_managed`** — authoritative active/passive flag. `NULL` = unknown.
 - **`entity_relationships`** — 5 types. Exclude `sub_adviser` when walking ownership trees.
-- **13F-NT vs 13F-HR** — NT filers have zero `holdings_v2` rows. Don't assume brand-name firms have holdings under their CIK.
-- **CRD normalization** — entity resolver now strips leading zeros (INF4b, `d89e663`). Old data has a mix of padded/unpadded; LTRIM lookup handles retroactive matching. New inserts are always unpadded.
+- **13F-NT vs 13F-HR** — NT filers have zero `holdings_v2` rows.
+- **CRD normalization** — entity resolver strips leading zeros (INF4b). LTRIM lookup handles retroactive matching.
 
 ### g–h: React/AG Grid/Tailwind landmines, inline style cascade
 
-10 specific gotchas from TCO port. See gotchas g–h in prior version.
+10 specific gotchas from TCO port. See full text in the 87bc812 version.
 
 ### i. Fuzzy name matching — use brand-token Jaccard, not token_sort_ratio
 
-`fuzz.token_sort_ratio` collapses under shared corporate suffixes. Use stopword-aware token-set Jaccard with ≥1 brand token overlap. See `build_managers.py` `_BRAND_STOPWORDS` + `_brand_tokens_overlap()` for the reference implementation.
+`fuzz.token_sort_ratio` collapses under shared corporate suffixes. Reference implementation: `build_managers.py` `_BRAND_STOPWORDS` + `_brand_tokens_overlap()`. Now also applied in `fetch_ncen.py` (INF17b `4ff0006`).
 
-### j. DuckDB has no pg_trgm similarity()
+### j–k: DuckDB similarity gap + audit query join bug
 
-Use Python-side matching or `jaccard` as first-pass filter.
-
-### k. Audit queries — join on (CIK, CRD) pair, not CRD alone
-
-Over-flags entities that legitimately own a CRD also polluted onto another entity.
+DuckDB has no pg_trgm `similarity()`. Audit queries must join on (CIK, CRD) pair, not CRD alone.
 
 ### l. merge_staging.py — managers uses DROP+CREATE path
 
@@ -139,15 +132,19 @@ Silently drops schema-drifting columns (e.g., `adviser_cik`). "Added 12,005" out
 
 ### o. 13F-NT filers distort AUM-at-risk estimates
 
-Always separate "entities affected" from "entities with holdings at risk". INF17's $180.71B → $1.27B after filtering.
+INF17's $180.71B → $1.27B after filtering. Always separate "entities affected" from "holdings at risk".
 
 ### p. CRD format normalization (INF4b)
 
-`entity_sync._normalize_crd()` strips leading zeros. `entity_identifiers` lookup now uses `LTRIM(identifier_value, '0')` for CRD type — retroactively matches old un-normalized data. `build_entities._try_insert()` normalizes before Python dedup dict and SQL INSERT. 214 entity pairs had CRD format mismatches; 96 merged in INF4c batch + 4 in INF4/INF6/INF8/INF4d individual merges = 100 resolved. 15 excluded (11 CRD pollutions, 4 borderline). Code fix prevents new occurrences.
+`entity_sync._normalize_crd()` strips leading zeros. 100 entity pairs merged (INF4+INF4d+INF4c), 15 excluded as pollutions (all added to INF17). Code fix prevents new occurrences.
 
-### q. Batch entity merge: always transfer CIK identifiers from merge source to survivor
+### q. Batch entity merge: always transfer CIK identifiers
 
-Do NOT just close a merge source's CIK identifier — **INSERT a copy on the survivor first**, then close the source row. Closing a CIK without transferring breaks the `total_aum` validation gate because `managers.aum_total` is summed through `managers m JOIN entity_identifiers ei ON m.cik = ei.identifier_value JOIN entity_rollup_history erh ON ...` — if the CIK has no active `entity_identifiers` row, that manager's AUM drops out of the join. INF4c batch merge hit a 0.457% gap (~$166B) when 12 CIKs were closed on merge sources that had their own CIKs (the "both entities have CIK" case). Fixed by transferring 12 CIKs to survivors after the main transaction. Same pattern as INF8 Trian where identifiers were explicitly transferred to eid=107.
+Do NOT just close a merge source's CIK — **INSERT a copy on the survivor first**. INF4c hit a 0.457% gap (~$166B) when 12 CIKs were closed without transferring. `total_aum` gate compares `SUM(managers.aum_total)` through the `entity_identifiers → entity_rollup_history` chain — dropped CIKs break the join.
+
+### r. L4-1 LOW_COV: N-PORT coverage < 50% → keep mixed (NEW)
+
+When N-PORT series coverage is below 50% of a firm's total 13F AUM, the active/passive split from N-PORT doesn't represent the whole firm. Goldman Sachs (27%), Franklin Templeton (27%), Nomura (32%), Focus Partners (35%) were all flagged ≥90% active by N-PORT but kept `mixed` because the uncovered AUM (banking, passive ETFs, fixed income) could flip the ratio. Only reclassify to `active`/`passive` when coverage is ≥50% OR the firm is structurally known (e.g., PIMCO = pure bond manager with no 13F).
 
 ---
 
@@ -156,12 +153,10 @@ Do NOT just close a merge source's CIK identifier — **INSERT a copy on the sur
 ```bash
 cd ~/ClaudeWorkspace/Projects/13f-ownership
 git status -sb                  # expect: ## main...origin/main
-git log -5 --oneline            # expect: 73f6acd or newer
+git log -5 --oneline            # expect: 50c9065 or newer
 pgrep -f "scripts/app.py"       # dev server PID
 curl -s http://localhost:8001/api/tickers | python3 -c "import json,sys; print(len(json.load(sys.stdin)))"  # 6500+
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/api/admin/stats  # 503
-pre-commit run pylint --files scripts/app.py scripts/queries.py scripts/admin_bp.py
-pre-commit run bandit --files scripts/app.py scripts/queries.py scripts/admin_bp.py
 python3 scripts/validate_entities.py --prod   # 9 PASS / 0 FAIL / 7 MANUAL
 ```
 
@@ -179,9 +174,10 @@ python3 scripts/validate_entities.py --prod   # 9 PASS / 0 FAIL / 7 MANUAL
 - Confirm destructive actions before running.
 - Use `python3 -u` for background tasks.
 - **Never trust `managers.manually_verified=True`.**
-- **Never use `fuzz.token_sort_ratio` alone for firm name matching.**
+- **Never use `fuzz.token_sort_ratio` alone for firm name matching.** Both `build_managers.py` and `fetch_ncen.py` now have brand-token gates.
 - **CRD values must be normalized** via `_normalize_crd()` before any insert or lookup (INF4b).
-- **Batch entity merges: always transfer CIK identifiers** from merge source to survivor before closing them (gotcha q). Closing without transferring breaks `total_aum` gate.
+- **Batch entity merges: always transfer CIK identifiers** from merge source to survivor before closing them (gotcha q).
+- **N-PORT coverage < 50%: keep classification as `mixed`** regardless of active/passive split (gotcha r).
 
 ---
 
@@ -200,6 +196,12 @@ python3 scripts/validate_entities.py --prod   # 9 PASS / 0 FAIL / 7 MANUAL
 ## Session ledger (newest first)
 
 ```
+50c9065 ROADMAP: mark L4-1 Done + INF17 Phase 1 Done + INF17b fully Done
+4ff0006 INF17b: add brand-token overlap gate to fetch_ncen.py adviser_cik matching
+46877c5 INF17 Phase 1: scrub bad crd_number + aum_total from 127 managers rows
+1e01b6b L4-1: reclassify 3 mixed entities to active based on N-PORT series split
+dba066b ROADMAP: mark INF4e Done — all 4 excluded as CRD pollutions
+436032f docs: update NEXT_SESSION_CONTEXT.md — INF4c gotcha + priority reorder
 73f6acd INF4c: batch merge 96 CRD-format fragmented entity pairs
 76dc31f ROADMAP: add INF17 Phase 1 additions (11 CRD pollutions) + INF4e (4 borderline pairs)
 eddb05c INF4d: merge eid=17933 into eid=9143 — Boston Partners fragmentation
@@ -218,10 +220,6 @@ ba4fb89 ROADMAP: mark INF17 Phase 3 Done
 0634682 INF17 Phase 3: fix build_managers.py CRD fuzzy-match — add brand-token overlap gate
 14f8250 ROADMAP: mark INF17 Phase 2 Done
 6743f11 INF17 Phase 2: self-root 5 misattributed entities from CRD pollution audit
-17265a8 ROADMAP: update INF17 Phase 2 with concrete 5-entity fix list
-95b30bd ROADMAP: update INF17 with revised four-phase plan
-41f9a8c ROADMAP: add INF17 — systematic managers CRD pollution (127 rows)
-59e8a0d ROADMAP: add INF7 aum_total follow-up
 1a43376 INF7 Done: Soros/VSS + Peter Soros/Orion fuzzy-match cleanup promoted
 c91afd2 ROADMAP: mark INF12 Done
 d51db60 INF12: admin Blueprint with token auth — gate all /api/admin/* except quarter_config
