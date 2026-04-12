@@ -5,29 +5,41 @@ interface Group {
 
 interface Props {
   groups: Group[]
+  /** When true (default) the whole row renders with an oxford-blue
+   *  background so it stacks visually with the column-label row
+   *  beneath it. Set false if the host table wants a light header. */
+  darkFill?: boolean
 }
 
-const LABELED: React.CSSProperties = {
-  padding: '6px 10px',
-  fontSize: 11,
-  fontWeight: 600,
-  color: '#475569',
-  textAlign: 'center',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  borderBottom: '2px solid var(--sandstone)',
-}
+export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
+  const bg = darkFill ? 'var(--oxford-blue)' : 'transparent'
+  const text = darkFill ? '#ffffff' : '#475569'
 
-const EMPTY: React.CSSProperties = {
-  padding: 0,
-  border: 'none',
-}
+  const labeled: React.CSSProperties = {
+    padding: '6px 10px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: text,
+    backgroundColor: bg,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    borderBottom: '2px solid var(--sandstone)',
+  }
 
-export function ColumnGroupHeader({ groups }: Props) {
+  // Empty group cells carry the same dark fill so the row reads as one
+  // continuous band — no border so the light-mode variant still looks
+  // clean when darkFill is false.
+  const empty: React.CSSProperties = {
+    padding: 0,
+    border: 'none',
+    backgroundColor: bg,
+  }
+
   return (
     <tr>
       {groups.map((g, i) => (
-        <th key={i} colSpan={g.colSpan} style={g.label ? LABELED : EMPTY}>
+        <th key={i} colSpan={g.colSpan} style={g.label ? labeled : empty}>
           {g.label}
         </th>
       ))}

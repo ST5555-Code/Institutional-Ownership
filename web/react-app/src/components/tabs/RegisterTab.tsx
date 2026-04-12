@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
 import type { RegisterResponse, RegisterRow } from '../../types/api'
@@ -8,7 +8,6 @@ import {
   FundViewToggle,
   ActiveOnlyToggle,
   InvestorTypeFilter,
-  InvestorSearch,
   ExportBar,
   TableFooter,
   ColumnGroupHeader,
@@ -19,14 +18,6 @@ import {
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
-
-// All per-column formatters per spec:
-//  Shares (MM): 2 decimals, no suffix     — value_live/1e6
-//  Value ($MM): comma-sep, 0 decimals     — value_live/1e6
-//  % Float: 1 decimal
-//  AUM ($MM): comma-sep, 0 decimals       — backend pre-divided to $M
-//  % of AUM: 2 decimals
-//  N-PORT Cov: rounded int %
 
 function fmtSharesMm(v: number | null): string {
   if (v == null) return '—'
@@ -48,9 +39,8 @@ function fmtPctFloat(v: number | null): string {
   return `${NUM_1.format(v)}%`
 }
 
-// Negative percentages render as "(2.30%)" in red per spec. Kept from the
-// prior implementation — query1 data is non-negative today, so this is
-// defensive formatting for future tabs that share the helper.
+// Defensive negative-percentage formatter kept from the prior file — query1
+// doesn't return negatives today but this helper is handy for other tabs.
 function PctCell({ v }: { v: number | null }) {
   if (v == null) return <>—</>
   if (v < 0)
@@ -136,35 +126,194 @@ function groupRows(rows: RegisterRow[]): RegisterGroup[] {
   return groups
 }
 
+// Fund-view rows carry the parent institution alongside the child data so
+// that Investor Search can filter fund rows by their owning parent.
+interface FundViewRow extends RegisterRow {
+  parentInstitution: string
+}
+
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 
 const TOTAL_COLS = 9
+
+// ── InvestorSearchWithDropdown ────────────────────────────────────────────
+// Local to this file per spec — the shared common/InvestorSearch stays a
+// simple text input for other tabs. This variant adds a typeahead dropdown
+// keyed off the response's parent rows (level=0), click-outside-to-close,
+// and a × clear control that fires onSelect(null).
+
+interface SearchProps {
+  data: RegisterRow[]
+  onSelect: (institution: string | null) => void
+}
+
+function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
+  const [value, setValue] = useState('')
+  const [open, setOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const matches = useMemo(() => {
+    if (value.length < 1) return [] as RegisterRow[]
+    const q = value.toLowerCase()
+    return data
+      .filter((r) => r.level === 0 && r.institution.toLowerCase().includes(q))
+      .slice(0, 10)
+  }, [data, value])
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [])
+
+  function select(institution: string) {
+    setValue(institution)
+    setOpen(false)
+    onSelect(institution)
+  }
+
+  function clear() {
+    setValue('')
+    setOpen(false)
+    onSelect(null)
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{ position: 'relative', display: 'inline-block' }}
+    >
+      <input
+        type="text"
+        value={value}
+        placeholder="Search investor…"
+        onChange={(e) => {
+          const v = e.target.value
+          setValue(v)
+          setOpen(v.length > 0)
+        }}
+        onFocus={() => {
+          setFocused(true)
+          if (value.length > 0) setOpen(true)
+        }}
+        onBlur={() => setFocused(false)}
+        style={{
+          width: 200,
+          padding: '6px 28px 6px 10px',
+          fontSize: 13,
+          color: '#1e293b',
+          backgroundColor: '#ffffff',
+          border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`,
+          borderRadius: 4,
+          outline: 'none',
+          transition: 'border-color 0.1s',
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={clear}
+          aria-label="Clear search"
+          style={{
+            position: 'absolute',
+            right: 6,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 18,
+            height: 18,
+            padding: 0,
+            lineHeight: '16px',
+            fontSize: 14,
+            color: '#94a3b8',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
+      )}
+      {open && matches.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: 2,
+            width: 280,
+            maxHeight: 240,
+            overflowY: 'auto',
+            backgroundColor: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 4,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            zIndex: 1000,
+          }}
+        >
+          {matches.map((m) => (
+            <div
+              key={m.institution}
+              // onMouseDown fires before the input's blur handler — without
+              // this the click would close the dropdown before selecting.
+              onMouseDown={() => select(m.institution)}
+              style={{
+                padding: '7px 12px',
+                fontSize: 13,
+                color: '#1e293b',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = '#f4f6f9')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = 'transparent')
+              }
+            >
+              {m.institution}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function RegisterTab() {
   const { ticker, quarter, setQuarter, rollupType } = useAppStore()
 
-  // Local UI state
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [activeOnly, setActiveOnly] = useState(false)
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
-  const [search, setSearch] = useState('')
-  // `selectedTypes` is null until we've seen a response — then it becomes
-  // the full set of types present in the data. `null` = "all selected, show
-  // everything" so the user doesn't see a flashing empty chip row.
   const [selectedTypes, setSelectedTypes] = useState<Set<string> | null>(null)
+  // Search-selection state: when non-null in fund view, filters fund rows
+  // to those owned by this parent institution. In hierarchy view it's
+  // only used to scroll/highlight — the list is not filtered.
+  const [selectedInstitution, setSelectedInstitution] = useState<string | null>(
+    null,
+  )
 
-  // URL: rollup_type is the only param query1 actually honors today. The
-  // quarter selector is cosmetic (see note below) but kept in the URL
-  // string so Vite's HMR replays the fetch if/when the backend starts
-  // accepting it without requiring a code edit here.
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+
   const url = ticker
     ? `/api/query1?ticker=${encodeURIComponent(ticker)}&rollup_type=${rollupType}&quarter=${encodeURIComponent(quarter)}`
     : null
   const { data, loading, error } = useFetch<RegisterResponse>(url)
 
-  // Available types derived from the parent rows of the current response.
+  // Clear the search selection whenever the ticker/rollup changes, so a
+  // stale highlight doesn't get re-applied to a completely different
+  // response.
+  useEffect(() => {
+    setSelectedInstitution(null)
+  }, [ticker, rollupType])
+
+  // Available types derived from parent rows in the current response.
   const availableTypes = useMemo(() => {
     if (!data) return [] as string[]
     const seen = new Set<string>()
@@ -174,59 +323,50 @@ export function RegisterTab() {
     return Array.from(seen).sort()
   }, [data])
 
-  // Reset the type-filter selection to "everything" whenever the set of
-  // available types changes (new ticker, new rollup). The first render
-  // after a fetch will see `selectedTypes === null` and treat it as all.
   const effectiveSelectedTypes = selectedTypes ?? new Set(availableTypes)
 
-  // ── Grouping + filtering ─────────────────────────────────────────────────
-  //
-  // 1. Group flat rows into {parent, children}
-  // 2. Drop parent groups whose type is not in the selected-types set
-  // 3. If activeOnly: drop parent groups where type === 'passive'
-  // 4. If search: drop parent groups whose institution doesn't contain text
-  // 5. In fund view: flatten to child rows, re-rank, drop parents entirely.
-  //    Child rows inherit the parent filter decisions from step 2-4 — i.e.
-  //    children of a passive parent are hidden under activeOnly even though
-  //    the child row itself might have a different `type`.
-
+  // Filter-pipeline for the parent-level groups. Child rows inherit their
+  // parent's pass/fail decision in hierarchy view.
   const groups = useMemo(() => {
     if (!data) return []
     const all = groupRows(data.rows)
-    const q = search.trim().toLowerCase()
     return all.filter((g) => {
       const t = (g.parent.type || '').toLowerCase()
       if (effectiveSelectedTypes.size > 0 && !effectiveSelectedTypes.has(t)) {
         return false
       }
       if (activeOnly && t === 'passive') return false
-      if (q && !(g.parent.institution || '').toLowerCase().includes(q)) {
-        return false
-      }
       return true
     })
-  }, [data, activeOnly, search, effectiveSelectedTypes])
+  }, [data, activeOnly, effectiveSelectedTypes])
 
-  // Fund-view rows: flatten children from filtered groups, sort by
-  // value_live desc, re-rank 1..N.
-  const fundRows = useMemo(() => {
-    if (fundView !== 'fund') return [] as RegisterRow[]
-    const flat: RegisterRow[] = []
+  // Flatten children from the filtered groups for fund view, carry their
+  // parent institution, sort by value_live desc, re-rank 1..N.
+  const fundRows = useMemo<FundViewRow[]>(() => {
+    if (fundView !== 'fund') return []
+    const flat: FundViewRow[] = []
     for (const g of groups) {
-      for (const c of g.children) flat.push(c)
+      for (const c of g.children) {
+        flat.push({ ...c, parentInstitution: g.parent.institution })
+      }
     }
     flat.sort((a, b) => (b.value_live || 0) - (a.value_live || 0))
     return flat.map((r, i) => ({ ...r, rank: i + 1 }))
   }, [groups, fundView])
 
-  // ── Footer totals ────────────────────────────────────────────────────────
-  // `visibleRows` in the spec means post-filter, so we sum what the user
-  // actually sees. In hierarchy view that's the parent rows; in fund view
-  // that's the flat child rows.
+  // Fund-view search filter: only applied when the user has picked a
+  // specific investor from the dropdown while in fund view.
+  const fundRowsDisplay = useMemo<FundViewRow[]>(() => {
+    if (fundView !== 'fund' || selectedInstitution == null) return fundRows
+    return fundRows.filter(
+      (r) => r.parentInstitution === selectedInstitution,
+    )
+  }, [fundRows, fundView, selectedInstitution])
 
+  // Totals footer sums the rows the user actually sees (post-filter).
   const visibleSums = useMemo(() => {
     const rows: RegisterRow[] =
-      fundView === 'fund' ? fundRows : groups.map((g) => g.parent)
+      fundView === 'fund' ? fundRowsDisplay : groups.map((g) => g.parent)
     let shares = 0
     let valueLive = 0
     let pctFloat = 0
@@ -236,9 +376,7 @@ export function RegisterTab() {
       pctFloat += r.pct_float || 0
     }
     return { count: rows.length, shares, valueLive, pctFloat }
-  }, [groups, fundRows, fundView])
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  }, [groups, fundRowsDisplay, fundView])
 
   function toggle(key: string) {
     setExpanded((prev) => {
@@ -249,9 +387,38 @@ export function RegisterTab() {
     })
   }
 
+  // ── Search selection handler ─────────────────────────────────────────────
+  // In hierarchy view: scroll the matching parent row into the viewport and
+  // apply a 2-second pale-gold highlight. The highlight uses a CSS class
+  // (defined in the <style> block below) rather than inline style so React's
+  // reconciler can't stomp it mid-fade if the component re-renders.
+  //
+  // In fund view: set state so fundRowsDisplay filters to the matching
+  // parent's fund series. The list contracts, no scroll/highlight needed.
+
+  function handleSearchSelect(institution: string | null) {
+    setSelectedInstitution(institution)
+    if (institution == null) return
+    if (fundView === 'fund') return
+    requestAnimationFrame(() => {
+      const wrap = tableWrapRef.current
+      if (!wrap) return
+      const escaped = institution.replace(/"/g, '\\"')
+      const el = wrap.querySelector(
+        `tr[data-institution="${escaped}"]`,
+      ) as HTMLElement | null
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('register-row-highlight')
+      window.setTimeout(() => {
+        el.classList.remove('register-row-highlight')
+      }, 2000)
+    })
+  }
+
+  // ── Export handlers ──────────────────────────────────────────────────────
+
   function onExcel() {
-    // CSV export of the currently-visible rows (post-filter, post-view).
-    // Tracking ticket for real .xlsx export if the user wants it later.
     const header = [
       'Rank',
       'Institution',
@@ -265,7 +432,7 @@ export function RegisterTab() {
     ]
     const rows: RegisterRow[] =
       fundView === 'fund'
-        ? fundRows
+        ? fundRowsDisplay
         : groups.flatMap((g) =>
             expanded.has(groupKey(g.parent))
               ? [g.parent, ...g.children]
@@ -284,21 +451,21 @@ export function RegisterTab() {
     ])
     const csv = [header, ...csvRows].map((row) => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
+    const dlUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
+    a.href = dlUrl
     a.download = `register_${ticker}_${quarter}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    URL.revokeObjectURL(dlUrl)
   }
 
   function onPrint() {
     window.print()
   }
 
-  // ── Early returns ────────────────────────────────────────────────────────
+  // ── Early return ─────────────────────────────────────────────────────────
 
   if (!ticker) {
     return (
@@ -314,6 +481,7 @@ export function RegisterTab() {
 
   return (
     <div
+      className="register-tab-container"
       style={{
         height: '100%',
         display: 'flex',
@@ -324,12 +492,18 @@ export function RegisterTab() {
         overflow: 'hidden',
       }}
     >
-      {/* Print CSS — hide controls, keep the table */}
+      {/* Print CSS + highlight class. !important on the highlight so it
+          survives mid-fade React re-renders that would otherwise restore
+          the row's inline backgroundColor. */}
       <style>{`
         @media print {
           .register-controls-bar { display: none !important; }
           .register-tab-container { height: auto !important; overflow: visible !important; }
           .register-table-wrap { overflow: visible !important; }
+        }
+        .register-row-highlight > td {
+          background-color: #fffbeb !important;
+          transition: background-color 0.4s ease-in-out;
         }
       `}</style>
 
@@ -379,7 +553,10 @@ export function RegisterTab() {
             onChange={setSelectedTypes}
           />
         )}
-        <InvestorSearch value={search} onChange={setSearch} />
+        <InvestorSearchWithDropdown
+          data={data?.rows ?? []}
+          onSelect={handleSearchSelect}
+        />
         <div style={{ marginLeft: 'auto' }}>
           <ExportBar onExcel={onExcel} onPrint={onPrint} disabled={!data} />
         </div>
@@ -387,6 +564,7 @@ export function RegisterTab() {
 
       {/* Table container */}
       <div
+        ref={tableWrapRef}
         className="register-table-wrap"
         style={{
           flex: 1,
@@ -430,7 +608,9 @@ export function RegisterTab() {
             </thead>
             <tbody>
               {fundView === 'fund'
-                ? fundRows.map((r) => renderRow(r, `f:${r.rank}`, 0, false, false, toggle))
+                ? fundRowsDisplay.map((r) =>
+                    renderRow(r, `f:${r.rank}`, 0, false, false, toggle),
+                  )
                 : groups.flatMap((g) => {
                     const pkey = groupKey(g.parent)
                     const canExpand = g.children.length >= 2
@@ -448,14 +628,16 @@ export function RegisterTab() {
                             false,
                             false,
                             toggle,
-                            `${g.parent.rank}${String.fromCharCode(97 + ci)}`,
+                            String(ci + 1),
                           ),
                         )
                       })
                     }
                     return trs
                   })}
-              {(fundView === 'fund' ? fundRows.length : groups.length) === 0 && (
+              {(fundView === 'fund'
+                ? fundRowsDisplay.length
+                : groups.length) === 0 && (
                 <tr>
                   <td
                     colSpan={TOTAL_COLS}
@@ -513,9 +695,10 @@ function groupKey(parent: RegisterRow): string {
   return `${parent.rank}:${parent.institution}`
 }
 
-// renderRow is a plain function (not a component) so it returns a <tr>
-// suitable for direct insertion into <tbody>. `displayRank` overrides the
-// rank label for child rows in hierarchy view (e.g. "1a", "1b").
+// renderRow returns a <tr>. `displayRank` overrides the rank column for
+// child rows (fix 2: 1, 2, 3... not 1a, 1b, 1c). Parent rows get a
+// data-institution attribute so the search highlight handler can find
+// them via querySelector.
 function renderRow(
   row: RegisterRow,
   key: string,
@@ -530,7 +713,7 @@ function renderRow(
   }
   const nameCell: React.CSSProperties = {
     ...TD_STYLE,
-    paddingLeft: indent === 1 ? 28 : 10,
+    paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,
     color: indent === 0 ? '#0f172a' : '#475569',
     fontSize: indent === 1 ? 12 : 13,
@@ -539,14 +722,18 @@ function renderRow(
   }
   const nport = nportBadgeStyle(row.nport_cov)
   return (
-    <tr key={key} style={rowBg}>
+    <tr
+      key={key}
+      style={rowBg}
+      data-institution={indent === 0 ? row.institution : undefined}
+    >
       <td
         style={{
           ...TD_STYLE,
           textAlign: 'right',
           fontWeight: indent === 0 ? 700 : 400,
           color: indent === 0 ? '#64748b' : '#94a3b8',
-          fontSize: indent === 1 ? 11 : 13,
+          fontSize: indent === 1 ? 12 : 13,
           width: 60,
         }}
       >
