@@ -253,44 +253,93 @@ interface SectionProps {
   type: 'buyers' | 'sellers' | 'new_entries' | 'exits'
 }
 
-function FlowSection({ title, rows, color, type }: SectionProps) {
+function FlowSection({ title, rows, type }: SectionProps) {
   const isBuyerSeller = type === 'buyers' || type === 'sellers'
+  const isPositive = type === 'buyers' || type === 'new_entries'
+  // Title bar: top sections (buyers/new entries) green, bottom (sellers/exits) red
+  const titleBg = isPositive ? '#27AE60' : '#ef4444'
+  const colCount = isBuyerSeller ? 10 : 6
+
+  // Compute totals for sticky footer
+  const totals = rows.reduce(
+    (acc, r) => ({
+      fromShares: acc.fromShares + (r.from_shares || 0),
+      toShares: acc.toShares + (r.to_shares || 0),
+      netShares: acc.netShares + (r.net_shares || 0),
+      netValue: acc.netValue + (r.net_value || 0),
+      fromValue: acc.fromValue + (r.from_value || 0),
+      toValue: acc.toValue + (r.to_value || 0),
+      pctFloat: acc.pctFloat + (r.pct_float || 0),
+    }),
+    { fromShares: 0, toShares: 0, netShares: 0, netValue: 0, fromValue: 0, toValue: 0, pctFloat: 0 },
+  )
+
+  const FC: React.CSSProperties = {
+    padding: '5px 8px', fontSize: 11, fontWeight: 600,
+    color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
+    position: 'sticky', bottom: 0, zIndex: 2,
+    borderTop: '2px solid var(--oxford-blue)',
+  }
+  const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column', maxHeight: 350, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderLeft: `3px solid ${color}`, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color }}>{title}</span>
-        <span style={{ fontSize: 11, color: '#94a3b8', backgroundColor: '#e2e8f0', padding: '1px 6px', borderRadius: 8 }}>{rows.length}</span>
+      {/* Title bar — green for inflow sections, red for outflow */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: titleBg, flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: '#ffffff' }}>{title}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: 8 }}>{rows.length}</span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+          <colgroup>
+            <col style={{ width: 30 }} />
+            <col />  {/* Institution — flex */}
+            <col style={{ width: 62 }} />
+            {isBuyerSeller ? (
+              <>
+                <col style={{ width: 72 }} />
+                <col style={{ width: 72 }} />
+                <col style={{ width: 72 }} />
+                <col style={{ width: 72 }} />
+                <col style={{ width: 56 }} />
+                <col style={{ width: 56 }} />
+                <col style={{ width: 36 }} />
+              </>
+            ) : (
+              <>
+                <col style={{ width: 72 }} />
+                <col style={{ width: 76 }} />
+                <col style={{ width: 56 }} />
+              </>
+            )}
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ ...TH, width: 36 }}>#</th>
+              <th style={{ ...TH, width: undefined }}>#</th>
               <th style={TH}>Institution</th>
-              <th style={{ ...TH, width: 72 }}>Type</th>
+              <th style={{ ...TH, width: undefined }}>Type</th>
               {isBuyerSeller ? (
                 <>
-                  <th style={{ ...TH_R, width: 80 }}>From (MM)</th>
-                  <th style={{ ...TH_R, width: 80 }}>To (MM)</th>
-                  <th style={{ ...TH_R, width: 80 }}>Net (MM)</th>
-                  <th style={{ ...TH_R, width: 80 }}>Net $MM</th>
-                  <th style={{ ...TH_R, width: 60 }}>% Chg</th>
-                  <th style={{ ...TH_R, width: 60 }}>% Float</th>
-                  <th style={{ ...TH, width: 44 }}>Sig</th>
+                  <th style={TH_R}>From</th>
+                  <th style={TH_R}>To</th>
+                  <th style={TH_R}>Net</th>
+                  <th style={TH_R}>Net $</th>
+                  <th style={TH_R}>% Chg</th>
+                  <th style={TH_R}>% Flt</th>
+                  <th style={TH}>Sig</th>
                 </>
               ) : type === 'new_entries' ? (
                 <>
-                  <th style={{ ...TH_R, width: 80 }}>Shares (MM)</th>
-                  <th style={{ ...TH_R, width: 80 }}>Value ($MM)</th>
-                  <th style={{ ...TH_R, width: 60 }}>% Float</th>
+                  <th style={TH_R}>Shares</th>
+                  <th style={TH_R}>Value</th>
+                  <th style={TH_R}>% Flt</th>
                 </>
               ) : (
                 <>
-                  <th style={{ ...TH_R, width: 80 }}>Prior (MM)</th>
-                  <th style={{ ...TH_R, width: 80 }}>Prior $MM</th>
-                  <th style={{ ...TH_R, width: 60 }}>% Float</th>
+                  <th style={TH_R}>Prior</th>
+                  <th style={TH_R}>Prior $</th>
+                  <th style={TH_R}>% Flt</th>
                 </>
               )}
             </tr>
@@ -334,9 +383,41 @@ function FlowSection({ title, rows, color, type }: SectionProps) {
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={isBuyerSeller ? 10 : 6} style={{ ...TD, textAlign: 'center', padding: 20, color: '#64748b' }}>No data</td></tr>
+              <tr><td colSpan={colCount} style={{ ...TD, textAlign: 'center', padding: 20, color: '#64748b' }}>No data</td></tr>
             )}
           </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr>
+                <td style={FC} />
+                <td style={FC}>Total</td>
+                <td style={FC} />
+                {isBuyerSeller ? (
+                  <>
+                    <td style={FCR}>{fmtSharesMm(totals.fromShares)}</td>
+                    <td style={FCR}>{fmtSharesMm(totals.toShares)}</td>
+                    <td style={FCR}><span style={{ color: totals.netShares >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netShares !== 0 ? NUM_2.format(totals.netShares / 1e6) : '—'}</span></td>
+                    <td style={FCR}><span style={{ color: totals.netValue >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netValue !== 0 ? `$${NUM_0.format(totals.netValue / 1e6)}` : '—'}</span></td>
+                    <td style={FC} />
+                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                    <td style={FC} />
+                  </>
+                ) : type === 'new_entries' ? (
+                  <>
+                    <td style={FCR}>{fmtSharesMm(totals.toShares)}</td>
+                    <td style={FCR}>{fmtValueMm(totals.toValue)}</td>
+                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td style={FCR}>{fmtSharesMm(totals.fromShares)}</td>
+                    <td style={FCR}>{fmtValueMm(totals.fromValue)}</td>
+                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                  </>
+                )}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
