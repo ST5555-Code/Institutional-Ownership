@@ -11,6 +11,15 @@
  * JSON null, so optional numerics are typed `number | null`, not `number | undefined`.
  */
 
+// ── Shared query parameters ───────────────────────────────────────────────
+// The Flask backend accepts `rollup_type` on most ticker-scoped endpoints
+// (query1/2/3/5/12/14, ownership_trend_summary, flow_analysis, cross_ownership,
+// portfolio_context, peer_rotation, sector_flow_*). Default is fund-sponsor
+// (`economic_control_v1`); `decision_maker_v1` reroutes sub-advised fund
+// series to the actual investment adviser instead of the legal sponsor.
+
+export type RollupType = 'economic_control_v1' | 'decision_maker_v1'
+
 // ── Summary — /api/summary?ticker=EQT ─────────────────────────────────────
 
 export interface SummaryTypeBreakdownRow {
