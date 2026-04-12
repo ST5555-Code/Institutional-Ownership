@@ -16,7 +16,7 @@ import {
   ExportBar,
 } from '../common'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
@@ -63,6 +63,9 @@ export function PeerRotationTab() {
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
   const [activeOnly, setActiveOnly] = useState(false)
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null)
+  const [periodCount, setPeriodCount] = useState<1 | 2 | 3>(3)
+  // Popup state for movers chart click
+  const [moverPopup, setMoverPopup] = useState<{ ticker: string; inflow: number; outflow: number; net: number; x: number; y: number } | null>(null)
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
@@ -78,8 +81,8 @@ export function PeerRotationTab() {
     : null
   const detail = useFetch<PeerRotationDetailResponse>(detailUrl)
 
-  // Build chart data from subject_flows + sector_flows keyed by period
-  const chartData = data ? data.periods.map(p => {
+  // Build chart data — filter to last N periods based on selector
+  const allChartData = data ? data.periods.map(p => {
     const key = `${p.from}_${p.to}`
     return {
       label: p.label,
@@ -88,6 +91,8 @@ export function PeerRotationTab() {
       pctOfIndustry: data.subject_pct_of_sector[key] ?? null,
     }
   }) : []
+  // Period filter: take last N entries from the periods array
+  const chartData = allChartData.slice(-periodCount)
 
   function onExcel() {
     if (!data) return
@@ -127,6 +132,21 @@ export function PeerRotationTab() {
 
       {/* Controls */}
       <div className="pr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        {/* Period selector */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
+            <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
+              style={{
+                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                fontWeight: periodCount === p.n ? 600 : 400,
+                color: periodCount === p.n ? '#fff' : '#64748b',
+                backgroundColor: periodCount === p.n ? 'var(--oxford-blue)' : '#fff',
+                border: `1px solid ${periodCount === p.n ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+              }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
@@ -177,9 +197,73 @@ export function PeerRotationTab() {
                 <div style={{ flex: 1, ...CENTER_MSG, color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 6 }}>Insufficient period data</div>
               )}
 
-              {/* Right: placeholder for future chart */}
-              <div style={{ flex: 1, border: '1px dashed #cbd5e1', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220, backgroundColor: '#fafafa' }}>
-                <span style={{ color: '#94a3b8', fontSize: 13 }}>Additional chart — coming soon</span>
+              {/* Right: Top Sector Movers chart */}
+              <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
+                <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Top Sector Movers — Net Flow</div>
+                <div style={{ padding: '8px 8px 4px' }}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart
+                      data={data.top_sector_movers.map(m => ({
+                        ticker: m.ticker,
+                        net: m.net_flow / 1e6,
+                        inflow: m.inflow,
+                        outflow: m.outflow,
+                        netRaw: m.net_flow,
+                        isSubject: m.is_subject,
+                      }))}
+                      barSize={24}
+                      onClick={(state) => {
+                        if (state && state.activePayload && state.activePayload[0]) {
+                          const d = state.activePayload[0].payload as { ticker: string; inflow: number; outflow: number; netRaw: number }
+                          setMoverPopup({
+                            ticker: d.ticker,
+                            inflow: d.inflow,
+                            outflow: d.outflow,
+                            net: d.netRaw,
+                            x: 0, y: 0,
+                          })
+                        }
+                      }}
+                    >
+                      <XAxis dataKey="ticker" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `$${NUM_1.format(v)}M`} width={56} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload || !payload[0]) return null
+                        const d = payload[0].payload as { ticker: string; inflow: number; outflow: number; netRaw: number; isSubject: boolean }
+                        return (
+                          <div style={{ backgroundColor: '#0d1526', color: '#e2e8f0', padding: '8px 12px', borderRadius: 4, border: '1px solid #2d3f5e', fontSize: 11, lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{d.ticker}{d.isSubject ? ' (Subject)' : ''}</div>
+                            <div><span style={{ color: '#27AE60' }}>Inflow:</span> ${NUM_0.format(d.inflow / 1e6)}M</div>
+                            <div><span style={{ color: '#ef4444' }}>Outflow:</span> (${NUM_0.format(Math.abs(d.outflow) / 1e6)}M)</div>
+                            <div style={{ borderTop: '1px solid #2d3f5e', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
+                              Net: <span style={{ color: d.netRaw >= 0 ? '#27AE60' : '#ef4444' }}>${NUM_0.format(d.netRaw / 1e6)}M</span>
+                            </div>
+                          </div>
+                        )
+                      }} />
+                      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                      <Bar dataKey="net" radius={[2, 2, 0, 0]}>
+                        {data.top_sector_movers.map((m, idx) => (
+                          <Cell key={idx} fill={m.is_subject ? '#f5a623' : '#002147'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* Click popup overlay */}
+                {moverPopup && (
+                  <div style={{ position: 'absolute', top: 40, right: 12, backgroundColor: '#0d1526', color: '#e2e8f0', padding: '10px 14px', borderRadius: 6, border: '1px solid #2d3f5e', fontSize: 12, lineHeight: 1.7, zIndex: 10, minWidth: 160 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{moverPopup.ticker}</span>
+                      <button type="button" onClick={() => setMoverPopup(null)} style={{ backgroundColor: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}>×</button>
+                    </div>
+                    <div><span style={{ color: '#27AE60' }}>Inflow:</span> ${NUM_0.format(moverPopup.inflow / 1e6)}M</div>
+                    <div><span style={{ color: '#ef4444' }}>Outflow:</span> (${NUM_0.format(Math.abs(moverPopup.outflow) / 1e6)}M)</div>
+                    <div style={{ borderTop: '1px solid #2d3f5e', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
+                      Net: <span style={{ color: moverPopup.net >= 0 ? '#27AE60' : '#ef4444' }}>${NUM_0.format(moverPopup.net / 1e6)}M</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
