@@ -47,7 +47,9 @@ const TH: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.04em',
   color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
   textAlign: 'left', borderBottom: '1px solid #1e2d47',
-  whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
+  // top: 30 sits below the sticky ColumnGroupHeader row (~30px tall)
+  // so the sandstone underline stays visible during scroll.
+  whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
@@ -381,10 +383,8 @@ function SectorCell({ entry }: { entry: { code: string; weight_pct: number } | u
   if (!entry) return <td style={TD}>—</td>
   return (
     <td style={TD}>
-      <div style={{ lineHeight: 1.3 }}>
-        <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{entry.code}</div>
-        <div style={{ color: '#64748b', fontSize: 11 }}>{entry.weight_pct}%</div>
-      </div>
+      <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{entry.code}</span>
+      <span style={{ color: '#64748b', fontSize: 11, marginLeft: 4 }}>{entry.weight_pct}%</span>
     </td>
   )
 }

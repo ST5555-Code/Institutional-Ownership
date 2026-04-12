@@ -15,6 +15,14 @@ export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
   const bg = darkFill ? 'var(--oxford-blue)' : 'transparent'
   const text = darkFill ? '#ffffff' : '#475569'
 
+  // When dark, pin both the group header row and (via the column label
+  // row's own top offset) the label row so the sandstone underline stays
+  // visible during scroll. The column label row should use top: ~30px
+  // to sit below this row.
+  const sticky: React.CSSProperties = darkFill
+    ? { position: 'sticky', top: 0, zIndex: 4 }
+    : {}
+
   const labeled: React.CSSProperties = {
     padding: '6px 10px',
     fontSize: 11,
@@ -25,6 +33,7 @@ export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     borderBottom: '2px solid var(--sandstone)',
+    ...sticky,
   }
 
   // Empty group cells carry the same dark fill so the row reads as one
@@ -34,6 +43,7 @@ export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
     padding: 0,
     border: 'none',
     backgroundColor: bg,
+    ...sticky,
   }
 
   return (
