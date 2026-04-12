@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (pending push)
-- **HEAD:** pending (Phase 3 polish commit)
+- **HEAD:** `c836813`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -180,7 +180,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
-pending Phase 3 visual polish: badge consolidation + cross-nav + print CSS + Playwright
+c836813 Phase 3 visual polish: badge consolidation + cross-nav + print CSS + Playwright
 11d7cce INF9c follow-up: entity_id fallback + backfill 6 rows
 976733a ROADMAP: close INF9d as won't fix + Stage 5 cleanup
 e0ffd4d INF4f: NorthStar CRD merge (eid=6693→7693)
