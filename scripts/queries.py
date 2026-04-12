@@ -4272,14 +4272,26 @@ def get_market_summary(limit=25):
                 if ent:
                     eid = ent[0]
                     r['entity_id'] = eid
-                    # Filer count: CIK-bearing children in entity_relationships
+                    # Filer count: children that have a CIK identifier
+                    # (actual 13F filing entities, not fund series)
                     fc = con.execute("""
-                        SELECT COUNT(DISTINCT child_entity_id)
-                        FROM entity_relationships
-                        WHERE parent_entity_id = ? AND valid_to = '9999-12-31'
-                          AND relationship_type != 'sub_adviser'
+                        SELECT COUNT(DISTINCT er.child_entity_id)
+                        FROM entity_relationships er
+                        JOIN entity_identifiers ei
+                          ON er.child_entity_id = ei.entity_id
+                          AND ei.identifier_type = 'cik'
+                          AND ei.valid_to = '9999-12-31'
+                        WHERE er.parent_entity_id = ? AND er.valid_to = '9999-12-31'
+                          AND er.relationship_type != 'sub_adviser'
                     """, [eid]).fetchone()
-                    r['filer_count'] = fc[0] if fc else 0
+                    # +1 for the institution itself if it has a CIK (self-filer)
+                    self_cik = con.execute("""
+                        SELECT COUNT(*) FROM entity_identifiers
+                        WHERE entity_id = ? AND identifier_type = 'cik'
+                          AND valid_to = '9999-12-31'
+                    """, [eid]).fetchone()
+                    filer_n = (fc[0] if fc else 0) + (1 if self_cik and self_cik[0] > 0 else 0)
+                    r['filer_count'] = max(filer_n, r['num_ciks'])
                     # Fund count: fund_sponsor children
                     fnc = con.execute("""
                         SELECT COUNT(DISTINCT child_entity_id)
