@@ -488,6 +488,78 @@ export interface SectorFlowsResponse {
   sectors: SectorFlowRow[]
 }
 
+// ── Peer Rotation — /api/peer_rotation + /api/peer_rotation_detail ────────
+// Note: active_only param uses '1'/'0' not 'true'/'false'.
+
+export interface PeerRotationSubject {
+  ticker: string
+  sector: string
+  industry: string
+}
+
+export interface PeerRotationPeriod {
+  from: string
+  to: string
+  label: string
+}
+
+export interface SubstitutionRow {
+  ticker: string
+  industry: string
+  net_peer_flow: number
+  contra_subject_flow: number
+  direction: string
+  num_entities: number
+  flows: Record<string, number>
+}
+
+export interface TopSectorMover {
+  rank: number
+  ticker: string
+  industry: string
+  net_flow: number
+  inflow: number
+  outflow: number
+  is_subject: boolean
+}
+
+export interface EntityStoryContraPeer {
+  ticker: string
+  flow: number
+}
+
+export interface EntityStoryRow {
+  entity: string
+  subject_flow: number
+  sector_flow: number
+  top_contra_peers: EntityStoryContraPeer[]
+}
+
+export interface PeerRotationResponse {
+  subject: PeerRotationSubject
+  periods: PeerRotationPeriod[]
+  // Keyed by period_key (e.g. "2025Q1_2025Q2") → { net: number }
+  subject_flows: Record<string, { net: number }>
+  sector_flows: Record<string, { net: number }>
+  subject_pct_of_sector: Record<string, number>
+  industry_substitutions: SubstitutionRow[]
+  sector_substitutions: SubstitutionRow[]
+  top_sector_movers: TopSectorMover[]
+  entity_stories: EntityStoryRow[]
+}
+
+export interface PeerRotationDetailEntity {
+  entity: string
+  subject_flow: number
+  peer_flow: number
+}
+
+export interface PeerRotationDetailResponse {
+  ticker: string
+  peer: string
+  entities: PeerRotationDetailEntity[]
+}
+
 // ── Entity Graph — /api/entity_search + /api/entity_children + /api/entity_graph
 
 export interface EntitySearchResult {
