@@ -27,48 +27,6 @@ def _rollup_col(rollup_type='economic_control_v1'):
     return 'dm_rollup_name' if rollup_type == 'decision_maker_v1' else 'rollup_name'
 
 
-# --- Phase 4 shadow logging ---
-_SHADOW_LOG_PATH = 'logs/phase4_shadow.log'
-
-
-def log_shadow_diff(endpoint, ticker, quarter, new_results, con):
-    """Run legacy query in background, log differences. Never affects user response."""
-    import threading
-
-    def _compare():
-        try:
-            legacy = {r[0]: r[1] for r in con.execute("""
-                SELECT inst_parent_name, SUM(market_value_live) as aum
-                FROM holdings
-                WHERE ticker=? AND quarter=?
-                GROUP BY inst_parent_name
-                ORDER BY aum DESC LIMIT 25
-            """, [ticker, quarter]).fetchall() if r[0] is not None}
-
-            new_map = {}
-            for row in new_results:
-                name = row.get('institution') or row.get('parent_name') or row.get('investor')
-                val = row.get('value_live') or row.get('total_value') or 0
-                if name and name not in new_map:
-                    new_map[name] = val
-
-            ts = _time.strftime('%Y-%m-%d %H:%M:%S')
-            with open(_SHADOW_LOG_PATH, 'a', encoding='utf-8') as f:
-                for parent, aum in new_map.items():
-                    if parent not in legacy:
-                        f.write(f"{ts}|{endpoint}|{ticker}|{quarter}|new_gain|{parent}|{aum}|0|100\n")
-                    elif aum and legacy[parent] and abs(aum - legacy[parent]) / max(legacy[parent], 1) > 0.001:
-                        diff_pct = round(abs(aum - legacy[parent]) / max(legacy[parent], 1) * 100, 2)
-                        f.write(f"{ts}|{endpoint}|{ticker}|{quarter}|value_diff|{parent}|{aum}|{legacy[parent]}|{diff_pct}\n")
-                for parent, aum in legacy.items():
-                    if parent not in new_map:
-                        f.write(f"{ts}|{endpoint}|{ticker}|{quarter}|legacy_only|{parent}|0|{aum}|100\n")
-        except Exception as e:
-            logger.debug("Shadow diff error: %s", e)
-
-    threading.Thread(target=_compare, daemon=True).start()
-
-
 # Simple time-based cache for expensive queries
 _query_cache = {}
 CACHE_TTL = 300  # 5 minutes
@@ -962,7 +920,6 @@ def query1(ticker, rollup_type='economic_control_v1'):
             type_totals[t]['pct_float'] += float(trow['pct_float'] or 0)
             type_totals[t]['count'] += 1
 
-        log_shadow_diff('register', ticker, LQ, results, con)
         return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
     finally:
         pass  # connection managed by thread-local cache
@@ -1143,7 +1100,6 @@ def query2(ticker, rollup_type='economic_control_v1'):
                 'section': 'exits',
                 'level': 0,
             })
-        log_shadow_diff('conviction', ticker, LQ, results, con)
         return results
     finally:
         pass  # connection managed by thread-local cache
@@ -2674,8 +2630,6 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
             trend = '\u2191 Accumulating' if pct > 0.005 else ('\u2193 Distributing' if pct < -0.005 else '\u2192 Stable')
             summary = {'trend': trend, 'total_shares_added': total_added, 'total_dollar_flow': total_flow, 'net_new_holders': net_new}
 
-        if level == 'parent':
-            log_shadow_diff('ownership_trend', ticker, LQ, rows, con)
         return {'quarters': rows, 'summary': summary, 'level': level}
     finally:
         pass  # connection managed by thread-local cache
@@ -3263,11 +3217,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
             'flow_trend': flow_trend,
         })
     finally:
-        if level == 'parent':
-            try:
-                log_shadow_diff('flow_analysis', ticker, LQ, buyers + sellers, con)
-            except Exception:  # nosec B110
-                pass
+        pass
 
 
 # ---------------------------------------------------------------------------
