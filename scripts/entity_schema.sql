@@ -267,8 +267,8 @@ CREATE INDEX IF NOT EXISTS idx_ers_status ON entity_relationships_staging(review
 -- build_entities.py replays all still_valid=TRUE rows after rebuild.
 CREATE TABLE IF NOT EXISTS entity_overrides_persistent (
     override_id    BIGINT PRIMARY KEY DEFAULT nextval('identifier_staging_id_seq'),
-    entity_cik     VARCHAR,          -- CIK of the target entity (used to re-resolve entity_id after rebuild)
-    action         VARCHAR NOT NULL,  -- reclassify|alias_add|merge
+    entity_cik     VARCHAR,          -- DEPRECATED: use identifier_type + identifier_value instead
+    action         VARCHAR NOT NULL,  -- reclassify|alias_add|merge|set_activist|suppress_relationship
     field          VARCHAR,
     old_value      VARCHAR,
     new_value      VARCHAR NOT NULL,
@@ -276,7 +276,14 @@ CREATE TABLE IF NOT EXISTS entity_overrides_persistent (
     analyst        VARCHAR,
     still_valid    BOOLEAN NOT NULL DEFAULT TRUE,
     applied_at     TIMESTAMP DEFAULT NOW(),
-    created_at     TIMESTAMP DEFAULT NOW()
+    created_at     TIMESTAMP DEFAULT NOW(),
+    -- INF9d: generic identifier lookup (replaces CIK-only entity_cik)
+    identifier_type  VARCHAR DEFAULT 'cik',   -- cik|crd|series_id
+    identifier_value VARCHAR,                 -- the actual identifier to resolve entity_id
+    -- INF9b: merge action can target either rollup type
+    rollup_type      VARCHAR DEFAULT 'economic_control_v1',
+    -- INF9c: relationship suppression context (JSON)
+    relationship_context VARCHAR              -- {"parent_cik":"...","child_cik":"...","relationship_type":"..."}
 );
 
 CREATE INDEX IF NOT EXISTS idx_eop_valid ON entity_overrides_persistent(still_valid);

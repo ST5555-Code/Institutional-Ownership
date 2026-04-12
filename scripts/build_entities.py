@@ -712,14 +712,22 @@ def step7_compute_rollups(con):
 def replay_persistent_overrides(con):
     """
     Replay all still_valid=TRUE overrides from entity_overrides_persistent
-    after a --reset rebuild. Resolves entity_id from CIK at replay time
-    (since entity_ids change across rebuilds).
+    after a --reset rebuild. Resolves entity_id from identifier at replay
+    time (since entity_ids change across rebuilds).
 
-    Supported actions: reclassify, alias_add, merge.
+    Supported actions:
+      reclassify          — close + insert classification row
+      alias_add           — insert brand alias
+      merge               — insert parent relationship + rollup (reads rollup_type)
+      set_activist        — flip is_activist flag on current classification (INF9a)
+      suppress_relationship — close a bad relationship edge (INF9c)
     """
     try:
         overrides = con.execute("""
-            SELECT override_id, entity_cik, action, field, old_value, new_value, reason, analyst
+            SELECT override_id, entity_cik, action, field, old_value, new_value,
+                   reason, analyst,
+                   identifier_type, identifier_value,
+                   rollup_type, relationship_context
             FROM entity_overrides_persistent
             WHERE still_valid = TRUE
             ORDER BY override_id
@@ -736,15 +744,42 @@ def replay_persistent_overrides(con):
     applied = 0
     skipped = 0
 
-    for oid, cik, action, field, _old, new_val, reason, analyst in overrides:
-        # Resolve entity_id from CIK (entity_ids change across rebuilds)
-        entity = con.execute("""
-            SELECT entity_id FROM entity_identifiers
-            WHERE identifier_type = 'cik' AND identifier_value = ?
-              AND valid_to = DATE '9999-12-31'
-        """, [cik]).fetchone()
+    for row in overrides:
+        (oid, cik, action, field, _old, new_val, reason, analyst,
+         id_type, id_val, rt, rel_ctx) = row
+
+        # INF9d: resolve entity via (identifier_type, identifier_value),
+        # falling back to entity_cik for backwards compat with old rows.
+        resolve_type = id_type or 'cik'
+        resolve_val = id_val or cik
+
+        if not resolve_val:
+            logger.warning("[step 8] override %d: no identifier value, skipping", oid)
+            skipped += 1
+            continue
+
+        # INF4b: normalize CRD for lookup
+        if resolve_type == 'crd':
+            from entity_sync import _normalize_crd  # noqa: E402  # pylint: disable=import-outside-toplevel
+            lookup_val = _normalize_crd(resolve_val)
+            entity = con.execute("""
+                SELECT entity_id FROM entity_identifiers
+                WHERE identifier_type = 'crd'
+                  AND LTRIM(identifier_value, '0') = LTRIM(?, '0')
+                  AND valid_to = DATE '9999-12-31'
+            """, [lookup_val]).fetchone()
+        else:
+            entity = con.execute("""
+                SELECT entity_id FROM entity_identifiers
+                WHERE identifier_type = ? AND identifier_value = ?
+                  AND valid_to = DATE '9999-12-31'
+            """, [resolve_type, resolve_val]).fetchone()
+
         if not entity:
-            logger.warning("[step 8] override %d: CIK %s not found, skipping", oid, cik)
+            logger.warning(
+                "[step 8] override %d: %s=%s not found, skipping",
+                oid, resolve_type, resolve_val,
+            )
             skipped += 1
             continue
         entity_id = entity[0]
@@ -763,6 +798,17 @@ def replay_persistent_overrides(con):
                             CURRENT_DATE, DATE '9999-12-31')
                 """, [entity_id, new_val])
                 applied += 1
+
+            elif action == "set_activist":
+                # INF9a: flip is_activist on the current classification row
+                is_act = new_val.strip().lower() in ('true', '1', 'yes')
+                con.execute("""
+                    UPDATE entity_classification_history
+                    SET is_activist = ?
+                    WHERE entity_id = ? AND valid_to = DATE '9999-12-31'
+                """, [is_act, entity_id])
+                applied += 1
+
             elif action == "alias_add":
                 con.execute("""
                     INSERT INTO entity_aliases
@@ -773,6 +819,7 @@ def replay_persistent_overrides(con):
                     ON CONFLICT DO NOTHING
                 """, [entity_id, new_val])
                 applied += 1
+
             elif action == "merge":
                 # new_val = parent CIK; resolve to entity_id
                 parent = con.execute("""
@@ -781,28 +828,69 @@ def replay_persistent_overrides(con):
                       AND valid_to = DATE '9999-12-31'
                 """, [new_val]).fetchone()
                 if parent:
-                    import entity_sync  # noqa: E402
+                    import entity_sync  # noqa: E402  # pylint: disable=import-outside-toplevel
                     entity_sync.insert_relationship_idempotent(
                         con, parent[0], entity_id, "parent_brand", "control",
                         True, "exact", "manual_override", is_inferred=False,
                     )
+                    # INF9b: read rollup_type from override row (default EC)
+                    merge_rt = rt or 'economic_control_v1'
                     con.execute("""
                         UPDATE entity_rollup_history SET valid_to = CURRENT_DATE
-                        WHERE entity_id = ? AND rollup_type = 'economic_control_v1'
+                        WHERE entity_id = ? AND rollup_type = ?
                           AND valid_to = DATE '9999-12-31'
-                    """, [entity_id])
+                    """, [entity_id, merge_rt])
                     con.execute("""
                         INSERT INTO entity_rollup_history
                           (entity_id, rollup_entity_id, rollup_type, rule_applied,
                            confidence, valid_from, valid_to)
-                        VALUES (?, ?, 'economic_control_v1', 'manual_override',
+                        VALUES (?, ?, ?, 'manual_override',
                                 'exact', CURRENT_DATE, DATE '9999-12-31')
-                    """, [entity_id, parent[0]])
+                    """, [entity_id, parent[0], merge_rt])
                     applied += 1
                 else:
                     skipped += 1
+
+            elif action == "suppress_relationship":
+                # INF9c: close a bad relationship edge identified by CIK pair + type
+                import json  # pylint: disable=import-outside-toplevel
+                ctx = json.loads(rel_ctx or '{}')
+                p_cik = ctx.get('parent_cik')
+                c_cik = ctx.get('child_cik')
+                r_type = ctx.get('relationship_type')
+                if p_cik and c_cik and r_type:
+                    p_eid = con.execute("""
+                        SELECT entity_id FROM entity_identifiers
+                        WHERE identifier_type='cik' AND identifier_value=?
+                          AND valid_to=DATE '9999-12-31'
+                    """, [p_cik]).fetchone()
+                    c_eid = con.execute("""
+                        SELECT entity_id FROM entity_identifiers
+                        WHERE identifier_type='cik' AND identifier_value=?
+                          AND valid_to=DATE '9999-12-31'
+                    """, [c_cik]).fetchone()
+                    if p_eid and c_eid:
+                        con.execute("""
+                            UPDATE entity_relationships SET valid_to = CURRENT_DATE
+                            WHERE parent_entity_id = ? AND child_entity_id = ?
+                              AND relationship_type = ?
+                              AND valid_to = DATE '9999-12-31'
+                        """, [p_eid[0], c_eid[0], r_type])
+                        applied += 1
+                    else:
+                        logger.warning(
+                            "[step 8] override %d: suppress_relationship parent/child CIK not found",
+                            oid,
+                        )
+                        skipped += 1
+                else:
+                    logger.warning("[step 8] override %d: suppress_relationship missing context", oid)
+                    skipped += 1
+
             else:
+                logger.warning("[step 8] override %d: unknown action '%s'", oid, action)
                 skipped += 1
+
         except Exception as e:
             logger.warning("[step 8] override %d failed: %s", oid, str(e)[:100])
             skipped += 1
