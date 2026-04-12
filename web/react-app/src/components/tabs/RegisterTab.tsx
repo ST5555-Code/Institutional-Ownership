@@ -11,6 +11,7 @@ import {
   ExportBar,
   TableFooter,
   ColumnGroupHeader,
+  getTypeStyle,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -50,14 +51,6 @@ function PctCell({ v }: { v: number | null }) {
 }
 
 // ── Badge styles ───────────────────────────────────────────────────────────
-
-function typeBadgeStyle(type: string | null): React.CSSProperties {
-  const t = (type || '').toLowerCase()
-  if (t === 'passive') return { backgroundColor: '#4A90D9', color: '#ffffff' }
-  if (t === 'active' || t === 'hedge_fund')
-    return { backgroundColor: '#002147', color: '#ffffff' }
-  return { backgroundColor: '#cbd5e1', color: '#1e293b' }
-}
 
 function nportBadgeStyle(cov: number | null): React.CSSProperties | null {
   if (cov == null || cov <= 0) return null
@@ -850,6 +843,7 @@ function renderRow(
     textOverflow: 'ellipsis',
     maxWidth: 0,
   }
+  const ts = getTypeStyle(row.type)
   const nport = nportBadgeStyle(row.nport_cov)
   return (
     <tr
@@ -906,8 +900,8 @@ function renderRow(
         )}
       </td>
       <td style={TD_STYLE}>
-        <span style={{ ...BADGE, ...typeBadgeStyle(row.type) }}>
-          {row.type || 'unknown'}
+        <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>
+          {ts.label}
         </span>
       </td>
       {/* Gap 1: pushes Shares/Value/%Float one Type-width to the right. */}

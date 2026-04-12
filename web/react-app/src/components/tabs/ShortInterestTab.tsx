@@ -86,7 +86,13 @@ export function ShortInterestTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <style>{`@media print { .si-controls { display:none!important } }`}</style>
+      <style>{`
+        @media print {
+          .si-controls { display:none!important }
+          .si-wrap { height:auto!important; max-height:none!important; overflow:visible!important }
+          .si-wrap * { max-height:none!important }
+        }
+      `}</style>
 
       {/* Controls */}
       <div className="si-controls" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
@@ -95,7 +101,7 @@ export function ShortInterestTab() {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
+      <div className="si-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
         {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
         {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
         {data && !loading && (

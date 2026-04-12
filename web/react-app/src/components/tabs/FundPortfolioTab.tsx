@@ -55,7 +55,15 @@ const TOTAL_COLS = 8
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function FundPortfolioTab() {
-  const { ticker } = useAppStore()
+  const { ticker, loadCompany, setActiveTab } = useAppStore()
+
+  function navigateToRegister(nextTicker: string | null) {
+    if (!nextTicker) return
+    const t = nextTicker.toUpperCase()
+    if (t === (ticker || '').toUpperCase()) return
+    loadCompany(t)
+    setActiveTab('register')
+  }
 
   // Selected manager state — cik + fund_name needed for query7
   const [selectedCik, setSelectedCik] = useState<string | null>(null)
@@ -135,7 +143,10 @@ export function FundPortfolioTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <style>{`@media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }`}</style>
+      <style>{`
+        @media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
+        .fp-ticker-link:hover { text-decoration: underline; }
+      `}</style>
 
       {/* Controls bar */}
       <div className="fp-controls" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
@@ -206,10 +217,23 @@ export function FundPortfolioTab() {
                   const rowBg: React.CSSProperties = isSubject
                     ? { backgroundColor: '#fef9c3' }
                     : {}
+                  const canNav = !!p.ticker && !isSubject
                   return (
                     <tr key={p.rank} style={rowBg}>
                       <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{p.rank}</td>
-                      <td style={{ ...TD, fontWeight: isSubject ? 700 : 600, color: 'var(--glacier-blue)' }}>{p.ticker}</td>
+                      <td
+                        style={{
+                          ...TD,
+                          fontWeight: isSubject ? 700 : 600,
+                          color: 'var(--glacier-blue)',
+                          cursor: canNav ? 'pointer' : 'default',
+                        }}
+                        className={canNav ? 'fp-ticker-link' : undefined}
+                        title={canNav ? `Open Register for ${p.ticker}` : undefined}
+                        onClick={canNav ? () => navigateToRegister(p.ticker) : undefined}
+                      >
+                        {p.ticker}
+                      </td>
                       <td style={{ ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0, fontWeight: isSubject ? 600 : 400 }} title={p.issuer_name || ''}>{p.issuer_name || '—'}</td>
                       <td style={{ ...TD, color: '#64748b', fontSize: 12 }}>{p.sector || '—'}</td>
                       <td style={TD_R}>{fmtSharesMm(p.shares)}</td>

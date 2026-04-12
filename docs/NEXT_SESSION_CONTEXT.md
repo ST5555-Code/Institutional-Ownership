@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (Phase 2 complete, HEAD: pending)_
+_Last updated: 2026-04-12 (Phase 3 visual polish complete, HEAD: pending)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -11,15 +11,15 @@ each working session so the top block stays current.
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `efab352`
+- **Branch:** `main` (pending push)
+- **HEAD:** pending (Phase 3 polish commit)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — `web/static/app.js` (~5600 lines)
   - Jinja templates — `web/templates/index.html` + `web/templates/admin.html`
-  - **React full-app (Phase 2 COMPLETE)** — `web/react-app/` (port 5174). All 11 tabs ported: Register, Ownership Trend, Conviction, Fund Portfolio, Flow Analysis, Cross-Ownership, Overlap Analysis, Peer Rotation, Sector Rotation, Entity Graph, Short Interest. See `REACT_MIGRATION.md`. Next: Phase 3 visual polish → Phase 4 cut over.
+  - **React full-app (Phase 3 COMPLETE)** — `web/react-app/` (port 5174). All 11 tabs ported + Phase 3 polish done (badge consolidation, Fund Portfolio → Register cross-nav, print CSS, Playwright scaffold). See `REACT_MIGRATION.md`. Next: Phase 4 cut over (`npm run build` → Flask serves `dist/`).
 
 ---
 
@@ -84,7 +84,12 @@ This is a pipeline operation, NOT a data QC task. Do not run without explicit us
 
 ### 3. React migration — ongoing parallel workstream
 
-**Phase 2 COMPLETE.** All 11 tabs ported. Next: Phase 3 (visual polish, cross-tab navigation, Playwright tests) → Phase 4 (cut over: Flask serves react-app/dist/ instead of templates/). See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
+**Phase 3 COMPLETE** (2026-04-12). RegisterTab badge → shared `getTypeStyle`, Fund Portfolio ticker → Register cross-nav, print CSS gaps closed on ShortInterest/PeerRotation/SectorRotation, Playwright scaffold (`@playwright/test`, config + 11-tab spec, `npm run test:visual` scripts). Baselines not yet captured. One-time setup for next session:
+```bash
+! cd web/react-app && npx playwright install chromium    # ~150MB
+! cd web/react-app && npm run test:visual:update         # captures baselines; Flask must be up on :8001
+```
+**Next: Phase 4 cut over.** `npm run build` → Flask serves `web/react-app/dist/index.html`. One-line change in `scripts/app.py`. Revertable in 30 seconds. Retire `web/react-src/` POC afterward. See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
 
 ### 4. Minor follow-ups
 
@@ -175,6 +180,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+pending Phase 3 visual polish: badge consolidation + cross-nav + print CSS + Playwright
 11d7cce INF9c follow-up: entity_id fallback + backfill 6 rows
 976733a ROADMAP: close INF9d as won't fix + Stage 5 cleanup
 e0ffd4d INF4f: NorthStar CRD merge (eid=6693→7693)
