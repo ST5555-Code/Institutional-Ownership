@@ -200,7 +200,7 @@ function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
   const pctTip = (v: number) => `${(v * 100).toFixed(2)}%`
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
       <MiniChart title="Flow Intensity — Total" data={qoqCharts}
         bars={[{ key: 'flow_intensity_total', name: 'Total', fill: '#002147' }]}
         fmt={pctFmt} tip={pctTip} />
@@ -225,12 +225,12 @@ function MiniChart({ title, data, bars, fmt, tip }: {
   tip: (v: number) => string
 }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', backgroundColor: '#fff' }}>
-      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>{title}</div>
-      <ResponsiveContainer width="100%" height={140}>
-        <BarChart data={data}>
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} width={48} />
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 8px', backgroundColor: '#fff' }}>
+      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600 }}>{title}</div>
+      <ResponsiveContainer width="100%" height={110}>
+        <BarChart data={data} barSize={14}>
+          <XAxis dataKey="label" tick={{ fontSize: 9 }} />
+          <YAxis tick={{ fontSize: 8 }} tickFormatter={fmt} width={40} />
           <Tooltip formatter={tip} />
           {bars.map(b => (
             <Bar key={b.key} dataKey={b.key} name={b.name} fill={b.fill} radius={[2, 2, 0, 0]} />
