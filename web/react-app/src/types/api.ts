@@ -123,6 +123,91 @@ export interface OwnershipTrendResponse {
   summary: OwnershipTrendSummary
 }
 
+// ── Holder Momentum — /api/holder_momentum?ticker=EQT ─────────────────────
+// Returns a flat array (not wrapped in a dict). Accepts level, active_only,
+// rollup_type. Parent rows (level=0) carry is_parent, child_count, rank.
+// Child rows (level=1) lack rank. Both carry dynamic quarter keys (e.g.
+// '2025Q1') with share counts as number | null.
+
+export interface HolderMomentumRow {
+  institution: string
+  type: string | null
+  level: number
+  is_parent: boolean
+  child_count: number
+  rank?: number
+  change: number | null
+  change_pct: number | null
+  // Dynamic quarter keys accessed via bracket notation:
+  //   (row as Record<string, unknown>)['2025Q1'] as number | null
+  // Using index signature here is intentional — the quarter columns are
+  // dynamic and change with each filing cycle.
+  [quarter: string]: string | number | boolean | null | undefined
+}
+
+// ── Cohort Analysis — /api/cohort_analysis?ticker=EQT&from=2025Q3 ────────
+// Returns { detail: CohortDetailRow[], summary: CohortSummary }.
+// Accepts ticker, from (quarter), level, active_only, rollup_type.
+// Detail rows represent cohort categories (Retained, Increased, Decreased,
+// Unchanged, New Entries, Exits, Total) with optional nested children (top 5
+// investors per category, level=2).
+
+export interface CohortDetailChild {
+  category: string
+  level: number
+  holders: number
+  shares: number
+  value: number
+  avg_position: number
+  pct_float_moved: number
+  delta_shares: number | null
+  delta_value: number | null
+}
+
+export interface CohortDetailRow {
+  category: string
+  level: number
+  holders: number
+  shares: number
+  value: number
+  avg_position: number
+  pct_float_moved: number
+  delta_shares: number | null
+  delta_value: number | null
+  has_children?: boolean
+  is_parent?: boolean
+  is_total?: boolean
+  children?: CohortDetailChild[]
+}
+
+export interface CohortRetentionTrend {
+  from: string
+  to: string
+  econ_retention: number
+  active_holders_from: number
+  active_holders_to: number
+}
+
+export interface CohortSummary {
+  retention_rate: number
+  econ_retention: number
+  net_holders: number
+  net_shares: number
+  net_value: number
+  from_quarter: string
+  to_quarter: string
+  active_only: boolean
+  level: string
+  // Counts of top-10 holders by cohort: {increased: 6, decreased: 4, ...}
+  top10: Record<string, number>
+  econ_retention_trend: CohortRetentionTrend[]
+}
+
+export interface CohortAnalysisResponse {
+  detail: CohortDetailRow[]
+  summary: CohortSummary
+}
+
 // ── Conviction — /api/portfolio_context?ticker=EQT ────────────────────────
 // NOTE: No /api/conviction route. Real route is /api/portfolio_context.
 // Quarter is implicit (uses server-side LATEST_QUARTER). Accepts level= and
