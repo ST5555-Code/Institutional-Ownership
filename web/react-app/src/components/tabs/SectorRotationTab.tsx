@@ -89,6 +89,7 @@ export function SectorRotationTab() {
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
   const [activeOnly, setActiveOnly] = useState(false)
   const [selectedSector, setSelectedSector] = useState<string | null>(null)
+  const [periodCount, setPeriodCount] = useState<1 | 2 | 3>(3)
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
@@ -97,8 +98,12 @@ export function SectorRotationTab() {
   const url = `/api/sector_flows?active_only=${ao}&level=${level}`
   const { data, loading, error } = useFetch<SectorFlowsResponse>(url)
 
-  // Movers fetch — on sector row click, for the latest period
-  const latestPeriod = data?.periods[data.periods.length - 1]
+  // Filter periods based on period selector (last N)
+  const allPeriods = data?.periods ?? []
+  const periods = allPeriods.slice(-periodCount)
+
+  // Movers fetch — on sector row click, for the selected period range's latest
+  const latestPeriod = periods[periods.length - 1] ?? null
   const moversUrl = selectedSector && latestPeriod
     ? `/api/sector_flow_movers?from=${enc(latestPeriod.from)}&to=${enc(latestPeriod.to)}&sector=${enc(selectedSector)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
     : null
@@ -110,7 +115,7 @@ export function SectorRotationTab() {
     return [...data.sectors].sort((a, b) => b.latest_net - a.latest_net)
   }, [data])
 
-  const periods = data?.periods ?? []
+  // periods already computed above from allPeriods.slice(-periodCount)
 
   // Chart data — latest period net per sector
   const chartData = useMemo(() => {
@@ -165,6 +170,21 @@ export function SectorRotationTab() {
 
       {/* Controls */}
       <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        {/* Period selector */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
+            <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
+              style={{
+                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                fontWeight: periodCount === p.n ? 600 : 400,
+                color: periodCount === p.n ? '#fff' : '#64748b',
+                backgroundColor: periodCount === p.n ? 'var(--oxford-blue)' : '#fff',
+                border: `1px solid ${periodCount === p.n ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+              }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
         <div style={{ marginLeft: 'auto' }}>
