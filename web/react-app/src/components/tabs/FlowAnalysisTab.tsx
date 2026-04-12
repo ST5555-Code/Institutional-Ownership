@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
-import type { FlowAnalysisResponse, FlowRow, FlowChartTickerRow } from '../../types/api'
+import type { FlowAnalysisResponse, FlowRow, QoqChartRow } from '../../types/api'
 import {
   RollupToggle,
   FundViewToggle,
@@ -10,7 +10,7 @@ import {
   getTypeStyle,
 } from '../common'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
 
@@ -73,13 +73,10 @@ const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 
 
 type Period = '1Q' | '2Q' | '4Q'
 const PERIODS: { id: Period; label: string }[] = [
-  { id: '1Q', label: '1Q (QoQ)' },
-  { id: '2Q', label: '2Q' },
-  { id: '4Q', label: 'Full Year' },
+  { id: '1Q', label: 'Last Quarter' },
+  { id: '2Q', label: 'Last 2 Quarters' },
+  { id: '4Q', label: 'Last 3 Quarters' },
 ]
-
-// suppress unused import warning — FlowChartTickerRow is used in ChartsRow props
-void (0 as unknown as FlowChartTickerRow)
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -89,13 +86,11 @@ export function FlowAnalysisTab() {
   const [period, setPeriod] = useState<Period>('1Q')
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
   const [activeOnly, setActiveOnly] = useState(false)
-  const [peers, setPeers] = useState('')
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
-  const peersParam = peers.trim() ? `&peers=${enc(peers.trim().toUpperCase())}` : ''
 
   const url = ticker
-    ? `/api/flow_analysis?ticker=${enc(ticker)}&period=${period}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}${peersParam}`
+    ? `/api/flow_analysis?ticker=${enc(ticker)}&period=${period}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
     : null
   const { data, loading, error } = useFetch<FlowAnalysisResponse>(url)
 
@@ -162,14 +157,6 @@ export function FlowAnalysisTab() {
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Peers</span>
-          <input type="text" value={peers} placeholder="Add peer tickers (e.g. AR, CNX)…"
-            autoComplete="off" autoCorrect="off" spellCheck={false}
-            onChange={e => setPeers(e.target.value)}
-            style={{ width: 200, padding: '5px 8px', fontSize: 12, color: '#1e293b', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, outline: 'none' }}
-          />
-        </div>
         <div style={{ marginLeft: 'auto' }}>
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
@@ -185,8 +172,8 @@ export function FlowAnalysisTab() {
               {data.quarter_from} → {data.quarter_to}
             </div>
 
-            {/* Charts */}
-            <ChartsRow charts={data.charts} />
+            {/* 4 QoQ trend charts in 2×2 grid */}
+            <ChartsRow qoqCharts={data.qoq_charts} />
 
             {/* Four sections 2×2 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -202,44 +189,54 @@ export function FlowAnalysisTab() {
   )
 }
 
-// ── Charts ──────────────────────────────────────────────────────────────────
+// ── Charts — 4 QoQ trend charts in a 2×2 grid ─────────────────────────────
 
-function ChartsRow({ charts }: { charts: FlowAnalysisResponse['charts'] }) {
-  const fiData = charts.flow_intensity
-  const churnData = charts.churn
-
-  if (!fiData.length && !churnData.length) {
+function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
+  if (!qoqCharts || qoqCharts.length === 0) {
     return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13 }}>No chart data available</div>
   }
 
+  const pctFmt = (v: number) => `${(v * 100).toFixed(1)}%`
+  const pctTip = (v: number) => `${(v * 100).toFixed(2)}%`
+
   return (
-    <div style={{ display: 'flex', gap: 16, height: 200 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Flow Intensity</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={fiData}>
-            <XAxis dataKey="ticker" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`} />
-            <Tooltip formatter={(v: number) => `${(v * 100).toFixed(2)}%`} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="flow_intensity_active" name="Active" fill="#002147" />
-            <Bar dataKey="flow_intensity_passive" name="Passive" fill="#4A90D9" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Active Churn</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={churnData}>
-            <XAxis dataKey="ticker" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`} />
-            <Tooltip formatter={(v: number) => `${(v * 100).toFixed(2)}%`} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="churn_nonpassive" name="Non-Passive" fill="#002147" />
-            <Bar dataKey="churn_active" name="Active" fill="#f5a623" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <MiniChart title="Flow Intensity — Total" data={qoqCharts}
+        bars={[{ key: 'flow_intensity_total', name: 'Total', fill: '#002147' }]}
+        fmt={pctFmt} tip={pctTip} />
+      <MiniChart title="Flow Intensity — Active Only" data={qoqCharts}
+        bars={[{ key: 'flow_intensity_active', name: 'Active', fill: '#4A90D9' }]}
+        fmt={pctFmt} tip={pctTip} />
+      <MiniChart title="Churn — Non-Passive" data={qoqCharts}
+        bars={[{ key: 'churn_nonpassive', name: 'Non-Passive', fill: '#002147' }]}
+        fmt={pctFmt} tip={pctTip} />
+      <MiniChart title="Churn — Active" data={qoqCharts}
+        bars={[{ key: 'churn_active', name: 'Active', fill: '#f5a623' }]}
+        fmt={pctFmt} tip={pctTip} />
+    </div>
+  )
+}
+
+function MiniChart({ title, data, bars, fmt, tip }: {
+  title: string
+  data: QoqChartRow[]
+  bars: Array<{ key: string; name: string; fill: string }>
+  fmt: (v: number) => string
+  tip: (v: number) => string
+}) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', backgroundColor: '#fff' }}>
+      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>{title}</div>
+      <ResponsiveContainer width="100%" height={140}>
+        <BarChart data={data}>
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} width={48} />
+          <Tooltip formatter={tip} />
+          {bars.map(b => (
+            <Bar key={b.key} dataKey={b.key} name={b.name} fill={b.fill} radius={[2, 2, 0, 0]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
