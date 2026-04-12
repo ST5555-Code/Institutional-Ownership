@@ -3128,8 +3128,18 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 r['net_value'] = (r.get('to_value') or 0) - (r.get('from_value') or 0)
                 ts = r.get('to_shares') or 0
                 fs = r.get('from_shares') or 0
-                ref_shares = ts if ts > 0 else fs
-                r['pct_float'] = round(ref_shares / flt * 100, 3) if flt and ref_shares else None
+                ns = abs(r.get('net_shares') or 0)
+                # pct_float = the relevant change as % of float:
+                #   buyers/sellers: net change / float (how much they added/reduced)
+                #   new entries: to_shares / float (entire new position)
+                #   exits: from_shares / float (entire prior position)
+                if r.get('is_new_entry'):
+                    change_shares = ts
+                elif r.get('is_exit'):
+                    change_shares = fs
+                else:
+                    change_shares = ns
+                r['pct_float'] = round(change_shares / flt * 100, 3) if flt and change_shares else None
             buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
                       and (r.get('net_shares') or 0) > 0][:25]
             sellers = sorted([r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')

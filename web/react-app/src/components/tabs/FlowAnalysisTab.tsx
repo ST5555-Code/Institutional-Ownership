@@ -326,7 +326,7 @@ function FlowSection({ title, rows, type }: SectionProps) {
                   <th style={TH_R}>Net</th>
                   <th style={TH_R}>Net $</th>
                   <th style={TH_R}>% Chg</th>
-                  <th style={TH_R}>% Flt</th>
+                  <th style={TH_R}>Δ% Flt</th>
                   <th style={TH}>Sig</th>
                 </>
               ) : type === 'new_entries' ? (
