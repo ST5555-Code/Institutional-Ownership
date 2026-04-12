@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
 import type { CrossOwnershipResponse } from '../../types/api'
@@ -25,7 +25,7 @@ function fmtPct2(v: number | null): string {
   return `${NUM_2.format(v)}%`
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+// ── Styles (Register-consistent first 3 columns) ──────────────────────────
 
 const TH: React.CSSProperties = {
   padding: '9px 10px', fontSize: 11, fontWeight: 700,
@@ -48,152 +48,211 @@ const BADGE: React.CSSProperties = {
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
-// ── View type ──────────────────────────────────────────────────────────────
+// Overlap row: investor holds ALL tickers in the group with non-null values.
+const OVERLAP_BG = '#eff6ff'
 
 type ViewMode = 'anchor' | 'top'
 
-// ── Ticker pill tag input ────────────────────────────────────────────��─────
+// ── Module-level state persistence across tab switches ─────────────────────
+// React unmounts the component when switching tabs. We save key state here
+// so it survives the round-trip and the user's selections are still there
+// when they return.
 
-interface TickerInputProps {
-  tickers: string[]
-  onChange: (tickers: string[]) => void
-  maxTickers?: number
+let _persisted: {
+  additionalTickers: string[]
+  viewMode: ViewMode
+  anchor: string
+  activeOnly: boolean
+  peerGroupId: string
+} | null = null
+
+// ── Peer groups ────────────────────────────────────────────────────────────
+
+interface PeerGroupTicker { ticker: string; company_name: string; is_primary: boolean }
+interface PeerGroup { group_id: string; group_name: string; tickers: PeerGroupTicker[] }
+
+// ── Individual ticker search input with dropdown ───────────────────────────
+
+interface TickerSlotProps {
+  value: string
+  onChange: (ticker: string) => void
+  onClear: () => void
+  placeholder?: string
 }
 
-function TickerTagInput({ tickers, onChange, maxTickers = 10 }: TickerInputProps) {
-  const [inputValue, setInputValue] = useState('')
-  const [flash, setFlash] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }: TickerSlotProps) {
+  const [input, setInput] = useState('')
+  const [options, setOptions] = useState<Array<{ ticker: string; name: string }>>([])
+  const [allTickers, setAllTickers] = useState<Array<{ ticker: string; name: string }>>([])
+  const [open, setOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
-  // Load the allTickers list on mount for validation
-  const [allTickers, setAllTickers] = useState<Set<string>>(new Set())
   useEffect(() => {
-    fetch('/api/tickers')
-      .then(r => r.json())
-      .then((list: Array<{ ticker: string }>) => {
-        setAllTickers(new Set(list.map(t => t.ticker)))
-      })
-      .catch(() => {})
+    fetch('/api/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
   }, [])
 
-  const addTicker = useCallback((raw: string) => {
-    const t = raw.trim().toUpperCase()
-    if (!t) return
-    if (tickers.includes(t)) return
-    if (tickers.length >= maxTickers) return
-    if (allTickers.size > 0 && !allTickers.has(t)) {
-      setFlash(true)
-      setTimeout(() => setFlash(false), 400)
-      return
-    }
-    onChange([...tickers, t])
-    setInputValue('')
-  }, [tickers, onChange, maxTickers, allTickers])
+  useEffect(() => {
+    if (input.length < 1) { setOptions([]); setOpen(false); return }
+    const q = input.toUpperCase()
+    setOptions(
+      allTickers.filter(t => t.ticker.startsWith(q) || t.name?.toUpperCase().includes(q)).slice(0, 8),
+    )
+    setOpen(true)
+  }, [input, allTickers])
 
-  function removeTicker(t: string) {
-    onChange(tickers.filter(x => x !== t))
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  function select(ticker: string) {
+    setInput('')
+    setOpen(false)
+    onChange(ticker)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTicker(inputValue)
-    } else if (e.key === 'Backspace' && !inputValue && tickers.length > 0) {
-      onChange(tickers.slice(0, -1))
-    }
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value
-    if (v.includes(',') || v.includes(' ')) {
-      const parts = v.split(/[, ]+/)
-      for (const p of parts) addTicker(p)
-      setInputValue('')
-    } else {
-      setInputValue(v)
-    }
+  // If a value is set, render as a pill
+  if (value) {
+    return (
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '4px 8px', fontSize: 12, fontWeight: 600,
+        backgroundColor: 'var(--glacier-blue)', color: '#fff',
+        borderRadius: 4, minWidth: 70,
+      }}>
+        {value}
+        <button type="button" onClick={onClear}
+          style={{ backgroundColor: 'transparent', border: 'none', color: '#fff',
+            cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
+      </div>
+    )
   }
 
   return (
-    <div
-      onClick={() => inputRef.current?.focus()}
-      style={{
-        display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center',
-        minWidth: 240, padding: '4px 8px',
-        backgroundColor: '#ffffff', border: `1px solid ${flash ? '#ef4444' : '#e2e8f0'}`,
-        borderRadius: 4, cursor: 'text', transition: 'border-color 0.2s',
-      }}
-    >
-      {tickers.map(t => (
-        <span key={t} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 3,
-          padding: '2px 6px', fontSize: 12, fontWeight: 600,
-          backgroundColor: 'var(--glacier-blue)', color: '#fff',
-          borderRadius: 3,
-        }}>
-          {t}
-          <button type="button" onClick={(e) => { e.stopPropagation(); removeTicker(t) }}
-            style={{ backgroundColor: 'transparent', border: 'none', color: '#fff',
-              cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1 }}>
-            ×
-          </button>
-        </span>
-      ))}
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputValue}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={tickers.length === 0 ? 'Add tickers…' : ''}
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <input type="text" value={input} placeholder={placeholder}
         autoComplete="off" autoCorrect="off" spellCheck={false}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && input.trim()) {
+            const t = input.trim().toUpperCase()
+            if (allTickers.some(x => x.ticker === t)) select(t)
+          }
+        }}
+        onFocus={() => { setFocused(true); if (input.length > 0) setOpen(true) }}
+        onBlur={() => setFocused(false)}
         style={{
-          flex: 1, minWidth: 60, padding: '4px 0', fontSize: 13,
-          border: 'none', outline: 'none', backgroundColor: 'transparent',
-          color: '#1e293b',
+          width: 120, padding: '5px 8px', fontSize: 12, color: '#1e293b',
+          backgroundColor: '#fff', borderRadius: 4, outline: 'none',
+          border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`,
+          transition: 'border-color 0.1s',
         }}
       />
+      {open && options.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 2,
+          width: 220, maxHeight: 200, overflowY: 'auto',
+          backgroundColor: '#fff', border: '1px solid #e2e8f0',
+          borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000,
+        }}>
+          {options.map(o => (
+            <div key={o.ticker} onMouseDown={() => select(o.ticker)}
+              style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f4f6f9')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+              <span style={{ color: 'var(--accent-gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
+              <span style={{ color: '#94a3b8', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
+const MAX_ADDITIONAL = 9 // header ticker + 9 additional = 10 max
+
 export function CrossOwnershipTab() {
   const { ticker, rollupType } = useAppStore()
 
-  const [viewMode, setViewMode] = useState<ViewMode>('anchor')
-  const [groupTickers, setGroupTickers] = useState<string[]>([])
-  const [anchor, setAnchor] = useState<string>('')
-  const [activeOnly, setActiveOnly] = useState(false)
+  // Restore persisted state or use defaults
+  const [additionalTickers, setAdditionalTickers] = useState<string[]>(_persisted?.additionalTickers ?? [])
+  const [viewMode, setViewMode] = useState<ViewMode>(_persisted?.viewMode ?? 'anchor')
+  const [anchor, setAnchor] = useState<string>(_persisted?.anchor ?? '')
+  const [activeOnly, setActiveOnly] = useState(_persisted?.activeOnly ?? false)
+  const [selectedPeerGroup, setSelectedPeerGroup] = useState(_persisted?.peerGroupId ?? '')
 
-  // Pre-populate with header ticker on tab activation / ticker change
+  // Persist state on unmount
   useEffect(() => {
-    if (ticker) {
-      const upper = ticker.toUpperCase()
-      setGroupTickers(prev => {
-        if (prev.length === 0 || (prev.length === 1 && prev[0] !== upper)) return [upper]
-        return prev
-      })
-      setAnchor(upper)
+    return () => {
+      _persisted = {
+        additionalTickers,
+        viewMode,
+        anchor,
+        activeOnly,
+        peerGroupId: selectedPeerGroup,
+      }
     }
-  }, [ticker])
+  })
 
-  // Build fetch URL
+  // Peer groups
+  const peerGroupsUrl = '/api/peer_groups'
+  const peerGroups = useFetch<PeerGroup[]>(peerGroupsUrl)
+
+  // When peer group selected, populate additional tickers from group
+  useEffect(() => {
+    if (!selectedPeerGroup || !peerGroups.data) return
+    const group = peerGroups.data.find(g => g.group_id === selectedPeerGroup)
+    if (!group) return
+    const headerUpper = (ticker || '').toUpperCase()
+    const others = group.tickers
+      .map(t => t.ticker)
+      .filter(t => t !== headerUpper)
+      .slice(0, MAX_ADDITIONAL)
+    setAdditionalTickers(others)
+  }, [selectedPeerGroup, peerGroups.data, ticker])
+
+  // Set anchor to header ticker on load
+  useEffect(() => {
+    if (ticker && !anchor) setAnchor(ticker.toUpperCase())
+  }, [ticker, anchor])
+
+  // Build full ticker list: header ticker + additionals (deduped)
+  const headerTicker = (ticker || '').toUpperCase()
+  const groupTickers = useMemo(() => {
+    const set = new Set<string>()
+    if (headerTicker) set.add(headerTicker)
+    for (const t of additionalTickers) if (t) set.add(t)
+    return Array.from(set)
+  }, [headerTicker, additionalTickers])
+
+  // All tickers in the anchor selector
+  const anchorOptions = groupTickers
+
+  // Fetch URL
   const tickersStr = groupTickers.join(',')
   const url = useMemo(() => {
     if (!tickersStr) return null
-    const base = viewMode === 'anchor'
-      ? `/api/cross_ownership?tickers=${enc(tickersStr)}&anchor=${enc(anchor || groupTickers[0] || '')}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
-      : `/api/cross_ownership_top?tickers=${enc(tickersStr)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
-    return base
+    if (viewMode === 'anchor') {
+      const a = anchor && groupTickers.includes(anchor) ? anchor : groupTickers[0] || ''
+      return `/api/cross_ownership?tickers=${enc(tickersStr)}&anchor=${enc(a)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
+    }
+    return `/api/cross_ownership_top?tickers=${enc(tickersStr)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
   }, [tickersStr, viewMode, anchor, activeOnly, rollupType, groupTickers])
 
   const { data, loading, error } = useFetch<CrossOwnershipResponse>(url)
 
-  // Dynamic ticker columns from response
   const dataTickers = data?.tickers ?? []
   const totalCols = 5 + dataTickers.length
+
+  // Overlap detection: investor holds ALL group tickers with non-null value
+  function isOverlap(holdings: Record<string, number | null>): boolean {
+    return dataTickers.every(t => holdings[t] != null)
+  }
 
   // Footer sums
   const footerSums = useMemo(() => {
@@ -203,9 +262,7 @@ export function CrossOwnershipTab() {
     for (const t of dataTickers) perTicker[t] = 0
     for (const inv of data.investors) {
       totalAcross += inv.total_across || 0
-      for (const t of dataTickers) {
-        perTicker[t] += inv.holdings[t] || 0
-      }
+      for (const t of dataTickers) perTicker[t] += inv.holdings[t] || 0
     }
     return { totalAcross, perTicker }
   }, [data, dataTickers])
@@ -216,17 +273,31 @@ export function CrossOwnershipTab() {
     const h = ['Rank', 'Institution', 'Type', 'Total ($MM)', '% Portfolio',
       ...dataTickers.map(t => `${t} ($MM)`)]
     const csv = [h, ...data.investors.map((inv, i) => [
-      i + 1,
-      `"${inv.investor.replace(/"/g, '""')}"`,
-      inv.type || '',
+      i + 1, `"${inv.investor.replace(/"/g, '""')}"`, inv.type || '',
       inv.total_across != null ? (inv.total_across / 1e6).toFixed(0) : '',
       inv.pct_of_portfolio != null ? inv.pct_of_portfolio.toFixed(2) : '',
-      ...dataTickers.map(t => {
-        const v = inv.holdings[t]
-        return v != null ? (v / 1e6).toFixed(0) : ''
-      }),
+      ...dataTickers.map(t => { const v = inv.holdings[t]; return v != null ? (v / 1e6).toFixed(0) : '' }),
     ])].map(r => r.join(',')).join('\n')
     downloadCsv(csv, `cross_ownership_${groupTickers.join('_')}.csv`)
+  }
+
+  // Additional ticker slot handlers
+  function setSlot(index: number, ticker: string) {
+    setAdditionalTickers(prev => {
+      const next = [...prev]
+      next[index] = ticker
+      return next
+    })
+    setSelectedPeerGroup('') // clear peer group on manual edit
+  }
+  function clearSlot(index: number) {
+    setAdditionalTickers(prev => prev.filter((_, i) => i !== index))
+    setSelectedPeerGroup('')
+  }
+  function addSlot() {
+    if (additionalTickers.length < MAX_ADDITIONAL) {
+      setAdditionalTickers(prev => [...prev, ''])
+    }
   }
 
   if (!ticker) {
@@ -255,14 +326,60 @@ export function CrossOwnershipTab() {
           ))}
         </div>
 
-        {/* Ticker group */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tickers (max 10)</span>
-          <TickerTagInput tickers={groupTickers} onChange={setGroupTickers} />
+        {/* Ticker slots */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tickers</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Header ticker — locked */}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', padding: '4px 8px',
+              fontSize: 12, fontWeight: 700, backgroundColor: 'var(--oxford-blue)',
+              color: '#fff', borderRadius: 4,
+            }}>
+              {headerTicker}
+            </span>
+            {/* Additional slots */}
+            {additionalTickers.map((t, i) => (
+              <TickerSlot key={i} value={t}
+                onChange={v => setSlot(i, v)}
+                onClear={() => clearSlot(i)}
+              />
+            ))}
+            {additionalTickers.length < MAX_ADDITIONAL && (
+              <button type="button" onClick={addSlot}
+                style={{
+                  padding: '4px 10px', fontSize: 12, color: '#64748b',
+                  backgroundColor: '#fff', border: '1px dashed #cbd5e1',
+                  borderRadius: 4, cursor: 'pointer',
+                }}>
+                + Add
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Peer group selector */}
+        {peerGroups.data && peerGroups.data.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Peer Group</span>
+            <select
+              value={selectedPeerGroup}
+              onChange={e => setSelectedPeerGroup(e.target.value)}
+              style={{
+                padding: '5px 10px', fontSize: 12, color: '#1e293b',
+                backgroundColor: '#fff', border: '1px solid #e2e8f0',
+                borderRadius: 4, outline: 'none',
+              }}>
+              <option value="">— Select group —</option>
+              {peerGroups.data.map(g => (
+                <option key={g.group_id} value={g.group_id}>{g.group_name} ({g.tickers.length})</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Anchor selector — only in anchor view */}
-        {viewMode === 'anchor' && groupTickers.length > 0 && (
+        {viewMode === 'anchor' && anchorOptions.length > 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Anchor</span>
             <select
@@ -273,7 +390,7 @@ export function CrossOwnershipTab() {
                 backgroundColor: '#fff', border: '1px solid #e2e8f0',
                 borderRadius: 4, outline: 'none',
               }}>
-              {groupTickers.map(t => <option key={t} value={t}>{t}</option>)}
+              {anchorOptions.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
         )}
@@ -289,16 +406,16 @@ export function CrossOwnershipTab() {
       <div className="co-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
         {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
         {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
-        {!loading && !data && !error && groupTickers.length === 0 && (
-          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Add tickers above to load cross-ownership data</div>
+        {!loading && !data && !error && groupTickers.length <= 1 && (
+          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Add comparison tickers or select a peer group</div>
         )}
         {data && !loading && (
           <div style={{ padding: 16 }}>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 13 }}>
               <colgroup>
-                <col style={{ width: 60 }} />   {/* Rank */}
-                <col style={{ width: 440 }} />  {/* Institution */}
-                <col style={{ width: 120 }} />  {/* Type */}
+                <col style={{ width: 60 }} />   {/* Rank — Register consistent */}
+                <col style={{ width: 440 }} />  {/* Institution — Register consistent */}
+                <col style={{ width: 120 }} />  {/* Type — Register consistent */}
                 <col style={{ width: 90 }} />   {/* Total */}
                 <col style={{ width: 80 }} />   {/* % Portfolio */}
                 {dataTickers.map(t => <col key={t} style={{ width: 80 }} />)}
@@ -315,19 +432,23 @@ export function CrossOwnershipTab() {
                   <th style={TH}>Type</th>
                   <th style={TH_R}>Total ($MM)</th>
                   <th style={TH_R}>% Portfolio</th>
-                  {dataTickers.map(t => (
-                    <th key={t} style={TH_R}>{t}</th>
-                  ))}
+                  {dataTickers.map(t => <th key={t} style={TH_R}>{t}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {data.investors.map((inv, i) => {
                   const ts = getTypeStyle(inv.type)
-                  const headerTicker = ticker?.toUpperCase() || ''
+                  const overlap = dataTickers.length > 1 && isOverlap(inv.holdings)
+                  const rowBg = overlap ? OVERLAP_BG : undefined
+                  const effectiveAnchor = anchor && groupTickers.includes(anchor) ? anchor : groupTickers[0]
                   return (
-                    <tr key={inv.investor}>
+                    <tr key={inv.investor} style={{ backgroundColor: rowBg }}>
                       <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{i + 1}</td>
-                      <td style={{ ...TD, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={inv.investor}>
+                      <td style={{
+                        ...TD, fontWeight: 600, whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
+                      }} title={inv.investor}>
+                        {/* Caret slot (14px) for Register alignment consistency */}
                         <span style={{ display: 'inline-block', width: 14 }} />
                         {inv.investor}
                       </td>
@@ -338,12 +459,12 @@ export function CrossOwnershipTab() {
                       <td style={TD_R}>{fmtPct2(inv.pct_of_portfolio)}</td>
                       {dataTickers.map(t => {
                         const v = inv.holdings[t]
-                        const isAnchor = viewMode === 'anchor' && t === (anchor || groupTickers[0])
+                        const isAnchorCol = viewMode === 'anchor' && t === effectiveAnchor
                         const isSubject = t === headerTicker
                         return (
                           <td key={t} style={{
                             ...TD_R,
-                            backgroundColor: isAnchor ? '#eff6ff' : undefined,
+                            backgroundColor: isAnchorCol && !overlap ? '#e0f2fe' : undefined,
                             fontWeight: isSubject ? 700 : undefined,
                             color: v == null ? '#cbd5e1' : undefined,
                           }}>
@@ -361,18 +482,13 @@ export function CrossOwnershipTab() {
               {footerSums && (
                 <tfoot>
                   <tr>
-                    {/* Use manual footer instead of TableFooter since column
-                        structure is dynamic and doesn't match TableFooter's
-                        fixed named-column layout. */}
-                    <FooterCell bottomPx={0} />
-                    <FooterCell bottomPx={0}>Total</FooterCell>
-                    <FooterCell bottomPx={0} />
-                    <FooterCell bottomPx={0} align="right">{fmtValueMm(footerSums.totalAcross)}</FooterCell>
-                    <FooterCell bottomPx={0} />
+                    <FooterCell />
+                    <FooterCell>Total</FooterCell>
+                    <FooterCell />
+                    <FooterCell align="right">{fmtValueMm(footerSums.totalAcross)}</FooterCell>
+                    <FooterCell />
                     {dataTickers.map(t => (
-                      <FooterCell key={t} bottomPx={0} align="right">
-                        {fmtValueMm(footerSums.perTicker[t] || 0)}
-                      </FooterCell>
+                      <FooterCell key={t} align="right">{fmtValueMm(footerSums.perTicker[t] || 0)}</FooterCell>
                     ))}
                   </tr>
                 </tfoot>
@@ -386,20 +502,15 @@ export function CrossOwnershipTab() {
 }
 
 // ── Footer cell ─────────────────────────────────────────────────────────────
-// Inline tfoot cell matching the TableFooter style. Used instead of the
-// shared TableFooter because the column count is dynamic and doesn't fit
-// the fixed named-column layout.
 
-function FooterCell({ children, bottomPx = 0, align = 'left' }: {
-  children?: React.ReactNode
-  bottomPx?: number
-  align?: 'left' | 'right'
+function FooterCell({ children, align = 'left' }: {
+  children?: React.ReactNode; align?: 'left' | 'right'
 }) {
   return (
     <td style={{
       padding: '7px 10px', fontSize: 13, fontWeight: 600,
       color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-      position: 'sticky', bottom: bottomPx, zIndex: 2,
+      position: 'sticky', bottom: 0, zIndex: 2,
       borderTop: '2px solid var(--oxford-blue)',
       textAlign: align, fontVariantNumeric: align === 'right' ? 'tabular-nums' : undefined,
     }}>
