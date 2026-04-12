@@ -371,7 +371,7 @@ function PanelTable({
         <div style={{ display: 'flex', gap: 16, padding: '10px 12px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0 }}>
           <Tile label="Top 25 overlap" value={String(top25Overlap)} />
           <Tile label="Top 50 overlap" value={String(top50Overlap)} />
-          <Tile label="Overlap %" value={`${overlapPct.toFixed(1)}%`} />
+          <Tile label="Overlap %" value={`${overlapPct.toFixed(2)}%`} />
         </div>
       )}
     </div>

@@ -249,7 +249,7 @@ function StatsCard({ stats }: { stats: FundPortfolioResponse['stats'] }) {
       </div>
       <MetricTile label="Total Value" value={fmtValueMm(stats.total_value)} />
       <MetricTile label="Positions" value={String(stats.num_positions)} />
-      <MetricTile label="Top 10 Conc." value={`${stats.top10_concentration_pct.toFixed(1)}%`} />
+      <MetricTile label="Top 10 Conc." value={`${stats.top10_concentration_pct.toFixed(2)}%`} />
     </div>
   )
 }

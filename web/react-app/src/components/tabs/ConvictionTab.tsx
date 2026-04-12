@@ -17,15 +17,16 @@ import {
 
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
+const NUM_2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 
 function fmtValueMm(v: number | null): string {
   if (v == null) return '—'
   return `$${NUM_0.format(v / 1e6)}`
 }
 
-function fmtPct1(v: number | null): string {
+function fmtPct2(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_1.format(v)}%`
+  return `${NUM_2.format(v)}%`
 }
 
 function fmtInt(v: number | null): string {
@@ -236,8 +237,8 @@ export function ConvictionTab() {
     const csv = [h, ...rows.map(r => [
       r.rank ?? '', `"${(r.institution || '').replace(/"/g, '""')}"`, r.type || '',
       r.value != null ? (r.value / 1e6).toFixed(0) : '',
-      r.subject_sector_pct != null ? r.subject_sector_pct.toFixed(1) : '',
-      r.vs_spx != null ? r.vs_spx.toFixed(1) : '',
+      r.subject_sector_pct != null ? r.subject_sector_pct.toFixed(2) : '',
+      r.vs_spx != null ? r.vs_spx.toFixed(2) : '',
       r.sector_rank ?? '', r.co_rank_in_sector ?? '', r.industry_rank ?? '',
       r.top3[0]?.code ?? '', r.top3[0]?.weight_pct ?? '',
       r.top3[1]?.code ?? '', r.top3[1]?.weight_pct ?? '',
@@ -283,7 +284,7 @@ export function ConvictionTab() {
                 <>
                   <InfoChip label="Sector" value={data.subject_sector} />
                   <InfoChip label="Industry" value={data.subject_industry || '—'} />
-                  <InfoChip label="SPX Weight" value={data.subject_spx_weight != null ? `${NUM_1.format(data.subject_spx_weight)}%` : '—'} />
+                  <InfoChip label="SPX Weight" value={data.subject_spx_weight != null ? `${NUM_2.format(data.subject_spx_weight)}%` : '—'} />
                 </>
               ) : (
                 <span style={{ color: '#94a3b8', fontSize: 13 }}>Sector data unavailable</span>
@@ -422,7 +423,7 @@ function renderRow(
         <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span>
       </td>
       <td style={TD_R}>{fmtValueMm(row.value)}</td>
-      <td style={TD_R}>{fmtPct1(row.subject_sector_pct)}</td>
+      <td style={TD_R}>{fmtPct2(row.subject_sector_pct)}</td>
       <td style={TD_R}><SignedPct1 v={row.vs_spx} /></td>
       <td style={TD_R}>{fmtInt(row.sector_rank)}</td>
       <td style={TD_R}>{fmtInt(row.co_rank_in_sector)}</td>

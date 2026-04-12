@@ -31,9 +31,9 @@ function fmtValueMm(v: number | null): string {
   return `$${NUM_0.format(v / 1e6)}`
 }
 
-function fmtPct1(v: number | null): string {
+function fmtPct2(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_1.format(v)}%`
+  return `${NUM_2.format(v)}%`
 }
 
 // Signed numeric formatting: +X.XX / (X.XX) with green/red coloring.
@@ -50,10 +50,10 @@ function SignedCell({ v, decimals = 2 }: { v: number | null; decimals?: number }
 function SignedPctCell({ v }: { v: number | null }) {
   if (v == null) return <>—</>
   if (v < 0)
-    return <span style={{ color: '#ef4444' }}>({NUM_1.format(Math.abs(v))}%)</span>
+    return <span style={{ color: '#ef4444' }}>({NUM_2.format(Math.abs(v))}%)</span>
   if (v > 0)
-    return <span style={{ color: '#27AE60' }}>+{NUM_1.format(v)}%</span>
-  return <>{NUM_1.format(v)}%</>
+    return <span style={{ color: '#27AE60' }}>+{NUM_2.format(v)}%</span>
+  return <>{NUM_2.format(v)}%</>
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────
@@ -146,8 +146,8 @@ export function OwnershipTrendTab() {
       const h = ['Quarter', 'Holders', 'Shares (MM)', '% Float', 'Value ($MM)', 'Active %', 'Passive %', 'Net Change', 'Signal']
       csv = [h, ...trend.data.quarters.map(q => [
         q.quarter, q.holder_count, (q.total_inst_shares / 1e6).toFixed(2),
-        q.pct_float.toFixed(1), (q.total_inst_value / 1e6).toFixed(0),
-        q.active_pct.toFixed(1), q.passive_pct.toFixed(1),
+        q.pct_float.toFixed(2), (q.total_inst_value / 1e6).toFixed(0),
+        q.active_pct.toFixed(2), q.passive_pct.toFixed(2),
         q.net_shares_change != null ? (q.net_shares_change / 1e6).toFixed(2) : '',
         q.signal || '',
       ])].map(r => r.join(',')).join('\n')
@@ -157,7 +157,7 @@ export function OwnershipTrendTab() {
       csv = [h, ...momentum.data.filter(r => r.level === 0).map(r => [
         r.rank ?? '', `"${(r.institution || '').replace(/"/g, '""')}"`, r.type || '',
         ...qKeys.map(q => { const v = (r as Record<string, unknown>)[q]; return typeof v === 'number' ? (v / 1e6).toFixed(2) : '' }),
-        r.change != null ? (r.change / 1e6).toFixed(2) : '', r.change_pct != null ? r.change_pct.toFixed(1) : '',
+        r.change != null ? (r.change / 1e6).toFixed(2) : '', r.change_pct != null ? r.change_pct.toFixed(2) : '',
       ])].map(r => r.join(',')).join('\n')
     } else if (subView === 'cohort' && cohort.data) {
       const h = ['Category', 'Holders', 'Shares (MM)', 'Value ($MM)', 'Avg Position ($MM)', 'Δ Shares (MM)', 'Δ Value ($MM)', '% Float Moved']
@@ -275,10 +275,10 @@ function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
               <td style={{ ...TD, fontWeight: 600 }}>{q.quarter}</td>
               <td style={TD_R}>{NUM_0.format(q.holder_count)}</td>
               <td style={TD_R}>{fmtSharesMm(q.total_inst_shares)}</td>
-              <td style={TD_R}>{fmtPct1(q.pct_float)}</td>
+              <td style={TD_R}>{fmtPct2(q.pct_float)}</td>
               <td style={TD_R}>{fmtValueMm(q.total_inst_value)}</td>
-              <td style={TD_R}>{fmtPct1(q.active_pct)}</td>
-              <td style={TD_R}>{fmtPct1(q.passive_pct)}</td>
+              <td style={TD_R}>{fmtPct2(q.active_pct)}</td>
+              <td style={TD_R}>{fmtPct2(q.passive_pct)}</td>
               <td style={TD_R}><SignedCell v={q.net_shares_change != null ? q.net_shares_change / 1e6 : null} /></td>
               <td style={TD}><SignalBadge signal={q.signal} /></td>
             </tr>
@@ -483,7 +483,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
                 <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{`$${NUM_1.format(r.avg_position / 1e6)}`}</td>
                 <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_shares != null ? r.delta_shares / 1e6 : null} /></td>
                 <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_value != null ? r.delta_value / 1e6 : null} decimals={0} /></td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtPct1(r.pct_float_moved)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtPct2(r.pct_float_moved)}</td>
               </tr>
             )]
 
@@ -500,7 +500,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
                     <td style={TD_R}>{`$${NUM_1.format(c.avg_position / 1e6)}`}</td>
                     <td style={TD_R}><SignedCell v={c.delta_shares != null ? c.delta_shares / 1e6 : null} /></td>
                     <td style={TD_R}><SignedCell v={c.delta_value != null ? c.delta_value / 1e6 : null} decimals={0} /></td>
-                    <td style={TD_R}>{fmtPct1(c.pct_float_moved)}</td>
+                    <td style={TD_R}>{fmtPct2(c.pct_float_moved)}</td>
                   </tr>
                 )
               })
@@ -514,8 +514,8 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
       {/* Summary metrics */}
       <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, marginTop: 16 }}>
         <MetricTile label={`${s.from_quarter} → ${s.to_quarter}`} value="Cohort Analysis" color="var(--oxford-blue)" />
-        <MetricTile label="Retention Rate" value={`${NUM_1.format(s.retention_rate)}%`} color="var(--oxford-blue)" />
-        <MetricTile label="Economic Retention" value={`${NUM_1.format(s.econ_retention)}%`} color="var(--oxford-blue)" />
+        <MetricTile label="Retention Rate" value={`${NUM_2.format(s.retention_rate)}%`} color="var(--oxford-blue)" />
+        <MetricTile label="Economic Retention" value={`${NUM_2.format(s.econ_retention)}%`} color="var(--oxford-blue)" />
         <MetricTile label="Net Holders" value={`${s.net_holders >= 0 ? '+' : ''}${s.net_holders}`} color={s.net_holders >= 0 ? '#27AE60' : '#ef4444'} />
         <MetricTile label="Net Shares (MM)" value={`${s.net_shares >= 0 ? '+' : ''}${NUM_2.format(s.net_shares / 1e6)}`} color={s.net_shares >= 0 ? '#27AE60' : '#ef4444'} />
         <MetricTile label="Net Value ($MM)" value={`${s.net_value >= 0 ? '+' : ''}$${NUM_0.format(s.net_value / 1e6)}`} color={s.net_value >= 0 ? '#27AE60' : '#ef4444'} />

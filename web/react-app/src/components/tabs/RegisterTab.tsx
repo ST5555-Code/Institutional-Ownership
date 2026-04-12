@@ -16,7 +16,6 @@ import {
 // ── Formatters ─────────────────────────────────────────────────────────────
 
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 
 function fmtSharesMm(v: number | null): string {
@@ -36,7 +35,7 @@ function fmtAumMm(v: number | null): string {
 
 function fmtPctFloat(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_1.format(v)}%`
+  return `${NUM_2.format(v)}%`
 }
 
 // Defensive negative-percentage formatter kept from the prior file — query1
@@ -463,7 +462,7 @@ export function RegisterTab() {
       r.type || '',
       r.shares != null ? (r.shares / 1e6).toFixed(2) : '',
       r.value_live != null ? (r.value_live / 1e6).toFixed(0) : '',
-      r.pct_float != null ? r.pct_float.toFixed(1) : '',
+      r.pct_float != null ? r.pct_float.toFixed(2) : '',
       r.aum != null ? r.aum.toFixed(0) : '',
       r.pct_aum != null ? r.pct_aum.toFixed(2) : '',
       r.nport_cov != null ? Math.round(r.nport_cov) : '',

@@ -50,7 +50,7 @@ function fmtValue(v: number | null): string {
 
 function fmtPct(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_1.format(v)}%`
+  return `${NUM_2.format(v)}%`
 }
 
 function cellStyle(bottomPx: number): React.CSSProperties {
