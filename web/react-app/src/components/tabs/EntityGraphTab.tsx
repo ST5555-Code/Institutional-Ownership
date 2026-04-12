@@ -271,7 +271,11 @@ export function EntityGraphTab() {
             </button>
           ))}
         </div>
-        {viewMode === 'company' && <EntitySearch onSelect={(id, name) => { setSelectedEntityId(id); setSelectedEntityName(name) }} />}
+        {viewMode === 'company' && <EntitySearch onSelect={(id, name) => {
+          setSelectedEntityId(id); setSelectedEntityName(name)
+          // Also open floating modal so the diagram shows immediately
+          setModalEntityId(id); setModalEntityName(name)
+        }} />}
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={q => { setQuarter(q); setModalEntityId(null) }} />
         {viewMode === 'company' && !ticker && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
