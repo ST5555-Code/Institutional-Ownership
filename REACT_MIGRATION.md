@@ -112,3 +112,28 @@ When all tabs migrated and validated:
 - Auth/token handling for /api/admin/* endpoints (INF12)
 - Activist flag as red highlight on Register + Conviction (not a tab)
 - Short Interest tab in Investor Targeting section
+
+## Backend Migration Plan
+
+### Current state
+- Flask dev server, single process
+- DuckDB single-writer with staging + readonly snapshot pattern
+- Manual pipeline execution from terminal
+- INF12: token auth on /api/admin/* endpoints
+- Localhost only
+
+### Migration order (do not build until frontend Phase 6 complete)
+
+| Priority | Component | Action | When |
+|----------|-----------|--------|------|
+| 1 | Flask serving | Replace dev server with Gunicorn + Nginx | First external user |
+| 2 | Authentication | Flask-JWT or Auth0, per-user access control | Same time as Gunicorn |
+| 3 | Pipeline scheduling | APScheduler inside Flask or Airflow | When running with a team |
+| 4 | PostgreSQL | Migrate entity MDM tables if write concurrency becomes an issue | If needed |
+| 5 | Cloud deployment | Railway (Flask) + Vercel (React) or combined EC2 | When productizing |
+
+### What does NOT need to change
+- DuckDB for analytics queries — works fine for multi-user reads
+- Flask API routes and queries.py — already clean, React calls same endpoints
+- Data pipeline scripts — unchanged
+- Staging workflow for entity changes — unchanged
