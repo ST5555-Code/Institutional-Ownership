@@ -20,7 +20,7 @@ export const useAppStore = create<AppState>((set) => ({
   ticker: '',
   company: null,
   quarter: '2025Q4',
-  activeTab: 'register',
+  activeTab: 'entity-graph',
   rollupType: 'economic_control_v1',
   loading: false,
   setTicker: (ticker) => set({ ticker }),

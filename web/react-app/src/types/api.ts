@@ -597,6 +597,7 @@ export interface MarketSummaryRow {
   entity_id: number | null
   filer_count: number
   fund_count: number
+  nport_coverage_pct: number | null
 }
 
 // ── Entity Graph — /api/entity_search + /api/entity_children + /api/entity_graph

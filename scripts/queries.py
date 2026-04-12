@@ -4297,6 +4297,17 @@ def get_market_summary(limit=25):
                 r['filer_count'] = r['num_ciks']
                 r['fund_count'] = 0
 
+            # N-PORT coverage from summary_by_parent
+            try:
+                cov = con.execute(f"""
+                    SELECT nport_coverage_pct
+                    FROM summary_by_parent
+                    WHERE inst_parent_name = ? AND quarter = '{LQ}'
+                """, [r['institution']]).fetchone()
+                r['nport_coverage_pct'] = cov[0] if cov and cov[0] is not None else None
+            except Exception:  # nosec B110
+                r['nport_coverage_pct'] = None
+
         return clean_for_json(rows)
     finally:
         pass  # connection managed by thread-local cache
