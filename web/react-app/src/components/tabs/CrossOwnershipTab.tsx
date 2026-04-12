@@ -233,16 +233,19 @@ export function CrossOwnershipTab() {
   // All tickers in the anchor selector
   const anchorOptions = groupTickers
 
-  // Fetch URL
+  // Fetch URL — require at least 2 tickers for a meaningful cross-ownership
+  // comparison. With only the subject ticker, Total and the single holding
+  // column show the same number, which is confusing.
   const tickersStr = groupTickers.join(',')
+  const needsMoreTickers = groupTickers.length < 2
   const url = useMemo(() => {
-    if (!tickersStr) return null
+    if (!tickersStr || needsMoreTickers) return null
     if (viewMode === 'anchor') {
       const a = anchor && groupTickers.includes(anchor) ? anchor : groupTickers[0] || ''
       return `/api/cross_ownership?tickers=${enc(tickersStr)}&anchor=${enc(a)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
     }
     return `/api/cross_ownership_top?tickers=${enc(tickersStr)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
-  }, [tickersStr, viewMode, anchor, activeOnly, rollupType, groupTickers])
+  }, [tickersStr, needsMoreTickers, viewMode, anchor, activeOnly, rollupType, groupTickers])
 
   const { data, loading, error } = useFetch<CrossOwnershipResponse>(url)
 
@@ -270,7 +273,7 @@ export function CrossOwnershipTab() {
   // CSV export
   function onExcel() {
     if (!data) return
-    const h = ['Rank', 'Institution', 'Type', 'Total ($MM)', '% Portfolio',
+    const h = ['Rank', 'Institution', 'Type', 'Group Total', '% Portfolio',
       ...dataTickers.map(t => `${t} ($MM)`)]
     const csv = [h, ...data.investors.map((inv, i) => [
       i + 1, `"${inv.investor.replace(/"/g, '""')}"`, inv.type || '',
@@ -406,8 +409,8 @@ export function CrossOwnershipTab() {
       <div className="co-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
         {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
         {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
-        {!loading && !data && !error && groupTickers.length <= 1 && (
-          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Add comparison tickers or select a peer group</div>
+        {!loading && needsMoreTickers && (
+          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Add at least one comparison ticker or select a peer group to see cross-ownership analysis</div>
         )}
         {data && !loading && (
           <div style={{ padding: 16 }}>
@@ -430,7 +433,7 @@ export function CrossOwnershipTab() {
                   <th style={TH_R}>Rank</th>
                   <th style={TH}>Institution</th>
                   <th style={TH}>Type</th>
-                  <th style={TH_R}>Total ($MM)</th>
+                  <th style={TH_R}>Group Total</th>
                   <th style={TH_R}>% Portfolio</th>
                   {dataTickers.map(t => <th key={t} style={TH_R}>{t}</th>)}
                 </tr>
