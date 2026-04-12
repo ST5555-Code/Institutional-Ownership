@@ -134,7 +134,11 @@ interface FundViewRow extends RegisterRow {
 
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 
-const TOTAL_COLS = 9
+// 9 data columns + 1 trailing spacer that absorbs whatever horizontal
+// space is left after the data columns are laid out. The spacer is why
+// the Institution column can be pinned at a specific width instead of
+// stretching across the full table width.
+const TOTAL_COLS = 10
 
 // ── InvestorSearchWithDropdown ────────────────────────────────────────────
 // Local to this file per spec — the shared common/InvestorSearch stays a
@@ -597,8 +601,8 @@ export function RegisterTab() {
           >
             <colgroup>
               <col style={{ width: 60 }} />
-              {/* Institution: remainder — no explicit width */}
-              <col />
+              {/* Institution: fixed so it doesn't balloon on Fund view. */}
+              <col style={{ width: 220 }} />
               <col style={{ width: 100 }} />
               <col style={{ width: 110 }} />
               <col style={{ width: 120 }} />
@@ -606,12 +610,15 @@ export function RegisterTab() {
               <col style={{ width: 120 }} />
               <col style={{ width: 100 }} />
               <col style={{ width: 140 }} />
+              {/* Spacer: absorbs remainder so the 9 data columns stay put. */}
+              <col />
             </colgroup>
             <thead>
               <ColumnGroupHeader
                 groups={[
                   { label: '', colSpan: 6 },
                   { label: 'Investor', colSpan: 3 },
+                  { label: '', colSpan: 1 },
                 ]}
               />
               <tr>
@@ -691,6 +698,10 @@ export function RegisterTab() {
                     )}
                   </span>
                 </th>
+                {/* Trailing spacer — absorbs horizontal slack so the
+                    nine data columns are pinned to their specified
+                    widths and don't stretch on wide viewports. */}
+                <th style={TH_STYLE} />
               </tr>
             </thead>
             <tbody>
@@ -898,6 +909,9 @@ function renderRow(
           '—'
         )}
       </td>
+      {/* Trailing spacer cell — matches the <col /> at the end of the
+          colgroup so the nine data columns keep their specified widths. */}
+      <td style={{ ...TD_STYLE, padding: 0, border: 'none' }} />
     </tr>
   )
 }
