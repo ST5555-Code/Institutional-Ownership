@@ -14,7 +14,9 @@ Run: python3 scripts/fetch_ncen.py                  # Full build
 """
 
 import argparse
+import csv
 import os
+import re
 import time
 from datetime import datetime
 
@@ -22,6 +24,30 @@ import duckdb
 import requests
 from lxml import etree
 from rapidfuzz import fuzz
+
+# ---------------------------------------------------------------------------
+# INF17b — Brand-token verification gate (same logic as build_managers.py)
+# ---------------------------------------------------------------------------
+_BRAND_STOPWORDS = frozenset({
+    "llc", "lp", "inc", "ltd", "co", "corp", "fund", "capital", "management",
+    "advisors", "partners", "holdings", "group", "the", "and", "of", "asset",
+    "investment", "financial", "services", "wealth",
+})
+
+
+def _brand_tokens(name):
+    """Non-stopword brand tokens from a firm name (INF17b)."""
+    if not name:
+        return set()
+    raw = re.split(r"[^a-z0-9]+", str(name).lower())
+    return {t for t in raw if len(t) >= 3 and t not in _BRAND_STOPWORDS}
+
+
+def _brand_tokens_overlap(a, b):
+    """True if two firm names share at least one brand token."""
+    ta = _brand_tokens(a)
+    tb = _brand_tokens(b)
+    return bool(ta and tb and (ta & tb))
 
 # ---------------------------------------------------------------------------
 # Config
@@ -315,26 +341,49 @@ def update_managers_adviser_cik(con):
         SELECT cik, manager_name FROM managers
     """).fetchall()
 
+    # INF17b: rejection audit log — same pattern as build_managers.py Phase 3
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rejections_path = os.path.join(base_dir, "logs", "fetch_ncen_rejected_crds.csv")
+    os.makedirs(os.path.dirname(rejections_path), exist_ok=True)
     matched = 0
-    for adv_name, adv_crd in advisers:
-        best_score = 0
-        best_mgr_cik = None
-        for mgr_cik, mgr_name in managers:
-            score = fuzz.token_sort_ratio(adv_name.upper(), mgr_name.upper())
-            if score > best_score:
-                best_score = score
-                best_mgr_cik = mgr_cik
+    rejected_count = 0
+    with open(rejections_path, "w", encoding="utf-8", newline="") as rej_file:
+        rej_writer = csv.writer(rej_file)
+        rej_writer.writerow(
+            ["adviser_name", "adviser_crd", "matched_cik", "matched_name", "score", "reason"]
+        )
 
-        if best_score >= 85 and adv_crd:
-            norm_crd = str(adv_crd).lstrip("0") or "0"  # INF4b: normalize CRD format
-            con.execute("""
-                UPDATE managers
-                SET adviser_cik = ?
-                WHERE cik = ? AND adviser_cik IS NULL
-            """, [norm_crd, best_mgr_cik])
-            matched += 1
+        for adv_name, adv_crd in advisers:
+            best_score = 0
+            best_mgr_cik = None
+            best_mgr_name = None
+            for mgr_cik, mgr_name in managers:
+                score = fuzz.token_sort_ratio(adv_name.upper(), mgr_name.upper())
+                if score > best_score:
+                    best_score = score
+                    best_mgr_cik = mgr_cik
+                    best_mgr_name = mgr_name
 
-    print(f"  Matched {matched} advisers to managers (fuzzy ≥85)")
+            if best_score >= 85 and adv_crd:
+                # INF17b gate: brand-token overlap required
+                if not _brand_tokens_overlap(adv_name, best_mgr_name):
+                    rej_writer.writerow(
+                        [adv_name, adv_crd, best_mgr_cik, best_mgr_name,
+                         best_score, "brand_token_mismatch"]
+                    )
+                    rejected_count += 1
+                    continue
+
+                norm_crd = str(adv_crd).lstrip("0") or "0"  # INF4b: normalize CRD format
+                con.execute("""
+                    UPDATE managers
+                    SET adviser_cik = ?
+                    WHERE cik = ? AND adviser_cik IS NULL
+                """, [norm_crd, best_mgr_cik])
+                matched += 1
+
+    print(f"  Matched {matched} advisers to managers (fuzzy ≥85, brand-token gate on)")
+    print(f"  Rejected: {rejected_count}  (log: {rejections_path})")
 
 
 # ---------------------------------------------------------------------------
