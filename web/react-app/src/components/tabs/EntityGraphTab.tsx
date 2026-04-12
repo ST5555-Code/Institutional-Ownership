@@ -359,7 +359,7 @@ export function EntityGraphTab() {
                       isExpanded && r.entity_id && (
                         <tr key={`${r.rank}-detail`}>
                           <td colSpan={COLS} style={{ padding: 0, borderBottom: '2px solid var(--oxford-blue)' }}>
-                            <MarketRowDetail data={expandedGraph.data} loading={expandedGraph.loading} quarter={quarter} />
+                            <MarketRowDetail data={expandedGraph.data} loading={expandedGraph.loading} quarter={quarter} summaryRow={r} />
                           </td>
                         </tr>
                       ),
@@ -453,8 +453,8 @@ export function EntityGraphTab() {
 
 // ── Market row expanded detail ─────────────────────────────────────────────
 
-function MarketRowDetail({ data, loading, quarter }: {
-  data: EntityGraphResponse | null; loading: boolean; quarter: string
+function MarketRowDetail({ data, loading, quarter, summaryRow }: {
+  data: EntityGraphResponse | null; loading: boolean; quarter: string; summaryRow: MarketSummaryRow
 }) {
   if (loading) return <div style={{ padding: 20, color: '#94a3b8', fontSize: 13 }}>Loading structure…</div>
   if (!data) return <div style={{ padding: 20, color: '#94a3b8', fontSize: 13 }}>Select to load</div>
@@ -462,14 +462,17 @@ function MarketRowDetail({ data, loading, quarter }: {
   const filers = data.nodes.filter(n => n.node_type === 'filer')
   const funds = data.nodes.filter(n => n.node_type === 'fund')
   const instAum = data.nodes.find(n => n.node_type === 'institution')?.aum
+  const totalFunds = Object.values(data.metadata.total_funds_by_filer).reduce((a, b) => a + b, 0)
 
   return (
     <div style={{ padding: '12px 20px 16px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 12, color: '#1e293b' }}>
-      {/* Summary tiles */}
+      {/* Summary tiles — use summaryRow for filer/fund counts (accurate),
+          graph data for the visual detail below */}
       <div style={{ display: 'flex', gap: 24 }}>
         <SummaryTile label="Total AUM" value={fmtAum(instAum ?? null)} />
-        <SummaryTile label="Filers" value={String(filers.length)} />
-        <SummaryTile label="Top Funds" value={String(funds.length)} sub={data.metadata.truncated ? `of ${Object.values(data.metadata.total_funds_by_filer).reduce((a, b) => a + b, 0)}` : undefined} />
+        <SummaryTile label="Filers" value={String(summaryRow.filer_count)} />
+        <SummaryTile label="Total Funds" value={String(summaryRow.fund_count)} />
+        <SummaryTile label="Top Funds Shown" value={String(funds.length)} sub={data.metadata.truncated ? `of ${totalFunds}` : undefined} />
         <SummaryTile label="Quarter" value={quarter} />
       </div>
       {/* Filers row */}
