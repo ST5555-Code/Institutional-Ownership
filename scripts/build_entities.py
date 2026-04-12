@@ -276,6 +276,8 @@ def step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_row
       - 'series_id' from fund_universe
     Hard-fails on duplicate active mapping via ux_identifier_active. Conflicts logged.
     """
+    from entity_sync import _normalize_crd  # noqa: E402  # INF4b
+
     logger.info("[step 3] populating entity_identifiers")
     added = {"cik": 0, "crd": 0, "series_id": 0}
     conflicts = 0
@@ -288,7 +290,9 @@ def step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_row
         nonlocal conflicts
         if not id_value:
             return False
-        key = (id_type, str(id_value))
+        # INF4b: normalize CRDs so '000123711' and '123711' map to the same key
+        norm_value = _normalize_crd(id_value) if id_type == "crd" else str(id_value)
+        key = (id_type, norm_value)
         prior_entity = seen_id_keys.get(key)
         if prior_entity is not None and prior_entity != entity_id:
             conflicts += 1
@@ -305,7 +309,7 @@ def step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_row
                (entity_id, identifier_type, identifier_value, confidence, source, is_inferred)
                VALUES (?, ?, ?, ?, ?, TRUE)
                ON CONFLICT DO NOTHING""",
-            [entity_id, id_type, str(id_value), confidence, source],
+            [entity_id, id_type, norm_value, confidence, source],
         )
         added[id_type] = added.get(id_type, 0) + 1
         return True

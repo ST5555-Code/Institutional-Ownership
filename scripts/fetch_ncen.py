@@ -115,8 +115,8 @@ def download_ncen_xml(cik_raw, accession, primary_doc):
 def parse_ncen_xml(xml_content, filing_info):
     """Parse N-CEN XML and extract adviser-to-series mappings."""
     try:
-        root = etree.fromstring(xml_content)
-    except etree.XMLSyntaxError:
+        root = etree.fromstring(xml_content)  # pylint: disable=c-extension-no-member
+    except etree.XMLSyntaxError:  # pylint: disable=c-extension-no-member
         return []
 
     # Get registrant info
@@ -196,8 +196,8 @@ def check_routing_drift(con):
     Log any series where N-CEN now shows a different sub-adviser than our manual
     routing so human reviewers can update manual fixes when source data changes.
     """
-    import os
-    from datetime import datetime
+    import os  # pylint: disable=reimported
+    from datetime import datetime  # pylint: disable=reimported
 
     try:
         drifted = con.execute("""
@@ -326,11 +326,12 @@ def update_managers_adviser_cik(con):
                 best_mgr_cik = mgr_cik
 
         if best_score >= 85 and adv_crd:
+            norm_crd = str(adv_crd).lstrip("0") or "0"  # INF4b: normalize CRD format
             con.execute("""
                 UPDATE managers
                 SET adviser_cik = ?
                 WHERE cik = ? AND adviser_cik IS NULL
-            """, [adv_crd, best_mgr_cik])
+            """, [norm_crd, best_mgr_cik])
             matched += 1
 
     print(f"  Matched {matched} advisers to managers (fuzzy ≥85)")

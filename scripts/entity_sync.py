@@ -31,6 +31,22 @@ class SyncResult(NamedTuple):
 
 
 # =============================================================================
+# INF4b: CRD normalization
+# =============================================================================
+
+def _normalize_crd(crd):
+    """Normalize CRD to canonical unpadded format for comparison.
+
+    '000123711' -> '123711', '123711' -> '123711', '0' -> '0'.
+    Returns empty string for None/empty input.
+    INF4b: prevents entity fragmentation from padded vs unpadded CRDs.
+    """
+    if not crd:
+        return ""
+    return str(crd).lstrip("0") or "0"
+
+
+# =============================================================================
 # Core: get-or-create by identifier
 # =============================================================================
 def get_or_create_entity_by_identifier(
@@ -57,13 +73,28 @@ def get_or_create_entity_by_identifier(
     if not id_value:
         raise ValueError(f"id_value is required (type={id_type})")
 
-    # 1. Lookup existing active mapping
-    existing = con.execute(
-        """SELECT entity_id FROM entity_identifiers
-           WHERE identifier_type = ? AND identifier_value = ?
-             AND valid_to = DATE '9999-12-31'""",
-        [id_type, str(id_value)],
-    ).fetchone()
+    # INF4b: for CRDs, normalize before lookup and insert so '000123711'
+    # matches existing '123711'. The LTRIM comparison retroactively matches
+    # old un-normalized data without a data migration.
+    if id_type == "crd":
+        store_value = _normalize_crd(id_value)
+        # 1. Lookup existing active mapping (format-insensitive for CRD)
+        existing = con.execute(
+            """SELECT entity_id FROM entity_identifiers
+               WHERE identifier_type = 'crd'
+                 AND LTRIM(identifier_value, '0') = LTRIM(?, '0')
+                 AND valid_to = DATE '9999-12-31'""",
+            [store_value],
+        ).fetchone()
+    else:
+        store_value = str(id_value)
+        # 1. Lookup existing active mapping (exact match for CIK/series_id)
+        existing = con.execute(
+            """SELECT entity_id FROM entity_identifiers
+               WHERE identifier_type = ? AND identifier_value = ?
+                 AND valid_to = DATE '9999-12-31'""",
+            [id_type, store_value],
+        ).fetchone()
     if existing:
         return SyncResult(existing[0], False, False)
 
@@ -76,14 +107,14 @@ def get_or_create_entity_by_identifier(
         [eid, entity_type, name or f"{id_type.upper()} {id_value}", source, is_inferred],
     )
 
-    # 3. Attempt to insert identifier
+    # 3. Attempt to insert identifier (stores normalized value for CRDs)
     result = con.execute(
         """INSERT INTO entity_identifiers
            (entity_id, identifier_type, identifier_value, confidence, source, is_inferred)
            VALUES (?, ?, ?, 'exact', ?, ?)
            ON CONFLICT DO NOTHING
            RETURNING entity_id""",
-        [eid, id_type, str(id_value), source, is_inferred],
+        [eid, id_type, store_value, source, is_inferred],
     ).fetchall()
 
     if result:
@@ -96,7 +127,7 @@ def get_or_create_entity_by_identifier(
         """SELECT entity_id FROM entity_identifiers
            WHERE identifier_type = ? AND identifier_value = ?
              AND valid_to = DATE '9999-12-31'""",
-        [id_type, str(id_value)],
+        [id_type, store_value],
     ).fetchone()
     log_identifier_conflict(
         con, eid, id_type, id_value,
