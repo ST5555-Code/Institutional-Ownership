@@ -10,6 +10,7 @@ import {
   ExportBar,
   TableFooter,
   ColumnGroupHeader,
+  getTypeStyle,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -62,25 +63,11 @@ const BADGE: React.CSSProperties = {
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
-function typeBadgeStyle(type: string | null): React.CSSProperties {
-  const t = (type || '').toLowerCase()
-  if (t === 'passive') return { backgroundColor: '#4A90D9', color: '#fff' }
-  if (t === 'active' || t === 'hedge_fund') return { backgroundColor: '#002147', color: '#fff' }
-  return { backgroundColor: '#cbd5e1', color: '#1e293b' }
-}
-
 function nportBadgeStyle(cov: number | null | undefined): React.CSSProperties | null {
   if (cov == null || cov <= 0) return null
   if (cov >= 80) return { backgroundColor: '#27AE60', color: '#fff' }
   if (cov >= 50) return { backgroundColor: '#F5A623', color: '#fff' }
   return { backgroundColor: '#94a3b8', color: '#fff' }
-}
-
-function scoreColor(s: number | null): string {
-  if (s == null) return '#1e293b'
-  if (s >= 70) return '#27AE60'
-  if (s >= 40) return '#F5A623'
-  return '#ef4444'
 }
 
 // ── Grouping ───────────────────────────────────────────────────────────────
@@ -97,11 +84,9 @@ function groupRows(rows: ConvictionRow[]): ConvictionGroup[] {
   return groups
 }
 
-// ── Fund-view rows ─────────────────────────────────────────────────────────
-
 interface FundRow extends ConvictionRow { parentInstitution: string }
 
-const TOTAL_COLS = 13
+const TOTAL_COLS = 14
 
 // ── InvestorSearchWithDropdown (local, same pattern as Register) ──────────
 
@@ -164,17 +149,8 @@ export function ConvictionTab() {
   const [selectedTypes, setSelectedTypes] = useState<Set<string> | null>(null)
   const [selectedInstitution, setSelectedInstitution] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [scoreTooltipOpen, setScoreTooltipOpen] = useState(false)
 
   const tableWrapRef = useRef<HTMLDivElement>(null)
-
-  function toggle(key: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key); else next.add(key)
-      return next
-    })
-  }
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const url = ticker
@@ -204,10 +180,9 @@ export function ConvictionTab() {
   const fundRows = useMemo<FundRow[]>(() => {
     if (fundView !== 'fund') return []
     const flat: FundRow[] = []
-    for (const g of groups) {
+    for (const g of groups)
       for (const c of g.children)
         flat.push({ ...c, parentInstitution: g.parent.institution })
-    }
     flat.sort((a, b) => (b.value || 0) - (a.value || 0))
     return flat.map((r, i) => ({ ...r, rank: i + 1 }))
   }, [groups, fundView])
@@ -224,24 +199,32 @@ export function ConvictionTab() {
     return { count: rows.length, value }
   }, [groups, fundRowsDisplay, fundView])
 
+  function toggle(key: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }
+
   function handleSearchSelect(inst: string | null) {
     setSelectedInstitution(inst)
     if (inst == null || fundView === 'fund') return
     requestAnimationFrame(() => {
       const wrap = tableWrapRef.current
       if (!wrap) return
-      const escaped = inst.replace(/"/g, '\\"')
-      const el = wrap.querySelector(`tr[data-institution="${escaped}"]`) as HTMLElement | null
+      const el = wrap.querySelector(`tr[data-institution="${inst.replace(/"/g, '\\"')}"]`) as HTMLElement | null
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('conviction-row-highlight')
-      window.setTimeout(() => el.classList.remove('conviction-row-highlight'), 2000)
+      el.classList.add('cv-row-highlight')
+      window.setTimeout(() => el.classList.remove('cv-row-highlight'), 2000)
     })
   }
 
   function onExcel() {
     const h = ['Rank', 'Institution', 'Type', 'Value ($MM)', 'Sector %', 'vs SPX',
-      'Score', 'Sector Rank', 'Co. Rank', 'Ind. Rank', 'Top 3', 'Diversity', 'Port. Coverage']
+      'Sector Rank', 'Co. Rank', 'Ind. Rank', 'Sector 1', 'S1 %', 'Sector 2', 'S2 %',
+      'Sector 3', 'S3 %', 'Diversity', 'Port. Coverage']
     const rows: ConvictionRow[] = fundView === 'fund' ? fundRowsDisplay
       : groups.flatMap(g => [g.parent, ...g.children])
     const csv = [h, ...rows.map(r => [
@@ -249,9 +232,11 @@ export function ConvictionTab() {
       r.value != null ? (r.value / 1e6).toFixed(0) : '',
       r.subject_sector_pct != null ? r.subject_sector_pct.toFixed(1) : '',
       r.vs_spx != null ? r.vs_spx.toFixed(1) : '',
-      r.conviction_score != null ? Math.round(r.conviction_score) : '',
       r.sector_rank ?? '', r.co_rank_in_sector ?? '', r.industry_rank ?? '',
-      (r.top3 || []).join(', '), r.diversity ?? '',
+      r.top3[0]?.code ?? '', r.top3[0]?.weight_pct ?? '',
+      r.top3[1]?.code ?? '', r.top3[1]?.weight_pct ?? '',
+      r.top3[2]?.code ?? '', r.top3[2]?.weight_pct ?? '',
+      r.diversity ?? '',
       r.nport_cov != null ? Math.round(r.nport_cov) : '',
     ])].map(r => r.join(',')).join('\n')
     downloadCsv(csv, `conviction_${ticker}.csv`)
@@ -263,10 +248,10 @@ export function ConvictionTab() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
-        .conviction-row-highlight > td { background-color: #fffbeb !important; transition: background-color 0.4s ease-in-out; }
+        .cv-row-highlight > td { background-color: #fffbeb !important; transition: background-color 0.4s ease-in-out; }
       `}</style>
 
-      {/* Controls bar */}
+      {/* Controls */}
       <div className="cv-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
@@ -302,26 +287,29 @@ export function ConvictionTab() {
             {/* Table */}
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 13 }}>
               <colgroup>
-                <col style={{ width: 50 }} />   {/* Rank */}
-                <col />                          {/* Institution — flex */}
-                <col style={{ width: 90 }} />    {/* Type */}
-                <col style={{ width: 100 }} />   {/* Value */}
-                <col style={{ width: 80 }} />    {/* Sector % */}
-                <col style={{ width: 75 }} />    {/* vs SPX */}
-                <col style={{ width: 65 }} />    {/* Score */}
-                <col style={{ width: 85 }} />    {/* Sector Rank */}
-                <col style={{ width: 80 }} />    {/* Co. Rank */}
-                <col style={{ width: 80 }} />    {/* Ind. Rank */}
-                <col style={{ width: 130 }} />   {/* Top 3 */}
-                <col style={{ width: 70 }} />    {/* Diversity */}
-                <col style={{ width: 105 }} />   {/* Port. Coverage */}
+                {/* Match Register widths for first 3 cols */}
+                <col style={{ width: 60 }} />   {/* Rank */}
+                <col style={{ width: 440 }} />  {/* Institution */}
+                <col style={{ width: 120 }} />  {/* Type */}
+                {/* Position group */}
+                <col style={{ width: 90 }} />   {/* Value */}
+                <col style={{ width: 72 }} />   {/* Sector % */}
+                <col style={{ width: 68 }} />   {/* vs SPX */}
+                <col style={{ width: 72 }} />   {/* Sector Rank */}
+                <col style={{ width: 68 }} />   {/* Co. Rank */}
+                <col style={{ width: 68 }} />   {/* Ind. Rank */}
+                {/* Portfolio group */}
+                <col style={{ width: 90 }} />   {/* Sector 1 */}
+                <col style={{ width: 90 }} />   {/* Sector 2 */}
+                <col style={{ width: 90 }} />   {/* Sector 3 */}
+                <col style={{ width: 64 }} />   {/* Diversity */}
+                <col style={{ width: 80 }} />   {/* Port. Coverage */}
               </colgroup>
               <thead>
                 <ColumnGroupHeader groups={[
                   { label: '', colSpan: 3 },
-                  { label: 'Position', colSpan: 3 },
-                  { label: 'Conviction', colSpan: 4 },
-                  { label: 'Portfolio', colSpan: 3 },
+                  { label: 'Position', colSpan: 6 },
+                  { label: 'Portfolio', colSpan: 5 },
                 ]} />
                 <tr>
                   <th style={TH_R}>Rank</th>
@@ -330,25 +318,12 @@ export function ConvictionTab() {
                   <th style={TH_R}>Value ($MM)</th>
                   <th style={TH_R}>Sector %</th>
                   <th style={TH_R}>vs SPX</th>
-                  <th style={TH_R} onMouseEnter={() => setScoreTooltipOpen(true)} onMouseLeave={() => setScoreTooltipOpen(false)}>
-                    <span style={{ position: 'relative', display: 'inline-block' }}>
-                      Score
-                      <span style={{ cursor: 'help', color: '#94a3b8', fontSize: 12, marginLeft: 3 }}>ⓘ</span>
-                      {scoreTooltipOpen && (
-                        <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, marginTop: 4, backgroundColor: '#0d1526', color: '#e2e8f0', fontSize: 11, lineHeight: 1.6, padding: '8px 12px', borderRadius: 4, border: '1px solid #2d3f5e', width: 220, whiteSpace: 'pre-line', textAlign: 'left', fontWeight: 400, textTransform: 'none', letterSpacing: 0, display: 'block' }}>
-                          <span style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Conviction Score 0–100</span>
-                          <span style={{ display: 'block' }}>Sector overweight vs SPX (+40)</span>
-                          <span style={{ display: 'block' }}>Sector rank in portfolio (+20/10/5)</span>
-                          <span style={{ display: 'block' }}>Company rank in sector (+15/10/5)</span>
-                          <span style={{ display: 'block' }}>Industry rank (+15/10/5)</span>
-                        </span>
-                      )}
-                    </span>
-                  </th>
                   <th style={TH_R}>Sector Rank</th>
                   <th style={TH_R}>Co. Rank</th>
                   <th style={TH_R}>Ind. Rank</th>
-                  <th style={TH}>Top 3 Sectors</th>
+                  <th style={TH}>Sector 1</th>
+                  <th style={TH}>Sector 2</th>
+                  <th style={TH}>Sector 3</th>
                   <th style={TH_R}>Diversity</th>
                   <th style={TH}>Port. Coverage</th>
                 </tr>
@@ -357,7 +332,7 @@ export function ConvictionTab() {
                 {fundView === 'fund'
                   ? fundRowsDisplay.map(r => renderRow(r, `f:${r.rank}`, 0, false, false, toggle))
                   : groups.flatMap(g => {
-                      const pkey = `${g.parent.rank}:${g.parent.institution}`
+                      const pkey = groupKey(g.parent)
                       const canExpand = g.children.length >= 2
                       const isOpen = expanded.has(pkey)
                       const trs = [renderRow(g.parent, pkey, 0, canExpand, isOpen, toggle)]
@@ -385,10 +360,9 @@ export function ConvictionTab() {
       </div>
     </div>
   )
-
 }
 
-// ── Helpers outside component ────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────
 
 function InfoChip({ label, value }: { label: string; value: string }) {
   return (
@@ -396,6 +370,22 @@ function InfoChip({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 13, color: '#1e293b' }}>{value}</div>
     </div>
+  )
+}
+
+function groupKey(parent: ConvictionRow): string {
+  return `${parent.rank}:${parent.institution}`
+}
+
+function SectorCell({ entry }: { entry: { code: string; weight_pct: number } | undefined }) {
+  if (!entry) return <td style={TD}>—</td>
+  return (
+    <td style={TD}>
+      <div style={{ lineHeight: 1.3 }}>
+        <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{entry.code}</div>
+        <div style={{ color: '#64748b', fontSize: 11 }}>{entry.weight_pct}%</div>
+      </div>
+    </td>
   )
 }
 
@@ -413,6 +403,7 @@ function renderRow(
     cursor: canExpand ? 'pointer' : 'default', userSelect: 'none',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
   }
+  const ts = getTypeStyle(row.type)
   const nport = nportBadgeStyle(row.nport_cov)
   return (
     <tr key={key} style={bg} data-institution={indent === 0 ? row.institution : undefined}>
@@ -423,21 +414,18 @@ function renderRow(
         {indent === 0 && <span style={{ display: 'inline-block', width: 14, color: '#64748b', fontSize: 10 }}>{canExpand ? (isOpen ? '▼' : '▶') : ''}</span>}
         {row.institution}
       </td>
-      <td style={TD}><span style={{ ...BADGE, ...typeBadgeStyle(row.type) }}>{row.type || 'unknown'}</span></td>
+      <td style={TD}>
+        <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span>
+      </td>
       <td style={TD_R}>{fmtValueMm(row.value)}</td>
       <td style={TD_R}>{fmtPct1(row.subject_sector_pct)}</td>
       <td style={TD_R}><SignedPct1 v={row.vs_spx} /></td>
-      <td style={{ ...TD_R, fontWeight: 700, color: scoreColor(row.conviction_score) }}>{row.conviction_score != null ? Math.round(row.conviction_score) : '—'}</td>
       <td style={TD_R}>{fmtInt(row.sector_rank)}</td>
       <td style={TD_R}>{fmtInt(row.co_rank_in_sector)}</td>
       <td style={TD_R}>{fmtInt(row.industry_rank)}</td>
-      <td style={TD}>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {(row.top3 || []).map((s, i) => (
-            <span key={i} style={{ backgroundColor: '#f4f6f9', color: '#475569', borderRadius: 10, padding: '2px 6px', fontSize: 11 }}>{s}</span>
-          ))}
-        </div>
-      </td>
+      <SectorCell entry={row.top3[0]} />
+      <SectorCell entry={row.top3[1]} />
+      <SectorCell entry={row.top3[2]} />
       <td style={TD_R}>{fmtInt(row.diversity)}</td>
       <td style={TD}>
         {nport && row.nport_cov != null ? (
