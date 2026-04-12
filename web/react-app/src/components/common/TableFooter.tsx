@@ -10,6 +10,15 @@ interface Props {
   totalColumns: number
   /** Row height in px for sticky-bottom offset stacking. Default 33. */
   rowHeightPx?: number
+  /** Empty cells inserted between the type cell and the shares cell.
+   *  Use when the host table has spacer columns between Type and
+   *  Shares so the footer's number cells line up with the body.
+   *  Default 0. */
+  skipBeforeNumbers?: number
+  /** Empty cells inserted between the %-float cell and the trailing
+   *  filler. Use when the host table has spacer columns between
+   *  %-float and whatever columns follow. Default 0. */
+  skipAfterNumbers?: number
 }
 
 // Column layout: Rank · Institution · Type · Shares · Value · % Float ·
@@ -68,8 +77,17 @@ function cellStyleRight(bottomPx: number): React.CSSProperties {
   }
 }
 
-export function TableFooter({ rows, totalColumns, rowHeightPx = 33 }: Props) {
-  const fillerCount = Math.max(0, totalColumns - NAMED_COL_COUNT)
+export function TableFooter({
+  rows,
+  totalColumns,
+  rowHeightPx = 33,
+  skipBeforeNumbers = 0,
+  skipAfterNumbers = 0,
+}: Props) {
+  const fillerCount = Math.max(
+    0,
+    totalColumns - NAMED_COL_COUNT - skipBeforeNumbers - skipAfterNumbers,
+  )
   return (
     <tfoot>
       {rows.map((r, i) => {
@@ -82,11 +100,17 @@ export function TableFooter({ rows, totalColumns, rowHeightPx = 33 }: Props) {
             <td style={cellStyle(bottomPx)} />
             <td style={cellStyle(bottomPx)}>{r.label}</td>
             <td style={cellStyle(bottomPx)} />
+            {Array.from({ length: skipBeforeNumbers }, (_, j) => (
+              <td key={`sb${j}`} style={cellStyle(bottomPx)} />
+            ))}
             <td style={cellStyleRight(bottomPx)}>{fmtShares(r.shares_mm)}</td>
             <td style={cellStyleRight(bottomPx)}>{fmtValue(r.value_mm)}</td>
             <td style={cellStyleRight(bottomPx)}>{fmtPct(r.pct_float)}</td>
+            {Array.from({ length: skipAfterNumbers }, (_, j) => (
+              <td key={`sa${j}`} style={cellStyle(bottomPx)} />
+            ))}
             {Array.from({ length: fillerCount }, (_, j) => (
-              <td key={j} style={cellStyle(bottomPx)} />
+              <td key={`f${j}`} style={cellStyle(bottomPx)} />
             ))}
           </tr>
         )

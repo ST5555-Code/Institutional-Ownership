@@ -134,11 +134,20 @@ interface FundViewRow extends RegisterRow {
 
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 
-// 9 data columns + 1 trailing spacer that absorbs whatever horizontal
-// space is left after the data columns are laid out. The spacer is why
-// the Institution column can be pinned at a specific width instead of
-// stretching across the full table width.
-const TOTAL_COLS = 10
+// Column layout (12 cols):
+//   1  Rank
+//   2  Institution
+//   3  Type
+//   4  (empty spacer — pushes Shares/Value/%Float right by one Type-width)
+//   5  Shares (MM)
+//   6  Value ($MM)
+//   7  % Float
+//   8  (empty spacer — pushes AUM / % AUM / Port. Coverage further right)
+//   9  AUM ($MM)
+//  10  % of AUM
+//  11  Port. Coverage
+//  12  Trailing spacer (flex — absorbs remainder on wide viewports)
+const TOTAL_COLS = 12
 
 // ── InvestorSearchWithDropdown ────────────────────────────────────────────
 // Local to this file per spec — the shared common/InvestorSearch stays a
@@ -608,23 +617,26 @@ export function RegisterTab() {
               {/* Institution: fixed at 440 so it doesn't balloon on Fund
                   view and gives enough room for most parent names. */}
               <col style={{ width: 440 }} />
-              {/* Seven numeric / badge columns, all consistent at 120
-                  so they read as a uniform block. */}
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              {/* Spacer: absorbs remainder so the 9 data columns stay put. */}
+              <col style={{ width: 120 }} /> {/* Type */}
+              <col style={{ width: 120 }} /> {/* empty gap 1 */}
+              <col style={{ width: 120 }} /> {/* Shares */}
+              <col style={{ width: 120 }} /> {/* Value */}
+              <col style={{ width: 120 }} /> {/* % Float */}
+              <col style={{ width: 120 }} /> {/* empty gap 2 */}
+              <col style={{ width: 120 }} /> {/* AUM */}
+              <col style={{ width: 120 }} /> {/* % of AUM */}
+              <col style={{ width: 120 }} /> {/* Port. Coverage */}
+              {/* Trailing spacer: absorbs remainder on wide viewports. */}
               <col />
             </colgroup>
             <thead>
               <ColumnGroupHeader
                 groups={[
-                  { label: '', colSpan: 6 },
+                  // cols 1-8: Rank, Inst, Type, gap, Shares, Value, %F, gap
+                  { label: '', colSpan: 8 },
+                  // cols 9-11: AUM, % AUM, Port. Coverage
                   { label: 'Investor', colSpan: 3 },
+                  // col 12: trailing spacer
                   { label: '', colSpan: 1 },
                 ]}
               />
@@ -632,9 +644,11 @@ export function RegisterTab() {
                 <th style={TH_RIGHT}>Rank</th>
                 <th style={TH_STYLE}>Institution</th>
                 <th style={TH_STYLE}>Type</th>
+                <th style={TH_STYLE} />
                 <th style={TH_RIGHT}>Shares (MM)</th>
                 <th style={TH_RIGHT}>Value ($MM)</th>
                 <th style={TH_RIGHT}>% Float</th>
+                <th style={TH_STYLE} />
                 <th style={TH_RIGHT}>AUM ($MM)</th>
                 <th style={TH_RIGHT}>% of AUM</th>
                 <th
@@ -760,6 +774,8 @@ export function RegisterTab() {
             </tbody>
             <TableFooter
               totalColumns={TOTAL_COLS}
+              skipBeforeNumbers={1}
+              skipAfterNumbers={1}
               rows={[
                 {
                   label: `Top ${visibleSums.count} Shown`,
@@ -892,9 +908,13 @@ function renderRow(
           {row.type || 'unknown'}
         </span>
       </td>
+      {/* Gap 1: pushes Shares/Value/%Float one Type-width to the right. */}
+      <td style={TD_STYLE} />
       <td style={TD_RIGHT}>{fmtSharesMm(row.shares)}</td>
       <td style={TD_RIGHT}>{fmtValueMm(row.value_live)}</td>
       <td style={TD_RIGHT}>{fmtPctFloat(row.pct_float)}</td>
+      {/* Gap 2: pushes AUM / %AUM / Port. Coverage one more to the right. */}
+      <td style={TD_STYLE} />
       <td style={TD_RIGHT}>{fmtAumMm(row.aum)}</td>
       <td style={TD_RIGHT}>
         <PctCell v={row.pct_aum} />
