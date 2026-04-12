@@ -300,7 +300,17 @@ export function EntityGraphTab() {
           <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
             {market.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading market summary…</div>}
             {market.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {market.error}</div>}
-            {market.data && (
+            {market.data && (() => {
+              const NUM_3B = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+              const totalAum = market.data.reduce((s, r) => s + r.total_aum, 0)
+              const totalFilers = market.data.reduce((s, r) => s + r.filer_count, 0)
+              const totalFunds = market.data.reduce((s, r) => s + r.fund_count, 0)
+              const totalHoldings = market.data.reduce((s, r) => s + r.num_holdings, 0)
+              // Estimate total market AUM (all institutions, not just top 25)
+              // For now use totalAum as denominator — user sees "% of top 25"
+              const FC: React.CSSProperties = { padding: '7px 10px', fontSize: 13, fontWeight: 600, color: '#fff', backgroundColor: 'var(--oxford-blue)', position: 'sticky', bottom: 0, zIndex: 2, borderTop: '2px solid var(--oxford-blue)' }
+              const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+              return (
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                 <thead>
                   <tr>
@@ -317,6 +327,8 @@ export function EntityGraphTab() {
                   {market.data.map(r => {
                     const isExpanded = expandedMarketRow === r.entity_id
                     const ts = getTypeStyle(r.manager_type)
+                    const aumB = r.total_aum / 1e9
+                    const pctOfTotal = totalAum > 0 ? (r.total_aum / totalAum * 100) : 0
                     return [
                       <tr key={r.rank}
                         onClick={() => setExpandedMarketRow(isExpanded ? null : r.entity_id)}
@@ -329,12 +341,11 @@ export function EntityGraphTab() {
                           {r.institution}
                         </td>
                         <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
-                        <td style={TD_R}>{fmtAum(r.total_aum)}</td>
+                        <td style={TD_R}>{NUM_3B.format(aumB)} <span style={{ color: '#94a3b8', fontSize: 10 }}>({pctOfTotal.toFixed(1)}%)</span></td>
                         <td style={TD_R}>{NUM_0.format(r.filer_count)}</td>
                         <td style={TD_R}>{NUM_0.format(r.fund_count)}</td>
                         <td style={TD_R}>{NUM_0.format(r.num_holdings)}</td>
                       </tr>,
-                      // Expanded detail row
                       isExpanded && r.entity_id && (
                         <tr key={`${r.rank}-detail`}>
                           <td colSpan={7} style={{ padding: 0, borderBottom: '2px solid var(--oxford-blue)' }}>
@@ -345,8 +356,20 @@ export function EntityGraphTab() {
                     ]
                   }).flat().filter(Boolean)}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={FC} />
+                    <td style={FC}>Top {market.data.length} Total</td>
+                    <td style={FC} />
+                    <td style={FCR}>{NUM_3B.format(totalAum / 1e9)}</td>
+                    <td style={FCR}>{NUM_0.format(totalFilers)}</td>
+                    <td style={FCR}>{NUM_0.format(totalFunds)}</td>
+                    <td style={FCR}>{NUM_0.format(totalHoldings)}</td>
+                  </tr>
+                </tfoot>
               </table>
-            )}
+              )
+            })()}
           </div>
         )}
 
