@@ -576,6 +576,10 @@ export function RegisterTab() {
         style={{
           flex: 1,
           overflowY: 'auto',
+          // Safety scroll when the nine fixed-width data columns
+          // overflow a narrow viewport. On wide viewports the spacer
+          // col soaks up the slack and no horizontal scroll appears.
+          overflowX: 'auto',
           position: 'relative',
         }}
       >
@@ -601,15 +605,18 @@ export function RegisterTab() {
           >
             <colgroup>
               <col style={{ width: 60 }} />
-              {/* Institution: fixed so it doesn't balloon on Fund view. */}
-              <col style={{ width: 220 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 110 }} />
+              {/* Institution: fixed at 440 so it doesn't balloon on Fund
+                  view and gives enough room for most parent names. */}
+              <col style={{ width: 440 }} />
+              {/* Seven numeric / badge columns, all consistent at 120
+                  so they read as a uniform block. */}
               <col style={{ width: 120 }} />
-              <col style={{ width: 90 }} />
               <col style={{ width: 120 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 140 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 120 }} />
               {/* Spacer: absorbs remainder so the 9 data columns stay put. */}
               <col />
             </colgroup>
