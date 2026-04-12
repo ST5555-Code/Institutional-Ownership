@@ -52,7 +52,7 @@ const BADGE: React.CSSProperties = {
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
 const OVERLAP_ROW: React.CSSProperties = {
-  backgroundColor: '#fef08a',
+  backgroundColor: '#fef9c3',
   borderLeft: '3px solid var(--accent-gold)',
 }
 

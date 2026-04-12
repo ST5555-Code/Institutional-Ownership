@@ -204,7 +204,7 @@ export function FundPortfolioTab() {
                 {portfolio.data.positions.map(p => {
                   const isSubject = ticker && p.ticker === ticker.toUpperCase()
                   const rowBg: React.CSSProperties = isSubject
-                    ? { backgroundColor: '#fef08a' }
+                    ? { backgroundColor: '#fef9c3' }
                     : {}
                   return (
                     <tr key={p.rank} style={rowBg}>

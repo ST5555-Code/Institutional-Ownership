@@ -520,7 +520,7 @@ export function RegisterTab() {
           .register-table-wrap { overflow: visible !important; }
         }
         .register-row-highlight > td {
-          background-color: #fef08a !important;
+          background-color: #fef9c3 !important;
           transition: background-color 0.4s ease-in-out;
         }
       `}</style>

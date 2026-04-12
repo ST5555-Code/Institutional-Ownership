@@ -255,7 +255,7 @@ export function ConvictionTab() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
-        .cv-row-highlight > td { background-color: #fef08a !important; transition: background-color 0.4s ease-in-out; }
+        .cv-row-highlight > td { background-color: #fef9c3 !important; transition: background-color 0.4s ease-in-out; }
       `}</style>
 
       {/* Controls */}
