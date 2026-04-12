@@ -5,6 +5,7 @@ import type { CrossOwnershipResponse } from '../../types/api'
 import {
   RollupToggle,
   ActiveOnlyToggle,
+  FundViewToggle,
   ExportBar,
   ColumnGroupHeader,
   getTypeStyle,
@@ -64,6 +65,7 @@ let _persisted: {
   anchor: string
   activeOnly: boolean
   peerGroupId: string
+  fundView: 'hierarchy' | 'fund'
 } | null = null
 
 // ── Peer groups ────────────────────────────────────────────────────────────
@@ -185,6 +187,7 @@ export function CrossOwnershipTab() {
   const [anchor, setAnchor] = useState<string>(_persisted?.anchor ?? '')
   const [activeOnly, setActiveOnly] = useState(_persisted?.activeOnly ?? false)
   const [selectedPeerGroup, setSelectedPeerGroup] = useState(_persisted?.peerGroupId ?? '')
+  const [fundView, setFundView] = useState<'hierarchy' | 'fund'>(_persisted?.fundView ?? 'hierarchy')
 
   // Persist state on unmount
   useEffect(() => {
@@ -195,6 +198,7 @@ export function CrossOwnershipTab() {
         anchor,
         activeOnly,
         peerGroupId: selectedPeerGroup,
+        fundView,
       }
     }
   })
@@ -273,13 +277,14 @@ export function CrossOwnershipTab() {
   // CSV export
   function onExcel() {
     if (!data) return
-    const h = ['Rank', 'Institution', 'Type', 'Group Total', '% Portfolio',
-      ...dataTickers.map(t => `${t} ($MM)`)]
+    const h = ['Rank', 'Institution', 'Type',
+      ...dataTickers.map(t => `${t} ($MM)`),
+      'Group Total ($MM)', '% Portfolio']
     const csv = [h, ...data.investors.map((inv, i) => [
       i + 1, `"${inv.investor.replace(/"/g, '""')}"`, inv.type || '',
+      ...dataTickers.map(t => { const v = inv.holdings[t]; return v != null ? (v / 1e6).toFixed(0) : '' }),
       inv.total_across != null ? (inv.total_across / 1e6).toFixed(0) : '',
       inv.pct_of_portfolio != null ? inv.pct_of_portfolio.toFixed(2) : '',
-      ...dataTickers.map(t => { const v = inv.holdings[t]; return v != null ? (v / 1e6).toFixed(0) : '' }),
     ])].map(r => r.join(',')).join('\n')
     downloadCsv(csv, `cross_ownership_${groupTickers.join('_')}.csv`)
   }
@@ -399,6 +404,7 @@ export function CrossOwnershipTab() {
         )}
 
         <RollupToggle />
+        <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
         <div style={{ marginLeft: 'auto' }}>
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
@@ -414,28 +420,30 @@ export function CrossOwnershipTab() {
         )}
         {data && !loading && (
           <div style={{ padding: 16 }}>
+            {/* Column order: Rank · Institution · Type · [ticker cols] · Group Total · % Portfolio
+                Tickers grow in the middle; summary stays pinned at the right edge. */}
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 13 }}>
               <colgroup>
-                <col style={{ width: 60 }} />   {/* Rank — Register consistent */}
-                <col style={{ width: 440 }} />  {/* Institution — Register consistent */}
-                <col style={{ width: 120 }} />  {/* Type — Register consistent */}
-                <col style={{ width: 90 }} />   {/* Total */}
-                <col style={{ width: 80 }} />   {/* % Portfolio */}
+                <col style={{ width: 60 }} />   {/* Rank — same as Register/Conviction */}
+                <col style={{ width: 440 }} />  {/* Institution — same as Register/Conviction */}
+                <col style={{ width: 120 }} />  {/* Type — same as Register/Conviction */}
                 {dataTickers.map(t => <col key={t} style={{ width: 80 }} />)}
+                <col style={{ width: 90 }} />   {/* Group Total — right edge */}
+                <col style={{ width: 80 }} />   {/* % Portfolio — right edge */}
               </colgroup>
               <thead>
                 <ColumnGroupHeader groups={[
                   { label: '', colSpan: 3 },
-                  { label: 'Summary', colSpan: 2 },
                   { label: 'Holdings', colSpan: dataTickers.length || 1 },
+                  { label: 'Summary', colSpan: 2 },
                 ]} />
                 <tr>
                   <th style={TH_R}>Rank</th>
                   <th style={TH}>Institution</th>
                   <th style={TH}>Type</th>
+                  {dataTickers.map(t => <th key={t} style={TH_R}>{t}</th>)}
                   <th style={TH_R}>Group Total</th>
                   <th style={TH_R}>% Portfolio</th>
-                  {dataTickers.map(t => <th key={t} style={TH_R}>{t}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -451,32 +459,27 @@ export function CrossOwnershipTab() {
                         ...TD, fontWeight: 600, whiteSpace: 'nowrap',
                         overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
                       }} title={inv.investor}>
-                        {/* Caret slot (14px) for Register alignment consistency */}
                         <span style={{ display: 'inline-block', width: 14 }} />
                         {inv.investor}
                       </td>
                       <td style={TD}>
                         <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span>
                       </td>
-                      <td style={TD_R}>{fmtValueMm(inv.total_across)}</td>
-                      <td style={TD_R}>{fmtPct2(inv.pct_of_portfolio)}</td>
                       {dataTickers.map(t => {
                         const v = inv.holdings[t]
                         const isAnchorCol = viewMode === 'anchor' && t === effectiveAnchor
                         return (
                           <td key={t} style={{
                             ...TD_R,
-                            // Anchor column gets a subtle blue tint (skip on overlap
-                            // rows which already have their own highlight).
                             backgroundColor: isAnchorCol && !overlap ? '#e0f2fe' : undefined,
-                            // All holding cells use the standard body text color —
-                            // same weight/color as Conviction tab for consistency.
                             color: v == null ? '#94a3b8' : '#1e293b',
                           }}>
                             {v != null ? fmtValueMm(v) : '—'}
                           </td>
                         )
                       })}
+                      <td style={TD_R}>{fmtValueMm(inv.total_across)}</td>
+                      <td style={TD_R}>{fmtPct2(inv.pct_of_portfolio)}</td>
                     </tr>
                   )
                 })}
@@ -490,11 +493,11 @@ export function CrossOwnershipTab() {
                     <FooterCell />
                     <FooterCell>Total</FooterCell>
                     <FooterCell />
-                    <FooterCell align="right">{fmtValueMm(footerSums.totalAcross)}</FooterCell>
-                    <FooterCell />
                     {dataTickers.map(t => (
                       <FooterCell key={t} align="right">{fmtValueMm(footerSums.perTicker[t] || 0)}</FooterCell>
                     ))}
+                    <FooterCell align="right">{fmtValueMm(footerSums.totalAcross)}</FooterCell>
+                    <FooterCell />
                   </tr>
                 </tfoot>
               )}
