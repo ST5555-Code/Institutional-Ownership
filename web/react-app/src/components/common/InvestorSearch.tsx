@@ -14,6 +14,9 @@ export function InvestorSearch({ value, onChange, placeholder = 'Search investor
         type="text"
         value={value}
         placeholder={placeholder}
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}

@@ -46,6 +46,9 @@ export function TickerInput() {
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && value) select(value.toUpperCase()) }}
         placeholder="Ticker…"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         style={{
           backgroundColor: '#1a2a4a', border: '1px solid #2d3f5e',
           borderRadius: '4px', color: '#ffffff', padding: '6px 10px',

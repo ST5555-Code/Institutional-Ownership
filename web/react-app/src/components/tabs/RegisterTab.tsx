@@ -205,6 +205,9 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
         type="text"
         value={value}
         placeholder="Search investor…"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         onChange={(e) => {
           const v = e.target.value
           setValue(v)
