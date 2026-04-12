@@ -7,62 +7,90 @@ interface FooterRow {
 
 interface Props {
   rows: FooterRow[]
+  totalColumns: number
+  /** Row height in px for sticky-bottom offset stacking. Default 33. */
+  rowHeightPx?: number
 }
 
-// Column layout mirrors the Register table: Rank · Institution · Type ·
-// Shares · Value · % Float · [remaining cells empty]. When a tab uses this
-// footer with a different column count, wrap it in a colgroup or pass
-// additional empty cells downstream.
+// Column layout: Rank · Institution · Type · Shares · Value · % Float ·
+// [filler empties to fill totalColumns]. The caller decides how many total
+// columns the host table has — filler count = totalColumns - 6.
+//
+// Sticky-bottom stacking: footer rows use position: sticky + bottom: Npx
+// so they stay pinned at the bottom edge of the scrolling tbody. With N
+// rows in DOM order [row0, row1, ..., rowLast], the visually-bottom row
+// needs bottom: 0 and each earlier row needs bottom: rowHeight * (distance
+// from bottom). That way DOM order matches visual stacking top→bottom.
 
+const NAMED_COL_COUNT = 6
+
+const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 const NUM_2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 
 function fmtShares(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_2.format(v)}M`
+  return NUM_2.format(v)
 }
 
 function fmtValue(v: number | null): string {
   if (v == null) return '—'
   if (v >= 1000) return `$${NUM_1.format(v / 1000)}B`
-  return `$${NUM_1.format(v)}M`
+  return `$${NUM_0.format(v)}M`
 }
 
 function fmtPct(v: number | null): string {
   if (v == null) return '—'
-  return `${NUM_2.format(v)}%`
+  return `${NUM_1.format(v)}%`
 }
 
-const FOOTER_CELL: React.CSSProperties = {
-  padding: '8px 10px',
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#ffffff',
-  backgroundColor: 'var(--oxford-blue)',
+function cellStyle(bottomPx: number): React.CSSProperties {
+  return {
+    padding: '7px 10px',
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#ffffff',
+    backgroundColor: 'var(--oxford-blue)',
+    position: 'sticky',
+    bottom: bottomPx,
+    zIndex: 2,
+    // First sticky row gets the top accent border; subsequent rows draw a
+    // thinner internal divider so the stacked rows read as one footer block.
+    borderTop: '2px solid var(--oxford-blue)',
+  }
 }
 
-const FOOTER_CELL_RIGHT: React.CSSProperties = {
-  ...FOOTER_CELL,
-  textAlign: 'right',
-  fontVariantNumeric: 'tabular-nums',
+function cellStyleRight(bottomPx: number): React.CSSProperties {
+  return {
+    ...cellStyle(bottomPx),
+    textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums',
+  }
 }
 
-export function TableFooter({ rows }: Props) {
+export function TableFooter({ rows, totalColumns, rowHeightPx = 33 }: Props) {
+  const fillerCount = Math.max(0, totalColumns - NAMED_COL_COUNT)
   return (
-    <tfoot style={{ borderTop: '2px solid var(--oxford-blue)' }}>
-      {rows.map((r, i) => (
-        <tr key={i}>
-          <td style={FOOTER_CELL} />
-          <td style={FOOTER_CELL}>{r.label}</td>
-          <td style={FOOTER_CELL} />
-          <td style={FOOTER_CELL_RIGHT}>{fmtShares(r.shares_mm)}</td>
-          <td style={FOOTER_CELL_RIGHT}>{fmtValue(r.value_mm)}</td>
-          <td style={FOOTER_CELL_RIGHT}>{fmtPct(r.pct_float)}</td>
-          <td style={FOOTER_CELL} />
-          <td style={FOOTER_CELL} />
-          <td style={FOOTER_CELL} />
-        </tr>
-      ))}
+    <tfoot>
+      {rows.map((r, i) => {
+        // Row 0 (top of footer) needs the largest bottom offset so it stacks
+        // above Row 1 which sits at bottom: 0. For N rows: bottomPx =
+        // (N - 1 - i) * rowHeight.
+        const bottomPx = (rows.length - 1 - i) * rowHeightPx
+        return (
+          <tr key={i}>
+            <td style={cellStyle(bottomPx)} />
+            <td style={cellStyle(bottomPx)}>{r.label}</td>
+            <td style={cellStyle(bottomPx)} />
+            <td style={cellStyleRight(bottomPx)}>{fmtShares(r.shares_mm)}</td>
+            <td style={cellStyleRight(bottomPx)}>{fmtValue(r.value_mm)}</td>
+            <td style={cellStyleRight(bottomPx)}>{fmtPct(r.pct_float)}</td>
+            {Array.from({ length: fillerCount }, (_, j) => (
+              <td key={j} style={cellStyle(bottomPx)} />
+            ))}
+          </tr>
+        )
+      })}
     </tfoot>
   )
 }
