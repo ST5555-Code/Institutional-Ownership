@@ -16,7 +16,7 @@ import {
   ExportBar,
 } from '../common'
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
@@ -83,8 +83,9 @@ export function PeerRotationTab() {
     const key = `${p.from}_${p.to}`
     return {
       label: p.label,
-      subject: (data.subject_flows[key]?.net || 0) / 1e6,
+      ticker: (data.subject_flows[key]?.net || 0) / 1e6,
       sector: (data.sector_flows[key]?.net || 0) / 1e6,
+      pctOfIndustry: data.subject_pct_of_sector[key] ?? null,
     }
   }) : []
 
@@ -147,27 +148,40 @@ export function PeerRotationTab() {
               <InfoChip label="Industry" value={data.subject.industry} />
             </div>
 
-            {/* Flow trend chart */}
-            {chartData.length > 0 ? (
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
-                <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Flow Trend — Subject vs Sector</div>
-                <div style={{ padding: '8px 8px 4px' }}>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={chartData}>
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `$${NUM_1.format(v)}M`} width={56} />
-                      <Tooltip formatter={(v: number) => `$${NUM_1.format(v)}M`} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
-                      <Line type="monotone" dataKey="subject" name="Subject" stroke="#f5a623" strokeWidth={2} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="sector" name="Sector" stroke="#4A90D9" strokeWidth={2} dot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+            {/* Charts row — flow bar chart left, placeholder right */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              {/* Left: ticker vs sector flow bars per period */}
+              {chartData.length > 0 ? (
+                <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
+                  <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{data.subject.ticker} vs {data.subject.sector} Sector — Flow by Quarter</span>
+                    <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>
+                      % of industry flow to {data.subject.ticker}: {data.subject_pct_of_sector.total != null ? `${data.subject_pct_of_sector.total}%` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '8px 8px 4px' }}>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={chartData} barSize={20} barGap={2}>
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `$${NUM_1.format(v)}M`} width={56} />
+                        <Tooltip formatter={(v: number) => `$${NUM_1.format(v)}M`} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                        <Bar dataKey="ticker" name={data.subject.ticker} fill="#f5a623" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="sector" name="Sector" fill="#4A90D9" radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
+              ) : (
+                <div style={{ flex: 1, ...CENTER_MSG, color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 6 }}>Insufficient period data</div>
+              )}
+
+              {/* Right: placeholder for future chart */}
+              <div style={{ flex: 1, border: '1px dashed #cbd5e1', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220, backgroundColor: '#fafafa' }}>
+                <span style={{ color: '#94a3b8', fontSize: 13 }}>Additional chart — coming soon</span>
               </div>
-            ) : (
-              <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Insufficient period data</div>
-            )}
+            </div>
 
             {/* Two-column layout */}
             <div style={{ display: 'flex', gap: 12 }}>
