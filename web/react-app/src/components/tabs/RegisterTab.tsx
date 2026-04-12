@@ -588,8 +588,25 @@ export function RegisterTab() {
               borderCollapse: 'separate',
               borderSpacing: 0,
               fontSize: 13,
+              // Fixed layout: columns are sized from <colgroup> below and
+              // ignore body-cell content width. This is what keeps the
+              // Institution column from expanding when Fund view swaps in
+              // long fund-series names.
+              tableLayout: 'fixed',
             }}
           >
+            <colgroup>
+              <col style={{ width: 60 }} />
+              {/* Institution: remainder — no explicit width */}
+              <col />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 140 }} />
+            </colgroup>
             <thead>
               <ColumnGroupHeader
                 groups={[
@@ -598,7 +615,7 @@ export function RegisterTab() {
                 ]}
               />
               <tr>
-                <th style={{ ...TH_RIGHT, width: 60 }}>Rank</th>
+                <th style={TH_RIGHT}>Rank</th>
                 <th style={TH_STYLE}>Institution</th>
                 <th style={TH_STYLE}>Type</th>
                 <th style={TH_RIGHT}>Shares (MM)</th>
@@ -789,6 +806,13 @@ function renderRow(
     fontSize: indent === 1 ? 12 : 13,
     cursor: canExpand ? 'pointer' : 'default',
     userSelect: 'none',
+    // Long fund-series names must truncate with ellipsis instead of
+    // wrapping or expanding the column. The title attribute below
+    // surfaces the full name on hover.
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 0,
   }
   const nport = nportBadgeStyle(row.nport_cov)
   return (
@@ -804,7 +828,6 @@ function renderRow(
           fontWeight: indent === 0 ? 700 : 400,
           color: indent === 0 ? '#64748b' : '#94a3b8',
           fontSize: indent === 1 ? 12 : 13,
-          width: 60,
         }}
       >
         {displayRank ?? row.rank}
