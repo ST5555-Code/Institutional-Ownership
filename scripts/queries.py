@@ -4222,6 +4222,87 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
 
 
 # ---------------------------------------------------------------------------
+# Market Summary — top institutions by 13F book value
+# ---------------------------------------------------------------------------
+
+
+def get_market_summary(limit=25):
+    """Top N institutions by total 13F holdings value (market-wide).
+
+    Returns a ranked list with AUM, filer count, and fund count per
+    institution. Uses holdings_v2 for AUM (avoids polluted managers.aum_total),
+    entity_relationships for filer count, and fund children for fund count.
+    """
+    con = get_db()
+    try:
+        # Top institutions by 13F book value
+        df = con.execute(f"""
+            WITH inst_aum AS (
+                SELECT
+                    COALESCE(rollup_name, inst_parent_name, manager_name) as institution,
+                    SUM(market_value_usd) as total_aum,
+                    COUNT(DISTINCT ticker) as num_holdings,
+                    COUNT(DISTINCT cik) as num_ciks,
+                    MAX(manager_type) as manager_type
+                FROM holdings_v2
+                WHERE quarter = '{LQ}'
+                GROUP BY institution
+                ORDER BY total_aum DESC NULLS LAST
+                LIMIT ?
+            )
+            SELECT * FROM inst_aum
+        """, [limit]).fetchdf()
+
+        if len(df) == 0:
+            return []
+
+        rows = df_to_records(df)
+
+        # Enrich with entity-level filer + fund counts where possible
+        for i, r in enumerate(rows, 1):
+            r['rank'] = i
+            # Look up entity_id for this institution name
+            try:
+                ent = con.execute("""
+                    SELECT ea.entity_id
+                    FROM entity_aliases ea
+                    WHERE ea.alias_name = ? AND ea.valid_to = '9999-12-31'
+                    LIMIT 1
+                """, [r['institution']]).fetchone()
+                if ent:
+                    eid = ent[0]
+                    r['entity_id'] = eid
+                    # Filer count: CIK-bearing children in entity_relationships
+                    fc = con.execute("""
+                        SELECT COUNT(DISTINCT child_entity_id)
+                        FROM entity_relationships
+                        WHERE parent_entity_id = ? AND valid_to = '9999-12-31'
+                          AND relationship_type != 'sub_adviser'
+                    """, [eid]).fetchone()
+                    r['filer_count'] = fc[0] if fc else 0
+                    # Fund count: fund_sponsor children
+                    fnc = con.execute("""
+                        SELECT COUNT(DISTINCT child_entity_id)
+                        FROM entity_relationships
+                        WHERE parent_entity_id = ? AND valid_to = '9999-12-31'
+                          AND relationship_type = 'fund_sponsor'
+                    """, [eid]).fetchone()
+                    r['fund_count'] = fnc[0] if fnc else 0
+                else:
+                    r['entity_id'] = None
+                    r['filer_count'] = r['num_ciks']
+                    r['fund_count'] = 0
+            except Exception:  # nosec B110
+                r['entity_id'] = None
+                r['filer_count'] = r['num_ciks']
+                r['fund_count'] = 0
+
+        return clean_for_json(rows)
+    finally:
+        pass  # connection managed by thread-local cache
+
+
+# ---------------------------------------------------------------------------
 # Peer Rotation — per-ticker substitution analysis within sector
 # ---------------------------------------------------------------------------
 

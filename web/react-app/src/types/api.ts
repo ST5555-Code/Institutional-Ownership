@@ -585,6 +585,20 @@ export interface PeerRotationDetailResponse {
   entities: PeerRotationDetailEntity[]
 }
 
+// ── Entity Market Summary — /api/entity_market_summary ────────────────────
+
+export interface MarketSummaryRow {
+  rank: number
+  institution: string
+  total_aum: number
+  num_holdings: number
+  num_ciks: number
+  manager_type: string | null
+  entity_id: number | null
+  filer_count: number
+  fund_count: number
+}
+
 // ── Entity Graph — /api/entity_search + /api/entity_children + /api/entity_graph
 
 export interface EntitySearchResult {

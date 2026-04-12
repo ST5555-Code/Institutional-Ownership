@@ -1403,6 +1403,22 @@ def api_entity_resolve():
         con.close()
 
 
+@app.route('/api/entity_market_summary')
+def api_entity_market_summary():
+    """Market-wide: top institutions by 13F book value with filer + fund counts."""
+    try:
+        limit = int(request.args.get('limit', 25))
+    except ValueError:
+        limit = 25
+    try:
+        from queries import get_market_summary
+        result = get_market_summary(limit=limit)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error("entity_market_summary error: %s", e, exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # ---------------------------------------------------------------------------
 # Main
 @app.route('/api/peer_rotation')
