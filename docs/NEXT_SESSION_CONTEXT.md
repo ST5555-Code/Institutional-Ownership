@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (session close, HEAD: f3d32db)_
+_Last updated: 2026-04-12 (session close, HEAD: efab352)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,99 +12,85 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main` (even with `origin/main`)
-- **HEAD:** `f3d32db`
+- **HEAD:** `efab352`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — `web/static/app.js` (~5600 lines)
   - Jinja templates — `web/templates/index.html` + `web/templates/admin.html`
-  - **React full-app (in progress)** — `web/react-app/` (port 5174). Phase 2 complete: Register + Ownership Trend + Conviction tabs ported. See `REACT_MIGRATION.md`.
+  - **React full-app (in progress)** — `web/react-app/` (port 5174). Phase 2: Register + Ownership Trend + Conviction + Entity Graph tabs ported. See `REACT_MIGRATION.md`.
 
 ---
 
 ## First 5 minutes — read these
 
 1. **`~/ClaudeWorkspace/CLAUDE.md`** — workspace rules
-2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF18. COMPLETED section at line ~250+.
+2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF18. COMPLETED section at line ~260+.
 3. **`docs/PROCESS_RULES.md`** — rules for large-data scripts
 4. **`REACT_MIGRATION.md`** — React app migration plan
 5. **Auto memory** at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`
 
 ---
 
-## Items completed this session (2026-04-11 + 2026-04-12)
+## Entity infrastructure — COMPLETE
 
-### Data QC + infrastructure completed (20 items)
+All entity data quality and infrastructure work from this session is done. The entity layer is in its cleanest state since launch.
 
-| Item | Commit | Snapshot | Summary |
-|---|---|---|---|
-| **INF12** | `d51db60` | — | Admin Blueprint with token auth. 15 routes gated. |
-| **INF7** | `1a43376` | `20260411_180047` | Soros/VSS + Peter Soros/Orion fuzzy-match cleanup. |
-| **INF17 Ph2** | `6743f11` | `20260411_214440` | Self-root 5 misattributed entities ($1.27B corrected). |
-| **INF17 Ph3** | `0634682` | — | Fix `build_managers.py` fuzzy matcher: brand-token overlap gate. |
-| **INF4** | `ff49dbc` | `20260411_221854` | Loomis Sayles merge (eid=17973→7650). |
-| **L4-2** | `a3c20e8` | `20260412_061258` | 3 classification mismatches → mixed. |
-| **INF6** | `eaab03b` | `20260412_063446` | Tortoise Capital merge (eid=20187→2273). |
-| **INF8** | `ffa9796` | `20260412_064353` | Trian merge (eid=1090+9075→107). |
-| **INF4b** | `d89e663` | — | CRD normalization: `_normalize_crd()` + LTRIM lookup. |
-| **INF4d** | `eddb05c` | `20260412_074237` | Boston Partners merge (eid=17933→9143). $96.58B. |
-| **INF4c** | `73f6acd` | `20260412_075814` | Batch merge 96 CRD-format fragmented pairs. |
-| **INF4e** | `dba066b` | — | 4 borderline pairs excluded as CRD pollutions. |
-| **L4-1** | `1e01b6b` | `20260412_085048` | 3 mixed→active (Ameriprise, PIMCO, AMG). |
-| **INF17 Ph1** | `46877c5` | — | Scrub 127 managers rows. |
-| **INF17b** | `4ff0006` | — | Brand-token gate in `fetch_ncen.py`. |
-| **INF9e** | `47bb627` | `20260412_092411` | diff/promote extended. 24 overrides promoted to prod. |
-| **INF9a/b/c/d** | `a0d6685` | — | Schema + replay extensions. 4 columns, 3 new action types. |
-| **INF9b data** | `8f8d9f2` | — | 9 Securian DM12 override rows written. |
-| **INF13** | `f3d32db` | — | Verified: fail-fast already in place, no code change. |
-| **43i** | `f3d32db` | `20260412_103422` | 4 Baird sub-advisers self-rooted for EC. |
+### What shipped (2026-04-11 + 2026-04-12)
 
-### Production validation: 9 PASS / 0 FAIL / 7 MANUAL
-
----
-
-## INF9 status — entity_overrides_persistent
-
-**35 rows in prod.** Schema has 4 extension columns (INF9a/b/c/d).
-
-| Component | Status | Detail |
+| Category | Items | Summary |
 |---|---|---|
-| **Table in prod** | ✓ Live | 35 rows: 24 reclassify + 2 set_activist + 9 merge/DM |
-| **diff/promote/sync** | ✓ Done | Full staging workflow coverage (INF9e) |
-| **Schema extensions** | ✓ Done | identifier_type, identifier_value, rollup_type, relationship_context |
-| **5 action types** | ✓ Code ready | reclassify, set_activist, alias_add, merge (with rollup_type), suppress_relationship |
-| **INF9b data** | ✓ Done | 9 Securian fund series. HC Capital/CRI were planning-phase, never executed. |
-| **INF9c data** | ⏳ Pending | L5 deletion list not recoverable — needs fresh L5 parent_bridge audit |
-| **INF9d orphans** | ⏳ Pending | 3 entities (Pacific Life, Stowers, Stonegate) need manual_entities_preserve |
+| **Admin auth** | INF12 | 15 admin routes gated with `ADMIN_TOKEN` + `hmac.compare_digest` |
+| **Entity merges** | INF4, INF4d, INF4c, INF6, INF8, INF4f | 101 CRD-format fragmented pairs merged (Loomis $83B, Boston Partners $97B, 96 batch, Tortoise, Trian, NorthStar). ~$287B combined AUM consolidated. |
+| **CRD normalization** | INF4b, INF17b | `_normalize_crd()` in entity resolver + fetch_ncen.py. LTRIM retroactive lookup. Prevents new fragmentation. |
+| **Fuzzy-match gates** | INF17 Phase 3, INF17b | Brand-token overlap gate in `build_managers.py` + `fetch_ncen.py`. 21-word stopword list. Rejection logging. |
+| **Managers cleanup** | INF17 Phase 1, INF7 | 127 CRD/AUM scrubs + 3 Soros/Peter Soros manual fixes + 2 Trian parent_name scrubs |
+| **Misattribution fixes** | INF17 Phase 2 | 5 entities self-rooted ($1.27B corrected) |
+| **Classification fixes** | L4-1, L4-2 | 6 reclassifications (3 passive→mixed, 3 mixed→active) |
+| **Sub-adviser rollup** | 43i, INF18 | 4 Baird sub-advisers self-rooted for EC. 2 NorthStar orphan_scan edges closed. Financial Partners Group confirmed legitimate. |
+| **Rollup preservation** | INF17 Phase 4 | 3 coincidentally-correct rollups preserved via merge overrides (Carillon→RJF, Nikko→Sumitomo, Nikko EU→JP). Carillon DM fixed to self-root. |
+| **Override framework** | INF9e, INF9a/b/c/d | `entity_overrides_persistent` live in prod (47 rows). diff/promote coverage. 5 action types. entity_id fallback for ghost parents. |
+| **Relationship suppression** | INF9c + follow-up | 6 bad parent_bridge edges suppressed. entity_id fallback for PARENT_SEEDS ghosts. |
+| **Snapshot fallback** | INF13 | Verified: fail-fast already in place, no shutil.copy2 |
+| **CRD audit** | INF4e | 4 borderline pairs confirmed as CRD pollutions, added to managers scrub |
+
+### Production state
+
+- **validate_entities.py --prod:** 9 PASS / 0 FAIL / 7 MANUAL
+- **entity_overrides_persistent:** 47 rows (24 reclassify + 2 set_activist + 9 merge/DM + 6 suppress_relationship + 6 merge/Phase4)
+- **managers.crd_number:** 127 polluted rows scrubbed to NULL
+- **Entity fragmentation:** 101 pairs merged. 15 excluded as CRD pollutions (added to managers scrub).
 
 ---
 
 ## Open items — current priority order
 
-### 1. INF9c data — Fresh L5 parent_bridge audit
+### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
-Code framework (`suppress_relationship` action) is ready. Original L5 deletion list not recoverable from current DB state. Need to re-audit parent_bridge fuzzy-match relationships to identify which are still bad. INF5 verifier backstops ADV-sourced subset.
+Original tables retained for 30-day rollback after Phase 4 cutover (2026-04-09). Cleanup list:
+- Delete 4 INF9d ghost entities (eid=20194, 20196, 20201, 20203 — no aliases, no identifiers, no holdings)
+- Drop legacy pre-entity tables (holdings v1, old parent_bridge snapshots, etc.)
+- Requires explicit user authorization before any deletion
 
-### 2. INF9d — manual_entities_preserve for 3 orphan entities
+### 2. N-PORT data refresh
 
-Pacific Life (eid=20194), Stowers (eid=20196), Stonegate (eid=20201) get dropped on `--reset`. Need a curated list in `build_entities.py` that re-creates them before replaying overrides.
+`fund_holdings_v2` data is stale through Oct 2025. Pipeline run needed to fetch current N-PORT filings. Run manually from terminal:
+```bash
+! python3 -u scripts/fetch_nport.py --test  # test first
+! python3 -u scripts/fetch_nport.py          # full run (authorized)
+```
+This is a pipeline operation, NOT a data QC task. Do not run without explicit user authorization.
 
-### 3. INF18 — Financial Partners Group children investigation
+### 3. React migration — ongoing parallel workstream
 
-Cassaday, LVW Advisors, Quadrant Private Wealth roll under Financial Partners Group for EC via orphan_scan. Verify if legitimate subsidiaries (FPG is an RIA aggregator) or sub-advisers. If subs: self-root for EC.
+Phase 2 in progress: Register + Ownership Trend + Conviction + Entity Graph tabs ported. Pick next tab. See `REACT_MIGRATION.md`.
 
-### 4. INF17 Phase 4 — Preserve coincidentally-correct rollups
+### 4. Minor follow-ups
 
-`parent_bridge_sync` manual writes for Carillon→RJF, Nikko→Sumitomo, Martin Currie→Martin Currie Ltd. Depends on INF9c data landing first.
-
-### 5. Amundi → Amundi Taiwan rollup
-
-eid=830 + eid=4248 → eid=752 Amundi Taiwan. Should roll to global Amundi SA parent.
-
-### 6. React migration — next tab
-
-Phase 2 complete (Register + Ownership Trend + Conviction). Pick next tab. See `REACT_MIGRATION.md`.
+- **Amundi → Amundi Taiwan rollup** — eid=830 + eid=4248 roll to eid=752 Amundi Taiwan via parent_bridge_sync/manual. Should roll to global Amundi SA parent. Separate manual fix.
+- **Financial Partners Group fragmentation** — eid=1600 "Inc" vs eid=9722 "LLC" with circular orphan_scan. Minor structural cleanup.
+- **INF9c suppress_relationship entity_id stability** — PARENT_SEEDS entity_ids are deterministic in practice but not contractually guaranteed. The 6 suppress rows use entity_id fallback which is best-effort across full --reset. Full fix would require adding CIK identifiers to PARENT_SEEDS brand ghosts.
 
 ---
 
@@ -116,46 +102,27 @@ See full text in `87bc812` version.
 
 ### f. Data model traps
 
-- **`entity_overrides_persistent`** — **35 rows in prod.** 5 action types, 4 extension columns (INF9a/b/c/d `a0d6685`). Flows through standard staging workflow. `replay_persistent_overrides()` resolves via `(identifier_type, identifier_value)` with CRD normalization.
-- **`managers.aum_total` + `crd_number`** — 127 rows scrubbed to NULL (INF17 Phase 1). Use `SUM(holdings_v2.market_value_usd)` for AUM.
-- **`holdings_v2.cik`** — 10-digit zero-padded.
-- **`fund_universe.is_actively_managed`** — authoritative active/passive flag. `NULL` = unknown.
-- **`entity_relationships`** — 5 types. Exclude `sub_adviser` when walking ownership trees.
+- **`entity_overrides_persistent`** — 47 rows in prod. 5 action types (reclassify, set_activist, alias_add, merge, suppress_relationship). 4 extension columns. Resolution via `(identifier_type, identifier_value)` with CRD normalization. suppress_relationship uses entity_id fallback for ghost parents.
+- **`managers.aum_total` + `crd_number`** — 127 rows scrubbed to NULL. Use `SUM(holdings_v2.market_value_usd)` for AUM.
+- **`_resolve_db_path()`** — fail-fast RuntimeError when DB locked. No shutil.copy2 (INF13 verified).
+- **CRD normalization** — `entity_sync._normalize_crd()` strips leading zeros. LTRIM retroactive lookup.
 - **13F-NT vs 13F-HR** — NT filers have zero `holdings_v2` rows.
-- **CRD normalization** — `entity_sync._normalize_crd()` strips leading zeros (INF4b). LTRIM lookup handles retroactive matching.
-- **`_resolve_db_path()`** — fail-fast RuntimeError when main DB locked and no snapshot exists. `shutil.copy2` removed (INF13 verified).
 
 ### g–h: React/AG Grid/Tailwind landmines, inline style cascade
 
 See `87bc812` version.
 
-### i. Fuzzy name matching — brand-token Jaccard, not token_sort_ratio
+### i. Fuzzy name matching — brand-token Jaccard
 
 Both `build_managers.py` and `fetch_ncen.py` have `_BRAND_STOPWORDS` + `_brand_tokens_overlap()`.
 
-### j–k: DuckDB similarity gap + audit query join bug
+### j–r: DuckDB similarity gap, audit join bug, merge_staging DROP+CREATE, sync SKIP, manually_verified unreliable, 13F-NT AUM distortion, CRD normalization, CIK transfer rule, LOW_COV classification rule
 
-### l. merge_staging.py — managers uses DROP+CREATE path
+See prior versions for full text.
 
-### m. sync_staging.py — entity_overrides_persistent syncs normally
+### s. Sub-adviser vs subsidiary for EC rollup
 
-### n. `manually_verified=True` is unreliable
-
-### o. 13F-NT filers distort AUM-at-risk estimates
-
-### p. CRD format normalization (INF4b)
-
-100 entity pairs merged, 15 excluded. Code fix prevents new occurrences.
-
-### q. Batch entity merge: always transfer CIK identifiers
-
-INSERT on survivor before closing source. INF4c lesson (~$166B gap).
-
-### r. L4-1 LOW_COV: N-PORT coverage < 50% → keep mixed
-
-### s. Sub-adviser vs subsidiary for EC rollup (NEW — 43i)
-
-When a non-fund entity rolls under a parent for `economic_control_v1` via `transitive_flatten` or `orphan_scan`, check whether the child is a **subsidiary** (legitimate EC rollup — brand-name subsidiaries like Carillon→Raymond James, Royce→Franklin Templeton) or a **sub-adviser** (should self-root for EC — GAMMA/Reinhart/Strategas sub-advising Baird funds but not owned by Baird). The brand-token overlap heuristic catches most cases, but sub-advisers with no name overlap AND no ownership relationship are the ones that need manual review. The 43i audit found 28 zero-overlap institution pairs; 24 were legitimate subsidiaries, 4 were mis-classified sub-advisers (all under Baird).
+When non-fund entity rolls under parent for EC via transitive_flatten/orphan_scan, verify if subsidiary (keep) or sub-adviser (self-root). 43i found 28 zero-overlap institution pairs; 24 legitimate, 4 Baird sub-advisers fixed.
 
 ---
 
@@ -164,11 +131,11 @@ When a non-fund entity rolls under a parent for `economic_control_v1` via `trans
 ```bash
 cd ~/ClaudeWorkspace/Projects/13f-ownership
 git status -sb                  # expect: ## main...origin/main
-git log -5 --oneline            # expect: f3d32db or newer
+git log -5 --oneline            # expect: efab352 or newer
 pgrep -f "scripts/app.py"       # dev server PID
 curl -s http://localhost:8001/api/tickers | python3 -c "import json,sys; print(len(json.load(sys.stdin)))"  # 6500+
 python3 scripts/validate_entities.py --prod   # 9 PASS / 0 FAIL / 7 MANUAL
-python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True).execute('SELECT COUNT(*) FROM entity_overrides_persistent').fetchone()[0], 'overrides in prod')"  # 35
+python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True).execute('SELECT COUNT(*) FROM entity_overrides_persistent').fetchone()[0], 'overrides in prod')"  # 47
 ```
 
 ---
@@ -180,7 +147,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 - Always update `ROADMAP.md` after completing a task.
 - Entity changes: `sync_staging.py` → `diff_staging.py` → `promote_staging.py`.
 - Reference-table changes: `merge_staging.py --tables <name>`.
-- **Entity overrides: 35 rows in prod.** 5 action types. Resolution uses `(identifier_type, identifier_value)` with CRD normalization.
+- Entity overrides: 47 rows in prod. 5 action types. suppress_relationship uses entity_id fallback.
 - Read files in full before editing.
 - Confirm destructive actions before running.
 - Use `python3 -u` for background tasks.
@@ -189,7 +156,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 - CRD values must be normalized via `_normalize_crd()`.
 - Batch entity merges: always transfer CIK identifiers before closing.
 - N-PORT coverage < 50%: keep classification as `mixed`.
-- Sub-adviser vs subsidiary: verify before EC rollup (gotcha s).
+- Sub-adviser vs subsidiary: verify before EC rollup.
 
 ---
 
@@ -205,28 +172,31 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 
 ---
 
-## Session ledger (newest first)
+## Session ledger (newest first — key data QC commits only)
 
 ```
-f3d32db 43i: self-root 4 Baird sub-advisers for EC + INF13 verified Done + INF18
-8f8d9f2 INF9b: write 9 Securian DM12 override rows
+11d7cce INF9c follow-up: entity_id fallback + backfill 6 rows
+976733a ROADMAP: close INF9d as won't fix + Stage 5 cleanup
+e0ffd4d INF4f: NorthStar CRD merge (eid=6693→7693)
+67f3f51 INF17 Phase 4: preserve 3 rollups + Carillon DM + close 3 CRDs
+f6076a3 43i/INF18: NorthStar orphan_scan fix + Financial Partners confirmed
+b543030 INF9c: suppress 6 bad parent_bridge relationships
+8f8d9f2 INF9b: 9 Securian DM12 override rows
 a0d6685 INF9a/b/c/d: schema + replay extensions
-47bb627 INF9e: diff/promote extended + 24 overrides promoted
-50c9065 ROADMAP: L4-1 + INF17 Phase 1 + INF17b Done
+47bb627 INF9e: diff/promote + 24 overrides promoted
 4ff0006 INF17b: brand-token gate in fetch_ncen.py
 46877c5 INF17 Phase 1: scrub 127 managers rows
 1e01b6b L4-1: 3 mixed→active
-dba066b INF4e Done: 4 pairs excluded as CRD pollutions
 73f6acd INF4c: batch merge 96 CRD-format fragmented pairs
-eddb05c INF4d: Boston Partners merge
+eddb05c INF4d: Boston Partners merge ($96.58B)
 d89e663 INF4b + INF17b: CRD normalization
 ffa9796 INF8: Trian merge
 eaab03b INF6: Tortoise Capital merge
 a3c20e8 L4-2: 3 classification fixes
 ff49dbc INF4: Loomis Sayles merge
 0634682 INF17 Phase 3: build_managers.py fuzzy-match fix
-6743f11 INF17 Phase 2: self-root 5 misattributed entities
+6743f11 INF17 Phase 2: self-root 5 entities
 1a43376 INF7: Soros/VSS cleanup
-d51db60 INF12: admin Blueprint with token auth
-b53e3fa INF9 Route A: 24 reclassify overrides to staging
+d51db60 INF12: admin Blueprint
+b53e3fa INF9 Route A: 24 overrides to staging
 ```
