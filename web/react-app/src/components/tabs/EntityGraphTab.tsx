@@ -169,12 +169,12 @@ export function EntityGraphTab() {
   const [modalEntityId, setModalEntityId] = useState<number | null>(null)
   const [modalEntityName, setModalEntityName] = useState('')
 
-  // Market summary (no ticker)
-  const marketUrl = viewMode === 'market' && !ticker ? '/api/entity_market_summary?limit=25' : null
+  // Market mode: always shows market leaderboard (ignores ticker)
+  const marketUrl = viewMode === 'market' ? '/api/entity_market_summary?limit=25' : null
   const market = useFetch<MarketSummaryRow[]>(marketUrl)
 
-  // Ticker holder table (when ticker is set in Market mode)
-  const tickerHoldersUrl = viewMode === 'market' && ticker
+  // Company mode: ticker holder table (when ticker is set)
+  const tickerHoldersUrl = viewMode === 'company' && ticker
     ? `/api/query1?ticker=${enc(ticker)}&rollup_type=${rollupType}`
     : null
   const tickerHolders = useFetch<RegisterResponse>(tickerHoldersUrl)
@@ -272,22 +272,22 @@ export function EntityGraphTab() {
             </button>
           ))}
         </div>
-        {viewMode === 'company' && <EntitySearch onSelect={(id, name) => { setSelectedEntityId(id); setSelectedEntityName(name) }} />}
+        {viewMode === 'company' && !ticker && <EntitySearch onSelect={(id, name) => { setSelectedEntityId(id); setSelectedEntityName(name) }} />}
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={q => { setQuarter(q); setModalEntityId(null) }} />
-        {viewMode === 'company' && (
+        {viewMode === 'company' && !ticker && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
             <input type="checkbox" checked={showSubAdvisers} onChange={e => setShowSubAdvisers(e.target.checked)} /> Sub-Advisers
           </label>
         )}
         <div style={{ marginLeft: 'auto' }}>
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={viewMode === 'market' ? (!ticker ? !market.data : !tickerHolders.data) : !data} />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={viewMode === 'market' ? !market.data : (ticker ? !tickerHolders.data : !data)} />
         </div>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-        {/* ── MARKET MODE — no ticker: market summary ── */}
-        {viewMode === 'market' && !ticker && (
+        {/* ── MARKET MODE — always market leaderboard ── */}
+        {viewMode === 'market' && (
           <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
             {market.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading market summary…</div>}
             {market.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {market.error}</div>}
@@ -335,52 +335,63 @@ export function EntityGraphTab() {
           </div>
         )}
 
-        {/* ── MARKET MODE — ticker set: top holders of ticker ── */}
-        {viewMode === 'market' && ticker && (
-          <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>Top Holders of {ticker.toUpperCase()} — click to view entity structure</div>
-            {tickerHolders.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading holders…</div>}
-            {tickerHolders.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {tickerHolders.error}</div>}
-            {tickerHolders.data && (() => {
-              const parentRows = tickerHolders.data.rows.filter(r => r.level === 0)
-              return (
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
-                <thead><tr>
-                  <th style={{ ...TH, width: 40 }}>#</th><th style={TH}>Institution</th><th style={TH}>Type</th>
-                  <th style={TH_R}>Value ($MM)</th><th style={TH_R}>% Float</th><th style={TH_R}>AUM ($MM)</th>
-                </tr></thead>
-                <tbody>
-                  {parentRows.map((r, i) => {
-                    const ts = getTypeStyle(r.type)
-                    return (
-                      <tr key={i} onClick={() => handleHolderClick(r.institution)} style={{ cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{r.rank}</td>
-                        <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
-                        <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
-                        <td style={TD_R}>{r.value_live != null && r.value_live !== 0 ? `$${NUM_0.format(r.value_live / 1e6)}` : '—'}</td>
-                        <td style={TD_R}>{r.pct_float != null && r.pct_float !== 0 ? `${NUM_2.format(r.pct_float)}%` : '—'}</td>
-                        <td style={TD_R}>{r.aum != null && r.aum !== 0 ? `$${NUM_0.format(r.aum)}` : '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>)
-            })()}
-          </div>
-        )}
-
         {/* ── COMPANY MODE ── */}
         {viewMode === 'company' && (
           <>
-            {!selectedEntityId && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <div style={{ fontSize: 32, color: '#2d3f5e' }}>🔍</div>
-                <div style={{ color: '#94a3b8', fontSize: 14 }}>Search for an institution to view its entity structure</div>
+            {/* Ticker set: show top holders table with modal on click */}
+            {ticker && (
+              <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>Top Holders of {ticker.toUpperCase()} — click to view entity structure</div>
+                {tickerHolders.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading holders…</div>}
+                {tickerHolders.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {tickerHolders.error}</div>}
+                {tickerHolders.data && (() => {
+                  const parentRows = tickerHolders.data.rows.filter(r => r.level === 0)
+                  const totalValue = parentRows.reduce((s, r) => s + (r.value_live || 0), 0)
+                  const totalPctFloat = parentRows.reduce((s, r) => s + (r.pct_float || 0), 0)
+                  return (
+                  <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
+                    <thead><tr>
+                      <th style={{ ...TH, width: 40 }}>#</th><th style={TH}>Institution</th><th style={TH}>Type</th>
+                      <th style={TH_R}>Value ($MM)</th><th style={TH_R}>% Float</th><th style={TH_R}>AUM ($MM)</th>
+                    </tr></thead>
+                    <tbody>
+                      {parentRows.map((r, i) => {
+                        const ts = getTypeStyle(r.type)
+                        return (
+                          <tr key={i} onClick={() => handleHolderClick(r.institution)} style={{ cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                            <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{r.rank}</td>
+                            <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
+                            <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
+                            <td style={TD_R}>{r.value_live != null && r.value_live !== 0 ? `$${NUM_0.format(r.value_live / 1e6)}` : '—'}</td>
+                            <td style={TD_R}>{r.pct_float != null && r.pct_float !== 0 ? `${NUM_2.format(r.pct_float)}%` : '—'}</td>
+                            <td style={TD_R}>{r.aum != null && r.aum !== 0 ? `$${NUM_0.format(r.aum)}` : '—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot><tr>
+                      <td style={FC} /><td style={FC}>Top {parentRows.length} Total</td><td style={FC} />
+                      <td style={FCR}>{totalValue > 0 ? `$${NUM_0.format(totalValue / 1e6)}` : '—'}</td>
+                      <td style={FCR}>{totalPctFloat > 0 ? `${NUM_2.format(totalPctFloat)}%` : '—'}</td>
+                      <td style={FC} />
+                    </tr></tfoot>
+                  </table>)
+                })()}
               </div>
             )}
-            {loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading…</div>}
-            {error && !loading && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {error}</div>}
+
+            {/* No ticker: entity search + React Flow diagram */}
+            {!ticker && (
+              <>
+                {!selectedEntityId && (
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                    <div style={{ fontSize: 32, color: '#2d3f5e' }}>🔍</div>
+                    <div style={{ color: '#94a3b8', fontSize: 14 }}>Search for an institution to view its entity structure</div>
+                  </div>
+                )}
+                {loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading…</div>}
+                {error && !loading && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {error}</div>}
             {data && !loading && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 <div style={{ height: graphHeight, borderBottom: '1px solid #1e2d47', flexShrink: 0 }}>
@@ -423,6 +434,8 @@ export function EntityGraphTab() {
                   )}
                 </div>
               </div>
+            )}
+              </>
             )}
           </>
         )}
