@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 0-B1 design doc + data_freshness pipeline hooks + FreshnessBadge all landed. HEAD: 7928035)_
+_Last updated: 2026-04-13 (session close — FreshnessBadge rollout to all 11 tabs + Phase 0-B2 smoke CI shipped. HEAD: 8cf0d82)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `7928035` (docs — session close)
+- **HEAD:** `8cf0d82` (Phase 0-B2 — smoke CI fixture + response snapshot tests)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -81,20 +81,14 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ### ⭐ Next tasks in order
 
-_Phase 0-B1 design doc committed 2026-04-13 (`7f62b7d`) — Option 2
-(committed binary snapshot + rebuild script). Data-freshness pipeline
-write hooks + FreshnessBadge shipped (`2892009`): `record_freshness()`
-helper in db.py, wired into compute_flows + build_summaries, React
-component piloting in FlowAnalysisTab._
+_FreshnessBadge rolled out to all 11 tabs 2026-04-13 (`83836ee`).
+Phase 0-B2 smoke CI shipped 2026-04-13 (`8cf0d82`) — fixture DB,
+build script, smoke workflow, and 8 passing tests all committed.
+Phase 4 Batch 4-A (Blueprint split) is now unblocked._
 
-**1. FreshnessBadge rollout — ~1 hour, low risk.** Wire `FreshnessBadge` into the remaining 10 tabs per the mapping in gotcha z: Register → `summary_by_parent`, Conviction → `summary_by_parent`, Ownership Trend → `investor_flows`, Peer Rotation → `investor_flows`, Sector Rotation → `investor_flows`, Fund Portfolio → `fund_holdings_v2`, Short Interest → `short_interest` (or `beneficial_ownership_current`), Cross-Ownership → `summary_by_parent`, Overlap Analysis → `summary_by_parent`, Entity Graph → (entity-MDM-level; probably skip or point at `summary_by_parent`). Badge already uses a shared module-level fetch cache, so cost scales O(1) regardless of tab count.
+**1. Phase 4 Batch 4-A — Blueprint split — ~1 day, large refactor.** Split `scripts/app.py` (~1,400 lines) into domain Blueprints per `ARCHITECTURE_REVIEW.md` Phase 4-A. Target files: `app_db.py` (web-layer DB helpers, distinct from pipeline `scripts/db.py`), `app_bootstrap.py` (≤100 lines), `api_register.py`, `api_flows.py`, `api_entities.py`, `api_market.py`, `api_config.py`. Smoke CI from Phase 0-B2 is the regression guardrail: `test_smoke_response_equality` must stay green on the 4 monitored endpoints. Feature branch recommended. `app.py` kept as `app_legacy.py` until smoke passes for ≥1 week. Does NOT include FastAPI swap (moved to Phase 4+).
 
-**2. Phase 0-B2 — smoke CI implementation — ~half day, medium risk.** From `ARCHITECTURE_REVIEW.md` Phase 0-B2 + `docs/ci_fixture_design.md` acceptance criteria.
-   a. `scripts/build_fixture.py` — idempotent; reads prod read-only; picks reference tickers (AAPL, MSFT, EQT, NVDA); walks holdings → entities → rollups → N-PORT children → fund_family_patterns; writes `tests/fixtures/13f_fixture.duckdb` < 1 MB.
-   b. `.github/workflows/smoke.yml` — copies fixture, runs Flask against it, exercises 4 smoke endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`), asserts HTTP 200 + non-empty body.
-   c. `tests/fixtures/responses/*.json` — one snapshot per endpoint, regenerated only by an explicit `--update` flag.
-   d. `test_smoke_response_equality()` — top-level keys present, row count ±5%, ≥ 1 sentinel value per endpoint.
-   **Gate:** Phase 0-B2 green unblocks Batch 4-A (Blueprint split).
+**2. Phase 4 Batch 4-B — queries.py service layer split — ~half day.** Follows 4-A. Split `queries.py` (~5,400 lines) into SQL construction (`queries.py`, leaner), response shaping (`serializers.py`), and cache helpers (`cache.py` with explicit key constants).
 
 **Known pre-existing issues — do not absorb:**
 - BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work.
@@ -193,6 +187,42 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
 
+### aa. `DATE '9999-12-31'` is the SCD open-row sentinel (not NULL) — Phase 0-B2 discovery
+
+Across every entity SCD table — `entity_rollup_history`, `entity_aliases`,
+`entity_identifiers`, `entity_classification_history`, `entity_relationships`
+— "currently open" rows have `valid_to = DATE '9999-12-31'`. `valid_to IS
+NULL` matches zero rows in prod. Any filter that tries to select the
+current row must use the sentinel explicitly (see `scripts/build_fixture.py`
+for the pattern). The `entity_current` view enforces this correctly;
+derivative code should query the view instead of re-rolling the filter.
+
+### bb. `entity_current` is a VIEW, not a table — Phase 0-B2 discovery
+
+`entity_current` is the only user-defined view in the DB. Any fixture build
+or snapshot that copies tables into a fresh DB must **recreate the view**
+after tables land. The view definition is mirrored in
+`scripts/build_fixture.py` and must stay in sync with prod — if prod
+redefines the view (via a migration), update the build script in the
+same PR.
+
+### cc. `entity_identifiers.identifier_type` is lowercase — Phase 0-B2 discovery
+
+Identifier type values are lowercase strings: `'cik'`, `'crd'`, `'series_id'`.
+Filters using uppercase (`WHERE identifier_type = 'CIK'`) silently return
+zero rows. Spot-checked during fixture build after the initial `managers`
+filter returned 0. No `UPPER()` normalization in prod; everything assumes
+lowercase.
+
+### dd. `DB_PATH_OVERRIDE` env var lets test harnesses swap DBs — Phase 0-B2
+
+`scripts/app.py:83` reads `DB_PATH_OVERRIDE` env var at module load and
+substitutes it for the default `data/13f.duckdb`. Used by
+`tests/smoke/conftest.py` to point Flask at the committed fixture DB.
+Undefined in normal use. Do not couple further logic to this var — it is
+a minimal override surface for test fixtures, not a general runtime
+configuration mechanism.
+
 ### z. `record_freshness` + FreshnessBadge wiring (Batch 3-A follow-on)
 
 - Pipeline scripts that rebuild a precomputed table should call `db.record_freshness(con, 'table_name')` at the end of their main() (after CHECKPOINT). Helper is no-op on a pre-Batch-3A DB that lacks `data_freshness`, so it's safe to leave in scripts that may run against old DBs.
@@ -281,6 +311,8 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+8cf0d82 feat: Phase 0-B2 — smoke CI fixture + response snapshot tests
+83836ee feat: FreshnessBadge rollout — wire into all 11 tabs
 2892009 feat: data_freshness pipeline write hooks + FreshnessBadge component
 7f62b7d docs: Phase 0-B1 — CI fixture DB design decision
 731f4a0 feat: Batch 3-A — fund_family_patterns + data_freshness tables
