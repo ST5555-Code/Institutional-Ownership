@@ -1,0 +1,44 @@
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # Runtime dependencies for scripts/app.py at import time. Keep this
+      # minimal — only the subset needed to boot Flask and run the 4 smoke
+      # endpoints against the fixture DB. Versions pinned to match
+      # requirements.txt.
+      - name: Install runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            duckdb==1.4.4 \
+            flask==3.1.1 \
+            pandas==2.3.3 \
+            requests==2.32.5 \
+            openpyxl==3.1.5 \
+            rapidfuzz==3.13.0 \
+            tabulate==0.9.0 \
+            pytest==8.3.3
+
+      - name: Verify fixture DB committed
+        run: |
+          test -f tests/fixtures/13f_fixture.duckdb \
+            || (echo "Missing tests/fixtures/13f_fixture.duckdb — run scripts/build_fixture.py and commit it" && exit 1)
+          ls -lh tests/fixtures/13f_fixture.duckdb
+
+      - name: Run smoke tests
+        run: pytest tests/smoke/ -v

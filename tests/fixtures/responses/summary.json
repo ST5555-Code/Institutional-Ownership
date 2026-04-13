@@ -1,0 +1,72 @@
+{
+  "active_value": 735124990492.4814,
+  "company_name": "APPLE INC",
+  "latest_quarter": "2025Q4",
+  "market_cap": 3757197348800.0,
+  "nport_coverage": 31.8,
+  "nport_funds": 1351,
+  "nport_latest_date": "2025-10-31",
+  "num_holders": 5928,
+  "passive_value": 1061117693799.5201,
+  "price": 255.92,
+  "price_date": "2026-04-05",
+  "shares_float": 14656035251.0,
+  "ticker": "AAPL",
+  "total_pct_float": 67.00410000000655,
+  "total_shares": 9853581626,
+  "total_value": 2521728609725.9014,
+  "type_breakdown": [
+    {
+      "type": "passive",
+      "value": 1118213825840.72
+    },
+    {
+      "type": "mixed",
+      "value": 548912686875.83984
+    },
+    {
+      "type": "active",
+      "value": 406915809107.3596
+    },
+    {
+      "type": "wealth_management",
+      "value": 180470527794.48026
+    },
+    {
+      "type": "pension_insurance",
+      "value": 99086645967.68007
+    },
+    {
+      "type": "quantitative",
+      "value": 68417590099.6
+    },
+    {
+      "type": "strategic",
+      "value": 59283976254.159996
+    },
+    {
+      "type": "hedge_fund",
+      "value": 20723795837.360004
+    },
+    {
+      "type": "SWF",
+      "value": 15351315902.159998
+    },
+    {
+      "type": "endowment_foundation",
+      "value": 4155041879.5199995
+    },
+    {
+      "type": "activist",
+      "value": 190735128.64
+    },
+    {
+      "type": "venture_capital",
+      "value": 6377526.399999999
+    },
+    {
+      "type": "private_equity",
+      "value": 281512.0
+    }
+  ]
+}

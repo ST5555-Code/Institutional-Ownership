@@ -79,7 +79,9 @@ QUERY_NAMES = {
 # ---------------------------------------------------------------------------
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, 'data', '13f.duckdb')
+# DB_PATH_OVERRIDE env var swaps in an alternate DB path (Phase 0-B2 smoke
+# tests point this at the committed CI fixture). Undefined in normal use.
+DB_PATH = os.environ.get('DB_PATH_OVERRIDE') or os.path.join(BASE_DIR, 'data', '13f.duckdb')
 DB_SNAPSHOT_PATH = os.path.join(BASE_DIR, 'data', '13f_readonly.duckdb')
 
 app = Flask(

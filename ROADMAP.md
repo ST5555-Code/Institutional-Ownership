@@ -173,25 +173,22 @@ _Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-b
 
 Source: `ARCHITECTURE_REVIEW.md` (repo root), revised `713fb3f`. Prerequisites
 and phase sequencing documented there — do not reorder without consulting the
-gate criteria in each phase. **Recommended next task for Claude Code: Phase 0-B2 — smoke CI
-implementation per `docs/ci_fixture_design.md` Option 2 (committed
-binary snapshot + rebuild script). New `scripts/build_fixture.py`,
-new `.github/workflows/smoke.yml`, `tests/fixtures/13f_fixture.duckdb`,
-`tests/fixtures/responses/*.json`, `test_smoke_response_equality()`.
-~half day. Gates Phase 4 Batch 4-A (Blueprint split). Phase 0-B1
-design doc committed 2026-04-13 (`7f62b7d`). Phase 3 exit gate cleared
-plus data_freshness pipeline write hooks shipped (`2892009`).
-FreshnessBadge rollout to all 11 tabs shipped 2026-04-13 (see COMPLETED).
-Prior progress: 1-A (`a8dd77a`), 1-B1 (`d3a2fcb`), 2-A (`700bcdb`),
-3-A (`731f4a0`), 3-A-followon (`2892009`). Phase 0-A green on main ✓
-(`e201885`).**
+gate criteria in each phase. **Phase 0-B2 smoke CI shipped 2026-04-13 —
+Phase 4 Batch 4-A (Blueprint split) is now unblocked and is the
+recommended next task.** Phase 0-B1 design doc `7f62b7d`. Phase 0-B2
+implementation (build_fixture + smoke tests + workflow). Phase 3 exit
+gate cleared plus data_freshness pipeline write hooks shipped
+(`2892009`). FreshnessBadge rollout to all 11 tabs shipped 2026-04-13
+(see COMPLETED). Prior progress: 1-A (`a8dd77a`), 1-B1 (`d3a2fcb`),
+2-A (`700bcdb`), 3-A (`731f4a0`), 3-A-followon (`2892009`). Phase 0-A
+green on main ✓ (`e201885`).**
 
 ### Phase 0 — Prerequisite (promoted from BL-1, split into 0-A + 0-B)
 
 | # | Item | Batch | Notes |
 |---|------|-------|-------|
 | ARCH-0A | Lint + static analysis CI | 0-A | ✅ **DONE 2026-04-13** (commit `e201885`). `.github/workflows/lint.yml` runs pre-commit (ruff + pylint + bandit) on push + PR. Green on main. See COMPLETED section for details + BL-8 for suppressed-rule cleanup backlog. |
-| ARCH-0B | Runtime smoke test CI | 0-B | Four-endpoint smoke test (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`) against a fixture DuckDB. **Phase-independent — does NOT gate Phase 1.** Sub-task 1: design fixture approach (seed script vs committed binary vs stripped `EXPORT DATABASE` dump) — design only in this batch, do not implement. Sub-task 2: implement (follow-on). ~2–3 hr including design. |
+| ARCH-0B | Runtime smoke test CI | 0-B | ✅ **DONE 2026-04-13**. Phase 0-B1 design doc landed (`7f62b7d`, Option 2). Phase 0-B2 implementation shipped in the same session: `scripts/build_fixture.py` + `tests/fixtures/13f_fixture.duckdb` (~11 MB) + `tests/smoke/` (endpoint-OK + response-equality tests) + `.github/workflows/smoke.yml`. 4 monitored endpoints: `/api/tickers`, `/api/query1?ticker=AAPL`, `/api/summary?ticker=AAPL`, `/api/entity_graph?entity_id=2`. Gate cleared: Phase 4 Batch 4-A (Blueprint split) now unblocked. See COMPLETED. |
 
 ### Phase 1 — Contract Stabilization (freeze endpoint semantics)
 
@@ -322,6 +319,7 @@ economic_control_v1 as 'Fund Sponsor / Voting' to make this explicit.
 
 | Date | Item | Details |
 |------|------|---------|
+| 2026-04-13 | **Phase 0-B2 — smoke CI fixture + response snapshot tests** | `scripts/build_fixture.py` + `tests/fixtures/13f_fixture.duckdb` (11.3 MB, 4 reference tickers — AAPL/MSFT/EQT/NVDA × 2025Q4 + entity closure to 9,145 eids) + `tests/smoke/{endpoints,test_smoke_endpoints,capture_snapshots}.py` + `tests/fixtures/responses/*.json` + `.github/workflows/smoke.yml`. Minimal DB_PATH_OVERRIDE env var in `scripts/app.py` lets smoke tests point Flask at the fixture without touching any runtime path. **Test suite:** 8 tests, 2 per endpoint — (a) `test_smoke_endpoint_ok` asserts HTTP 200 + non-empty JSON body; (b) `test_smoke_response_equality` asserts keys match snapshot, list-valued rows within ±5 %, and an endpoint-specific sentinel (AAPL ticker in `/api/tickers`, Vanguard Group in `/api/query1` rows, AAPL echo in `/api/summary`, `nodes` non-empty in `/api/entity_graph`). **Endpoints monitored:** `/api/tickers`, `/api/query1?ticker=AAPL`, `/api/summary?ticker=AAPL`, `/api/entity_graph?entity_id=2` (BlackRock — stable big holder across all 4 tickers). **Fixture-build trims applied** (per `docs/ci_fixture_design.md` acceptance): `entity_rollup_history` current-only (`valid_to = DATE '9999-12-31'`) — 40.4k→31.2k; `summary_by_parent` filtered to entity closure — 8.4k→6.5k; `ncen_adviser_map` + `fund_universe` filtered to fund_cik IN fixture — 11.1k→9.3k and 6.7k→5.6k; `investor_flows` excluded entirely (no smoke endpoint reads it). `entity_current` view re-emitted in fixture after tables land (view, not table — must be recreated after schema materialization). **Size note:** <1 MB design target was aspirational pre-schema-inspection; actual binary is 11 MB. User confirmed acceptable — still well below GitHub's 50 MB LFS threshold, no performance impact for `cp`-based CI setup. **CI workflow:** `.github/workflows/smoke.yml` installs pinned runtime deps (duckdb 1.4.4, flask 3.1.1, pandas 2.3.3, etc.) + pytest, verifies fixture present, runs `pytest tests/smoke/ -v`. **Safety rails in build_fixture.py:** source opened with `ATTACH … (READ_ONLY)`, aborts if source==dest, aborts if dest exists without `--force`, interactive confirmation unless `--yes`, supports `--dry-run`. All 4 response snapshots captured via `tests/smoke/capture_snapshots.py --update`. 8/8 tests pass locally. **Gate cleared — Phase 4 Batch 4-A (Blueprint split) now unblocked.** |
 | 2026-04-13 | **FreshnessBadge rollout — all 11 tabs** (Batch 3-A follow-on) | `web/react-app/src/components/tabs/*.tsx` — wired `FreshnessBadge` into the 10 remaining tabs per the mapping in `NEXT_SESSION_CONTEXT.md` gotcha z. Register / Conviction / CrossOwnership / OverlapAnalysis / EntityGraph → `summary_by_parent` (label "register"). OwnershipTrend / PeerRotation / SectorRotation → `investor_flows` (label "flows"). FundPortfolio → `fund_holdings_v2` (label "N-PORT"). ShortInterest → `beneficial_ownership_current` (label "SC-13"). Each tab's control bar `<div style={{ marginLeft: 'auto' }}>` wrapper upgraded to `display: flex, alignItems: center, gap: 10` and badge placed left of `ExportBar` — same pattern as the FlowAnalysisTab pilot. FundPortfolioTab has a flat control row (no marginLeft wrapper) — badge inlined before the ExportBar. Module-level fetch cache in `FreshnessBadge.tsx` means the 11 badges share one `/api/v1/freshness` call. `fund_holdings_v2` and `beneficial_ownership_current` have no pipeline write hook yet — those badges will render "No data" until hooks land; acceptable per component design. `npm run build` + `tsc --noEmit` clean. |
 | 2026-04-13 | **Phase 0-B1 — CI fixture DB design decision** | New `docs/ci_fixture_design.md`, ~210 lines. Evaluates three fixture options (SQL seed script / committed binary snapshot / stripped EXPORT DATABASE dump) against the Phase 0-B2 smoke test requirements. **Recommendation: Option 2 — committed binary snapshot + rebuild script.** Rationale: entity-graph consistency (ADV / parent-bridge / classification / rollup chains) is the dominant complexity driver, which Options 2 & 3 get for free by filtering a validated prod DB while Option 1 requires hand-authoring an unblessed parallel validator. Option 2 edges Option 3 on CI-runtime simplicity (`cp` vs `IMPORT DATABASE`) and ergonomics (one file vs parquet dir). Explicit Phase 0-B2 acceptance criteria included. Commit `7f62b7d`. |
 | 2026-04-13 | **data_freshness pipeline write hooks + FreshnessBadge** (Batch 3-A follow-on) | New `record_freshness(con, table_name, row_count=None)` helper in `scripts/db.py` — INSERT OR REPLACE on `data_freshness` with CURRENT_TIMESTAMP. Auto-count if row_count omitted. Safe no-op (warning only) if `data_freshness` table is missing (pre-3A DB). Wired into `scripts/compute_flows.py` main() — stamps `investor_flows` + `ticker_flow_stats` after CHECKPOINT. Wired into `scripts/build_summaries.py` main() — stamps `summary_by_ticker` + `summary_by_parent`. New React component `web/react-app/src/components/common/FreshnessBadge.tsx` — per-table pill that fetches `/api/v1/freshness` once (module-level cache shared across all badges), renders color-coded pill with status (fresh / amber / red / never) per the ARCH-3A SLA thresholds. Pilot integration: FlowAnalysisTab toolbar next to ExportBar, surfacing `investor_flows`. Other tabs will wire their relevant tables in a follow-up. Graceful degradation to neutral "No data" pill on 404 or empty response. Pre-commit + tsc + `npm run build` all clean. Running Flask needs restart to serve `/api/v1/freshness`. Commit `2892009`. |
