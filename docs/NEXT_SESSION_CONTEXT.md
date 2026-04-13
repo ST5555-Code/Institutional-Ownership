@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Stage 5 cleanup: 3 legacy tables dropped, 4 INF9d eids preserved as PARENT_SEEDS brand shells. HEAD: 305739e)_
+_Last updated: 2026-04-13 (session close — BL-9 + BL-10 fixed, React type migration deferred as two-step ARCH-4C-followup. HEAD: pending)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `305739e` (chore: Stage 5 cleanup — drop 3 legacy tables; preserve 4 INF9d eids)
+- **HEAD:** pending commit (ROADMAP/NEXT_SESSION_CONTEXT doc update). Prior HEAD `9ea3557` (fix: BL-10 multi-sheet exports), preceded by `9572844` (fix: BL-9 short_long).
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
@@ -98,18 +98,28 @@ Run manually when authorized:
 ```
 Pipeline operation — explicit user authorization required before full run.
 
-**2. openapi-typescript tab-by-tab migration.** Migrate remaining React
-tabs from the hand-written `src/types/api.ts` to the auto-generated
-`src/types/api-generated.ts` (shipped 2026-04-13 in `89bc7c8`). One tab
-per PR as the wire contract stabilizes. Not urgent — hand-written types
-still work and stay in sync with prod responses.
+**2. `scripts/schemas.py` expansion (ARCH-4C-followup step 1).**
+Author Pydantic models covering the field-level shape of all ~55
+response types currently in `src/types/api.ts` (Conviction, Cohort,
+FundPortfolio, CrossOwnership, TwoCompany, Crowding, ShortAnalysis,
+SectorFlows, PeerRotation, etc.). Today the only typed envelopes are
+the 6 Phase 1-B2 endpoints + `RegisterRow`+`TickerRow` — everything
+else is untyped, so `api-generated.ts` currently has 7 named schemas
+(5 opaque) vs 55 in `api.ts`. Estimate 4-6 hours + per-endpoint drift
+check against live responses. **Unblocks step 2** (regenerate
+`api-generated.ts` + migrate React tabs + delete `api.ts`). Do not
+attempt the React-side migration before step 1 lands — mechanical
+migration today is a compile-time-safety regression.
+
+**3. Phase-independent backlog cleanup candidates.** BL-3
+(write-path consistency implementation), BL-8 (re-enable suppressed
+pre-commit rules). Small-PR friendly.
 
 ### Phase-independent backlog
 
 - BL-3: write-path consistency implementation (follow-on to 2-A audit)
 - BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
-- BL-9: `/api/v1/short_long` 500 — pre-existing `KeyError 'long_value_k'`
-- BL-10: `/api/v1/export/query<N>` 500 on q6/q10/q11/q15 (multi-table shapes)
+- ARCH-4C-followup: two-step React type migration — schemas.py expansion, then regenerate+migrate (see ROADMAP)
 
 ### Trigger-based (parked — not in the next-session queue)
 
@@ -158,6 +168,23 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### ff. `api-generated.ts` is sparser than `api.ts` — do not delete api.ts
+
+`web/react-app/src/types/api-generated.ts` (openapi-typescript output
+from `/openapi.json`) has 7 named schemas: `TickerRow`, `RegisterRow`,
+`RegisterPayload`, `ConvictionPayload`, `FlowAnalysisPayload`,
+`OwnershipTrendPayload`, `EntityGraphPayload`. 5 of those 7 are
+`{[key: string]: unknown}` opaque because the backend Pydantic models
+in `scripts/schemas.py` declare only the envelope + payload-container
+shape without field-level types. `RegisterRow` generated has 1 field
+typed (`institution`) vs 17 in `api.ts`. The other ~48 endpoints have
+no OpenAPI schema at all — they return raw dict responses. Hand-written
+`src/types/api.ts` (~55 interfaces, ~900 lines) is the authoritative
+shape source today. **Do not delete api.ts** until step 1 of
+ARCH-4C-followup (expand `scripts/schemas.py` to cover full response
+shapes) has shipped and regeneration has parity. Mechanical tab
+migration before that is a compile-time type regression.
 
 ### ee. INF9d eids (20194/20196/20201/20203) are live PARENT_SEEDS brand shells — Stage 5 discovery
 
