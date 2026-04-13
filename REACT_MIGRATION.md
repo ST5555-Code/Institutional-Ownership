@@ -1,5 +1,5 @@
 # React Migration Plan
-_Created: 2026-04-11_
+_Created: 2026-04-11. Updated 2026-04-12 — Phase 2 + 3 complete._
 
 ## Architecture Decision
 Parallel build — new React app in web/react-app/, existing app on localhost:8001 untouched until cut over.
@@ -107,11 +107,22 @@ When all tabs migrated and validated:
 - Revert in 30 seconds if needed
 - web/react-src/ (POC) retired and deleted
 
+## Status
+
+- **Phase 1 (shell):** complete
+- **Phase 2 (all 11 tabs):** complete 2026-04-12 (HEAD `b0ece77`)
+- **Phase 3 (visual polish):** complete 2026-04-12 (HEAD `c836813`)
+  - RegisterTab badge → shared `getTypeStyle`
+  - Fund Portfolio → Register cross-nav
+  - Print CSS gaps closed (ShortInterest, PeerRotation, SectorRotation)
+  - Column alignment audit — no changes; compact-layout deviations intentional
+  - Playwright scaffold — `@playwright/test`, config, 11-tab spec, npm scripts. **Baselines not yet captured** — requires one-time `npx playwright install chromium` + Flask on :8001 + `npm run test:visual:update`.
+- **Phase 4 (cut over):** pending — `npm run build` → one-line change in `scripts/app.py` so Flask serves `web/react-app/dist/`. Revertable in 30s. Retire `web/react-src/` POC afterward.
+
 ## Open Items (do not build yet)
-- Playwright visual regression testing (add when 3+ tabs migrated)
-- Auth/token handling for /api/admin/* endpoints (INF12)
+- Auth/token handling for /api/admin/* endpoints (INF12) — admin Blueprint shipped; remaining work is per-user access control when going multi-tenant
 - Activist flag as red highlight on Register + Conviction (not a tab)
-- Short Interest tab in Investor Targeting section
+- Short Interest tab in Investor Targeting section — done (Phase 2)
 
 ## Backend Migration Plan
 
