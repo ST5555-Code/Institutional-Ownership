@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 4C+ openapi-typescript regen shipped + Phase 5/6 parked as medium-term. HEAD: 3c3b5ff)_
+_Last updated: 2026-04-13 (session close — infrastructure complete: Phase 0 through Phase 4+ Batch 4-C all shipped, Phase 5/6 parked as medium-term. HEAD: 7695ee7)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `746a798` (Phase 4 Batch 4-A — Blueprint split of scripts/app.py)
+- **HEAD:** `7695ee7` (docs: ROADMAP Phase 5/6 parked as medium-term + HEAD backfill)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
@@ -81,82 +81,48 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Next tasks in order
+### ⭐ Next session priorities
 
-_All near-term architecture work (Phases 0 through 4+) is complete.
-Phase 4+ Batch 4-C Flask → FastAPI cutover shipped 2026-04-13 (`a9bc423`);
-Phase 4C+ openapi-typescript React type regeneration shipped 2026-04-13
-(`89bc7c8`). Phase 5 / 6 parked as medium-term in ROADMAP — triggered on
-external user / team / productization, not calendar._
+_All infrastructure through Phase 4+ Batch 4-C + openapi-typescript regen
+is complete as of 2026-04-13. No architecture work queued for the next
+session. Phase 5 / 6 parked as medium-term (MT-1 through MT-6) in
+ROADMAP — triggered on external user / team / productization milestones,
+not calendar._
 
-**1. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
+**1. Stage 5 cleanup — authorized 2026-04-09, deadline 2026-05-09.** Drop
+legacy pre-entity tables (`holdings`, `fund_holdings`, `beneficial_ownership`)
+and 4 INF9d ghost entities (eid=20194, 20196, 20201, 20203 — no aliases,
+no identifiers, no holdings). Requires explicit authorization before any
+DROP / DELETE runs. See ROADMAP for exact table inventory.
 
-**2. Phase 3++ — build_analytics.py quarterly precompute — ~half day.** Trigger-based. `register_cache` / `conviction_cache` / `ownership_trend_cache` / `cross_ownership_cache` tables. See ARCHITECTURE_REVIEW.md Phase 3++.
-
-**3. Tab-by-tab migration to auto-generated React types.** Hand-written `src/types/api.ts` still the working source; `src/types/api-generated.ts` available for reference. Migrate one file at a time as the wire contract stabilizes.
-
-**4. Backlog (no phase dependency).**
-- BL-3: write-path consistency implementation (follow-on to 2-A audit)
-- BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
-- BL-9: `/api/v1/short_long` returns 500 with `KeyError 'long_value_k'`
-- BL-10: `/api/v1/export/query<N>` 500 on q6/q10/q11/q15 (multi-table shapes)
-
-**Known pre-existing issues — do not absorb:**
-- BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work.
-- BL-8 — Re-enable suppressed pre-commit rules.
-- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`.
-- BL-10 — `/api/export/query<N>` still 500s for q6/q10/q11/q15 (multi-table shapes).
-
-### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
-
-Original tables retained for 30-day rollback after Phase 4 cutover (2026-04-09). Cleanup list:
-- Delete 4 INF9d ghost entities (eid=20194, 20196, 20201, 20203 — no aliases, no identifiers, no holdings)
-- Drop legacy pre-entity tables (holdings v1, old parent_bridge snapshots, etc.)
-- Requires explicit user authorization before any deletion
-
-### 2. N-PORT data refresh
-
-`fund_holdings_v2` data is stale through Oct 2025. Pipeline run needed to fetch current N-PORT filings. Run manually from terminal:
+**2. N-PORT data refresh.** `fund_holdings_v2` is stale through Oct 2025.
+Run manually **after Stage 5 cleanup** completes:
 ```bash
 ! python3 -u scripts/fetch_nport.py --test  # test first
 ! python3 -u scripts/fetch_nport.py          # full run (authorized)
 ```
-This is a pipeline operation, NOT a data QC task. Do not run without explicit user authorization.
+Pipeline operation — explicit user authorization required before full run.
 
-### 3. Vanilla-JS retirement — earliest 2026-04-20
+**3. openapi-typescript tab-by-tab migration.** Migrate remaining React
+tabs from the hand-written `src/types/api.ts` to the auto-generated
+`src/types/api-generated.ts` (shipped 2026-04-13 in `89bc7c8`). One tab
+per PR as the wire contract stabilizes. Not urgent — hand-written types
+still work and stay in sync with prod responses.
 
-Retirement window opens 2026-04-20 (1 week stable after Phase 4 cutover).
-Requires explicit user authorization. Files to delete:
-- web/react-src/ (POC)
-- web/templates/index.html
-- web/static/app.js
-Do not delete before 2026-04-20. Do not delete without explicit confirmation.
+### Phase-independent backlog
 
-### 4. Architecture upgrade — next steps (see ARCHITECTURE_REVIEW.md)
+- BL-3: write-path consistency implementation (follow-on to 2-A audit)
+- BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
+- BL-9: `/api/v1/short_long` 500 — pre-existing `KeyError 'long_value_k'`
+- BL-10: `/api/v1/export/query<N>` 500 on q6/q10/q11/q15 (multi-table shapes)
 
-Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
-Phase 1 Batch 1-A: ✅ DONE 2026-04-13 (commit `a8dd77a`). See ROADMAP COMPLETED.
-Phase 1 Batch 1-B1: ✅ DONE 2026-04-13 (commit `d3a2fcb`). See ROADMAP COMPLETED.
-Phase 2 Batch 2-A: ✅ DONE 2026-04-13 (commit `700bcdb`). See ROADMAP COMPLETED.
-Phase 3 Batch 3-A: ✅ DONE 2026-04-13 (commit `731f4a0`). See ROADMAP COMPLETED.
-Phase 0-B1: ✅ DONE 2026-04-13 (commit `7f62b7d`). Option 2 (committed binary snapshot).
-data_freshness pipeline write hooks + FreshnessBadge: ✅ DONE 2026-04-13 (commit `2892009`).
-Phase 1 Batch 1-B2: error envelope + Pydantic schemas + React error boundaries.
-**Gated on vanilla-JS retirement (≥2026-04-20)** — the `{data, error, meta}`
-envelope would break the legacy frontend at port 8001 if landed before then.
-Phase 0-B2: smoke CI with committed binary fixture. Half day. Gates Batch 4-A.
-Next recommended task.
-Phase 3+ (portfolio_context precompute): trigger-based, runs in parallel to
-Phase 4. Not urgent (730ms current perf acceptable after Batch 2-A).
-Phase 4 Batch 4-A (Blueprint split): gated on Phase 0-B2.
-FreshnessBadge rollout to remaining tabs: follow-up to 2892009.
-BL-3: write-path consistency implementation (follow-on to 2-A audit).
-BL-8: re-enable suppressed pre-commit rules. Small rule-by-rule PRs.
-BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`.
-BL-10: `/api/export/query<N>` 500 on q6/q10/q11/q15 — multi-table shape
-mismatches.
+### Trigger-based (parked — not in the next-session queue)
 
-### 5. Minor follow-ups
+- **Phase 3+** — `portfolio_context_cache` precompute. Trigger: latency regression or natural pipeline cadence.
+- **Phase 3++** — `build_analytics.py` (register_cache / conviction_cache / ownership_trend_cache / cross_ownership_cache). Trigger: on-demand query latency becomes user-visible.
+- **MT-1 through MT-6** (Medium Term, ROADMAP) — Gunicorn+Nginx, JWT/Auth0, APScheduler/Airflow, cloud deployment, PostgreSQL, repo reshape. Triggers: external user, team cadence, productization.
+
+### Data-QC minor follow-ups
 
 - **Amundi → Amundi Taiwan rollup** — eid=830 + eid=4248 roll to eid=752 Amundi Taiwan via parent_bridge_sync/manual. Should roll to global Amundi SA parent. Separate manual fix.
 - **Financial Partners Group fragmentation** — eid=1600 "Inc" vs eid=9722 "LLC" with circular orphan_scan. Minor structural cleanup.

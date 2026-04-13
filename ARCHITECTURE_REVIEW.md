@@ -665,3 +665,40 @@ gates Phase 4-A only — does not gate Phases 1–3)._
 | BL-5 | Zustand scope enforcement | Document rule: global store = ticker/quarter/rollupType/company only. Tab state stays local. |
 | BL-6 | Loading state standardization | Shared skeleton + empty state components across all 11 tabs. |
 | BL-7 | DB-universe ticker validation | Route-layer check against the `tickers` table (or cached set). Catches typos that the regex in Batch 1-A passes. Follow-on to ARCH-1A. Keep the route layer decoupled from the DB by loading the ticker set at app startup or caching with a short TTL. |
+
+---
+
+## Session Ledger — Architecture Work
+
+Architecture milestones with commit hashes. Updated at session close.
+Docs-only commits (HEAD backfills, session summaries) omitted.
+
+### 2026-04-13 — Phase 0 through Phase 4+ Batch 4-C + openapi-typescript regen
+
+| Commit | Scope |
+|---|---|
+| `e201885` | Phase 0-A — lint CI (ruff + pylint + bandit on every push) |
+| `a8dd77a` | Phase 1 Batch 1-A — `/api/v1/*` dual-mount + routing hygiene + input guards |
+| `d3a2fcb` | Phase 1 Batch 1-B1 — endpoint classification + export parity |
+| `700bcdb` | Phase 2 Batch 2-A — `get_nport_children` N+1 fix + write-path risk map |
+| `731f4a0` | Phase 3 Batch 3-A — `fund_family_patterns` + `data_freshness` tables |
+| `2892009` | data_freshness pipeline write hooks + FreshnessBadge component |
+| `83836ee` | FreshnessBadge rollout — all 11 tabs |
+| `7f62b7d` | Phase 0-B1 — CI fixture DB design decision (Option 2) |
+| `8cf0d82` | Phase 0-B2 — smoke CI fixture + response snapshot tests |
+| `71269cb` | Vanilla-JS retirement + legacy `/api/*` mount removal |
+| `3526757` | Playwright baselines refreshed post-FreshnessBadge + URL rewrite |
+| `9c27b7e` | Phase 1-B2 infra — envelope types + Pydantic schemas + ErrorBoundary |
+| `6572a46` | Phase 1-B2 rollout — envelope on 6 priority endpoints |
+| `746a798` | Phase 4 Batch 4-A — Blueprint split (`scripts/app.py` into 9 modules) |
+| `125d86d` | Phase 4 Batch 4-B — queries.py service layer split (`cache.py` + `serializers.py`) |
+| `4b7aa7f` | `app_legacy.py` deletion — rollback window passed |
+| `81af4a8` | Orphaned `web/static/{dist,vendor,style.css}` deletion |
+| `386c066` | Phase 4+ Batch 4-C infra — FastAPI deps + envelope helpers |
+| `a9bc423` | Phase 4+ Batch 4-C cutover — Flask → FastAPI, 8 routers, admin Depends auth |
+| `89bc7c8` | Phase 4C+ — `response_model=` on 6 endpoints + `api-generated.ts` |
+| `3c3b5ff` | ROADMAP — Phase 5 / 6 parked as medium-term (MT-1…MT-6) |
+
+**End-state HEAD:** `7695ee7` (docs backfill). All near-term architecture
+phases complete. Next queued: Stage 5 data-layer cleanup, N-PORT refresh,
+tab-by-tab migration to auto-generated React types.
