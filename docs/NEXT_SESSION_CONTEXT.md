@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 4C+ openapi-typescript regen shipped + Phase 5/6 parked as medium-term. HEAD: pending)_
+_Last updated: 2026-04-13 (session close — Phase 4C+ openapi-typescript regen shipped + Phase 5/6 parked as medium-term. HEAD: 3c3b5ff)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
