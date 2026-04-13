@@ -223,17 +223,20 @@ green on main ✓ (`e201885`).**
 | ARCH-4B | Service layer split | 4-B | ✅ **DONE 2026-04-13**. Split `scripts/queries.py` (5,703 → 5,523 lines) — extracted `cache.py` (43 lines: CACHE_TTL, `CACHE_KEY_SUMMARY` template, `cached()` + `_cached` alias) and `serializers.py` (211 lines: `_clean_val`, `clean_for_json`, `df_to_records`, `resolve_filer_to_parent` + supporting CIK/name sets, `resolve_filer_names_in_records`, `_13f_entity_footnote` + `_13F_ENTITY_NOTES`, `get_subadviser_note` + `SUBADVISER_NOTES`). `queries.py` re-exports `clean_for_json` + `df_to_records` so handler imports stay green (Option B pragmatic split, not spec's strict Option A — rollback is "module merge" per spec). `get_summary` migrated to `cached(CACHE_KEY_SUMMARY.format(ticker=ticker), ...)`. 0 `jsonify()` calls in `queries.py`, all response shaping in `serializers.py`. 8/8 smoke tests green, pre-commit clean. See COMPLETED. |
 | ARCH-4C | Flask → FastAPI migration | 4-C | ✅ **DONE 2026-04-13**. All 8 domain Blueprints → FastAPI APIRouters (config/register/fund/flows/entities/market/cross/admin). `scripts/app.py` now a FastAPI entry with `uvicorn` `__main__`, `StaticFiles` mount, `Jinja2Templates`, `lifespan` handler. `admin_bp.py` token auth moved from `@before_request` to `Depends(require_admin_token)` via `Header(alias='X-Admin-Token')`. All routes kept as `def` (not `async def`) to preserve thread-local `get_db()` cache under FastAPI's threadpool. Every `jsonify()` call replaced with `JSONResponse` or bare dict return. Excel export uses `StreamingResponse`. Smoke tests swap `flask.test_client()` for `fastapi.testclient.TestClient`. `/docs` + `/redoc` OpenAPI surface added. Flask removed from requirements.txt + smoke.yml. 8/8 smoke + 11/11 Playwright green on uvicorn. Fast-forward merged from `phase4-fastapi`. **Follow-up:** React api.ts regeneration from `/openapi.json` via openapi-typescript (not gating — wire format unchanged). See COMPLETED. |
 
-### Phase 5 — Backend Deployment (gated on React Phase 4 cutover stable ≥1 week)
+### Medium Term — External User / Team / Productization Triggered
 
-See `REACT_MIGRATION.md` backend migration table. Gunicorn+Nginx, Flask-JWT/Auth0,
-APScheduler, optional PostgreSQL, cloud deployment. Triggered by external-user /
-team-use / productization milestones, not calendar.
+_Explicitly parked. Not being planned. Pulled from the near-term queue
+2026-04-13 after Batch 4-C landed. Each item is triggered by a business
+milestone — calendar cadence is the wrong lens._
 
-### Phase 6 — Repo reshape (only if Phase 4 proves insufficient)
-
-Gate: concrete pain point (second operator, independent pipeline deploy, test
-isolation) — not aesthetic. `src/{api,queries,pipeline,entity,db}/` layout
-sketched in ARCHITECTURE_REVIEW.md.
+| # | Item | Notes / Trigger |
+|---|------|-----------------|
+| MT-1 | Gunicorn + Nginx serving | Replace the `uvicorn` dev entry with `gunicorn -k uvicorn.workers.UvicornWorker` behind Nginx. Trigger: first external user or `uvicorn` dev-server limits surface. |
+| MT-2 | Authentication | Flask-JWT or Auth0 or FastAPI OAuth2 — picks up per-user access control on top of the existing INF12 admin token. Trigger: same moment as Gunicorn. |
+| MT-3 | Pipeline scheduling | APScheduler inside the FastAPI process (smaller footprint) or Airflow (multi-team). Trigger: moving from solo-operator to team cadence. |
+| MT-4 | Cloud deployment | Railway + Vercel, or a combined EC2 box, or Render — choose when productizing. Render `render.yaml` already sketched (`web/README_deploy.md`). |
+| MT-5 | PostgreSQL migration for entity MDM | Only if DuckDB write concurrency becomes a problem. Fixed-size analytical tables stay on DuckDB. Trigger: concurrent writer contention. |
+| MT-6 | Repo reshape (Phase 6 in ARCHITECTURE_REVIEW.md) | `src/{api,queries,pipeline,entity,db}/` layout. Gate: concrete pain point (second operator onboarding, independent pipeline deploy, test isolation) — not aesthetic preference. |
 
 ### Phase-independent backlog
 

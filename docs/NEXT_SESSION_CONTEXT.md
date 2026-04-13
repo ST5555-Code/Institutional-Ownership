@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 4+ Batch 4-C Flask → FastAPI cutover shipped; app_legacy.py deleted. Architecture work through Batch 4-C complete. HEAD: 889c803)_
+_Last updated: 2026-04-13 (session close — Phase 4C+ openapi-typescript regen shipped + Phase 5/6 parked as medium-term. HEAD: pending)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -83,17 +83,17 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ### ⭐ Next tasks in order
 
-_Orphaned `web/static/{dist,vendor,style.css}` deleted 2026-04-13
-(`81af4a8`). Phase 4 Batch 4-B queries.py service-layer split shipped
-2026-04-13: extracted `cache.py` + `serializers.py`, queries.py
-5,703 → 5,523 lines, 0 jsonify calls, 8/8 smoke green. All architecture
-work through Batch 4-B is complete._
+_All near-term architecture work (Phases 0 through 4+) is complete.
+Phase 4+ Batch 4-C Flask → FastAPI cutover shipped 2026-04-13 (`a9bc423`);
+Phase 4C+ openapi-typescript React type regeneration shipped 2026-04-13
+(`89bc7c8`). Phase 5 / 6 parked as medium-term in ROADMAP — triggered on
+external user / team / productization, not calendar._
 
-**1. React `api.ts` regeneration via openapi-typescript — follow-up to Batch 4-C.** Wire format is unchanged so this isn't urgent. Script: install `openapi-typescript` as a React devDep, fetch `http://localhost:8001/openapi.json`, write `src/types/api.generated.ts`. Migrate tab imports one file at a time.
+**1. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
 
-**2. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
+**2. Phase 3++ — build_analytics.py quarterly precompute — ~half day.** Trigger-based. `register_cache` / `conviction_cache` / `ownership_trend_cache` / `cross_ownership_cache` tables. See ARCHITECTURE_REVIEW.md Phase 3++.
 
-**3. Phase 3++ — build_analytics.py quarterly precompute — ~half day.** Trigger-based. `register_cache` / `conviction_cache` / `ownership_trend_cache` / `cross_ownership_cache` tables. See ARCHITECTURE_REVIEW.md Phase 3++.
+**3. Tab-by-tab migration to auto-generated React types.** Hand-written `src/types/api.ts` still the working source; `src/types/api-generated.ts` available for reference. Migrate one file at a time as the wire contract stabilizes.
 
 **4. Backlog (no phase dependency).**
 - BL-3: write-path consistency implementation (follow-on to 2-A audit)
