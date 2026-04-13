@@ -136,3 +136,69 @@ def respond(data=None, *, schema=None, error=None, status=200):
             }), 500
 
     return jsonify(envelope), status
+
+
+# ── FastAPI envelope helpers (Phase 4+ Batch 4-C) ─────────────────────────
+# Added alongside Flask's `respond()` during the FastAPI migration. No
+# callers yet — the cutover commit swaps every handler from respond() to
+# these. respond() + _build_meta() deleted once callers gone.
+#
+# Shape-identical to `respond()`: `{data, error, meta}`. Meta is sourced
+# from the FastAPI request.query_params (same keys: quarter, rollup_type,
+# generated_at). Pass the request via the second positional argument — the
+# dependency machinery makes that cheap.
+
+
+def _build_meta_fastapi(request) -> dict:
+    """FastAPI analogue of _build_meta(). `request` is starlette.Request."""
+    return {
+        "quarter": request.query_params.get("quarter"),
+        "rollup_type": request.query_params.get("rollup_type"),
+        "generated_at": iso_now(),
+    }
+
+
+def envelope_success(data, request, *, schema=None, status: int = 200):
+    """FastAPI: return a successful envelope response."""
+    # Deferred import — starlette is a fastapi transitive, not a Flask-time dep.
+    from starlette.responses import JSONResponse  # pylint: disable=import-outside-toplevel
+
+    envelope = {"data": data, "error": None, "meta": _build_meta_fastapi(request)}
+    if schema is not None:
+        try:
+            schema.model_validate(envelope)
+        except ValidationError as e:
+            # Downgrade to 500 — same semantics as Flask respond()
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "data": None,
+                    "error": {
+                        "code": "schema_validation_error",
+                        "message": "Response failed server-side validation",
+                        "detail": {"errors": e.errors()[:5]},
+                    },
+                    "meta": _build_meta_fastapi(request),
+                },
+            )
+    return JSONResponse(status_code=status, content=envelope)
+
+
+def envelope_error(code: str, message: str, request, *,
+                   schema=None, status: int = 500, detail=None):
+    """FastAPI: return an error envelope response."""
+    from starlette.responses import JSONResponse  # pylint: disable=import-outside-toplevel
+
+    err = {"code": code, "message": message}
+    if detail is not None:
+        err["detail"] = detail
+    envelope = {"data": None, "error": err, "meta": _build_meta_fastapi(request)}
+    # Schema validation optional — same contract as respond()
+    if schema is not None:
+        try:
+            schema.model_validate(envelope)
+        except ValidationError:
+            # Already an error response; don't mask the original with a
+            # schema-validation fallback. Return as-is.
+            pass
+    return JSONResponse(status_code=status, content=envelope)

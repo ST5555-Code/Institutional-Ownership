@@ -26,13 +26,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install \
             duckdb==1.4.4 \
+            fastapi==0.115.4 \
             flask==3.1.1 \
+            httpx==0.28.1 \
+            jinja2==3.1.6 \
             pandas==2.3.3 \
             pydantic==2.12.5 \
             requests==2.32.5 \
             openpyxl==3.1.5 \
             rapidfuzz==3.13.0 \
             tabulate==0.9.0 \
+            uvicorn==0.39.0 \
             pytest==8.3.3
 
       - name: Verify fixture DB committed
