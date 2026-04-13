@@ -61,6 +61,12 @@ QUERY_FUNCTIONS = {
     16: query16,
 }
 
+# Queries that accept rollup_type. Shared by api_query and api_export so the
+# Excel export mirrors on-screen semantics (Batch 1-B1 export parity). Keep
+# in sync with the signatures in queries.py — every function in this set
+# must declare `rollup_type='economic_control_v1'`.
+_RT_AWARE_QUERIES = frozenset({1, 2, 3, 5, 12, 14})
+
 QUERY_NAMES = {
     1: 'Register', 2: 'Holder Changes', 3: 'Conviction',
     6: 'Activist', 7: 'Fund Portfolio', 8: 'Cross-Ownership',
@@ -311,6 +317,68 @@ def api_config_quarters():
     """Quarter configuration (ARCH-1A rename from /api/admin/quarter_config).
     Public endpoint — no auth, loaded by UI on every page."""
     return _quarter_config_payload()
+
+
+# ---------------------------------------------------------------------------
+# Endpoint classification (Phase 1 Batch 1-B1, 2026-04-13) — freeze artifact
+# ---------------------------------------------------------------------------
+# Every /api/* route on this app, categorized by:
+#   Quarter: latest-only (no `quarter` param, always LATEST_QUARTER) vs
+#            quarter-aware (reads `quarter`, validates, passes through).
+#   Rollup:  rollup-agnostic vs rollup-aware (reads `rollup_type`).
+#
+# Phase 4 Blueprint split (Batch 4-A) consumes this table — routes sharing a
+# category cluster naturally into the same domain module. Do not change a
+# row's category without updating this comment AND the downstream consumer.
+#
+# /api/admin/* lives on admin_bp (scripts/admin_bp.py). /api/admin/quarter_config
+# is listed here because it is a public endpoint that stayed on the main app
+# for vanilla-JS compatibility (rename target: /api/config/quarters, ARCH-1A).
+# All /api/* routes below are also mounted under /api/v1/* by
+# _register_v1_aliases() at the bottom of this file.
+#
+# Path                             Quarter         Rollup
+# -------------------------------- --------------- ----------------
+# /api/config/quarters             n/a (config)    n/a
+# /api/admin/quarter_config        n/a (config)    n/a  (legacy — drop at vanilla-JS retirement)
+# /api/tickers                     latest-only     rollup-agnostic
+# /api/summary                     latest-only     rollup-agnostic
+# /api/fund_rollup_context         latest-only     rollup-agnostic  (returns BOTH rollup names by design)
+# /api/fund_portfolio_managers     latest-only     rollup-agnostic
+# /api/fund_behavioral_profile     latest-only     rollup-agnostic
+# /api/nport_shorts                latest-only     rollup-agnostic
+# /api/short_volume                latest-only     rollup-agnostic
+# /api/smart_money                 latest-only     rollup-agnostic
+# /api/crowding                    latest-only     rollup-agnostic
+# /api/sector_flows                latest-only     rollup-agnostic
+# /api/heatmap                     latest-only     rollup-agnostic
+# /api/manager_profile             latest-only     rollup-agnostic
+# /api/amendments                  latest-only     rollup-agnostic
+# /api/peer_groups                 latest-only     rollup-agnostic
+# /api/peer_groups/<group_id>      latest-only     rollup-agnostic
+# /api/entity_search               latest-only     rollup-agnostic
+# /api/entity_resolve              latest-only     rollup-agnostic
+# /api/entity_market_summary       latest-only     rollup-agnostic
+# /api/short_analysis              latest-only     rollup-aware  (threaded in Batch 1-A)
+# /api/short_long                  latest-only     rollup-aware  (threaded in Batch 1-A; 500 pre-existing, BL-9)
+# /api/ownership_trend_summary     latest-only     rollup-aware
+# /api/cohort_analysis             latest-only     rollup-aware
+# /api/holder_momentum             latest-only     rollup-aware
+# /api/flow_analysis               latest-only     rollup-aware
+# /api/cross_ownership             latest-only     rollup-aware
+# /api/cross_ownership_top         latest-only     rollup-aware
+# /api/peer_rotation               latest-only     rollup-aware
+# /api/peer_rotation_detail        latest-only     rollup-aware
+# /api/portfolio_context           latest-only     rollup-aware
+# /api/sector_flow_movers          latest-only     rollup-aware
+# /api/sector_flow_detail          latest-only     rollup-aware
+# /api/entity_children             quarter-aware   rollup-agnostic  (graph layer sits below rollup)
+# /api/entity_graph                quarter-aware   rollup-agnostic
+# /api/two_company_overlap         quarter-aware   rollup-agnostic
+# /api/two_company_subject         quarter-aware   rollup-agnostic
+# /api/query<int:qnum>             quarter-aware   rollup-aware  (for qnum in _RT_AWARE_QUERIES = {1,2,3,5,12,14})
+# /api/export/query<int:qnum>      quarter-aware   rollup-aware  (mirrors /api/query — fixed Batch 1-B1)
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -1148,9 +1216,6 @@ def api_query(qnum):
     if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
 
-    # Functions that accept rollup_type (must match queries.py parameterized set)
-    _rt_aware = {1, 2, 3, 5, 12, 14}
-
     try:
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
@@ -1162,7 +1227,7 @@ def api_query(qnum):
             return jsonify(data)
         elif qnum == 15:
             data = fn(ticker or None, quarter=quarter)
-        elif qnum in _rt_aware:
+        elif qnum in _RT_AWARE_QUERIES:
             data = fn(ticker, rollup_type=rt, quarter=quarter)
         else:
             data = fn(ticker, quarter=quarter)
@@ -1191,6 +1256,7 @@ def api_export(qnum):
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
     quarter = request.args.get('quarter', LQ)
+    rt = _get_rollup_type(request)
 
     if qnum not in (15,) and not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
@@ -1202,14 +1268,30 @@ def api_export(qnum):
             data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
         elif qnum == 15:
             data = fn(ticker or None, quarter=quarter)
+        elif qnum in _RT_AWARE_QUERIES:
+            data = fn(ticker, rollup_type=rt, quarter=quarter)
         else:
             data = fn(ticker, quarter=quarter)
 
         if not data:
             return jsonify({'error': f'No data found for ticker {ticker}'}), 404
 
-        # Q7 returns {stats, positions} — export the positions list
-        export_data = data.get('positions', data) if isinstance(data, dict) and 'positions' in data else data
+        # Extract the tabular portion from structured responses:
+        #   q7         → {stats, positions}              export `positions`
+        #   q1, q16    → {rows, all_totals, type_totals} export `rows`
+        # Other multi-table shapes (q6 activist / q10 new_positions /
+        # q11 exits / q15 db_stats) are pre-existing data-shape failures in
+        # this extractor; tracked as BL-10 in Architecture Backlog. Out of
+        # Batch 1-B1 scope, which is rollup + quarter parity.
+        if isinstance(data, dict):
+            if 'positions' in data:
+                export_data = data['positions']
+            elif 'rows' in data:
+                export_data = data['rows']
+            else:
+                export_data = data
+        else:
+            export_data = data
         qname = QUERY_NAMES.get(qnum, f'Query{qnum}')
         sheet_name = f"{qname} - {ticker or 'ALL'}"
         buf = build_excel(export_data, sheet_name=sheet_name)
