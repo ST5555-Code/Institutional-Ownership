@@ -108,3 +108,17 @@ class EntityGraphPayload(_Loose):
     # /api/v1/entity_graph
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
+
+
+# ── Concrete parameterized envelope types ─────────────────────────────────
+# These are what the 6 priority handlers pass to respond(schema=...).
+# Factored out here so handlers import one symbol instead of composing
+# `Envelope[Payload]` inline.
+
+TickersEnvelope = Envelope[list[TickerRow]]
+SummaryEnvelope = Envelope[SummaryPayload]
+RegisterEnvelope = Envelope[RegisterPayload]
+ConvictionEnvelope = Envelope[ConvictionPayload]
+FlowAnalysisEnvelope = Envelope[FlowAnalysisPayload]
+OwnershipTrendEnvelope = Envelope[OwnershipTrendPayload]
+EntityGraphEnvelope = Envelope[EntityGraphPayload]

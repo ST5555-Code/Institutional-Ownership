@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
+import { useFetchEnvelope } from '../../hooks/useFetchEnvelope'
 import type {
   OwnershipTrendResponse,
   OwnershipTrendQuarter,
@@ -127,7 +128,7 @@ export function OwnershipTrendTab() {
     ? `/api/v1/cohort_analysis?ticker=${enc(ticker)}&from=${enc(cohortFrom)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
     : null
 
-  const trend = useFetch<OwnershipTrendResponse>(trendUrl)
+  const trend = useFetchEnvelope<OwnershipTrendResponse>(trendUrl)
   const momentum = useFetch<HolderMomentumRow[]>(momentumUrl)
   const cohort = useFetch<CohortAnalysisResponse>(cohortUrl)
 

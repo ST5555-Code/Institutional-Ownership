@@ -12,7 +12,10 @@ export function TickerInput() {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/v1/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
+    fetch('/api/v1/tickers')
+      .then(r => r.json())
+      .then((env: { data?: TickerOption[] }) => setAllTickers(env?.data ?? []))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {

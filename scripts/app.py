@@ -16,7 +16,15 @@ from pydantic import ValidationError
 from admin_bp import admin_bp, init_admin_bp
 from config import LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
 from export import build_excel
-from schemas import iso_now
+from schemas import (
+    iso_now,
+    ConvictionEnvelope,
+    EntityGraphEnvelope,
+    FlowAnalysisEnvelope,
+    OwnershipTrendEnvelope,
+    RegisterEnvelope,
+    TickersEnvelope,
+)
 import queries
 from queries import (
     clean_for_json, df_to_records,
@@ -480,7 +488,11 @@ def api_tickers():
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return respond(
+            error={'code': 'db_unavailable', 'message': f'Database unavailable: {e}'},
+            schema=TickersEnvelope,
+            status=503,
+        )
     try:
         df = con.execute(
             f""  # nosec B608
@@ -492,7 +504,7 @@ def api_tickers():
             ORDER BY ticker
             """
         ).fetchdf()
-        return jsonify(df_to_records(df))
+        return respond(data=df_to_records(df), schema=TickersEnvelope)
     finally:
         con.close()
 
@@ -751,12 +763,20 @@ def api_ownership_trend_summary():
     ao = request.args.get('active_only', '').strip() == 'true'
     rt = _get_rollup_type(request)
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return respond(
+            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
+            schema=OwnershipTrendEnvelope,
+            status=400,
+        )
     try:
         result = ownership_trend_summary(ticker, level=level, active_only=ao, rollup_type=rt)
-        return jsonify(clean_for_json(result))
+        return respond(data=clean_for_json(result), schema=OwnershipTrendEnvelope)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return respond(
+            error={'code': 'internal_error', 'message': str(e)},
+            schema=OwnershipTrendEnvelope,
+            status=500,
+        )
 
 
 @app.route('/api/v1/cohort_analysis')
@@ -799,12 +819,20 @@ def api_flow_analysis():
     ao = request.args.get('active_only', '').strip() == 'true'
     rt = _get_rollup_type(request)
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return respond(
+            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
+            schema=FlowAnalysisEnvelope,
+            status=400,
+        )
     try:
         result = flow_analysis(ticker, period=period, peers=peers, level=level, active_only=ao, rollup_type=rt)
-        return jsonify(clean_for_json(result))
+        return respond(data=clean_for_json(result), schema=FlowAnalysisEnvelope)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return respond(
+            error={'code': 'internal_error', 'message': str(e)},
+            schema=FlowAnalysisEnvelope,
+            status=500,
+        )
 
 
 @app.route('/api/v1/cross_ownership')
@@ -943,13 +971,21 @@ def api_portfolio_context():
     level = request.args.get('level', 'parent').strip()
     ao = request.args.get('active_only', '').strip() == 'true'
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return respond(
+            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
+            schema=ConvictionEnvelope,
+            status=400,
+        )
     try:
         rt = _get_rollup_type(request)
         result = portfolio_context(ticker, level=level, active_only=ao, rollup_type=rt)
-        return jsonify(clean_for_json(result))
+        return respond(data=clean_for_json(result), schema=ConvictionEnvelope)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return respond(
+            error={'code': 'internal_error', 'message': str(e)},
+            schema=ConvictionEnvelope,
+            status=500,
+        )
 
 
 @app.route('/api/v1/short_analysis')
@@ -1284,28 +1320,32 @@ def api_summary():
     return jsonify(result)
 
 
-@app.route('/api/v1/query<int:qnum>')
-def api_query(qnum):
+def _execute_query(qnum):
+    """Run query-N dispatch. Returns (data, error_dict, status).
+
+    Shared core used by the generic `/api/v1/query<N>` handler AND the
+    dedicated `/api/v1/query1` envelope handler below. Error shape follows
+    ErrorShape (code/message) so callers can wrap in respond() or jsonify()
+    as needed.
+    """
     if qnum not in QUERY_FUNCTIONS:
-        return jsonify({'error': f'Invalid query number: {qnum}'}), 400
+        return None, {'code': 'invalid_query', 'message': f'Invalid query number: {qnum}'}, 400
     ticker = request.args.get('ticker', '').upper().strip()
     cik = request.args.get('cik', '').strip()
     quarter = request.args.get('quarter', LQ)
     rt = _get_rollup_type(request)
 
-    # Query 15 does not require a ticker
     if qnum not in (15,) and not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return None, {'code': 'missing_param', 'message': 'Missing ticker parameter'}, 400
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
             fund_name = request.args.get('fund_name', '').strip() or None
             data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
-            # query7 returns {stats, positions} dict
             if not data.get('positions'):
-                return jsonify({'error': f'No holdings found for CIK {cik}'}), 404
-            return jsonify(data)
+                return None, {'code': 'not_found', 'message': f'No holdings found for CIK {cik}'}, 404
+            return data, None, 200
         elif qnum == 15:
             data = fn(ticker or None, quarter=quarter)
         elif qnum in _RT_AWARE_QUERIES:
@@ -1313,10 +1353,6 @@ def api_query(qnum):
         else:
             data = fn(ticker, quarter=quarter)
 
-        # Empty check: list = empty if no rows; dict = only check 'rows' key
-        # if the dict has one (query1/query16 structure). Other dict shapes
-        # (like query6 with activist_13d/passive_5pct/history) are always
-        # considered non-empty at this layer.
         if isinstance(data, list):
             is_empty = not data
         elif isinstance(data, dict) and 'rows' in data:
@@ -1324,10 +1360,31 @@ def api_query(qnum):
         else:
             is_empty = False
         if is_empty:
-            return jsonify({'error': f'No data found for ticker {ticker}'}), 404
-        return jsonify(data)
+            return None, {'code': 'not_found', 'message': f'No data found for ticker {ticker}'}, 404
+        return data, None, 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return None, {'code': 'internal_error', 'message': str(e)}, 500
+
+
+@app.route('/api/v1/query1')
+def api_query1():
+    """Register tab — enveloped per Phase 1-B2. Queries 2–16 stay bare."""
+    data, err, status = _execute_query(1)
+    if err is not None:
+        return respond(error=err, schema=RegisterEnvelope, status=status)
+    return respond(data=data, schema=RegisterEnvelope, status=status)
+
+
+@app.route('/api/v1/query<int:qnum>')
+def api_query(qnum):
+    if qnum == 1:
+        # Flask should dispatch /api/v1/query1 to api_query1 (more specific
+        # route wins), but defend in depth in case routing order changes.
+        return api_query1()
+    data, err, status = _execute_query(qnum)
+    if err is not None:
+        return jsonify({'error': err['message']}), status
+    return jsonify(data)
 
 
 @app.route('/api/v1/export/query<int:qnum>')
@@ -1483,11 +1540,19 @@ def api_entity_graph():
     """
     entity_id = (request.args.get('entity_id') or '').strip()
     if not entity_id:
-        return jsonify({'error': 'Missing entity_id parameter'}), 400
+        return respond(
+            error={'code': 'missing_param', 'message': 'Missing entity_id parameter'},
+            schema=EntityGraphEnvelope,
+            status=400,
+        )
     try:
         eid = int(entity_id)
     except ValueError:
-        return jsonify({'error': f'Invalid entity_id: {entity_id}'}), 400
+        return respond(
+            error={'code': 'invalid_param', 'message': f'Invalid entity_id: {entity_id}'},
+            schema=EntityGraphEnvelope,
+            status=400,
+        )
 
     quarter = _eg_quarter(request)
     try:
@@ -1505,15 +1570,27 @@ def api_entity_graph():
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return respond(
+            error={'code': 'db_unavailable', 'message': f'Database unavailable: {e}'},
+            schema=EntityGraphEnvelope,
+            status=503,
+        )
     try:
         data = queries.build_entity_graph(eid, quarter, depth, include_sub, top_n_funds, con)
         if isinstance(data, dict) and data.get('error'):
-            return jsonify(data), 404
-        return jsonify(queries.clean_for_json(data))
+            return respond(
+                error={'code': 'not_found', 'message': str(data['error'])},
+                schema=EntityGraphEnvelope,
+                status=404,
+            )
+        return respond(data=queries.clean_for_json(data), schema=EntityGraphEnvelope)
     except Exception as e:
         app.logger.error("entity_graph error: %s", e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return respond(
+            error={'code': 'internal_error', 'message': str(e)},
+            schema=EntityGraphEnvelope,
+            status=500,
+        )
     finally:
         con.close()
 

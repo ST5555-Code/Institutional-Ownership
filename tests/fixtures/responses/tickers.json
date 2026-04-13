@@ -1,18 +1,26 @@
-[
-  {
-    "name": "APPLE INC",
-    "ticker": "AAPL"
-  },
-  {
-    "name": "EQT CORP",
-    "ticker": "EQT"
-  },
-  {
-    "name": "MICROSOFT CORP",
-    "ticker": "MSFT"
-  },
-  {
-    "name": "NVIDIA CORPORATION",
-    "ticker": "NVDA"
+{
+  "data": [
+    {
+      "name": "APPLE INC",
+      "ticker": "AAPL"
+    },
+    {
+      "name": "EQT CORP",
+      "ticker": "EQT"
+    },
+    {
+      "name": "MICROSOFT CORP",
+      "ticker": "MSFT"
+    },
+    {
+      "name": "NVIDIA CORPORATION",
+      "ticker": "NVDA"
+    }
+  ],
+  "error": null,
+  "meta": {
+    "generated_at": "2026-04-13T20:13:11Z",
+    "quarter": null,
+    "rollup_type": null
   }
-]
+}

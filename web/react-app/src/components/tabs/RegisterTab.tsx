@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-import { useFetch } from '../../hooks/useFetch'
+import { useFetchEnvelope } from '../../hooks/useFetchEnvelope'
 import type { RegisterResponse, RegisterRow } from '../../types/api'
 import {
   QuarterSelector,
@@ -316,7 +316,7 @@ export function RegisterTab() {
   const url = ticker
     ? `/api/v1/query1?ticker=${encodeURIComponent(ticker)}&rollup_type=${rollupType}&quarter=${encodeURIComponent(quarter)}`
     : null
-  const { data, loading, error } = useFetch<RegisterResponse>(url)
+  const { data, loading, error } = useFetchEnvelope<RegisterResponse>(url)
 
   // Clear the search selection whenever the ticker/rollup changes, so a
   // stale highlight doesn't get re-applied to a completely different

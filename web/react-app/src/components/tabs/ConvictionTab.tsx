@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-import { useFetch } from '../../hooks/useFetch'
+import { useFetchEnvelope } from '../../hooks/useFetchEnvelope'
 import type { ConvictionResponse, ConvictionRow } from '../../types/api'
 import {
   RollupToggle,
@@ -160,7 +160,7 @@ export function ConvictionTab() {
   const url = ticker
     ? `/api/v1/portfolio_context?ticker=${enc(ticker)}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
     : null
-  const { data, loading, error } = useFetch<ConvictionResponse>(url)
+  const { data, loading, error } = useFetchEnvelope<ConvictionResponse>(url)
 
   useEffect(() => { setSelectedInstitution(null) }, [ticker, rollupType])
 

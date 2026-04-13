@@ -27,23 +27,34 @@ TOLERANCE = 0.05  # ±5 % row count
 # Endpoint-specific sentinel predicates. Each returns True when the
 # response contains at least one known-good value that would be absent
 # after a broken schema rename or dropped field.
+#
+# Phase 1-B2 — 3 of 4 monitored endpoints are now wrapped in the
+# `{data, error, meta}` envelope. `/api/v1/summary` remains bare because
+# it is not in the Batch 1-B2 priority 6 set.
 SENTINELS = {
-    "tickers":      lambda body: any(
-        isinstance(r, dict) and r.get("ticker") == "AAPL" for r in (body or [])
-    ),
-    # query1 response is {rows, all_totals, type_totals} — no ticker echo.
-    # Sentinel: Vanguard Group appears in the register for AAPL.
+    # /api/v1/tickers — envelope. Payload is list[{ticker, name}].
+    "tickers":      lambda body: isinstance(body, dict)
+                                  and isinstance(body.get("data"), list)
+                                  and any(
+                                      isinstance(r, dict) and r.get("ticker") == "AAPL"
+                                      for r in body["data"]
+                                  ),
+    # /api/v1/query1 — envelope. Payload is {rows, all_totals, type_totals}.
     "query1":       lambda body: isinstance(body, dict)
-                                  and isinstance(body.get("rows"), list)
+                                  and isinstance(body.get("data"), dict)
+                                  and isinstance(body["data"].get("rows"), list)
                                   and any(
                                       isinstance(r, dict) and r.get("institution") == "Vanguard Group"
-                                      for r in body["rows"]
+                                      for r in body["data"]["rows"]
                                   ),
+    # /api/v1/summary — bare (not in priority 6).
     "summary":      lambda body: isinstance(body, dict)
                                   and (body.get("ticker") or "").upper() == "AAPL",
+    # /api/v1/entity_graph — envelope. Payload is {nodes, edges, ...}.
     "entity_graph": lambda body: isinstance(body, dict)
-                                  and isinstance(body.get("nodes"), list)
-                                  and len(body["nodes"]) > 0,
+                                  and isinstance(body.get("data"), dict)
+                                  and isinstance(body["data"].get("nodes"), list)
+                                  and len(body["data"]["nodes"]) > 0,
 }
 
 
@@ -95,6 +106,12 @@ def _assert_row_counts(name: str, actual, expected) -> None:
     def _counts(obj):
         if isinstance(obj, list):
             return {"__root__": len(obj)}
+        if not isinstance(obj, dict):
+            return {}
+        # Envelope shape: {data, error, meta} — recurse into data so
+        # row-count checks still fire on enveloped endpoints.
+        if set(obj.keys()) == {"data", "error", "meta"}:
+            return _counts(obj.get("data"))
         return {k: len(v) for k, v in obj.items() if isinstance(v, list)}
 
     exp_counts = _counts(expected)

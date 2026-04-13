@@ -76,7 +76,10 @@ function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/v1/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
+    fetch('/api/v1/tickers')
+      .then(r => r.json())
+      .then((env: { data?: Array<{ ticker: string; name: string }> }) => setAllTickers(env?.data ?? []))
+      .catch(() => {})
   }, [])
 
   useEffect(() => { setInput(value) }, [value])

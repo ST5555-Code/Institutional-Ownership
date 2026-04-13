@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
+import { useFetchEnvelope } from '../../hooks/useFetchEnvelope'
 import type {
   EntitySearchResult,
   EntityGraphResponse,
@@ -176,19 +177,19 @@ export function EntityGraphTab() {
   const tickerHoldersUrl = viewMode === 'company' && ticker
     ? `/api/v1/query1?ticker=${enc(ticker)}&rollup_type=${rollupType}`
     : null
-  const tickerHolders = useFetch<RegisterResponse>(tickerHoldersUrl)
+  const tickerHolders = useFetchEnvelope<RegisterResponse>(tickerHoldersUrl)
 
   // Modal graph fetch
   const modalGraphUrl = modalEntityId
     ? `/api/v1/entity_graph?entity_id=${modalEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
     : null
-  const modalGraph = useFetch<EntityGraphResponse>(modalGraphUrl)
+  const modalGraph = useFetchEnvelope<EntityGraphResponse>(modalGraphUrl)
 
   // Company graph fetch
   const graphUrl = viewMode === 'company' && selectedEntityId
     ? `/api/v1/entity_graph?entity_id=${selectedEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
     : null
-  const { data, loading, error } = useFetch<EntityGraphResponse>(graphUrl)
+  const { data, loading, error } = useFetchEnvelope<EntityGraphResponse>(graphUrl)
 
   useEffect(() => { setExpanded(false); setAllFundNodes([]); setSelectedFiler(null) }, [selectedEntityId, quarter, showSubAdvisers])
 

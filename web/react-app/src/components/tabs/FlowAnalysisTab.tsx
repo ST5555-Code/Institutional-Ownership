@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-import { useFetch } from '../../hooks/useFetch'
+import { useFetchEnvelope } from '../../hooks/useFetchEnvelope'
 import type { FlowAnalysisResponse, FlowRow, QoqChartRow } from '../../types/api'
 import {
   RollupToggle,
@@ -93,7 +93,7 @@ export function FlowAnalysisTab() {
   const url = ticker
     ? `/api/v1/flow_analysis?ticker=${enc(ticker)}&period=${period}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
     : null
-  const { data, loading, error } = useFetch<FlowAnalysisResponse>(url)
+  const { data, loading, error } = useFetchEnvelope<FlowAnalysisResponse>(url)
 
   function onExcel() {
     if (!data) return

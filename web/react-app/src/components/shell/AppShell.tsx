@@ -1,6 +1,7 @@
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { useAppStore } from '../../store/useAppStore'
+import { ErrorBoundary } from '../common'
 import { lazy, Suspense } from 'react'
 
 const TAB_MAP: Record<string, React.LazyExoticComponent<() => React.ReactElement>> = {
@@ -26,9 +27,11 @@ export function AppShell() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header />
         <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--content-bg)', padding: '20px' }}>
-          <Suspense fallback={<div style={{ color: '#94a3b8', padding: '20px' }}>Loading…</div>}>
-            {TabComponent ? <TabComponent /> : <div>Tab not found</div>}
-          </Suspense>
+          <ErrorBoundary key={activeTab} tab={activeTab}>
+            <Suspense fallback={<div style={{ color: '#94a3b8', padding: '20px' }}>Loading…</div>}>
+              {TabComponent ? <TabComponent /> : <div>Tab not found</div>}
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>
