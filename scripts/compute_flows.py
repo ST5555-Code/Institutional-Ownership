@@ -13,10 +13,9 @@ import time
 from datetime import datetime
 
 import duckdb
-import pandas as pd
 
 from db import set_staging_mode, get_db_path
-from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, FLOW_PERIODS
+from config import LATEST_QUARTER, FLOW_PERIODS
 
 PERIODS = FLOW_PERIODS
 LATEST_Q = LATEST_QUARTER

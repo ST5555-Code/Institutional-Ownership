@@ -14,7 +14,6 @@ Usage:
     python3 scripts/fix_fund_classification.py --production   # prod (after verification)
 """
 import argparse
-import re
 import sys
 from pathlib import Path
 
