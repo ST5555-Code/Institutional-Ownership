@@ -230,9 +230,21 @@ Implement the fixture approach chosen in 0-B1. Wire four-endpoint smoke test
 into CI: `/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`.
 Each test asserts HTTP 200 + non-empty JSON body against the fixture DB.
 
-**Done means:** Smoke workflow runs on push. All four endpoints return 200
-against the fixture. A breaking schema change on any of the four fails CI.
-Fixture builds successfully in a clean CI environment.
+**Done means:**
+- Smoke workflow runs on push against the fixture DB.
+- Four endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`,
+  `/api/summary`) return HTTP 200 and non-empty JSON body.
+- Response snapshots committed to `tests/fixtures/responses/*.json` —
+  one file per endpoint, captured at CI setup time.
+- `test_smoke_response_equality()` diffs post-split responses against
+  committed snapshots on: JSON top-level keys present, row count within
+  ±5%, and at least one sentinel value per endpoint (e.g. a known ticker
+  appearing in `/api/tickers` response). A broken field rename or dropped
+  key fails the test.
+- Snapshot updates require an explicit commit with reviewer approval —
+  they are not auto-updated on test failure.
+- A breaking schema change on any of the four endpoints fails CI.
+- Fixture builds successfully in a clean CI environment.
 
 **Gate:** Phase 0-B2 must complete before Phase 4-A begins. Phase 4-A
 requires a regression baseline to validate the Blueprint split — a documented
@@ -245,10 +257,11 @@ unaffected and do not require 0-B2.
 _Freeze endpoint semantics before any structural change._
 _Gate on: do not start Phase 2 until exit criteria below are met._
 
-_Note: Batch 1-A input guards and Batch 1-B hand-written Pydantic schemas are
+_Note: Batch 1-A input guards and Batch 1-B2 hand-written Pydantic schemas are
 transitional. FastAPI (Batch 4-C) auto-validates via Pydantic and auto-generates
 schemas from response models — these hand-written artifacts are scaffolding,
-not permanent code._
+not permanent code. Batch 1-B1 (endpoint classification + export parity) is
+the permanent contract artifact Phase 4 consumes._
 
 ---
 
@@ -277,44 +290,63 @@ Phase 4 cutover task — `/api/*` legacy mount stays until then.
 
 ---
 
-### Batch 1-B — Response contract
+### Batch 1-B1 — Endpoint classification + export parity
+_~2 hours · `app.py` + `queries.py` (export path only) · low risk · no React gate_
+
+| Item | Action |
+|------|--------|
+| Endpoint classification | Produce and commit a table: every endpoint marked latest-only or quarter-aware. Add as comment block in `app.py`. This is the freeze artifact that Phase 4 consumes. |
+| Export parity | Verify `api_export()` passes same `quarter` + `rollup_type` as the on-screen table. Fix any mismatches. |
+
+**Files:** `scripts/app.py`, `scripts/queries.py` (export path only).
+
+**Done means:** Endpoint classification table committed. Export matches
+on-screen state for 3 manually tested ticker/quarter/rollup combinations.
+
+**Rollback:** Classification comment is additive — remove to revert. Export
+fix is a query change — straightforward revert.
+
+**Not doing here:** Error envelope, Pydantic schemas, React changes. Those
+are 1-B2.
+
+---
+
+### Batch 1-B2 — Error envelope + Pydantic schemas + React error boundaries
 _~half day · `app.py` + new `schemas.py` + React · medium risk_
-_⚠ Requires React Phase 4 cutover complete before running. The error envelope
+_⚠ Batch 1-B2 is gated on React Phase 4 cutover complete. The error envelope
 `{ data, error, meta }` changes the response shape on all handlers. Because
 Phase 1-A dual-mounts the same handlers on both `/api/*` and `/api/v1/*`,
 this shape change would hit both prefixes simultaneously and break the
 vanilla-JS frontend at port 8001, which dereferences raw fields directly
-(e.g. `s.company_name`, `s.market_cap`). Gate: vanilla-JS frontend must
-be retired before Batch 1-B executes._
-
+(e.g. `s.company_name`, `s.market_cap`). Gate: vanilla-JS frontend must be
+retired before Batch 1-B2 executes._
 
 | Item | Action |
 |------|--------|
-| Endpoint classification | Produce and commit a table: every endpoint marked latest-only or quarter-aware. Add as comment block in `app.py`. This is the freeze artifact. |
-| Export parity | Verify `api_export()` passes same `quarter` + `rollup_type` as the on-screen table. Fix any mismatches. |
 | Pydantic schemas | New `scripts/schemas.py`. Add Pydantic response models for 6 priority endpoints: `/register`, `/tickers`, `/conviction`, `/flow_analysis`, `/ownership_trend`, `/entity_graph`. Validate on the way out. _Transitional — regenerated from FastAPI response models via openapi-typescript in Batch 4-C._ |
 | Error envelope | Standardize `{ data, error, meta }` on all endpoints. `meta` carries `quarter`, `rollup_type`, `generated_at`. |
 | React error boundaries | New `src/components/ErrorBoundary.tsx`. Per-tab wrapper. Catches envelope `error` field, renders consistent error state. |
-| React type sync | Update hand-written types in `src/types/` to match Pydantic schemas. Single source of truth until FastAPI generates them automatically (Phase 4-C). |
+| React type sync | Update hand-written types in `src/types/` to match Pydantic schemas. Single source of truth until FastAPI generates them automatically (Batch 4-C). |
 
-**Files:** `scripts/app.py`, new `scripts/schemas.py`, `scripts/queries.py`
-(export path only), `web/react-app/src/types/`, new
+**Files:** `scripts/app.py`, new `scripts/schemas.py`,
+`web/react-app/src/types/`, new
 `web/react-app/src/components/ErrorBoundary.tsx`.
 
-**Done means:** Endpoint classification table committed. 6 priority endpoints
-have Pydantic validation. All endpoints return `{ data, error, meta }`. Excel
-export matches on-screen state for 3 manually tested ticker/quarter/rollup
-combinations. React has per-tab error boundaries.
+**Done means:** 6 priority endpoints have Pydantic validation. All endpoints
+return `{ data, error, meta }`. React has per-tab error boundaries.
 
 **Rollback:** Pydantic is additive — revert to `jsonify()`. Error envelope
 is a shape change; React types updated in same commit so one revert covers both.
 
-**Not doing here:** `queries.py` restructure, Flask → FastAPI, Blueprint split,
-any data layer changes.
+**Not doing here:** `queries.py` restructure, Flask → FastAPI, Blueprint
+split, any data layer changes.
 
 ---
 
-**Phase 1 exit gate:** Batch 1-A complete (routing hygiene, dual-mount, input guards). Endpoint classification table committed. Batch 1-B gated on React Phase 4 cutover (error envelope + Pydantic schemas) — may complete after Phase 2 and 3 if cutover is delayed.
+**Phase 1 exit gate:** Batch 1-A complete (routing hygiene, dual-mount,
+input guards). Batch 1-B1 complete (endpoint classification committed,
+export parity confirmed). Batch 1-B2 gated on React Phase 4 cutover —
+defers cleanly without blocking Phase 4 modularization.
 
 ---
 
@@ -378,8 +410,24 @@ to revert. `match_nport_family()` revert restores dict lookup.
 
 ---
 
-### Batch 3-B — portfolio_context quarterly artifact
-_~half day · new pipeline script + `queries.py` · depends on Batch 3-A_
+**Phase 3 exit gate:** `FAMILY_MAP` in DB. `data_freshness` table live and
+visible in React. portfolio_context precompute is Phase 3+ — does not gate
+this phase.
+
+---
+
+## Phase 3+ — portfolio_context quarterly artifact
+_Triggered when: portfolio_context latency becomes a bottleneck again, or
+quarterly pipeline cadence is established and precompute fits naturally._
+_Prerequisite: Phase 3 complete. Not a blocker for Phase 4._
+
+With the vectorization shipped (2.7s → 730ms), the current on-demand path
+is acceptable. Full precompute as a quarterly artifact is the right end
+state architecturally but is not urgent. Defer until latency regresses or
+pipeline scheduling (Phase 5, Priority 3) makes a natural home for it.
+
+### Batch 3B — portfolio_context quarterly artifact
+_~half day · new pipeline script + `queries.py`_
 
 | Item | Action |
 |------|--------|
@@ -400,17 +448,16 @@ additive — drop to clean up.
 
 ---
 
-**Phase 3 exit gate:** `FAMILY_MAP` in DB. `data_freshness` table live and
-visible in React. `portfolio_context` pipeline-built and ≤50ms.
-
----
-
 ## Phase 4 — Backend Modularization
 _Split app.py and queries.py into well-bounded modules._
-_Do not start until Phase 1 is complete — contracts must be frozen first._
+_Do not start until Batches 1-A and 1-B1 are complete — endpoint
+classification table must be committed and export parity confirmed.
+Batch 1-B2 (error envelope + Pydantic) is React-cutover-gated and does
+not block Phase 4._
 _Scope: Batches 4-A and 4-B only. The Flask → FastAPI swap (formerly Batch
 4-C) has been moved into **Phase 4+**, triggered on team sharing rather than
-executed as part of this phase._
+executed as part of this phase. **Phase 3+** (portfolio_context precompute)
+is likewise trigger-based and runs in parallel to Phase 4 without blocking._
 
 ---
 
@@ -433,7 +480,9 @@ Split `scripts/app.py` (~1,400 lines) into:
 **Done means:** `app_bootstrap.py` ≤100 lines. No domain routes in bootstrap.
 `app_db.py` importable independently of `app_bootstrap.py`. Each Blueprint
 independently importable. `pylint` + `bandit` pass. All endpoints smoke-tested
-against Phase 0-B fixture baseline — responses match pre-split behavior.
+against Phase 0-B2 fixture baseline — `test_smoke_response_equality()` passes
+on all four monitored endpoints, confirming no field-level regressions from
+the Blueprint split.
 
 **Rollback:** Feature branch. Old `app.py` retained as `app_legacy.py` until
 smoke test passes.
@@ -477,7 +526,7 @@ _Triggered when: first second operator joins, or tool moves to shared/hosted use
 _Prerequisite: Phase 4 complete._
 
 _Note: Batches 4-A and 4-B must complete before this phase starts. The
-hand-written Pydantic schemas from Batch 1-B are replaced by auto-generated
+hand-written Pydantic schemas from Batch 1-B2 are replaced by auto-generated
 types from the OpenAPI spec in this phase._
 
 ### Batch 4-C — Flask → FastAPI
