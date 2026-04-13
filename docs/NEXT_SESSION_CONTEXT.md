@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (ARCH-1B1 endpoint classification + export parity landed, HEAD: d3a2fcb — docs commit will advance the ref)_
+_Last updated: 2026-04-13 (ARCH-2A correctness fixes landed — N+1 batching, summary_by_parent audit, write-path risk map. HEAD: 700bcdb — docs commit will advance the ref)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `d3a2fcb` (code) / docs commit will be latest
+- **HEAD:** `700bcdb` (code) / docs commit will be latest
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -79,25 +79,26 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Phase 2 Batch 2-A (correctness fixes)
+### ⭐ Recommended next Claude Code task — ARCH Phase 3 Batch 3-A (DB schema cleanup)
 
-_Batch 1-B1 complete 2026-04-13 (commit `d3a2fcb`). 39-route classification
-table committed to `app.py`, `api_export` now mirrors `api_query` rollup
-semantics via shared `_RT_AWARE_QUERIES`, q1/q16 exports unblocked. Phase 1
-exit gate partial: Batch 1-B2 deferred until vanilla-JS retirement (≥2026-04-20)
-— does NOT block Phase 2 per `ARCHITECTURE_REVIEW.md`._
+_Batch 2-A complete 2026-04-13 (commit `700bcdb`). N+1 batched
+(`get_nport_children_batch` — 17.8ms vs 297ms legacy, 14× speedup).
+`summary_by_parent` confirmed read-only. Write-path risk map committed
+to `docs/write_path_risk_map.md`._
 
-From `ARCHITECTURE_REVIEW.md` Batch 2-A. **Low risk, ~2 hours, `scripts/queries.py` + new `docs/write_path_risk_map.md`.**
+From `ARCHITECTURE_REVIEW.md` Batch 3-A. **Medium risk (schema DDL via staging workflow), ~2 hours, `data/13f.duckdb` DDL + `scripts/app.py` (`match_nport_family()`) + pipeline scripts (freshness writes) + React footer component.**
 
-1. **`get_nport_children` N+1 loop fix** — batch N-PORT children into a single SQL `IN` clause. Measured hotspot from portfolio_context vectorization work (286ms / 45% of `/api/portfolio_context` budget). Target: batched call completes ≤50ms for a 25-fund portfolio.
-2. **`summary_by_parent` path check** — verify it is read, not recomputed, on every request path. If any path recomputes on demand, move to a pipeline rebuild step.
-3. **Write-path consistency audit** — map all non-entity pipeline scripts; identify which can partially apply vs roll back on failure. **Audit only, no code changes.** Output: `docs/write_path_risk_map.md`.
+1. **`FAMILY_MAP` → DB table** — create `fund_family_patterns (pattern TEXT, inst_parent_name TEXT)`, migrate 50+ hardcoded entries from `scripts/queries.py` (`get_nport_family_patterns`), switch `match_nport_family()` to query the table. Editable without code change.
+2. **`data_freshness` table** — create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipelines write a row after each successful rebuild. New `/api/v1/freshness` endpoint. React footer badge with staleness thresholds per `ARCHITECTURE_REVIEW.md` Batch 3-A.
+
+**Run DDL via the staging workflow** (sync → diff → promote), not direct prod mutation. Entity-change hard rule.
 
 Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate any Phase. Start when capacity allows.
 
-**Known pre-existing issues surfaced in 1-A / 1-B1 — do not absorb into 2-A:**
-- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type. Fix before Short Interest tab wires up the endpoint.
-- BL-10 — `/api/export/query<N>` still 500s for q6/q10/q11/q15 (multi-table shapes). Fix needs multi-sheet Excel or per-query extractors.
+**Known pre-existing issues — do not absorb into 3-A:**
+- BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work — separate task.
+- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type.
+- BL-10 — `/api/export/query<N>` still 500s for q6/q10/q11/q15 (multi-table shapes).
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
@@ -129,21 +130,19 @@ Do not delete before 2026-04-20. Do not delete without explicit confirmation.
 Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-A: ✅ DONE 2026-04-13 (commit `a8dd77a`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-B1: ✅ DONE 2026-04-13 (commit `d3a2fcb`). See ROADMAP COMPLETED.
+Phase 2 Batch 2-A: ✅ DONE 2026-04-13 (commit `700bcdb`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-B2: error envelope + Pydantic schemas + React error boundaries.
 **Gated on vanilla-JS retirement (≥2026-04-20)** — the `{data, error, meta}`
 envelope would break the legacy frontend at port 8001 if landed before then.
-Does NOT block Phase 2.
-Phase 2 Batch 2-A: N+1 fix + summary_by_parent path check + write-path risk
-map. `queries.py` + new `docs/write_path_risk_map.md`. ~2 hours. Next
-recommended task.
-Phase 0-B: runtime smoke CI with fixture DB — phase-independent, does not
-gate Phase 1 or Phase 2. Start when capacity allows. Phase 0-B2 gates 4-A.
+Phase 3 Batch 3-A: `FAMILY_MAP` → DB table + `data_freshness` table. ~2 hours.
+Medium risk (schema DDL via staging workflow). Next recommended task.
+Phase 0-B: runtime smoke CI with fixture DB — phase-independent. Start when
+capacity allows. Phase 0-B2 gates Batch 4-A.
+BL-3: write-path consistency implementation (follow-on to 2-A audit).
 BL-8: re-enable suppressed pre-commit rules. Small rule-by-rule PRs.
-BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`. Fix
-before Short Interest tab wires up the endpoint.
-BL-10: `/api/export/query<N>` 500 on q6/q10/q11/q15 — pre-existing
-multi-table shape mismatches. Fix needs multi-sheet Excel or per-query
-extractors.
+BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`.
+BL-10: `/api/export/query<N>` 500 on q6/q10/q11/q15 — multi-table shape
+mismatches.
 
 ### 5. Minor follow-ups
 
@@ -186,6 +185,13 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### x. `get_nport_children_batch()` replaces the loop (ARCH-2A.1)
+
+- Hot-path callers in `query1` (Register) and `portfolio_context` (Conviction) now call `get_nport_children_batch(parent_names, ticker, quarter, con, limit=5)` once and dict-lookup per parent. Do NOT reintroduce a per-parent loop — the win is 14× (297ms → 21ms for 25 parents).
+- `get_nport_children()` (singular) is kept for the currently-unused `get_children()` fallback path. If you delete `get_children()`, delete the singular too.
+- `get_nport_children_q2` is INTENTIONALLY not batched — it is a FQ↔LQ delta helper (gotcha u). If someone asks to batch it, that is a separate, distinct task.
+- `summary_by_parent` is a read-only table on every request path. Any new code reading from it is fine; anything that would compute it on demand must instead go into `build_summaries.py` (T4 pipeline).
 
 ### w. `_RT_AWARE_QUERIES` + endpoint classification block (ARCH-1B1)
 
@@ -255,6 +261,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+700bcdb feat: Batch 2-A — N+1 batching + summary_by_parent audit + write-path risk map
 d3a2fcb feat: Batch 1-B1 — endpoint classification + export parity
 a8dd77a feat: Batch 1-A — /api/v1/ dual-mount, quarter_config rename, input guards
 e201885 ci: Phase 0-A — lint/bandit CI (ruff + pylint + bandit on every push)
