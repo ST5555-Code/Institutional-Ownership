@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (React Phase 4 cutover shipped — Flask now serves `web/react-app/dist/`; Playwright baselines captured + spec robustified)_
+_Last updated: 2026-04-12 (React Phase 4 cutover complete, HEAD: 799dbde)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,14 +12,14 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `002fab0`
+- **HEAD:** `799dbde`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — `web/static/app.js` (~5600 lines, **retired 2026-04-13 pending 1-week stability**)
   - Jinja templates — `web/templates/admin.html` (admin page only; `web/templates/index.html` orphaned but retained for rollback)
-  - **React full-app (Phase 4 COMPLETE)** — `web/react-app/` (dev :5174, prod served by Flask from `dist/`). All 11 tabs ported, Phase 3 polish done, cutover shipped 2026-04-13 (HEAD `002fab0`). Playwright regression 11/11 green at :8001 vs dev baselines. See `REACT_MIGRATION.md`. Next: retire `web/react-src/` POC + vanilla-JS after 1 week of stability; Batch 1-B2 (error envelope + Pydantic) now unblocked.
+  - **React full-app (Phase 4 COMPLETE)** — `web/react-app/` is now the primary frontend served by Flask at :8001 from `web/react-app/dist/`. Vanilla-JS frontend (web/static/app.js, web/templates/index.html) still on disk — retirement window opens 2026-04-20. React dev server on :5174 still available for development.
 
 ---
 
@@ -110,21 +110,24 @@ Original tables retained for 30-day rollback after Phase 4 cutover (2026-04-09).
 ```
 This is a pipeline operation, NOT a data QC task. Do not run without explicit user authorization.
 
-### 3. React migration — Phase 4 cutover shipped 2026-04-13
+### 3. Vanilla-JS retirement — earliest 2026-04-20
 
-**Phase 4 COMPLETE** (HEAD `002fab0`). Flask now serves `web/react-app/dist/index.html` from `/` and `/assets/*` from `dist/assets/`. One-line-ish change to `scripts/app.py` (static_folder + static_url_path + index route). Playwright regression 11/11 green at :8001 vs dev-server baselines (`dc27d25`), 0 pixel diff. Vanilla-JS frontend + `web/react-src/` POC retained for now — retire after 1 week of stability (earliest 2026-04-20).
+Retirement window opens 2026-04-20 (1 week stable after Phase 4 cutover).
+Requires explicit user authorization. Files to delete:
+- web/react-src/ (POC)
+- web/templates/index.html
+- web/static/app.js
+Do not delete before 2026-04-20. Do not delete without explicit confirmation.
 
-**Prerequisite for starting Flask:** `cd web/react-app && npm run build` (not committed; `dist/` is gitignored).
+### 4. Architecture upgrade — next steps (see ARCHITECTURE_REVIEW.md)
 
-**Unblocked by cutover:** Batch 1-B2 (error envelope + Pydantic schemas + React error boundaries) from `ARCHITECTURE_REVIEW.md`. Vanilla-JS must be retired before executing — 1-week watch starts now.
+Phase 0-A: GitHub Actions CI — lint/bandit on push. Gates Phase 1. ~1 hour.
+Phase 1 Batch 1-A: routing hygiene — /api/v1/ prefix (straight prefix, no
+dual-mount needed — vanilla-JS retired), quarter_config rename, rollup audit,
+input guards. ~1 hour, scripts/app.py only, low risk.
 
-**Playwright notes:** Config keeps `baseURL: http://localhost:5174` for dev-server use. For post-deploy validation against Flask-served build, temporarily set baseURL to `:8001` and remove the `webServer` block (revert after run). `tabs.spec.ts` uses `expect(getByText('APPLE INC')).toBeVisible()` for ticker load — robust against the Zustand same-ticker short-circuit; do not revert to `waitForResponse('/api/summary')`.
+### 5. Minor follow-ups
 
-See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
-
-### 4. Minor follow-ups
-
-- **web/react-src/ + web/templates/index.html + web/static/app.js retirement** — earliest 2026-04-20 (1 week stable). Requires explicit authorization. Do not delete before that date.
 - **Amundi → Amundi Taiwan rollup** — eid=830 + eid=4248 roll to eid=752 Amundi Taiwan via parent_bridge_sync/manual. Should roll to global Amundi SA parent. Separate manual fix.
 - **Financial Partners Group fragmentation** — eid=1600 "Inc" vs eid=9722 "LLC" with circular orphan_scan. Minor structural cleanup.
 - **INF9c suppress_relationship entity_id stability** — PARENT_SEEDS entity_ids are deterministic in practice but not contractually guaranteed. The 6 suppress rows use entity_id fallback which is best-effort across full --reset. Full fix would require adding CIK identifiers to PARENT_SEEDS brand ghosts.
@@ -220,6 +223,13 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+799dbde docs: ROADMAP + NEXT_SESSION_CONTEXT — Phase 4 cutover complete
+2bac928 docs: REACT_MIGRATION + NEXT_SESSION_CONTEXT — Phase 4 cutover docs
+002fab0 feat: React Phase 4 cutover — Flask serves web/react-app/dist/
+a555a91 test: set playwright expect.timeout 10s in config
+dc27d25 test: capture Playwright visual regression baselines (11 tabs, AAPL)
+442084f docs: ARCHITECTURE_REVIEW.md — sequencing and gate fixes (3 changes)
+6291c6b docs: ARCHITECTURE_REVIEW.md — final revision pass (6 changes)
 2c99d34 ARCH: add ARCHITECTURE_REVIEW.md + sync ROADMAP + NEXT_SESSION_CONTEXT. 6-phase upgrade plan. Recommended next task: Batch 1-A routing hygiene (~1hr, app.py only).
 573b504 docs: REACT_MIGRATION.md — Phase 2+3 complete, Phase 4 pending
 b8d95af docs: ROADMAP entry for 2026-04-12 backend cleanup trio
