@@ -745,9 +745,11 @@ export interface EntityGraphResponse {
   metadata: EntityGraphMetadata
 }
 
-// ── Quarter Config — /api/admin/quarter_config ────────────────────────────
-// NOTE: Real route is /api/admin/quarter_config (not /api/quarter_config).
-// INF12 left this endpoint ungated because the public UI loads it every page.
+// ── Quarter Config — /api/config/quarters ─────────────────────────────────
+// Public endpoint loaded by the UI on every page (no auth). Renamed from
+// /api/admin/quarter_config in ARCH-1A — legacy path still served until
+// vanilla-JS frontend retirement (2026-04-20). This type is currently
+// declared but unused; tabs hardcode quarter arrays today.
 
 export interface QuarterConfigResponse {
   quarters: string[]

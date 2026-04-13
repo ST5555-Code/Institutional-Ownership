@@ -5,6 +5,7 @@ Replaces Jupyter notebook for day-to-day browser-based research.
 
 import argparse
 import os
+import re
 import threading as _threading
 from datetime import datetime
 
@@ -25,6 +26,17 @@ from queries import (
     get_summary, _cross_ownership_query,
     VALID_ROLLUP_TYPES,
 )
+
+
+# Input-guard regexes — Batch 1-A (ARCH-1A). Ticker regex accepts BRK.B, BF.B,
+# ADRs. Spec in ARCHITECTURE_REVIEW.md literally reads `^[A-Z]{1,6}[.A-Z]?$`;
+# that pattern only matches one of {trailing dot, trailing letter}, not both,
+# and so would reject BRK.B which the spec comment explicitly says it should
+# accept. Using the corrected form `^[A-Z]{1,6}(\.[A-Z])?$` to match the
+# stated intent. Transitional — Pydantic validation in Batch 4-C (FastAPI)
+# replaces these route-layer guards.
+_TICKER_RE = re.compile(r'^[A-Z]{1,6}(\.[A-Z])?$')
+_QUARTER_RE = re.compile(r'^20\d{2}Q[1-4]$')
 
 
 def _get_rollup_type(req):
@@ -240,6 +252,33 @@ app.register_blueprint(admin_bp)
 
 
 # ---------------------------------------------------------------------------
+# Input guards (ARCH-1A) — validate shape of ticker / quarter / rollup_type
+# before handlers see them. Applies to /api/* on the main app only. admin_bp
+# has its own before_request for token auth. Empty/missing params pass
+# through so handlers can still enforce required-param presence themselves.
+# ---------------------------------------------------------------------------
+
+@app.before_request
+def _validate_query_params():
+    path = request.path
+    if not path.startswith('/api/'):
+        return None
+    if path.startswith('/api/admin/'):
+        return None  # admin_bp runs its own token + validation layer
+    ticker = request.args.get('ticker')
+    if ticker:
+        if not _TICKER_RE.match(ticker.upper().strip()):
+            return jsonify({'error': f'Invalid ticker format: {ticker!r}'}), 400
+    quarter = request.args.get('quarter')
+    if quarter and not _QUARTER_RE.match(quarter.strip()):
+        return jsonify({'error': f'Invalid quarter format: {quarter!r}'}), 400
+    rollup = request.args.get('rollup_type')
+    if rollup and rollup.strip() not in VALID_ROLLUP_TYPES:
+        return jsonify({'error': f'Invalid rollup_type: {rollup!r}'}), 400
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Admin page (HTML shell only — API endpoints live on admin_bp)
 # ---------------------------------------------------------------------------
 
@@ -249,9 +288,7 @@ def admin_page():
     return render_template('admin.html')
 
 
-@app.route('/api/admin/quarter_config')
-def api_admin_quarter_config():
-    """F7: Show current quarter configuration."""
+def _quarter_config_payload():
     from config import QUARTERS, QUARTER_URLS, QUARTER_REPORT_DATES, QUARTER_SNAPSHOT_DATES
     return jsonify({
         'quarters': QUARTERS,
@@ -260,6 +297,20 @@ def api_admin_quarter_config():
         'snapshot_dates': QUARTER_SNAPSHOT_DATES,
         'config_file': os.path.join(BASE_DIR, 'scripts', 'config.py'),
     })
+
+
+@app.route('/api/admin/quarter_config')
+def api_admin_quarter_config():
+    """Legacy path — retained for vanilla-JS frontend until retirement window
+    2026-04-20. New code should use /api/config/quarters (ARCH-1A rename)."""
+    return _quarter_config_payload()
+
+
+@app.route('/api/config/quarters')
+def api_config_quarters():
+    """Quarter configuration (ARCH-1A rename from /api/admin/quarter_config).
+    Public endpoint — no auth, loaded by UI on every page."""
+    return _quarter_config_payload()
 
 
 # ---------------------------------------------------------------------------
@@ -759,7 +810,8 @@ def api_short_analysis():
     if not ticker:
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
-        result = short_interest_analysis(ticker)
+        rt = _get_rollup_type(request)
+        result = short_interest_analysis(ticker, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -819,7 +871,8 @@ def api_short_long():
         return jsonify({'error': 'Missing ticker parameter'}), 400
     try:
         from queries import get_short_long_comparison
-        result = get_short_long_comparison(ticker)
+        rt = _get_rollup_type(request)
+        result = get_short_long_comparison(ticker, rollup_type=rt)
         return jsonify(result)
     except Exception as e:
         app.logger.error("short_long error for %s: %s", ticker, e)
@@ -1461,6 +1514,34 @@ def api_peer_rotation_detail():
     except Exception as e:
         app.logger.error("peer_rotation_detail error: %s", e)
         return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# API v1 dual-mount (ARCH-1A) — register every public /api/<name> route
+# under /api/v1/<name> as well. Legacy /api/* stays live for vanilla-JS
+# frontend until retirement window 2026-04-20. After retirement, replace
+# with a url_prefix Blueprint and drop the legacy mount.
+# ---------------------------------------------------------------------------
+
+def _register_v1_aliases():
+    aliases = []
+    for rule in list(app.url_map.iter_rules()):
+        path = rule.rule
+        if (path.startswith('/api/')
+                and not path.startswith('/api/v1/')
+                and not path.startswith('/api/admin/')):
+            v1_path = '/api/v1/' + path[len('/api/'):]
+            aliases.append((v1_path, rule.endpoint, rule))
+    for v1_path, endpoint, rule in aliases:
+        app.add_url_rule(
+            v1_path,
+            endpoint=f'v1_{endpoint}',
+            view_func=app.view_functions[endpoint],
+            methods=sorted(rule.methods - {'HEAD', 'OPTIONS'}),
+        )
+
+
+_register_v1_aliases()
 
 
 # ---------------------------------------------------------------------------
