@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — FreshnessBadge rollout to all 11 tabs + Phase 0-B2 smoke CI shipped. HEAD: 8cf0d82)_
+_Last updated: 2026-04-13 (session close — vanilla-JS retirement + Phase 1-B2 envelope + Phase 4 Batch 4-A Blueprint split all shipped. HEAD: 746a798)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,14 +12,15 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `8cf0d82` (Phase 0-B2 — smoke CI fixture + response snapshot tests)
+- **HEAD:** `746a798` (Phase 4 Batch 4-A — Blueprint split of scripts/app.py)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
-  - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
+  - Flask — `scripts/app.py` (103 lines, thin entry) + 9 Blueprint modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (~700 lines, `/api/admin/*`, INF12). `scripts/app_legacy.py` retained for 1-week rollback.
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
-  - Vanilla JS — `web/static/app.js` (~5600 lines, **retired 2026-04-13 pending 1-week stability**)
-  - Jinja templates — `web/templates/admin.html` (admin page only; `web/templates/index.html` orphaned but retained for rollback)
-  - **React full-app (Phase 4 COMPLETE)** — `web/react-app/` is now the primary frontend served by Flask at :8001 from `web/react-app/dist/`. Vanilla-JS frontend (web/static/app.js, web/templates/index.html) still on disk — retirement window opens 2026-04-20. React dev server on :5174 still available for development.
+  - Vanilla JS — **retired 2026-04-13** (commit `71269cb`). `web/static/{dist,vendor,style.css}` are orphaned — safe to delete in a follow-up PR.
+  - Jinja templates — `web/templates/admin.html` only (index.html deleted)
+  - **React full-app** — `web/react-app/` is the only frontend, served by Flask at :8001 from `web/react-app/dist/`. React dev server on :5174 still available for development.
+  - **API contract** — public routes at `/api/v1/*` only (legacy `/api/*` mount removed). 6 endpoints wrap responses in the Phase 1-B2 envelope: `/api/v1/tickers`, `/api/v1/query1`, `/api/v1/portfolio_context`, `/api/v1/flow_analysis`, `/api/v1/ownership_trend_summary`, `/api/v1/entity_graph`.
 
 ---
 
@@ -81,14 +82,17 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ### ⭐ Next tasks in order
 
-_FreshnessBadge rolled out to all 11 tabs 2026-04-13 (`83836ee`).
-Phase 0-B2 smoke CI shipped 2026-04-13 (`8cf0d82`) — fixture DB,
-build script, smoke workflow, and 8 passing tests all committed.
-Phase 4 Batch 4-A (Blueprint split) is now unblocked._
+_Vanilla-JS retired 2026-04-13 (`71269cb`); Playwright baselines refreshed
+(`3526757`). Phase 1-B2 envelope shipped: infra (`9c27b7e`) + rollout
+(`6572a46`). Phase 4 Batch 4-A Blueprint split shipped as a feature
+branch, fast-forward merged (`746a798`) after 8/8 smoke + 11/11 Playwright
+green. Phase 4 Batch 4-B is now unblocked._
 
-**1. Phase 4 Batch 4-A — Blueprint split — ~1 day, large refactor.** Split `scripts/app.py` (~1,400 lines) into domain Blueprints per `ARCHITECTURE_REVIEW.md` Phase 4-A. Target files: `app_db.py` (web-layer DB helpers, distinct from pipeline `scripts/db.py`), `app_bootstrap.py` (≤100 lines), `api_register.py`, `api_flows.py`, `api_entities.py`, `api_market.py`, `api_config.py`. Smoke CI from Phase 0-B2 is the regression guardrail: `test_smoke_response_equality` must stay green on the 4 monitored endpoints. Feature branch recommended. `app.py` kept as `app_legacy.py` until smoke passes for ≥1 week. Does NOT include FastAPI swap (moved to Phase 4+).
+**1. Phase 4 Batch 4-B — queries.py service layer split — ~half day.** Split `queries.py` (~5,400 lines) into SQL construction (`queries.py`, leaner), response shaping (`serializers.py`), and cache helpers (`cache.py` with explicit key constants). Follow-on to 4-A. Per-domain `queries_*.py` split (queries_register / queries_flows / queries_entities / queries_market) explicitly deferred to Phase 6.
 
-**2. Phase 4 Batch 4-B — queries.py service layer split — ~half day.** Follows 4-A. Split `queries.py` (~5,400 lines) into SQL construction (`queries.py`, leaner), response shaping (`serializers.py`), and cache helpers (`cache.py` with explicit key constants).
+**2. `app_legacy.py` cleanup — delete after 1 week stable.** `scripts/app_legacy.py` (1,788-line pre-Batch-4-A snapshot) retained for rollback. Safe to delete ≥2026-04-20 if no regressions in main. Needs explicit authorization before deletion.
+
+**3. Follow-ups.** `web/static/{dist,vendor,style.css}` are orphaned after vanilla-JS retirement — `index.html` was their only consumer. Safe to delete in a separate PR; not done in 2026-04-13 commit per user working-preference rule (no unauthorized deletions).
 
 **Known pre-existing issues — do not absorb:**
 - BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work.
@@ -311,6 +315,11 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+746a798 feat: Phase 4 Batch 4-A — Blueprint split of scripts/app.py
+6572a46 feat: Phase 1-B2 rollout — envelope + schemas on 6 priority endpoints
+9c27b7e feat: Phase 1-B2 infra — envelope types + Pydantic schemas + ErrorBoundary
+3526757 test: refresh Playwright baselines post-FreshnessBadge + URL rewrite
+71269cb feat: retire vanilla-JS frontend — legacy /api/* mount removed
 8cf0d82 feat: Phase 0-B2 — smoke CI fixture + response snapshot tests
 83836ee feat: FreshnessBadge rollout — wire into all 11 tabs
 2892009 feat: data_freshness pipeline write hooks + FreshnessBadge component
