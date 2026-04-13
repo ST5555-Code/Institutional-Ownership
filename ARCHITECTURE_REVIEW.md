@@ -448,6 +448,34 @@ additive — drop to clean up.
 
 ---
 
+## Phase 3++ — build_analytics.py quarterly precompute pipeline
+_Triggered when: on-demand query latency becomes user-visible, or quarterly
+pipeline cadence is established and precompute fits naturally._
+_Prerequisite: Phase 3 complete. Not a blocker for Phase 4 or 4+._
+
+Most stable analytical views (Register, Conviction, Ownership Trend,
+Cross-Ownership) are deterministic per ticker×quarter×rollup_type. Running
+them on demand means re-executing complex SQL on every page load. The right
+pattern — already established by `investor_flows` and `ticker_flow_stats` —
+is to precompute them in the pipeline and serve thin SELECTs from shaped
+tables.
+
+New `scripts/build_analytics.py` pipeline step runs after `compute_flows.py`:
+- `register_cache (ticker, quarter, rollup_type, rank, institution, ...)`
+- `conviction_cache (ticker, quarter, rollup_type, ...)`
+- `ownership_trend_cache (ticker, quarter, ...)`
+- `cross_ownership_cache (ticker_a, ticker_b, quarter, ...)`
+
+Each table gets a `data_freshness` row on completion. API endpoints become
+single-table SELECTs. Target latency: ≤50ms across all precomputed tabs.
+
+Stays on-demand (user-driven, dynamic):
+- Fund Portfolio — scoped to manager selected by user
+- Entity Graph — user picks root entity, dynamic traversal
+- Flow Analysis period selector — user picks window
+
+---
+
 ## Phase 4 — Backend Modularization
 _Split app.py and queries.py into well-bounded modules._
 _Do not start until Batches 1-A and 1-B1 are complete — endpoint
