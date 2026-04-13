@@ -171,16 +171,17 @@ _Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-b
 
 ## ARCHITECTURE BACKLOG — from ARCHITECTURE_REVIEW.md (2026-04-12)
 
-Source: `ARCHITECTURE_REVIEW.md` (repo root), revised `657c885`. Prerequisites
+Source: `ARCHITECTURE_REVIEW.md` (repo root), revised `713fb3f`. Prerequisites
 and phase sequencing documented there — do not reorder without consulting the
-gate criteria in each phase. **Recommended next task for Claude Code: Batch
-0-A (GitHub Actions CI, ~2 hr). Phase 1 is gated on green CI.**
+gate criteria in each phase. **Recommended next task for Claude Code: Phase
+0-A (lint/bandit CI, ~1 hr). Phase 1 is gated on Phase 0-A green on main.**
 
-### Phase 0 — Prerequisite (promoted from BL-1)
+### Phase 0 — Prerequisite (promoted from BL-1, split into 0-A + 0-B)
 
 | # | Item | Batch | Notes |
 |---|------|-------|-------|
-| ARCH-0A | GitHub Actions CI | 0-A | Pre-commit (pylint + bandit + ruff) on push. Smoke test against 5 critical endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`, `/api/admin/stats`) using a headless fixture DB. ~2 hr. **Gate: Phase 1 does not start until CI is green on main.** |
+| ARCH-0A | Lint + static analysis CI | 0-A | Pre-commit (pylint + bandit + ruff) wired to run on every push. No runtime smoke — just static analysis. ~1 hr. **Gate: Phase 1 does not start until Phase 0-A CI is green on main.** |
+| ARCH-0B | Runtime smoke test CI | 0-B | Four-endpoint smoke test (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`) against a fixture DuckDB. **Phase-independent — does NOT gate Phase 1.** Sub-task 1: design fixture approach (seed script vs committed binary vs stripped `EXPORT DATABASE` dump) — design only in this batch, do not implement. Sub-task 2: implement (follow-on). ~2–3 hr including design. |
 
 ### Phase 1 — Contract Stabilization (freeze endpoint semantics)
 

@@ -79,18 +79,20 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Batch 0-A (GitHub Actions CI)
+### ⭐ Recommended next Claude Code task — ARCH Phase 0-A (lint/bandit CI)
 
-_Promoted from BL-1 to Phase 0 prerequisite in the architecture revision pass
-(commit `657c885`). Phase 1 does not start until CI is green on main._
+_Promoted from BL-1 to Phase 0, then split into 0-A + 0-B in the second
+revision pass (commit `713fb3f`). Phase 0-A gates Phase 1; Phase 0-B is
+phase-independent._
 
-From `ARCHITECTURE_REVIEW.md` Phase 0. **Low risk, ~2 hours, new `.github/workflows/*.yml`.**
+From `ARCHITECTURE_REVIEW.md` Phase 0-A. **Low risk, ~1 hour, new `.github/workflows/lint.yml`.**
 
-1. Pre-commit hooks (pylint + bandit + ruff) wired to run on push.
-2. Smoke test against 5 critical endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`, `/api/admin/stats`) using a headless fixture DB.
-3. Done means: CI runs on every push; a B608-class bug (mis-placed `nosec` injecting `#` into SQL) fails CI, not production.
+1. Pre-commit hooks (pylint + bandit + ruff) wired to run on every push.
+2. No runtime smoke tests in this batch — just static analysis.
+3. Done means: CI runs on every push; a B608-class bug (mis-placed `nosec` injecting `#` into SQL) fails CI, not production. `pylint` / `bandit` / `ruff` all pass on `main`.
+4. Gate: Phase 1 does not start until Phase 0-A is green on `main`.
 
-Once Phase 0 is green, the next task is ARCH-1A (routing hygiene — dual-mount `/api/*` + `/api/v1/*`, ticker regex `^[A-Z]{1,6}[.A-Z]?$`, input guards). See ROADMAP "ARCHITECTURE BACKLOG" section for tracking.
+Phase 0-B (runtime smoke against 4 endpoints with a fixture DB) is separate and phase-independent — start it whenever the fixture-design sub-task lands, does NOT gate Phase 1. Once Phase 0-A is green, next task is ARCH-1A (routing hygiene — dual-mount `/api/*` + `/api/v1/*`, ticker regex `^[A-Z]{1,6}[.A-Z]?$`, input guards). See ROADMAP "ARCHITECTURE BACKLOG" for tracking.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
