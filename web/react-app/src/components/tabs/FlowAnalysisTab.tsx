@@ -91,7 +91,7 @@ export function FlowAnalysisTab() {
   const level = fundView === 'fund' ? 'fund' : 'parent'
 
   const url = ticker
-    ? `/api/flow_analysis?ticker=${enc(ticker)}&period=${period}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
+    ? `/api/v1/flow_analysis?ticker=${enc(ticker)}&period=${period}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
     : null
   const { data, loading, error } = useFetch<FlowAnalysisResponse>(url)
 

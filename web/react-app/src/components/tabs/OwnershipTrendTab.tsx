@@ -118,13 +118,13 @@ export function OwnershipTrendTab() {
 
   // Fetch URLs — null when no ticker, only the active sub-view's URL triggers a fetch
   const trendUrl = ticker && subView === 'quarterly'
-    ? `/api/ownership_trend_summary?ticker=${enc(ticker)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
+    ? `/api/v1/ownership_trend_summary?ticker=${enc(ticker)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
     : null
   const momentumUrl = ticker && subView === 'holders'
-    ? `/api/holder_momentum?ticker=${enc(ticker)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
+    ? `/api/v1/holder_momentum?ticker=${enc(ticker)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
     : null
   const cohortUrl = ticker && subView === 'cohort'
-    ? `/api/cohort_analysis?ticker=${enc(ticker)}&from=${enc(cohortFrom)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
+    ? `/api/v1/cohort_analysis?ticker=${enc(ticker)}&from=${enc(cohortFrom)}&level=${level}&active_only=${aoStr}&rollup_type=${rollupType}`
     : null
 
   const trend = useFetch<OwnershipTrendResponse>(trendUrl)

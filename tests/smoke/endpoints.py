@@ -10,8 +10,8 @@ if the fixture tickers change.
 from __future__ import annotations
 
 ENDPOINTS: dict[str, str] = {
-    "tickers":      "/api/tickers",
-    "query1":       "/api/query1?ticker=AAPL",
-    "summary":      "/api/summary?ticker=AAPL",
-    "entity_graph": "/api/entity_graph?entity_id=2",
+    "tickers":      "/api/v1/tickers",
+    "query1":       "/api/v1/query1?ticker=AAPL",
+    "summary":      "/api/v1/summary?ticker=AAPL",
+    "entity_graph": "/api/v1/entity_graph?entity_id=2",
 }

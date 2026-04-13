@@ -76,7 +76,7 @@ function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
+    fetch('/api/v1/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
   }, [])
 
   useEffect(() => { setInput(value) }, [value])
@@ -149,10 +149,10 @@ export function OverlapAnalysisTab() {
 
   // Fetch subject-only on tab load, overlap when second ticker selected
   const subjectUrl = subject && !secondTicker
-    ? `/api/two_company_subject?subject=${enc(subject)}&quarter=${enc(quarter)}`
+    ? `/api/v1/two_company_subject?subject=${enc(subject)}&quarter=${enc(quarter)}`
     : null
   const overlapUrl = subject && secondTicker
-    ? `/api/two_company_overlap?subject=${enc(subject)}&second=${enc(secondTicker)}&quarter=${enc(quarter)}`
+    ? `/api/v1/two_company_overlap?subject=${enc(subject)}&second=${enc(secondTicker)}&quarter=${enc(quarter)}`
     : null
 
   const subjectData = useFetch<TwoCompanyOverlapResponse>(subjectUrl)

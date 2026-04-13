@@ -1,7 +1,7 @@
 {
   "all_totals": {
     "count": 5797,
-    "pct_float": 67.00410000000001,
+    "pct_float": 67.0041,
     "shares": 9853581626.0,
     "value_live": 2521728609725.92
   },
@@ -412,13 +412,13 @@
       "count": 9,
       "pct_float": 0.40790000000000004,
       "shares": 59984823.0,
-      "value_live": 15351315902.159998
+      "value_live": 15351315902.16
     },
     "active": {
       "count": 3300,
-      "pct_float": 10.017799999999982,
+      "pct_float": 10.017799999999987,
       "shares": 1471880570.0,
-      "value_live": 376683675474.3994
+      "value_live": 376683675474.4
     },
     "activist": {
       "count": 3,
@@ -428,21 +428,21 @@
     },
     "endowment_foundation": {
       "count": 12,
-      "pct_float": 0.1103,
+      "pct_float": 0.11030000000000001,
       "shares": 16235706.0,
-      "value_live": 4155041879.5200005
+      "value_live": 4155041879.5199995
     },
     "hedge_fund": {
       "count": 285,
-      "pct_float": 0.5501999999999996,
+      "pct_float": 0.5501999999999992,
       "shares": 80895993.0,
-      "value_live": 20702902528.55998
+      "value_live": 20702902528.560005
     },
     "mixed": {
       "count": 1511,
-      "pct_float": 15.223299999999902,
+      "pct_float": 15.22329999999991,
       "shares": 2240908889.0,
-      "value_live": 573493402872.8795
+      "value_live": 573493402872.8801
     },
     "passive": {
       "count": 33,
@@ -452,9 +452,9 @@
     },
     "pension_insurance": {
       "count": 93,
-      "pct_float": 2.6326,
+      "pct_float": 2.6325999999999996,
       "shares": 387178204.0,
-      "value_live": 99086645967.68007
+      "value_live": 99086645967.68002
     },
     "private_equity": {
       "count": 1,
@@ -464,15 +464,15 @@
     },
     "quantitative": {
       "count": 43,
-      "pct_float": 1.8184999999999998,
+      "pct_float": 1.8185000000000002,
       "shares": 267339755.0,
-      "value_live": 68417590099.59998
+      "value_live": 68417590099.59999
     },
     "strategic": {
       "count": 52,
-      "pct_float": 1.5752999999999993,
+      "pct_float": 1.5753000000000001,
       "shares": 231650423.0,
-      "value_live": 59283976254.16001
+      "value_live": 59283976254.16
     },
     "venture_capital": {
       "count": 1,
@@ -482,9 +482,9 @@
     },
     "wealth_management": {
       "count": 454,
-      "pct_float": 4.940700000000003,
+      "pct_float": 4.940699999999995,
       "shares": 726785179.0,
-      "value_live": 185998863009.68015
+      "value_live": 185998863009.68005
     }
   }
 }

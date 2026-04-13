@@ -59,7 +59,7 @@ const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 
 export function ShortInterestTab() {
   const { ticker } = useAppStore()
 
-  const url = ticker ? `/api/short_analysis?ticker=${encodeURIComponent(ticker)}` : null
+  const url = ticker ? `/api/v1/short_analysis?ticker=${encodeURIComponent(ticker)}` : null
   const { data, loading, error } = useFetch<ShortAnalysisResponse>(url)
 
   function onExcel() {

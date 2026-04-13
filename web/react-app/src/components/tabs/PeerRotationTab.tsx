@@ -72,13 +72,13 @@ export function PeerRotationTab() {
   const ao = activeOnly ? '1' : '0'
 
   const url = ticker
-    ? `/api/peer_rotation?ticker=${enc(ticker)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
+    ? `/api/v1/peer_rotation?ticker=${enc(ticker)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
     : null
   const { data, loading, error } = useFetch<PeerRotationResponse>(url)
 
   // Detail fetch — only when a peer is selected
   const detailUrl = ticker && selectedPeer
-    ? `/api/peer_rotation_detail?ticker=${enc(ticker)}&peer=${enc(selectedPeer)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
+    ? `/api/v1/peer_rotation_detail?ticker=${enc(ticker)}&peer=${enc(selectedPeer)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
     : null
   const detail = useFetch<PeerRotationDetailResponse>(detailUrl)
 

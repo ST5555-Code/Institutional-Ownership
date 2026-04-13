@@ -96,8 +96,8 @@ app = Flask(
 # env, plus an X-Admin-Token header on every request. Without both env vars
 # set, admin_bp returns 503 "Admin disabled". Blueprint registration happens
 # after get_db / has_table are defined below (see end of this module's setup).
-# EXCEPTION: /api/admin/quarter_config stays on the main app — it's loaded by
-# the public main UI on every page and cannot be gated without breaking it.
+# Public quarter config lives at /api/v1/config/quarters on the main app —
+# no auth needed, loaded by React on every page load.
 
 
 # ---------------------------------------------------------------------------
@@ -261,18 +261,17 @@ app.register_blueprint(admin_bp)
 
 # ---------------------------------------------------------------------------
 # Input guards (ARCH-1A) — validate shape of ticker / quarter / rollup_type
-# before handlers see them. Applies to /api/* on the main app only. admin_bp
-# has its own before_request for token auth. Empty/missing params pass
-# through so handlers can still enforce required-param presence themselves.
+# before handlers see them. Applies to /api/v1/* public routes only.
+# /api/admin/* lives on admin_bp, which runs its own before_request for
+# token auth + param validation. Empty/missing params pass through so
+# handlers can still enforce required-param presence themselves.
 # ---------------------------------------------------------------------------
 
 @app.before_request
 def _validate_query_params():
     path = request.path
-    if not path.startswith('/api/'):
+    if not path.startswith('/api/v1/'):
         return None
-    if path.startswith('/api/admin/'):
-        return None  # admin_bp runs its own token + validation layer
     ticker = request.args.get('ticker')
     if ticker:
         if not _TICKER_RE.match(ticker.upper().strip()):
@@ -307,21 +306,15 @@ def _quarter_config_payload():
     })
 
 
-@app.route('/api/admin/quarter_config')
-def api_admin_quarter_config():
-    """Legacy path — retained for vanilla-JS frontend until retirement window
-    2026-04-20. New code should use /api/config/quarters (ARCH-1A rename)."""
-    return _quarter_config_payload()
-
-
-@app.route('/api/config/quarters')
+@app.route('/api/v1/config/quarters')
 def api_config_quarters():
-    """Quarter configuration (ARCH-1A rename from /api/admin/quarter_config).
+    """Quarter configuration (ARCH-1A rename from legacy /api/admin/quarter_config,
+    which was removed 2026-04-13 with the vanilla-JS retirement).
     Public endpoint — no auth, loaded by UI on every page."""
     return _quarter_config_payload()
 
 
-@app.route('/api/freshness')
+@app.route('/api/v1/freshness')
 def api_freshness():
     """Data freshness snapshot (ARCH-3A Batch 3-A).
 
@@ -351,9 +344,9 @@ def api_freshness():
 
 
 # ---------------------------------------------------------------------------
-# Endpoint classification (Phase 1 Batch 1-B1, 2026-04-13) — freeze artifact
+# Endpoint classification (Phase 1 Batch 1-B1 + vanilla-JS retirement) — freeze artifact
 # ---------------------------------------------------------------------------
-# Every /api/* route on this app, categorized by:
+# Every /api/v1/* route on this app, categorized by:
 #   Quarter: latest-only (no `quarter` param, always LATEST_QUARTER) vs
 #            quarter-aware (reads `quarter`, validates, passes through).
 #   Rollup:  rollup-agnostic vs rollup-aware (reads `rollup_type`).
@@ -362,54 +355,51 @@ def api_freshness():
 # category cluster naturally into the same domain module. Do not change a
 # row's category without updating this comment AND the downstream consumer.
 #
-# /api/admin/* lives on admin_bp (scripts/admin_bp.py). /api/admin/quarter_config
-# is listed here because it is a public endpoint that stayed on the main app
-# for vanilla-JS compatibility (rename target: /api/config/quarters, ARCH-1A).
-# All /api/* routes below are also mounted under /api/v1/* by
-# _register_v1_aliases() at the bottom of this file.
+# /api/admin/* lives on admin_bp (scripts/admin_bp.py), token-auth gated.
+# The legacy /api/* public mount was removed 2026-04-13 after the vanilla-JS
+# frontend was retired — everything public is now /api/v1/* only.
 #
-# Path                             Quarter         Rollup
-# -------------------------------- --------------- ----------------
-# /api/config/quarters             n/a (config)    n/a
-# /api/admin/quarter_config        n/a (config)    n/a  (legacy — drop at vanilla-JS retirement)
-# /api/freshness                   n/a (meta)      n/a  (data_freshness snapshot — ARCH-3A)
-# /api/tickers                     latest-only     rollup-agnostic
-# /api/summary                     latest-only     rollup-agnostic
-# /api/fund_rollup_context         latest-only     rollup-agnostic  (returns BOTH rollup names by design)
-# /api/fund_portfolio_managers     latest-only     rollup-agnostic
-# /api/fund_behavioral_profile     latest-only     rollup-agnostic
-# /api/nport_shorts                latest-only     rollup-agnostic
-# /api/short_volume                latest-only     rollup-agnostic
-# /api/smart_money                 latest-only     rollup-agnostic
-# /api/crowding                    latest-only     rollup-agnostic
-# /api/sector_flows                latest-only     rollup-agnostic
-# /api/heatmap                     latest-only     rollup-agnostic
-# /api/manager_profile             latest-only     rollup-agnostic
-# /api/amendments                  latest-only     rollup-agnostic
-# /api/peer_groups                 latest-only     rollup-agnostic
-# /api/peer_groups/<group_id>      latest-only     rollup-agnostic
-# /api/entity_search               latest-only     rollup-agnostic
-# /api/entity_resolve              latest-only     rollup-agnostic
-# /api/entity_market_summary       latest-only     rollup-agnostic
-# /api/short_analysis              latest-only     rollup-aware  (threaded in Batch 1-A)
-# /api/short_long                  latest-only     rollup-aware  (threaded in Batch 1-A; 500 pre-existing, BL-9)
-# /api/ownership_trend_summary     latest-only     rollup-aware
-# /api/cohort_analysis             latest-only     rollup-aware
-# /api/holder_momentum             latest-only     rollup-aware
-# /api/flow_analysis               latest-only     rollup-aware
-# /api/cross_ownership             latest-only     rollup-aware
-# /api/cross_ownership_top         latest-only     rollup-aware
-# /api/peer_rotation               latest-only     rollup-aware
-# /api/peer_rotation_detail        latest-only     rollup-aware
-# /api/portfolio_context           latest-only     rollup-aware
-# /api/sector_flow_movers          latest-only     rollup-aware
-# /api/sector_flow_detail          latest-only     rollup-aware
-# /api/entity_children             quarter-aware   rollup-agnostic  (graph layer sits below rollup)
-# /api/entity_graph                quarter-aware   rollup-agnostic
-# /api/two_company_overlap         quarter-aware   rollup-agnostic
-# /api/two_company_subject         quarter-aware   rollup-agnostic
-# /api/query<int:qnum>             quarter-aware   rollup-aware  (for qnum in _RT_AWARE_QUERIES = {1,2,3,5,12,14})
-# /api/export/query<int:qnum>      quarter-aware   rollup-aware  (mirrors /api/query — fixed Batch 1-B1)
+# Path                                Quarter         Rollup
+# ----------------------------------- --------------- ----------------
+# /api/v1/config/quarters             n/a (config)    n/a
+# /api/v1/freshness                   n/a (meta)      n/a  (data_freshness snapshot — ARCH-3A)
+# /api/v1/tickers                     latest-only     rollup-agnostic
+# /api/v1/summary                     latest-only     rollup-agnostic
+# /api/v1/fund_rollup_context         latest-only     rollup-agnostic  (returns BOTH rollup names by design)
+# /api/v1/fund_portfolio_managers     latest-only     rollup-agnostic
+# /api/v1/fund_behavioral_profile     latest-only     rollup-agnostic
+# /api/v1/nport_shorts                latest-only     rollup-agnostic
+# /api/v1/short_volume                latest-only     rollup-agnostic
+# /api/v1/smart_money                 latest-only     rollup-agnostic
+# /api/v1/crowding                    latest-only     rollup-agnostic
+# /api/v1/sector_flows                latest-only     rollup-agnostic
+# /api/v1/heatmap                     latest-only     rollup-agnostic
+# /api/v1/manager_profile             latest-only     rollup-agnostic
+# /api/v1/amendments                  latest-only     rollup-agnostic
+# /api/v1/peer_groups                 latest-only     rollup-agnostic
+# /api/v1/peer_groups/<group_id>      latest-only     rollup-agnostic
+# /api/v1/entity_search               latest-only     rollup-agnostic
+# /api/v1/entity_resolve              latest-only     rollup-agnostic
+# /api/v1/entity_market_summary       latest-only     rollup-agnostic
+# /api/v1/short_analysis              latest-only     rollup-aware  (threaded in Batch 1-A)
+# /api/v1/short_long                  latest-only     rollup-aware  (threaded in Batch 1-A; 500 pre-existing, BL-9)
+# /api/v1/ownership_trend_summary     latest-only     rollup-aware
+# /api/v1/cohort_analysis             latest-only     rollup-aware
+# /api/v1/holder_momentum             latest-only     rollup-aware
+# /api/v1/flow_analysis               latest-only     rollup-aware
+# /api/v1/cross_ownership             latest-only     rollup-aware
+# /api/v1/cross_ownership_top         latest-only     rollup-aware
+# /api/v1/peer_rotation               latest-only     rollup-aware
+# /api/v1/peer_rotation_detail        latest-only     rollup-aware
+# /api/v1/portfolio_context           latest-only     rollup-aware
+# /api/v1/sector_flow_movers          latest-only     rollup-aware
+# /api/v1/sector_flow_detail          latest-only     rollup-aware
+# /api/v1/entity_children             quarter-aware   rollup-agnostic  (graph layer sits below rollup)
+# /api/v1/entity_graph                quarter-aware   rollup-agnostic
+# /api/v1/two_company_overlap         quarter-aware   rollup-agnostic
+# /api/v1/two_company_subject         quarter-aware   rollup-agnostic
+# /api/v1/query<int:qnum>             quarter-aware   rollup-aware  (for qnum in _RT_AWARE_QUERIES = {1,2,3,5,12,14})
+# /api/v1/export/query<int:qnum>      quarter-aware   rollup-aware  (mirrors /api/v1/query — fixed Batch 1-B1)
 # ---------------------------------------------------------------------------
 
 
@@ -424,9 +414,9 @@ def index():
     ))
 
 
-# SMOKE TEST: always include /api/tickers in post-commit curl checks — it is
+# SMOKE TEST: always include /api/v1/tickers in post-commit curl checks — it is
 # the autocomplete root and a silent 500 here breaks the entire UI ticker search.
-@app.route('/api/tickers')
+@app.route('/api/v1/tickers')
 def api_tickers():
     try:
         con = get_db()
@@ -448,7 +438,7 @@ def api_tickers():
         con.close()
 
 
-@app.route('/api/fund_rollup_context')
+@app.route('/api/v1/fund_rollup_context')
 def api_fund_rollup_context():
     """Return economic and decision-maker rollup names for a given CIK or series_id.
     Used by L4 Fund Portfolio tab to show rollup context panel above holdings table.
@@ -512,7 +502,7 @@ def api_fund_rollup_context():
         con.close()
 
 
-@app.route('/api/fund_portfolio_managers')
+@app.route('/api/v1/fund_portfolio_managers')
 def api_fund_portfolio_managers():
     ticker = request.args.get('ticker', '').upper().strip()
     if not ticker:
@@ -544,7 +534,7 @@ def api_fund_portfolio_managers():
         con.close()
 
 
-@app.route('/api/nport_shorts')
+@app.route('/api/v1/nport_shorts')
 def api_nport_shorts():
     """N-PORT negative balance positions — fund short positions from filings."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -577,7 +567,7 @@ def api_nport_shorts():
         con.close()
 
 
-@app.route('/api/short_volume')
+@app.route('/api/v1/short_volume')
 def api_short_volume():
     """FINRA daily short sale volume for a ticker."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -599,7 +589,7 @@ def api_short_volume():
         con.close()
 
 
-@app.route('/api/fund_behavioral_profile')
+@app.route('/api/v1/fund_behavioral_profile')
 def api_fund_behavioral_profile():
     """Behavioral profile for a fund by LEI or series_id — analyzes historical positions."""
     lei = request.args.get('lei', '').strip()
@@ -695,7 +685,7 @@ def api_fund_behavioral_profile():
         con.close()
 
 
-@app.route('/api/ownership_trend_summary')
+@app.route('/api/v1/ownership_trend_summary')
 def api_ownership_trend_summary():
     ticker = request.args.get('ticker', '').upper().strip()
     level = request.args.get('level', 'parent').strip()
@@ -710,7 +700,7 @@ def api_ownership_trend_summary():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/cohort_analysis')
+@app.route('/api/v1/cohort_analysis')
 def api_cohort_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
     from_q = request.args.get('from', '').strip() or None
@@ -726,7 +716,7 @@ def api_cohort_analysis():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/holder_momentum')
+@app.route('/api/v1/holder_momentum')
 def api_holder_momentum():
     ticker = request.args.get('ticker', '').upper().strip()
     level = request.args.get('level', 'parent').strip()
@@ -741,7 +731,7 @@ def api_holder_momentum():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/flow_analysis')
+@app.route('/api/v1/flow_analysis')
 def api_flow_analysis():
     ticker = request.args.get('ticker', '').upper().strip()
     period = request.args.get('period', '1Q').upper().strip()
@@ -758,7 +748,7 @@ def api_flow_analysis():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/cross_ownership')
+@app.route('/api/v1/cross_ownership')
 def api_cross_ownership():
     """View 1: top holders of anchor company with cross-holdings in other tickers."""
     tickers_raw = request.args.get('tickers', '').upper().strip()
@@ -783,7 +773,7 @@ def api_cross_ownership():
         con.close()
 
 
-@app.route('/api/cross_ownership_top')
+@app.route('/api/v1/cross_ownership_top')
 def api_cross_ownership_top():
     """View 2: top investors by total exposure across all selected tickers."""
     tickers_raw = request.args.get('tickers', '').upper().strip()
@@ -805,7 +795,7 @@ def api_cross_ownership_top():
         con.close()
 
 
-@app.route('/api/peer_groups')
+@app.route('/api/v1/peer_groups')
 def api_peer_groups():
     """Return all peer groups."""
     con = get_db()
@@ -837,7 +827,7 @@ def api_peer_groups():
         con.close()
 
 
-@app.route('/api/peer_groups/<group_id>')
+@app.route('/api/v1/peer_groups/<group_id>')
 def api_peer_group_detail(group_id):
     """Return tickers in a specific peer group."""
     con = get_db()
@@ -853,7 +843,7 @@ def api_peer_group_detail(group_id):
         con.close()
 
 
-@app.route('/api/crowding')
+@app.route('/api/v1/crowding')
 def api_crowding():
     """Crowding analysis: institutional concentration + short interest overlay."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -887,7 +877,7 @@ def api_crowding():
         con.close()
 
 
-@app.route('/api/portfolio_context')
+@app.route('/api/v1/portfolio_context')
 def api_portfolio_context():
     """Conviction tab — portfolio concentration context."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -903,7 +893,7 @@ def api_portfolio_context():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/short_analysis')
+@app.route('/api/v1/short_analysis')
 def api_short_analysis():
     """Short Interest Analysis — N-PORT shorts, FINRA volume, long/short cross-ref."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -917,7 +907,7 @@ def api_short_analysis():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/smart_money')
+@app.route('/api/v1/smart_money')
 def api_smart_money():
     """Smart Money: net exposure view — long 13F vs short FINRA per manager type."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -963,7 +953,7 @@ def api_smart_money():
         con.close()
 
 
-@app.route('/api/short_long')
+@app.route('/api/v1/short_long')
 def api_short_long():
     """Short vs Long comparison: managers long via 13F and short via N-PORT."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -979,7 +969,7 @@ def api_short_long():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/sector_flows')
+@app.route('/api/v1/sector_flows')
 def api_sector_flows():
     """Multi-quarter institutional money flows by GICS sector."""
     try:
@@ -993,7 +983,7 @@ def api_sector_flows():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/sector_flow_movers')
+@app.route('/api/v1/sector_flow_movers')
 def api_sector_flow_movers():
     """Top buyers/sellers for one sector in one quarter transition."""
     try:
@@ -1015,7 +1005,7 @@ def api_sector_flow_movers():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/sector_flow_detail')
+@app.route('/api/v1/sector_flow_detail')
 def api_sector_flow_detail():
     """Full cross-quarter detail for one sector: inflow/outflow/net + top movers."""
     try:
@@ -1036,7 +1026,7 @@ def api_sector_flow_detail():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/heatmap')
+@app.route('/api/v1/heatmap')
 def api_heatmap():
     """Ownership concentration heatmap: top managers × tickers by pct_of_float."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -1106,7 +1096,7 @@ def api_heatmap():
         con.close()
 
 
-@app.route('/api/manager_profile')
+@app.route('/api/v1/manager_profile')
 def api_manager_profile():
     """Manager profile: all holdings, sector allocation, top positions."""
     manager = request.args.get('manager', '').strip()
@@ -1179,7 +1169,7 @@ def api_manager_profile():
         con.close()
 
 
-@app.route('/api/amendments')
+@app.route('/api/v1/amendments')
 def api_amendments():
     """13F-HR amendment reconciliation: show amended vs original filings per quarter."""
     ticker = request.args.get('ticker', '').upper().strip()
@@ -1224,7 +1214,7 @@ def api_amendments():
         con.close()
 
 
-@app.route('/api/summary')
+@app.route('/api/v1/summary')
 def api_summary():
     ticker = request.args.get('ticker', '').upper().strip()
     if not ticker:
@@ -1235,7 +1225,7 @@ def api_summary():
     return jsonify(result)
 
 
-@app.route('/api/query<int:qnum>')
+@app.route('/api/v1/query<int:qnum>')
 def api_query(qnum):
     if qnum not in QUERY_FUNCTIONS:
         return jsonify({'error': f'Invalid query number: {qnum}'}), 400
@@ -1281,7 +1271,7 @@ def api_query(qnum):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/export/query<int:qnum>')
+@app.route('/api/v1/export/query<int:qnum>')
 def api_export(qnum):
     if qnum not in QUERY_FUNCTIONS:
         return jsonify({'error': f'Invalid query number: {qnum}'}), 400
@@ -1358,7 +1348,7 @@ def _eg_quarter(req):
     return q if q in _QUARTERS else LATEST_QUARTER
 
 
-@app.route('/api/entity_search')
+@app.route('/api/v1/entity_search')
 def api_entity_search():
     """Type-ahead search for the Institution dropdown. Searches rollup parents
     only (entity_id = rollup_entity_id). Requires q ≥ 2 chars."""
@@ -1379,7 +1369,7 @@ def api_entity_search():
         con.close()
 
 
-@app.route('/api/entity_children')
+@app.route('/api/v1/entity_children')
 def api_entity_children():
     """Cascading dropdown population. `level` is 'filer' or 'fund'.
     Filer level returns CIK-bearing descendants (tree walk, fallback to self).
@@ -1423,7 +1413,7 @@ def api_entity_children():
         con.close()
 
 
-@app.route('/api/entity_graph')
+@app.route('/api/v1/entity_graph')
 def api_entity_graph():
     """Main graph data endpoint — returns {nodes, edges, metadata} for vis.js.
 
@@ -1469,7 +1459,7 @@ def api_entity_graph():
         con.close()
 
 
-@app.route('/api/two_company_overlap')
+@app.route('/api/v1/two_company_overlap')
 def api_two_company_overlap():
     """Two Companies Overlap tab — institutional and fund-level holder comparison."""
     # QUARTERS lives in config; aliased locally to avoid a reimport warning
@@ -1496,7 +1486,7 @@ def api_two_company_overlap():
         con.close()
 
 
-@app.route('/api/two_company_subject')
+@app.route('/api/v1/two_company_subject')
 def api_two_company_subject():
     """Return top 50 holders for subject ticker only — used for immediate
     tab load before the user selects a second company. Same payload shape
@@ -1522,7 +1512,7 @@ def api_two_company_subject():
         con.close()
 
 
-@app.route('/api/entity_resolve')
+@app.route('/api/v1/entity_resolve')
 def api_entity_resolve():
     """Resolve any entity_id to its canonical institution root.
 
@@ -1574,7 +1564,7 @@ def api_entity_resolve():
         con.close()
 
 
-@app.route('/api/entity_market_summary')
+@app.route('/api/v1/entity_market_summary')
 def api_entity_market_summary():
     """Market-wide: top institutions by 13F book value with filer + fund counts."""
     try:
@@ -1592,7 +1582,7 @@ def api_entity_market_summary():
 
 # ---------------------------------------------------------------------------
 # Main
-@app.route('/api/peer_rotation')
+@app.route('/api/v1/peer_rotation')
 def api_peer_rotation():
     """Peer rotation analysis: subject vs sector/industry peer substitutions."""
     try:
@@ -1610,7 +1600,7 @@ def api_peer_rotation():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/peer_rotation_detail')
+@app.route('/api/v1/peer_rotation_detail')
 def api_peer_rotation_detail():
     """Entity-level breakdown for a subject+peer substitution pair."""
     try:
@@ -1636,27 +1626,6 @@ def api_peer_rotation_detail():
 # frontend until retirement window 2026-04-20. After retirement, replace
 # with a url_prefix Blueprint and drop the legacy mount.
 # ---------------------------------------------------------------------------
-
-def _register_v1_aliases():
-    aliases = []
-    for rule in list(app.url_map.iter_rules()):
-        path = rule.rule
-        if (path.startswith('/api/')
-                and not path.startswith('/api/v1/')
-                and not path.startswith('/api/admin/')):
-            v1_path = '/api/v1/' + path[len('/api/'):]
-            aliases.append((v1_path, rule.endpoint, rule))
-    for v1_path, endpoint, rule in aliases:
-        app.add_url_rule(
-            v1_path,
-            endpoint=f'v1_{endpoint}',
-            view_func=app.view_functions[endpoint],
-            methods=sorted(rule.methods - {'HEAD', 'OPTIONS'}),
-        )
-
-
-_register_v1_aliases()
-
 
 # ---------------------------------------------------------------------------
 

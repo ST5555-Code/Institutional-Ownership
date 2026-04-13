@@ -92,7 +92,7 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
+    fetch('/api/v1/tickers').then(r => r.json()).then(setAllTickers).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -205,7 +205,7 @@ export function CrossOwnershipTab() {
   })
 
   // Peer groups
-  const peerGroupsUrl = '/api/peer_groups'
+  const peerGroupsUrl = '/api/v1/peer_groups'
   const peerGroups = useFetch<PeerGroup[]>(peerGroupsUrl)
 
   // When peer group selected, populate additional tickers from group
@@ -247,9 +247,9 @@ export function CrossOwnershipTab() {
     if (!tickersStr || needsMoreTickers) return null
     if (viewMode === 'anchor') {
       const a = anchor && groupTickers.includes(anchor) ? anchor : groupTickers[0] || ''
-      return `/api/cross_ownership?tickers=${enc(tickersStr)}&anchor=${enc(a)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
+      return `/api/v1/cross_ownership?tickers=${enc(tickersStr)}&anchor=${enc(a)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
     }
-    return `/api/cross_ownership_top?tickers=${enc(tickersStr)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
+    return `/api/v1/cross_ownership_top?tickers=${enc(tickersStr)}&active_only=${activeOnly}&limit=25&rollup_type=${rollupType}`
   }, [tickersStr, needsMoreTickers, viewMode, anchor, activeOnly, rollupType, groupTickers])
 
   const { data, loading, error } = useFetch<CrossOwnershipResponse>(url)

@@ -158,7 +158,7 @@ export function ConvictionTab() {
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const url = ticker
-    ? `/api/portfolio_context?ticker=${enc(ticker)}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
+    ? `/api/v1/portfolio_context?ticker=${enc(ticker)}&level=${level}&active_only=${activeOnly}&rollup_type=${rollupType}`
     : null
   const { data, loading, error } = useFetch<ConvictionResponse>(url)
 

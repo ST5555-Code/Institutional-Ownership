@@ -96,7 +96,7 @@ export function SectorRotationTab() {
   const ao = activeOnly ? '1' : '0'
 
   // Market-wide — no ticker dependency. Load on tab activation.
-  const url = `/api/sector_flows?active_only=${ao}&level=${level}`
+  const url = `/api/v1/sector_flows?active_only=${ao}&level=${level}`
   const { data, loading, error } = useFetch<SectorFlowsResponse>(url)
 
   // Filter periods based on period selector (last N)
@@ -106,7 +106,7 @@ export function SectorRotationTab() {
   // Movers fetch — on sector row click, for the selected period range's latest
   const latestPeriod = periods[periods.length - 1] ?? null
   const moversUrl = selectedSector && latestPeriod
-    ? `/api/sector_flow_movers?from=${enc(latestPeriod.from)}&to=${enc(latestPeriod.to)}&sector=${enc(selectedSector)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
+    ? `/api/v1/sector_flow_movers?from=${enc(latestPeriod.from)}&to=${enc(latestPeriod.to)}&sector=${enc(selectedSector)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
     : null
   const movers = useFetch<SectorFlowMoversResponse>(moversUrl)
 

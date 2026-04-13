@@ -121,7 +121,7 @@ function EntitySearch({ onSelect }: { onSelect: (id: number, name: string) => vo
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (v.length < 2) { setResults([]); setOpen(false); return }
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/entity_search?q=${encodeURIComponent(v)}`)
+      fetch(`/api/v1/entity_search?q=${encodeURIComponent(v)}`)
         .then(r => r.json()).then((data: EntitySearchResult[]) => { setResults(data.slice(0, 10)); setOpen(data.length > 0) }).catch(() => {})
     }, 300)
   }
@@ -169,24 +169,24 @@ export function EntityGraphTab() {
   const [modalEntityName, setModalEntityName] = useState('')
 
   // Market mode: always shows market leaderboard (ignores ticker)
-  const marketUrl = viewMode === 'market' ? '/api/entity_market_summary?limit=25' : null
+  const marketUrl = viewMode === 'market' ? '/api/v1/entity_market_summary?limit=25' : null
   const market = useFetch<MarketSummaryRow[]>(marketUrl)
 
   // Company mode: ticker holder table (when ticker is set)
   const tickerHoldersUrl = viewMode === 'company' && ticker
-    ? `/api/query1?ticker=${enc(ticker)}&rollup_type=${rollupType}`
+    ? `/api/v1/query1?ticker=${enc(ticker)}&rollup_type=${rollupType}`
     : null
   const tickerHolders = useFetch<RegisterResponse>(tickerHoldersUrl)
 
   // Modal graph fetch
   const modalGraphUrl = modalEntityId
-    ? `/api/entity_graph?entity_id=${modalEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
+    ? `/api/v1/entity_graph?entity_id=${modalEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
     : null
   const modalGraph = useFetch<EntityGraphResponse>(modalGraphUrl)
 
   // Company graph fetch
   const graphUrl = viewMode === 'company' && selectedEntityId
-    ? `/api/entity_graph?entity_id=${selectedEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
+    ? `/api/v1/entity_graph?entity_id=${selectedEntityId}&quarter=${enc(quarter)}&depth=2&include_sub_advisers=${showSubAdvisers}&top_n_funds=20`
     : null
   const { data, loading, error } = useFetch<EntityGraphResponse>(graphUrl)
 
@@ -215,7 +215,7 @@ export function EntityGraphTab() {
 
   function expandFunds() {
     if (!activeCo || expanded) return
-    fetch(`/api/entity_children?entity_id=${activeCo.metadata.root_entity_id}&level=fund&top_n=0`)
+    fetch(`/api/v1/entity_children?entity_id=${activeCo.metadata.root_entity_id}&level=fund&top_n=0`)
       .then(r => r.json()).then((children: Array<{ entity_id: number; display_name: string; aum: number | null }>) => {
         setAllFundNodes(children.map(c => ({ id: `fund-${c.entity_id}`, entity_id: c.entity_id, node_type: 'fund', display_name: c.display_name, label: c.display_name, title: c.display_name, level: 2, classification: null, aum: c.aum, aum_type: null, color: { background: '#2E7D32', border: '#1B5E20' }, font: { color: '#fff' } })))
         setExpanded(true)
@@ -226,7 +226,7 @@ export function EntityGraphTab() {
 
   // Row click in ticker holders: search entity by name → open modal
   function handleHolderClick(institutionName: string) {
-    fetch(`/api/entity_search?q=${encodeURIComponent(institutionName.substring(0, 30))}`)
+    fetch(`/api/v1/entity_search?q=${encodeURIComponent(institutionName.substring(0, 30))}`)
       .then(r => r.json())
       .then((results: EntitySearchResult[]) => {
         if (results.length > 0) {

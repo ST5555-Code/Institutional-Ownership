@@ -314,7 +314,7 @@ export function RegisterTab() {
   const tableWrapRef = useRef<HTMLDivElement>(null)
 
   const url = ticker
-    ? `/api/query1?ticker=${encodeURIComponent(ticker)}&rollup_type=${rollupType}&quarter=${encodeURIComponent(quarter)}`
+    ? `/api/v1/query1?ticker=${encodeURIComponent(ticker)}&rollup_type=${rollupType}&quarter=${encodeURIComponent(quarter)}`
     : null
   const { data, loading, error } = useFetch<RegisterResponse>(url)
 

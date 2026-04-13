@@ -71,7 +71,7 @@ export function FundPortfolioTab() {
 
   // Fetch manager list
   const managersUrl = ticker
-    ? `/api/fund_portfolio_managers?ticker=${enc(ticker)}`
+    ? `/api/v1/fund_portfolio_managers?ticker=${enc(ticker)}`
     : null
   const managers = useFetch<FundPortfolioManager[]>(managersUrl)
 
@@ -89,7 +89,7 @@ export function FundPortfolioTab() {
 
   // Fetch portfolio for selected manager
   const portfolioUrl = ticker && selectedCik
-    ? `/api/query7?ticker=${enc(ticker)}&cik=${enc(selectedCik)}${selectedFundName ? `&fund_name=${enc(selectedFundName)}` : ''}`
+    ? `/api/v1/query7?ticker=${enc(ticker)}&cik=${enc(selectedCik)}${selectedFundName ? `&fund_name=${enc(selectedFundName)}` : ''}`
     : null
   const portfolio = useFetch<FundPortfolioResponse>(portfolioUrl)
 

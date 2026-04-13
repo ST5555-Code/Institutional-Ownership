@@ -30,7 +30,7 @@ export const useAppStore = create<AppState>((set) => ({
   loadCompany: async (ticker) => {
     set({ loading: true })
     try {
-      const res = await fetch(`/api/summary?ticker=${encodeURIComponent(ticker)}`)
+      const res = await fetch(`/api/v1/summary?ticker=${encodeURIComponent(ticker)}`)
       if (!res.ok) throw new Error('fetch failed')
       const data = await res.json()
       set({ company: data, ticker })
