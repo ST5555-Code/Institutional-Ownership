@@ -67,7 +67,8 @@ DB_SNAPSHOT_PATH = os.path.join(BASE_DIR, 'data', '13f_readonly.duckdb')
 app = Flask(
     __name__,
     template_folder=os.path.join(BASE_DIR, 'web', 'templates'),
-    static_folder=os.path.join(BASE_DIR, 'web', 'static'),
+    static_folder=os.path.join(BASE_DIR, 'web', 'react-app', 'dist', 'assets'),
+    static_url_path='/assets',
 )
 
 # INF12: app binds 0.0.0.0 for Render. All mutating/admin endpoints live on
@@ -267,8 +268,9 @@ def api_admin_quarter_config():
 
 @app.route('/')
 def index():
-    from flask import render_template
-    return render_template('index.html')
+    return send_file(os.path.join(
+        BASE_DIR, 'web', 'react-app', 'dist', 'index.html'
+    ))
 
 
 # SMOKE TEST: always include /api/tickers in post-commit curl checks — it is
