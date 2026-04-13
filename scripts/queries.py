@@ -3868,7 +3868,7 @@ def get_short_long_comparison(ticker, rollup_type='economic_control_v1', quarter
     try:
         result = {'ticker': ticker, 'long_short_managers': [], 'short_only_funds': []}
 
-        if not _has_table('fund_holdings'):
+        if not _has_table('fund_holdings_v2'):
             return result
 
         # Managers with 13F long positions
@@ -3924,7 +3924,7 @@ def get_short_long_comparison(ticker, rollup_type='economic_control_v1', quarter
                     'manager': matched_long,
                     'fund_name': fund_name,
                     'long_shares': int(long_row['long_shares']),
-                    'long_value_k': float(long_row['long_value_k']),
+                    'long_value': float(long_row['long_value']),
                     'short_shares': int(short_shares),
                     'short_value': float(short_value),
                     'net_shares': int(long_row['long_shares']) - int(short_shares),
