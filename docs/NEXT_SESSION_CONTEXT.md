@@ -11,8 +11,8 @@ each working session so the top block stays current.
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main` (pending push — architecture review commit)
-- **HEAD:** pending (will update after commit)
+- **Branch:** `main`
+- **HEAD:** `2c99d34`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -212,7 +212,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
-pending ARCH: add ARCHITECTURE_REVIEW.md + sync ROADMAP + NEXT_SESSION_CONTEXT. 6-phase upgrade plan. Recommended next task: Batch 1-A routing hygiene (~1hr, app.py only).
+2c99d34 ARCH: add ARCHITECTURE_REVIEW.md + sync ROADMAP + NEXT_SESSION_CONTEXT. 6-phase upgrade plan. Recommended next task: Batch 1-A routing hygiene (~1hr, app.py only).
 573b504 docs: REACT_MIGRATION.md — Phase 2+3 complete, Phase 4 pending
 b8d95af docs: ROADMAP entry for 2026-04-12 backend cleanup trio
 251072b Vectorize portfolio_context._compute_metrics (2.7s → 730ms)
