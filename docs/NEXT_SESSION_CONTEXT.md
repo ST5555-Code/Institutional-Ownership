@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (Phase 3 visual polish complete, HEAD: pending)_
+_Last updated: 2026-04-12 (backend cleanup trio + Phase 3 polish complete, HEAD: 573b504)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -11,8 +11,8 @@ each working session so the top block stays current.
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main` (pending push)
-- **HEAD:** `c836813`
+- **Branch:** `main` (synced with origin)
+- **HEAD:** `573b504`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -30,6 +30,18 @@ each working session so the top block stays current.
 3. **`docs/PROCESS_RULES.md`** — rules for large-data scripts
 4. **`REACT_MIGRATION.md`** — React app migration plan
 5. **Auto memory** at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`
+
+---
+
+## Backend cleanup — 2026-04-12 session
+
+Three related fixes landed on top of Phase 3. See ROADMAP row dated 2026-04-12 for full detail.
+
+| Fix | Commit | Impact |
+|---|---|---|
+| Dropped `log_shadow_diff()` | `c2c5441` | Removed function + `_SHADOW_LOG_PATH` + 4 call sites. Phase 4 shadow logging no longer needed. |
+| Threaded `quarter` param through query endpoints | `94b0402` | `api_query` + `api_export` read `quarter` from request args (default LATEST_QUARTER); 25 query functions gained `quarter=LQ` kwarg. All defaults preserve existing caller behavior. `get_nport_children_q2` intentionally left alone (FQ↔LQ delta helper). Smoke test: `EQT` Q1=69 rows vs Q4=89 rows — divergence confirms wiring. **New capability:** clients can now pass `?quarter=2025Q1` etc. to every `/api/query<N>` + `/api/export/query<N>` endpoint. |
+| Vectorized `portfolio_context._compute_metrics` | `251072b` | 2.7s → 730ms HTTP warm. GICS sector mapping moved into SQL `CASE WHEN` columns on all 3 portfolio queries; iterrows/apply eliminated; groupby + idxmax replace the row loops. Remaining hotspot is `get_nport_children` N+1 loop (286ms) — next optimization target. |
 
 ---
 
@@ -129,6 +141,14 @@ See prior versions for full text.
 
 When non-fund entity rolls under parent for EC via transitive_flatten/orphan_scan, verify if subsidiary (keep) or sub-adviser (self-root). 43i found 28 zero-overlap institution pairs; 24 legitimate, 4 Baird sub-advisers fixed.
 
+### t. Conviction tab is served by two separate endpoints
+
+`/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### u. `get_nport_children_q2` is a FQ↔LQ delta helper — do not add a `quarter` param
+
+The 2026-04-12 quarter-param refactor threaded `quarter=LQ` through every query function that hardcoded LQ — except `get_nport_children_q2`. It compares `{FQ}` vs `{LQ}` inside a single SELECT (columns `q1_shares`, `q4_shares`) and is semantically pinned to the first-vs-latest quarter pair. Leave it as-is unless you also generalize the delta semantic.
+
 ---
 
 ## Sanity checklist
@@ -180,6 +200,12 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+573b504 docs: REACT_MIGRATION.md — Phase 2+3 complete, Phase 4 pending
+b8d95af docs: ROADMAP entry for 2026-04-12 backend cleanup trio
+251072b Vectorize portfolio_context._compute_metrics (2.7s → 730ms)
+94b0402 Add quarter param to query endpoints + 25 query functions
+c2c5441 Remove log_shadow_diff() and all 4 call sites
+8403cf8 docs: backfill Phase 3 commit hash in ROADMAP + NEXT_SESSION_CONTEXT
 c836813 Phase 3 visual polish: badge consolidation + cross-nav + print CSS + Playwright
 11d7cce INF9c follow-up: entity_id fallback + backfill 6 rows
 976733a ROADMAP: close INF9d as won't fix + Stage 5 cleanup
