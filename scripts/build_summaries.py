@@ -16,7 +16,7 @@ import os
 import duckdb
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import set_staging_mode, get_db_path
+from db import set_staging_mode, get_db_path, record_freshness
 
 try:
     from config import QUARTERS, LATEST_QUARTER
@@ -141,6 +141,10 @@ def main():
     build_summary_by_ticker(con, quarters)
     build_summary_by_parent(con, quarters)
     con.execute("CHECKPOINT")
+
+    # Stamp freshness (Batch 3-A follow-on).
+    record_freshness(con, "summary_by_ticker")
+    record_freshness(con, "summary_by_parent")
 
     con.close()
     print("\nDone.")

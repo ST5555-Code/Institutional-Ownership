@@ -7,6 +7,7 @@ import {
   FundViewToggle,
   ActiveOnlyToggle,
   ExportBar,
+  FreshnessBadge,
   getTypeStyle,
 } from '../common'
 import {
@@ -157,7 +158,8 @@ export function FlowAnalysisTab() {
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="investor_flows" label="flows" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
       </div>

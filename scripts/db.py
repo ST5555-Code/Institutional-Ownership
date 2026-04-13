@@ -137,6 +137,36 @@ def seed_staging():
         print(f"  Staging seeded: {copied} reference tables copied from production", flush=True)
 
 
+def record_freshness(con, table_name, row_count=None):
+    """Stamp `data_freshness` with a fresh timestamp + row_count for `table_name`.
+
+    Used by pipeline scripts at the end of each successful rebuild so the
+    React footer badge (`/api/v1/freshness`) can surface staleness per
+    the Batch 3-A SLA thresholds in ARCHITECTURE_REVIEW.md.
+
+    If `row_count` is not provided, does a `SELECT COUNT(*) FROM <table>`.
+    Safe no-op (warning only) if the `data_freshness` table is missing —
+    e.g., when running against a fresh DB that hasn't had the Batch 3-A
+    migration applied yet.
+    """
+    if row_count is None:
+        try:
+            row_count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+        except Exception as e:
+            print(f"  [record_freshness] could not count {table_name}: {e}", flush=True)
+            return
+    try:
+        con.execute(
+            "INSERT OR REPLACE INTO data_freshness "
+            "(table_name, last_computed_at, row_count) "
+            "VALUES (?, CURRENT_TIMESTAMP, ?)",
+            [table_name, row_count],
+        )
+    except Exception as e:
+        # data_freshness table missing (pre-Batch-3A DB) — non-fatal.
+        print(f"  [record_freshness] skipped ({table_name}): {e}", flush=True)
+
+
 def crash_handler(script_name):
     """Decorator/context manager: log unhandled exceptions to logs/<script>_crash.log."""
     def run_with_crash_log(main_fn):

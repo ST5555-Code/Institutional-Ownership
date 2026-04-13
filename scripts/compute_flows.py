@@ -14,7 +14,7 @@ from datetime import datetime
 
 import duckdb
 
-from db import set_staging_mode, get_db_path
+from db import set_staging_mode, get_db_path, record_freshness
 from config import LATEST_QUARTER, FLOW_PERIODS
 
 PERIODS = FLOW_PERIODS
@@ -231,6 +231,12 @@ def main():
     # Summary
     total_flows = con.execute("SELECT COUNT(*) FROM investor_flows").fetchone()[0]
     total_stats = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
+
+    # Stamp freshness (Batch 3-A follow-on) — records last_computed_at per
+    # rebuilt table so the React footer badge can surface staleness.
+    record_freshness(con, "investor_flows", total_flows)
+    record_freshness(con, "ticker_flow_stats", total_stats)
+
     elapsed = time.time() - t_start
 
     print(f"\nCompleted in {elapsed:.0f}s")
