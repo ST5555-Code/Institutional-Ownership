@@ -81,6 +81,14 @@ Open http://localhost:8001. The app provides a browser-based interface with all 
 ownership queries, ticker autocomplete, sortable tables, copy-to-clipboard, and
 Excel export. See `web/README_deploy.md` for Render.com deployment.
 
+**One-command startup alias.** Add to `~/.zshrc` for boot-and-open from any terminal:
+
+```bash
+alias 13f='cd ~/ClaudeWorkspace/Projects/13f-ownership && ./scripts/start_app.sh && open http://localhost:8001'
+```
+
+Then run `13f` to start the server and launch the UI in the default browser.
+
 ### Legacy Datasette Dashboard
 
 ```bash
