@@ -171,17 +171,16 @@ _Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-b
 
 ## ARCHITECTURE BACKLOG — from ARCHITECTURE_REVIEW.md (2026-04-12)
 
-Source: `ARCHITECTURE_REVIEW.md` (repo root), revised `713fb3f`. Prerequisites
-and phase sequencing documented there — do not reorder without consulting the
-gate criteria in each phase. **Phase 0-B2 smoke CI shipped 2026-04-13 —
-Phase 4 Batch 4-A (Blueprint split) is now unblocked and is the
-recommended next task.** Phase 0-B1 design doc `7f62b7d`. Phase 0-B2
-implementation (build_fixture + smoke tests + workflow). Phase 3 exit
-gate cleared plus data_freshness pipeline write hooks shipped
-(`2892009`). FreshnessBadge rollout to all 11 tabs shipped 2026-04-13
-(see COMPLETED). Prior progress: 1-A (`a8dd77a`), 1-B1 (`d3a2fcb`),
-2-A (`700bcdb`), 3-A (`731f4a0`), 3-A-followon (`2892009`). Phase 0-A
-green on main ✓ (`e201885`).**
+Source: `ARCHITECTURE_REVIEW.md` (repo root). Prerequisites and phase
+sequencing documented there — do not reorder without consulting the gate
+criteria in each phase. **Status (2026-04-13): all near-term architecture
+work complete — Phase 0 (CI) through Phase 4+ Batch 4-C (Flask → FastAPI)
++ 4C+ (openapi-typescript regen) all shipped.** Phase 5 / 6 parked as
+Medium Term (MT-1 through MT-6) — triggered on external user / team /
+productization milestones, not calendar. Next near-term work is data-layer
+(Stage 5 cleanup + N-PORT refresh); architecture side has Phase 3+
+(portfolio_context precompute) and Phase 3++ (build_analytics.py) both
+trigger-based. See `docs/NEXT_SESSION_CONTEXT.md` for the session queue.
 
 ### Phase 0 — Prerequisite (promoted from BL-1, split into 0-A + 0-B)
 
