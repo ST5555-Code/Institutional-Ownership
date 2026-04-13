@@ -55,17 +55,30 @@ interface AppState {
   tabular institutional data. Tailwind v3 stable. Zustand correct scope —
   enforce the rule that tab-local state stays in components, not in the global store.
 
+### Endpoint performance budgets (p95, warm, local)
+
+| Endpoint class | Budget |
+|---|---|
+| Tabular data (`/register`, `/conviction`, `/flow_analysis`) | ≤800ms |
+| Drilldown (`/fund_portfolio_managers`, `/query7`) | ≤500ms |
+| Small lookups (`/summary`, `/tickers`, `/config/quarters`) | ≤150ms |
+| Precomputed artifacts (`/portfolio_context`, future) | ≤50ms |
+
+Budgets are guidance, not SLOs. Regressions vs. these budgets require
+commit-message justification.
+
 ---
 
 ## 3. Architecture Gaps
 
 ### Stack layer gaps
 
-**G1 — Untyped API contract (highest consequence gap)**
+**G1 — Untyped API contract (highest value before team sharing)**
 Flask returns untyped JSON. React TypeScript types in `src/types/` and `api.ts`
 (60+ interfaces) were written by hand. There is no enforcement. A column rename
 or null change in a query breaks the frontend silently at runtime, not at build
-time. This is the most consequential gap in the current stack.
+time. This is the highest-value gap to close before the tool gets shared with a
+second operator.
 
 Options in order of value:
 - **FastAPI + openapi-typescript** — Pydantic response models auto-generate an
@@ -133,6 +146,21 @@ endpoints — would have caught it.
 Run sequence is documented in ROADMAP.md but not enforced in code. A Makefile
 with prerequisite rules or a lightweight DAG prevents silent out-of-order runs.
 
+### Out of scope for this document
+
+The following are real gaps but covered in separate docs to keep the
+architecture plan focused:
+
+- **Testing strategy** — unit tests for `queries.py`, contract tests between
+  React types and API responses, Playwright CI integration.
+  _Separate doc: `docs/TESTING_STRATEGY.md` (TODO)._
+- **Observability** — structured logs, request tracing, audit log for staging
+  promotions, latency metrics.
+  _Separate doc: `docs/OBSERVABILITY_PLAN.md` (TODO)._
+- **Schema migration tooling** — current DDL changes go through the staging
+  workflow manually. Alembic-style tooling is a separate concern.
+  _Separate doc: `docs/SCHEMA_MIGRATIONS.md` (TODO)._
+
 ---
 
 ## 4. Execution Logic
@@ -149,11 +177,36 @@ Each phase has an explicit exit gate. Phase N+1 does not start until that gate
 is met. Each batch is sized to hand directly to Claude Code as a self-contained
 unit.
 
+_Estimates below are authoring time for the batch. Smoke-testing, deployment,
+and React type regeneration are separate steps — budget an additional 30–60 min
+per batch for these. Exit gates assume smoke-testing has run._
+
+---
+
+## Phase 0 — Prerequisite (BL-1 promoted)
+
+### Batch 0-A — GitHub Actions CI
+_~2 hours · new `.github/workflows/*.yml` · low risk_
+
+Pre-commit (pylint + bandit + ruff) on push. Smoke test against 5 critical
+endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`,
+`/api/admin/stats`) using a headless fixture DB.
+
+**Done means:** CI runs on every push. A B608-class bug (mis-placed `nosec`
+injecting `#` into SQL) fails CI, not production.
+
+**Gate:** Phase 1 does not start until CI is green on main.
+
 ---
 
 ## Phase 1 — Contract Stabilization
 _Freeze endpoint semantics before any structural change._
 _Gate on: do not start Phase 2 until exit criteria below are met._
+
+_Note: Batch 1-A input guards and Batch 1-B hand-written Pydantic schemas are
+transitional. FastAPI (Batch 4-C) auto-validates via Pydantic and auto-generates
+schemas from response models — these hand-written artifacts are scaffolding,
+not permanent code._
 
 ---
 
@@ -163,20 +216,22 @@ _~1 hour · `scripts/app.py` only · low risk_
 | Item | Action |
 |------|--------|
 | `quarter_config` namespace | Move `/api/admin/quarter_config` → `/api/config/quarters`. Update React fetch call in same commit. |
-| API versioning | Add `/api/v1/` prefix to all public routes via Blueprint `url_prefix`. One registration change. |
+| API versioning (dual-mount) | Dual-mount: register public routes under BOTH `/api/*` (existing) and `/api/v1/*` (new) during the React Phase 4 cutover window. Old frontend at :8001 continues to call `/api/*`; React migrates to `/api/v1/*` first. Deprecation: remove `/api/*` mount only after the vanilla-JS frontend is retired (React Phase 4 confirmed stable ≥1 week). Tracked as a Phase 5 prerequisite. |
 | Rollup param audit | Verify `rollup_type` reaches every query function that should respect it. Fix any gaps. |
-| Input guards | Add route-layer validation: ticker regex `^[A-Z]{1,5}$`, quarter format `^20\d{2}Q[1-4]$`, rollup_type against `VALID_ROLLUP_TYPES`. Return 400 on invalid input. |
+| Input guards | Add route-layer validation: ticker regex `^[A-Z]{1,6}[.A-Z]?$` (accepts `BRK.B`, `BF.B`, ADRs), quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input. DB-universe validation (lookup against `tickers` table) is a follow-on — tracked as BL-7 below. Deferred from 1-A to avoid coupling the route layer to a DB query. _Transitional — replaced by FastAPI Pydantic validation in Batch 4-C._ |
 
 **Files:** `scripts/app.py`, React config fetch call.
 
-**Done means:** Every public endpoint under `/api/v1/`. `quarter_config` off
-admin namespace. `rollup_type` verified end-to-end on Register, Conviction,
-Ownership Trend, Fund Portfolio. Invalid ticker returns 400, not a DuckDB error.
+**Done means:** Every public endpoint mounted under BOTH `/api/*` and
+`/api/v1/*`. `quarter_config` off admin namespace. `rollup_type` verified
+end-to-end on Register, Conviction, Ownership Trend, Fund Portfolio. Invalid
+ticker returns 400, not a DuckDB error.
 
 **Rollback:** Single git revert. React URL updated in same commit.
 
 **Not doing here:** Response schemas, error envelope, any `queries.py` changes
-beyond rollup gap fixes.
+beyond rollup gap fixes. Vanilla-JS frontend retirement is a separate React
+Phase 4 cutover task — `/api/*` legacy mount stays until then.
 
 ---
 
@@ -187,7 +242,7 @@ _~half day · `app.py` + new `schemas.py` + React · medium risk_
 |------|--------|
 | Endpoint classification | Produce and commit a table: every endpoint marked latest-only or quarter-aware. Add as comment block in `app.py`. This is the freeze artifact. |
 | Export parity | Verify `api_export()` passes same `quarter` + `rollup_type` as the on-screen table. Fix any mismatches. |
-| Pydantic schemas | New `scripts/schemas.py`. Add Pydantic response models for 6 priority endpoints: `/register`, `/tickers`, `/conviction`, `/flow_analysis`, `/ownership_trend`, `/entity_graph`. Validate on the way out. |
+| Pydantic schemas | New `scripts/schemas.py`. Add Pydantic response models for 6 priority endpoints: `/register`, `/tickers`, `/conviction`, `/flow_analysis`, `/ownership_trend`, `/entity_graph`. Validate on the way out. _Transitional — regenerated from FastAPI response models via openapi-typescript in Batch 4-C._ |
 | Error envelope | Standardize `{ data, error, meta }` on all endpoints. `meta` carries `quarter`, `rollup_type`, `generated_at`. |
 | React error boundaries | New `src/components/ErrorBoundary.tsx`. Per-tab wrapper. Catches envelope `error` field, renders consistent error state. |
 | React type sync | Update hand-written types in `src/types/` to match Pydantic schemas. Single source of truth until FastAPI generates them automatically (Phase 4-C). |
@@ -231,8 +286,10 @@ _~2 hours · `queries.py` · low risk_
 
 **Files:** `scripts/queries.py`, `docs/write_path_risk_map.md` (new, audit output).
 
-**Done means:** `get_nport_children` batched. `summary_by_parent` confirmed read-only
-on request path. Write-path risk map committed.
+**Done means:** `get_nport_children` batched — batched call completes ≤50ms
+for a 25-fund portfolio (down from 286ms measured 2026-04-12).
+`summary_by_parent` confirmed read-only on request path. Write-path risk map
+committed.
 
 **Not doing here:** Fixing write-path consistency (audit only). Any structural refactor.
 
@@ -254,7 +311,7 @@ _~2 hours · DuckDB DDL · staging workflow · ⚠ time-sensitive: May 9 deadlin
 | Item | Action |
 |------|--------|
 | `FAMILY_MAP` → DB table | Create `fund_family_patterns (pattern TEXT, inst_parent_name TEXT)`. Migrate 50+ hardcoded entries from `app.py`. Update `match_nport_family()` to query it. |
-| `data_freshness` table | Create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipeline scripts write a row after each successful rebuild. API exposes via `/api/v1/freshness`. React surfaces as footer badge per tab. |
+| `data_freshness` table | Create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipeline scripts write a row after each successful rebuild. API exposes via `/api/v1/freshness`. React surfaces as footer badge per tab. **Staleness SLA per table:** `investor_flows` fresh ≤24h / stale >24h (footer amber); `ticker_flow_stats` fresh ≤24h / stale >24h (footer amber); `summary_by_parent` fresh ≤quarter+7d / stale >quarter+30d (footer red); `beneficial_ownership_current` fresh ≤48h / stale >7d (footer amber); `fund_holdings_v2` fresh ≤quarter+60d / stale >quarter+120d (footer red). Thresholds are pragmatic (reflect pipeline cadence), not regulatory. Stale ≠ wrong — surfaces "data older than expected" for the operator. |
 
 _Note: Stage 5 table drops (original holdings/fund_holdings) are a data ops
 item — tracked in ROADMAP, not here._
@@ -346,16 +403,22 @@ Split `scripts/queries.py` (~5,400 lines) into:
 **Done means:** `queries.py` has no `jsonify()` calls. All response shaping in
 `serializers.py`. Cache keys are constants, not inline f-strings. `pylint` passes.
 
+_Note: `queries.py` remains large after this split (SQL-only, ~3,500 lines
+estimated). Per-domain split — `queries_register.py`, `queries_flows.py`,
+`queries_entities.py`, `queries_market.py` — is explicitly deferred to Phase 6
+as a follow-on. Do not attempt in 4-B._
+
 **Rollback:** Module merge — straightforward revert.
 
 ---
 
 ### Batch 4-C — Flask → FastAPI
-_~half day · follows 4-A + 4-B · do before team sharing_
+_~2–3 days · follows 4-A + 4-B · do before team sharing_
 
 | Item | Action |
 |------|--------|
 | Framework swap | Replace Flask with FastAPI. Domain Blueprint files become FastAPI routers. Same `queries.py` — no query changes. |
+| Thread-local preservation | FastAPI routes declared as `def`, NOT `async def`. Sync routes run in FastAPI's threadpool, preserving `_threading.local()` semantics and the `get_db()` cache. Any future async route must explicitly opt out of the cache or use an async DuckDB adapter (not currently used). |
 | Pydantic integration | `schemas.py` models become FastAPI `response_model` declarations. Auto OpenAPI spec at `/docs`. |
 | openapi-typescript | Run against generated spec. React types generated, not hand-written. `src/types/` becomes auto-generated. |
 | Input validation | Route params validated automatically via Pydantic — removes manual guards from Batch 1-A. |
@@ -363,8 +426,16 @@ _~half day · follows 4-A + 4-B · do before team sharing_
 **Files:** All `scripts/api_*.py` routers, `scripts/app_bootstrap.py`,
 `web/react-app/src/types/` (regenerated).
 
+**Known risks:** `before_request` token guard in `admin_bp.py` requires FastAPI
+`Depends()` conversion — estimate includes this. Every `jsonify()` call must
+become a Pydantic return type or `JSONResponse`. CORS + startup hooks need
+explicit FastAPI equivalents. These are why the estimate is 2–3 days, not
+half a day.
+
 **Done means:** FastAPI starts. All endpoints respond. OpenAPI spec at `/docs`.
-React types regenerated from spec. Smoke test passes.
+React types regenerated from spec. Smoke test passes. All routes are `def`,
+not `async def`. Thread-local `get_db()` cache hit rate unchanged from Flask
+baseline.
 
 **Rollback:** Flask preserved as `app_flask_legacy.py` until FastAPI stable
 for one full week.
@@ -411,25 +482,35 @@ preference.
 Likely shape if needed:
 ```
 src/
-  api/        ← FastAPI routers
-  queries/    ← SQL service layer
-  pipeline/   ← ingestion + compute scripts
-  entity/     ← MDM, staging, promotion
-  db/         ← connection management
+  api/            ← FastAPI routers
+  queries/        ← SQL service layer (per-domain split)
+    register.py
+    flows.py
+    entities.py
+    market.py
+  pipeline/       ← ingestion + compute scripts
+  entity/         ← MDM, staging, promotion
+  db/             ← connection management
 tests/
 web/react-app/
 ```
+
+The per-domain `queries/*.py` split is the natural follow-on to Batch 4-B's
+initial queries/serializers/cache separation — explicitly deferred here to
+avoid scope creep inside Phase 4.
 
 ---
 
 ## Backlog
 _No phase dependency. Improve resilience when capacity allows._
 
+_Note: BL-1 (GitHub Actions CI) has been promoted to **Phase 0 — Prerequisite**._
+
 | # | Item | Notes |
 |---|------|-------|
-| BL-1 | GitHub Actions CI | Pre-commit + endpoint smoke tests on push. Would have caught B608. |
 | BL-2 | Pipeline dependency enforcement | Makefile or DAG. Prevents out-of-order runs. |
 | BL-3 | Write-path consistency (non-entity) | Extend staging/validation to flow recompute + market data upsert. Audit in Batch 2-A first. |
 | BL-4 | Three snapshot roles documented | Serving snapshot / promotion rollback / cold archive. Distinct artifacts, different retention. |
 | BL-5 | Zustand scope enforcement | Document rule: global store = ticker/quarter/rollupType/company only. Tab state stays local. |
 | BL-6 | Loading state standardization | Shared skeleton + empty state components across all 11 tabs. |
+| BL-7 | DB-universe ticker validation | Route-layer check against the `tickers` table (or cached set). Catches typos that the regex in Batch 1-A passes. Follow-on to ARCH-1A. Keep the route layer decoupled from the DB by loading the ticker set at app startup or caching with a short TTL. |
