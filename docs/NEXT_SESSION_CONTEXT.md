@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 4 Batch 4-B queries.py service-layer split shipped; all architecture work through 4-B done. HEAD: pending commit)_
+_Last updated: 2026-04-13 (session close — Phase 4 Batch 4-B queries.py service-layer split shipped; all architecture work through 4-B done. HEAD: 125d86d)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
