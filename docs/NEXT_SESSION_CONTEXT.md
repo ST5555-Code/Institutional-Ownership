@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — infrastructure complete: Phase 0 through Phase 4+ Batch 4-C all shipped, Phase 5/6 parked as medium-term. HEAD: 7695ee7)_
+_Last updated: 2026-04-13 (session close — Stage 5 cleanup: 3 legacy tables dropped, 4 INF9d eids preserved as PARENT_SEEDS brand shells. HEAD: pending)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `7695ee7` (docs: ROADMAP Phase 5/6 parked as medium-term + HEAD backfill)
+- **HEAD:** pending commit (Stage 5 cleanup — drop 3 legacy tables + close INF9d ghost delete as won't fix). Prior HEAD `d2c05a9` (chore: expand .gitignore).
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
@@ -84,26 +84,21 @@ All entity data quality and infrastructure work from this session is done. The e
 ### ⭐ Next session priorities
 
 _All infrastructure through Phase 4+ Batch 4-C + openapi-typescript regen
-is complete as of 2026-04-13. No architecture work queued for the next
-session. Phase 5 / 6 parked as medium-term (MT-1 through MT-6) in
-ROADMAP — triggered on external user / team / productization milestones,
-not calendar._
+is complete as of 2026-04-13. Stage 5 cleanup (3 legacy tables) closed
+2026-04-13 — 4 INF9d eids preserved as live PARENT_SEEDS brand shells.
+Phase 5 / 6 parked as medium-term (MT-1 through MT-6) in ROADMAP —
+triggered on external user / team / productization milestones, not
+calendar._
 
-**1. Stage 5 cleanup — authorized 2026-04-09, deadline 2026-05-09.** Drop
-legacy pre-entity tables (`holdings`, `fund_holdings`, `beneficial_ownership`)
-and 4 INF9d ghost entities (eid=20194, 20196, 20201, 20203 — no aliases,
-no identifiers, no holdings). Requires explicit authorization before any
-DROP / DELETE runs. See ROADMAP for exact table inventory.
-
-**2. N-PORT data refresh.** `fund_holdings_v2` is stale through Oct 2025.
-Run manually **after Stage 5 cleanup** completes:
+**1. N-PORT data refresh.** `fund_holdings_v2` is stale through Oct 2025.
+Run manually when authorized:
 ```bash
 ! python3 -u scripts/fetch_nport.py --test  # test first
 ! python3 -u scripts/fetch_nport.py          # full run (authorized)
 ```
 Pipeline operation — explicit user authorization required before full run.
 
-**3. openapi-typescript tab-by-tab migration.** Migrate remaining React
+**2. openapi-typescript tab-by-tab migration.** Migrate remaining React
 tabs from the hand-written `src/types/api.ts` to the auto-generated
 `src/types/api-generated.ts` (shipped 2026-04-13 in `89bc7c8`). One tab
 per PR as the wire contract stabilizes. Not urgent — hand-written types
@@ -163,6 +158,23 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### ee. INF9d eids (20194/20196/20201/20203) are live PARENT_SEEDS brand shells — Stage 5 discovery
+
+Do not delete eid=20194 (Pacific Life Insurance Company), 20196 (Stowers
+Institute for Medical Research), 20201 (Stonegate Global Financial), or
+20203 (International Assets Advisory, LLC). The historical Apr-11/12
+classification of these as "ghost entities with no aliases, no
+identifiers, no holdings" was wrong on "no aliases" — each has 1 brand
+alias, 2 self-root rollup_history rows (EC+DM), recent manual_l4
+classification edits from 2026-04-10, and 1 outgoing
+`wholly_owned` ADV_SCHEDULE_MANUAL relationship to a real child entity
+(→1685 Pacific Life Fund Advisors, →8544 American Century, →9990
+Catalyst Capital, →2196 International Assets Investment Mgmt). The v2
+data plane (`holdings_v2`, `fund_holdings_v2`) correctly does not
+reference them because EC/DM rollups resolved to the child entities, but
+the ADV lineage is load-bearing for the relationship graph. Treat these
+4 eids as untouchable.
 
 ### aa. `DATE '9999-12-31'` is the SCD open-row sentinel (not NULL) — Phase 0-B2 discovery
 
