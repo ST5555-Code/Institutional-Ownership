@@ -319,6 +319,35 @@ def api_config_quarters():
     return _quarter_config_payload()
 
 
+@app.route('/api/freshness')
+def api_freshness():
+    """Data freshness snapshot (ARCH-3A Batch 3-A).
+
+    Returns one row per precomputed table: {table_name, last_computed_at,
+    row_count}. Pipeline scripts write to `data_freshness` after each
+    successful rebuild; the React footer consumes this to surface
+    staleness per `ARCHITECTURE_REVIEW.md` Batch 3-A SLA table.
+
+    The table exists but is empty until the pipelines wire in their
+    write hooks — this endpoint returns `{"data": []}` in that case.
+    """
+    try:
+        con = get_db()
+    except Exception as e:
+        return jsonify({'error': f'Database unavailable: {e}'}), 503
+    try:
+        df = con.execute("""
+            SELECT table_name, last_computed_at, row_count
+            FROM data_freshness
+            ORDER BY table_name
+        """).fetchdf()
+    except Exception as e:
+        # Table does not exist on this DB (pre-migration fallback).
+        app.logger.warning("[api_freshness] data_freshness unavailable: %s", e)
+        return jsonify({'data': []})
+    return jsonify({'data': df_to_records(df)})
+
+
 # ---------------------------------------------------------------------------
 # Endpoint classification (Phase 1 Batch 1-B1, 2026-04-13) — freeze artifact
 # ---------------------------------------------------------------------------
@@ -341,6 +370,7 @@ def api_config_quarters():
 # -------------------------------- --------------- ----------------
 # /api/config/quarters             n/a (config)    n/a
 # /api/admin/quarter_config        n/a (config)    n/a  (legacy — drop at vanilla-JS retirement)
+# /api/freshness                   n/a (meta)      n/a  (data_freshness snapshot — ARCH-3A)
 # /api/tickers                     latest-only     rollup-agnostic
 # /api/summary                     latest-only     rollup-agnostic
 # /api/fund_rollup_context         latest-only     rollup-agnostic  (returns BOTH rollup names by design)

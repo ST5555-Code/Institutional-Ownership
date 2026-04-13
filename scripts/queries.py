@@ -179,60 +179,99 @@ def resolve_filer_names_in_records(records):
 # ---------------------------------------------------------------------------
 
 
+# Fallback dict used when the fund_family_patterns table is missing or empty
+# (fresh deploy before Batch 3-A migration has run). Kept here verbatim so a
+# broken DDL does not take down match_nport_family(). The DB is the
+# authoritative source once migrated; remove this constant in a later pass
+# after confirming no deploy path is missing the table.
+_FAMILY_PATTERNS_FALLBACK = {
+    'fidelity': ['Fidelity', 'FMR', 'Puritan', 'Rutland', 'Strategic Advisers'],
+    'geode': ['Geode'],
+    'vanguard': ['Vanguard'],
+    'blackrock': ['BlackRock', 'iShares', 'BGFA'],
+    'wellington': ['Wellington'],
+    't. rowe': ['T. Rowe', 'Price Associates'],
+    'dimensional': ['DFA', 'Dimensional'],
+    'mfs': ['MFS', 'Massachusetts Financial'],
+    'neuberger': ['Neuberger Berman'],
+    'aqr': ['AQR'],
+    'loomis': ['Loomis Sayles'],
+    'victory': ['Victory Capital'],
+    'american century': ['American Century'],
+    'dodge': ['Dodge & Cox'],
+    'putnam': ['Putnam'],
+    'columbia': ['Columbia'],
+    'invesco': ['Invesco', 'AIM', 'PowerShares'],
+    'jpmorgan': ['JPMorgan', 'J.P. Morgan'],
+    'goldman': ['Goldman Sachs'],
+    'morgan stanley': ['Morgan Stanley', 'Eaton Vance'],
+    'nuveen': ['Nuveen', 'TIAA', 'Teachers'],
+    'northern trust': ['Northern Trust', 'FlexShares'],
+    'state street': ['State Street', 'SSGA', 'SPDR', 'Select Sector'],
+    'pimco': ['PIMCO', 'Pacific Investment'],
+    'franklin': ['Franklin', 'Templeton'],
+    'affiliated managers': ['AMG', 'Affiliated Managers'],
+    'harbor': ['Harbor'],
+    'carillon': ['Carillon'],
+    'calvert': ['Calvert'],
+    'baird': ['Baird'],
+    'principal': ['Principal'],
+    'lord abbett': ['Lord Abbett'],
+    'alliancebernstein': ['AllianceBernstein', 'AB Funds'],
+    'lazard': ['Lazard'],
+    'royce': ['Royce'],
+    'gabelli': ['Gabelli'],
+    'oakmark': ['Oakmark', 'Harris Associates'],
+    'artisan': ['Artisan'],
+    'brown advisory': ['Brown Advisory'],
+    'wasatch': ['Wasatch'],
+    'william blair': ['William Blair'],
+    'parnassus': ['Parnassus'],
+    'calamos': ['Calamos'],
+    'schwab': ['Schwab', 'Charles Schwab'],
+    'capital group': ['Capital Research', 'Capital Group', 'American Funds'],
+    'deutsche': ['DWS', 'Xtrackers', 'Deutsche'],
+    'bny mellon': ['BNY', 'Mellon', 'Dreyfus'],
+    'ubs': ['UBS'],
+    'bank of america': ['BofA', 'Merrill Lynch'],
+    'legal & general': ['Legal & General', 'L&G'],
+}
+
+_family_patterns_cache = None
+
+
 def get_nport_family_patterns():
-    """Map inst_parent_name keywords to N-PORT fund_holdings family_name search patterns."""
-    return {
-        'fidelity': ['Fidelity', 'FMR', 'Puritan', 'Rutland', 'Strategic Advisers'],
-        'geode': ['Geode'],
-        'vanguard': ['Vanguard'],
-        'blackrock': ['BlackRock', 'iShares', 'BGFA'],
-        'wellington': ['Wellington'],
-        't. rowe': ['T. Rowe', 'Price Associates'],
-        'dimensional': ['DFA', 'Dimensional'],
-        'mfs': ['MFS', 'Massachusetts Financial'],
-        'neuberger': ['Neuberger Berman'],
-        'aqr': ['AQR'],
-        'loomis': ['Loomis Sayles'],
-        'victory': ['Victory Capital'],
-        'american century': ['American Century'],
-        'dodge': ['Dodge & Cox'],
-        'putnam': ['Putnam'],
-        'columbia': ['Columbia'],
-        'invesco': ['Invesco', 'AIM', 'PowerShares'],
-        'jpmorgan': ['JPMorgan', 'J.P. Morgan'],
-        'goldman': ['Goldman Sachs'],
-        'morgan stanley': ['Morgan Stanley', 'Eaton Vance'],
-        'nuveen': ['Nuveen', 'TIAA', 'Teachers'],
-        'northern trust': ['Northern Trust', 'FlexShares'],
-        'state street': ['State Street', 'SSGA', 'SPDR', 'Select Sector'],
-        'pimco': ['PIMCO', 'Pacific Investment'],
-        'franklin': ['Franklin', 'Templeton'],
-        'affiliated managers': ['AMG', 'Affiliated Managers'],
-        'harbor': ['Harbor'],
-        'carillon': ['Carillon'],
-        'calvert': ['Calvert'],
-        'baird': ['Baird'],
-        'principal': ['Principal'],
-        'lord abbett': ['Lord Abbett'],
-        'alliancebernstein': ['AllianceBernstein', 'AB Funds'],
-        'lazard': ['Lazard'],
-        'royce': ['Royce'],
-        'gabelli': ['Gabelli'],
-        'oakmark': ['Oakmark', 'Harris Associates'],
-        'artisan': ['Artisan'],
-        'brown advisory': ['Brown Advisory'],
-        'wasatch': ['Wasatch'],
-        'william blair': ['William Blair'],
-        'parnassus': ['Parnassus'],
-        'calamos': ['Calamos'],
-        'schwab': ['Schwab', 'Charles Schwab'],
-        'capital group': ['Capital Research', 'Capital Group', 'American Funds'],
-        'deutsche': ['DWS', 'Xtrackers', 'Deutsche'],
-        'bny mellon': ['BNY', 'Mellon', 'Dreyfus'],
-        'ubs': ['UBS'],
-        'bank of america': ['BofA', 'Merrill Lynch'],
-        'legal & general': ['Legal & General', 'L&G'],
-    }
+    """Map inst_parent_name keywords to N-PORT fund_holdings family_name
+    search patterns.
+
+    Reads from the fund_family_patterns DB table (Batch 3-A, ARCH-3A).
+    Falls back to _FAMILY_PATTERNS_FALLBACK if the table is missing,
+    empty, or the DB is unreachable (e.g., during testing without the
+    staging / prod DDL applied).
+
+    Memoized at module scope — patterns are effectively static during
+    a process lifetime. Restart the app to pick up new DB rows.
+    """
+    global _family_patterns_cache  # pylint: disable=global-statement
+    if _family_patterns_cache is not None:
+        return _family_patterns_cache
+    try:
+        con = get_db()
+        rows = con.execute("""
+            SELECT inst_parent_name, pattern
+            FROM fund_family_patterns
+            ORDER BY inst_parent_name, pattern
+        """).fetchall()
+        if rows:
+            grouped = {}
+            for key, pattern in rows:
+                grouped.setdefault(key, []).append(pattern)
+            _family_patterns_cache = grouped
+            return grouped
+    except Exception as e:
+        logger.warning("[get_nport_family_patterns] DB unavailable, using fallback: %s", e)
+    _family_patterns_cache = _FAMILY_PATTERNS_FALLBACK
+    return _FAMILY_PATTERNS_FALLBACK
 
 
 

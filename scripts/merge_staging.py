@@ -62,6 +62,15 @@ TABLE_KEYS = {
     "summary_by_parent": ["quarter", "inst_parent_name"],
     "_cache_openfigi": ["cusip"],
     "_cache_yfinance": ["ticker"],
+    # Batch 3-A (ARCH-3A): N-PORT family pattern lookup. Rebuilt from the
+    # in-code dict via scripts/migrate_batch_3a.py — the staging copy is
+    # authoritative, so full-replace on merge is correct.
+    "fund_family_patterns": None,
+    # Batch 3-A (ARCH-3A): one row per precomputed table, updated by
+    # pipeline scripts after each rebuild. Upsert on `table_name` so that
+    # fresh pipeline writes in prod are preserved when reference-table
+    # merges flow through.
+    "data_freshness": ["table_name"],
 }
 
 
