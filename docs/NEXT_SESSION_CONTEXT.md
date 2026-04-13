@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (ARCHITECTURE_REVIEW.md committed; backend cleanup trio + Phase 3 polish also shipped today)_
+_Last updated: 2026-04-13 (React Phase 4 cutover shipped — Flask now serves `web/react-app/dist/`; Playwright baselines captured + spec robustified)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,14 +12,14 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `2c99d34`
+- **HEAD:** `002fab0`
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
-  - Vanilla JS — `web/static/app.js` (~5600 lines)
-  - Jinja templates — `web/templates/index.html` + `web/templates/admin.html`
-  - **React full-app (Phase 3 COMPLETE)** — `web/react-app/` (port 5174). All 11 tabs ported + Phase 3 polish done (badge consolidation, Fund Portfolio → Register cross-nav, print CSS, Playwright scaffold). See `REACT_MIGRATION.md`. Next: Phase 4 cut over (`npm run build` → Flask serves `dist/`).
+  - Vanilla JS — `web/static/app.js` (~5600 lines, **retired 2026-04-13 pending 1-week stability**)
+  - Jinja templates — `web/templates/admin.html` (admin page only; `web/templates/index.html` orphaned but retained for rollback)
+  - **React full-app (Phase 4 COMPLETE)** — `web/react-app/` (dev :5174, prod served by Flask from `dist/`). All 11 tabs ported, Phase 3 polish done, cutover shipped 2026-04-13 (HEAD `002fab0`). Playwright regression 11/11 green at :8001 vs dev baselines. See `REACT_MIGRATION.md`. Next: retire `web/react-src/` POC + vanilla-JS after 1 week of stability; Batch 1-B2 (error envelope + Pydantic) now unblocked.
 
 ---
 
@@ -110,14 +110,17 @@ Original tables retained for 30-day rollback after Phase 4 cutover (2026-04-09).
 ```
 This is a pipeline operation, NOT a data QC task. Do not run without explicit user authorization.
 
-### 3. React migration — ongoing parallel workstream
+### 3. React migration — Phase 4 cutover shipped 2026-04-13
 
-**Phase 3 COMPLETE** (2026-04-12). RegisterTab badge → shared `getTypeStyle`, Fund Portfolio ticker → Register cross-nav, print CSS gaps closed on ShortInterest/PeerRotation/SectorRotation, Playwright scaffold (`@playwright/test`, config + 11-tab spec, `npm run test:visual` scripts). Baselines not yet captured. One-time setup for next session:
-```bash
-! cd web/react-app && npx playwright install chromium    # ~150MB
-! cd web/react-app && npm run test:visual:update         # captures baselines; Flask must be up on :8001
-```
-**Next: Phase 4 cut over.** `npm run build` → Flask serves `web/react-app/dist/index.html`. One-line change in `scripts/app.py`. Revertable in 30 seconds. Retire `web/react-src/` POC afterward. See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
+**Phase 4 COMPLETE** (HEAD `002fab0`). Flask now serves `web/react-app/dist/index.html` from `/` and `/assets/*` from `dist/assets/`. One-line-ish change to `scripts/app.py` (static_folder + static_url_path + index route). Playwright regression 11/11 green at :8001 vs dev-server baselines (`dc27d25`), 0 pixel diff. Vanilla-JS frontend + `web/react-src/` POC retained for now — retire after 1 week of stability (earliest 2026-04-20).
+
+**Prerequisite for starting Flask:** `cd web/react-app && npm run build` (not committed; `dist/` is gitignored).
+
+**Unblocked by cutover:** Batch 1-B2 (error envelope + Pydantic schemas + React error boundaries) from `ARCHITECTURE_REVIEW.md`. Vanilla-JS must be retired before executing — 1-week watch starts now.
+
+**Playwright notes:** Config keeps `baseURL: http://localhost:5174` for dev-server use. For post-deploy validation against Flask-served build, temporarily set baseURL to `:8001` and remove the `webServer` block (revert after run). `tabs.spec.ts` uses `expect(getByText('APPLE INC')).toBeVisible()` for ticker load — robust against the Zustand same-ticker short-circuit; do not revert to `waitForResponse('/api/summary')`.
+
+See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
 
 ### 4. Minor follow-ups
 

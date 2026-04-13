@@ -1,5 +1,5 @@
 # React Migration Plan
-_Created: 2026-04-11. Updated 2026-04-12 — Phase 2 + 3 complete._
+_Created: 2026-04-11. Updated 2026-04-13 — Phase 4 cutover complete._
 
 ## Architecture Decision
 Parallel build — new React app in web/react-app/, existing app on localhost:8001 untouched until cut over.
@@ -117,7 +117,7 @@ When all tabs migrated and validated:
   - Print CSS gaps closed (ShortInterest, PeerRotation, SectorRotation)
   - Column alignment audit — no changes; compact-layout deviations intentional
   - Playwright scaffold — `@playwright/test`, config, 11-tab spec, npm scripts. **Baselines not yet captured** — requires one-time `npx playwright install chromium` + Flask on :8001 + `npm run test:visual:update`.
-- **Phase 4 (cut over):** pending — `npm run build` → one-line change in `scripts/app.py` so Flask serves `web/react-app/dist/`. Revertable in 30s. Retire `web/react-src/` POC afterward.
+- **Phase 4 (cut over):** complete 2026-04-13 (HEAD `002fab0`) — Flask serves `web/react-app/dist/`. Vanilla-JS frontend retired pending 1-week stability confirmation. Build step (`cd web/react-app && npm run build`) is now a prerequisite before starting Flask. Revert: restore original `static_folder` + index route in `app.py`. Playwright regression (11/11) against Flask-served build confirmed 0 pixel diff vs dev-server baselines.
 
 ## Open Items (do not build yet)
 - Auth/token handling for /api/admin/* endpoints (INF12) — admin Blueprint shipped; remaining work is per-user access control when going multi-tenant
