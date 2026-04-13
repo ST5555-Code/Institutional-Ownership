@@ -445,6 +445,117 @@ def _build_excl_clause(family_patterns):
     return clause, excl_patterns
 
 
+def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
+    """Batched version of get_nport_children (ARCH-2A.1).
+
+    Resolves top-N N-PORT fund children for multiple institution parents in
+    a single SQL round-trip. Eliminates the N+1 pattern in query1 / Register
+    and portfolio_context / Conviction. Measured hotspot before this fix:
+    286ms / 45% of the portfolio_context HTTP budget (2026-04-12).
+
+    Returns: dict parent_name -> list of child row dicts (same shape as
+    get_nport_children). Parents with no matching family patterns or no
+    N-PORT rows for this ticker/quarter are simply absent from the dict.
+    """
+    if not inst_parent_names:
+        return {}
+    unique_parents = list(dict.fromkeys(inst_parent_names))
+
+    parent_patterns = []
+    parent_exclusions = []
+    for pname in unique_parents:
+        patterns = match_nport_family(pname)
+        if not patterns:
+            continue
+        for p in patterns:
+            parent_patterns.append((pname, '%' + p + '%'))
+        for e in _get_subadviser_exclusions(patterns):
+            parent_exclusions.append((pname, '%' + e + '%'))
+    if not parent_patterns:
+        return {}
+
+    float_row = con.execute(
+        "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
+    ).fetchone()
+    float_shares = float_row[0] if float_row and float_row[0] else None
+
+    pp_ph = ', '.join(['(?, ?)'] * len(parent_patterns))
+    pp_params = [v for row in parent_patterns for v in row]
+
+    if parent_exclusions:
+        pe_ph = ', '.join(['(?, ?)'] * len(parent_exclusions))
+        pe_params = [v for row in parent_exclusions for v in row]
+        excl_cte = f""",
+        parent_exclusions AS (
+            SELECT * FROM (VALUES {pe_ph}) AS t(parent_name, excl_pattern)
+        ),
+        excluded_series AS (
+            SELECT DISTINCT pe.parent_name, nam.series_id
+            FROM parent_exclusions pe
+            JOIN ncen_adviser_map nam ON nam.adviser_name ILIKE pe.excl_pattern
+        )"""
+        excl_where = """
+          AND NOT EXISTS (
+              SELECT 1 FROM excluded_series es
+              WHERE es.parent_name = pp.parent_name
+                AND es.series_id = fh.series_id
+          )"""
+    else:
+        excl_cte = ""
+        excl_where = ""
+        pe_params = []
+
+    try:
+        df = con.execute(f"""
+            WITH parent_patterns AS (
+                SELECT * FROM (VALUES {pp_ph}) AS t(parent_name, pattern)
+            ){excl_cte}
+            SELECT
+                pp.parent_name,
+                fh.fund_name,
+                MAX(fh.market_value_usd) AS value,
+                MAX(fh.shares_or_principal) AS shares,
+                MAX(fh.pct_of_nav) AS pct_of_nav,
+                fh.series_id,
+                MAX(fu.total_net_assets) / 1e6 AS aum_mm
+            FROM parent_patterns pp
+            JOIN fund_holdings_v2 fh ON fh.family_name ILIKE pp.pattern
+            LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
+            WHERE fh.ticker = ?
+              AND fh.quarter = ?
+              {excl_where}
+            GROUP BY pp.parent_name, fh.fund_name, fh.series_id
+            QUALIFY row_number() OVER (
+                PARTITION BY pp.parent_name
+                ORDER BY value DESC NULLS LAST
+            ) <= {int(limit)}
+        """, pp_params + pe_params + [ticker, quarter]).fetchdf()
+    except Exception as e:
+        logger.error("[get_nport_children_batch] %s", e, exc_info=True)
+        return {}
+
+    result = {}
+    for r in df_to_records(df):
+        pname = r.get('parent_name')
+        if not pname:
+            continue
+        shares = r.get('shares') or 0
+        pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+        aum_val = r.get('aum_mm')
+        aum = int(aum_val) if aum_val and aum_val > 0 else None
+        pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
+        result.setdefault(pname, []).append({
+            'institution': r.get('fund_name'),
+            'value_live': r.get('value'),
+            'shares': shares,
+            'pct_float': pct_float,
+            'aum': aum,
+            'pct_aum': pct_aum,
+            'source': 'N-PORT',
+        })
+    return result
+
+
 def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
     """Get top fund series from fund_holdings for a parent institution.
 
@@ -817,18 +928,13 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     'subadviser_note': note,
                 })
 
-        # N-PORT fund series lookup — uses get_nport_children (deduped + exclusions + %float)
+        # N-PORT fund series lookup — batched to eliminate N+1 (ARCH-2A.1).
         nport_by_parent = {}
         if has_table('fund_holdings'):
-            for pname in parent_names:
-                try:
-                    kids = get_nport_children(pname, ticker, quarter, con, limit=5)
-                    if kids:
-                        for k in kids:
-                            k['type'] = _classify_fund_type(k.get('institution'))
-                        nport_by_parent[pname] = kids
-                except Exception:  # nosec B110
-                    pass
+            nport_by_parent = get_nport_children_batch(parent_names, ticker, quarter, con, limit=5)
+            for kids in nport_by_parent.values():
+                for k in kids:
+                    k['type'] = _classify_fund_type(k.get('institution'))
 
         # Build results — prefer N-PORT children, supplement with 13F entities
         results = []
@@ -3518,20 +3624,14 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
 
         # --- Children: top 5 N-PORT funds per parent (parent level only) ---
         if level == 'parent':
-            # Fetch top 5 N-PORT children per parent
-            children_by_parent = {}  # parent_name -> list of {fund_name, value}
+            # Fetch top 5 N-PORT children per parent — batched (ARCH-2A.1).
+            parent_list = [pr['institution'] for pr in results]
+            children_by_parent = get_nport_children_batch(parent_list, ticker, quarter, con, limit=5)
             all_child_funds = set()
-            for parent_row in results:
-                pname = parent_row['institution']
-                try:
-                    kids = get_nport_children(pname, ticker, quarter, con, limit=5)
-                    if kids:
-                        children_by_parent[pname] = kids
-                        for k in kids:
-                            if k.get('institution'):
-                                all_child_funds.add(k['institution'])
-                except Exception:  # nosec B112
-                    continue
+            for kids in children_by_parent.values():
+                for k in kids:
+                    if k.get('institution'):
+                        all_child_funds.add(k['institution'])
 
             if all_child_funds:
                 # Batch query portfolios for all child funds
