@@ -79,16 +79,18 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Batch 1-A (routing hygiene)
+### ⭐ Recommended next Claude Code task — ARCH Batch 0-A (GitHub Actions CI)
 
-From `ARCHITECTURE_REVIEW.md` (Phase 1, Batch 1-A). **Low risk, ~1 hour, `scripts/app.py` only + one React fetch-call update.** Four sub-items:
+_Promoted from BL-1 to Phase 0 prerequisite in the architecture revision pass
+(commit `657c885`). Phase 1 does not start until CI is green on main._
 
-1. Move `/api/admin/quarter_config` → `/api/config/quarters` (public endpoint out of admin namespace). Update React fetch in same commit.
-2. Add `/api/v1/` prefix to all public routes via Blueprint `url_prefix` — one registration change.
-3. Audit `rollup_type` coverage — verify it reaches every query function that should respect it, fix any gaps.
-4. Input guards at route layer — ticker regex `^[A-Z]{1,5}$`, quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input.
+From `ARCHITECTURE_REVIEW.md` Phase 0. **Low risk, ~2 hours, new `.github/workflows/*.yml`.**
 
-Rollback: single git revert. Done means every public endpoint under `/api/v1/`, `quarter_config` off admin namespace, invalid ticker returns 400 not a DuckDB error. See ARCH-1A row in ROADMAP "ARCHITECTURE BACKLOG" section for tracking.
+1. Pre-commit hooks (pylint + bandit + ruff) wired to run on push.
+2. Smoke test against 5 critical endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`, `/api/admin/stats`) using a headless fixture DB.
+3. Done means: CI runs on every push; a B608-class bug (mis-placed `nosec` injecting `#` into SQL) fails CI, not production.
+
+Once Phase 0 is green, the next task is ARCH-1A (routing hygiene — dual-mount `/api/*` + `/api/v1/*`, ticker regex `^[A-Z]{1,6}[.A-Z]?$`, input guards). See ROADMAP "ARCHITECTURE BACKLOG" section for tracking.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 

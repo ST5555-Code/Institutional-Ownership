@@ -171,16 +171,22 @@ _Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-b
 
 ## ARCHITECTURE BACKLOG — from ARCHITECTURE_REVIEW.md (2026-04-12)
 
-Source: `ARCHITECTURE_REVIEW.md` (repo root). Prerequisites and phase sequencing
-documented there — do not reorder without consulting the gate criteria in each
-phase. **Recommended next task for Claude Code: Batch 1-A (routing hygiene,
-`scripts/app.py` only, ~1 hour, low risk).**
+Source: `ARCHITECTURE_REVIEW.md` (repo root), revised `657c885`. Prerequisites
+and phase sequencing documented there — do not reorder without consulting the
+gate criteria in each phase. **Recommended next task for Claude Code: Batch
+0-A (GitHub Actions CI, ~2 hr). Phase 1 is gated on green CI.**
+
+### Phase 0 — Prerequisite (promoted from BL-1)
+
+| # | Item | Batch | Notes |
+|---|------|-------|-------|
+| ARCH-0A | GitHub Actions CI | 0-A | Pre-commit (pylint + bandit + ruff) on push. Smoke test against 5 critical endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`, `/api/admin/stats`) using a headless fixture DB. ~2 hr. **Gate: Phase 1 does not start until CI is green on main.** |
 
 ### Phase 1 — Contract Stabilization (freeze endpoint semantics)
 
 | # | Item | Batch | Notes |
 |---|------|-------|-------|
-| ARCH-1A | Routing hygiene | 1-A | Move `/api/admin/quarter_config` → `/api/config/quarters`. Add `/api/v1/` prefix via Blueprint `url_prefix`. Audit `rollup_type` coverage. Add input guards (ticker regex, quarter format, rollup_type enum). ~1 hr, `scripts/app.py` only. |
+| ARCH-1A | Routing hygiene | 1-A | Move `/api/admin/quarter_config` → `/api/config/quarters`. **Dual-mount** `/api/*` AND `/api/v1/*` during React Phase 4 cutover window (legacy mount stays until vanilla-JS frontend retires). Audit `rollup_type` coverage. Add input guards: ticker regex `^[A-Z]{1,6}[.A-Z]?$` (accepts BRK.B / BF.B / ADRs), quarter format, rollup_type enum. Guards are transitional — replaced by FastAPI Pydantic in 4-C. ~1 hr, `scripts/app.py` only. |
 | ARCH-1B | Response contract | 1-B | Endpoint classification table (latest-only vs quarter-aware). `api_export` parity with on-screen state. Pydantic response models for 6 priority endpoints. `{ data, error, meta }` envelope. React `ErrorBoundary` per tab. ~half day. |
 
 ### Phase 2 — Correctness Fixes
@@ -205,7 +211,7 @@ phase. **Recommended next task for Claude Code: Batch 1-A (routing hygiene,
 |---|------|-------|-------|
 | ARCH-4A | Runtime surface split | 4-A | Split `app.py` (~1,400 lines) into `db.py`, `app_bootstrap.py` (≤100 lines), `api_register.py`, `api_flows.py`, `api_entities.py`, `api_market.py`, `api_config.py`. Feature branch required. Do not start until Phase 1 complete. |
 | ARCH-4B | Service layer split | 4-B | Split `queries.py` (~5,400 lines) into `queries.py` (SQL only), `serializers.py` (response shaping), `cache.py` (explicit key constants). |
-| ARCH-4C | Flask → FastAPI migration | 4-C | Replace Flask with FastAPI. Domain Blueprints → FastAPI routers. `schemas.py` → `response_model`. `openapi-typescript` regenerates React types from `/docs` spec. Input validation via Pydantic removes manual guards from 1-A. Gate: do before team sharing. |
+| ARCH-4C | Flask → FastAPI migration | 4-C | Replace Flask with FastAPI. Domain Blueprints → FastAPI routers. Routes declared as `def`, NOT `async def`, to preserve thread-local `get_db()` cache. `schemas.py` → `response_model`. `openapi-typescript` regenerates React types from `/docs` spec. Input validation via Pydantic removes manual guards from 1-A. ~2–3 days (includes admin_bp `Depends()` conversion + `jsonify` → Pydantic returns + CORS/startup hooks). Gate: do before team sharing. |
 
 ### Phase 5 — Backend Deployment (gated on React Phase 4 cutover stable ≥1 week)
 
@@ -221,14 +227,16 @@ sketched in ARCHITECTURE_REVIEW.md.
 
 ### Phase-independent backlog
 
+_BL-1 (GitHub Actions CI) promoted to Phase 0 — see ARCH-0A above._
+
 | # | Item | Notes |
 |---|------|-------|
-| BL-1 | GitHub Actions CI | Pre-commit + endpoint smoke tests on push. Would have caught B608. |
 | BL-2 | Pipeline dependency enforcement | Makefile or DAG. Prevents out-of-order runs. |
 | BL-3 | Write-path consistency (non-entity) — implementation | Follow-on to ARCH-2A.3 audit. Extend staging/validation to flow recompute + market data upsert. |
 | BL-4 | Three snapshot roles documented | Serving (`13f_readonly.duckdb`) / promotion rollback (intra-DB tables) / cold archive (`EXPORT DATABASE`). Distinct retention rules. |
 | BL-5 | Zustand scope enforcement | Document rule: global store = `ticker / quarter / rollupType / company` only. Tab-local state stays in components. |
 | BL-6 | Loading state standardization | Shared skeleton + empty state components across all 11 React tabs. |
+| BL-7 | DB-universe ticker validation | Route-layer check against the `tickers` table (or cached set). Catches typos that the Batch 1-A regex passes. Follow-on to ARCH-1A. Load the ticker set at app startup or cache with short TTL to keep route layer decoupled from a per-request DB query. |
 
 ---
 
