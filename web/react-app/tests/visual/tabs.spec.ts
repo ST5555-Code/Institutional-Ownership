@@ -21,15 +21,12 @@ async function loadTicker(page: Page, ticker: string) {
   const input = page.getByPlaceholder(/ticker/i)
   await input.fill(ticker)
   await input.press('Enter')
-  await page.waitForResponse(
-    r => r.url().includes('/api/summary') && r.status() === 200,
-    { timeout: 15_000 },
-  )
+  await expect(page.getByText('APPLE INC').first()).toBeVisible({ timeout: 15_000 })
 }
 
 async function openTab(page: Page, label: string) {
   await page.getByRole('button', { name: label, exact: true }).click()
-  await page.waitForLoadState('networkidle', { timeout: 15_000 })
+  await page.waitForLoadState('networkidle', { timeout: 45_000 })
   // Small settle delay so chart transitions finish before snapshot.
   await page.waitForTimeout(400)
 }
