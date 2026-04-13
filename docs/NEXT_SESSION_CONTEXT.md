@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Phase 4 Batch 4-B queries.py service-layer split shipped; all architecture work through 4-B done. HEAD: 125d86d)_
+_Last updated: 2026-04-13 (session close — Phase 4+ Batch 4-C Flask → FastAPI cutover shipped; app_legacy.py deleted. Architecture work through Batch 4-C complete. HEAD: pending-commit)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -15,7 +15,7 @@ each working session so the top block stays current.
 - **HEAD:** `746a798` (Phase 4 Batch 4-A — Blueprint split of scripts/app.py)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
-  - Flask — `scripts/app.py` (103 lines, thin entry) + 9 Blueprint modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (~700 lines, `/api/admin/*`, INF12).
+  - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
   - Service layer — `scripts/queries.py` (~5,500 lines, SQL + query logic) + `scripts/serializers.py` (~210 lines, `clean_for_json` / `df_to_records` / filer-name resolution / subadviser notes) + `scripts/cache.py` (~40 lines, `cached()` + key templates).
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — **retired 2026-04-13** (commit `71269cb`). `web/static/{dist,vendor,style.css}` are orphaned — safe to delete in a follow-up PR.
@@ -89,11 +89,13 @@ _Orphaned `web/static/{dist,vendor,style.css}` deleted 2026-04-13
 5,703 → 5,523 lines, 0 jsonify calls, 8/8 smoke green. All architecture
 work through Batch 4-B is complete._
 
-**1. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
+**1. React `api.ts` regeneration via openapi-typescript — follow-up to Batch 4-C.** Wire format is unchanged so this isn't urgent. Script: install `openapi-typescript` as a React devDep, fetch `http://localhost:8001/openapi.json`, write `src/types/api.generated.ts`. Migrate tab imports one file at a time.
 
-**2. Phase 4+ — Flask → FastAPI — ~2–3 days.** Triggered on first second-operator joining or move to shared/hosted use. Replaces hand-written Pydantic schemas + React `src/types/api.ts` with openapi-typescript auto-generation. Removes route-layer input guards (Pydantic validates). Thread-local `get_db()` preserved via `def` (not `async def`) routes.
+**2. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
 
-**3. Backlog (no phase dependency).**
+**3. Phase 3++ — build_analytics.py quarterly precompute — ~half day.** Trigger-based. `register_cache` / `conviction_cache` / `ownership_trend_cache` / `cross_ownership_cache` tables. See ARCHITECTURE_REVIEW.md Phase 3++.
+
+**4. Backlog (no phase dependency).**
 - BL-3: write-path consistency implementation (follow-on to 2-A audit)
 - BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
 - BL-9: `/api/v1/short_long` returns 500 with `KeyError 'long_value_k'`
