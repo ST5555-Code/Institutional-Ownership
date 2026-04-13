@@ -1,7 +1,10 @@
 # 13F Institutional Ownership — Architecture & Upgrade Plan
 
 _Prepared: April 12, 2026_
-_Scope: Stack decisions, API contracts, modularization, deployment. No data ops or pipeline work._
+_Scope: Stack decisions, API contracts, modularization, deployment, and data
+layer schema changes that directly support the architecture (freshness
+metadata, precomputed artifact tables). Pipeline operations and data quality
+work remain in ROADMAP._
 
 ---
 
@@ -201,32 +204,40 @@ phase-independent and do not gate Phase 1.
 
 ---
 
-### Phase 0-B — Runtime smoke test CI (phase-independent)
-_~2–3 hours · new `.github/workflows/smoke.yml` · medium risk · does NOT gate Phase 1_
+### Phase 0-B1 — Fixture DB design (phase-independent, no gate)
+_~1 hour · documentation only · no code_
 
-Four-endpoint smoke test against a fixture DuckDB: `/api/tickers`, `/api/query1`,
-`/api/entity_graph`, `/api/summary`. Scoped narrowly — these four exercise
-enough of the stack to catch endpoint-level regressions without pulling admin
-routes into CI.
+Document the chosen fixture approach from three options:
+1. Seed script that builds a minimal DuckDB from SQL fixtures at CI startup
+2. Committed small binary snapshot (minimal rows, no PII)
+3. Stripped `EXPORT DATABASE` dump checked into repo
 
-**In scope for this batch:**
-1. Design fixture DB — document the chosen approach (seed script that builds
-   a minimal DuckDB from SQL fixtures vs. committed small binary snapshot vs.
-   stripped `EXPORT DATABASE` dump) and commit the decision. Implementation
-   is deferred until the design is approved.
+Decision committed to `docs/ci_fixture_design.md`. Implementation deferred
+until design is approved.
 
-**Follow-on (separate commit, after design approval):**
-- Implement the chosen fixture approach
-- Wire fixture build into the CI workflow
-- Each smoke test asserts HTTP 200 + non-empty JSON body
+**Done means:** `docs/ci_fixture_design.md` exists and specifies the chosen
+approach, its tradeoffs, and an estimated implementation time.
 
-**Done means:** Fixture design decision documented and committed. Approach
-chosen from the three options above. Implementation not yet complete.
+**Gate:** None — phase-independent. Does not gate any phase.
 
-**Gate:** Phase 0-B does not gate Phases 1–3. Phase 0-B **must complete
-before Phase 4-A begins** — Batch 4-A requires a regression baseline to
-validate the split. If Phase 0-B implementation is not yet done when Phase
-4-A is ready to start, complete 0-B first.
+---
+
+### Phase 0-B2 — Smoke test CI implementation (gates Phase 4-A)
+_~2–3 hours · new `.github/workflows/smoke.yml` · medium risk_
+_Prerequisite: Phase 0-B1 design approved._
+
+Implement the fixture approach chosen in 0-B1. Wire four-endpoint smoke test
+into CI: `/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`.
+Each test asserts HTTP 200 + non-empty JSON body against the fixture DB.
+
+**Done means:** Smoke workflow runs on push. All four endpoints return 200
+against the fixture. A breaking schema change on any of the four fails CI.
+Fixture builds successfully in a clean CI environment.
+
+**Gate:** Phase 0-B2 must complete before Phase 4-A begins. Phase 4-A
+requires a regression baseline to validate the Blueprint split — a documented
+design alone does not satisfy this requirement. Phases 1, 2, and 3 are
+unaffected and do not require 0-B2.
 
 ---
 
@@ -268,6 +279,14 @@ Phase 4 cutover task — `/api/*` legacy mount stays until then.
 
 ### Batch 1-B — Response contract
 _~half day · `app.py` + new `schemas.py` + React · medium risk_
+_⚠ Requires React Phase 4 cutover complete before running. The error envelope
+`{ data, error, meta }` changes the response shape on all handlers. Because
+Phase 1-A dual-mounts the same handlers on both `/api/*` and `/api/v1/*`,
+this shape change would hit both prefixes simultaneously and break the
+vanilla-JS frontend at port 8001, which dereferences raw fields directly
+(e.g. `s.company_name`, `s.market_cap`). Gate: vanilla-JS frontend must
+be retired before Batch 1-B executes._
+
 
 | Item | Action |
 |------|--------|
@@ -295,8 +314,7 @@ any data layer changes.
 
 ---
 
-**Phase 1 exit gate:** Endpoint classification table committed. Pydantic covers
-6 priority endpoints. Export parity confirmed. React error boundaries in place.
+**Phase 1 exit gate:** Batch 1-A complete (routing hygiene, dual-mount, input guards). Endpoint classification table committed. Batch 1-B gated on React Phase 4 cutover (error envelope + Pydantic schemas) — may complete after Phase 2 and 3 if cutover is delayed.
 
 ---
 
@@ -403,7 +421,7 @@ Split `scripts/app.py` (~1,400 lines) into:
 
 | New file | Contents |
 |----------|----------|
-| `scripts/db.py` | `get_db()`, `_resolve_db_path()`, `_start_switchback_monitor()`, `_refresh_table_list()`, `has_table()` |
+| `scripts/app_db.py` | `get_db()`, `_resolve_db_path()`, `_start_switchback_monitor()`, `_refresh_table_list()`, `has_table()` — web-serving DB helpers only. **Note:** scripts/db.py already exists as the pipeline/staging write-path utility. Do not overwrite or merge with it. `scripts/app_db.py` is a distinct module for web-layer concerns only. |
 | `scripts/app_bootstrap.py` | Flask app creation, Blueprint registration, `_init_db_path()`, startup logging. Target ≤100 lines. |
 | `scripts/api_register.py` | `/register`, `/tickers`, `/summary` routes |
 | `scripts/api_flows.py` | `/flow_analysis`, `/investor_flows`, `/ownership_trend` routes |
@@ -413,9 +431,9 @@ Split `scripts/app.py` (~1,400 lines) into:
 | `scripts/admin_bp.py` | Unchanged |
 
 **Done means:** `app_bootstrap.py` ≤100 lines. No domain routes in bootstrap.
-Each Blueprint independently importable. `pylint` + `bandit` pass. All endpoints
-smoke-tested against Phase 0-B fixture baseline — responses match pre-split
-behavior.
+`app_db.py` importable independently of `app_bootstrap.py`. Each Blueprint
+independently importable. `pylint` + `bandit` pass. All endpoints smoke-tested
+against Phase 0-B fixture baseline — responses match pre-split behavior.
 
 **Rollback:** Feature branch. Old `app.py` retained as `app_legacy.py` until
 smoke test passes.
@@ -558,8 +576,9 @@ avoid scope creep inside Phase 4.
 _No phase dependency. Improve resilience when capacity allows._
 
 _Note: BL-1 (GitHub Actions CI) has been promoted to **Phase 0** and split
-into Phase 0-A (lint/bandit, gates Phase 1) and Phase 0-B (runtime smoke,
-phase-independent)._
+into three batches: Phase 0-A (lint/bandit, gates Phase 1), Phase 0-B1
+(fixture design, phase-independent), and Phase 0-B2 (smoke CI implementation,
+gates Phase 4-A only — does not gate Phases 1–3)._
 
 | # | Item | Notes |
 |---|------|-------|
