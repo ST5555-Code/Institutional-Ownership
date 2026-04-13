@@ -29,7 +29,7 @@ from api_common import (
     validate_query_params_dep,
 )
 from app_db import get_db
-from export import build_excel
+from export import build_excel, build_excel_multisheet
 from queries import clean_for_json, df_to_records, get_summary
 from schemas import RegisterEnvelope, TickersEnvelope
 
@@ -190,20 +190,39 @@ def api_export(qnum: int, request: Request):
         # Extract the tabular portion from structured responses:
         #   q7         → {stats, positions}              export `positions`
         #   q1, q16    → {rows, all_totals, type_totals} export `rows`
-        # q6/q10/q11/q15 are multi-table shapes the extractor doesn't know
-        # (BL-10 in Architecture Backlog).
+        #   q6/q10/q11 → multi-list dict                 → multi-sheet
+        #   q15        → [{scalars, quarters[], coverage{}}]  → multi-sheet
+        qname = QUERY_NAMES.get(qnum, f'Query{qnum}')
+        sheet_name = f"{qname} - {ticker or 'ALL'}"
+        multisheet = None
+        export_data = data
+
         if isinstance(data, dict):
             if 'positions' in data:
                 export_data = data['positions']
             elif 'rows' in data:
                 export_data = data['rows']
             else:
-                export_data = data
+                multisheet = {k: v for k, v in data.items()}
+        elif (
+            isinstance(data, list)
+            and len(data) == 1
+            and isinstance(data[0], dict)
+            and any(isinstance(v, (list, dict)) for v in data[0].values())
+        ):
+            row = data[0]
+            scalars = {k: v for k, v in row.items() if not isinstance(v, (list, dict))}
+            multisheet = {}
+            if scalars:
+                multisheet['Overview'] = [scalars]
+            for k, v in row.items():
+                if isinstance(v, (list, dict)):
+                    multisheet[k] = v
+
+        if multisheet is not None:
+            buf = build_excel_multisheet(multisheet)
         else:
-            export_data = data
-        qname = QUERY_NAMES.get(qnum, f'Query{qnum}')
-        sheet_name = f"{qname} - {ticker or 'ALL'}"
-        buf = build_excel(export_data, sheet_name=sheet_name)
+            buf = build_excel(export_data, sheet_name=sheet_name)
 
         filename = f"query{qnum}_{ticker or 'ALL'}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         return StreamingResponse(
