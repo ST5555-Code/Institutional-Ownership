@@ -168,7 +168,7 @@ Structural work before stable contracts spreads ambiguity across more files.
 The dependency chain is fixed:
 
 ```
-Freeze contracts → Fix correctness → Precompute analytics
+CI baseline → Freeze contracts → Fix correctness → Precompute analytics
     → Modularize backend → Deploy for production use
 ```
 
@@ -209,20 +209,24 @@ Four-endpoint smoke test against a fixture DuckDB: `/api/tickers`, `/api/query1`
 enough of the stack to catch endpoint-level regressions without pulling admin
 routes into CI.
 
-**Sub-tasks:**
-1. **Design fixture DB** — document the chosen approach (seed script that
-   builds a minimal DuckDB from SQL fixtures vs. committed small binary
-   snapshot vs. stripped `EXPORT DATABASE` dump) before implementing. Open
-   question for the operator. **Do not implement the fixture in this batch**
-   — design only.
-2. Implement the chosen approach (follow-on).
-3. Wire fixture build into CI workflow.
-4. Each smoke test asserts HTTP 200 + non-empty JSON body.
+**In scope for this batch:**
+1. Design fixture DB — document the chosen approach (seed script that builds
+   a minimal DuckDB from SQL fixtures vs. committed small binary snapshot vs.
+   stripped `EXPORT DATABASE` dump) and commit the decision. Implementation
+   is deferred until the design is approved.
 
-**Done means:** Smoke workflow runs on push. Four endpoints return 200 against
-the fixture. A breaking schema change on any of the four fails CI.
+**Follow-on (separate commit, after design approval):**
+- Implement the chosen fixture approach
+- Wire fixture build into the CI workflow
+- Each smoke test asserts HTTP 200 + non-empty JSON body
 
-**Gate:** None — phase-independent. Ship whenever fixture design lands.
+**Done means:** Fixture design decision documented and committed. Approach
+chosen from the three options above. Implementation not yet complete.
+
+**Gate:** Phase 0-B does not gate Phases 1–3. Phase 0-B **must complete
+before Phase 4-A begins** — Batch 4-A requires a regression baseline to
+validate the split. If Phase 0-B implementation is not yet done when Phase
+4-A is ready to start, complete 0-B first.
 
 ---
 
@@ -333,7 +337,7 @@ _Architecture concern: consistent freshness model and reducing on-request comput
 ---
 
 ### Batch 3-A — DB schema cleanup
-_~2 hours · DuckDB DDL · staging workflow · ⚠ time-sensitive: May 9 deadline_
+_~2 hours · DuckDB DDL · staging workflow_
 
 | Item | Action |
 |------|--------|
@@ -386,6 +390,9 @@ visible in React. `portfolio_context` pipeline-built and ≤50ms.
 ## Phase 4 — Backend Modularization
 _Split app.py and queries.py into well-bounded modules._
 _Do not start until Phase 1 is complete — contracts must be frozen first._
+_Scope: Batches 4-A and 4-B only. The Flask → FastAPI swap (formerly Batch
+4-C) has been moved into **Phase 4+**, triggered on team sharing rather than
+executed as part of this phase._
 
 ---
 
@@ -407,7 +414,8 @@ Split `scripts/app.py` (~1,400 lines) into:
 
 **Done means:** `app_bootstrap.py` ≤100 lines. No domain routes in bootstrap.
 Each Blueprint independently importable. `pylint` + `bandit` pass. All endpoints
-smoke-tested against pre-split baseline.
+smoke-tested against Phase 0-B fixture baseline — responses match pre-split
+behavior.
 
 **Rollback:** Feature branch. Old `app.py` retained as `app_legacy.py` until
 smoke test passes.
@@ -439,6 +447,21 @@ as a follow-on. Do not attempt in 4-B._
 
 ---
 
+**Phase 4 exit gate:** All domain files ≤400 lines. `queries.py` contains no
+response shaping. `serializers.py` handles all response shaping. `cache.py`
+holds explicit cache key constants. `pylint` + `bandit` pass on all new files.
+All endpoints smoke-tested against pre-split baseline.
+
+---
+
+## Phase 4+ — Flask → FastAPI
+_Triggered when: first second operator joins, or tool moves to shared/hosted use._
+_Prerequisite: Phase 4 complete._
+
+_Note: Batches 4-A and 4-B must complete before this phase starts. The
+hand-written Pydantic schemas from Batch 1-B are replaced by auto-generated
+types from the OpenAPI spec in this phase._
+
 ### Batch 4-C — Flask → FastAPI
 _~2–3 days · follows 4-A + 4-B · do before team sharing_
 
@@ -469,9 +492,11 @@ for one full week.
 
 ---
 
-**Phase 4 exit gate:** All domain files ≤400 lines. `queries.py` has no
-response shaping. FastAPI OpenAPI spec generated. React types auto-generated
-and match existing types.
+**Phase 4+ exit gate:** FastAPI starts. All endpoints respond. OpenAPI spec
+at `/docs`. React types regenerated from spec via openapi-typescript and
+match existing `schemas.py` types. All routes are `def`, not `async def`.
+Thread-local `get_db()` cache hit rate unchanged from Flask baseline. Smoke
+test passes.
 
 ---
 
@@ -493,7 +518,8 @@ Gate restated as: **React Phase 4 cutover confirmed stable.**
 
 **What does not change in this phase:**
 - DuckDB for analytics queries
-- Flask API routes and `queries.py` (modularized in Phase 4, but endpoints unchanged)
+- API routes and query logic (FastAPI post-Batch 4-C, but endpoints and query
+  behavior unchanged — framework swap only)
 - Data pipeline scripts
 - Entity staging workflow
 
