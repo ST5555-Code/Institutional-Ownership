@@ -1,6 +1,6 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 12, 2026 — React Phase 3 visual polish complete (badge consolidation, Fund Portfolio → Register cross-nav, print CSS gaps closed, Playwright scaffolded)_
+_Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-batch upgrade plan). React Phase 3 + backend cleanup trio also shipped today._
 
 ## Session Summary 2026-04-10
 
@@ -169,6 +169,69 @@ _Last updated: April 12, 2026 — React Phase 3 visual polish complete (badge co
 
 ---
 
+## ARCHITECTURE BACKLOG — from ARCHITECTURE_REVIEW.md (2026-04-12)
+
+Source: `ARCHITECTURE_REVIEW.md` (repo root). Prerequisites and phase sequencing
+documented there — do not reorder without consulting the gate criteria in each
+phase. **Recommended next task for Claude Code: Batch 1-A (routing hygiene,
+`scripts/app.py` only, ~1 hour, low risk).**
+
+### Phase 1 — Contract Stabilization (freeze endpoint semantics)
+
+| # | Item | Batch | Notes |
+|---|------|-------|-------|
+| ARCH-1A | Routing hygiene | 1-A | Move `/api/admin/quarter_config` → `/api/config/quarters`. Add `/api/v1/` prefix via Blueprint `url_prefix`. Audit `rollup_type` coverage. Add input guards (ticker regex, quarter format, rollup_type enum). ~1 hr, `scripts/app.py` only. |
+| ARCH-1B | Response contract | 1-B | Endpoint classification table (latest-only vs quarter-aware). `api_export` parity with on-screen state. Pydantic response models for 6 priority endpoints. `{ data, error, meta }` envelope. React `ErrorBoundary` per tab. ~half day. |
+
+### Phase 2 — Correctness Fixes
+
+| # | Item | Batch | Notes |
+|---|------|-------|-------|
+| ARCH-2A.1 | `get_nport_children` N+1 loop fix | 2-A | Batch into single SQL `IN` clause. Measured hotspot from portfolio_context vectorization (286ms / 45% of budget). |
+| ARCH-2A.2 | `summary_by_parent` path check | 2-A | Verify read-only on request path. Move any recompute to pipeline. |
+| ARCH-2A.3 | Write-path consistency audit (non-entity) | 2-A | Map which pipeline scripts can partially apply vs roll back. Output: `docs/write_path_risk_map.md`. Audit only — no fixes yet. |
+
+### Phase 3 — Precompute + Data Layer
+
+| # | Item | Batch | Notes |
+|---|------|-------|-------|
+| ARCH-3A.1 | `FAMILY_MAP` → `fund_family_patterns` DB table | 3-A | Migrate 50+ hardcoded entries from `app.py`. `match_nport_family()` queries DB. Editable without code change. |
+| ARCH-3A.2 | `data_freshness` table | 3-A | One row per precomputed table (`last_computed_at`, `row_count`). Pipelines write after rebuild. `/api/v1/freshness` + React footer badge. |
+| ARCH-3B | `portfolio_context` quarterly precomputed artifact | 3-B | New `portfolio_context_cache` table + `scripts/compute_portfolio_context.py`. Thin endpoint `SELECT` — no pandas. Target ≤50ms. Keep legacy fallback until one full pipeline run validates. |
+
+### Phase 4 — Backend Modularization
+
+| # | Item | Batch | Notes |
+|---|------|-------|-------|
+| ARCH-4A | Runtime surface split | 4-A | Split `app.py` (~1,400 lines) into `db.py`, `app_bootstrap.py` (≤100 lines), `api_register.py`, `api_flows.py`, `api_entities.py`, `api_market.py`, `api_config.py`. Feature branch required. Do not start until Phase 1 complete. |
+| ARCH-4B | Service layer split | 4-B | Split `queries.py` (~5,400 lines) into `queries.py` (SQL only), `serializers.py` (response shaping), `cache.py` (explicit key constants). |
+| ARCH-4C | Flask → FastAPI migration | 4-C | Replace Flask with FastAPI. Domain Blueprints → FastAPI routers. `schemas.py` → `response_model`. `openapi-typescript` regenerates React types from `/docs` spec. Input validation via Pydantic removes manual guards from 1-A. Gate: do before team sharing. |
+
+### Phase 5 — Backend Deployment (gated on React Phase 4 cutover stable ≥1 week)
+
+See `REACT_MIGRATION.md` backend migration table. Gunicorn+Nginx, Flask-JWT/Auth0,
+APScheduler, optional PostgreSQL, cloud deployment. Triggered by external-user /
+team-use / productization milestones, not calendar.
+
+### Phase 6 — Repo reshape (only if Phase 4 proves insufficient)
+
+Gate: concrete pain point (second operator, independent pipeline deploy, test
+isolation) — not aesthetic. `src/{api,queries,pipeline,entity,db}/` layout
+sketched in ARCHITECTURE_REVIEW.md.
+
+### Phase-independent backlog
+
+| # | Item | Notes |
+|---|------|-------|
+| BL-1 | GitHub Actions CI | Pre-commit + endpoint smoke tests on push. Would have caught B608. |
+| BL-2 | Pipeline dependency enforcement | Makefile or DAG. Prevents out-of-order runs. |
+| BL-3 | Write-path consistency (non-entity) — implementation | Follow-on to ARCH-2A.3 audit. Extend staging/validation to flow recompute + market data upsert. |
+| BL-4 | Three snapshot roles documented | Serving (`13f_readonly.duckdb`) / promotion rollback (intra-DB tables) / cold archive (`EXPORT DATABASE`). Distinct retention rules. |
+| BL-5 | Zustand scope enforcement | Document rule: global store = `ticker / quarter / rollupType / company` only. Tab-local state stays in components. |
+| BL-6 | Loading state standardization | Shared skeleton + empty state components across all 11 React tabs. |
+
+---
+
 ## DECISION MAKER & VOTING ROLLUP WORLDVIEWS
 
 New rollup types to coexist alongside economic_control_v1 in entity_rollup_history.
@@ -236,6 +299,7 @@ economic_control_v1 as 'Fund Sponsor / Voting' to make this explicit.
 
 | Date | Item | Details |
 |------|------|---------|
+| 2026-04-12 | **ARCHITECTURE_REVIEW.md — full stack architecture review + phased upgrade plan** | 435-line architecture document at repo root. Scope: stack decisions, API contracts, modularization, deployment. No data ops or pipeline work. **Structure:** Current Stack diagram; What Is Solid — Do Not Change (7 items including DuckDB, entity MDM temporal graph, thread-local connection caching, query result caching, snapshot+switchback monitor, precomputed `investor_flows`/`ticker_flow_stats`, admin Blueprint with token auth); Architecture Gaps (G1–G11 covering untyped API contract as highest-consequence, missing error contract, input validation gaps, `quarter_config` namespace drift, no API versioning, `app.py` monolith, `queries.py` mixed concerns, `FAMILY_MAP` hardcoded dict, three conflated snapshot roles, no CI on push, no pipeline dependency enforcement); **Execution logic:** freeze contracts → fix correctness → precompute analytics → modularize → deploy. **6 phases, 9 batches, explicit exit gates:** Phase 1 Contract Stabilization (1-A routing hygiene ~1hr, 1-B response contract ~half day) → Phase 2 Correctness Fixes (2-A known gaps ~2hr) → Phase 3 Precompute + Data Layer (3-A DB schema cleanup ~2hr, 3-B portfolio_context artifact ~half day) → Phase 4 Backend Modularization (4-A runtime split ~1 day, 4-B service layer split ~half day, 4-C Flask→FastAPI ~half day) → Phase 5 Deployment Migration (gated on React Phase 4 cutover stable ≥1 week) → Phase 6 Repo reshape (only if 4 insufficient). Backlog section BL-1 through BL-6 for phase-independent work (GitHub Actions CI, Makefile/DAG, write-path consistency implementation, three snapshot roles doc, Zustand scope rule, loading state standardization). **Recommended next Claude Code task: Batch 1-A — routing hygiene, `scripts/app.py` only, low risk, ~1 hour.** Tracked items added to new ROADMAP section "ARCHITECTURE BACKLOG" (before DECISION MAKER). Commit pending. |
 | 2026-04-12 | Backend cleanup — shadow diff removal, quarter param threading, portfolio_context vectorization | Three related backend fixes in one session. **(1) Dropped `log_shadow_diff()`** (commit `c2c5441`): Phase 4 shadow logging no longer needed. Removed function definition, `_SHADOW_LOG_PATH` constant, and 4 call sites in `query1`, `query2`, `ownership_trend_summary`, and `flow_analysis`. `-51/+1` lines in `scripts/queries.py`. **(2) Threaded `quarter` param through query endpoints** (commit `94b0402`): `api_query` and `api_export` now read `quarter` from request args (default `LATEST_QUARTER`) and pass it through every dispatched `fn()` call. Added `quarter=LQ` kwarg to 25 query functions — `query1-16`, `holder_momentum`, `portfolio_context`, `cohort_analysis`, `flow_analysis`, `short_interest_analysis`, `get_short_long_comparison`, `_get_summary_impl`, `_cross_ownership_query`, `get_market_summary`, `get_peer_rotation` — with all `'{LQ}'` SQL f-strings and bareword `LQ` references rewritten to use the local param (`quarter_to = LQ` → `quarter_to = quarter`, `q_date_map.get(LQ, ...)` → `q_date_map.get(quarter, ...)`, `get_nport_children(..., LQ, ...)` → `get_nport_children(..., quarter, ...)`, `x.get(LQ, 0)` → `x.get(quarter, 0)`). `query11` redirect passes quarter through to `query10`. `get_nport_children_q2` intentionally left alone (semantically a FQ↔LQ delta helper, fixed at both ends). All defaults are `quarter=LQ` so existing callers unchanged. Smoke test on `/api/query1?ticker=EQT&quarter=2025Q1` vs `&quarter=2025Q4` returned 69 vs 89 rows — divergence confirms param flows end-to-end. **(3) Vectorized `portfolio_context._compute_metrics`** (commit `251072b`, 2.7s → 730ms HTTP warm / 632ms in-process): Moved GICS sector mapping from Python row-level `_gics_sector()` calls into SQL as `CASE WHEN` columns on all three portfolio queries (parent top-25, fund top-25, N-PORT child batch) — REIT-under-Financial-Services branch first so it wins over plain Financial Services. With `gics_sector`+`gics_code` pre-computed in the fetchdf, `_compute_metrics` drops its two `iterrows()` loops and the `apply(lambda r: _gics_sector(...), axis=1)` call: sector totals now come from a single `groupby(['gics_sector','gics_code'])['value'].sum()`, and both rank lookups collapse to boolean mask + `idxmax()`. Return dict shape and callers unchanged. 600ms soft target missed by ~130ms HTTP — remaining hotspot is the 25-call `get_nport_children` N+1 loop (286ms, 45% of total budget), explicitly out of scope for this pass. Next optimization target if latency needed further is batching that loop. |
 | 2026-04-12 | **React Phase 3 — Visual polish** | Five sub-items from `REACT_MIGRATION.md`: (1) **RegisterTab badge consolidation** — removed local `typeBadgeStyle()`, switched to shared `getTypeStyle()` from `common/typeConfig.ts`. User-visible behavior changes aligned Register with the other 8 tabs that already use the shared helper: `hedge_fund` badge now purple `#7B2D8B` (was navy `#002147`), labels switched from raw type names to friendly forms (`wealth_management` → `wealth mgmt`, `hedge_fund` → `quant/hedge`). Fallback `unknown` label preserved. (2) **Column alignment audit** — surveyed all 11 tabs. Register/Conviction/CrossOwnership share canonical 60/440/120 (Rank/Institution/Type); OverlapAnalysis (36/flex/80), FlowAnalysis (30/flex/62), PeerRotation (30/64/flex) deviate intentionally because they must fit additional period columns in the same viewport width. No changes — deviations validated. (3) **Cross-tab navigation — Fund Portfolio → Register** — ticker cells in the positions table are now clickable (except the subject row which is already the current ticker). Click calls `loadCompany(ticker.toUpperCase())` + `setActiveTab('register')`. Cursor pointer + hover underline via new `.fp-ticker-link` class + `title="Open Register for XYZ"`. (4) **Print CSS gaps** — extended `@media print` rules on ShortInterest, PeerRotation, SectorRotation from controls-only (`.si-controls { display:none }` etc.) to also expand the scroll wrappers: new classes `.si-wrap`, `.pr-wrap`, `.sr-wrap` with `height:auto!important; max-height:none!important; overflow:visible!important` + universal descendant `max-height:none!important` to defeat nested `maxHeight: 240/280/500` scroll containers on print. EntityGraph left as-is (ReactFlow canvas doesn't print usefully — controls already hidden). (5) **Playwright visual regression scaffold** — `@playwright/test@^1.59` installed, `playwright.config.ts` (Chromium, 1440×900, `reuseExistingServer`, 2% pixel-diff tolerance, animations disabled), `tests/visual/tabs.spec.ts` covers all 11 tabs with fixed `TICKER=AAPL`, each test loads ticker → waits for `/api/summary` 200 → clicks sidebar button by role+exact name → waits `networkidle` + 400ms settle → full-page screenshot. New scripts: `npm run test:visual`, `npm run test:visual:update`. `.gitignore` covers `test-results/` + `playwright-report/`. Baselines not captured in this session — requires one-time `npx playwright install chromium` + Flask on :8001 + `npm run test:visual:update`. `npm run build` passes. Commit `c836813`. |
 | 2026-04-12 | **React Phase 2 COMPLETE — all 11 tabs ported** | All 11 sidebar tabs fully ported to `web/react-app/`: Register, Ownership Trend (3 sub-views), Conviction, Fund Portfolio, Flow Analysis, Cross-Ownership, Overlap Analysis, Peer Rotation, Sector Rotation, Entity Graph (Market + Company modes), Short Interest. Shared infrastructure: 9 common components, `useFetch` hook, `typeConfig.ts`, Zustand store with `rollupType`, Recharts + React Flow libraries, `api.ts` with 60+ interfaces covering all endpoints. Global formatting rules: 2-decimal percentages with trailing zeros, 0→em-dash, consistent highlight yellow `#fef9c3`. Backend fixes shipped alongside: query7 f-string bug, flow_analysis pct_float semantics, portfolio_context top3 objects, entity_market_summary endpoint. Flask app at :8001 untouched. Next: Phase 3 (visual polish, Playwright tests) → Phase 4 (remaining tabs) → Phase 5 (cut over). |

@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (backend cleanup trio + Phase 3 polish complete, HEAD: 573b504)_
+_Last updated: 2026-04-12 (ARCHITECTURE_REVIEW.md committed; backend cleanup trio + Phase 3 polish also shipped today)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -11,8 +11,8 @@ each working session so the top block stays current.
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main` (synced with origin)
-- **HEAD:** `573b504`
+- **Branch:** `main` (pending push — architecture review commit)
+- **HEAD:** pending (will update after commit)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -26,10 +26,11 @@ each working session so the top block stays current.
 ## First 5 minutes — read these
 
 1. **`~/ClaudeWorkspace/CLAUDE.md`** — workspace rules
-2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF18. COMPLETED section at line ~260+.
+2. **`ROADMAP.md`** — full project state. INFRASTRUCTURE table tracks INF1–INF18. COMPLETED section at line ~260+. ARCHITECTURE BACKLOG section tracks ARCH-1A through ARCH-4C + BL-1 through BL-6.
 3. **`docs/PROCESS_RULES.md`** — rules for large-data scripts
 4. **`REACT_MIGRATION.md`** — React app migration plan
-5. **Auto memory** at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`
+5. **`ARCHITECTURE_REVIEW.md`** — 6-phase stack upgrade plan (2026-04-12). Start here for architecture work.
+6. **Auto memory** at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`
 
 ---
 
@@ -77,6 +78,17 @@ All entity data quality and infrastructure work from this session is done. The e
 ---
 
 ## Open items — current priority order
+
+### ⭐ Recommended next Claude Code task — ARCH Batch 1-A (routing hygiene)
+
+From `ARCHITECTURE_REVIEW.md` (Phase 1, Batch 1-A). **Low risk, ~1 hour, `scripts/app.py` only + one React fetch-call update.** Four sub-items:
+
+1. Move `/api/admin/quarter_config` → `/api/config/quarters` (public endpoint out of admin namespace). Update React fetch in same commit.
+2. Add `/api/v1/` prefix to all public routes via Blueprint `url_prefix` — one registration change.
+3. Audit `rollup_type` coverage — verify it reaches every query function that should respect it, fix any gaps.
+4. Input guards at route layer — ticker regex `^[A-Z]{1,5}$`, quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input.
+
+Rollback: single git revert. Done means every public endpoint under `/api/v1/`, `quarter_config` off admin namespace, invalid ticker returns 400 not a DuckDB error. See ARCH-1A row in ROADMAP "ARCHITECTURE BACKLOG" section for tracking.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
@@ -200,6 +212,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+pending ARCH: add ARCHITECTURE_REVIEW.md + sync ROADMAP + NEXT_SESSION_CONTEXT. 6-phase upgrade plan. Recommended next task: Batch 1-A routing hygiene (~1hr, app.py only).
 573b504 docs: REACT_MIGRATION.md — Phase 2+3 complete, Phase 4 pending
 b8d95af docs: ROADMAP entry for 2026-04-12 backend cleanup trio
 251072b Vectorize portfolio_context._compute_metrics (2.7s → 730ms)
