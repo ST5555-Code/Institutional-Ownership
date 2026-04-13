@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-12 (React Phase 4 cutover complete, HEAD: 799dbde)_
+_Last updated: 2026-04-13 (ARCH-0A lint CI green on main, HEAD: e201885 — docs commit will advance the ref)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `799dbde`
+- **HEAD:** `e201885` (code) / docs commit will be latest
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -79,20 +79,20 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Phase 0-A (lint/bandit CI)
+### ⭐ Recommended next Claude Code task — ARCH Phase 1 Batch 1-A (routing hygiene)
 
-_Promoted from BL-1 to Phase 0, then split into 0-A + 0-B in the second
-revision pass (commit `713fb3f`). Phase 0-A gates Phase 1; Phase 0-B is
-phase-independent._
+_Phase 0-A gate cleared 2026-04-13 (commit `e201885`, CI green in 1m0s).
+`.github/workflows/lint.yml` now runs pre-commit (ruff + pylint + bandit)
+on every push + PR._
 
-From `ARCHITECTURE_REVIEW.md` Phase 0-A. **Low risk, ~1 hour, new `.github/workflows/lint.yml`.**
+From `ARCHITECTURE_REVIEW.md` Batch 1-A. **Low risk, ~1 hour, `scripts/app.py` only.**
 
-1. Pre-commit hooks (pylint + bandit + ruff) wired to run on every push.
-2. No runtime smoke tests in this batch — just static analysis.
-3. Done means: CI runs on every push; a B608-class bug (mis-placed `nosec` injecting `#` into SQL) fails CI, not production. `pylint` / `bandit` / `ruff` all pass on `main`.
-4. Gate: Phase 1 does not start until Phase 0-A is green on `main`.
+1. Move `/api/admin/quarter_config` → `/api/config/quarters` (update React fetch call in same commit).
+2. API versioning: dual-mount public routes under BOTH `/api/*` (legacy) AND `/api/v1/*` (new). Spec in ARCHITECTURE_REVIEW.md still calls for dual-mount; the vanilla-JS frontend is retained on disk until 2026-04-20 retirement window, so legacy `/api/*` must stay live until then. **Do not drop to a straight `/api/v1/*` prefix in this batch** — remove `/api/*` as a React Phase 4 cleanup step after vanilla-JS is deleted.
+3. Rollup param audit: verify `rollup_type` reaches every query function that should respect it (Register, Conviction, Ownership Trend, Fund Portfolio especially).
+4. Input guards at route layer: ticker regex `^[A-Z]{1,6}[.A-Z]?$` (accepts `BRK.B`, `BF.B`, ADRs), quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input. DB-universe validation is follow-on (BL-7).
 
-Phase 0-B (runtime smoke against 4 endpoints with a fixture DB) is separate and phase-independent — start it whenever the fixture-design sub-task lands, does NOT gate Phase 1. Once Phase 0-A is green, next task is ARCH-1A (routing hygiene — dual-mount `/api/*` + `/api/v1/*`, ticker regex `^[A-Z]{1,6}[.A-Z]?$`, input guards). See ROADMAP "ARCHITECTURE BACKLOG" for tracking.
+Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate Phase 1. See `ARCHITECTURE_REVIEW.md` Phase 0-B1 / 0-B2. Phase 0-B2 gates Batch 4-A only.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
@@ -121,10 +121,16 @@ Do not delete before 2026-04-20. Do not delete without explicit confirmation.
 
 ### 4. Architecture upgrade — next steps (see ARCHITECTURE_REVIEW.md)
 
-Phase 0-A: GitHub Actions CI — lint/bandit on push. Gates Phase 1. ~1 hour.
-Phase 1 Batch 1-A: routing hygiene — /api/v1/ prefix (straight prefix, no
-dual-mount needed — vanilla-JS retired), quarter_config rename, rollup audit,
-input guards. ~1 hour, scripts/app.py only, low risk.
+Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
+Phase 1 Batch 1-A: routing hygiene — dual-mount `/api/*` + `/api/v1/*`
+(legacy `/api/*` stays until vanilla-JS retirement 2026-04-20),
+`quarter_config` rename to `/api/config/quarters`, rollup param audit,
+input guards (ticker regex, quarter format, rollup_type enum). ~1 hour,
+`scripts/app.py` only, low risk.
+Phase 0-B: runtime smoke CI with fixture DB — phase-independent, does not
+gate Phase 1. Start when capacity allows. Phase 0-B2 gates Batch 4-A only.
+BL-8: re-enable suppressed pre-commit rules (fix underlying warnings). Small
+rule-by-rule PRs. Not a Phase 1 gate.
 
 ### 5. Minor follow-ups
 
@@ -223,6 +229,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+e201885 ci: Phase 0-A — lint/bandit CI (ruff + pylint + bandit on every push)
 799dbde docs: ROADMAP + NEXT_SESSION_CONTEXT — Phase 4 cutover complete
 2bac928 docs: REACT_MIGRATION + NEXT_SESSION_CONTEXT — Phase 4 cutover docs
 002fab0 feat: React Phase 4 cutover — Flask serves web/react-app/dist/
