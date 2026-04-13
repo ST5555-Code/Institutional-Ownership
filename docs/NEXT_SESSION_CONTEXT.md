@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — BL-9 + BL-10 fixed, React type migration deferred as two-step ARCH-4C-followup. HEAD: bdd436b)_
+_Last updated: 2026-04-13 (session close — Stage 5 cleanup + BL-9 + BL-10 complete; React type migration deferred as two-step ARCH-4C-followup. HEAD: 1b0c9d6)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `bdd436b` (docs: BL-9/BL-10 status, React migration finding, next priorities). Preceded by `9ea3557` (fix: BL-10 multi-sheet exports) + `9572844` (fix: BL-9 short_long).
+- **HEAD:** `1b0c9d6` (docs: session close — Stage 5 + BL-9 + BL-10 complete, N-PORT next). Preceded this session by `bdd436b` (docs: BL-9/BL-10 status + React migration finding) → `9ea3557` (fix: BL-10 multi-sheet exports) → `9572844` (fix: BL-9 short_long) → `5342920` (docs: Stage 5 backfill) → `305739e` (chore: Stage 5 — drop 3 legacy tables).
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
@@ -111,7 +111,17 @@ check against live responses. **Unblocks step 2** (regenerate
 attempt the React-side migration before step 1 lands — mechanical
 migration today is a compile-time-safety regression.
 
-**3. Phase-independent backlog cleanup candidates.** BL-3
+**3. Data quality backlog.** DM13 / DM14 / DM15 (decision-maker
+routing follow-ups queued during INF9b/c work), L4-1 / L4-2
+classification re-audits (bank-holdco vs pure-asset-manager and
+N-PORT cross-check originally shipped 2026-04-12 — revisit the
+adjacent 1,037-entity `mixed` population for similar mis-classifications),
+and the outstanding entity follow-ups in "Data-QC minor follow-ups"
+below (Amundi rollup, Financial Partners fragmentation, INF9c
+entity_id stability). Use INF1 staging workflow for any entity
+mutations; no direct prod writes.
+
+**4. Phase-independent backlog cleanup candidates.** BL-3
 (write-path consistency implementation), BL-8 (re-enable suppressed
 pre-commit rules). Small-PR friendly.
 
@@ -327,6 +337,12 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+1b0c9d6 docs: session close
+bdd436b docs: ARCH-4C-followup reframe + React migration finding
+9ea3557 fix: BL-10 — 4 broken Excel exports (q6/q10/q11/q15)
+9572844 fix: BL-9 — short_long KeyError + fund_holdings_v2 ref
+5342920 docs: Stage 5 cleanup backfill
+305739e chore: Stage 5 — drop holdings/fund_holdings/beneficial_ownership
 746a798 feat: Phase 4 Batch 4-A — Blueprint split of scripts/app.py
 6572a46 feat: Phase 1-B2 rollout — envelope + schemas on 6 priority endpoints
 9c27b7e feat: Phase 1-B2 infra — envelope types + Pydantic schemas + ErrorBoundary

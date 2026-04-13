@@ -702,3 +702,19 @@ Docs-only commits (HEAD backfills, session summaries) omitted.
 **End-state HEAD:** `7695ee7` (docs backfill). All near-term architecture
 phases complete. Next queued: Stage 5 data-layer cleanup, N-PORT refresh,
 tab-by-tab migration to auto-generated React types.
+
+### 2026-04-13 (late) — Stage 5 data-layer cleanup + post-cutover backlog sweep
+
+| Commit | Scope |
+|---|---|
+| `305739e` | Stage 5 cleanup — dropped `holdings` (12.27M), `fund_holdings` (6.39M), `beneficial_ownership` (51.9k prod / 0 staging) from prod + staging DBs; `EXPORT DATABASE` backup before any mutation; 4 INF9d eids verified as live PARENT_SEEDS brand shells and preserved (ADV lineage + manual_l4 classification + aliases load-bearing) |
+| `5342920` | NEXT_SESSION_CONTEXT — HEAD backfill `305739e` |
+| `9572844` | BL-9 — `/api/v1/short_long` KeyError `long_value_k`: (1) `_has_table('fund_holdings')` → `fund_holdings_v2` (Stage 5 follow-on); (2) output dict key `long_value_k` → `long_value` to match SELECT alias |
+| `9ea3557` | BL-10 — 4 broken Excel exports (q6/q10/q11/q15): new `build_excel_multisheet()` in `scripts/export.py` + runtime shape detection in `api_export`. Verified q6→5 sheets, q10/q11→2 each, q15→3. q1/q2/q7/q16 single-sheet path unchanged |
+| `bdd436b` | ARCH-4C-followup reframe — React type migration deferred as two-step (schemas.py expansion first, then regenerate + migrate React tabs). `api-generated.ts` has 7 named schemas (5 opaque) vs ~55 in `api.ts`; mechanical migration would regress compile-time type safety. Do not delete `api.ts` until schemas.py carries full field-level shapes |
+| `1b0c9d6` | Docs-only session close — HEAD backfill + session ledger entries |
+
+**End-state HEAD:** `1b0c9d6` (session close). Stage 5 + BL-9 + BL-10
+complete. Near-term architecture backlog is now empty; next queued is
+N-PORT refresh (pipeline operation, authorization-gated) followed by
+`scripts/schemas.py` expansion as step 1 of ARCH-4C-followup.
