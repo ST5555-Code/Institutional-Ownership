@@ -1,14 +1,26 @@
 /**
- * API types — mirrors the JSON shapes returned by scripts/app.py routes.
+ * API types — hand-written shapes for the JSON returned by scripts/app.py routes.
  *
- * Generated 2026-04-11 by inspecting live responses from a running Flask
- * instance (`python3 scripts/app.py --port 8001`). Field names and nullability
- * reflect the actual responses for ticker=EQT at quarter=2025Q4 — NOT the
- * route-name aliases used in REACT_MIGRATION.md. The React tab code must hit
- * the real route names noted in each section header.
+ * Originally authored 2026-04-11 from live Flask responses; kept current as
+ * the React code migrated to FastAPI (Batch 4-C, 2026-04-13). Post-4-C an
+ * auto-generated companion file lives at `src/types/api-generated.ts`
+ * (produced via `npx openapi-typescript http://localhost:8001/openapi.json
+ * -o src/types/api-generated.ts`). The generated file covers every route
+ * FastAPI knows about — including the 6 priority envelope types declared
+ * via `response_model` (`Envelope_list_TickerRow__`, `Envelope_RegisterPayload_`,
+ * `Envelope_ConvictionPayload_`, `Envelope_FlowAnalysisPayload_`,
+ * `Envelope_OwnershipTrendPayload_`, `Envelope_EntityGraphPayload_`).
  *
- * Nullability rule: Flask's clean_for_json() converts NaN / pd.NA / None to
- * JSON null, so optional numerics are typed `number | null`, not `number | undefined`.
+ * The hand-written types below are still the working source of truth for
+ * tab components. Migrating tab-by-tab to the generated types is a
+ * follow-up: the auto-generated names are verbose, and the hand-written
+ * shapes capture field nullability / numeric quirks (NaN → null, date
+ * strings) that are more ergonomic in the React layer. Do both sides
+ * update when the wire contract changes until the last tab is migrated.
+ *
+ * Nullability rule: serializers.clean_for_json() converts NaN / pd.NA /
+ * None to JSON null, so optional numerics are typed `number | null`, not
+ * `number | undefined`.
  */
 
 // ── Shared query parameters ───────────────────────────────────────────────

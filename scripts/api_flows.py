@@ -45,7 +45,7 @@ flows_router = APIRouter(
 )
 
 
-@flows_router.get('/flow_analysis')
+@flows_router.get('/flow_analysis', response_model=FlowAnalysisEnvelope)
 def api_flow_analysis(request: Request):
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     period = (request.query_params.get('period') or '1Q').upper().strip()
@@ -69,7 +69,7 @@ def api_flow_analysis(request: Request):
         )
 
 
-@flows_router.get('/ownership_trend_summary')
+@flows_router.get('/ownership_trend_summary', response_model=OwnershipTrendEnvelope)
 def api_ownership_trend_summary(request: Request):
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     level = (request.query_params.get('level') or 'parent').strip()
@@ -160,7 +160,7 @@ def api_peer_rotation_detail(request: Request):
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@flows_router.get('/portfolio_context')
+@flows_router.get('/portfolio_context', response_model=ConvictionEnvelope)
 def api_portfolio_context(request: Request):
     """Conviction tab — portfolio concentration context."""
     ticker = (request.query_params.get('ticker') or '').upper().strip()

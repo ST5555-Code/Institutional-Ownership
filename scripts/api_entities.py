@@ -96,7 +96,7 @@ def api_entity_children(request: Request):
         con.close()
 
 
-@entities_router.get('/entity_graph')
+@entities_router.get('/entity_graph', response_model=EntityGraphEnvelope)
 def api_entity_graph(request: Request):
     """Main graph data endpoint — returns {nodes, edges, metadata}."""
     entity_id = (request.query_params.get('entity_id') or '').strip()

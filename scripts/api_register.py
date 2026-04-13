@@ -52,7 +52,7 @@ QUERY_NAMES = {
 
 # SMOKE TEST: /api/v1/tickers is the autocomplete root — a silent 500 here
 # breaks the entire UI ticker search. Always include in post-commit curl.
-@register_router.get('/tickers')
+@register_router.get('/tickers', response_model=TickersEnvelope)
 def api_tickers(request: Request):
     try:
         con = get_db()
@@ -136,7 +136,7 @@ def _execute_query(qnum: int, request: Request):
         return None, {'code': 'internal_error', 'message': str(e)}, 500
 
 
-@register_router.get('/query1')
+@register_router.get('/query1', response_model=RegisterEnvelope)
 def api_query1(request: Request):
     """Register tab — enveloped per Phase 1-B2. Queries 2–16 stay bare."""
     data, err, status = _execute_query(1, request)
