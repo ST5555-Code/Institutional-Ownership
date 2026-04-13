@@ -55,7 +55,12 @@ interface AppState {
   tabular institutional data. Tailwind v3 stable. Zustand correct scope —
   enforce the rule that tab-local state stays in components, not in the global store.
 
-### Endpoint performance budgets (p95, warm, local)
+---
+
+## 2b. Endpoint Performance Budgets
+
+Guidance, not SLOs. Regressions vs. these budgets require commit-message
+justification. Measured p95, warm cache, local (`localhost:8001`).
 
 | Endpoint class | Budget |
 |---|---|
@@ -63,9 +68,6 @@ interface AppState {
 | Drilldown (`/fund_portfolio_managers`, `/query7`) | ≤500ms |
 | Small lookups (`/summary`, `/tickers`, `/config/quarters`) | ≤150ms |
 | Precomputed artifacts (`/portfolio_context`, future) | ≤50ms |
-
-Budgets are guidance, not SLOs. Regressions vs. these budgets require
-commit-message justification.
 
 ---
 
@@ -157,9 +159,6 @@ architecture plan focused:
 - **Observability** — structured logs, request tracing, audit log for staging
   promotions, latency metrics.
   _Separate doc: `docs/OBSERVABILITY_PLAN.md` (TODO)._
-- **Schema migration tooling** — current DDL changes go through the staging
-  workflow manually. Alembic-style tooling is a separate concern.
-  _Separate doc: `docs/SCHEMA_MIGRATIONS.md` (TODO)._
 
 ---
 
@@ -183,19 +182,47 @@ per batch for these. Exit gates assume smoke-testing has run._
 
 ---
 
-## Phase 0 — Prerequisite (BL-1 promoted)
+## Phase 0 — Prerequisite (BL-1 promoted, split into 0-A and 0-B)
 
-### Batch 0-A — GitHub Actions CI
-_~2 hours · new `.github/workflows/*.yml` · low risk_
+### Phase 0-A — Lint + static analysis CI
+_~1 hour · new `.github/workflows/lint.yml` · low risk · **gates Phase 1**_
 
-Pre-commit (pylint + bandit + ruff) on push. Smoke test against 5 critical
-endpoints (`/api/tickers`, `/api/query1`, `/api/entity_graph`, `/api/summary`,
-`/api/admin/stats`) using a headless fixture DB.
+Pre-commit hooks (pylint + bandit + ruff) wired to run on every push. No
+runtime smoke tests in this batch — just static analysis.
 
 **Done means:** CI runs on every push. A B608-class bug (mis-placed `nosec`
-injecting `#` into SQL) fails CI, not production.
+injecting `#` into SQL) fails CI before it reaches production. `pylint`,
+`bandit`, and `ruff` all pass on `main`. Phase 0-A complete.
 
-**Gate:** Phase 1 does not start until CI is green on main.
+**Gate:** Phase 1 does not start until Phase 0-A CI is green on `main`.
+
+**Not doing here:** Runtime smoke tests. Fixture DB. Those are Phase 0-B —
+phase-independent and do not gate Phase 1.
+
+---
+
+### Phase 0-B — Runtime smoke test CI (phase-independent)
+_~2–3 hours · new `.github/workflows/smoke.yml` · medium risk · does NOT gate Phase 1_
+
+Four-endpoint smoke test against a fixture DuckDB: `/api/tickers`, `/api/query1`,
+`/api/entity_graph`, `/api/summary`. Scoped narrowly — these four exercise
+enough of the stack to catch endpoint-level regressions without pulling admin
+routes into CI.
+
+**Sub-tasks:**
+1. **Design fixture DB** — document the chosen approach (seed script that
+   builds a minimal DuckDB from SQL fixtures vs. committed small binary
+   snapshot vs. stripped `EXPORT DATABASE` dump) before implementing. Open
+   question for the operator. **Do not implement the fixture in this batch**
+   — design only.
+2. Implement the chosen approach (follow-on).
+3. Wire fixture build into CI workflow.
+4. Each smoke test asserts HTTP 200 + non-empty JSON body.
+
+**Done means:** Smoke workflow runs on push. Four endpoints return 200 against
+the fixture. A breaking schema change on any of the four fails CI.
+
+**Gate:** None — phase-independent. Ship whenever fixture design lands.
 
 ---
 
@@ -216,7 +243,7 @@ _~1 hour · `scripts/app.py` only · low risk_
 | Item | Action |
 |------|--------|
 | `quarter_config` namespace | Move `/api/admin/quarter_config` → `/api/config/quarters`. Update React fetch call in same commit. |
-| API versioning (dual-mount) | Dual-mount: register public routes under BOTH `/api/*` (existing) and `/api/v1/*` (new) during the React Phase 4 cutover window. Old frontend at :8001 continues to call `/api/*`; React migrates to `/api/v1/*` first. Deprecation: remove `/api/*` mount only after the vanilla-JS frontend is retired (React Phase 4 confirmed stable ≥1 week). Tracked as a Phase 5 prerequisite. |
+| API versioning (dual-mount) | Dual-mount: register public routes under BOTH `/api/*` (existing) and `/api/v1/*` (new) during the React Phase 4 cutover window. Old frontend at :8001 continues to call `/api/*`; React migrates to `/api/v1/*` first. Deprecation: remove `/api/*` mount as a **React Phase 4 cleanup step** after cutover is confirmed stable ≥1 week. Not a backend-phase prerequisite — lives in the React migration lane. |
 | Rollup param audit | Verify `rollup_type` reaches every query function that should respect it. Fix any gaps. |
 | Input guards | Add route-layer validation: ticker regex `^[A-Z]{1,6}[.A-Z]?$` (accepts `BRK.B`, `BF.B`, ADRs), quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input. DB-universe validation (lookup against `tickers` table) is a follow-on — tracked as BL-7 below. Deferred from 1-A to avoid coupling the route layer to a DB query. _Transitional — replaced by FastAPI Pydantic validation in Batch 4-C._ |
 
@@ -311,7 +338,7 @@ _~2 hours · DuckDB DDL · staging workflow · ⚠ time-sensitive: May 9 deadlin
 | Item | Action |
 |------|--------|
 | `FAMILY_MAP` → DB table | Create `fund_family_patterns (pattern TEXT, inst_parent_name TEXT)`. Migrate 50+ hardcoded entries from `app.py`. Update `match_nport_family()` to query it. |
-| `data_freshness` table | Create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipeline scripts write a row after each successful rebuild. API exposes via `/api/v1/freshness`. React surfaces as footer badge per tab. **Staleness SLA per table:** `investor_flows` fresh ≤24h / stale >24h (footer amber); `ticker_flow_stats` fresh ≤24h / stale >24h (footer amber); `summary_by_parent` fresh ≤quarter+7d / stale >quarter+30d (footer red); `beneficial_ownership_current` fresh ≤48h / stale >7d (footer amber); `fund_holdings_v2` fresh ≤quarter+60d / stale >quarter+120d (footer red). Thresholds are pragmatic (reflect pipeline cadence), not regulatory. Stale ≠ wrong — surfaces "data older than expected" for the operator. |
+| `data_freshness` table | Create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipeline scripts write a row after each successful rebuild. API exposes via `/api/v1/freshness`. React surfaces as footer badge per tab. **Staleness SLA per table:** `investor_flows` fresh ≤24h / stale >24h (footer amber); `ticker_flow_stats` fresh ≤24h / stale >24h (footer amber); `summary_by_parent` fresh ≤quarter+7d / stale >quarter+30d (footer red); `beneficial_ownership_current` fresh ≤48h / stale >7d (footer amber)†; `fund_holdings_v2` fresh ≤quarter+60d / stale >quarter+120d (footer red). Thresholds are pragmatic (reflect pipeline cadence), not regulatory. Stale ≠ wrong — surfaces "data older than expected" for the operator. **† Filing-lag dependent — threshold reflects SEC reporting cadence, not pipeline cadence. Treat as aspirational.** |
 
 _Note: Stage 5 table drops (original holdings/fund_holdings) are a data ops
 item — tracked in ROADMAP, not here._
@@ -504,7 +531,9 @@ avoid scope creep inside Phase 4.
 ## Backlog
 _No phase dependency. Improve resilience when capacity allows._
 
-_Note: BL-1 (GitHub Actions CI) has been promoted to **Phase 0 — Prerequisite**._
+_Note: BL-1 (GitHub Actions CI) has been promoted to **Phase 0** and split
+into Phase 0-A (lint/bandit, gates Phase 1) and Phase 0-B (runtime smoke,
+phase-independent)._
 
 | # | Item | Notes |
 |---|------|-------|
