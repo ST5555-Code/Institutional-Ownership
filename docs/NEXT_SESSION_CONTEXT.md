@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — vanilla-JS retirement + Phase 1-B2 envelope + Phase 4 Batch 4-A Blueprint split all shipped. HEAD: 746a798)_
+_Last updated: 2026-04-13 (session close — Phase 4 Batch 4-B queries.py service-layer split shipped; all architecture work through 4-B done. HEAD: pending commit)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -16,6 +16,7 @@ each working session so the top block stays current.
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (103 lines, thin entry) + 9 Blueprint modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (~700 lines, `/api/admin/*`, INF12). `scripts/app_legacy.py` retained for 1-week rollback.
+  - Service layer — `scripts/queries.py` (~5,500 lines, SQL + query logic) + `scripts/serializers.py` (~210 lines, `clean_for_json` / `df_to_records` / filer-name resolution / subadviser notes) + `scripts/cache.py` (~40 lines, `cached()` + key templates).
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — **retired 2026-04-13** (commit `71269cb`). `web/static/{dist,vendor,style.css}` are orphaned — safe to delete in a follow-up PR.
   - Jinja templates — `web/templates/admin.html` only (index.html deleted)
@@ -82,17 +83,23 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ### ⭐ Next tasks in order
 
-_Vanilla-JS retired 2026-04-13 (`71269cb`); Playwright baselines refreshed
-(`3526757`). Phase 1-B2 envelope shipped: infra (`9c27b7e`) + rollout
-(`6572a46`). Phase 4 Batch 4-A Blueprint split shipped as a feature
-branch, fast-forward merged (`746a798`) after 8/8 smoke + 11/11 Playwright
-green. Phase 4 Batch 4-B is now unblocked._
+_Orphaned `web/static/{dist,vendor,style.css}` deleted 2026-04-13
+(`81af4a8`). Phase 4 Batch 4-B queries.py service-layer split shipped
+2026-04-13: extracted `cache.py` + `serializers.py`, queries.py
+5,703 → 5,523 lines, 0 jsonify calls, 8/8 smoke green. All architecture
+work through Batch 4-B is complete._
 
-**1. Phase 4 Batch 4-B — queries.py service layer split — ~half day.** Split `queries.py` (~5,400 lines) into SQL construction (`queries.py`, leaner), response shaping (`serializers.py`), and cache helpers (`cache.py` with explicit key constants). Follow-on to 4-A. Per-domain `queries_*.py` split (queries_register / queries_flows / queries_entities / queries_market) explicitly deferred to Phase 6.
+**1. Phase 3+ — portfolio_context quarterly artifact — ~half day.** Trigger-based, not urgent. Precompute `portfolio_context` into a `portfolio_context_cache` table; thin endpoint becomes a single SELECT. Current 730ms is acceptable after Batch 2-A vectorization.
 
-**2. `app_legacy.py` cleanup — delete after 1 week stable.** `scripts/app_legacy.py` (1,788-line pre-Batch-4-A snapshot) retained for rollback. Safe to delete ≥2026-04-20 if no regressions in main. Needs explicit authorization before deletion.
+**2. Phase 4+ — Flask → FastAPI — ~2–3 days.** Triggered on first second-operator joining or move to shared/hosted use. Replaces hand-written Pydantic schemas + React `src/types/api.ts` with openapi-typescript auto-generation. Removes route-layer input guards (Pydantic validates). Thread-local `get_db()` preserved via `def` (not `async def`) routes.
 
-**3. Follow-ups.** `web/static/{dist,vendor,style.css}` are orphaned after vanilla-JS retirement — `index.html` was their only consumer. Safe to delete in a separate PR; not done in 2026-04-13 commit per user working-preference rule (no unauthorized deletions).
+**3. `app_legacy.py` cleanup — delete after 1 week stable.** `scripts/app_legacy.py` (1,788-line pre-Batch-4-A snapshot) retained for rollback. Safe to delete ≥2026-04-20 if no regressions in main. Needs explicit authorization before deletion.
+
+**4. Backlog (no phase dependency).**
+- BL-3: write-path consistency implementation (follow-on to 2-A audit)
+- BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
+- BL-9: `/api/v1/short_long` returns 500 with `KeyError 'long_value_k'`
+- BL-10: `/api/v1/export/query<N>` 500 on q6/q10/q11/q15 (multi-table shapes)
 
 **Known pre-existing issues — do not absorb:**
 - BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work.
