@@ -11,10 +11,12 @@ from datetime import datetime
 
 import duckdb
 from flask import Flask, jsonify, request, send_file
+from pydantic import ValidationError
 
 from admin_bp import admin_bp, init_admin_bp
 from config import LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
 from export import build_excel
+from schemas import iso_now
 import queries
 from queries import (
     clean_for_json, df_to_records,
@@ -257,6 +259,63 @@ queries._setup(get_db, has_table)  # pylint: disable=protected-access
 # happen after get_db / has_table are defined above.
 init_admin_bp(get_db, has_table)
 app.register_blueprint(admin_bp)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1-B2 — response envelope helper
+# ---------------------------------------------------------------------------
+# `respond()` wraps payloads in the `{data, error, meta}` envelope introduced
+# by ARCHITECTURE_REVIEW.md Batch 1-B2. Applied opt-in per endpoint during
+# the Phase 1-B2 rollout — handlers that have NOT been migrated continue to
+# call `jsonify()` directly and return bare payloads.
+#
+# schema is the per-endpoint Pydantic payload model (e.g. TickersPayload).
+# If data is a list/dict, schema validates the envelope[data] shape on the
+# way out. A schema failure returns a 500 with the standard error envelope
+# rather than silently serving a malformed response.
+# ---------------------------------------------------------------------------
+
+def _build_meta() -> dict:
+    return {
+        "quarter": request.args.get("quarter"),
+        "rollup_type": request.args.get("rollup_type"),
+        "generated_at": iso_now(),
+    }
+
+
+def respond(data=None, *, schema=None, error=None, status=200):
+    """Return a Flask JSON response wrapped in the Phase 1-B2 envelope.
+
+    Args:
+        data: payload. Can be list/dict. `None` when `error` is set.
+        schema: optional Pydantic type used to validate `{data, meta, error}`
+                on the way out. Use parameterized generics like
+                `Envelope[list[TickerRow]]`. Skipped if None.
+        error: optional ErrorShape-compatible dict or pydantic model.
+        status: HTTP status code (default 200; use 4xx/5xx with error).
+    """
+    err_payload = None
+    if error is not None:
+        err_payload = error if isinstance(error, dict) else error.model_dump()
+
+    envelope = {"data": data, "error": err_payload, "meta": _build_meta()}
+
+    if schema is not None:
+        try:
+            schema.model_validate(envelope)
+        except ValidationError as e:
+            app.logger.error("[respond] envelope schema validation failed: %s", e)
+            return jsonify({
+                "data": None,
+                "error": {
+                    "code": "schema_validation_error",
+                    "message": "Response failed server-side validation",
+                    "detail": {"errors": e.errors()[:5]},
+                },
+                "meta": _build_meta(),
+            }), 500
+
+    return jsonify(envelope), status
 
 
 # ---------------------------------------------------------------------------
