@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (ARCH-2A correctness fixes landed — N+1 batching, summary_by_parent audit, write-path risk map. HEAD: 700bcdb — docs commit will advance the ref)_
+_Last updated: 2026-04-13 (ARCH-3A DB schema cleanup landed — fund_family_patterns + data_freshness + /api/freshness. HEAD: 731f4a0 — docs commit will advance the ref)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `700bcdb` (code) / docs commit will be latest
+- **HEAD:** `731f4a0` (code) / docs commit will be latest
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -79,25 +79,30 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Phase 3 Batch 3-A (DB schema cleanup)
+### ⭐ Recommended next Claude Code task — `data_freshness` pipeline write hooks + React footer badge
 
-_Batch 2-A complete 2026-04-13 (commit `700bcdb`). N+1 batched
-(`get_nport_children_batch` — 17.8ms vs 297ms legacy, 14× speedup).
-`summary_by_parent` confirmed read-only. Write-path risk map committed
-to `docs/write_path_risk_map.md`._
+_Batch 3-A complete 2026-04-13 (commit `731f4a0`). Both tables in prod:
+`fund_family_patterns` (83 rows) and `data_freshness` (empty). New
+`/api/freshness` endpoint live (also at `/api/v1/freshness` via the
+Batch 1-A dual-mount helper). Fallback dict in `queries.py` preserved
+for deploy safety._
 
-From `ARCHITECTURE_REVIEW.md` Batch 3-A. **Medium risk (schema DDL via staging workflow), ~2 hours, `data/13f.duckdb` DDL + `scripts/app.py` (`match_nport_family()`) + pipeline scripts (freshness writes) + React footer component.**
+From `ARCHITECTURE_REVIEW.md` Phase 3 follow-on. **Low-medium risk, ~1-2 hours, pipeline scripts + one React component.**
 
-1. **`FAMILY_MAP` → DB table** — create `fund_family_patterns (pattern TEXT, inst_parent_name TEXT)`, migrate 50+ hardcoded entries from `scripts/queries.py` (`get_nport_family_patterns`), switch `match_nport_family()` to query the table. Editable without code change.
-2. **`data_freshness` table** — create `data_freshness (table_name TEXT, last_computed_at TIMESTAMP, row_count BIGINT)`. Pipelines write a row after each successful rebuild. New `/api/v1/freshness` endpoint. React footer badge with staleness thresholds per `ARCHITECTURE_REVIEW.md` Batch 3-A.
+1. **Pipeline write hooks** — after each successful rebuild, the pipeline script writes a row to `data_freshness`:
+   - `compute_flows.py` → `investor_flows`, `ticker_flow_stats`
+   - `build_summaries.py` → `summary_by_parent` (+ `summary_by_ticker`)
+   - `fetch_nport.py` → `fund_holdings_v2`
+   - `build_managers.py` → `beneficial_ownership_current` (if applicable)
+   One-liner pattern: `INSERT OR REPLACE INTO data_freshness VALUES (?, CURRENT_TIMESTAMP, ?)`.
+2. **React footer badge** — new `<FreshnessBadge />` component in `web/react-app/src/components/common/`, consuming `/api/v1/freshness`. Staleness thresholds per `ARCHITECTURE_REVIEW.md` Batch 3-A SLA table (amber > 24h for flow/flow_stats; red > quarter+30d for summary_by_parent; etc.). Visible in at least one tab first, then wire into AppShell footer.
 
-**Run DDL via the staging workflow** (sync → diff → promote), not direct prod mutation. Entity-change hard rule.
+Or alternatively: **Phase 0-B fixture-design sub-task** (phase-independent; `docs/ci_fixture_design.md`, design only, ~1 hr) — unblocks Phase 0-B2 which gates Batch 4-A Blueprint split.
 
-Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate any Phase. Start when capacity allows.
-
-**Known pre-existing issues — do not absorb into 3-A:**
-- BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work — separate task.
-- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type.
+**Known pre-existing issues — do not absorb:**
+- BL-3 — Write-path consistency implementation (T2 drop+recreate scripts). Follow-on to the 2-A audit. Substantial work.
+- BL-8 — Re-enable suppressed pre-commit rules.
+- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`.
 - BL-10 — `/api/export/query<N>` still 500s for q6/q10/q11/q15 (multi-table shapes).
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
@@ -131,13 +136,18 @@ Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-A: ✅ DONE 2026-04-13 (commit `a8dd77a`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-B1: ✅ DONE 2026-04-13 (commit `d3a2fcb`). See ROADMAP COMPLETED.
 Phase 2 Batch 2-A: ✅ DONE 2026-04-13 (commit `700bcdb`). See ROADMAP COMPLETED.
+Phase 3 Batch 3-A: ✅ DONE 2026-04-13 (commit `731f4a0`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-B2: error envelope + Pydantic schemas + React error boundaries.
 **Gated on vanilla-JS retirement (≥2026-04-20)** — the `{data, error, meta}`
 envelope would break the legacy frontend at port 8001 if landed before then.
-Phase 3 Batch 3-A: `FAMILY_MAP` → DB table + `data_freshness` table. ~2 hours.
-Medium risk (schema DDL via staging workflow). Next recommended task.
-Phase 0-B: runtime smoke CI with fixture DB — phase-independent. Start when
-capacity allows. Phase 0-B2 gates Batch 4-A.
+data_freshness pipeline write hooks + React footer badge: Phase 3 follow-on,
+~1-2 hours. Next recommended task.
+Phase 3+ (portfolio_context precompute): trigger-based, runs in parallel to
+Phase 4. Not urgent (730ms current perf acceptable after Batch 2-A).
+Phase 4 Batch 4-A (Blueprint split): gated on Phase 0-B2 — start fixture
+design (0-B1) when capacity allows.
+Phase 0-B: runtime smoke CI with fixture DB — phase-independent. 0-B1
+(design doc) is ~1 hr and unblocks 0-B2 which gates Batch 4-A.
 BL-3: write-path consistency implementation (follow-on to 2-A audit).
 BL-8: re-enable suppressed pre-commit rules. Small rule-by-rule PRs.
 BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`.
@@ -185,6 +195,12 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### y. `fund_family_patterns` + `data_freshness` (ARCH-3A)
+
+- `get_nport_family_patterns()` in `scripts/queries.py` now reads from `fund_family_patterns` (DB) and falls back to `_FAMILY_PATTERNS_FALLBACK` (in-code dict, identical content). Memoized at module scope — restart the app to pick up a table edit. If you add a new pattern, add it to **both** the DB (via another migration or direct INSERT) **and** `_FAMILY_PATTERNS_FALLBACK` until the fallback is removed.
+- `data_freshness (table_name PK, last_computed_at, row_count)` is empty on arrival. Pipeline scripts should `INSERT OR REPLACE` a row at the end of each successful rebuild. `/api/freshness` + `/api/v1/freshness` already serve whatever's in the table.
+- **Staging workflow caveat:** `sync_staging.py` / `diff_staging.py` / `promote_staging.py` are **entity-graph only**. For non-entity reference tables (new tables, schema changes, seed data), use `merge_staging.py --tables <name>` with an entry in `TABLE_KEYS`, or for brand-new tables with no prod data, a one-shot migration script applied first to staging then to prod. `fund_family_patterns: None` and `data_freshness: ["table_name"]` are already registered in `TABLE_KEYS`.
 
 ### x. `get_nport_children_batch()` replaces the loop (ARCH-2A.1)
 
@@ -261,6 +277,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+731f4a0 feat: Batch 3-A — fund_family_patterns + data_freshness tables
 700bcdb feat: Batch 2-A — N+1 batching + summary_by_parent audit + write-path risk map
 d3a2fcb feat: Batch 1-B1 — endpoint classification + export parity
 a8dd77a feat: Batch 1-A — /api/v1/ dual-mount, quarter_config rename, input guards
