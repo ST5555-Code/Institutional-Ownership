@@ -124,6 +124,7 @@ See `REACT_MIGRATION.md` for backend migration plan (gated on Phase 6).
 
 ### 4. Minor follow-ups
 
+- **web/react-src/ + web/templates/index.html + web/static/app.js retirement** — earliest 2026-04-20 (1 week stable). Requires explicit authorization. Do not delete before that date.
 - **Amundi → Amundi Taiwan rollup** — eid=830 + eid=4248 roll to eid=752 Amundi Taiwan via parent_bridge_sync/manual. Should roll to global Amundi SA parent. Separate manual fix.
 - **Financial Partners Group fragmentation** — eid=1600 "Inc" vs eid=9722 "LLC" with circular orphan_scan. Minor structural cleanup.
 - **INF9c suppress_relationship entity_id stability** — PARENT_SEEDS entity_ids are deterministic in practice but not contractually guaranteed. The 6 suppress rows use entity_id fallback which is best-effort across full --reset. Full fix would require adding CIK identifiers to PARENT_SEEDS brand ghosts.
