@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (ARCH-0A lint CI green on main, HEAD: e201885 — docs commit will advance the ref)_
+_Last updated: 2026-04-13 (ARCH-1A routing hygiene landed, HEAD: a8dd77a — docs commit will advance the ref)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `e201885` (code) / docs commit will be latest
+- **HEAD:** `a8dd77a` (code) / docs commit will be latest
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -79,20 +79,22 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Phase 1 Batch 1-A (routing hygiene)
+### ⭐ Recommended next Claude Code task — ARCH Phase 1 Batch 1-B1 (endpoint classification + export parity)
 
-_Phase 0-A gate cleared 2026-04-13 (commit `e201885`, CI green in 1m0s).
-`.github/workflows/lint.yml` now runs pre-commit (ruff + pylint + bandit)
-on every push + PR._
+_Batch 1-A complete 2026-04-13 (commit `a8dd77a`). 38 public `/api/*`
+routes dual-mounted at `/api/v1/*`, `/api/config/quarters` live,
+`before_request` hook guards ticker / quarter / rollup_type, rollup
+threaded through to `/api/short_analysis` + `/api/short_long`._
 
-From `ARCHITECTURE_REVIEW.md` Batch 1-A. **Low risk, ~1 hour, `scripts/app.py` only.**
+From `ARCHITECTURE_REVIEW.md` Batch 1-B1. **Low risk, ~2 hours, `app.py` + `queries.py` (export path only), no React gate.**
 
-1. Move `/api/admin/quarter_config` → `/api/config/quarters` (update React fetch call in same commit).
-2. API versioning: dual-mount public routes under BOTH `/api/*` (legacy) AND `/api/v1/*` (new). Spec in ARCHITECTURE_REVIEW.md still calls for dual-mount; the vanilla-JS frontend is retained on disk until 2026-04-20 retirement window, so legacy `/api/*` must stay live until then. **Do not drop to a straight `/api/v1/*` prefix in this batch** — remove `/api/*` as a React Phase 4 cleanup step after vanilla-JS is deleted.
-3. Rollup param audit: verify `rollup_type` reaches every query function that should respect it (Register, Conviction, Ownership Trend, Fund Portfolio especially).
-4. Input guards at route layer: ticker regex `^[A-Z]{1,6}[.A-Z]?$` (accepts `BRK.B`, `BF.B`, ADRs), quarter format `^20\d{2}Q[1-4]$`, `rollup_type` against `VALID_ROLLUP_TYPES`. Return 400 on invalid input. DB-universe validation is follow-on (BL-7).
+1. **Endpoint classification** — produce and commit a comment block in `app.py`: every endpoint marked `latest-only` or `quarter-aware`. This is the freeze artifact that Phase 4 consumes.
+2. **Export parity** — verify `api_export()` passes the same `quarter` + `rollup_type` as the on-screen table. Fix any mismatches. Manually spot-check 3 ticker / quarter / rollup combinations.
+3. Not doing in 1-B1: error envelope, Pydantic schemas, React changes — those are Batch 1-B2, which is gated on React Phase 4 vanilla-JS retirement (≥2026-04-20) because the `{ data, error, meta }` envelope would break the legacy frontend.
 
 Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate Phase 1. See `ARCHITECTURE_REVIEW.md` Phase 0-B1 / 0-B2. Phase 0-B2 gates Batch 4-A only.
+
+**Known pre-existing issue surfaced in Batch 1-A** — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type. Tracked as BL-9. Fix before Short Interest tab wires up the endpoint.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
@@ -122,15 +124,18 @@ Do not delete before 2026-04-20. Do not delete without explicit confirmation.
 ### 4. Architecture upgrade — next steps (see ARCHITECTURE_REVIEW.md)
 
 Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
-Phase 1 Batch 1-A: routing hygiene — dual-mount `/api/*` + `/api/v1/*`
-(legacy `/api/*` stays until vanilla-JS retirement 2026-04-20),
-`quarter_config` rename to `/api/config/quarters`, rollup param audit,
-input guards (ticker regex, quarter format, rollup_type enum). ~1 hour,
-`scripts/app.py` only, low risk.
+Phase 1 Batch 1-A: ✅ DONE 2026-04-13 (commit `a8dd77a`). See ROADMAP COMPLETED.
+Phase 1 Batch 1-B1: endpoint classification + export parity. `app.py` +
+`queries.py` export path only. ~2 hours. No React gate. Next recommended task.
+Phase 1 Batch 1-B2: error envelope + Pydantic schemas + React error boundaries.
+**Gated on vanilla-JS retirement (≥2026-04-20)** — the `{ data, error, meta }`
+envelope would break the legacy frontend at port 8001 if landed before then.
 Phase 0-B: runtime smoke CI with fixture DB — phase-independent, does not
 gate Phase 1. Start when capacity allows. Phase 0-B2 gates Batch 4-A only.
 BL-8: re-enable suppressed pre-commit rules (fix underlying warnings). Small
 rule-by-rule PRs. Not a Phase 1 gate.
+BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`. Fix
+before Short Interest tab wires up the endpoint.
 
 ### 5. Minor follow-ups
 
@@ -173,6 +178,13 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### v. `/api/*` dual-mount + `before_request` ordering (ARCH-1A)
+
+- All public `/api/*` routes are aliased under `/api/v1/*` by `_register_v1_aliases()` in `app.py` (near the bottom of the file). `/api/admin/*` is excluded because it's gated by `admin_bp`'s own `before_request` for token auth.
+- The app-level `_validate_query_params()` `before_request` fires on both `/api/*` and `/api/v1/*`. For `/api/admin/*` paths it returns `None` so admin_bp's own token validator gets to run.
+- `/api/config/quarters` (new canonical) and `/api/admin/quarter_config` (legacy, kept for vanilla-JS until 2026-04-20 retirement) both call `_quarter_config_payload()`. Do not consolidate yet — remove legacy in a separate PR after retirement.
+- Ticker regex in app.py is `^[A-Z]{1,6}(\.[A-Z])?$` (corrected from the spec's literal `^[A-Z]{1,6}[.A-Z]?$` which did not accept BRK.B despite the spec comment saying it should).
 
 ### u. `get_nport_children_q2` is a FQ↔LQ delta helper — do not add a `quarter` param
 
@@ -229,6 +241,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+a8dd77a feat: Batch 1-A — /api/v1/ dual-mount, quarter_config rename, input guards
 e201885 ci: Phase 0-A — lint/bandit CI (ruff + pylint + bandit on every push)
 799dbde docs: ROADMAP + NEXT_SESSION_CONTEXT — Phase 4 cutover complete
 2bac928 docs: REACT_MIGRATION + NEXT_SESSION_CONTEXT — Phase 4 cutover docs
