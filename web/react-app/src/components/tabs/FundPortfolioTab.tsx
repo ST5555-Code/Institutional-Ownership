@@ -5,7 +5,7 @@ import type {
   FundPortfolioManager,
   FundPortfolioResponse,
 } from '../../types/api'
-import { ExportBar, TableFooter, getTypeStyle } from '../common'
+import { ExportBar, FreshnessBadge, TableFooter, getTypeStyle } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -170,6 +170,7 @@ export function FundPortfolioTab() {
             </option>
           ))}
         </select>
+        <FreshnessBadge tableName="fund_holdings_v2" label="N-PORT" />
         <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!portfolio.data} />
       </div>
 

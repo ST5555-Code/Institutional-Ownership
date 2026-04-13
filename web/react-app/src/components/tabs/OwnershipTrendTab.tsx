@@ -13,6 +13,7 @@ import {
   ActiveOnlyToggle,
   FundViewToggle,
   ExportBar,
+  FreshnessBadge,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -220,7 +221,8 @@ export function OwnershipTrendTab() {
             </div>
           </div>
         )}
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="investor_flows" label="flows" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={loading} />
         </div>
       </div>

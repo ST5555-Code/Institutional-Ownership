@@ -9,6 +9,7 @@ import {
   ActiveOnlyToggle,
   InvestorTypeFilter,
   ExportBar,
+  FreshnessBadge,
   TableFooter,
   ColumnGroupHeader,
   getTypeStyle,
@@ -568,7 +569,8 @@ export function RegisterTab() {
           data={data?.rows ?? []}
           onSelect={handleSearchSelect}
         />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
           <ExportBar onExcel={onExcel} onPrint={onPrint} disabled={!data} />
         </div>
       </div>

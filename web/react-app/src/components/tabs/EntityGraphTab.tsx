@@ -9,7 +9,7 @@ import type {
   MarketSummaryRow,
   RegisterResponse,
 } from '../../types/api'
-import { QuarterSelector, ExportBar, getTypeStyle } from '../common'
+import { QuarterSelector, ExportBar, FreshnessBadge, getTypeStyle } from '../common'
 import ReactFlow, {
   Background, Controls,
   useNodesState, useEdgesState,
@@ -282,7 +282,8 @@ export function EntityGraphTab() {
             <input type="checkbox" checked={showSubAdvisers} onChange={e => setShowSubAdvisers(e.target.checked)} /> Sub-Advisers
           </label>
         )}
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={viewMode === 'market' ? !market.data : (ticker ? !tickerHolders.data : !data)} />
         </div>
       </div>

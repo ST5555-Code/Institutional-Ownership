@@ -10,6 +10,7 @@ import {
   QuarterSelector,
   ExportBar,
   ColumnGroupHeader,
+  FreshnessBadge,
   getTypeStyle,
 } from '../common'
 
@@ -218,7 +219,8 @@ export function OverlapAnalysisTab() {
           <SecondTickerInput value={secondTicker || ''} onSelect={setSecondTicker} />
         </div>
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={setQuarter} />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
       </div>

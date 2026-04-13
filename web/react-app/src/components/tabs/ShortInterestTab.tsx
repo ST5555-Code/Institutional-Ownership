@@ -8,7 +8,7 @@ import type {
   ShortOnlyFundRow,
   NportByFundRow,
 } from '../../types/api'
-import { ExportBar, ColumnGroupHeader, getTypeStyle } from '../common'
+import { ExportBar, ColumnGroupHeader, FreshnessBadge, getTypeStyle } from '../common'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -96,7 +96,8 @@ export function ShortInterestTab() {
 
       {/* Controls */}
       <div className="si-controls" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="beneficial_ownership_current" label="SC-13" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
       </div>

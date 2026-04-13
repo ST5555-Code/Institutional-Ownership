@@ -8,6 +8,7 @@ import {
   ActiveOnlyToggle,
   InvestorTypeFilter,
   ExportBar,
+  FreshnessBadge,
   TableFooter,
   ColumnGroupHeader,
   getTypeStyle,
@@ -267,7 +268,8 @@ export function ConvictionTab() {
           <InvestorTypeFilter available={availableTypes} selected={effectiveTypes} onChange={setSelectedTypes} />
         )}
         <InvestorSearchWithDropdown data={data?.rows ?? []} onSelect={handleSearchSelect} />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
       </div>

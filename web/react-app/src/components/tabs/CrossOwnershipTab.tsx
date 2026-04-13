@@ -8,6 +8,7 @@ import {
   FundViewToggle,
   ExportBar,
   ColumnGroupHeader,
+  FreshnessBadge,
   getTypeStyle,
 } from '../common'
 
@@ -406,7 +407,8 @@ export function CrossOwnershipTab() {
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
           <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
         </div>
       </div>
