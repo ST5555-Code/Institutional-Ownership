@@ -62,9 +62,9 @@ SENTINELS = {
 def test_smoke_endpoint_ok(client, name, path):
     resp = client.get(path)
     assert resp.status_code == 200, (
-        f"{name}: HTTP {resp.status_code} body={resp.data[:200]!r}"
+        f"{name}: HTTP {resp.status_code} body={resp.content[:200]!r}"
     )
-    body = resp.get_json()
+    body = resp.json()
     assert body, f"{name}: empty JSON body"
 
 
@@ -76,7 +76,7 @@ def test_smoke_response_equality(client, name, path):
             f"no snapshot at {snap} — run `python tests/smoke/capture_snapshots.py --update`"
         )
     expected = json.loads(snap.read_text())
-    actual = client.get(path).get_json()
+    actual = client.get(path).json()
     _assert_keys_match(name, actual, expected)
     _assert_row_counts(name, actual, expected)
     _assert_sentinel(name, actual)

@@ -1,9 +1,4 @@
-"""Fund-lookup endpoints.
-
-Split out of api_register.py in Phase 4 Batch 4-A to keep register under
-the 400-line target. These endpoints share the fund-centric data model
-(fund_holdings_v2 + entity_identifiers + series_id) and a distinct
-consumer — the Fund Portfolio tab + fund drill-down UIs.
+"""Fund-lookup endpoints (FastAPI).
 
 Routes:
   /api/v1/fund_rollup_context
@@ -13,28 +8,33 @@ Routes:
 """
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
-from api_common import LQ
+from api_common import LQ, validate_query_params_dep
 from app_db import get_db
 from queries import clean_for_json, df_to_records
 
-fund_bp = Blueprint('api_fund', __name__, url_prefix='/api/v1')
+fund_router = APIRouter(
+    prefix='/api/v1',
+    tags=['fund'],
+    dependencies=[Depends(validate_query_params_dep)],
+)
 
 
-@fund_bp.route('/fund_rollup_context')
-def api_fund_rollup_context():
+@fund_router.get('/fund_rollup_context')
+def api_fund_rollup_context(cik: str = '', series_id: str = ''):
     """Return economic and decision-maker rollup names for a given CIK or series_id.
     Used by L4 Fund Portfolio tab to show rollup context panel above holdings table.
     """
-    cik = request.args.get('cik', '').strip()
-    series_id = request.args.get('series_id', '').strip()
+    cik = (cik or '').strip()
+    series_id = (series_id or '').strip()
     if not cik and not series_id:
-        return jsonify({'error': 'Missing cik or series_id parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing cik or series_id parameter'})
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
         if cik:
             row = con.execute("""
@@ -50,7 +50,10 @@ def api_fund_rollup_context():
             """, [series_id]).fetchone()
 
         if not row:
-            return jsonify({'error': 'Entity not found', 'cik': cik, 'series_id': series_id}), 404
+            return JSONResponse(
+                status_code=404,
+                content={'error': 'Entity not found', 'cik': cik, 'series_id': series_id},
+            )
 
         entity_id = row[0]
 
@@ -73,25 +76,25 @@ def api_fund_rollup_context():
         ec_name = ec[0] if ec else None
         dm_name = dm[0] if dm else None
 
-        return jsonify({
+        return {
             'entity_id': entity_id,
             'economic_sponsor': ec_name,
             'decision_maker': dm_name,
             'same': ec_name == dm_name,
-        })
+        }
     finally:
         con.close()
 
 
-@fund_bp.route('/fund_portfolio_managers')
-def api_fund_portfolio_managers():
-    ticker = request.args.get('ticker', '').upper().strip()
+@fund_router.get('/fund_portfolio_managers')
+def api_fund_portfolio_managers(ticker: str = ''):
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
         df = con.execute(
             f""  # nosec B608
@@ -110,18 +113,18 @@ def api_fund_portfolio_managers():
             LIMIT 50
             """, [ticker]
         ).fetchdf()
-        return jsonify(df_to_records(df))
+        return df_to_records(df)
     finally:
         con.close()
 
 
-@fund_bp.route('/fund_behavioral_profile')
-def api_fund_behavioral_profile():
+@fund_router.get('/fund_behavioral_profile')
+def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
     """Behavioral profile for a fund by LEI or series_id — historical positions."""
-    lei = request.args.get('lei', '').strip()
-    series_id = request.args.get('series_id', '').strip()
+    lei = (lei or '').strip()
+    series_id = (series_id or '').strip()
     if not lei and not series_id:
-        return jsonify({'error': 'Missing lei or series_id parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing lei or series_id parameter'})
 
     con = get_db()
     try:
@@ -142,7 +145,7 @@ def api_fund_behavioral_profile():
             """, [param]
         ).fetchone()
         if not fund_info:
-            return jsonify({'error': 'Fund not found'}), 404
+            return JSONResponse(status_code=404, content={'error': 'Fund not found'})
 
         fund_name, sid, fund_lei, family, quarters = fund_info
 
@@ -187,7 +190,7 @@ def api_fund_behavioral_profile():
             """, [param]
         ).fetchdf()
 
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'fund_name': fund_name,
             'series_id': sid,
             'lei': fund_lei,
@@ -201,15 +204,15 @@ def api_fund_behavioral_profile():
             },
             'sector_breakdown': df_to_records(sectors),
             'top_holdings': df_to_records(top),
-        }))
+        })
     finally:
         con.close()
 
 
-@fund_bp.route('/nport_shorts')
-def api_nport_shorts():
+@fund_router.get('/nport_shorts')
+def api_nport_shorts(ticker: str = ''):
     """N-PORT negative balance positions — fund short positions from filings."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (ticker or '').upper().strip()
     con = get_db()
     try:
         where = "AND fh.ticker = ?" if ticker else ""
@@ -234,6 +237,6 @@ def api_nport_shorts():
             LIMIT 200
             """, params
         ).fetchdf()
-        return jsonify(df_to_records(df))
+        return df_to_records(df)
     finally:
         con.close()

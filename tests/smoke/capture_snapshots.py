@@ -43,10 +43,11 @@ def main():
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
 
+    from fastapi.testclient import TestClient  # noqa: E402
     import app as app_module  # noqa: E402 — needs env set first
     from tests.smoke.endpoints import ENDPOINTS  # noqa: E402
 
-    client = app_module.app.test_client()
+    client = TestClient(app_module.app)
 
     for name, path in ENDPOINTS.items():
         out = SNAP_DIR / f"{name}.json"
@@ -55,8 +56,8 @@ def main():
             continue
         resp = client.get(path)
         if resp.status_code != 200:
-            sys.exit(f"[capture] {name} {path} → HTTP {resp.status_code}: {resp.data[:300]!r}")
-        body = resp.get_json()
+            sys.exit(f"[capture] {name} {path} → HTTP {resp.status_code}: {resp.content[:300]!r}")
+        body = resp.json()
         if body is None:
             sys.exit(f"[capture] {name} {path} → non-JSON or empty body")
         out.write_text(json.dumps(body, indent=2, default=str, sort_keys=False) + "\n")

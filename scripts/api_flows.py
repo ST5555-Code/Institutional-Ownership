@@ -1,4 +1,4 @@
-"""Flow / trend / rotation / conviction endpoints.
+"""Flow / trend / rotation / conviction endpoints (FastAPI).
 
 Routes:
   /api/v1/flow_analysis            (enveloped, Phase 1-B2)
@@ -11,9 +11,17 @@ Routes:
 """
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, request
+import logging
 
-from api_common import _get_rollup_type, respond
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
+from api_common import (
+    envelope_error,
+    envelope_success,
+    get_rollup_type,
+    validate_query_params_dep,
+)
 from queries import (
     clean_for_json,
     cohort_analysis,
@@ -28,147 +36,147 @@ from schemas import (
     OwnershipTrendEnvelope,
 )
 
-flows_bp = Blueprint('api_flows', __name__, url_prefix='/api/v1')
+log = logging.getLogger(__name__)
+
+flows_router = APIRouter(
+    prefix='/api/v1',
+    tags=['flows'],
+    dependencies=[Depends(validate_query_params_dep)],
+)
 
 
-@flows_bp.route('/flow_analysis')
-def api_flow_analysis():
-    ticker = request.args.get('ticker', '').upper().strip()
-    period = request.args.get('period', '1Q').upper().strip()
-    peers = request.args.get('peers', '').upper().strip() or None
-    level = request.args.get('level', 'parent').strip()
-    ao = request.args.get('active_only', '').strip() == 'true'
-    rt = _get_rollup_type(request)
+@flows_router.get('/flow_analysis')
+def api_flow_analysis(request: Request):
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    period = (request.query_params.get('period') or '1Q').upper().strip()
+    peers = (request.query_params.get('peers') or '').upper().strip() or None
+    level = (request.query_params.get('level') or 'parent').strip()
+    ao = (request.query_params.get('active_only') or '').strip() == 'true'
+    rt = get_rollup_type(request)
     if not ticker:
-        return respond(
-            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
-            schema=FlowAnalysisEnvelope,
-            status=400,
+        return envelope_error(
+            'missing_param', 'Missing ticker parameter',
+            request, schema=FlowAnalysisEnvelope, status=400,
         )
     try:
         result = flow_analysis(ticker, period=period, peers=peers, level=level,
                                active_only=ao, rollup_type=rt)
-        return respond(data=clean_for_json(result), schema=FlowAnalysisEnvelope)
+        return envelope_success(clean_for_json(result), request, schema=FlowAnalysisEnvelope)
     except Exception as e:
-        return respond(
-            error={'code': 'internal_error', 'message': str(e)},
-            schema=FlowAnalysisEnvelope,
-            status=500,
+        return envelope_error(
+            'internal_error', str(e),
+            request, schema=FlowAnalysisEnvelope, status=500,
         )
 
 
-@flows_bp.route('/ownership_trend_summary')
-def api_ownership_trend_summary():
-    ticker = request.args.get('ticker', '').upper().strip()
-    level = request.args.get('level', 'parent').strip()
-    ao = request.args.get('active_only', '').strip() == 'true'
-    rt = _get_rollup_type(request)
+@flows_router.get('/ownership_trend_summary')
+def api_ownership_trend_summary(request: Request):
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    level = (request.query_params.get('level') or 'parent').strip()
+    ao = (request.query_params.get('active_only') or '').strip() == 'true'
+    rt = get_rollup_type(request)
     if not ticker:
-        return respond(
-            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
-            schema=OwnershipTrendEnvelope,
-            status=400,
+        return envelope_error(
+            'missing_param', 'Missing ticker parameter',
+            request, schema=OwnershipTrendEnvelope, status=400,
         )
     try:
         result = ownership_trend_summary(ticker, level=level, active_only=ao, rollup_type=rt)
-        return respond(data=clean_for_json(result), schema=OwnershipTrendEnvelope)
+        return envelope_success(clean_for_json(result), request, schema=OwnershipTrendEnvelope)
     except Exception as e:
-        return respond(
-            error={'code': 'internal_error', 'message': str(e)},
-            schema=OwnershipTrendEnvelope,
-            status=500,
+        return envelope_error(
+            'internal_error', str(e),
+            request, schema=OwnershipTrendEnvelope, status=500,
         )
 
 
-@flows_bp.route('/cohort_analysis')
-def api_cohort_analysis():
-    ticker = request.args.get('ticker', '').upper().strip()
-    from_q = request.args.get('from', '').strip() or None
-    level = request.args.get('level', 'parent').strip()
-    active_only = request.args.get('active_only', '').strip() == 'true'
-    rt = _get_rollup_type(request)
+@flows_router.get('/cohort_analysis')
+def api_cohort_analysis(request: Request):
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    from_q = (request.query_params.get('from') or '').strip() or None
+    level = (request.query_params.get('level') or 'parent').strip()
+    active_only = (request.query_params.get('active_only') or '').strip() == 'true'
+    rt = get_rollup_type(request)
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     try:
         result = cohort_analysis(ticker, from_quarter=from_q, level=level,
                                  active_only=active_only, rollup_type=rt)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@flows_bp.route('/holder_momentum')
-def api_holder_momentum():
-    ticker = request.args.get('ticker', '').upper().strip()
-    level = request.args.get('level', 'parent').strip()
-    ao = request.args.get('active_only', '').strip() == 'true'
-    rt = _get_rollup_type(request)
+@flows_router.get('/holder_momentum')
+def api_holder_momentum(request: Request):
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    level = (request.query_params.get('level') or 'parent').strip()
+    ao = (request.query_params.get('active_only') or '').strip() == 'true'
+    rt = get_rollup_type(request)
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     try:
         result = holder_momentum(ticker, level=level, active_only=ao, rollup_type=rt)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@flows_bp.route('/peer_rotation')
-def api_peer_rotation():
+@flows_router.get('/peer_rotation')
+def api_peer_rotation(request: Request):
     """Peer rotation analysis: subject vs sector/industry peer substitutions."""
     try:
         from queries import get_peer_rotation
-        ticker = request.args.get('ticker', '').upper().strip()
+        ticker = (request.query_params.get('ticker') or '').upper().strip()
         if not ticker:
-            return jsonify({'error': 'Missing ticker param'}), 400
-        active_only = request.args.get('active_only', '0') == '1'
-        level = request.args.get('level', 'parent').strip()
-        rt = _get_rollup_type(request)
+            return JSONResponse(status_code=400, content={'error': 'Missing ticker param'})
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
+        rt = get_rollup_type(request)
         result = get_peer_rotation(ticker, active_only=active_only, level=level, rollup_type=rt)
-        return jsonify(result)
+        return result
     except Exception as e:
-        current_app.logger.error("peer_rotation error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("peer_rotation error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@flows_bp.route('/peer_rotation_detail')
-def api_peer_rotation_detail():
+@flows_router.get('/peer_rotation_detail')
+def api_peer_rotation_detail(request: Request):
     """Entity-level breakdown for a subject+peer substitution pair."""
     try:
         from queries import get_peer_rotation_detail
-        ticker = request.args.get('ticker', '').upper().strip()
-        peer = request.args.get('peer', '').upper().strip()
+        ticker = (request.query_params.get('ticker') or '').upper().strip()
+        peer = (request.query_params.get('peer') or '').upper().strip()
         if not ticker or not peer:
-            return jsonify({'error': 'Missing ticker or peer param'}), 400
-        active_only = request.args.get('active_only', '0') == '1'
-        level = request.args.get('level', 'parent').strip()
-        rt = _get_rollup_type(request)
+            return JSONResponse(status_code=400, content={'error': 'Missing ticker or peer param'})
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
+        rt = get_rollup_type(request)
         result = get_peer_rotation_detail(
             ticker, peer, active_only=active_only, level=level, rollup_type=rt)
-        return jsonify(result)
+        return result
     except Exception as e:
-        current_app.logger.error("peer_rotation_detail error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("peer_rotation_detail error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@flows_bp.route('/portfolio_context')
-def api_portfolio_context():
+@flows_router.get('/portfolio_context')
+def api_portfolio_context(request: Request):
     """Conviction tab — portfolio concentration context."""
-    ticker = request.args.get('ticker', '').upper().strip()
-    level = request.args.get('level', 'parent').strip()
-    ao = request.args.get('active_only', '').strip() == 'true'
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    level = (request.query_params.get('level') or 'parent').strip()
+    ao = (request.query_params.get('active_only') or '').strip() == 'true'
     if not ticker:
-        return respond(
-            error={'code': 'missing_param', 'message': 'Missing ticker parameter'},
-            schema=ConvictionEnvelope,
-            status=400,
+        return envelope_error(
+            'missing_param', 'Missing ticker parameter',
+            request, schema=ConvictionEnvelope, status=400,
         )
     try:
-        rt = _get_rollup_type(request)
+        rt = get_rollup_type(request)
         result = portfolio_context(ticker, level=level, active_only=ao, rollup_type=rt)
-        return respond(data=clean_for_json(result), schema=ConvictionEnvelope)
+        return envelope_success(clean_for_json(result), request, schema=ConvictionEnvelope)
     except Exception as e:
-        return respond(
-            error={'code': 'internal_error', 'message': str(e)},
-            schema=ConvictionEnvelope,
-            status=500,
+        return envelope_error(
+            'internal_error', str(e),
+            request, schema=ConvictionEnvelope, status=500,
         )

@@ -1,68 +1,81 @@
 """
-INF12: Admin Blueprint for /api/admin/* endpoints.
+INF12: Admin router for /api/admin/* endpoints (FastAPI).
 
-All routes on this blueprint require ENABLE_ADMIN=1 and ADMIN_TOKEN set in
+All routes on this router require ENABLE_ADMIN=1 and ADMIN_TOKEN set in
 env, plus an `X-Admin-Token` header matching ADMIN_TOKEN on every request.
 
 When ENABLE_ADMIN or ADMIN_TOKEN is unset, every route returns 503
 "Admin disabled". When the header is missing or wrong, returns 403.
 Token comparison uses hmac.compare_digest for timing-safe checking.
 
-EXCEPTION: /api/admin/quarter_config stays on the main app (scripts/app.py).
-It is loaded by the public main UI (app.js QuarterSelector) on every page and
-cannot be gated without breaking the public site.
+Name retained as `admin_bp.py` for git history continuity even though the
+exported symbol is now an APIRouter (`admin_router`).
 """
+from __future__ import annotations
 
 import csv as _csv
 import hmac
 import io as _io
+import logging
 import os
 import re
 import subprocess  # nosec B404
 from datetime import datetime
 
 import duckdb
-from flask import Blueprint, current_app, jsonify, request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from config import LATEST_QUARTER, PREV_QUARTER
 from queries import clean_for_json, df_to_records
+
+log = logging.getLogger(__name__)
 
 LQ = LATEST_QUARTER
 PQ = PREV_QUARTER
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 # Module-level refs set by init_admin_bp() from app.py. Avoids circular import
 # (app.py imports this module at load time; get_db / has_table are defined in
-# app.py after DB bootstrap). Routes access these lazily at request time, by
-# which point init_admin_bp() has run.
+# app_db.py but this router can be registered before _setup runs).
 _get_db = None
 _has_table = None
 
 
 def init_admin_bp(get_db_fn, has_table_fn):
-    """Wire app.py's DB helpers into the Blueprint.
-    Must be called from app.py before app.register_blueprint(admin_bp).
+    """Wire app_db's DB helpers into the router.
+    Must be called from app.py before `app.include_router(admin_router)`.
     """
     global _get_db, _has_table  # pylint: disable=global-statement
     _get_db = get_db_fn
     _has_table = has_table_fn
 
 
-@admin_bp.before_request
-def _require_admin_token():
-    """INF12: Token-gate every admin endpoint.
+def require_admin_token(x_admin_token: str = Header(None, alias='X-Admin-Token')) -> None:
+    """INF12: Token-gate dependency for every admin endpoint.
+
     503 if ENABLE_ADMIN or ADMIN_TOKEN unset. 403 on bad/missing header.
+    Timing-safe via hmac.compare_digest.
     """
     if os.environ.get('ENABLE_ADMIN') != '1' or not os.environ.get('ADMIN_TOKEN'):
-        return jsonify({'error': 'Admin disabled'}), 503
-    provided = request.headers.get('X-Admin-Token', '')
+        raise HTTPException(status_code=503, detail={'error': 'Admin disabled'})
+    provided = x_admin_token or ''
     expected = os.environ['ADMIN_TOKEN']
     if not hmac.compare_digest(provided, expected):
-        return jsonify({'error': 'Forbidden'}), 403
-    return None
+        raise HTTPException(status_code=403, detail={'error': 'Forbidden'})
+
+
+admin_router = APIRouter(
+    prefix='/api/admin',
+    tags=['admin'],
+    dependencies=[Depends(require_admin_token)],
+)
+
+# Backwards-compat alias: app.py used to import `admin_bp` + `init_admin_bp`.
+# Keep the name exported so old imports don't break mid-migration.
+admin_bp = admin_router
 
 
 # ---------------------------------------------------------------------------
@@ -70,12 +83,12 @@ def _require_admin_token():
 # ---------------------------------------------------------------------------
 
 
-@admin_bp.route('/add_ticker', methods=['POST'])
-def api_add_ticker():
+@admin_router.post('/add_ticker')
+def api_add_ticker(body: dict = Body(default={})):
     """Add a single ticker on-demand: fetch CUSIP, market data, 13D/G filings."""
-    ticker = request.json.get('ticker', '').upper().strip() if request.json else ''
+    ticker = (body.get('ticker') or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker'})
 
     from db import PROD_DB  # pylint: disable=import-outside-toplevel
     results = {'ticker': ticker, 'steps': []}
@@ -101,9 +114,6 @@ def api_add_ticker():
             results['steps'].append(f'OpenFIGI: HTTP {figi_resp.status_code}')
 
         # Step 2: Fetch market data via YahooClient + SEC XBRL
-        # - Yahoo: price, sector, industry, float, 52w (via direct JSON API)
-        # - SEC:   authoritative shares_outstanding from 10-K/10-Q cover page
-        # - market_cap: computed as shares_outstanding × price (strict)
         from yahoo_client import YahooClient  # pylint: disable=import-outside-toplevel
         from sec_shares_client import SECSharesClient  # pylint: disable=import-outside-toplevel
         yc = YahooClient()
@@ -152,12 +162,12 @@ def api_add_ticker():
             results['steps'].append(f'13D/G: {e}')
 
         results['status'] = 'ok'
-        return jsonify(results)
+        return results
 
     except Exception as e:  # pylint: disable=broad-except
         results['status'] = 'error'
         results['error'] = str(e)
-        return jsonify(results), 500
+        return JSONResponse(status_code=500, content=results)
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +175,7 @@ def api_add_ticker():
 # ---------------------------------------------------------------------------
 
 
-@admin_bp.route('/stats')
+@admin_router.get('/stats')
 def api_admin_stats():
     """Database row counts for admin dashboard."""
     con = _get_db()
@@ -177,44 +187,40 @@ def api_admin_stats():
             try:
                 stats[key] = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # nosec B608
             except Exception as e:  # pylint: disable=broad-except
-                current_app.logger.debug("Error: %s", e)
+                log.debug("stats error: %s", e)
                 stats[key] = 0
         try:
             stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings_v2 WHERE ticker IS NOT NULL").fetchone()[0]
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("tickers error: %s", e)
             stats['tickers'] = 0
         try:
             stats['short_interest_days'] = con.execute("SELECT COUNT(DISTINCT report_date) FROM short_interest").fetchone()[0]
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("si error: %s", e)
             stats['short_interest_days'] = 0
-        return jsonify(stats)
+        return stats
     finally:
         con.close()
 
 
-@admin_bp.route('/progress')
+@admin_router.get('/progress')
 def api_admin_progress():
     """Check if a pipeline is running and return progress."""
     result = {'running': False}
-
-    # Check for running fetch_13dg process
     try:
-        ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
+        ps = subprocess.run(['pgrep', '-f', 'fetch_13dg.py'], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603
         if ps.returncode == 0:
             result['running'] = True
     except Exception as e:  # pylint: disable=broad-except
-        current_app.logger.debug("Suppressed: %s", e)
+        log.debug("progress pgrep: %s", e)
 
-    # Read progress file
     progress_file = os.path.join(BASE_DIR, 'logs', 'phase2_progress.txt')
     try:
         with open(progress_file, encoding='utf-8') as f:
             lines = f.read().strip().split('\n')
             if lines:
                 result['progress_line'] = lines[0].strip()
-                # Parse [N/M] pattern
                 m = re.search(r'\[(\d+)/(\d+)\]', lines[0])
                 if m:
                     done, total = int(m.group(1)), int(m.group(2))
@@ -226,34 +232,29 @@ def api_admin_progress():
     except FileNotFoundError:
         pass
 
-    return jsonify(result)
+    return result
 
 
-@admin_bp.route('/errors')
+@admin_router.get('/errors')
 def api_admin_errors():
     """Return recent errors from fetch_13dg_errors.csv."""
     error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
     try:
         with open(error_file, encoding='utf-8') as f:
             lines = f.readlines()
-        # Return last 20 lines
         recent = ''.join(lines[-20:]) if len(lines) > 20 else ''.join(lines)
-        return jsonify({'errors': recent, 'count': len(lines) - 1})  # -1 for header
+        return {'errors': recent, 'count': len(lines) - 1}
     except FileNotFoundError:
-        return jsonify({'errors': 'No error log found', 'count': 0})
+        return {'errors': 'No error log found', 'count': 0}
 
 
-@admin_bp.route('/run_script', methods=['POST'])
-def api_admin_run_script():
+@admin_router.post('/run_script')
+def api_admin_run_script(body: dict = Body(default={})):
     """Run a pipeline script in the background. Returns immediately."""
-    data = request.json or {}
-    script = data.get('script', '')
-    flags = data.get('flags', [])
+    script = body.get('script', '')
+    flags = body.get('flags', [])
 
-    # Whitelist of allowed scripts.
-    # INF12: run_pipeline.sh and merge_staging.py removed — never web-triggerable,
-    # run manually only. Both are destructive/irreversible at the pipeline level
-    # and have no business being launched from a browser request.
+    # INF12: run_pipeline.sh and merge_staging.py removed — never web-triggerable.
     allowed = {
         'fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
         'fetch_finra_short.py', 'fetch_ncen.py', 'compute_flows.py',
@@ -261,44 +262,40 @@ def api_admin_run_script():
         'refresh_snapshot.sh',
     }
     if script not in allowed:
-        return jsonify({'error': f'Script not allowed: {script}'}), 400
+        return JSONResponse(status_code=400, content={'error': f'Script not allowed: {script}'})
 
-    # Check if already running
     try:
-        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
+        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603
         if ps.returncode == 0:
-            return jsonify({'error': f'{script} is already running'}), 409
+            return JSONResponse(status_code=409, content={'error': f'{script} is already running'})
     except Exception as e:  # pylint: disable=broad-except
-        current_app.logger.debug("Suppressed: %s", e)
+        log.debug("run_script pgrep: %s", e)
 
-    # Build command
     script_path = os.path.join(BASE_DIR, 'scripts', script)
     if script.endswith('.sh'):
         cmd = ['bash', script_path] + flags
     else:
         cmd = ['python3', '-u', script_path] + flags
 
-    # Run in background
     log_name = script.replace('.py', '').replace('.sh', '')
     log_path = os.path.join(BASE_DIR, 'logs', f'{log_name}_run.log')
     with open(log_path, 'w', encoding='utf-8') as log_file:
         proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=BASE_DIR)  # nosec B603
 
-    return jsonify({
+    return {
         'status': 'started',
         'script': script,
         'flags': flags,
         'pid': proc.pid,
         'log': log_path,
-    })
+    }
 
 
-@admin_bp.route('/manager_changes')
+@admin_router.get('/manager_changes')
 def api_admin_manager_changes():
     """D2: Detect manager changes across quarters — new, disappeared, name changes."""
     con = _get_db()
     try:
-        # New managers (in latest quarter but not previous)
         new_mgrs = con.execute(
             f""  # nosec B608
             f"""
@@ -308,7 +305,6 @@ def api_admin_manager_changes():
             ORDER BY manager_name LIMIT 50
             """
         ).fetchdf()
-        # Disappeared managers
         gone_mgrs = con.execute(
             f""  # nosec B608
             f"""
@@ -318,17 +314,17 @@ def api_admin_manager_changes():
             ORDER BY manager_name LIMIT 50
             """
         ).fetchdf()
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'new_managers': df_to_records(new_mgrs),
             'disappeared_managers': df_to_records(gone_mgrs),
             'latest_quarter': LATEST_QUARTER,
             'prev_quarter': PREV_QUARTER,
-        }))
+        })
     finally:
         con.close()
 
 
-@admin_bp.route('/ticker_changes')
+@admin_router.get('/ticker_changes')
 def api_admin_ticker_changes():
     """D3: Detect ticker changes — new tickers, disappeared tickers."""
     con = _get_db()
@@ -351,20 +347,19 @@ def api_admin_ticker_changes():
             GROUP BY ticker ORDER BY ticker LIMIT 100
             """
         ).fetchdf()
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'new_tickers': df_to_records(new_tickers),
             'disappeared_tickers': df_to_records(gone_tickers),
-        }))
+        })
     finally:
         con.close()
 
 
-@admin_bp.route('/parent_mapping_health')
+@admin_router.get('/parent_mapping_health')
 def api_admin_parent_health():
     """D4: Check parent mapping health — orphaned CIKs, unmatched managers."""
     con = _get_db()
     try:
-        # Managers without parent assignment
         orphaned = con.execute(
             f""  # nosec B608
             f"""
@@ -377,7 +372,6 @@ def api_admin_parent_health():
             LIMIT 20
             """
         ).fetchdf()
-        # Top parents by value
         top_parents = con.execute(
             f""  # nosec B608
             f"""
@@ -388,21 +382,20 @@ def api_admin_parent_health():
             ORDER BY total_value DESC NULLS LAST LIMIT 20
             """
         ).fetchdf()
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'orphaned_managers': df_to_records(orphaned),
             'top_parents': df_to_records(top_parents),
-        }))
+        })
     finally:
         con.close()
 
 
-@admin_bp.route('/stale_data')
+@admin_router.get('/stale_data')
 def api_admin_stale_data():
     """D5: Flag stale data — old market data, inactive managers."""
     con = _get_db()
     try:
         result = {}
-        # Tickers with old market data
         try:
             stale_market = con.execute("""
                 SELECT ticker, fetch_date, price_live
@@ -412,9 +405,8 @@ def api_admin_stale_data():
             """).fetchdf()
             result['stale_market_data'] = df_to_records(stale_market)
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("stale_market: %s", e)
             result['stale_market_data'] = []
-        # Managers only in old quarters
         try:
             inactive = con.execute(
                 f""  # nosec B608
@@ -428,19 +420,18 @@ def api_admin_stale_data():
             ).fetchdf()
             result['inactive_managers'] = df_to_records(inactive)
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("inactive_mgrs: %s", e)
             result['inactive_managers'] = []
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     finally:
         con.close()
 
 
-@admin_bp.route('/merger_signals')
+@admin_router.get('/merger_signals')
 def api_admin_merger_signals():
     """D6: Detect potential mergers — CIK disappears + another CIK's holdings jump."""
     con = _get_db()
     try:
-        # CIKs that disappeared AND had large holdings
         signals = con.execute(
             f""  # nosec B608
             f"""
@@ -454,19 +445,18 @@ def api_admin_merger_signals():
             SELECT * FROM gone ORDER BY prev_value DESC LIMIT 20
             """
         ).fetchdf()
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'potential_mergers': df_to_records(signals),
-        }))
+        })
     finally:
         con.close()
 
 
-@admin_bp.route('/new_companies')
+@admin_router.get('/new_companies')
 def api_admin_new_companies():
     """D7: New companies with institutional interest — recent entries."""
     con = _get_db()
     try:
-        # Tickers that appeared in latest quarter with significant institutional value
         new_cos = con.execute(
             f""  # nosec B608
             f"""
@@ -486,20 +476,19 @@ def api_admin_new_companies():
             ORDER BY total_value DESC LIMIT 30
             """
         ).fetchdf()
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'new_companies': df_to_records(new_cos),
-        }))
+        })
     finally:
         con.close()
 
 
-@admin_bp.route('/data_quality')
+@admin_router.get('/data_quality')
 def api_admin_data_quality():
     """F6: Data quality metrics — coverage, parse rates, gaps."""
     con = _get_db()
     try:
         result = {}
-        # Holdings coverage
         try:
             r = con.execute(
                 f""  # nosec B608
@@ -519,9 +508,8 @@ def api_admin_data_quality():
                 'live_value_pct': round(r[2] / r[0] * 100, 1) if r[0] else 0,
             }
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("dq_holdings: %s", e)
             result['holdings'] = {}
-        # 13D/G parse quality
         try:
             r = con.execute("""
                 SELECT COUNT(*) as total,
@@ -536,7 +524,6 @@ def api_admin_data_quality():
                 'unknown_filers': r[3],
                 'pct_coverage': round(r[1] / r[0] * 100, 1) if r[0] else 0,
             }
-            # Name resolution stats if column exists
             try:
                 nr = con.execute("""
                     SELECT COUNT(CASE WHEN name_resolved THEN 1 END) as resolved,
@@ -547,12 +534,11 @@ def api_admin_data_quality():
                 bo_stats['name_unresolved'] = nr[1]
                 bo_stats['name_resolution_pct'] = round(nr[0] / (nr[0] + nr[1]) * 100, 1) if (nr[0] + nr[1]) else 0
             except Exception as e:  # pylint: disable=broad-except
-                current_app.logger.debug("Suppressed: %s", e)
+                log.debug("dq_bo_name: %s", e)
             result['beneficial_ownership'] = bo_stats
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Error: %s", e)
+            log.debug("dq_bo: %s", e)
             result['beneficial_ownership'] = {}
-        # Error log stats
         error_file = os.path.join(BASE_DIR, 'logs', 'fetch_13dg_errors.csv')
         try:
             with open(error_file, encoding='utf-8') as f:
@@ -560,94 +546,93 @@ def api_admin_data_quality():
             result['fetch_errors'] = error_count
         except FileNotFoundError:
             result['fetch_errors'] = 0
-        return jsonify(result)
+        return result
     finally:
         con.close()
 
 
-@admin_bp.route('/staging_preview')
+@admin_router.get('/staging_preview')
 def api_admin_staging_preview():
     """F5: Preview what merge_staging would do (dry-run)."""
     script_path = os.path.join(BASE_DIR, 'scripts', 'merge_staging.py')
     try:
-        result = subprocess.run(  # nosec  # bandit B607 + B603 — known partial-path subprocess
+        result = subprocess.run(  # nosec  # bandit B607 + B603
             ['python3', script_path, '--all', '--dry-run'],
             capture_output=True, text=True, timeout=30, cwd=BASE_DIR, check=False,
         )
-        return jsonify({
+        return {
             'output': result.stdout,
             'error': result.stderr if result.returncode != 0 else None,
             'returncode': result.returncode,
-        })
+        }
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Preview timed out after 30s'}), 504
+        return JSONResponse(status_code=504, content={'error': 'Preview timed out after 30s'})
     except Exception as e:  # pylint: disable=broad-except
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@admin_bp.route('/running')
+@admin_router.get('/running')
 def api_admin_running():
     """List currently running pipeline scripts."""
     running = []
     for script in ['fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
                    'fetch_finra_short.py', 'compute_flows.py', 'merge_staging.py']:
         try:
-            ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603 — known partial-path subprocess
+            ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603
             if ps.returncode == 0:
                 pids = ps.stdout.strip().split('\n')
                 running.append({'script': script, 'pids': pids})
         except Exception as e:  # pylint: disable=broad-except
-            current_app.logger.debug("Suppressed: %s", e)
-    return jsonify({'running': running})
+            log.debug("running pgrep: %s", e)
+    return {'running': running}
 
 
 # ---------------------------------------------------------------------------
 # Entity MDM — Priority 6 manual override endpoint (Phase 1)
 # ---------------------------------------------------------------------------
-# CSV input format (header required):
-#   entity_id,action,field,old_value,new_value,reason,analyst
-#
-# Supported actions:
-#   reclassify  — update entity_classification_history (field=classification|is_activist)
-#   alias_add   — add a brand alias to entity_aliases (new_value = alias name)
-#   merge       — set rollup parent in entity_rollup_history (new_value = parent entity_id)
-#
-# All writes are applied against the STAGING entity tables with:
-#   source='manual', confidence='exact', is_inferred=FALSE
-# and logged to logs/entity_overrides.log with timestamp and analyst initials.
-#
-# Query param ?target=staging|prod — defaults to staging. Prod is blocked until
-# Phase 4 authorization (returns 403).
-@admin_bp.route('/entity_override', methods=['POST'])
-def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    target = (request.args.get('target') or 'staging').lower()
+
+
+@admin_router.post('/entity_override')
+def api_admin_entity_override(request: Request, body: bytes = Body(default=b''), target: str = 'staging'):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    target = (target or 'staging').lower()
     if target != 'staging':
-        return jsonify({
-            'error': 'entity_override against production is blocked until Phase 4 authorization',
-            'target': target,
-        }), 403
+        return JSONResponse(
+            status_code=403,
+            content={
+                'error': 'entity_override against production is blocked until Phase 4 authorization',
+                'target': target,
+            },
+        )
 
     # Accept either raw CSV body (text/csv) or JSON {"csv": "..."}
-    if request.content_type and 'application/json' in request.content_type:
-        body = (request.json or {}).get('csv', '')
+    content_type = request.headers.get('content-type', '')
+    if 'application/json' in content_type:
+        try:
+            import json as _json  # pylint: disable=import-outside-toplevel
+            parsed = _json.loads(body or b'{}')
+            csv_text = parsed.get('csv', '') if isinstance(parsed, dict) else ''
+        except Exception:  # pylint: disable=broad-except
+            csv_text = ''
     else:
-        body = request.get_data(as_text=True) or ''
+        csv_text = (body or b'').decode('utf-8', errors='replace')
 
-    if not body.strip():
-        return jsonify({'error': 'empty CSV body'}), 400
+    if not csv_text.strip():
+        return JSONResponse(status_code=400, content={'error': 'empty CSV body'})
 
-    reader = _csv.DictReader(_io.StringIO(body))
+    reader = _csv.DictReader(_io.StringIO(csv_text))
     required = {'entity_id', 'action', 'field', 'old_value', 'new_value', 'reason', 'analyst'}
     if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
-        return jsonify({
-            'error': 'CSV must contain columns: ' + ','.join(sorted(required)),
-            'received': reader.fieldnames,
-        }), 400
+        return JSONResponse(
+            status_code=400,
+            content={
+                'error': 'CSV must contain columns: ' + ','.join(sorted(required)),
+                'received': reader.fieldnames,
+            },
+        )
 
-    # Open a staging write connection. Do NOT use the app's read-only get_db().
     staging_path = os.path.join(BASE_DIR, 'data', '13f_staging.duckdb')
     if not os.path.exists(staging_path):
-        return jsonify({'error': f'staging DB not found: {staging_path}'}), 500
+        return JSONResponse(status_code=500, content={'error': f'staging DB not found: {staging_path}'})
 
     log_path = os.path.join(BASE_DIR, 'logs', 'entity_overrides.log')
     applied, skipped = [], []
@@ -663,7 +648,6 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                 reason = row['reason'] or ''
                 analyst = row['analyst'] or ''
 
-                # Verify the entity exists
                 exists = con.execute(
                     "SELECT 1 FROM entities WHERE entity_id = ?", [entity_id]
                 ).fetchone()
@@ -672,7 +656,6 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                     continue
 
                 if action == 'reclassify':
-                    # Close current classification, insert new one
                     con.execute("BEGIN TRANSACTION")
                     try:
                         con.execute(
@@ -709,7 +692,7 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                             raise ValueError(f"unsupported field for reclassify: {field}")
                         con.execute("COMMIT")
                     except Exception as e:
-                        current_app.logger.debug("Error: %s", e)
+                        log.debug("reclassify: %s", e)
                         con.execute("ROLLBACK")
                         raise
 
@@ -725,7 +708,6 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                     )
 
                 elif action == 'merge':
-                    # new_value = parent entity_id; close current rollup, insert new
                     parent_id = int(new_value)
                     parent_exists = con.execute(
                         "SELECT 1 FROM entities WHERE entity_id = ?", [parent_id]
@@ -753,7 +735,7 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                         )
                         con.execute("COMMIT")
                     except Exception as e:
-                        current_app.logger.debug("Error: %s", e)
+                        log.debug("merge: %s", e)
                         con.execute("ROLLBACK")
                         raise
 
@@ -762,7 +744,6 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                     continue
 
                 # Persist override for replay after --reset rebuilds
-                # Look up CIK for this entity (used to re-resolve after rebuild)
                 cik_row = con.execute(
                     """SELECT identifier_value FROM entity_identifiers
                        WHERE entity_id = ? AND identifier_type = 'cik'
@@ -778,8 +759,7 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
                         [entity_cik, action, field, old_value, new_value, reason, analyst],
                     )
                 except Exception as e:  # pylint: disable=broad-except
-                    current_app.logger.debug("Error: %s", e)
-                    # table might not exist in older staging DBs
+                    log.debug("persistent: %s", e)
 
                 # Audit log append
                 with open(log_path, 'a', encoding='utf-8') as f:
@@ -795,11 +775,11 @@ def api_admin_entity_override():  # pylint: disable=too-many-locals,too-many-bra
     finally:
         con.close()
 
-    return jsonify({
+    return {
         'target': target,
         'applied': applied,
         'skipped': skipped,
         'applied_count': len(applied),
         'skipped_count': len(skipped),
         'log': log_path,
-    })
+    }

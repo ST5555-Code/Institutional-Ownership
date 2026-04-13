@@ -31,5 +31,6 @@ def _configure_fixture_db():
 @pytest.fixture(scope="session")
 def client(_configure_fixture_db):
     # Import after env var + sys.path are set.
+    from fastapi.testclient import TestClient  # noqa: E402
     import app as app_module  # noqa: E402 — deferred on purpose
-    return app_module.app.test_client()
+    return TestClient(app_module.app)

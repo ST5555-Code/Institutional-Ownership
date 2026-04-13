@@ -1,4 +1,4 @@
-"""Cross-ownership, overlap, and peer-group endpoints.
+"""Cross-ownership, overlap, and peer-group endpoints (FastAPI).
 
 Routes:
   /api/v1/cross_ownership
@@ -6,125 +6,133 @@ Routes:
   /api/v1/two_company_overlap
   /api/v1/two_company_subject
   /api/v1/peer_groups
-  /api/v1/peer_groups/<group_id>
+  /api/v1/peer_groups/{group_id}
 """
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, request
+import logging
 
-from api_common import _get_rollup_type
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
+from api_common import get_rollup_type, validate_query_params_dep
 from app_db import get_db, has_table
 import queries
 from queries import _cross_ownership_query, clean_for_json, df_to_records
 
-cross_bp = Blueprint('api_cross', __name__, url_prefix='/api/v1')
+log = logging.getLogger(__name__)
+
+cross_router = APIRouter(
+    prefix='/api/v1',
+    tags=['cross'],
+    dependencies=[Depends(validate_query_params_dep)],
+)
 
 
-@cross_bp.route('/cross_ownership')
-def api_cross_ownership():
+@cross_router.get('/cross_ownership')
+def api_cross_ownership(request: Request):
     """View 1: top holders of anchor company with cross-holdings in other tickers."""
-    tickers_raw = request.args.get('tickers', '').upper().strip()
-    anchor = request.args.get('anchor', '').upper().strip()
-    active_only = request.args.get('active_only', 'false').lower() == 'true'
-    limit = int(request.args.get('limit', 25))
-    rt = _get_rollup_type(request)
+    tickers_raw = (request.query_params.get('tickers') or '').upper().strip()
+    anchor = (request.query_params.get('anchor') or '').upper().strip()
+    active_only = request.query_params.get('active_only', 'false').lower() == 'true'
+    limit = int(request.query_params.get('limit', 25))
+    rt = get_rollup_type(request)
     if not tickers_raw:
-        return jsonify({'error': 'Missing tickers parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing tickers parameter'})
     tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
     if not anchor:
         anchor = tickers[0]
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
-        return jsonify(_cross_ownership_query(con, tickers, anchor=anchor,
-                                              active_only=active_only, limit=limit,
-                                              rollup_type=rt))
+        return _cross_ownership_query(con, tickers, anchor=anchor,
+                                      active_only=active_only, limit=limit,
+                                      rollup_type=rt)
     finally:
         con.close()
 
 
-@cross_bp.route('/cross_ownership_top')
-def api_cross_ownership_top():
+@cross_router.get('/cross_ownership_top')
+def api_cross_ownership_top(request: Request):
     """View 2: top investors by total exposure across all selected tickers."""
-    tickers_raw = request.args.get('tickers', '').upper().strip()
-    active_only = request.args.get('active_only', 'false').lower() == 'true'
-    limit = int(request.args.get('limit', 25))
-    rt = _get_rollup_type(request)
+    tickers_raw = (request.query_params.get('tickers') or '').upper().strip()
+    active_only = request.query_params.get('active_only', 'false').lower() == 'true'
+    limit = int(request.query_params.get('limit', 25))
+    rt = get_rollup_type(request)
     if not tickers_raw:
-        return jsonify({'error': 'Missing tickers parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing tickers parameter'})
     tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
-        return jsonify(_cross_ownership_query(con, tickers, anchor=None,
-                                              active_only=active_only, limit=limit,
-                                              rollup_type=rt))
+        return _cross_ownership_query(con, tickers, anchor=None,
+                                      active_only=active_only, limit=limit,
+                                      rollup_type=rt)
     finally:
         con.close()
 
 
-@cross_bp.route('/two_company_overlap')
-def api_two_company_overlap():
+@cross_router.get('/two_company_overlap')
+def api_two_company_overlap(request: Request):
     """Two Companies Overlap tab — institutional and fund-level holder comparison."""
     from config import QUARTERS as _QUARTERS, LATEST_QUARTER
-    subject = request.args.get('subject', '').upper().strip()
-    second = request.args.get('second', '').upper().strip()
-    quarter = request.args.get('quarter', '').strip() or LATEST_QUARTER
+    subject = (request.query_params.get('subject') or '').upper().strip()
+    second = (request.query_params.get('second') or '').upper().strip()
+    quarter = (request.query_params.get('quarter') or '').strip() or LATEST_QUARTER
     if quarter not in _QUARTERS:
         quarter = LATEST_QUARTER
     if not subject or not second:
-        return jsonify({'error': 'Missing subject or second ticker'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing subject or second ticker'})
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
         result = queries.get_two_company_overlap(subject, second, quarter, con)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     except Exception as e:
-        current_app.logger.error("two_company_overlap error: %s", e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        log.error("two_company_overlap error: %s", e, exc_info=True)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
 
 
-@cross_bp.route('/two_company_subject')
-def api_two_company_subject():
+@cross_router.get('/two_company_subject')
+def api_two_company_subject(request: Request):
     """Return top 50 holders for subject ticker only — used for immediate
-    tab load before the user selects a second company. Same payload shape
-    as /api/v1/two_company_overlap with all sec_* fields set to None."""
+    tab load before the user selects a second company."""
     from config import QUARTERS as _QUARTERS, LATEST_QUARTER
-    subject = request.args.get('subject', '').upper().strip()
-    quarter = request.args.get('quarter', '').strip() or LATEST_QUARTER
+    subject = (request.query_params.get('subject') or '').upper().strip()
+    quarter = (request.query_params.get('quarter') or '').strip() or LATEST_QUARTER
     if quarter not in _QUARTERS:
         quarter = LATEST_QUARTER
     if not subject:
-        return jsonify({'error': 'Missing subject ticker'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing subject ticker'})
     try:
         con = get_db()
     except Exception as e:
-        return jsonify({'error': f'Database unavailable: {e}'}), 503
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
         result = queries.get_two_company_subject(subject, quarter, con)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     except Exception as e:
-        current_app.logger.error("two_company_subject error: %s", e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        log.error("two_company_subject error: %s", e, exc_info=True)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
 
 
-@cross_bp.route('/peer_groups')
+@cross_router.get('/peer_groups')
 def api_peer_groups():
     """Return all peer groups."""
     con = get_db()
     try:
         if not has_table('peer_groups'):
-            return jsonify([])
+            return []
         df = con.execute("""
             SELECT group_id, group_name, ticker, company_name, is_primary
             FROM peer_groups
@@ -144,13 +152,13 @@ def api_peer_groups():
                 'company_name': row['company_name'],
                 'is_primary': bool(row['is_primary']),
             })
-        return jsonify(list(groups.values()))
+        return list(groups.values())
     finally:
         con.close()
 
 
-@cross_bp.route('/peer_groups/<group_id>')
-def api_peer_group_detail(group_id):
+@cross_router.get('/peer_groups/{group_id}')
+def api_peer_group_detail(group_id: str):
     """Return tickers in a specific peer group."""
     con = get_db()
     try:
@@ -160,6 +168,6 @@ def api_peer_group_detail(group_id):
             WHERE group_id = ?
             ORDER BY is_primary DESC, ticker
         """, [group_id]).fetchdf()
-        return jsonify(df_to_records(df))
+        return df_to_records(df)
     finally:
         con.close()

@@ -1,36 +1,45 @@
-"""Register + query dispatch endpoints.
+"""Register + query dispatch endpoints (FastAPI).
 
 Routes:
   /api/v1/tickers                 (enveloped, Phase 1-B2)
   /api/v1/summary
   /api/v1/query1                  (enveloped, Phase 1-B2)
-  /api/v1/query<int:qnum>         (bare, queries 2–16)
-  /api/v1/export/query<int:qnum>
+  /api/v1/query{qnum}             (bare, queries 2–16)
+  /api/v1/export/query{qnum}
   /api/v1/amendments
   /api/v1/manager_profile
 
-Fund-lookup endpoints (fund_rollup_context, fund_portfolio_managers,
-fund_behavioral_profile, nport_shorts) live in api_fund.py.
+Fund-lookup endpoints live in api_fund.py.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from api_common import (
     LQ,
     QUERY_FUNCTIONS,
     _RT_AWARE_QUERIES,
-    _get_rollup_type,
-    respond,
+    envelope_error,
+    envelope_success,
+    get_rollup_type,
+    validate_query_params_dep,
 )
 from app_db import get_db
 from export import build_excel
 from queries import clean_for_json, df_to_records, get_summary
 from schemas import RegisterEnvelope, TickersEnvelope
 
-register_bp = Blueprint('api_register', __name__, url_prefix='/api/v1')
+log = logging.getLogger(__name__)
+
+register_router = APIRouter(
+    prefix='/api/v1',
+    tags=['register'],
+    dependencies=[Depends(validate_query_params_dep)],
+)
 
 
 QUERY_NAMES = {
@@ -43,15 +52,14 @@ QUERY_NAMES = {
 
 # SMOKE TEST: /api/v1/tickers is the autocomplete root — a silent 500 here
 # breaks the entire UI ticker search. Always include in post-commit curl.
-@register_bp.route('/tickers')
-def api_tickers():
+@register_router.get('/tickers')
+def api_tickers(request: Request):
     try:
         con = get_db()
     except Exception as e:
-        return respond(
-            error={'code': 'db_unavailable', 'message': f'Database unavailable: {e}'},
-            schema=TickersEnvelope,
-            status=503,
+        return envelope_error(
+            'db_unavailable', f'Database unavailable: {e}',
+            request, schema=TickersEnvelope, status=503,
         )
     try:
         df = con.execute(
@@ -64,35 +72,38 @@ def api_tickers():
             ORDER BY ticker
             """
         ).fetchdf()
-        return respond(data=df_to_records(df), schema=TickersEnvelope)
+        return envelope_success(df_to_records(df), request, schema=TickersEnvelope)
     finally:
         con.close()
 
 
-@register_bp.route('/summary')
-def api_summary():
-    ticker = request.args.get('ticker', '').upper().strip()
+@register_router.get('/summary')
+def api_summary(ticker: str = ''):
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     result = get_summary(ticker)
     if not result:
-        return jsonify({'error': f'No data found for ticker {ticker}'}), 404
-    return jsonify(result)
+        return JSONResponse(
+            status_code=404,
+            content={'error': f'No data found for ticker {ticker}'},
+        )
+    return result
 
 
-def _execute_query(qnum):
+def _execute_query(qnum: int, request: Request):
     """Run query-N dispatch. Returns (data, error_dict, status).
 
-    Shared by the generic /api/v1/query<N> handler AND the dedicated
+    Shared by the generic /api/v1/query{N} handler AND the dedicated
     /api/v1/query1 envelope handler. Error shape is ErrorShape-compatible
-    so callers can wrap in respond() or jsonify() as needed.
+    so callers can wrap in envelope_error() or JSONResponse as needed.
     """
     if qnum not in QUERY_FUNCTIONS:
         return None, {'code': 'invalid_query', 'message': f'Invalid query number: {qnum}'}, 400
-    ticker = request.args.get('ticker', '').upper().strip()
-    cik = request.args.get('cik', '').strip()
-    quarter = request.args.get('quarter', LQ)
-    rt = _get_rollup_type(request)
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    cik = (request.query_params.get('cik') or '').strip()
+    quarter = request.query_params.get('quarter', LQ)
+    rt = get_rollup_type(request)
 
     if qnum not in (15,) and not ticker:
         return None, {'code': 'missing_param', 'message': 'Missing ticker parameter'}, 400
@@ -100,7 +111,7 @@ def _execute_query(qnum):
     try:
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
-            fund_name = request.args.get('fund_name', '').strip() or None
+            fund_name = (request.query_params.get('fund_name') or '').strip() or None
             data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
             if not data.get('positions'):
                 return None, {'code': 'not_found', 'message': f'No holdings found for CIK {cik}'}, 404
@@ -125,42 +136,43 @@ def _execute_query(qnum):
         return None, {'code': 'internal_error', 'message': str(e)}, 500
 
 
-@register_bp.route('/query1')
-def api_query1():
+@register_router.get('/query1')
+def api_query1(request: Request):
     """Register tab — enveloped per Phase 1-B2. Queries 2–16 stay bare."""
-    data, err, status = _execute_query(1)
+    data, err, status = _execute_query(1, request)
     if err is not None:
-        return respond(error=err, schema=RegisterEnvelope, status=status)
-    return respond(data=data, schema=RegisterEnvelope, status=status)
+        return envelope_error(err['code'], err['message'], request,
+                              schema=RegisterEnvelope, status=status)
+    return envelope_success(data, request, schema=RegisterEnvelope, status=status)
 
 
-@register_bp.route('/query<int:qnum>')
-def api_query(qnum):
+@register_router.get('/query{qnum}')
+def api_query(qnum: int, request: Request):
     if qnum == 1:
-        # More-specific /query1 route wins in Flask; defend in depth.
-        return api_query1()
-    data, err, status = _execute_query(qnum)
+        # More-specific /query1 route wins in FastAPI; defend in depth.
+        return api_query1(request)
+    data, err, status = _execute_query(qnum, request)
     if err is not None:
-        return jsonify({'error': err['message']}), status
-    return jsonify(data)
+        return JSONResponse(status_code=status, content={'error': err['message']})
+    return data
 
 
-@register_bp.route('/export/query<int:qnum>')
-def api_export(qnum):
+@register_router.get('/export/query{qnum}')
+def api_export(qnum: int, request: Request):
     if qnum not in QUERY_FUNCTIONS:
-        return jsonify({'error': f'Invalid query number: {qnum}'}), 400
-    ticker = request.args.get('ticker', '').upper().strip()
-    cik = request.args.get('cik', '').strip()
-    quarter = request.args.get('quarter', LQ)
-    rt = _get_rollup_type(request)
+        return JSONResponse(status_code=400, content={'error': f'Invalid query number: {qnum}'})
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    cik = (request.query_params.get('cik') or '').strip()
+    quarter = request.query_params.get('quarter', LQ)
+    rt = get_rollup_type(request)
 
     if qnum not in (15,) and not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
         if qnum == 7:
-            fund_name = request.args.get('fund_name', '').strip() or None
+            fund_name = (request.query_params.get('fund_name') or '').strip() or None
             data = fn(ticker, cik=cik or None, fund_name=fund_name, quarter=quarter)
         elif qnum == 15:
             data = fn(ticker or None, quarter=quarter)
@@ -170,7 +182,10 @@ def api_export(qnum):
             data = fn(ticker, quarter=quarter)
 
         if not data:
-            return jsonify({'error': f'No data found for ticker {ticker}'}), 404
+            return JSONResponse(
+                status_code=404,
+                content={'error': f'No data found for ticker {ticker}'},
+            )
 
         # Extract the tabular portion from structured responses:
         #   q7         → {stats, positions}              export `positions`
@@ -191,22 +206,21 @@ def api_export(qnum):
         buf = build_excel(export_data, sheet_name=sheet_name)
 
         filename = f"query{qnum}_{ticker or 'ALL'}_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        return send_file(
+        return StreamingResponse(
             buf,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=filename,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'},
         )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@register_bp.route('/amendments')
-def api_amendments():
+@register_router.get('/amendments')
+def api_amendments(ticker: str = ''):
     """13F-HR amendment reconciliation: show amended vs original filings per quarter."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
         amendments = con.execute(
@@ -234,23 +248,23 @@ def api_amendments():
             """, [ticker]
         ).fetchdf()
 
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'ticker': ticker,
             'amendments': df_to_records(amendments),
-        }))
+        })
     except Exception as e:
-        current_app.logger.error("amendments error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("amendments error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
 
 
-@register_bp.route('/manager_profile')
-def api_manager_profile():
+@register_router.get('/manager_profile')
+def api_manager_profile(manager: str = ''):
     """Manager profile: all holdings, sector allocation, top positions."""
-    manager = request.args.get('manager', '').strip()
+    manager = (manager or '').strip()
     if not manager:
-        return jsonify({'error': 'Missing manager parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing manager parameter'})
     con = get_db()
     try:
         top_holdings_df = con.execute(
@@ -307,11 +321,9 @@ def api_manager_profile():
             'sector_allocation': df_to_records(sectors),
             'quarterly_trend': df_to_records(qoq),
         }
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     except Exception as e:
-        current_app.logger.error("manager_profile error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("manager_profile error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
-
-

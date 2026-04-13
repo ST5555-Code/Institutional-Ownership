@@ -1,24 +1,25 @@
-"""Shared API helpers for the Phase 4 domain Blueprints.
+"""Shared API helpers for the FastAPI domain routers (Phase 4+ Batch 4-C).
 
 Holds:
   - Input-guard regexes (TICKER_RE, QUARTER_RE) + VALID_ROLLUP_TYPES set
   - _RT_AWARE_QUERIES frozenset (rollup-aware queryN dispatch)
   - QUERY_FUNCTIONS dispatch table
   - LQ / FQ / PQ quarter constants
-  - _get_rollup_type(req) request helper
-  - validate_query_params() before_request hook
-  - respond() envelope helper (Phase 1-B2)
+  - get_rollup_type(request) request helper
+  - validate_query_params_dep() FastAPI dependency
+  - envelope_success / envelope_error helpers
 
-No Flask app instantiation here — this file is imported by every api_*.py
-Blueprint module AND by scripts/app.py. Keep it dependency-light so it
-doesn't introduce circular imports.
+No FastAPI app instantiation here — this file is imported by every api_*.py
+router AND by scripts/app.py. Keep it dependency-light so it doesn't
+introduce circular imports.
 """
 from __future__ import annotations
 
 import logging
 import re
 
-from flask import current_app, jsonify, request
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from config import LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER
@@ -35,13 +36,11 @@ log = logging.getLogger(__name__)
 
 # ── Input-guard regexes (ARCH-1A) ──────────────────────────────────────────
 # Ticker regex accepts BRK.B, BF.B, ADRs. Quarter regex matches 20XXQ[1-4].
-# Transitional — Pydantic validation in Batch 4-C (FastAPI) replaces these.
 TICKER_RE = re.compile(r'^[A-Z]{1,6}(\.[A-Z])?$')
 QUARTER_RE = re.compile(r'^20\d{2}Q[1-4]$')
 
 
 # ── Quarter constants (re-exported from config.py) ─────────────────────────
-# Edit ONLY scripts/config.py to roll forward. These propagate everywhere.
 LQ = LATEST_QUARTER
 FQ = FIRST_QUARTER
 PQ = PREV_QUARTER
@@ -58,99 +57,55 @@ QUERY_FUNCTIONS = {
 
 # Queries that accept rollup_type. Shared by api_query and api_export so
 # Excel export mirrors on-screen semantics (Batch 1-B1 export parity).
-# Keep in sync with queries.py signatures.
 _RT_AWARE_QUERIES = frozenset({1, 2, 3, 5, 12, 14})
 
 
-def _get_rollup_type(req) -> str:
+def get_rollup_type(request: Request) -> str:
     """Extract rollup_type query parameter, validated against VALID_ROLLUP_TYPES.
     Default: 'economic_control_v1' (fund sponsor / voting view).
     """
-    rt = req.args.get('rollup_type', 'economic_control_v1').strip()
+    rt = (request.query_params.get('rollup_type') or 'economic_control_v1').strip()
     if rt not in VALID_ROLLUP_TYPES:
         rt = 'economic_control_v1'
     return rt
 
 
-# ── Input guards (ARCH-1A) ─────────────────────────────────────────────────
-# Registered as a Flask @before_request in app.py. Validates /api/v1/*.
-# /api/admin/* has its own before_request (admin_bp token auth).
+# ── Input guards (ARCH-1A) — FastAPI dependency ────────────────────────────
+# Applied via APIRouter(dependencies=[Depends(validate_query_params_dep)]).
+# Raises HTTPException(400, ...) on invalid input. /api/admin/* routers
+# bring their own token-auth dependency instead.
 
-def validate_query_params():
-    path = request.path
-    if not path.startswith('/api/v1/'):
-        return None
-    ticker = request.args.get('ticker')
+def validate_query_params_dep(request: Request) -> None:
+    """FastAPI dependency: validate shape of ticker / quarter / rollup_type."""
+    ticker = request.query_params.get('ticker')
     if ticker and not TICKER_RE.match(ticker.upper().strip()):
-        return jsonify({'error': f'Invalid ticker format: {ticker!r}'}), 400
-    quarter = request.args.get('quarter')
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'Invalid ticker format: {ticker!r}'},
+        )
+    quarter = request.query_params.get('quarter')
     if quarter and not QUARTER_RE.match(quarter.strip()):
-        return jsonify({'error': f'Invalid quarter format: {quarter!r}'}), 400
-    rollup = request.args.get('rollup_type')
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'Invalid quarter format: {quarter!r}'},
+        )
+    rollup = request.query_params.get('rollup_type')
     if rollup and rollup.strip() not in VALID_ROLLUP_TYPES:
-        return jsonify({'error': f'Invalid rollup_type: {rollup!r}'}), 400
-    return None
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'Invalid rollup_type: {rollup!r}'},
+        )
 
 
-# ── Phase 1-B2 envelope helper ─────────────────────────────────────────────
-# respond() wraps payloads in the {data, error, meta} envelope. Applied
-# opt-in per endpoint — handlers NOT migrated still call jsonify() directly.
-
-def _build_meta() -> dict:
-    return {
-        "quarter": request.args.get("quarter"),
-        "rollup_type": request.args.get("rollup_type"),
-        "generated_at": iso_now(),
-    }
+# ── Phase 1-B2 envelope helpers (Phase 4+ Batch 4-C form) ─────────────────
+# Replaces the Flask respond() helper. Each enveloped endpoint constructs
+# {data, error, meta} via envelope_success() on the happy path and
+# envelope_error() on the failure paths. `schema` is a Pydantic Envelope
+# class (e.g. TickersEnvelope) validated on the way out — a shape mismatch
+# downgrades the response to a standard 500 error envelope.
 
 
-def respond(data=None, *, schema=None, error=None, status=200):
-    """Return a Flask JSON response wrapped in the Phase 1-B2 envelope.
-
-    Args:
-        data: payload. Can be list/dict. `None` when `error` is set.
-        schema: optional Pydantic envelope type (e.g. `TickersEnvelope`);
-                validates the {data, error, meta} shape on the way out.
-        error: optional ErrorShape-compatible dict or pydantic model.
-        status: HTTP status code.
-    """
-    err_payload = None
-    if error is not None:
-        err_payload = error if isinstance(error, dict) else error.model_dump()
-
-    envelope = {"data": data, "error": err_payload, "meta": _build_meta()}
-
-    if schema is not None:
-        try:
-            schema.model_validate(envelope)
-        except ValidationError as e:
-            current_app.logger.error("[respond] envelope schema validation failed: %s", e)
-            return jsonify({
-                "data": None,
-                "error": {
-                    "code": "schema_validation_error",
-                    "message": "Response failed server-side validation",
-                    "detail": {"errors": e.errors()[:5]},
-                },
-                "meta": _build_meta(),
-            }), 500
-
-    return jsonify(envelope), status
-
-
-# ── FastAPI envelope helpers (Phase 4+ Batch 4-C) ─────────────────────────
-# Added alongside Flask's `respond()` during the FastAPI migration. No
-# callers yet — the cutover commit swaps every handler from respond() to
-# these. respond() + _build_meta() deleted once callers gone.
-#
-# Shape-identical to `respond()`: `{data, error, meta}`. Meta is sourced
-# from the FastAPI request.query_params (same keys: quarter, rollup_type,
-# generated_at). Pass the request via the second positional argument — the
-# dependency machinery makes that cheap.
-
-
-def _build_meta_fastapi(request) -> dict:
-    """FastAPI analogue of _build_meta(). `request` is starlette.Request."""
+def _build_meta(request: Request) -> dict:
     return {
         "quarter": request.query_params.get("quarter"),
         "rollup_type": request.query_params.get("rollup_type"),
@@ -158,17 +113,14 @@ def _build_meta_fastapi(request) -> dict:
     }
 
 
-def envelope_success(data, request, *, schema=None, status: int = 200):
-    """FastAPI: return a successful envelope response."""
-    # Deferred import — starlette is a fastapi transitive, not a Flask-time dep.
-    from starlette.responses import JSONResponse  # pylint: disable=import-outside-toplevel
-
-    envelope = {"data": data, "error": None, "meta": _build_meta_fastapi(request)}
+def envelope_success(data, request: Request, *, schema=None, status: int = 200):
+    """Return a JSONResponse wrapped in the Phase 1-B2 envelope."""
+    envelope = {"data": data, "error": None, "meta": _build_meta(request)}
     if schema is not None:
         try:
             schema.model_validate(envelope)
         except ValidationError as e:
-            # Downgrade to 500 — same semantics as Flask respond()
+            log.error("[envelope_success] schema validation failed: %s", e)
             return JSONResponse(
                 status_code=500,
                 content={
@@ -178,27 +130,24 @@ def envelope_success(data, request, *, schema=None, status: int = 200):
                         "message": "Response failed server-side validation",
                         "detail": {"errors": e.errors()[:5]},
                     },
-                    "meta": _build_meta_fastapi(request),
+                    "meta": _build_meta(request),
                 },
             )
     return JSONResponse(status_code=status, content=envelope)
 
 
-def envelope_error(code: str, message: str, request, *,
+def envelope_error(code: str, message: str, request: Request, *,
                    schema=None, status: int = 500, detail=None):
-    """FastAPI: return an error envelope response."""
-    from starlette.responses import JSONResponse  # pylint: disable=import-outside-toplevel
-
+    """Return an error envelope response."""
     err = {"code": code, "message": message}
     if detail is not None:
         err["detail"] = detail
-    envelope = {"data": None, "error": err, "meta": _build_meta_fastapi(request)}
-    # Schema validation optional — same contract as respond()
+    envelope = {"data": None, "error": err, "meta": _build_meta(request)}
+    # Schema validation on error paths is best-effort — don't mask the
+    # original failure with a schema-validation fallback.
     if schema is not None:
         try:
             schema.model_validate(envelope)
         except ValidationError:
-            # Already an error response; don't mask the original with a
-            # schema-validation fallback. Return as-is.
             pass
     return JSONResponse(status_code=status, content=envelope)

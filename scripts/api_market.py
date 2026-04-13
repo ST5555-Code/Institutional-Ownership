@@ -1,4 +1,4 @@
-"""Market-wide analytics endpoints.
+"""Market-wide analytics endpoints (FastAPI).
 
 Routes:
   /api/v1/sector_flows
@@ -13,112 +13,119 @@ Routes:
 """
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, request
+import logging
 
-from api_common import LQ, _get_rollup_type
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
+from api_common import LQ, get_rollup_type, validate_query_params_dep
 from app_db import get_db, has_table
 from queries import clean_for_json, df_to_records, short_interest_analysis
 
-market_bp = Blueprint('api_market', __name__, url_prefix='/api/v1')
+log = logging.getLogger(__name__)
+
+market_router = APIRouter(
+    prefix='/api/v1',
+    tags=['market'],
+    dependencies=[Depends(validate_query_params_dep)],
+)
 
 
-@market_bp.route('/sector_flows')
-def api_sector_flows():
+@market_router.get('/sector_flows')
+def api_sector_flows(request: Request):
     """Multi-quarter institutional money flows by GICS sector."""
     try:
         from queries import get_sector_flows
-        active_only = request.args.get('active_only', '0') == '1'
-        level = request.args.get('level', 'parent').strip()
-        result = get_sector_flows(active_only=active_only, level=level)
-        return jsonify(result)
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
+        return get_sector_flows(active_only=active_only, level=level)
     except Exception as e:
-        current_app.logger.error("sector_flows error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("sector_flows error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_bp.route('/sector_flow_movers')
-def api_sector_flow_movers():
+@market_router.get('/sector_flow_movers')
+def api_sector_flow_movers(request: Request):
     """Top buyers/sellers for one sector in one quarter transition."""
     try:
         from queries import get_sector_flow_movers
-        q_from = request.args.get('from', '').strip()
-        q_to = request.args.get('to', '').strip()
-        sector = request.args.get('sector', '').strip()
-        active_only = request.args.get('active_only', '0') == '1'
-        level = request.args.get('level', 'parent').strip()
+        q_from = (request.query_params.get('from') or '').strip()
+        q_to = (request.query_params.get('to') or '').strip()
+        sector = (request.query_params.get('sector') or '').strip()
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
         if not q_from or not q_to or not sector:
-            return jsonify({'error': 'Missing required params: from, to, sector'}), 400
-        rt = _get_rollup_type(request)
-        result = get_sector_flow_movers(q_from, q_to, sector,
-                                        active_only=active_only, level=level,
-                                        rollup_type=rt)
-        return jsonify(result)
+            return JSONResponse(status_code=400, content={'error': 'Missing required params: from, to, sector'})
+        rt = get_rollup_type(request)
+        return get_sector_flow_movers(q_from, q_to, sector,
+                                      active_only=active_only, level=level,
+                                      rollup_type=rt)
     except Exception as e:
-        current_app.logger.error("sector_flow_movers error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("sector_flow_movers error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_bp.route('/sector_flow_detail')
-def api_sector_flow_detail():
+@market_router.get('/sector_flow_detail')
+def api_sector_flow_detail(request: Request):
     """Full cross-quarter detail for one sector: inflow/outflow/net + top movers."""
     try:
         from queries import get_sector_flow_detail
-        sector = request.args.get('sector', '').strip()
-        active_only = request.args.get('active_only', '0') == '1'
-        level = request.args.get('level', 'parent').strip()
+        sector = (request.query_params.get('sector') or '').strip()
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
         if not sector:
-            return jsonify({'error': 'Missing sector param'}), 400
-        rank_by = request.args.get('rank_by', 'total').strip()
-        rt = _get_rollup_type(request)
-        result = get_sector_flow_detail(
+            return JSONResponse(status_code=400, content={'error': 'Missing sector param'})
+        rank_by = (request.query_params.get('rank_by') or 'total').strip()
+        rt = get_rollup_type(request)
+        return get_sector_flow_detail(
             sector, active_only=active_only, level=level, rank_by=rank_by,
             rollup_type=rt)
-        return jsonify(result)
     except Exception as e:
-        current_app.logger.error("sector_flow_detail error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("sector_flow_detail error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_bp.route('/short_analysis')
-def api_short_analysis():
+@market_router.get('/short_analysis')
+def api_short_analysis(request: Request):
     """Short Interest Analysis — N-PORT shorts, FINRA volume, long/short cross-ref."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     try:
-        rt = _get_rollup_type(request)
-        result = short_interest_analysis(ticker, rollup_type=rt)
-        return jsonify(result)
+        rt = get_rollup_type(request)
+        return short_interest_analysis(ticker, rollup_type=rt)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_bp.route('/short_long')
-def api_short_long():
+@market_router.get('/short_long')
+def api_short_long(request: Request):
     """Short vs Long comparison: managers long via 13F and short via N-PORT."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     try:
         from queries import get_short_long_comparison
-        rt = _get_rollup_type(request)
-        result = get_short_long_comparison(ticker, rollup_type=rt)
-        return jsonify(result)
+        rt = get_rollup_type(request)
+        return get_short_long_comparison(ticker, rollup_type=rt)
     except Exception as e:
-        current_app.logger.error("short_long error for %s: %s", ticker, e)
-        return jsonify({'error': str(e)}), 500
+        log.error("short_long error for %s: %s", ticker, e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_bp.route('/short_volume')
-def api_short_volume():
+@market_router.get('/short_volume')
+def api_short_volume(ticker: str = ''):
     """FINRA daily short sale volume for a ticker."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
         if not has_table('short_interest'):
-            return jsonify({'error': 'short_interest table not loaded — run fetch_finra_short.py'}), 404
+            return JSONResponse(
+                status_code=404,
+                content={'error': 'short_interest table not loaded — run fetch_finra_short.py'},
+            )
         df = con.execute("""
             SELECT report_date, short_volume, total_volume, short_pct
             FROM short_interest
@@ -126,17 +133,17 @@ def api_short_volume():
             ORDER BY report_date DESC
             LIMIT 60
         """, [ticker]).fetchdf()
-        return jsonify(df_to_records(df))
+        return df_to_records(df)
     finally:
         con.close()
 
 
-@market_bp.route('/crowding')
-def api_crowding():
+@market_router.get('/crowding')
+def api_crowding(ticker: str = ''):
     """Crowding analysis: institutional concentration + short interest overlay."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
         holders = con.execute(
@@ -158,17 +165,17 @@ def api_crowding():
                 ORDER BY report_date DESC LIMIT 20
             """, [ticker]).fetchdf()
             result['short_history'] = df_to_records(si)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     finally:
         con.close()
 
 
-@market_bp.route('/smart_money')
-def api_smart_money():
+@market_router.get('/smart_money')
+def api_smart_money(ticker: str = ''):
     """Smart Money: net exposure view — long 13F vs short FINRA per manager type."""
-    ticker = request.args.get('ticker', '').upper().strip()
+    ticker = (ticker or '').upper().strip()
     if not ticker:
-        return jsonify({'error': 'Missing ticker parameter'}), 400
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
         longs = con.execute(
@@ -201,16 +208,16 @@ def api_smart_money():
                 ORDER BY market_value_usd ASC LIMIT 10
             """, [ticker]).fetchdf()
             result['nport_shorts'] = df_to_records(nport_shorts)
-        return jsonify(clean_for_json(result))
+        return clean_for_json(result)
     finally:
         con.close()
 
 
-@market_bp.route('/heatmap')
-def api_heatmap():
+@market_router.get('/heatmap')
+def api_heatmap(request: Request):
     """Ownership concentration heatmap: top managers × tickers by pct_of_float."""
-    ticker = request.args.get('ticker', '').upper().strip()
-    peers = request.args.get('peers', '').upper().strip()
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    peers = (request.query_params.get('peers') or '').upper().strip()
     con = get_db()
     try:
         tickers = [ticker] if ticker else []
@@ -242,7 +249,7 @@ def api_heatmap():
         manager_names = [r[0] for r in managers]
 
         if not manager_names:
-            return jsonify({'tickers': tickers, 'managers': [], 'cells': []})
+            return {'tickers': tickers, 'managers': [], 'cells': []}
 
         mgr_ph = ','.join(['?'] * len(manager_names))
         cells = con.execute(
@@ -260,13 +267,13 @@ def api_heatmap():
             """, tickers + manager_names
         ).fetchdf()
 
-        return jsonify(clean_for_json({
+        return clean_for_json({
             'tickers': tickers,
             'managers': manager_names,
             'cells': df_to_records(cells),
-        }))
+        })
     except Exception as e:
-        current_app.logger.error("heatmap error: %s", e)
-        return jsonify({'error': str(e)}), 500
+        log.error("heatmap error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
