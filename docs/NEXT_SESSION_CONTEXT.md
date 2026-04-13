@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (ARCH-1A routing hygiene landed, HEAD: a8dd77a — docs commit will advance the ref)_
+_Last updated: 2026-04-13 (ARCH-1B1 endpoint classification + export parity landed, HEAD: d3a2fcb — docs commit will advance the ref)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** `a8dd77a` (code) / docs commit will be latest
+- **HEAD:** `d3a2fcb` (code) / docs commit will be latest
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - Flask — `scripts/app.py` (~1400 lines) + `scripts/admin_bp.py` (~700 lines, admin Blueprint, INF12)
@@ -79,22 +79,25 @@ All entity data quality and infrastructure work from this session is done. The e
 
 ## Open items — current priority order
 
-### ⭐ Recommended next Claude Code task — ARCH Phase 1 Batch 1-B1 (endpoint classification + export parity)
+### ⭐ Recommended next Claude Code task — ARCH Phase 2 Batch 2-A (correctness fixes)
 
-_Batch 1-A complete 2026-04-13 (commit `a8dd77a`). 38 public `/api/*`
-routes dual-mounted at `/api/v1/*`, `/api/config/quarters` live,
-`before_request` hook guards ticker / quarter / rollup_type, rollup
-threaded through to `/api/short_analysis` + `/api/short_long`._
+_Batch 1-B1 complete 2026-04-13 (commit `d3a2fcb`). 39-route classification
+table committed to `app.py`, `api_export` now mirrors `api_query` rollup
+semantics via shared `_RT_AWARE_QUERIES`, q1/q16 exports unblocked. Phase 1
+exit gate partial: Batch 1-B2 deferred until vanilla-JS retirement (≥2026-04-20)
+— does NOT block Phase 2 per `ARCHITECTURE_REVIEW.md`._
 
-From `ARCHITECTURE_REVIEW.md` Batch 1-B1. **Low risk, ~2 hours, `app.py` + `queries.py` (export path only), no React gate.**
+From `ARCHITECTURE_REVIEW.md` Batch 2-A. **Low risk, ~2 hours, `scripts/queries.py` + new `docs/write_path_risk_map.md`.**
 
-1. **Endpoint classification** — produce and commit a comment block in `app.py`: every endpoint marked `latest-only` or `quarter-aware`. This is the freeze artifact that Phase 4 consumes.
-2. **Export parity** — verify `api_export()` passes the same `quarter` + `rollup_type` as the on-screen table. Fix any mismatches. Manually spot-check 3 ticker / quarter / rollup combinations.
-3. Not doing in 1-B1: error envelope, Pydantic schemas, React changes — those are Batch 1-B2, which is gated on React Phase 4 vanilla-JS retirement (≥2026-04-20) because the `{ data, error, meta }` envelope would break the legacy frontend.
+1. **`get_nport_children` N+1 loop fix** — batch N-PORT children into a single SQL `IN` clause. Measured hotspot from portfolio_context vectorization work (286ms / 45% of `/api/portfolio_context` budget). Target: batched call completes ≤50ms for a 25-fund portfolio.
+2. **`summary_by_parent` path check** — verify it is read, not recomputed, on every request path. If any path recomputes on demand, move to a pipeline rebuild step.
+3. **Write-path consistency audit** — map all non-entity pipeline scripts; identify which can partially apply vs roll back on failure. **Audit only, no code changes.** Output: `docs/write_path_risk_map.md`.
 
-Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate Phase 1. See `ARCHITECTURE_REVIEW.md` Phase 0-B1 / 0-B2. Phase 0-B2 gates Batch 4-A only.
+Phase 0-B (runtime smoke test CI with fixture DB) is separate and phase-independent — does NOT gate any Phase. Start when capacity allows.
 
-**Known pre-existing issue surfaced in Batch 1-A** — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type. Tracked as BL-9. Fix before Short Interest tab wires up the endpoint.
+**Known pre-existing issues surfaced in 1-A / 1-B1 — do not absorb into 2-A:**
+- BL-9 — `/api/short_long` returns 500 with `KeyError 'long_value_k'`, independent of rollup_type. Fix before Short Interest tab wires up the endpoint.
+- BL-10 — `/api/export/query<N>` still 500s for q6/q10/q11/q15 (multi-table shapes). Fix needs multi-sheet Excel or per-query extractors.
 
 ### 1. Stage 5 cleanup — scheduled 2026-05-09+, requires explicit authorization
 
@@ -125,17 +128,22 @@ Do not delete before 2026-04-20. Do not delete without explicit confirmation.
 
 Phase 0-A: ✅ DONE 2026-04-13 (commit `e201885`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-A: ✅ DONE 2026-04-13 (commit `a8dd77a`). See ROADMAP COMPLETED.
-Phase 1 Batch 1-B1: endpoint classification + export parity. `app.py` +
-`queries.py` export path only. ~2 hours. No React gate. Next recommended task.
+Phase 1 Batch 1-B1: ✅ DONE 2026-04-13 (commit `d3a2fcb`). See ROADMAP COMPLETED.
 Phase 1 Batch 1-B2: error envelope + Pydantic schemas + React error boundaries.
-**Gated on vanilla-JS retirement (≥2026-04-20)** — the `{ data, error, meta }`
+**Gated on vanilla-JS retirement (≥2026-04-20)** — the `{data, error, meta}`
 envelope would break the legacy frontend at port 8001 if landed before then.
+Does NOT block Phase 2.
+Phase 2 Batch 2-A: N+1 fix + summary_by_parent path check + write-path risk
+map. `queries.py` + new `docs/write_path_risk_map.md`. ~2 hours. Next
+recommended task.
 Phase 0-B: runtime smoke CI with fixture DB — phase-independent, does not
-gate Phase 1. Start when capacity allows. Phase 0-B2 gates Batch 4-A only.
-BL-8: re-enable suppressed pre-commit rules (fix underlying warnings). Small
-rule-by-rule PRs. Not a Phase 1 gate.
+gate Phase 1 or Phase 2. Start when capacity allows. Phase 0-B2 gates 4-A.
+BL-8: re-enable suppressed pre-commit rules. Small rule-by-rule PRs.
 BL-9: `/api/short_long` 500 — pre-existing `KeyError 'long_value_k'`. Fix
 before Short Interest tab wires up the endpoint.
+BL-10: `/api/export/query<N>` 500 on q6/q10/q11/q15 — pre-existing
+multi-table shape mismatches. Fix needs multi-sheet Excel or per-query
+extractors.
 
 ### 5. Minor follow-ups
 
@@ -178,6 +186,12 @@ When non-fund entity rolls under parent for EC via transitive_flatten/orphan_sca
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.
+
+### w. `_RT_AWARE_QUERIES` + endpoint classification block (ARCH-1B1)
+
+- `_RT_AWARE_QUERIES = frozenset({1, 2, 3, 5, 12, 14})` at module scope in `app.py` is the single source of truth for which `query<N>` endpoints accept `rollup_type`. Both `api_query` and `api_export` dispatch on it. If you change a `query<N>` signature to add or remove `rollup_type`, update this set AND the classification comment block above the Flask routes section.
+- `api_export` extracts tabular data from structured responses: q7 → `positions`, q1/q16 → `rows`, anything else → passed whole to `build_excel`. q6/q10/q11/q15 still 500 because their shapes are multi-table and the extractor doesn't know them (BL-10).
+- Endpoint classification block at the top of the routes section is the freeze artifact consumed by Batch 4-A — do not add a route without adding a row there.
 
 ### v. `/api/*` dual-mount + `before_request` ordering (ARCH-1A)
 
@@ -241,6 +255,7 @@ python3 -c "import duckdb; print(duckdb.connect('data/13f.duckdb',read_only=True
 ## Session ledger (newest first — key data QC commits only)
 
 ```
+d3a2fcb feat: Batch 1-B1 — endpoint classification + export parity
 a8dd77a feat: Batch 1-A — /api/v1/ dual-mount, quarter_config rename, input guards
 e201885 ci: Phase 0-A — lint/bandit CI (ruff + pylint + bandit on every push)
 799dbde docs: ROADMAP + NEXT_SESSION_CONTEXT — Phase 4 cutover complete
