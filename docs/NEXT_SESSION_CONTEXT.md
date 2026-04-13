@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Stage 5 cleanup: 3 legacy tables dropped, 4 INF9d eids preserved as PARENT_SEEDS brand shells. HEAD: pending)_
+_Last updated: 2026-04-13 (session close — Stage 5 cleanup: 3 legacy tables dropped, 4 INF9d eids preserved as PARENT_SEEDS brand shells. HEAD: 305739e)_
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of
@@ -12,7 +12,7 @@ each working session so the top block stays current.
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
 - **Branch:** `main`
-- **HEAD:** pending commit (Stage 5 cleanup — drop 3 legacy tables + close INF9d ghost delete as won't fix). Prior HEAD `d2c05a9` (chore: expand .gitignore).
+- **HEAD:** `305739e` (chore: Stage 5 cleanup — drop 3 legacy tables; preserve 4 INF9d eids)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - FastAPI + uvicorn — `scripts/app.py` (thin entry, ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (`admin_router`, `/api/admin/*`, INF12 token auth via `Depends`). OpenAPI `/docs` + `/redoc` available. Flask retired 2026-04-13 (Batch 4-C).
