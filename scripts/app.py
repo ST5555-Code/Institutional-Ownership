@@ -1,7 +1,8 @@
 """Flask web application entry point for 13F institutional ownership research.
 
 Phase 4 Batch 4-A (2026-04-13) split this module into domain Blueprints.
-Pre-split logic preserved in app_legacy.py for rollback.
+The pre-split `app_legacy.py` snapshot was deleted once the split proved
+stable (see COMPLETED section of ROADMAP for dates).
 
 Layout:
   - app_db.py               DB helpers (get_db, has_table, resolve_db_path, ...)

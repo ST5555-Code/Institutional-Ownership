@@ -15,7 +15,7 @@ each working session so the top block stays current.
 - **HEAD:** `746a798` (Phase 4 Batch 4-A — Blueprint split of scripts/app.py)
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
-  - Flask — `scripts/app.py` (103 lines, thin entry) + 9 Blueprint modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (~700 lines, `/api/admin/*`, INF12). `scripts/app_legacy.py` retained for 1-week rollback.
+  - Flask — `scripts/app.py` (103 lines, thin entry) + 9 Blueprint modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (~700 lines, `/api/admin/*`, INF12).
   - Service layer — `scripts/queries.py` (~5,500 lines, SQL + query logic) + `scripts/serializers.py` (~210 lines, `clean_for_json` / `df_to_records` / filer-name resolution / subadviser notes) + `scripts/cache.py` (~40 lines, `cached()` + key templates).
   - DuckDB — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging)
   - Vanilla JS — **retired 2026-04-13** (commit `71269cb`). `web/static/{dist,vendor,style.css}` are orphaned — safe to delete in a follow-up PR.
@@ -93,9 +93,7 @@ work through Batch 4-B is complete._
 
 **2. Phase 4+ — Flask → FastAPI — ~2–3 days.** Triggered on first second-operator joining or move to shared/hosted use. Replaces hand-written Pydantic schemas + React `src/types/api.ts` with openapi-typescript auto-generation. Removes route-layer input guards (Pydantic validates). Thread-local `get_db()` preserved via `def` (not `async def`) routes.
 
-**3. `app_legacy.py` cleanup — delete after 1 week stable.** `scripts/app_legacy.py` (1,788-line pre-Batch-4-A snapshot) retained for rollback. Safe to delete ≥2026-04-20 if no regressions in main. Needs explicit authorization before deletion.
-
-**4. Backlog (no phase dependency).**
+**3. Backlog (no phase dependency).**
 - BL-3: write-path consistency implementation (follow-on to 2-A audit)
 - BL-8: re-enable suppressed pre-commit rules (small rule-by-rule PRs)
 - BL-9: `/api/v1/short_long` returns 500 with `KeyError 'long_value_k'`
