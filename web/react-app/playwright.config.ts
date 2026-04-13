@@ -26,6 +26,7 @@ export default defineConfig({
     timeout: 30_000,
   },
   expect: {
+    timeout: 10_000,
     // Full-page screenshots against live backend data will drift; allow a
     // modest pixel-diff threshold so colour-level changes (badge palette,
     // layout shifts) are still caught while small numeric updates aren't.
