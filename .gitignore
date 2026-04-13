@@ -5,9 +5,13 @@ data/raw/
 data/extracted/
 data/market/
 data/nport_raw/
-data/cache/adv_pdfs/
-data/cache/adv_parse_w*.csv
-data/cache/adv_parsed.txt
+# DB backups (per-session parquet dumps, multi-GB)
+data/backups/
+# Local cache root (18 GB at session close 2026-04-13; previously only
+# the adv_* subpaths were ignored, which left the root open to accidents)
+data/cache/
+# Large SEC reference feeds — re-downloadable; keep small CSVs tracked
+data/reference/*.xml.gz
 
 # Outputs — generated files
 outputs/
@@ -33,6 +37,9 @@ data/13f_readonly.duckdb
 
 # React build output
 web/static/dist/
+
+# TypeScript incremental build info (regenerated on every tsc)
+**/*.tsbuildinfo
 
 # Node modules
 web/react-src/node_modules/
