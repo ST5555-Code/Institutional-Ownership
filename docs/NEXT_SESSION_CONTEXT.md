@@ -1,6 +1,42 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Batch 1 cleanup complete: positions dropped (18.68M rows), build_summaries.py DDL aligned, control plane live in prod, canonical_ddl.md reclassified. HEAD: TBD, replaces 3816577.)_
+_Last updated: 2026-04-13 (Batch 2A close — fetch_market.py rewritten as DirectWritePipeline; proved sec_fetch/rate_limit/manifest/freshness against live canonical. HEAD: TBD, replaces d50b602.)_
+
+## Batch 2A — 2026-04-13 session
+
+fetch_market.py rewritten to implement the DirectWritePipeline protocol
+from `scripts/pipeline/protocol.py`. First real proof of the v1.2
+framework against a canonical table.
+
+**Shipped:**
+- `scripts/fetch_market.py` — full rewrite (~750 lines): MarketDataPipeline class implementing `source_type`/`discover()`/`fetch()`/`write_to_canonical()`/`validate_post_write()`/`stamp_freshness()`. Manifest write per batch, impact row per ticker, CHECKPOINT every 500 rows, per-domain rate_limit() on every Yahoo + SEC call. `--dry-run` shows discovery without writes; `--test` clips to 10 tickers and writes to staging.
+- `scripts/pipeline/discover.py` — `discover_market()` NA-bool fix (pandas `pd.NA` raised TypeError on `if row.get("unfetchable"):`; now explicit `is True` check).
+- Legacy `UPDATE holdings SET market_value_live/pct_of_float` path removed. Group 3 enrichment (holdings_v2 post-promote) is now `enrich_holdings.py`, Batch 2B.
+
+**Test run results (staging):**
+- 10-ticker batch: 1 manifest row (fetch_status=complete, 27.6 KB bytes), 10 impacts (8 loaded / 2 failed on exotic symbols), all promote_status=promoted, data_freshness row stamped (6,425 rows @ 2026-04-13 22:46:05).
+- BLOCKS=0, 1 sentinel FLAG (4 rows with non-positive prices — exotic OTC tickers), 2 WARNS (coverage skipped in staging, 6,103 pre-existing stale price rows — expected, staging market_data last refreshed pre-Batch-2A).
+
+**Dry-run results (prod):**
+- Universe: 43,049 tickers (`holdings_v2 ∪ fund_holdings_v2`).
+- Stale in prod market_data: 6,424 price / 382 metadata / 2,008 SEC.
+- 428 batches × 100 tickers = 42,735 to fetch. Est. 12h at rate limits.
+- No prod DB writes.
+
+**PROCESS_RULES violations cleared:**
+- §1 CHECKPOINT per 500 rows inside `upsert_yahoo` / `upsert_sec`.
+- §2 restart-safe — discover_market anti-joins staleness thresholds.
+- §3 source failover — per-ticker errors captured in manifest, not fatal.
+- §4 rate_limit('query1.finance.yahoo.com') + rate_limit('data.sec.gov') before every HTTP call.
+- §5 coverage gate (prod only) BLOCKs at <85%, WARNs at <95%; sentinel gates always run.
+- §6 progress line every 100 tickers with rate + ETA.
+- §9 --dry-run flag that writes nothing.
+
+**Open for Batch 2B (next session):**
+- Full market refresh authorized run (~12h at rate limits). Not run this session per prompt.
+- `enrich_holdings.py` as Group 3 DirectWritePipeline for `holdings_v2` (ticker / security_type_inferred / market_value_live / pct_of_float) post-promote.
+
+
 
 ## Batch 1 — 2026-04-13 session
 

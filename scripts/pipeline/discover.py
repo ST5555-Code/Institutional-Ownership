@@ -271,7 +271,10 @@ def discover_market(
 
     stale_tickers: list[str] = []
     for _, row in merged.iterrows():
-        if row.get("unfetchable"):
+        # Coerce pandas NA / nan → False explicitly. A plain `if row.get(...)`
+        # raises TypeError when the value is pd.NA.
+        unfetch = row.get("unfetchable")
+        if unfetch is True:
             continue
         if (
             _stale(row.get("fetch_date"), cutoffs["price"])

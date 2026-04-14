@@ -2,6 +2,22 @@
 
 _Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
 
+## Session Summary 2026-04-13 (Batch 2A) — fetch_market.py DirectWritePipeline
+
+First real proof of the v1.2 pipeline framework against a canonical
+table.
+
+- **`scripts/fetch_market.py` rewrite (~750 lines):** implements `MarketDataPipeline(source_type="MARKET")` conforming to `DirectWritePipeline` structurally. `discover()` → `discover_market()`. `fetch()` writes one `ingestion_manifest` row per 100-ticker batch, calls `rate_limit('query1.finance.yahoo.com')` + `rate_limit('data.sec.gov')` on every HTTP call. `write_to_canonical()` upserts `market_data` with CHECKPOINT every 500 rows and writes one `ingestion_impacts` row per ticker. `validate_post_write()` runs a 85%/95% coverage gate (prod-only) plus sentinel gates (non-positive price/float, market_cap > 50T, stale rows). `stamp_freshness()` upserts `data_freshness`. `--dry-run` shows discovery, no writes. `--test` clips to 10 tickers and routes to staging.
+- **Legacy holdings update removed:** the pre-rewrite `UPDATE holdings SET market_value_live/pct_of_float` block (targeting Stage-5-dropped `holdings`) is gone. Group 3 enrichment for `holdings_v2` is now a separate `enrich_holdings.py` planned for Batch 2B.
+- **`scripts/pipeline/discover.py` bug fix:** `discover_market()` tripped on `if row.get("unfetchable"):` when the cell held `pd.NA`. Replaced with explicit `is True` check.
+- **Test run (staging):** 10 tickers, 8.3s, 1 manifest + 10 impacts (8 loaded / 2 failed on exotic OTC tickers), 27.6 KB bytes, all promote_status=promoted, `data_freshness[market_data]` stamped.
+- **Dry-run (prod):** 43,049-ticker universe, 6,424 stale prices / 382 stale metadata / 2,008 stale SEC, 428 batches, est. 12h at rate limits. No writes.
+- **PROCESS_RULES violation list for fetch_market.py cleared:** §1, §2, §3, §4, §5, §6, §9 all addressed. `docs/pipeline_violations.md` row for `fetch_market.py` now stands as historical record of the pre-rewrite state.
+
+**Next: Batch 2B** — authorized full market refresh (separate session, ~12h), then `enrich_holdings.py` for Group 3 post-promote.
+
+---
+
 ## Session Summary 2026-04-13 (Batch 1) — Housekeeping + control plane to prod
 
 Schema-only follow-up to the v1.2 framework foundation session.
