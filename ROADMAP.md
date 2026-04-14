@@ -1,6 +1,50 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 12, 2026 — ARCHITECTURE_REVIEW.md committed (6-phase, 9-batch upgrade plan). React Phase 3 + backend cleanup trio also shipped today._
+_Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
+
+## Session Summary 2026-04-13 — Pipeline framework foundation (v1.2)
+
+Twelve-deliverable documentation + framework-scaffolding session. No
+pipeline script ran; no canonical table was modified. Acceptance
+criteria for rewrite work on 9 scripts that touch Stage-5-dropped
+tables are now in place.
+
+**Docs shipped:**
+- `docs/data_layers.md` — complete table inventory classified into L0–L4 (every prod table assigned, 0 unclassified)
+- `docs/canonical_ddl.md` — L3 + L4 DDL audit; 5 BROKEN total (3 L3: `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`; 2 L4: `summary_by_parent`, `summary_by_ticker`) / 20 ALIGNED; blocks promote-script writing until each row's drift is resolved
+- `docs/pipeline_inventory.md` — full script audit: REWRITE × 10, RETROFIT × 7, OK × 11, RETIRE × 13
+- `docs/pipeline_violations.md` — per-script PROCESS_RULES detail with file:line for every violation
+
+**Code shipped:**
+- `scripts/migrations/001_pipeline_control_plane.py` — creates `ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`, confirms `data_freshness`, view `ingestion_manifest_current`. Idempotent. Three separate sequences. `object_key` synthetic uniqueness. Sentinel pattern for partial-index gap in DuckDB 1.4.4.
+- `scripts/pipeline/registry.py` — 52 DatasetSpec entries covering every prod table.
+- `scripts/pipeline/protocol.py` — typing.Protocol definitions: SourcePipeline, DirectWritePipeline, DerivedPipeline + 6 supporting dataclasses.
+- `scripts/pipeline/shared.py` — sec_fetch (5xx backoff + 429 60s pause), rate_limit (per-domain threading.Lock + monotonic token bucket), stamp_freshness, refresh_snapshot, entity_gate_check (3 hard blockers + 2 best-effort hints), write_manifest_row, write_impact_row, compute_object_key.
+- `scripts/pipeline/manifest.py` — get_or_create_manifest_row, update_manifest_status, supersede_manifest, write_impact, update_impact_status, get_already_fetched, get_promotable_impacts.
+- `scripts/pipeline/discover.py` — discover_13f (scrapes SEC form-13f landing page, no hardcoded ZIP URLs), discover_nport (accession-level, 75-day publication lag), discover_13dg (scoped to SCOPED_13DG_TEST_TICKERS = AR/OXY/EQT/NFLX), discover_market (staleness thresholds 7/30/90d).
+
+**Bugs fixed (pre-commit green):**
+- `scripts/api_market.py:201` — `has_table('fund_holdings')` → `has_table('fund_holdings_v2')` (Stage 5 follow-on).
+- `scripts/build_benchmark_weights.py:16` — removed broken `from db import get_connection` import. Now uses inline `duckdb.connect(get_db_path())` at call site (the standard pattern used by every other script: `fetch_nport`, `fetch_13dg`, `fetch_market`, `fetch_ncen`, `fetch_finra_short`, `compute_flows`, `build_summaries`, `build_cusip`, `load_13f`, `build_shares_history`). `db.connect_write()` already exists for the named-function case — no new wrapper needed.
+
+**Open decisions D5–D8** (documented in `docs/data_layers.md` §6, require operational data):
+- D5 entity retro-enrichment path; D6 market_value_live refresh cadence; D7 snapshot retention; D8 L3 DDL migration framework.
+
+**Critical finding:** 11 non-retired scripts still touch Stage-5-dropped
+`holdings`/`fund_holdings`/`beneficial_ownership` tables (8 write, 3
+read-only — see `docs/pipeline_inventory.md` cross-cutting finding #1
+for the full list). They will fail on next run. Rewrite acceptance
+criteria are the per-script violation lists in `docs/pipeline_violations.md`.
+
+**Verification (all green):**
+- Staging migration run clean — 0 rows in each new table on fresh install.
+- Pre-commit (ruff + pylint + bandit) passes on all 7 new files and both bug-fix files.
+- Smoke tests pass (8/8).
+- App healthy: /api/v1/tickers returns 6,511 tickers.
+
+---
+
+
 
 ## Session Summary 2026-04-10
 

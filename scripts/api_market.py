@@ -198,7 +198,7 @@ def api_smart_money(ticker: str = ''):
                 result['short_volume'] = si[0]
                 result['short_pct'] = si[2]
                 result['short_date'] = str(si[3])
-        if has_table('fund_holdings'):
+        if has_table('fund_holdings_v2'):
             nport_shorts = con.execute("""
                 SELECT fund_name, shares_or_principal as shares_short,
                        market_value_usd as short_value, quarter

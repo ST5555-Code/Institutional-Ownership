@@ -1,6 +1,61 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — Stage 5 cleanup + BL-9 + BL-10 complete; React type migration deferred as two-step ARCH-4C-followup. HEAD: 1b0c9d6)_
+_Last updated: 2026-04-13 (session close — v1.2 pipeline framework foundation complete: docs + control plane migration + protocols + registry + discover + 2 live app bug fixes. HEAD: TBD, replaces 1b0c9d6)_
+
+## Pipeline framework foundation — 2026-04-13 session
+
+Twelve deliverables landed this session. The framework is code-ready
+to start writing per-source `promote_*.py` SourcePipeline implementations.
+
+| # | Deliverable | Path |
+|---|-------------|------|
+| 1 | Data-layer classification | `docs/data_layers.md` |
+| 2 | L3 canonical DDL audit | `docs/canonical_ddl.md` |
+| 3 | Pipeline inventory | `docs/pipeline_inventory.md` |
+| 4 | Per-script PROCESS_RULES violations | `docs/pipeline_violations.md` |
+| 5 | Control-plane DDL migration | `scripts/migrations/001_pipeline_control_plane.py` |
+| 6 | Dataset registry | `scripts/pipeline/registry.py` (52 datasets, 0 unclassified) |
+| 7 | Pipeline protocols | `scripts/pipeline/protocol.py` (Source / DirectWrite / Derived) |
+| 8 | Shared utilities | `scripts/pipeline/shared.py` (sec_fetch / rate_limit / entity_gate_check) |
+| 9 | Manifest helpers | `scripts/pipeline/manifest.py` |
+| 10 | Per-source discovery | `scripts/pipeline/discover.py` (SCOPED_13DG_TEST_TICKERS = AR/OXY/EQT/NFLX) |
+| 11 | Two live app bugs fixed | `api_market.py:201` + `build_benchmark_weights.py:16` |
+| 12 | This doc + ROADMAP refresh | — |
+
+**Status:** Staging migration runs clean (0 rows on fresh install).
+Pre-commit green on all 7 new files. Smoke tests green (8/8). App
+healthy at :8001 (6,511 tickers).
+
+**Open decisions D5–D8** (recorded in `docs/data_layers.md` §6, need
+real operational data to resolve):
+- D5 — Entity retro-enrichment when merges change historical `rollup_entity_id`
+- D6 — `market_value_live` refresh cadence for historical rows
+- D7 — Snapshot table retention policy (144 snapshots in prod, ~negligible)
+- D8 — L3 canonical DDL migration framework (first candidate: `summary_by_parent` drift)
+
+**Critical finding surfaced by the audit:** **eleven** scripts still
+touch Stage-5-dropped tables (8 writers + 3 read-only) — full list in
+`docs/pipeline_inventory.md` cross-cutting finding #1. None will run
+successfully against prod until rewrites land. The pipeline inventory
+and violations docs are the acceptance criteria.
+
+**Five BROKEN tables in `docs/canonical_ddl.md`** (promote scripts
+blocked until each drift is resolved): **L3** — `holdings_v2`,
+`fund_holdings_v2`, `beneficial_ownership_v2`. **L4** —
+`summary_by_parent` (MISSING_COLUMNS + wrong PK), `summary_by_ticker`
+(DDL aligned but source reads dead `holdings`).
+
+**Next session** (build sequence Step 11 — Promote Pipelines):
+1. `promote_13f.py` — SourcePipeline for 13F (solves `holdings_v2` BROKEN).
+2. `promote_nport.py` — SourcePipeline for N-PORT (solves `fund_holdings_v2` BROKEN; unblocks pending N-PORT refresh on stale Oct-2025 data).
+3. `enrich_holdings.py` — DirectWritePipeline Group-3 enrichment after promote (Option B).
+4. Migration 002 — `build_summaries.py` DDL + source rewrite (`holdings` → `holdings_v2`, add rollup_entity_id + 3 other missing columns + correct PK).
+
+Entity infrastructure through Phase 4+ Batch 4-C remains complete.
+Framework rewrites do NOT require entity-layer changes — they consume
+`entity_current` through `entity_gate_check()`.
+
+
 
 Paste this file's contents — or reference it by path — at the start of a
 fresh Claude Code session to land fully oriented. Regenerate at the end of

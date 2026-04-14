@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from db import get_connection  # noqa: E402
+import duckdb  # noqa: E402
+from db import get_db_path  # noqa: E402
 from config import QUARTERS  # noqa: E402
 
 # Vanguard Total Stock Market Index Fund — broadest US equity coverage
@@ -53,7 +54,7 @@ def _map_to_gics(yf_sector, yf_industry):
 
 
 def build():
-    con = get_connection()
+    con = duckdb.connect(get_db_path())
 
     # Ensure table exists
     con.execute("""
