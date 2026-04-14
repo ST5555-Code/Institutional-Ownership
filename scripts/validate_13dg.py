@@ -208,7 +208,12 @@ def main() -> None:
     staging_path = STAGING_DB if args.staging else PROD_DB
 
     staging_con = duckdb.connect(staging_path, read_only=True)
-    prod_con = duckdb.connect(PROD_DB)
+    # Read-only — the running app may hold the prod write lock.
+    # entity_gate_check's pending_entity_resolution insert is wrapped in
+    # try/except (scripts/pipeline/shared.py); the gate still returns
+    # accurate block/promotable/pending lists. Promote step writes
+    # pending rows for real when it has the lock.
+    prod_con = duckdb.connect(PROD_DB, read_only=True)
     try:
         rows = _collect_staging_rows(staging_con, run_id)
         n = len(rows)

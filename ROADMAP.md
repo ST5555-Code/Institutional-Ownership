@@ -2,6 +2,21 @@
 
 _Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
 
+## Session Summary 2026-04-14 (Batch 2C) — N-PORT v2 SourcePipeline
+
+Second SourcePipeline. Same structural pattern as 13D/G (Batch 2B) with stricter entity gate (BLOCK on unknown series_id, not FLAG) and dual staging tables (holdings + universe).
+
+- **3 new scripts:** `scripts/fetch_nport_v2.py` (NPortPipeline; reuses parse_nport_xml + classify_fund from legacy fetch_nport.py; dynamic quarter labelling replaces the hardcoded MONTHLY_TARGETS dict; atomic per-series loads via BEGIN→DELETE→INSERT→COMMIT→CHECKPOINT), `scripts/validate_nport.py` (HARD entity gate; both rollup worldviews; lifecycle checks for new_series / top10_drift / AUM delta), `scripts/promote_nport.py` (Group 2 entity enrichment at promote via entity_current lookup; atomic per (series_id, report_month) tuple; UPSERT fund_universe; stamp freshness; refresh snapshot).
+- **discover_nport() rewrite** in `scripts/pipeline/discover.py`: was a `return []` stub; now actually queries EDGAR per CIK (test mode) or per calendar quarter (full mode), coerces edgar lib's mixed string/date returns, anti-joins ingestion_manifest.
+- **Validate scripts open prod read-only** — `validate_nport.py` and `validate_13dg.py` updated. The dev app holds a prod read lock; entity_gate_check's pending insert is wrapped in try/except so the gate logic still works.
+- **5-fund test:** Fidelity Contrafund / Vanguard Wellington / T. Rowe Blue Chip / Dodge & Cox / Growth Fund of America. 15 accessions → 14 series → 10,503 holdings staged in 5.8s. Validate 0 BLOCK / 3 FLAG / 1 WARN. Promote: −3,006 / +10,503 holdings, +3 new series (6,677 → 6,680). New 2025-11 data live; AAPL now in Growth Fund of America 2025-11 ($7.55B / 2.22% NAV) with full Group 2 entity enrichment populated.
+- **All 10 PROCESS_RULES blockers** for fetch_nport.py from `docs/pipeline_violations.md` cleared in v2 — see `docs/NEXT_SESSION_CONTEXT.md` for the per-blocker tracking.
+- **Operational note:** dev app must be stopped for promote (DuckDB single-process write-lock contention). Tracked as a follow-up; long-term resolution is MT-1 (Gunicorn / hosted serving).
+
+**Next session:** Batch 3 — `enrich_holdings.py` Group 3 DirectWritePipeline for `holdings_v2` (`ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float`). Plus retire legacy `fetch_nport.py` + `fetch_13dg.py` after amendment-chain test runs.
+
+---
+
 ## Session Summary 2026-04-14 (Batch 2B-13dg) — scoped 13D/G reference vertical
 
 First full SourcePipeline proof — discover → fetch → parse →

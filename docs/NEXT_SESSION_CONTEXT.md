@@ -1,6 +1,45 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (Batch 2B close — scoped 13D/G SourcePipeline reference vertical live; first full discover → fetch → parse → load_to_staging → validate → promote chain shipped. HEAD: TBD.)_
+_Last updated: 2026-04-14 (Batch 2C close — N-PORT SourcePipeline rewrite live, 5-fund test promoted to prod with Group 2 entity enrichment. HEAD: TBD.)_
+
+## Batch 2C — 2026-04-14 N-PORT v2 SourcePipeline
+
+Second SourcePipeline. Same structural pattern as 13D/G with stricter
+entity gate and dual staging tables (holdings + universe).
+
+**New scripts:**
+- `scripts/fetch_nport_v2.py` — `NPortPipeline` SourcePipeline. Reuses `parse_nport_xml` + `classify_fund` from legacy `fetch_nport.py`. Dynamic quarter labelling (`quarter_label_for_month`) replaces the hardcoded MONTHLY_TARGETS dict from the legacy script. Two staging tables: `stg_nport_holdings` (mirror of `fund_holdings_v2` Group 1 + `manifest_id`/`parse_status`/`qc_flags`) and `stg_nport_fund_universe`. Atomic per-series loads — BEGIN → DELETE prior → INSERT → impact='loaded' → COMMIT → CHECKPOINT. Synthetic `series_id` fallback (`{cik}_{accession}`) with FLAG-level QC.
+- `scripts/validate_nport.py` — stricter than `validate_13dg.py`. Entity gate is **HARD**: missing series_id in `entity_identifiers` → BLOCK (registered funds always have prior EDGAR history). Both rollup worldviews required (`economic_control_v1` + `decision_maker_v1`). Lifecycle checks: new_series, top10_drift (CUSIP overlap < 1/10 vs prior quarter), AUM delta (>80% BLOCK, 50–80% WARN). Markdown report at `logs/reports/nport_{run_id}.md`.
+- `scripts/promote_nport.py` — Group 2 entity enrichment at promote time via `_enrich_entity()` against `entity_current` (entity_id + rollup_entity_id + dm_entity_id + dm_rollup_entity_id + dm_rollup_name). Atomic per-tuple `(series_id, report_month)`: DELETE+INSERT replaces amendments. UPSERT `fund_universe`. Stamp freshness for both tables. Refresh `13f_readonly.duckdb` snapshot.
+
+**`scripts/pipeline/discover.py` `discover_nport()` rewrite:**
+- Now actually queries EDGAR (was a `return []` stub). Two paths: `cik_filter=` for targeted/test discovery using `Company(cik).get_filings(form='NPORT-P')`, and full-universe via `get_filings(year=Y, quarter=Q, form='NPORT-P')` for each calendar quarter between prod floor and `today − 75 days`.
+- Coerces `f.period_of_report` and `f.filing_date` to `datetime.date` (edgar lib returns mixed string/date).
+- Anti-joins `ingestion_manifest` on `accession_number`.
+
+**Validate scripts now open prod read-only.** Both `validate_nport.py` and `validate_13dg.py` opened prod write — fails when the dev app holds a lock. `entity_gate_check`'s `pending_entity_resolution` insert is wrapped in try/except (in `pipeline/shared.py`) so the gate still returns accurate block lists when read-only. Promote step writes pending rows for real (it requires the lock anyway).
+
+**5-fund test run results:**
+- `Fidelity Contrafund` (24238), `Vanguard Wellington` (105563), `T. Rowe Price Blue Chip` (902259), `Dodge & Cox Funds` (29440), `Growth Fund of America` (44201).
+- 15 accessions discovered → 14 series → 10,503 holdings staged in **5.8s**.
+- Validate: 0 BLOCK / 3 FLAG / 1 WARN. Entity gate resolved all 14 series_ids. Promote-ready: YES.
+- Promote: 15 (series, month) tuples, **−3,006 / +10,503** rows. fund_universe: +3 new series (6,677 → 6,680). New `2025-11` data added for 5 series; existing `2025-09` data refreshed for 9 series. Snapshot refreshed (7.66 GB). Backup at `data/backups/13f_backup_20260414_053433` (1.6 GB).
+- AAPL now appears in Growth Fund of America 2025-11 ($7.55B / 2.22% NAV); rollup_entity_id and dm_rollup_entity_id populated correctly via Group 2 enrichment.
+
+**Prod control plane after Batch 2C:** 18 ingestion_manifest rows, 18 ingestion_impacts (all promote_status='promoted'), 3 pending_entity_resolution (all from Batch 2B, no new pending from N-PORT — all 14 series resolved cleanly).
+
+**Operational note:** prod write lock contention. The dev `scripts/app.py` holds prod open read-only; promote needs an exclusive lock. Stop+start the app for any promote step. Future: orchestrator should signal the app to drop its connection cache (or move to a hosted serving mode like Gunicorn — MT-1).
+
+**Verification:** smoke 8/8; AAPL `/api/v1/query1` 25 rows; pre-commit (ruff + pylint + bandit) green on all 5 new+modified files.
+
+## Follow-up items (not lost between sessions)
+
+1. **Live price in Register tab — Track B.** Add `/api/market_price?tickers=...` endpoint that hits yfinance on demand. No pipeline dependency. Lets Register show today's prices without the next quarterly market refresh.
+2. **Full N-PORT refresh authorization.** v2 verified clean on 5 funds. The full ~6,000-series refresh needs explicit auth: `python3 scripts/fetch_nport_v2.py --staging` (no `--test`). Estimate ~6–8h overnight at sec.gov rate limit.
+3. **`enrich_holdings.py` (Batch 3).** Group 3 enrichment for `holdings_v2` (`ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float`) — the legacy `UPDATE holdings SET ...` block was removed in Batch 2A. Build a DirectWritePipeline that reads `securities` + `market_data` and writes Group 3 columns post-promote.
+4. **Retire legacy fetch_nport.py.** After a second clean v2 run (amendment chain test), `mv scripts/fetch_nport.py scripts/retired/fetch_nport.py`. Same for `scripts/fetch_13dg.py` once its amendment-chain test passes.
+
+## Batch 2B-13dg — 2026-04-13 session
 
 ## Batch 2B-13dg — 2026-04-14 session
 

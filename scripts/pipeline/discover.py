@@ -142,42 +142,162 @@ def discover_13f(con_prod: Any, today: Optional[date] = None) -> list[DownloadTa
 # discover_nport — accession-level
 # ---------------------------------------------------------------------------
 
-def discover_nport(con_prod: Any, today: Optional[date] = None) -> list[DownloadTarget]:
+def discover_nport(
+    con_prod: Any,
+    today: Optional[date] = None,
+    *,
+    cik_filter: Optional[list[int]] = None,
+    max_per_cik: int = 4,
+) -> list[DownloadTarget]:
     """Enumerate N-PORT accessions not yet fetched.
 
-    The SEC publishes N-PORT-P filings with a ~75-day lag. This function
-    queries EDGAR's full-text filings index for filings in that window,
-    anti-joins ingestion_manifest, and returns accession-level targets.
+    The SEC publishes N-PORT-P filings with a ~75-day lag. Per-CIK
+    discovery (when ``cik_filter`` is provided) calls
+    ``edgar.Company(cik).get_filings(form='NPORT-P')`` and returns the
+    most recent ``max_per_cik`` filings since the prod floor (max
+    ``report_date`` in ``fund_holdings_v2`` for that filer).
 
-    A single accession may contain multiple series; the parse() step
-    splits them out. Discover stays at accession grain.
+    When ``cik_filter`` is None the full-universe path uses
+    ``edgar.get_filings(year=Y, quarter=Q, form='NPORT-P')`` for each
+    quarter between the prod floor and ``today - 75 days``. That path
+    is significantly more expensive — pull the index for each EDGAR
+    quarter then anti-join the manifest.
 
-    Implementation note: this function intentionally does NOT issue the
-    EDGAR query inline — that is a network fetch and discover is
-    supposed to be read-only against local state. The real pipeline
-    will delegate to an EDGAR helper that discover() then consumes.
-    Kept as a TODO marker for the first N-PORT pipeline port.
+    Anti-joins ``ingestion_manifest`` on ``accession_number`` (regardless
+    of which path produced it). Returns accession-level targets;
+    series-level splitting happens in parse().
     """
+    from edgar import set_identity, Company, get_filings  # local import
+
+    set_identity("13f-research serge.tismen@gmail.com")
+
     t = _today(today)
     cutoff = t - timedelta(days=75)
 
-    # Read current floor from prod so the framework knows where to start.
-    row = con_prod.execute(
+    # Manifest anti-join set
+    already = set(con_prod.execute(
+        "SELECT accession_number FROM ingestion_manifest "
+        "WHERE source_type = 'NPORT' AND fetch_status = 'complete'"
+    ).fetchdf()["accession_number"].tolist())
+
+    targets: list[DownloadTarget] = []
+
+    if cik_filter:
+        # Per-CIK targeted discovery — used by test runs and
+        # focused-vertical reruns.
+        for raw_cik in cik_filter:
+            try:
+                company = Company(int(raw_cik))
+                filings = company.get_filings(form="NPORT-P")
+            except Exception as exc:  # pylint: disable=broad-except
+                print(f"  discover_nport: Company({raw_cik}) failed — {exc}",
+                      flush=True)
+                continue
+            if not filings:
+                continue
+            # Floor for this filer specifically
+            floor_row = con_prod.execute(
+                "SELECT MAX(report_date) FROM fund_holdings_v2 "
+                "WHERE fund_cik = ?",
+                [str(raw_cik).zfill(10)],
+            ).fetchone()
+            floor = floor_row[0] if floor_row and floor_row[0] else None
+
+            def _to_date(v):
+                """Coerce edgar's date fields (str or date) to date."""
+                if v is None:
+                    return None
+                if isinstance(v, date):
+                    return v
+                try:
+                    return datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    return None
+
+            count = 0
+            for f in filings:
+                if count >= max_per_cik:
+                    break
+                acc = f.accession_no
+                if acc in already:
+                    continue
+                period = _to_date(f.period_of_report)
+                filed = _to_date(f.filing_date)
+                # Skip filings that pre-date our prod floor for this filer
+                if floor is not None and period is not None and period < floor:
+                    continue
+                # Skip filings inside the SEC publication-lag window
+                if filed is not None and filed > cutoff:
+                    continue
+                # Build the L1 artifact URL — primary_doc.xml is the
+                # canonical N-PORT XML for the accession
+                url = (
+                    f"https://www.sec.gov/Archives/edgar/data/"
+                    f"{int(raw_cik)}/{acc.replace('-', '')}/primary_doc.xml"
+                )
+                targets.append(DownloadTarget(
+                    source_type="NPORT",
+                    object_type="XML",
+                    source_url=url,
+                    accession_number=acc,
+                    report_period=period,
+                    filing_date=filed,
+                    extras={
+                        "fund_cik": str(raw_cik).zfill(10),
+                        "company_name": company.name,
+                    },
+                ))
+                count += 1
+        return targets
+
+    # Full-universe path — iterate EDGAR quarterly indexes between the
+    # prod floor and `cutoff`. This loads a large index per quarter; do
+    # not call from --test runs.
+    floor_row = con_prod.execute(
         "SELECT MAX(filing_date) FROM fund_holdings_v2"
     ).fetchone()
-    prod_floor = row[0] if row and row[0] else cutoff - timedelta(days=365)
+    prod_floor = floor_row[0] if floor_row and floor_row[0] else (
+        cutoff - timedelta(days=365)
+    )
 
-    # The real implementation will:
-    #   1. Query https://efts.sec.gov/LATEST/search-index?q=...&forms=NPORT-P
-    #      with filingDate from prod_floor..cutoff
-    #   2. Parse JSON response → accession_number + filed_date + cik
-    #   3. Anti-join ingestion_manifest via get_already_fetched()
-    # Here we emit an empty list so the orchestrator can run dry against
-    # a freshly-migrated control plane without network access.
-    #
-    # TODO(promote_nport): replace with live EDGAR query.
-    _ = (t, cutoff, prod_floor)
-    return []
+    # Walk calendar quarters from prod_floor → cutoff
+    cur = date(prod_floor.year, ((prod_floor.month - 1) // 3) * 3 + 1, 1)
+    end = cutoff
+    while cur <= end:
+        y, q = cur.year, (cur.month - 1) // 3 + 1
+        try:
+            q_filings = get_filings(year=y, quarter=q, form="NPORT-P")
+        except Exception as exc:  # pylint: disable=broad-except
+            print(f"  discover_nport: index {y}Q{q} failed — {exc}",
+                  flush=True)
+        else:
+            df = q_filings.data.to_pandas()
+            df = df[df["filing_date"] <= cutoff]
+            df = df[df["filing_date"] >= prod_floor]
+            for _, row in df.iterrows():
+                acc = row["accession_number"]
+                if acc in already:
+                    continue
+                cik = int(row["cik"])
+                url = (
+                    f"https://www.sec.gov/Archives/edgar/data/"
+                    f"{cik}/{acc.replace('-', '')}/primary_doc.xml"
+                )
+                targets.append(DownloadTarget(
+                    source_type="NPORT",
+                    object_type="XML",
+                    source_url=url,
+                    accession_number=acc,
+                    filing_date=row["filing_date"],
+                    extras={"fund_cik": str(cik).zfill(10)},
+                ))
+        # advance one quarter
+        cur = date(
+            cur.year + (1 if cur.month >= 10 else 0),
+            ((cur.month - 1 + 3) % 12) + 1,
+            1,
+        )
+    return targets
 
 
 # ---------------------------------------------------------------------------
