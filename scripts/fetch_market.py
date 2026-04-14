@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
+# CHECKPOINT GRANULARITY POLICY
+# This pipeline checkpoints after every unit of work listed below.
+# A restart never reprocesses more than one unit.
+# fetch_market.py unit: one batch (100 tickers)
+# Each batch writes: manifest row (fetch_started_at → complete|failed),
+# market_data upsert (CHECKPOINT), one ingestion_impacts row per ticker,
+# promote_status='promoted'. If the process dies mid-batch, the next run
+# discovers tickers that were already written as fresh and skips them.
+# Never accumulate results across units before writing.
 """fetch_market.py — DirectWritePipeline for market_data (Yahoo + SEC XBRL).
 
 Rewritten 2026-04-13 (Batch 2A) to implement the DirectWritePipeline
-protocol in scripts/pipeline/protocol.py. Proves sec_fetch / rate_limit
-/ manifest writes / freshness stamping against a live canonical table.
+protocol in scripts/pipeline/protocol.py. Hardened 2026-04-14 (Batch 2B)
+with CUSIP-anchored universe (see scripts/pipeline/discover.discover_market)
+and per-ticker cross-validation against ``securities`` + ``holdings_v2``.
 
 Data sources:
   1. YahooClient (curl_cffi → query1/query2.finance.yahoo.com)
@@ -89,6 +99,20 @@ COVERAGE_BLOCK_PCT = 85.0
 COVERAGE_WARN_PCT = 95.0
 MARKET_CAP_CEILING = 50_000_000_000_000.0  # 50T — anything above is a data error
 
+# Cross-validation
+NAME_FUZZY_MIN = 60               # rapidfuzz token_sort_ratio threshold
+PRICE_DIVERGENCE_MAX = 0.50       # implied_price vs yf_price
+KNOWN_EXCHANGES = {
+    # Canonical names
+    "NYSE", "NASDAQ", "NYSEArca", "NYSEAMERICAN", "BATS", "CBOE",
+    "LSE", "TSX", "TSXV", "ASX", "HKG", "HKSE", "TYO", "TSE",
+    "SHG", "SSE", "SHE", "SZSE", "NSE", "BSE", "FRA", "XETRA",
+    "AMS", "STO", "OSL", "CPH", "HEL", "ARCX",
+    # Yahoo short codes
+    "NMS", "NYQ", "NGM", "NCM", "PCX", "PNK", "BTS", "OBB",
+    "ASE", "OPR", "NIM",
+}
+
 
 # ---------------------------------------------------------------------------
 # Schema sanity — idempotent ALTER TABLE for the columns this script owns.
@@ -125,6 +149,61 @@ def ensure_schema(con: duckdb.DuckDBPyConnection) -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_market_ticker "
         "ON market_data(ticker)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cross-validation — compare live Yahoo fields against securities + holdings_v2
+# ---------------------------------------------------------------------------
+
+def _cross_validate_ticker(
+    ticker: str,
+    yf_row: dict[str, Any],
+    securities_row: Optional[dict[str, Any]],
+    implied_price: Optional[float],
+) -> list[dict[str, Any]]:
+    """Return a list of validation issue dicts for one ticker. Empty on clean."""
+    from rapidfuzz import fuzz  # local import — only needed when we validate
+
+    issues: list[dict[str, Any]] = []
+
+    long_name = (yf_row.get("_long_name") or "").strip()
+    sec_name = (securities_row or {}).get("issuer_name") or ""
+    if long_name and sec_name:
+        score = fuzz.token_sort_ratio(long_name.upper(), sec_name.upper())
+        if score < NAME_FUZZY_MIN:
+            issues.append({
+                "ticker": ticker, "severity": "WARN", "gate": "name_mismatch",
+                "yahoo_name": long_name, "securities_name": sec_name,
+                "score": int(score),
+            })
+
+    mcap = yf_row.get("_market_cap_yahoo")
+    if mcap is not None and mcap <= 0:
+        issues.append({
+            "ticker": ticker, "severity": "WARN", "gate": "possibly_delisted",
+            "market_cap": mcap,
+        })
+
+    exch = (yf_row.get("exchange") or "").strip()
+    if exch and exch not in KNOWN_EXCHANGES:
+        issues.append({
+            "ticker": ticker, "severity": "WARN", "gate": "unknown_exchange",
+            "exchange": exch,
+        })
+
+    yf_price = yf_row.get("price_live")
+    if yf_price and implied_price and implied_price > 0:
+        diff = abs(yf_price - implied_price) / implied_price
+        if diff > PRICE_DIVERGENCE_MAX:
+            issues.append({
+                "ticker": ticker, "severity": "WARN",
+                "gate": "price_sanity",
+                "yahoo_price": float(yf_price),
+                "implied_price": float(implied_price),
+                "divergence": round(diff, 3),
+            })
+
+    return issues
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +283,8 @@ def fetch_yahoo_batch(
     # Merge quote + metadata → canonical-shape rows.
     # market_cap and shares_outstanding intentionally NOT written here —
     # market_cap is recomputed downstream as SEC shares × Yahoo price.
+    # long_name / quote_type / market_cap_yahoo are extra columns used by
+    # cross-validation; they're stripped before upsert_yahoo().
     rows: list[dict[str, Any]] = []
     for sym in tickers:
         q = quotes.get(sym, {})
@@ -223,6 +304,10 @@ def fetch_yahoo_batch(
             "exchange":            m.get("exchange") or q.get("exchange"),
             "fetch_date":          today,
             "metadata_date":       today if m else None,
+            # validation-only columns (stripped before upsert_yahoo)
+            "_long_name":          m.get("long_name") or q.get("long_name"),
+            "_quote_type":         m.get("quote_type") or q.get("quote_type"),
+            "_market_cap_yahoo":   q.get("market_cap") or m.get("market_cap"),
         })
     return pd.DataFrame(rows), bytes_total, errors
 
@@ -347,6 +432,58 @@ def recompute_market_cap(con: duckdb.DuckDBPyConnection) -> None:
     """)
 
 
+def _stamp_batch_attempt(con: duckdb.DuckDBPyConnection,
+                         tickers: list[str],
+                         today: str,
+                         *,
+                         yahoo_attempted: bool,
+                         sec_attempted: bool) -> None:
+    """Stamp attempt-dates for every ticker in the batch regardless of outcome.
+
+    discover_market marks a ticker stale if ANY of price / metadata / shares
+    is past its freshness threshold. For a ticker Yahoo can't price and SEC
+    has no CIK for, all three dates stay NULL after the fetch, so the ticker
+    looks perpetually stale and re-enters discover on every restart. The fix
+    is to stamp all three attempt dates — NULL price_live is still visible
+    as a data-quality signal but the ticker is correctly skipped for 7 / 30
+    / 90 days based on the bucket it missed.
+
+    Args:
+        yahoo_attempted: True unless --sec-only. Stamps fetch_date +
+            metadata_date (Yahoo-owned buckets).
+        sec_attempted:   True unless --metadata-only. Stamps sec_date.
+    """
+    if not tickers:
+        return
+    assignments = ["fetch_date = excluded.fetch_date"]
+    insert_cols = ["ticker", "fetch_date"]
+    values_tpl = ["?", "?"]
+    cols_row = lambda t: [t, today]  # noqa: E731 — local helper
+
+    if yahoo_attempted:
+        assignments.append("metadata_date = excluded.metadata_date")
+        insert_cols.append("metadata_date")
+        values_tpl.append("?")
+        prev_row = cols_row
+        cols_row = lambda t: prev_row(t) + [today]  # noqa: E731
+    if sec_attempted:
+        assignments.append("sec_date = excluded.sec_date")
+        insert_cols.append("sec_date")
+        values_tpl.append("?")
+        prev_row2 = cols_row
+        cols_row = lambda t: prev_row2(t) + [today]  # noqa: E731
+
+    stmt = (
+        f"INSERT INTO market_data ({', '.join(insert_cols)}) "
+        f"VALUES ({', '.join(values_tpl)}) "
+        f"ON CONFLICT (ticker) DO UPDATE SET {', '.join(assignments)}"
+    )
+    for start in range(0, len(tickers), CHECKPOINT_EVERY):
+        chunk = tickers[start:start + CHECKPOINT_EVERY]
+        con.executemany(stmt, [cols_row(t) for t in chunk])
+        con.execute("CHECKPOINT")
+
+
 # ---------------------------------------------------------------------------
 # DirectWritePipeline implementation
 # ---------------------------------------------------------------------------
@@ -365,6 +502,7 @@ class MarketDataPipeline:
     source_type = "MARKET"
 
     def __init__(self, *, run_id: str, test_mode: bool = False,
+                 test_size: int = 10,
                  limit: Optional[int] = None,
                  missing_only: bool = False,
                  metadata_only: bool = False,
@@ -372,6 +510,7 @@ class MarketDataPipeline:
                  force: bool = False) -> None:
         self.run_id = run_id
         self.test_mode = test_mode
+        self.test_size = test_size
         self.limit = limit
         self.missing_only = missing_only
         self.metadata_only = metadata_only
@@ -380,6 +519,9 @@ class MarketDataPipeline:
         self._batch_data: dict[int, tuple[pd.DataFrame, pd.DataFrame, list[dict[str, Any]]]] = {}
         self._yahoo_client: Optional[YahooClient] = None
         self._sec_client: Optional[SECSharesClient] = None
+        # Cross-validation issues accumulated across all batches; written to
+        # logs/market_validation_{run_id}.csv at the end of validate_post_write.
+        self._validation_issues: list[dict[str, Any]] = []
 
     # --- discover ---------------------------------------------------------
 
@@ -387,33 +529,51 @@ class MarketDataPipeline:
         """Enumerate stale-ticker batches via pipeline.discover.discover_market.
 
         Applies --test / --limit truncation. Returns [] when nothing is stale.
-        Upstream reads (holdings_v2, fund_holdings_v2, market_data) always
-        come from prod via get_read_db_path() — staging mode only affects
-        where we WRITE, not where we read reference data.
+        Reference data (holdings_v2 ∪ fund_holdings_v2 + securities) always
+        comes from prod via get_read_db_path(). The market_data freshness
+        anti-join uses the WRITE DB — same place write_to_canonical wrote
+        — so a restart that crashed mid-batch correctly skips tickers
+        already written in the previous process.
         """
-        con = duckdb.connect(get_read_db_path(), read_only=True)
+        con_prod = duckdb.connect(get_read_db_path(), read_only=True)
+        con_write = (duckdb.connect(get_db_path(), read_only=True)
+                     if is_staging_mode() else None)
         try:
-            targets = discover_market(con)
+            targets = discover_market(con_prod, con_write=con_write)
         finally:
-            con.close()
+            con_prod.close()
+            if con_write is not None:
+                con_write.close()
 
         if not targets:
             return []
 
-        # --test: take first batch and clip to 10 tickers
+        # --test: clip across batches up to self.test_size tickers (default 10).
+        # Used with a larger test_size to exercise crash recovery across
+        # multiple CHECKPOINT GRANULARITY batches (one batch = 100 tickers).
         if self.test_mode:
-            first = targets[0]
-            tickers = list(first.extras["tickers"])[:10]
-            object_key = f"market_{run_id}_test_{len(tickers)}t"
-            return [DownloadTarget(
-                source_type="MARKET",
-                object_type="price_batch",
-                source_url=first.source_url,
-                accession_number=None,
-                report_period=None,
-                filing_date=None,
-                extras={"tickers": tickers, "object_key": object_key},
-            )]
+            target_size = self.test_size
+            clipped: list[DownloadTarget] = []
+            running = 0
+            for t in targets:
+                if running >= target_size:
+                    break
+                remaining = target_size - running
+                batch_tickers = list(t.extras["tickers"])[:remaining]
+                object_key = (
+                    f"market_{run_id}_test_b{len(clipped)}_{len(batch_tickers)}t"
+                )
+                clipped.append(DownloadTarget(
+                    source_type="MARKET",
+                    object_type="price_batch",
+                    source_url=t.source_url,
+                    accession_number=None,
+                    report_period=None,
+                    filing_date=None,
+                    extras={"tickers": batch_tickers, "object_key": object_key},
+                ))
+                running += len(batch_tickers)
+            return clipped
 
         # --limit: truncate across batches
         if self.limit:
@@ -520,10 +680,29 @@ class MarketDataPipeline:
 
     def write_to_canonical(self, fetch_result: FetchResult,
                            prod_db_path: str, run_id: str) -> int:
-        """Upsert one batch into market_data + write one impact row per ticker."""
+        """Upsert one batch into market_data + write one impact row per ticker.
+
+        Before upsert, strips the ``_long_name`` / ``_quote_type`` /
+        ``_market_cap_yahoo`` helper columns emitted by ``fetch_yahoo_batch``
+        and runs ``_cross_validate_ticker`` against ``securities`` +
+        ``holdings_v2``. Issues are accumulated on self._validation_issues
+        and flushed to CSV by ``validate_post_write``.
+        """
         df_y, df_s, errors = self._batch_data.pop(fetch_result.manifest_id)
         tickers = list(fetch_result.target.extras["tickers"])
         error_tickers = {e.get("ticker") for e in errors if e.get("ticker")}
+
+        # --- Cross-validation BEFORE upsert ----------------------------------
+        # Runs even in staging/--test mode because the issues are informational.
+        self._run_cross_validation(df_y, tickers)
+
+        # Drop the validation-only columns that fetch_yahoo_batch emits but
+        # market_data does not store.
+        if not df_y.empty:
+            df_y = df_y.drop(
+                columns=[c for c in ("_long_name", "_quote_type", "_market_cap_yahoo")
+                         if c in df_y.columns],
+            )
 
         con = duckdb.connect(prod_db_path)
         try:
@@ -531,6 +710,16 @@ class MarketDataPipeline:
             written_y = upsert_yahoo(con, df_y)
             written_s = upsert_sec(con, df_s)
             recompute_market_cap(con)
+            # Stamp attempt dates for EVERY ticker in the batch so that
+            # tickers which returned no data (invalid, delisted, no CIK in
+            # SEC) are not re-picked on restart. Stamps price/metadata
+            # buckets only if we actually attempted Yahoo, and sec bucket
+            # only if we attempted SEC.
+            _stamp_batch_attempt(
+                con, tickers, datetime.now().strftime("%Y-%m-%d"),
+                yahoo_attempted=not self.sec_only,
+                sec_attempted=not self.metadata_only,
+            )
             con.execute("CHECKPOINT")
 
             # One impact row per ticker. DuckDB's unit_key_json is VARCHAR.
@@ -564,6 +753,71 @@ class MarketDataPipeline:
             con.close()
 
         return written_y + written_s
+
+    # --- cross-validation -------------------------------------------------
+
+    def _run_cross_validation(self, df_y: pd.DataFrame, tickers: list[str]) -> None:
+        """Compare fresh Yahoo data vs securities + holdings_v2 implied price.
+
+        One pass per batch — issues are accumulated on self._validation_issues
+        and flushed to CSV from validate_post_write.
+        """
+        if df_y.empty:
+            return
+
+        # Look up securities + implied price via a single prod query per
+        # batch. Always reads prod — implied price comes from holdings_v2.
+        con = duckdb.connect(get_read_db_path(), read_only=True)
+        try:
+            ph = ", ".join(["?"] * len(tickers))
+            sec = con.execute(
+                f"SELECT ticker, cusip, issuer_name FROM securities "
+                f"WHERE ticker IN ({ph})",
+                tickers,
+            ).fetchdf()
+            implied = con.execute(
+                f"""
+                SELECT ticker,
+                       MEDIAN(market_value_usd::DOUBLE / NULLIF(shares, 0))
+                         AS implied_price
+                FROM holdings_v2
+                WHERE ticker IN ({ph})
+                  AND shares > 0
+                  AND market_value_usd IS NOT NULL
+                GROUP BY ticker
+                """,
+                tickers,
+            ).fetchdf()
+        finally:
+            con.close()
+
+        sec_by_t = {r["ticker"]: {"cusip": r["cusip"], "issuer_name": r["issuer_name"]}
+                    for _, r in sec.iterrows()}
+        implied_by_t = {r["ticker"]: r["implied_price"]
+                        for _, r in implied.iterrows()
+                        if r["implied_price"] and r["implied_price"] > 0}
+
+        for _, yf_row in df_y.iterrows():
+            t = yf_row.get("ticker")
+            if not t:
+                continue
+            issues = _cross_validate_ticker(
+                ticker=t,
+                yf_row=yf_row.to_dict(),
+                securities_row=sec_by_t.get(t),
+                implied_price=implied_by_t.get(t),
+            )
+            self._validation_issues.extend(issues)
+
+    def _write_validation_csv(self, run_id: str) -> Optional[str]:
+        """Flush cross-validation issues to logs/market_validation_{run_id}.csv."""
+        if not self._validation_issues:
+            return None
+        log_dir = os.path.join(BASE_DIR, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(log_dir, f"market_validation_{run_id}.csv")
+        pd.DataFrame(self._validation_issues).to_csv(path, index=False)
+        return path
 
     # --- validate_post_write ---------------------------------------------
 
@@ -661,6 +915,19 @@ class MarketDataPipeline:
 
         pass_count = 1 if (coverage_pct is not None and coverage_pct >= COVERAGE_WARN_PCT) else 0
 
+        # Cross-validation summary (all WARN-level by design)
+        csv_path = self._write_validation_csv(run_id)
+        by_gate: dict[str, int] = {}
+        for issue in self._validation_issues:
+            by_gate[issue["gate"]] = by_gate.get(issue["gate"], 0) + 1
+        if by_gate:
+            warns.append({
+                "gate": "cross_validation",
+                "csv": csv_path,
+                "counts": by_gate,
+                "total_tickers_flagged": len({i["ticker"] for i in self._validation_issues}),
+            })
+
         return ValidationReport(
             run_id=run_id,
             source_type=self.source_type,
@@ -668,7 +935,7 @@ class MarketDataPipeline:
             flag_count=len(flags),
             warn_count=len(warns),
             pass_count=pass_count,
-            report_path=None,
+            report_path=csv_path,
             blocks=blocks,
             flags=flags,
             warns=warns,
@@ -758,14 +1025,15 @@ def run_dry_run() -> int:
 
 def run_pipeline(*, test_mode: bool, force: bool, missing_only: bool,
                  metadata_only: bool, sec_only: bool,
-                 limit: Optional[int]) -> int:
+                 limit: Optional[int], test_size: int) -> int:
     """Execute discover → fetch → write_to_canonical → validate → stamp."""
     run_id = f"market_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     print("=" * 60)
     print(f"fetch_market.py — DirectWritePipeline  run_id={run_id}")
     print(f"  staging={is_staging_mode()}  test={test_mode}  force={force}")
-    print(f"  limit={limit}  missing_only={missing_only}  "
-          f"metadata_only={metadata_only}  sec_only={sec_only}")
+    print(f"  test_size={test_size}  limit={limit}")
+    print(f"  missing_only={missing_only}  metadata_only={metadata_only}  "
+          f"sec_only={sec_only}")
     print("=" * 60)
 
     if test_mode:
@@ -773,11 +1041,12 @@ def run_pipeline(*, test_mode: bool, force: bool, missing_only: bool,
         if not is_staging_mode():
             print("  --test forces staging mode (writing to data/13f_staging.duckdb)")
             set_staging_mode(True)
-        print("  TEST MODE — clipping to 10 tickers")
+        print(f"  TEST MODE — clipping to {test_size} tickers")
 
     pipeline = MarketDataPipeline(
         run_id=run_id,
         test_mode=test_mode,
+        test_size=test_size,
         limit=limit,
         missing_only=missing_only,
         metadata_only=metadata_only,
@@ -840,7 +1109,9 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be fetched, write nothing.")
     parser.add_argument("--test", action="store_true",
-                        help="10 stale tickers, writes to staging DB.")
+                        help="N stale tickers (see --test-size), writes to staging DB.")
+    parser.add_argument("--test-size", type=int, default=10,
+                        help="Ticker count cap under --test (default 10).")
     parser.add_argument("--staging", action="store_true",
                         help="Write to staging DB instead of prod.")
     parser.add_argument("--force", action="store_true",
@@ -868,6 +1139,7 @@ def main() -> None:
         metadata_only=args.metadata_only,
         sec_only=args.sec_only,
         limit=args.limit,
+        test_size=args.test_size,
     ))
 
 

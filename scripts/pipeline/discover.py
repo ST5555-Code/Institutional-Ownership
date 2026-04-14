@@ -227,15 +227,39 @@ _MARKET_FRESHNESS_DAYS = {
 }
 
 
+_MARKET_MIN_POSITION_USD = 1_000_000  # per-row threshold for the active universe
+
+
 def discover_market(
     con_prod: Any,
     today: Optional[date] = None,
+    *,
+    print_reduction: bool = True,
+    con_write: Optional[Any] = None,
 ) -> list[DownloadTarget]:
-    """Enumerate stale tickers in market_data and return batched download targets.
+    """Enumerate stale tickers in the CUSIP-anchored active equity universe.
 
-    One DownloadTarget per batch of 100 tickers; object_key is a sha256
-    hash of the sorted ticker list so the same batch submitted twice
-    returns the same manifest row.
+    Filter logic (fixes the 43K-ticker over-broad set from the pre-Batch-2B
+    implementation):
+
+      1. Anchor on ``securities.cusip`` — the stable identifier. Ticker
+         reuse and renames are tolerated because CUSIPs don't recycle.
+      2. Latest quarter of ``holdings_v2`` + latest ``report_month`` of
+         ``fund_holdings_v2`` — no stale history.
+      3. Equity only — ``holdings_v2`` rows with ``put_call IS NULL/''``
+         (excludes options), ``fund_holdings_v2.asset_category IN
+         ('EC','EP')`` (common + preferred).
+      4. At least one position with ``market_value_usd >= $1M``.
+      5. ``securities.ticker`` not null / blank.
+      6. Anti-join ``market_data`` on the per-bucket freshness thresholds
+         in ``_MARKET_FRESHNESS_DAYS``. When ``con_write`` is provided the
+         freshness check uses its ``market_data`` — this is the crash-
+         recovery path: writes go to staging, so a restart must see staging
+         rows as fresh (otherwise we'd refetch on every restart).
+
+    Returns one DownloadTarget per 100-ticker batch; ``object_key`` is a
+    sha256 of the sorted ticker list so the same batch submitted twice
+    hits the same manifest row (``get_or_create_manifest_row``).
     """
     t = _today(today)
     cutoffs = {
@@ -243,38 +267,71 @@ def discover_market(
         for kind, n in _MARKET_FRESHNESS_DAYS.items()
     }
 
-    # Universe of tickers referenced by any canonical fact table.
+    # --- Raw universe (pre-filter) --- kept for the logging line
+    raw_count = con_prod.execute(
+        """
+        SELECT COUNT(DISTINCT ticker) FROM (
+            SELECT ticker FROM holdings_v2 WHERE ticker IS NOT NULL AND ticker <> ''
+            UNION
+            SELECT ticker FROM fund_holdings_v2 WHERE ticker IS NOT NULL AND ticker <> ''
+        )
+        """
+    ).fetchone()[0]
+
+    # --- CUSIP-anchored active universe ---
+    latest_q = con_prod.execute(
+        "SELECT MAX(quarter) FROM holdings_v2"
+    ).fetchone()[0]
+    latest_m = con_prod.execute(
+        "SELECT MAX(report_month) FROM fund_holdings_v2"
+    ).fetchone()[0]
+
     universe = con_prod.execute(
         """
-        SELECT DISTINCT ticker FROM holdings_v2 WHERE ticker IS NOT NULL
-        UNION
-        SELECT DISTINCT ticker FROM fund_holdings_v2 WHERE ticker IS NOT NULL
-        """
+        SELECT DISTINCT s.ticker AS ticker FROM (
+            SELECT s.ticker
+            FROM holdings_v2 h
+            JOIN securities s ON h.cusip = s.cusip
+            WHERE h.quarter = ?
+              AND (h.put_call IS NULL OR h.put_call = '')
+              AND h.market_value_usd >= ?
+              AND s.ticker IS NOT NULL AND s.ticker <> ''
+            UNION
+            SELECT s.ticker
+            FROM fund_holdings_v2 fh
+            JOIN securities s ON fh.cusip = s.cusip
+            WHERE fh.report_month = ?
+              AND fh.asset_category IN ('EC','EP')
+              AND fh.market_value_usd >= ?
+              AND s.ticker IS NOT NULL AND s.ticker <> ''
+        ) s
+        """,
+        [latest_q, _MARKET_MIN_POSITION_USD, latest_m, _MARKET_MIN_POSITION_USD],
     ).fetchdf()
 
-    md = con_prod.execute(
+    filtered_count = len(universe)
+
+    md_source = con_write if con_write is not None else con_prod
+    md = md_source.execute(
         "SELECT ticker, fetch_date, metadata_date, sec_date, unfetchable "
         "FROM market_data"
     ).fetchdf()
 
     merged = universe.merge(md, on="ticker", how="left")
 
-    # A ticker needs refresh if any of the three dates is stale (or missing)
-    # and it is not marked unfetchable.
     def _stale(d: Any, cutoff: date) -> bool:
         if d is None or (isinstance(d, float) and pd.isna(d)):
             return True
         try:
             return pd.to_datetime(d).date() < cutoff
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             return True
 
     stale_tickers: list[str] = []
     for _, row in merged.iterrows():
-        # Coerce pandas NA / nan → False explicitly. A plain `if row.get(...)`
-        # raises TypeError when the value is pd.NA.
-        unfetch = row.get("unfetchable")
-        if unfetch is True:
+        # pandas coerces missing BOOLEAN columns to pd.NA which raises
+        # TypeError when truth-tested; compare with `is True` explicitly.
+        if row.get("unfetchable") is True:
             continue
         if (
             _stale(row.get("fetch_date"), cutoffs["price"])
@@ -282,6 +339,16 @@ def discover_market(
             or _stale(row.get("sec_date"), cutoffs["shares"])
         ):
             stale_tickers.append(row["ticker"])
+
+    if print_reduction:
+        print(
+            f"  discover_market: raw_universe={raw_count:,} "
+            f"cusip_anchored_active={filtered_count:,} "
+            f"stale={len(stale_tickers):,} "
+            f"(latest_q={latest_q}, latest_m={latest_m}, "
+            f"min_position=${_MARKET_MIN_POSITION_USD:,})",
+            flush=True,
+        )
 
     if not stale_tickers:
         return []

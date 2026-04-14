@@ -1,6 +1,52 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (Batch 2A close — fetch_market.py rewritten as DirectWritePipeline; proved sec_fetch/rate_limit/manifest/freshness against live canonical. HEAD: TBD, replaces d50b602.)_
+_Last updated: 2026-04-14 (Batch 2B-market close — CUSIP-anchored discover_market, cross-validation, all-3-bucket attempt stamping for crash recovery. Next: scoped 13D/G SourcePipeline. HEAD: TBD, replaces b95cb31.)_
+
+## Batch 2B-market — 2026-04-14
+
+Hardened fetch_market.py before it's ever authorized for a full
+43K-ticker refresh.
+
+**discover_market() rewrite (`scripts/pipeline/discover.py`):**
+- CUSIP-anchored universe filter: latest quarter of holdings_v2 +
+  latest report_month of fund_holdings_v2; equity only
+  (13F `put_call IS NULL`, N-PORT `asset_category IN ('EC','EP')`);
+  min $1M position; `securities.ticker` present.
+- New optional `con_write` arg separates reference reads (prod) from
+  freshness-check reads (write DB) — required for staging-mode crash
+  recovery.
+- Result: 43,049 → 5,874 CUSIP-anchored active tickers, 5,628 stale.
+  Est. fetch time 712 min → 94 min.
+
+**fetch_market.py:**
+- Added cross-validation (`_cross_validate_ticker`): fuzzy name match
+  vs securities (token_sort_ratio < 60 → WARN); market_cap sanity;
+  exchange in KNOWN_EXCHANGES set (incl. Yahoo short codes); price
+  divergence from holdings_v2 implied price (>50% → WARN).
+  All WARN-level, emitted to `logs/market_validation_{run_id}.csv`.
+- Added `_stamp_batch_attempt()` — stamps fetch_date + metadata_date +
+  sec_date on EVERY ticker in the batch regardless of outcome.
+  Without this, Yahoo-unpriceable tickers (e.g. `1RG`) stay NULL in
+  the metadata/SEC buckets and discover_market re-picks them every
+  restart. Fixes restart-safety.
+- `--test-size N` flag overrides the 10-ticker default of `--test`.
+- `# CHECKPOINT GRANULARITY POLICY` block at top of file: one batch
+  (100 tickers) per unit.
+
+**Crash-recovery test:**
+- Six --test --staging --test-size 30 runs.
+- Before the all-3-bucket fix: run 2 and run 3 both re-picked '1RG'
+  because only fetch_date was stamped.
+- After the fix: run 5 stamped all three dates for its 30 tickers;
+  run 6 started on 'ABNB' — '1RG' correctly skipped. Stale count
+  dropped 5,562 → 5,532 (exactly 30 tickers de-duplicated).
+
+**Verification:** app /api/v1/tickers OK (6,511); smoke 8/8;
+pre-commit green.
+
+**Full market refresh still pending authorization.** Not run this session.
+
+
 
 ## Batch 2A — 2026-04-13 session
 

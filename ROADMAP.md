@@ -2,6 +2,21 @@
 
 _Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
 
+## Session Summary 2026-04-14 (Batch 2B-market) — market data quality fix
+
+Hardening before full market refresh is ever authorized.
+
+- **CUSIP-anchored `discover_market()`** (`scripts/pipeline/discover.py`): latest quarter + latest report_month + equity-only + $1M min position + `securities.ticker` present. 43,049 → 5,874 active universe, 5,628 stale. Est. fetch time 712 min → 94 min. New `con_write` arg lets staging runs check freshness against the write DB, not prod.
+- **Cross-validation** (`_cross_validate_ticker`): fuzzy name match vs `securities` (token_sort_ratio < 60), market_cap sanity, known-exchange check, price divergence vs `holdings_v2` implied price. All WARN-level. Output: `logs/market_validation_{run_id}.csv`.
+- **All-3-bucket attempt stamping** (`_stamp_batch_attempt`): stamps fetch_date + metadata_date + sec_date for every ticker in the batch, even ones Yahoo/SEC returned no data for. Fixes the restart-safety bug where Yahoo-unpriceable tickers (`1RG`, exotic OTC) kept being re-picked on every run because their metadata_date/sec_date stayed NULL.
+- **`--test-size N` flag** on `--test` mode.
+- **CHECKPOINT GRANULARITY POLICY** comment block added to `fetch_market.py`: unit = one batch (100 tickers).
+- **Crash-recovery test:** six staged runs demonstrated the fix. Post-fix run 6 correctly skipped all 30 tickers from run 5 (stale count 5,562 → 5,532).
+
+**Full market refresh remains unauthorized.** This session proved crash recovery on ~150 tickers across staging; prod remains untouched.
+
+---
+
 ## Session Summary 2026-04-13 (Batch 2A) — fetch_market.py DirectWritePipeline
 
 First real proof of the v1.2 pipeline framework against a canonical
