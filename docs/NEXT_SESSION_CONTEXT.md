@@ -663,3 +663,27 @@ ff49dbc INF4: Loomis Sayles merge
 d51db60 INF12: admin Blueprint
 b53e3fa INF9 Route A: 24 overrides to staging
 ```
+
+## Session Close — April 14 2026
+
+### Ready to implement
+- CUSIP Classification Plan v1.4 — implementation prompt at:
+  /mnt/user-data/outputs/cusip_implementation_prompt_session1.md
+- fetch_nport_v2.py batch flags committed (--limit N / --all)
+- N-PORT architecture review prompt ready at:
+  /mnt/user-data/outputs/nport_architecture_review_prompt.md
+
+### Key confirmed facts
+- OpenFIGI: 25 req/min unauthenticated, 10 jobs/batch, ~40 min for 10K CUSIPs
+- No pyopenfigi — plain requests.post confirmed sufficient
+- _cache_openfigi does NOT exist in prod — CREATE fresh 7 cols
+- securities.market_sector exists column 5 — do NOT re-add
+- fund_holdings_v2 has 832,597 N/A sentinel rows — filter LENGTH=9
+- build_cusip.py filename unchanged — 6 external references valid
+- N-PORT full refresh unblocked and pending
+
+### Next session
+- Open fresh Claude Code session
+- Paste /mnt/user-data/outputs/cusip_implementation_prompt_session1.md
+- N-PORT review runs in parallel — paste nport_architecture_review_prompt.md
+  into a second session while CUSIP Session 1 runs
