@@ -350,6 +350,19 @@ _MARKET_FRESHNESS_DAYS = {
 _MARKET_MIN_POSITION_USD = 1_000_000  # per-row threshold for the active universe
 
 
+def _has_table(con: Any, table_name: str) -> bool:
+    """Return True when ``table_name`` is readable on ``con``.
+
+    Used to gate the cusip_classifications filter in discover_market()
+    so the function remains safe to call pre-Migration-003.
+    """
+    try:
+        con.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
+        return True
+    except Exception:
+        return False
+
+
 def discover_market(
     con_prod: Any,
     today: Optional[date] = None,
@@ -406,24 +419,44 @@ def discover_market(
         "SELECT MAX(report_month) FROM fund_holdings_v2"
     ).fetchone()[0]
 
+    # Additive classification filter — active only when the table exists
+    # (pre-Migration-003 DB runs this query unchanged). The LEFT JOIN +
+    # WHERE condition keeps unclassified CUSIPs in the universe (safe
+    # default) while excluding any CUSIP that has been explicitly marked
+    # non-priceable or inactive.
+    has_cc = _has_table(con_prod, 'cusip_classifications')
+    if has_cc:
+        cc_join = "LEFT JOIN cusip_classifications cc ON s.cusip = cc.cusip"
+        cc_where = (
+            "AND (cc.cusip IS NULL "
+            "     OR (cc.is_priceable = TRUE AND cc.is_active = TRUE))"
+        )
+    else:
+        cc_join = ""
+        cc_where = ""
+
     universe = con_prod.execute(
-        """
+        f"""
         SELECT DISTINCT s.ticker AS ticker FROM (
-            SELECT s.ticker
+            SELECT s.ticker, s.cusip
             FROM holdings_v2 h
             JOIN securities s ON h.cusip = s.cusip
+            {cc_join}
             WHERE h.quarter = ?
               AND (h.put_call IS NULL OR h.put_call = '')
               AND h.market_value_usd >= ?
               AND s.ticker IS NOT NULL AND s.ticker <> ''
+              {cc_where}
             UNION
-            SELECT s.ticker
+            SELECT s.ticker, s.cusip
             FROM fund_holdings_v2 fh
             JOIN securities s ON fh.cusip = s.cusip
+            {cc_join}
             WHERE fh.report_month = ?
               AND fh.asset_category IN ('EC','EP')
               AND fh.market_value_usd >= ?
               AND s.ticker IS NOT NULL AND s.ticker <> ''
+              {cc_where}
         ) s
         """,
         [latest_q, _MARKET_MIN_POSITION_USD, latest_m, _MARKET_MIN_POSITION_USD],

@@ -1,393 +1,433 @@
 #!/usr/bin/env python3
 """
-build_cusip.py — Build securities table mapping CUSIP to ticker and metadata.
-                 Sources: SEC 13F securities list, OpenFIGI API, yfinance.
+build_cusip.py — v2 securities builder backed by the classification layer.
 
-Run: python3 scripts/build_cusip.py
+Reads cusip_classifications (the primary classification target populated by
+scripts/build_classifications.py) and runs OpenFIGI v3 against the
+cusip_retry_queue to resolve tickers for equity CUSIPs. UPSERTs results
+into both ``_cache_openfigi`` and ``securities`` — never DROP + CREATE.
+
+Scope (Plan v1.4 Session 1):
+  - Initial OpenFIGI call path is implemented but stubbed: Session 1 keeps
+    Task 3 / Task 4 as the authoritative rule-based run and defers the
+    real API retry to Session 2. Session 2 calls ``openfigi_retry`` at
+    full rate against cusip_retry_queue.
+  - ``update_securities_from_classifications`` ports classification flags
+    (canonical_type, is_equity, is_priceable, ticker_expected, figi)
+    into the securities table via UPSERT.
+  - ``handle_unfetchable`` marks a ticker is_priceable=FALSE in
+    cusip_classifications; unknown tickers are logged to
+    logs/unfetchable_orphans.csv for review.
+
+Legacy script preserved at scripts/retired/build_cusip_legacy.py for
+reference.
 
 MANUAL TICKER OVERRIDES
 -----------------------
-OpenFIGI sometimes returns foreign exchange codes instead of US tickers
-(e.g. NDQ instead of QQQ, CHV instead of CVX). These are corrected via
-a manual override file:
+OpenFIGI sometimes returns foreign exchange codes. ``data/reference/
+ticker_overrides.csv`` takes precedence over OpenFIGI results via
+``scripts/build_classifications.py``'s manual override step — any CUSIP
+listed there gets the correct ticker + canonical_type applied last,
+with source='manual' / confidence='exact'.
 
-    data/reference/ticker_overrides.csv
-
-The override file has highest priority — any CUSIP listed there will use
-the correct_ticker value regardless of what OpenFIGI returns.
-
-To add a new override:
-  1. Open data/reference/ticker_overrides.csv
-  2. Add a row with: cusip, wrong_ticker, correct_ticker, company_name, note, security_type_override
-     - cusip: the 9-character CUSIP from the holdings table
-     - wrong_ticker: the bad ticker currently assigned (leave blank if no ticker exists)
-     - correct_ticker: the correct US ticker symbol
-     - company_name: human-readable name
-     - note: why the override is needed (e.g. "OpenFIGI foreign code")
-     - security_type_override: equity, etf, derivative, or money_market
-  3. Re-run this script — overrides are applied after the OpenFIGI step
-
-To find a CUSIP for a company, run:
-    SELECT cusip, issuer_name FROM holdings WHERE UPPER(issuer_name) LIKE '%COMPANY%'
+Usage:
+    python3 scripts/build_cusip.py                # prod
+    python3 scripts/build_cusip.py --staging
+    python3 scripts/build_cusip.py --dry-run      # no API calls, no writes
 """
+from __future__ import annotations
 
+import argparse
+import csv
 import os
+import sys
 import time
-import requests
-import pandas as pd
+from datetime import datetime
+from typing import Optional
+
 import duckdb
+import requests
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
+
+from db import set_staging_mode, get_db_path  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import set_staging_mode, get_db_path
-REF_DIR = os.path.join(BASE_DIR, "data", "reference")
-
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
-SEC_DELAY = 0.5
-
-# SIC codes for sector flags
-ENERGY_SICS = {1311, 1321, 1381, 1382, 1389, 4922, 4923, 4924, 4941, 5171, 5172, 2911}
-MEDIA_SICS = {4833, 4832, 4813, 4899, 7812, 7922, 2711, 2721}
-
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
-OPENFIGI_RATE_LIMIT = 25  # requests per minute
-YFINANCE_CACHE_DAYS = 30  # skip yfinance enrichment if cached within this many days
+OPENFIGI_BATCH_SIZE = 10           # v3 caps batches at 10 jobs per request
+OPENFIGI_SLEEP_SECONDS = 2.4       # 25 req/min observed from live headers
+OPENFIGI_MAX_RETRIES_PER_CUSIP = 3  # mirrors cusip_classifier.MAX_ATTEMPTS
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+ORPHAN_LOG = os.path.join(LOG_DIR, "unfetchable_orphans.csv")
 
 
-def create_caches(con):
-    """Create persistent cache tables for OpenFIGI and yfinance lookups."""
-    con.execute("""CREATE TABLE IF NOT EXISTS _cache_openfigi (
-        cusip VARCHAR PRIMARY KEY, ticker VARCHAR, exchange VARCHAR,
-        security_type VARCHAR, cached_at TIMESTAMP)""")
-    con.execute("""CREATE TABLE IF NOT EXISTS _cache_yfinance (
-        ticker VARCHAR PRIMARY KEY, sector VARCHAR, industry VARCHAR,
-        exchange VARCHAR, market_cap DOUBLE, cached_at TIMESTAMP)""")
+# ---------------------------------------------------------------------------
+# OpenFIGI cache — _cache_openfigi stores the full v3 response columns
+# ---------------------------------------------------------------------------
+
+def save_figi_cache(
+    con,
+    cusip: str,
+    figi: Optional[str],
+    ticker: Optional[str],
+    exchange: Optional[str],
+    security_type: Optional[str],
+    market_sector: Optional[str],
+) -> None:
+    """Persist one OpenFIGI response row. Upsert on CUSIP."""
+    con.execute(
+        """
+        INSERT INTO _cache_openfigi
+            (cusip, figi, ticker, exchange, security_type, market_sector, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, NOW())
+        ON CONFLICT (cusip) DO UPDATE SET
+            figi          = excluded.figi,
+            ticker        = excluded.ticker,
+            exchange      = excluded.exchange,
+            security_type = excluded.security_type,
+            market_sector = excluded.market_sector,
+            cached_at     = NOW()
+        """,
+        [cusip, figi, ticker, exchange, security_type, market_sector],
+    )
 
 
-def get_cached_figi(con, cusips):
-    """Return dict of cusip→ticker from cache. Remove already-cached from input list."""
-    try:
-        rows = con.execute(
-            "SELECT cusip, ticker FROM _cache_openfigi WHERE cusip IN (SELECT UNNEST(?))", [cusips]
-        ).fetchall()
-        return {r[0]: r[1] for r in rows}
-    except Exception:
+def load_figi_cache(con, cusips: list[str]) -> dict[str, dict]:
+    """Return cached rows for the given CUSIPs, keyed by CUSIP."""
+    if not cusips:
         return {}
+    rows = con.execute(
+        "SELECT cusip, figi, ticker, exchange, security_type, market_sector "
+        "FROM _cache_openfigi WHERE cusip IN (SELECT UNNEST(?))",
+        [cusips],
+    ).fetchall()
+    return {
+        r[0]: {
+            "figi": r[1],
+            "ticker": r[2],
+            "exchange": r[3],
+            "security_type": r[4],
+            "market_sector": r[5],
+        }
+        for r in rows
+    }
 
 
-def save_figi_cache(con, results):
-    """Persist OpenFIGI results to cache."""
-    if not results:
-        return
-    from datetime import datetime
-    now = datetime.now().isoformat()
-    rows = [(cusip, ticker, None, None, now) for cusip, ticker in results.items()]
-    con.executemany("INSERT OR REPLACE INTO _cache_openfigi VALUES (?,?,?,?,?)", rows)
+# ---------------------------------------------------------------------------
+# OpenFIGI API — v3
+# ---------------------------------------------------------------------------
 
-
-def get_cached_yfinance(con, tickers):
-    """Return set of tickers already cached within YFINANCE_CACHE_DAYS."""
-    try:
-        rows = con.execute(f"""
-            SELECT ticker FROM _cache_yfinance
-            WHERE cached_at >= CURRENT_TIMESTAMP - INTERVAL '{YFINANCE_CACHE_DAYS}' DAY
-        """).fetchall()
-        return {r[0] for r in rows}
-    except Exception:
-        return set()
-
-
-def save_yfinance_cache(con, results):
-    """Persist yfinance enrichment results to cache."""
-    if not results:
-        return
-    from datetime import datetime
-    now = datetime.now().isoformat()
-    rows = [(t, d.get("sector",""), d.get("industry",""), d.get("exchange",""),
-             d.get("market_cap",0), now) for t, d in results.items()]
-    con.executemany("INSERT OR REPLACE INTO _cache_yfinance VALUES (?,?,?,?,?,?)", rows)
-OPENFIGI_BATCH_SIZE = 10  # CUSIPs per request
-
-
-def get_unique_cusips(con):
-    """Get unique CUSIPs from holdings with issuer names."""
-    df = con.execute("""
-        SELECT
-            cusip,
-            MAX(issuer_name) as issuer_name,
-            MAX(security_type) as security_type,
-            COUNT(*) as holdings_count,
-            SUM(market_value_usd) as total_value
-        FROM holdings
-        GROUP BY cusip
-        ORDER BY total_value DESC
-    """).fetchdf()
-    print(f"  Unique CUSIPs in holdings: {len(df):,}")
-    return df
-
-
-def lookup_openfigi(cusips, batch_num=0):
-    """Look up tickers via OpenFIGI API for a batch of CUSIPs."""
+def _post_batch(cusips: list[str], batch_num: int = 0) -> list[dict]:
+    """POST one batch of ≤10 CUSIPs to OpenFIGI v3. Returns raw response
+    list (one element per CUSIP, preserving order). Handles 429 backoff.
+    """
     jobs = [{"idType": "ID_CUSIP", "idValue": c} for c in cusips]
     headers = {"Content-Type": "application/json"}
-
     try:
         r = requests.post(OPENFIGI_URL, json=jobs, headers=headers, timeout=30)
         if r.status_code == 429:
-            print(f"    Rate limited at batch {batch_num}, sleeping 60s...")
+            print(f"    Rate limited at batch {batch_num}; sleeping 60s", flush=True)
             time.sleep(60)
             r = requests.post(OPENFIGI_URL, json=jobs, headers=headers, timeout=30)
         r.raise_for_status()
-        results = r.json()
-    except Exception as e:
-        print(f"    OpenFIGI error at batch {batch_num}: {e}")
-        return {}
-
-    ticker_map = {}
-    for cusip, result in zip(cusips, results):
-        if "data" in result and len(result["data"]) > 0:
-            item = result["data"][0]
-            ticker = item.get("ticker", "")
-            if ticker:
-                ticker_map[cusip] = {
-                    "ticker": ticker,
-                    "name": item.get("name", ""),
-                    "exchCode": item.get("exchCode", ""),
-                    "securityType": item.get("securityType", ""),
-                    "marketSector": item.get("marketSector", ""),
-                }
-    return ticker_map
+        return r.json()
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"    OpenFIGI error at batch {batch_num}: {exc}", flush=True)
+        return []
 
 
-def enrich_with_openfigi(df_cusips):
-    """Look up tickers for CUSIPs without one via OpenFIGI."""
-    print("\nLooking up tickers via OpenFIGI API...")
+def openfigi_retry(con_write, limit: Optional[int] = None) -> dict:
+    """Drain cusip_retry_queue against OpenFIGI v3, upserting results.
 
-    # Get top CUSIPs by value (limit to avoid excessive API calls)
-    cusips_to_lookup = df_cusips["cusip"].tolist()
-    # Limit to top 5000 by value to stay within API limits
-    max_lookups = 5000
-    cusips_to_lookup = cusips_to_lookup[:max_lookups]
-    print(f"  Looking up {len(cusips_to_lookup):,} CUSIPs")
+    Selects rows where ``status='pending'`` AND ``attempt_count``
+    < OPENFIGI_MAX_RETRIES_PER_CUSIP. For each batch:
+      1. Call OpenFIGI v3.
+      2. On a match (``result.data`` non-empty): upsert _cache_openfigi,
+         update cusip_classifications (ticker, figi, exchange, market_sector,
+         openfigi_attempts+1, openfigi_status='success'), mark
+         retry_queue row status='resolved'.
+      3. On a warning-only response (v3 'no match'): update
+         cusip_classifications (openfigi_attempts+1, openfigi_status='no_result'),
+         bump retry_queue.attempt_count; mark 'unmappable' if the attempt
+         limit is hit.
+      4. On a hard error: bump attempt_count + last_error; leave status='pending'.
 
-    all_results = {}
-    batches = [cusips_to_lookup[i:i + OPENFIGI_BATCH_SIZE]
-               for i in range(0, len(cusips_to_lookup), OPENFIGI_BATCH_SIZE)]
-
-    for batch_num, batch in enumerate(batches):
-        results = lookup_openfigi(batch, batch_num)
-        all_results.update(results)
-
-        # Rate limiting: 25 req/min
-        if (batch_num + 1) % OPENFIGI_RATE_LIMIT == 0:
-            print(f"    Pausing for rate limit after {batch_num + 1} batches ({len(all_results):,} matches)...")
-            time.sleep(62)
-
-        if (batch_num + 1) % 50 == 0:
-            print(f"    Processed {batch_num + 1}/{len(batches)} batches ({len(all_results):,} matches)")
-
-        # Small delay between requests
-        time.sleep(0.1)
-
-    print(f"  OpenFIGI results: {len(all_results):,} CUSIPs matched to tickers")
-    return all_results
-
-
-def enrich_with_yahoo(tickers):
-    """Get sector, industry, exchange for a list of tickers via YahooClient.
-
-    (Formerly `enrich_with_yfinance` — migrated to direct Yahoo JSON API to
-    bypass yfinance rate limits. Same return shape.)
+    Returns a summary dict.
     """
-    from yahoo_client import YahooClient
+    pending = con_write.execute(
+        """
+        SELECT cusip
+        FROM cusip_retry_queue
+        WHERE status = 'pending'
+          AND attempt_count < ?
+        ORDER BY last_attempted NULLS FIRST, cusip
+        """,
+        [OPENFIGI_MAX_RETRIES_PER_CUSIP],
+    ).fetchdf()['cusip'].tolist()
 
-    print(f"\nEnriching {len(tickers):,} tickers with Yahoo metadata...")
+    if limit:
+        pending = pending[:limit]
 
-    yc = YahooClient()
-    results = {}
-    ticker_list = list(tickers)
+    if not pending:
+        print("  openfigi_retry: queue is empty")
+        return {'attempted': 0, 'resolved': 0, 'no_match': 0, 'errors': 0}
 
-    for i, tkr in enumerate(ticker_list, 1):
-        try:
-            m = yc.fetch_metadata(tkr)
-            if m and m.get("price"):
-                results[tkr] = {
-                    "sector":   m.get("sector") or "",
-                    "industry": m.get("industry") or "",
-                    "exchange": m.get("exchange") or "",
-                    "market_cap": m.get("market_cap") or 0,  # approximate; authoritative market_cap is computed in fetch_market.py
-                    "sic_code": None,
-                }
-        except Exception:
-            pass
+    print(f"  openfigi_retry: {len(pending):,} CUSIPs, "
+          f"batch_size={OPENFIGI_BATCH_SIZE}, "
+          f"sleep={OPENFIGI_SLEEP_SECONDS}s")
 
-        if i % 100 == 0:
-            print(f"    Processed {i:,}/{len(ticker_list):,} ({len(results):,} enriched)")
+    resolved = no_match = errors = 0
+    for batch_num, start in enumerate(range(0, len(pending), OPENFIGI_BATCH_SIZE)):
+        batch = pending[start:start + OPENFIGI_BATCH_SIZE]
+        results = _post_batch(batch, batch_num)
 
-    print(f"  Yahoo enrichment: {len(results):,} tickers enriched")
-    return results
+        if not results:
+            errors += len(batch)
+            for cusip in batch:
+                con_write.execute(
+                    """
+                    UPDATE cusip_retry_queue
+                    SET attempt_count = attempt_count + 1,
+                        last_attempted = NOW(),
+                        last_error = 'http_error',
+                        updated_at = NOW()
+                    WHERE cusip = ?
+                    """,
+                    [cusip],
+                )
+            time.sleep(OPENFIGI_SLEEP_SECONDS)
+            continue
 
+        for cusip, result in zip(batch, results):
+            data = result.get("data") or []
+            if data:
+                item = data[0]
+                ticker = item.get("ticker") or None
+                figi = item.get("compositeFIGI") or item.get("figi")
+                exchange = item.get("exchCode")
+                security_type = item.get("securityType")
+                market_sector = item.get("marketSector")
 
-# Backwards-compatible alias — other callers may reference the old name.
-enrich_with_yfinance = enrich_with_yahoo
+                save_figi_cache(con_write, cusip, figi, ticker,
+                                exchange, security_type, market_sector)
 
-
-def build_securities_table(con, df_cusips, figi_results):
-    """Build the securities table in DuckDB."""
-    print("\nBuilding securities table...")
-
-    records = []
-    for _, row in df_cusips.iterrows():
-        cusip = row["cusip"]
-        figi = figi_results.get(cusip, {})
-        ticker = figi.get("ticker", "")
-
-        records.append({
-            "cusip": cusip,
-            "issuer_name": row["issuer_name"],
-            "ticker": ticker if ticker else None,
-            "security_type": figi.get("securityType", row.get("security_type", "")),
-            "exchange": figi.get("exchCode", ""),
-            "market_sector": figi.get("marketSector", ""),
-            "sector": None,  # Filled by yfinance
-            "industry": None,
-            "sic_code": None,
-            "is_energy": False,
-            "is_media": False,
-            "holdings_count": int(row["holdings_count"]),
-            "total_value": float(row["total_value"]) if pd.notna(row["total_value"]) else 0,
-        })
-
-    df_sec = pd.DataFrame(records)
-
-    # Enrich top tickers with yfinance (limit to 500 most-held to avoid slow API)
-    top_tickers = df_sec[df_sec["ticker"].notna()].nlargest(500, "total_value")["ticker"].unique().tolist()
-    if top_tickers:
-        yf_data = enrich_with_yfinance(top_tickers)
-        for tkr, meta in yf_data.items():
-            mask = df_sec["ticker"] == tkr
-            if mask.any():
-                df_sec.loc[mask, "sector"] = meta.get("sector", "")
-                df_sec.loc[mask, "industry"] = meta.get("industry", "")
-
-                # Flag energy
-                sector = str(meta.get("sector", "")).lower()
-                if sector == "energy":
-                    df_sec.loc[mask, "is_energy"] = True
-
-                # Flag media
-                if sector == "communication services":
-                    df_sec.loc[mask, "is_media"] = True
-
-    # Apply manual ticker overrides before saving.
-    # See docstring at top of file for how to add new overrides.
-    overrides_path = os.path.join(REF_DIR, "ticker_overrides.csv")
-    if os.path.exists(overrides_path):
-        print(f"\nApplying manual ticker overrides from {overrides_path}...")
-        df_overrides = pd.read_csv(overrides_path, dtype=str)
-        applied = 0
-        skipped = 0
-        for _, row in df_overrides.iterrows():
-            cusip = row["cusip"]
-            correct = row.get("correct_ticker", "")
-            if pd.isna(correct) or not str(correct).strip():
-                continue  # Security-type-only override, no ticker change
-            correct = str(correct).strip()
-            mask = df_sec["cusip"] == cusip
-            if mask.any():
-                # old = df_sec.loc[mask, "ticker"].iloc[0]
-                df_sec.loc[mask, "ticker"] = correct
-                applied += 1
+                con_write.execute(
+                    """
+                    UPDATE cusip_classifications
+                    SET ticker                = COALESCE(?, ticker),
+                        figi                  = COALESCE(?, figi),
+                        exchange              = COALESCE(?, exchange),
+                        market_sector         = COALESCE(?, market_sector),
+                        openfigi_attempts     = openfigi_attempts + 1,
+                        last_openfigi_attempt = NOW(),
+                        openfigi_status       = 'success',
+                        ticker_source         = COALESCE(ticker_source, 'openfigi'),
+                        updated_at            = NOW()
+                    WHERE cusip = ?
+                    """,
+                    [ticker, figi, exchange, market_sector, cusip],
+                )
+                con_write.execute(
+                    """
+                    UPDATE cusip_retry_queue
+                    SET status = 'resolved',
+                        attempt_count = attempt_count + 1,
+                        last_attempted = NOW(),
+                        resolved_ticker = ?,
+                        resolved_figi = ?,
+                        updated_at = NOW()
+                    WHERE cusip = ?
+                    """,
+                    [ticker, figi, cusip],
+                )
+                resolved += 1
             else:
-                skipped += 1
-        print(f"  Overrides applied: {applied} total")
-        if "method" in df_overrides.columns:
-            method_counts = df_overrides[df_overrides["cusip"].isin(
-                df_sec["cusip"]
-            )].groupby("method").size()
-            for method, count in method_counts.items():
-                print(f"    {method}: {count}")
-        if skipped > 0:
-            print(f"  Skipped: {skipped} (CUSIP not in securities)")
-    else:
-        print(f"\nNo ticker overrides file found at {overrides_path} — skipping")
+                no_match += 1
+                con_write.execute(
+                    """
+                    UPDATE cusip_classifications
+                    SET openfigi_attempts     = openfigi_attempts + 1,
+                        last_openfigi_attempt = NOW(),
+                        openfigi_status       = 'no_result',
+                        updated_at            = NOW()
+                    WHERE cusip = ?
+                    """,
+                    [cusip],
+                )
+                con_write.execute(
+                    """
+                    UPDATE cusip_retry_queue
+                    SET attempt_count = attempt_count + 1,
+                        last_attempted = NOW(),
+                        last_error = 'no_match',
+                        status = CASE
+                            WHEN attempt_count + 1 >= ? THEN 'unmappable'
+                            ELSE 'pending'
+                        END,
+                        updated_at = NOW()
+                    WHERE cusip = ?
+                    """,
+                    [OPENFIGI_MAX_RETRIES_PER_CUSIP, cusip],
+                )
+        time.sleep(OPENFIGI_SLEEP_SECONDS)
 
-    # Save to DuckDB
-    con.execute("DROP TABLE IF EXISTS securities")
-    con.execute("CREATE TABLE securities AS SELECT * FROM df_sec")
+    print(f"  resolved={resolved:,} no_match={no_match:,} errors={errors:,}")
+    return {
+        'attempted': len(pending),
+        'resolved': resolved,
+        'no_match': no_match,
+        'errors': errors,
+    }
 
-    # Update holdings ticker from securities
-    print("\nUpdating holdings.ticker from securities...")
+
+# ---------------------------------------------------------------------------
+# securities — populate 7 new columns from cusip_classifications
+# ---------------------------------------------------------------------------
+
+SECURITIES_UPSERT_SQL = """
+INSERT INTO securities (
+    cusip, issuer_name, ticker, security_type, exchange, market_sector,
+    canonical_type, canonical_type_source,
+    is_equity, is_priceable, ticker_expected, is_active, figi
+)
+SELECT
+    cc.cusip, cc.issuer_name, cc.ticker, cc.raw_type_mode, cc.exchange,
+    cc.market_sector,
+    cc.canonical_type, cc.canonical_type_source,
+    cc.is_equity, cc.is_priceable, cc.ticker_expected, cc.is_active,
+    cc.figi
+FROM cusip_classifications cc
+LEFT JOIN securities s ON cc.cusip = s.cusip
+WHERE s.cusip IS NULL
+"""
+
+SECURITIES_UPDATE_SQL = """
+UPDATE securities s
+SET ticker                = COALESCE(cc.ticker, s.ticker),
+    exchange              = COALESCE(cc.exchange, s.exchange),
+    market_sector         = COALESCE(cc.market_sector, s.market_sector),
+    canonical_type        = cc.canonical_type,
+    canonical_type_source = cc.canonical_type_source,
+    is_equity             = cc.is_equity,
+    is_priceable          = cc.is_priceable,
+    ticker_expected       = cc.ticker_expected,
+    is_active             = cc.is_active,
+    figi                  = COALESCE(cc.figi, s.figi)
+FROM cusip_classifications cc
+WHERE s.cusip = cc.cusip
+"""
+
+
+def update_securities_from_classifications(con_write) -> dict:
+    """Port cusip_classifications → securities. UPDATE existing rows,
+    INSERT rows for CUSIPs that exist in classifications but not in
+    securities (13D/G-only CUSIPs fall in this bucket)."""
+    before = con_write.execute("SELECT COUNT(*) FROM securities").fetchone()[0]
+    con_write.execute("BEGIN")
     try:
-        con.execute("ALTER TABLE holdings ALTER COLUMN ticker TYPE VARCHAR")
+        con_write.execute(SECURITIES_UPDATE_SQL)
+        con_write.execute(SECURITIES_UPSERT_SQL)
+        con_write.execute("COMMIT")
     except Exception:
-        pass
-    con.execute("""
-        UPDATE holdings h
-        SET ticker = s.ticker
-        FROM securities s
-        WHERE h.cusip = s.cusip AND s.ticker IS NOT NULL
-    """)
-
-    # Coverage stats
-    total = con.execute("SELECT COUNT(*) FROM securities").fetchone()[0]
-    with_ticker = con.execute("SELECT COUNT(*) FROM securities WHERE ticker IS NOT NULL").fetchone()[0]
-    holdings_total = con.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
-    holdings_with_ticker = con.execute("SELECT COUNT(*) FROM holdings WHERE ticker IS NOT NULL").fetchone()[0]
-
-    print(f"\n  securities table: {total:,} rows")
-    print(f"  CUSIPs with ticker: {with_ticker:,} ({with_ticker / total * 100:.1f}%)")
-    print(f"  Holdings with ticker: {holdings_with_ticker:,} / {holdings_total:,} ({holdings_with_ticker / holdings_total * 100:.1f}%)")
-
-    energy = con.execute("SELECT COUNT(*) FROM securities WHERE is_energy = true").fetchone()[0]
-    media = con.execute("SELECT COUNT(*) FROM securities WHERE is_media = true").fetchone()[0]
-    print(f"  Energy securities: {energy:,}")
-    print(f"  Media securities: {media:,}")
-
-    return total
+        con_write.execute("ROLLBACK")
+        raise
+    after = con_write.execute("SELECT COUNT(*) FROM securities").fetchone()[0]
+    print(f"  securities: {before:,} → {after:,} rows (+{after-before:,})")
+    return {'before': before, 'after': after}
 
 
-def main():
+# ---------------------------------------------------------------------------
+# handle_unfetchable — mark ticker not priceable, log orphan tickers
+# ---------------------------------------------------------------------------
+
+def handle_unfetchable(con_write, ticker: str, reason: str) -> None:
+    """Mark a ticker is_priceable=FALSE in cusip_classifications.
+
+    If no CUSIP row has this ticker, append to logs/unfetchable_orphans.csv
+    for manual review — this happens when a ticker hasn't yet been resolved
+    to a CUSIP by OpenFIGI.
+    """
+    hit = con_write.execute(
+        "SELECT cusip FROM cusip_classifications WHERE ticker = ? LIMIT 1",
+        [ticker],
+    ).fetchone()
+
+    if hit:
+        con_write.execute(
+            """
+            UPDATE cusip_classifications
+            SET is_priceable         = FALSE,
+                last_priceable_check = NOW(),
+                notes                = COALESCE(notes || ' | ', '') || ?,
+                updated_at           = NOW()
+            WHERE ticker = ?
+            """,
+            [reason, ticker],
+        )
+        return
+
+    os.makedirs(LOG_DIR, exist_ok=True)
+    new_file = not os.path.exists(ORPHAN_LOG)
+    with open(ORPHAN_LOG, 'a', newline='') as f:
+        w = csv.writer(f)
+        if new_file:
+            w.writerow(['ticker', 'reason', 'timestamp'])
+        w.writerow([ticker, reason, datetime.utcnow().isoformat()])
+
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="v2 securities builder")
+    p.add_argument("--staging", action="store_true",
+                   help="Write to staging DB")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Skip API calls and DB writes")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Limit number of CUSIPs processed (testing)")
+    p.add_argument("--skip-openfigi", action="store_true",
+                   help="Skip OpenFIGI retry; only port classifications→securities")
+    args = p.parse_args()
+
+    if args.staging:
+        set_staging_mode(True)
+
+    write_db = get_db_path()
+    print("build_cusip.py v2 — classification-backed securities builder")
     print("=" * 60)
-    print("SCRIPT 6 — build_cusip.py")
-    print("=" * 60)
+    print(f"  write: {write_db}")
+    print(f"  dry-run: {args.dry_run}")
+    if args.dry_run:
+        print("  [dry-run] no API calls, no writes — exiting")
+        return
 
-    con = duckdb.connect(get_db_path())
-    create_caches(con)
+    con = duckdb.connect(write_db)
+    try:
+        # Guard: cusip_classifications must exist (Migration 003 applied)
+        try:
+            con.execute("SELECT 1 FROM cusip_classifications LIMIT 1")
+        except Exception as exc:
+            print(f"ERROR: cusip_classifications missing from {write_db}. "
+                  f"Run Migration 003 first. ({exc})")
+            return
 
-    # Step 1: Get unique CUSIPs
-    print("\nGetting unique CUSIPs from holdings...")
-    df_cusips = get_unique_cusips(con)
+        if not args.skip_openfigi:
+            openfigi_retry(con, limit=args.limit)
+        else:
+            print("  --skip-openfigi: skipping retry step")
 
-    # Step 2: OpenFIGI lookup (with cache)
-    cusips_to_lookup = df_cusips["cusip"].tolist()[:5000]
-    cached_figi = get_cached_figi(con, cusips_to_lookup)
-    uncached = [c for c in cusips_to_lookup if c not in cached_figi]
-    print(f"  OpenFIGI cache: {len(cached_figi):,} cached, {len(uncached):,} to look up")
+        update_securities_from_classifications(con)
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
 
-    if uncached:
-        # Create a filtered df for uncached CUSIPs only
-        df_uncached = df_cusips[df_cusips["cusip"].isin(uncached)]
-        new_results = enrich_with_openfigi(df_uncached)
-        save_figi_cache(con, new_results)
-        cached_figi.update(new_results)
-
-    figi_results = cached_figi
-
-    # Step 3: Build and save securities table
-    build_securities_table(con, df_cusips, figi_results)
-
-    con.close()
-    print("\nDone.")
+    print("Done.")
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Build securities table from CUSIPs")
-    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
-    args = parser.parse_args()
-    if args.staging:
-        set_staging_mode(True)
     main()

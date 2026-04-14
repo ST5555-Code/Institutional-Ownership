@@ -1,6 +1,27 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
+_Last updated: April 14, 2026 — CUSIP classification v1.4 Session 1 landed (Migration 003 + cusip_classifier + build_classifications + validate_classifications + build_cusip v2 + discover_market filter). Staging validated: 132,618 CUSIPs classified, 0.14% OTHER, 37,925 queued for OpenFIGI. All 4 BLOCK checks PASS._
+
+## Session Summary 2026-04-14 (CUSIP v1.4 Session 1) — classification layer
+
+First of two sessions. Builds the CUSIP classification layer that gates which CUSIPs are priceable equities vs permanent non-equities (BOND/OPTION/CASH). Session 2 will run the OpenFIGI retry against the resulting queue.
+
+- **Migration 003** (`scripts/migrations/003_cusip_classifications.py`): 3 new tables (`cusip_classifications`, `cusip_retry_queue`, `_cache_openfigi`) + `schema_versions` stamp + 7 new columns on `securities` (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`). `market_sector` already existed — not re-added. Rollback on failure, idempotent, applied to staging.
+- **New classifier module** (`scripts/pipeline/cusip_classifier.py`): pure logic, no DB writes. `classify_cusip()` implements the 5-step order: derivative pre-check → market_sector map → combined seed → rule match → (new) equity-seed fallback. Corrected `ASSET_CATEGORY_SEED_MAP` after discovering plan v1.4 had `DE` wrongly mapped to 'debt' (it's Derivative-Equity) and missed `DBT`/`ABS-*`/`LON`/`STIV`/`DIR`/`DCO`/`DCR`/`DO`/`DFE`. Full vocabulary now covered.
+- **`scripts/build_classifications.py`**: standalone driver. Reads 3-source CUSIP universe from prod, classifies all 132,618 rows in 2.5s (~53K rows/s), UPSERTs into `cusip_classifications` (staging), populates `cusip_retry_queue` with 37,925 pending entries. Applies manual overrides from `data/reference/ticker_overrides.csv` as Step 5.
+- **`scripts/validate_classifications.py`**: 4 BLOCK + 1 WARN + 1 INFO gates. All BLOCK PASS on staging; OTHER = 0.14% (well under 5% WARN threshold).
+- **`scripts/build_cusip.py` rewrite**: legacy moved to `scripts/retired/build_cusip_legacy.py`. New version is UPSERT-only (no DROP+CREATE), OpenFIGI v3 with 10-per-batch + 2.4s sleep (25 req/min), `save_figi_cache` persists all 7 response columns, `handle_unfetchable` logs orphan tickers to `logs/unfetchable_orphans.csv`, removed `UPDATE holdings` block (handled by Batch 3 enrichment).
+- **`discover_market()` additive filter**: `LEFT JOIN cusip_classifications cc` with `has_table()` guard. Pre-migration: no-op. Post-migration: pre-filter 5,867 tickers → post-filter 5,031 (836 excluded — 1,709 OPTIONs, 148 BONDs, 50 FOREIGN, 40 CASH, etc.).
+- **Staging validation numbers:**
+  - Total CUSIPs classified: **132,618**
+  - `canonical_type='OTHER'`: 185 (0.14%)
+  - `cusip_retry_queue` pending: **37,925** (~2.5h at 250 CUSIPs/min in Session 2)
+  - Top categories: BOND 71,328 / COM 30,340 / OPTION 18,730 / ETF 5,580 / CASH 1,882
+  - `discover_market()` universe: 5,867 → 5,031 tickers (836 excluded, all legitimate non-equities)
+
+**Next (Session 2):** OpenFIGI retry run against `cusip_retry_queue` (~10K equity CUSIPs at 250 req/min → ~40 min). Then port `cusip_classifications` flags into `securities` via `update_securities_from_classifications()`.
+
+---
 
 ## Session Summary 2026-04-14 (Batch 2C) — N-PORT v2 SourcePipeline
 

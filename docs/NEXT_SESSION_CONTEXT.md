@@ -1,6 +1,41 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (Batch 2C close — N-PORT SourcePipeline rewrite live, 5-fund test promoted to prod with Group 2 entity enrichment. HEAD: TBD.)_
+_Last updated: 2026-04-14 (CUSIP v1.4 Session 1 close — classification layer live in staging, 132,618 CUSIPs classified, 37,925 queued for Session 2 OpenFIGI retry. All 4 BLOCK validation checks PASS.)_
+
+## CUSIP Classification v1.4 — 2026-04-14 Session 1
+
+First of two CUSIP classification sessions. Session 1 = Migration 003 + rule-based classification + securities schema extension + discover_market filter. **No OpenFIGI calls in Session 1** — those live in Session 2 against the 37,925-row retry queue.
+
+**New files (4):**
+- `scripts/migrations/003_cusip_classifications.py` — creates `cusip_classifications`, `cusip_retry_queue`, `_cache_openfigi`, `schema_versions`; adds 7 columns to `securities`. Idempotent, rollback on failure, applied to staging (not prod).
+- `scripts/pipeline/cusip_classifier.py` — pure classification logic, no DB writes. `classify_cusip()`, `normalize_raw_type()`, `tokenize_compound()`, `get_cusip_universe()`. The `ASSET_CATEGORY_SEED_MAP` corrects plan v1.4 errors: `DE` was wrongly 'debt' (actually Derivative-Equity per SEC N-PORT spec); `DBT`, `ABS-*`, `LON`, `SN`, `STIV`, `RA`, `RE`, all `D*` derivative codes now explicitly mapped.
+- `scripts/build_classifications.py` — standalone driver: reads 3-source universe from prod, classifies all rows, UPSERTs to staging, populates retry queue. NOW() used instead of CURRENT_TIMESTAMP inside `executemany` parameterized statements — DuckDB binder misreads CURRENT_TIMESTAMP as a column name in that context. **Gotcha worth remembering.**
+- `scripts/validate_classifications.py` — 4 BLOCK + 1 WARN + 1 INFO gates. BLOCK-3 (derivatives misclassified as BOND/PREF) was the failure mode for plan v1.4's original ASSET_CATEGORY_SEED_MAP.
+
+**Modified files (2):**
+- `scripts/build_cusip.py` — rewrite. Legacy at `scripts/retired/build_cusip_legacy.py`. UPSERT-only (no DROP+CREATE). OpenFIGI v3 (batch=10, sleep=2.4s). `update_securities_from_classifications()` ports 7 new columns. `handle_unfetchable()` logs orphans to `logs/unfetchable_orphans.csv` when the ticker isn't yet resolved to a CUSIP.
+- `scripts/pipeline/discover.py` — added `_has_table()` guard + additive `LEFT JOIN cusip_classifications` with WHERE filter. Pre-migration prod runs unchanged.
+
+**Classification results (staging):**
+- Total: **132,618 CUSIPs** classified
+- OTHER: 185 (0.14%) — well under 5% WARN threshold
+- Retry queue pending: **37,925** (equity CUSIPs without tickers)
+- Top canonical_types: BOND 71,328 · COM 30,340 · OPTION 18,730 · ETF 5,580 · CASH 1,882 · FOREIGN 1,150 · PREF 1,078 · MUTUAL_FUND 627 · ADR 610 · WARRANT 555
+- `discover_market()` universe: 5,867 → 5,031 (836 excluded: 1,709 OPTIONs, 148 BONDs, 50 FOREIGN, 40 CASH, 37 WARRANT, 3 CONVERT, 1 BANK_LOAN — all legitimate non-equities)
+
+**Key plan corrections made during implementation:**
+1. **ASSET_CATEGORY_SEED_MAP rewrite.** Plan v1.4's map would have mis-routed ~70K CUSIPs. SEC N-PORT codes: `E*` = equity, `D*` except `DBT` = derivative, `DBT` = debt, `ABS-*`/`LON`/`SN` = debt, `STIV`/`RA` = money_market.
+2. **Equity-seed fallback (Step 4b).** Fund-only EC/EP CUSIPs with no `raw_type_mode` would have landed in OTHER under plan v1.4 rules (~15K affected). Added explicit fallback: seed=='equity' → COM (or PREF for EP) with `ticker_expected=TRUE` so they enter the retry queue.
+3. **NOW() vs CURRENT_TIMESTAMP.** DuckDB binder error in `executemany` with CURRENT_TIMESTAMP inside `ON CONFLICT DO UPDATE SET` — switched to `NOW()`.
+
+**Session 2 plan (separate prompt):**
+- Run `scripts/build_cusip.py --staging` → drains `cusip_retry_queue` via OpenFIGI v3 at 250 req/min (~40 min for 10K expected matches).
+- `update_securities_from_classifications()` ports classification flags into `securities`.
+- Re-validate. Then authorize promotion to prod (Migration 003 on prod + same build+validate sequence).
+
+**Follow-up bookkeeping:**
+- Prod still has no `cusip_classifications` table — Session 1 writes only to staging per user rule.
+- `schema_versions` table created as part of Migration 003 (didn't exist before); prior migrations are not retroactively stamped.
 
 ## Batch 2C — 2026-04-14 N-PORT v2 SourcePipeline
 
