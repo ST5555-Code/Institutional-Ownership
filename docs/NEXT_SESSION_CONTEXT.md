@@ -1,6 +1,49 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (CUSIP v1.4 Session 2 scripts close — run_openfigi_retry + normalize_securities + extended validator delivered. 100-CUSIP staging test passed 92/8/0. Full retry authorized for overnight; retry + normalization commit follows once validation passes.)_
+_Last updated: 2026-04-14 (N-PORT DERA ZIP Session 2 code-complete — fetch_nport_v2.py rewritten as 4-mode orchestrator; --zip PATH flag added; shared utils relocated. Staging load deferred behind concurrent run_openfigi_retry.py --staging. CUSIP v1.4 Session 2 scripts also landed earlier today.)_
+
+## N-PORT DERA ZIP — 2026-04-14 Session 2 (code-complete)
+
+Session 2 rewrites `fetch_nport_v2.py` to make DERA ZIP the primary bulk path. Session 1 parity (commit 5cf3585) is the gate; this session integrates.
+
+**New flag — user-requested:**
+- `--zip PATH` on `fetch_dera_nport.py` and `fetch_nport_v2.py`: PATH may be a file or a directory containing `{YYYY}q{N}_nport.zip` files. When a match is found, network download is skipped. Matches the two pre-downloaded Session-2 ZIPs at `data/nport_raw/dera/2025q4_nport.zip` and `.../2026q1_nport.zip`.
+
+**Rewrite — `scripts/fetch_nport_v2.py` (4 modes):**
+- **Mode 1 (default): DERA bulk.** `discover_missing_quarters(con)` walks `ingestion_manifest` for prior `DERA_ZIP:YYYYQn` keys; on empty-manifest first run returns the two most-recent complete DERA quarters when prod has data (four when seeding from scratch). `--all` and `--limit N` behave as before (`N` = quarters in Mode 1, accessions in Mode 2).
+- **Mode 2: `--monthly-topup`.** XML per-accession, scoped to today's calendar quarter, filtered to filings posted since the last DERA ZIP's quarter-end. Reuses the Session-1 XML pipeline (renamed `NPortXMLPipeline`). Correct edgartools API: `get_filings(form='NPORT-P', year=Y, quarter=Q)` — no `limit=` kwarg.
+- **Mode 3: `--test`.** Delegates to `fetch_dera_nport.run_test_mode(zip_spec=...)`.
+- **Mode 4: `--dry-run`.** Shows the plan; skips staging read-lock so it still works when another writer holds it (e.g. the Session-2 OpenFIGI retry).
+
+**Circular-import fix — moved from `fetch_nport_v2` into `fetch_dera_nport`:**
+- `quarter_label_for_date`, `quarter_label_for_month`
+- `_STG_HOLDINGS_DDL`, `_STG_UNIVERSE_DDL`, `_ensure_staging_schema`
+
+Both scripts now import these from `fetch_dera_nport`. No caller duplication.
+
+**Control-plane convention for DERA loads:**
+- `ingestion_manifest.source_type='NPORT'` + `object_type='DERA_ZIP'` + `object_key='DERA_ZIP:{YYYY}Q{N}'` stamped per quarter after load. `_already_loaded_quarters(con)` reads these to determine which ZIPs to skip on the next run.
+- One `ingestion_impacts` row per quarter with `unit_type='quarter'` + `unit_key_json='{"year":Y,"quarter":Q}'`. Per-(series, month) impacts are written inside `dera_load_to_staging` as before.
+
+**Dry-run verdict (2026-04-14):**
+- Missing quarters: `['2025Q4', '2026Q1']`
+- Both resolved locally via `--zip data/nport_raw/dera` — no download needed.
+
+**Operational blocker (at code-complete):**
+- User's `scripts/run_openfigi_retry.py --staging` (PID 49378, CUSIP v1.4 Session 2) holds the staging write lock. N-PORT DERA staging load is deferred until that finishes. DuckDB single-writer semantics — same constraint as promote behind `app.py`.
+
+**Next steps after OpenFIGI retry completes:**
+```
+python3 scripts/fetch_nport_v2.py --staging --all --zip data/nport_raw/dera
+python3 scripts/validate_nport.py --changes-only --run-id <run_id> --staging
+python3 scripts/validate_nport.py --run-id <run_id> --staging
+# On authorization:
+python3 scripts/promote_nport.py --run-id <run_id>
+```
+
+Expected staging rows: ~2-3M new holdings across 3-5 new months (2025-12, 2026-01/02/03).
+
+---
 
 ## CUSIP Classification v1.4 — 2026-04-14 Session 2 (scripts)
 

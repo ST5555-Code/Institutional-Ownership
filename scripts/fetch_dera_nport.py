@@ -72,11 +72,90 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import STAGING_DB, PROD_DB, set_staging_mode  # noqa: E402
-from fetch_nport_v2 import (  # noqa: E402
-    quarter_label_for_date, _ensure_staging_schema,
-)
 import fetch_nport  # noqa: E402
 from fetch_nport import classify_fund  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers (moved from fetch_nport_v2 in Session 2 to break a circular
+# import: fetch_nport_v2 now imports these from here, so this module must own
+# them. Behaviour unchanged — callers from either path see the same labels
+# and the same staging DDL.)
+# ---------------------------------------------------------------------------
+
+def quarter_label_for_month(year: int, month: int) -> str:
+    """Map N-PORT report month -> prod ``quarter`` label.
+
+    Convention observed in prod ``fund_holdings_v2``:
+      Jan/Feb/Mar -> YYYY-Q2,  Apr/May/Jun -> YYYY-Q3,
+      Jul/Aug/Sep -> YYYY-Q4,  Oct/Nov/Dec -> (YYYY+1)-Q1.
+    """
+    if month >= 10:
+        return f"{year + 1}Q1"
+    if month >= 7:
+        return f"{year}Q4"
+    if month >= 4:
+        return f"{year}Q3"
+    return f"{year}Q2"
+
+
+def quarter_label_for_date(d: date) -> str:
+    return quarter_label_for_month(d.year, d.month)
+
+
+_STG_HOLDINGS_DDL = """
+CREATE TABLE IF NOT EXISTS stg_nport_holdings (
+    fund_cik             VARCHAR,
+    fund_name            VARCHAR,
+    family_name          VARCHAR,
+    series_id            VARCHAR,
+    quarter              VARCHAR,
+    report_month         VARCHAR,
+    report_date          DATE,
+    cusip                VARCHAR,
+    isin                 VARCHAR,
+    issuer_name          VARCHAR,
+    ticker               VARCHAR,
+    asset_category       VARCHAR,
+    shares_or_principal  DOUBLE,
+    market_value_usd     DOUBLE,
+    pct_of_nav           DOUBLE,
+    fair_value_level     VARCHAR,
+    is_restricted        BOOLEAN,
+    payoff_profile       VARCHAR,
+    loaded_at            TIMESTAMP,
+    fund_strategy        VARCHAR,
+    best_index           VARCHAR,
+    accession_number     VARCHAR,
+    manifest_id          BIGINT,
+    parse_status         VARCHAR,
+    qc_flags             VARCHAR
+)
+"""
+
+_STG_UNIVERSE_DDL = """
+CREATE TABLE IF NOT EXISTS stg_nport_fund_universe (
+    fund_cik              VARCHAR,
+    fund_name             VARCHAR,
+    series_id             VARCHAR PRIMARY KEY,
+    family_name           VARCHAR,
+    total_net_assets      DOUBLE,
+    fund_category         VARCHAR,
+    is_actively_managed   BOOLEAN,
+    total_holdings_count  INTEGER,
+    equity_pct            DOUBLE,
+    top10_concentration   DOUBLE,
+    last_updated          TIMESTAMP,
+    fund_strategy         VARCHAR,
+    best_index            VARCHAR,
+    manifest_id           BIGINT
+)
+"""
+
+
+def _ensure_staging_schema(con: duckdb.DuckDBPyConnection) -> None:
+    con.execute(_STG_HOLDINGS_DDL)
+    con.execute(_STG_UNIVERSE_DDL)
 
 
 # ---------------------------------------------------------------------------
@@ -121,13 +200,55 @@ def dera_zip_local_path(year: int, quarter: int) -> str:
     return os.path.join(L1_DIR, "inspect", f"{year}q{quarter}_nport.zip")
 
 
-def download_dera_zip(year: int, quarter: int) -> Path:
-    """Download quarterly ZIP to data/nport_raw/dera/inspect/YYYYqN_nport.zip.
+def resolve_zip_path(year: int, quarter: int,
+                     zip_spec: Optional[str]) -> Optional[Path]:
+    """Find a pre-downloaded DERA ZIP for {year}q{quarter}.
 
-    Idempotent: if the file already exists and Content-Length matches the
-    server HEAD, skip the download. Partial files are replaced (no resume —
-    SEC doesn't reliably honor Range for these ZIPs).
+    ``zip_spec`` is interpreted as:
+      * path to a directory -> look for ``{year}q{quarter}_nport.zip`` inside.
+      * path to a file     -> treat as the ZIP for this quarter. Caller is
+        responsible for making sure the filename matches the quarter they
+        asked for; we accept any .zip to keep the CLI ergonomic.
+
+    Returns the resolved Path if found, otherwise None. None means the
+    caller should fall back to ``download_dera_zip``.
     """
+    if not zip_spec:
+        return None
+    p = Path(zip_spec).expanduser()
+    if p.is_dir():
+        candidate = p / f"{year}q{quarter}_nport.zip"
+        return candidate if candidate.exists() else None
+    if p.is_file():
+        return p
+    return None
+
+
+def download_dera_zip(year: int, quarter: int,
+                      zip_spec: Optional[str] = None) -> Path:
+    """Return a Path to the DERA ZIP for {year}q{quarter}, downloading
+    only if necessary.
+
+    ``zip_spec`` (optional) is a file or directory containing a
+    pre-downloaded ZIP — see :func:`resolve_zip_path`. When present and
+    matching, no network call is made. Useful for air-gapped runs or when
+    the user pre-seeds ZIPs to skip the ~400MB transfer.
+
+    Default behaviour (zip_spec=None): idempotent download to the canonical
+    cache location. If a cached copy already exists with matching
+    Content-Length, skip. Partial downloads are replaced.
+    """
+    # 1. User-supplied pre-downloaded ZIP
+    if zip_spec:
+        local_override = resolve_zip_path(year, quarter, zip_spec)
+        if local_override is not None:
+            size_mb = local_override.stat().st_size / 1e6
+            print(f"  using pre-downloaded: {local_override} "
+                  f"({size_mb:.1f} MB)")
+            return local_override
+        print(f"  --zip {zip_spec} did not contain "
+              f"{year}q{quarter}_nport.zip; falling back to download")
+
     url = dera_zip_url(year, quarter)
     dst = Path(dera_zip_local_path(year, quarter))
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -932,7 +1053,7 @@ def _write_last_run(run_id: str) -> None:
         fh.write(run_id)
 
 
-def run_test_mode() -> int:
+def run_test_mode(zip_spec: Optional[str] = None) -> int:
     run_id = f"dera_parity_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     _write_last_run(run_id)
     year, quarter = 2025, 3  # 2025Q3 — fully in prod, best parity target
@@ -942,13 +1063,14 @@ def run_test_mode() -> int:
     print(f"  reference funds: {[f['name'] for f in REFERENCE_FUNDS]}")
     print("=" * 60)
 
-    zip_path = download_dera_zip(year, quarter)
+    zip_path = download_dera_zip(year, quarter, zip_spec=zip_spec)
     report_path = run_parity_test(run_id, zip_path, f"{year}Q{quarter}")
     print(f"\nrun_id saved to logs/last_dera_run_id.txt: {run_id}")
     return 0
 
 
-def run_quarter(quarter_label: str, dry_run: bool) -> int:
+def run_quarter(quarter_label: str, dry_run: bool,
+                zip_spec: Optional[str] = None) -> int:
     run_id = f"dera_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     _write_last_run(run_id)
     year, quarter = parse_quarter(quarter_label)
@@ -957,7 +1079,7 @@ def run_quarter(quarter_label: str, dry_run: bool) -> int:
     print(f"  dry_run={dry_run}")
     print("=" * 60)
 
-    zip_path = download_dera_zip(year, quarter)
+    zip_path = download_dera_zip(year, quarter, zip_spec=zip_spec)
     dataset = build_dera_dataset(zip_path, filter_ciks=None)
     submissions_kept = resolve_amendments(dataset["submissions"])
     n_dropped = len(dataset["submissions"]) - len(submissions_kept)
@@ -997,20 +1119,29 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true",
                         help="Show summary without DB writes.")
     parser.add_argument("--all-missing", action="store_true",
-                        help="PLACEHOLDER — Session 2 integrates this path.")
+                        help="PLACEHOLDER — orchestration lives in "
+                             "fetch_nport_v2.py as of Session 2.")
+    parser.add_argument("--zip", type=str, default="",
+                        help="Path to a pre-downloaded DERA ZIP (file) or a "
+                             "directory containing {YYYY}q{N}_nport.zip "
+                             "files. Skips the network download when a match "
+                             "is found; falls back to downloading otherwise.")
     args = parser.parse_args()
 
     if args.all_missing:
         sys.stderr.write(
-            "ERROR: --all-missing is not implemented in Session 1.\n"
-            "       Use --quarter YYYYQN for single-quarter loads.\n"
-            "       Session 2 will integrate the full backlog walker.\n"
+            "ERROR: --all-missing moved to fetch_nport_v2.py --all in "
+            "Session 2.\n"
+            "       Use  python3 scripts/fetch_nport_v2.py --staging --all\n"
+            "       to walk every missing DERA quarter.\n"
         )
         sys.exit(2)
 
+    zip_spec = args.zip or None
+
     if args.test:
         set_staging_mode(True)
-        sys.exit(run_test_mode())
+        sys.exit(run_test_mode(zip_spec=zip_spec))
 
     if not args.quarter:
         sys.stderr.write(
@@ -1025,7 +1156,7 @@ def main() -> None:
         sys.exit(2)
 
     set_staging_mode(True)
-    sys.exit(run_quarter(args.quarter, dry_run=args.dry_run))
+    sys.exit(run_quarter(args.quarter, dry_run=args.dry_run, zip_spec=zip_spec))
 
 
 if __name__ == "__main__":
