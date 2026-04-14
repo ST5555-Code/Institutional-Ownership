@@ -1,6 +1,74 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (Batch 2B-market close — CUSIP-anchored discover_market, cross-validation, all-3-bucket attempt stamping for crash recovery. Next: scoped 13D/G SourcePipeline. HEAD: TBD, replaces b95cb31.)_
+_Last updated: 2026-04-14 (Batch 2B close — scoped 13D/G SourcePipeline reference vertical live; first full discover → fetch → parse → load_to_staging → validate → promote chain shipped. HEAD: TBD.)_
+
+## Batch 2B-13dg — 2026-04-14 session
+
+First end-to-end SourcePipeline proof. Every subsequent SourcePipeline
+(N-PORT, 13F, ADV, N-CEN) copies this pattern.
+
+**New scripts (3):**
+- `scripts/fetch_13dg_v2.py` — `Dg13DgPipeline` conforming to
+  `SourcePipeline`. EDGAR efts full-text search per subject CIK
+  (hardcoded overrides for the scoped universe to avoid known
+  ticker-collision bugs in `securities` — OXY→PKG, EQT→RJF, NFLX→Vanguard).
+  `discover → fetch → parse → load_to_staging` with manifest writes per
+  accession and impact rows per (filer, subject, accession). Reuses the
+  proven `_clean_text` + `_extract_fields` regex parser from
+  `fetch_13dg.py` (legacy script stays intact — moves to retired/ once
+  v2 is verified over multiple runs). `stg_13dg_filings` table DDL
+  (staging).
+- `scripts/validate_13dg.py` — BLOCK/FLAG/WARN gates + entity gate.
+  Structural BLOCKs: dup accession, pct out of range, partial parse.
+  Per-spec tweak: `entity_gate_check` blocks on "missing from
+  entity_identifiers" become FLAGs (not BLOCKs) because 13D/G filers
+  are often individuals or corporations not in the 13F-centric MDM;
+  the gate still queues them in `pending_entity_resolution` for
+  operator review. Markdown report at `logs/reports/13dg_{run_id}.md`.
+- `scripts/promote_13dg.py` — DELETE+INSERT `beneficial_ownership_v2`,
+  rebuild `beneficial_ownership_current` (24,753 → 24,756 rows),
+  stamp freshness on both tables, refresh `13f_readonly.duckdb`
+  snapshot, mirror manifest+impacts staging→prod, update impact
+  `promote_status='promoted'`. Refuses to promote unless validation
+  report marks the run "Promote-ready: YES" (only structural BLOCKs
+  refuse). `--exclude ACC1,ACC2` flag for holding out flagged items.
+
+**Scoped test run:**
+- 4 subject tickers: AR, OXY, EQT, NFLX.
+- 3 accessions returned by EDGAR efts (AR had no new filings since
+  2024-11-12 prod floor): OXY 13D/A, EQT 13G/A, NFLX 13G/A.
+- All 3 staged cleanly (QC passed at parse time).
+- validate: 0 BLOCK / 3 FLAG (all missing-MDM filer notices) / 0 WARN.
+  Entity gate queued 3 filer CIKs into `pending_entity_resolution`
+  for operator review (0001423902 = Berkshire sub, 0000033213 = EQT
+  self-filing, 0001065280 = Netflix self-filing).
+- promote: -3 existing accessions, +3 re-parsed versions. Row counts
+  unchanged (same 3 accessions existed in prod, now updated via
+  v2 pipeline). Snapshot refreshed (4.9GB → 7.6GB).
+
+**Control plane live in prod for 13D/G:**
+- `ingestion_manifest`: 3 rows, all fetch_status=complete.
+- `ingestion_impacts`: 3 rows, promote_status=promoted.
+- `pending_entity_resolution`: 3 rows awaiting human review.
+- `data_freshness`: both `beneficial_ownership_v2` + `beneficial_ownership_current` rows stamped at 2026-04-14 04:05.
+
+**Backup taken before promote:**
+`data/backups/13f_backup_20260414_040227` (1.6 GB).
+
+**Verification:** app /api/v1/tickers = 6,511; OXY query1 = 25 rows;
+smoke 8/8; pre-commit green on all 3 new scripts + the 2 modified
+Batch 2B-market files.
+
+**Next session:**
+- Resolve the 3 `pending_entity_resolution` entries (add
+  `entity_identifiers` staging rows → diff → promote; INF1 workflow).
+- Retire `scripts/fetch_13dg.py` → `scripts/retired/fetch_13dg.py`
+  after a second successful v2 run (amendment chain test).
+- Promote framework pattern to N-PORT (Batch 2C — `fetch_nport_v2.py`).
+  Parser reuse from existing fetch_nport.py; structural copy of
+  fetch_13dg_v2.py's `SourcePipeline` implementation.
+
+## Batch 2B-market — 2026-04-14
 
 ## Batch 2B-market — 2026-04-14
 

@@ -51,3 +51,6 @@ PHASE*_PROMPT.md
 # live under data/reference/ and stay tracked there; anything at
 # data/*.csv is a session scratch file.
 data/*.csv
+
+# L1 artefact caches — pipeline-local fetch results, re-downloadable
+data/13dg_raw/

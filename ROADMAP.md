@@ -2,6 +2,21 @@
 
 _Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
 
+## Session Summary 2026-04-14 (Batch 2B-13dg) — scoped 13D/G reference vertical
+
+First full SourcePipeline proof — discover → fetch → parse →
+load_to_staging → validate → promote end-to-end.
+
+- **3 new scripts:** `scripts/fetch_13dg_v2.py` (SourcePipeline class `Dg13DgPipeline`, EDGAR efts full-text search by subject CIK, manifest+impact writes per accession, reuses proven parser from `fetch_13dg.py`), `scripts/validate_13dg.py` (BLOCK/FLAG/WARN + `entity_gate_check` with 13D/G relaxation: missing `entity_identifiers` → FLAG not BLOCK, queues to `pending_entity_resolution`), `scripts/promote_13dg.py` (DELETE+INSERT `beneficial_ownership_v2`, rebuild `beneficial_ownership_current`, stamp freshness, refresh `13f_readonly.duckdb` snapshot, mirror manifest+impacts staging→prod).
+- **Scoped test (AR, OXY, EQT, NFLX):** 3 accessions returned by EDGAR (AR had no new filings since 2024-11-12). Staged → validated (0 BLOCK / 3 FLAG / 0 WARN; 3 filers queued in `pending_entity_resolution`) → promoted. `beneficial_ownership_current`: 24,753 → 24,756 rows. Backup taken beforehand.
+- **CHECKPOINT GRANULARITY** policy comment on `fetch_13dg_v2.py` (unit = one accession) and `promote_13dg.py` (unit = one run_id).
+- **Control plane live in prod for 13D/G:** 3 rows in `ingestion_manifest`, 3 in `ingestion_impacts` (all `promote_status='promoted'`), 3 in `pending_entity_resolution`, `data_freshness` stamped on both BO tables.
+- **`fetch_13dg.py` stays intact** — retires to `scripts/retired/` after a second successful v2 run (amendment chain test).
+
+**Next:** resolve pending_entity_resolution rows via INF1 workflow, then copy this SourcePipeline pattern to N-PORT (Batch 2C).
+
+---
+
 ## Session Summary 2026-04-14 (Batch 2B-market) — market data quality fix
 
 Hardening before full market refresh is ever authorized.
