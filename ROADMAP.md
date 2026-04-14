@@ -2,6 +2,21 @@
 
 _Last updated: April 13, 2026 — v1.2 pipeline framework foundation landed (docs + control plane + protocols + registry + discover + 2 bug fixes). ARCHITECTURE_REVIEW.md committed earlier (6-phase, 9-batch upgrade plan)._
 
+## Session Summary 2026-04-13 (Batch 1) — Housekeeping + control plane to prod
+
+Schema-only follow-up to the v1.2 framework foundation session.
+
+- **T1 drop positions:** 18,682,708 rows removed from prod. `scripts/unify_positions.py` → `scripts/retired/`. EXPORT DATABASE backup taken first (2.1 GB at `data/backups/13f_backup_20260413_222950`).
+- **T2 `build_summaries.py` DDL:** `summary_by_parent` CREATE updated from 9 → 13 columns with `PK (quarter, rollup_entity_id)` — matches prod exactly. Script not run. INSERT-side rewrite (swap `holdings` → `holdings_v2` + `fund_holdings_v2`) stays on the REWRITE list.
+- **T3 migration 002 — skipped.** Direct PRAGMA inspection of prod showed `holdings_v2` / `fund_holdings_v2` / `beneficial_ownership_v2` already carry every column their owner scripts reference. Drift is owner-behind, not prod-missing; no ALTER TABLE migration can fix it. `docs/canonical_ddl.md` reclassified the three verdicts BROKEN → OWNER_BEHIND; `summary_by_parent` + `summary_by_ticker` BROKEN → ALIGNED after T2.
+- **T4 migration 001 on prod:** 4 L0 tables live in prod (`ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`, `data_freshness`) at 0 rows. `ingestion_manifest_current` VIEW present.
+- **T5 docs reclassification:** see above. Added a Migration History section explaining why 002 was not created.
+- **T6 `.gitignore`:** `PHASE*_PROMPT.md` and `data/*.csv` added. Two pre-existing untracked files (`PHASE1_PROMPT.md`, `data/uncategorized_institutions_funds.csv`) now correctly ignored.
+
+Verification at close: 11 columns in each prod L3 fact table confirmed via PRAGMA; app healthy (6,511 tickers); smoke 8/8; pre-commit green.
+
+---
+
 ## Session Summary 2026-04-13 — Pipeline framework foundation (v1.2)
 
 Twelve-deliverable documentation + framework-scaffolding session. No

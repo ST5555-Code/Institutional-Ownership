@@ -1,6 +1,28 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-13 (session close — v1.2 pipeline framework foundation complete: docs + control plane migration + protocols + registry + discover + 2 live app bug fixes. HEAD: TBD, replaces 1b0c9d6)_
+_Last updated: 2026-04-13 (session close — Batch 1 cleanup complete: positions dropped (18.68M rows), build_summaries.py DDL aligned, control plane live in prod, canonical_ddl.md reclassified. HEAD: TBD, replaces 3816577.)_
+
+## Batch 1 — 2026-04-13 session
+
+Schema cleanup + control-plane rollout to prod. No pipeline runs, no
+data moves.
+
+| Task | Outcome |
+|---|---|
+| T1 — drop `positions` | 18,682,708 rows dropped from prod; staging already clean. `scripts/unify_positions.py` → `scripts/retired/`. Backup at `data/backups/13f_backup_20260413_222950` (2.1 GB). |
+| T2 — `build_summaries.py` DDL fix | `summary_by_parent` CREATE extended from 9 → 13 cols with `PK (quarter, rollup_entity_id)`; `summary_by_ticker` verified already aligned. INSERT rewrite still pending (REWRITE tracked in `docs/pipeline_inventory.md`). Script not run. |
+| T3 — (skipped) | Premise check surfaced that prod already holds every `_v2` column; drift is owner-script-side, not prod-side. No migration 002 needed. `canonical_ddl.md` reclassified accordingly. |
+| T4 — migration 001 on prod | `ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution` live in prod with 0 rows; `ingestion_manifest_current` VIEW created. |
+| T5 — `canonical_ddl.md` reclass | 3 L3 verdicts BROKEN → OWNER_BEHIND (prod correct, owner scripts lag). 2 L4 verdicts BROKEN → ALIGNED after T2. Migration History table added. |
+| T6 — `.gitignore` + closeout | Ignore `PHASE*_PROMPT.md` and `data/*.csv`. Docs + commit + push. |
+
+**Verdict model now in canonical_ddl.md:** ALIGNED / OWNER_BEHIND.
+`OWNER_BEHIND` = prod DDL is complete; owning script is the blocker
+(rewrite in Batch 2). No schema migration on prod can resolve these
+— only rewriting `load_13f.py`, `fetch_nport.py`, and `fetch_13dg.py`
+to target `_v2` clears the verdict.
+
+
 
 ## Pipeline framework foundation — 2026-04-13 session
 

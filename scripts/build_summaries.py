@@ -30,6 +30,10 @@ def build_summary_by_ticker(con, quarters=None):
     if quarters is None:
         quarters = [LATEST_QUARTER]
 
+    # Column order + types + PK must match prod DDL exactly. Any divergence
+    # here silently corrupts downstream queries if the table is ever
+    # dropped and recreated from this script. Verified against prod
+    # 2026-04-13 (Batch 1 DDL fix).
     con.execute("""
         CREATE TABLE IF NOT EXISTS summary_by_ticker (
             quarter VARCHAR,
@@ -85,18 +89,30 @@ def build_summary_by_parent(con, quarters=None):
     if quarters is None:
         quarters = [LATEST_QUARTER]
 
+    # DDL aligned to prod 2026-04-13 (Batch 1). Adds rollup_entity_id,
+    # rollup_name, total_nport_aum, nport_coverage_pct; PK is now
+    # (quarter, rollup_entity_id) to match the rollup-based aggregation
+    # that populated prod on 2026-04-10. The INSERT below is still the
+    # pre-rollup shape (9 values, reads dropped `holdings`) and does NOT
+    # match this DDL — the full rewrite is tracked as REWRITE in
+    # docs/pipeline_inventory.md and resolves in Batch 2 along with the
+    # source swap to holdings_v2 + fund_holdings_v2.
     con.execute("""
         CREATE TABLE IF NOT EXISTS summary_by_parent (
             quarter VARCHAR,
+            rollup_entity_id BIGINT,
             inst_parent_name VARCHAR,
+            rollup_name VARCHAR,
             total_aum DOUBLE,
+            total_nport_aum DOUBLE,
+            nport_coverage_pct DOUBLE,
             ticker_count INTEGER,
             total_shares BIGINT,
             manager_type VARCHAR,
             is_passive BOOLEAN,
             top10_tickers VARCHAR,
             updated_at TIMESTAMP,
-            PRIMARY KEY (quarter, inst_parent_name)
+            PRIMARY KEY (quarter, rollup_entity_id)
         )
     """)
 

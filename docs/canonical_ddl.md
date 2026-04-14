@@ -1,21 +1,29 @@
 # Canonical DDL Audit — L3 Drift Report
 
-_Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
+_Prepared: 2026-04-13 — pipeline framework foundation (v1.2). Reclassified 2026-04-13 (Batch 1) after direct inspection of prod — drift direction is owner-behind, not prod-missing._
 
 For every L3 canonical table, this document compares prod DDL against
-the owner script's INSERT/UPDATE column list. **A promote script for a
-table with `DRIFT` / `MISSING_COLUMNS` / `SCHEMA_MISMATCH` / `BROKEN`
-verdict cannot be written until the drift is resolved.**
+the owner script's INSERT/UPDATE column list.
+
+**Verdict semantics:**
+- `ALIGNED` — prod DDL and owner-script column list match. No action needed.
+- `OWNER_BEHIND` — prod DDL is complete; the **owner script** lags (writes to a
+  dropped table and/or its CREATE DDL is missing columns prod has). Fixable
+  only by rewriting the owner script — not by schema migration on prod.
+  Promote-script writing is blocked until the rewrite ships; prod itself is
+  unchanged.
+- `BROKEN` — formerly used as a catch-all; replaced by `OWNER_BEHIND` after
+  the 2026-04-13 Batch 1 reclassification.
 
 ## Summary table
 
 | Table | Owner script | Verdict | Blocker? |
 |-------|--------------|---------|----------|
-| `holdings_v2` | `load_13f.py` (legacy `holdings`) + in-place Phase 4 migration | **BROKEN** | yes — owner writes to dropped `holdings` |
-| `fund_holdings_v2` | `fetch_nport.py` | **BROKEN** | yes — owner writes to dropped `fund_holdings` and lacks 7 columns |
-| `beneficial_ownership_v2` | `fetch_13dg.py` | **BROKEN** | yes — owner writes to dropped `beneficial_ownership` |
-| `summary_by_parent` | `build_summaries.py` | **BROKEN + MISSING_COLUMNS** | yes — reads dropped `holdings`; DDL lacks 4 columns |
-| `summary_by_ticker` | `build_summaries.py` | **BROKEN** | yes — reads dropped `holdings` |
+| `holdings_v2` | `load_13f.py` (legacy `holdings`) + in-place Phase 4 migration | **OWNER_BEHIND** | yes — rewrite owner to target `holdings_v2`; prod already has all 33 cols |
+| `fund_holdings_v2` | `fetch_nport.py` | **OWNER_BEHIND** | yes — rewrite owner to target `fund_holdings_v2`; prod already has all 26 cols |
+| `beneficial_ownership_v2` | `fetch_13dg.py` | **OWNER_BEHIND** | yes — rewrite owner to target `beneficial_ownership_v2`; prod already has all 21 cols |
+| `summary_by_parent` | `build_summaries.py` | **ALIGNED** (Batch 1 DDL fix) | no — CREATE DDL now matches prod 13-col shape + PK; INSERT rewrite tracked separately in pipeline_inventory.md |
+| `summary_by_ticker` | `build_summaries.py` | **ALIGNED** | no — CREATE DDL already matched; INSERT rewrite tracked separately |
 | `filings` | `load_13f.py` | ALIGNED | no |
 | `filings_deduped` | `load_13f.py` | ALIGNED | no |
 | `raw_submissions` / `raw_infotable` / `raw_coverpage` | `load_13f.py` | ALIGNED | no |
@@ -36,13 +44,16 @@ verdict cannot be written until the drift is resolved.**
 | `investor_flows` / `ticker_flow_stats` (L4) | `compute_flows.py` | ALIGNED (drop + create) | no |
 | `data_freshness` (L0) | `db.record_freshness()` | ALIGNED | no |
 
-Seven tables fail the gate; twenty are aligned. All seven failures
-trace back to the Stage 5 legacy-table drops on 2026-04-13. Owner
-scripts were never updated to write to the `_v2` successor tables.
+Three tables are OWNER_BEHIND; twenty-two are aligned. All three
+OWNER_BEHIND rows trace back to the Stage 5 legacy-table drops on
+2026-04-13 — owner scripts were never updated to write to the `_v2`
+successor tables. Prod schemas are complete; no DDL migration is
+needed to fix them. The fix path is rewriting the owner scripts
+(tracked as REWRITE in `docs/pipeline_inventory.md`).
 
 ---
 
-## 1. `holdings_v2` — BROKEN
+## 1. `holdings_v2` — OWNER_BEHIND
 
 **Prod DDL (33 columns):**
 ```
@@ -72,10 +83,11 @@ pct_of_float, etc.) were added. The owner script was not updated.
 - **In owner script, not in prod:** none relevant (legacy CTAS is
   broader but we ignore the dropped table).
 
-**Verdict:** BROKEN. No working owner script for `holdings_v2` exists
-today. Stage 5 completed the table rename; the companion promote
-rewrite was deferred — it is exactly the new `promote_13f.py` that the
-framework calls for.
+**Verdict:** OWNER_BEHIND. Prod `holdings_v2` already has all 33
+columns listed above — direct `PRAGMA table_info('holdings_v2')`
+confirms. No schema migration is needed. The fix is rewriting
+`load_13f.py` (or replacing it with `promote_13f.py`) to target
+`holdings_v2` and include the 13 enrichment columns at write time.
 
 **Resolution:** Deliverable 11+ (write `promote_13f.py` as a
 SourcePipeline implementation; Group 1+2 columns set at promote, Group 3
@@ -83,7 +95,7 @@ columns set by a separate `enrich_holdings.py` pass).
 
 ---
 
-## 2. `fund_holdings_v2` — BROKEN
+## 2. `fund_holdings_v2` — OWNER_BEHIND
 
 **Prod DDL (25 columns):**
 ```
@@ -115,9 +127,11 @@ CREATE TABLE IF NOT EXISTS fund_holdings (
   `best_index`, `entity_id`, `rollup_entity_id`, `dm_entity_id`,
   `dm_rollup_entity_id`, `dm_rollup_name`.
 
-**Verdict:** BROKEN. `fetch_nport.py` will error on its next run because
-its first write (`is_already_loaded()` at line 414) queries
-`fund_holdings`, which no longer exists.
+**Verdict:** OWNER_BEHIND. Prod `fund_holdings_v2` already has all 26
+columns listed above. `fetch_nport.py` will still error on its next
+run because `is_already_loaded()` at line 414 queries the dropped
+`fund_holdings`, but this is a source-code bug, not a prod schema
+problem. No schema migration required.
 
 **Resolution:** Framework rewrite — split fetch_nport.py into
 `discover_nport.py` (done in Deliverable 10) + `promote_nport.py` that
@@ -127,7 +141,7 @@ pattern.
 
 ---
 
-## 3. `beneficial_ownership_v2` — BROKEN
+## 3. `beneficial_ownership_v2` — OWNER_BEHIND
 
 **Prod DDL (21 columns):**
 ```
@@ -155,8 +169,11 @@ CREATE TABLE IF NOT EXISTS beneficial_ownership (
 - **Wrong target table.**
 - **Missing from owner:** 2 columns — `name_resolved`, `entity_id`.
 
-**Verdict:** BROKEN. Next `fetch_13dg.py` invocation will fail at
-`get_existing()` line 245 (`SELECT accession_number FROM beneficial_ownership`).
+**Verdict:** OWNER_BEHIND. Prod `beneficial_ownership_v2` already has
+all 21 columns listed above. `fetch_13dg.py` will still error on its
+next run because `get_existing()` at line 245 queries the dropped
+`beneficial_ownership`, but that is a source-code bug, not a prod
+schema problem. No schema migration required.
 
 **Resolution:** Framework rewrite — `promote_13dg.py` writes to
 `beneficial_ownership_v2` with `entity_id` resolved at promote time
@@ -164,7 +181,7 @@ CREATE TABLE IF NOT EXISTS beneficial_ownership (
 
 ---
 
-## 4. `summary_by_parent` — BROKEN + MISSING_COLUMNS
+## 4. `summary_by_parent` — ALIGNED (Batch 1 DDL fix)
 
 **Prod DDL (13 columns):**
 ```
@@ -196,19 +213,19 @@ CREATE TABLE IF NOT EXISTS summary_by_parent (
   rollup key change. `summary_by_ticker` owner DDL is correct
   (but script still reads dropped `holdings`).
 
-**Verdict:** BROKEN (reads dropped `holdings`) + MISSING_COLUMNS (DDL
-drift: 4 columns missing, PK differs).
+**Verdict (post-Batch 1):** ALIGNED for DDL. The CREATE TABLE IF NOT
+EXISTS block now declares all 13 prod columns in the correct order
+with `PK (quarter, rollup_entity_id)`.
 
-**Resolution:** Migration script 002 (follow-on) updates
-`build_summaries.py` to (a) read `holdings_v2` + `fund_holdings_v2`
-with rollup-based aggregation (per the 2026-04-10 ROADMAP session
-summary), (b) extend the CREATE TABLE IF NOT EXISTS to include all
-4 missing columns with the new PK. D8 open-decision confirms migration
-script pattern.
+The INSERT statement below the DDL still reads dropped `holdings` and
+emits the old 9-value shape — that is an owner-script REWRITE item
+(tracked in `docs/pipeline_inventory.md`), separate from the DDL
+verdict. Batch 2 swaps the source reads to `holdings_v2` +
+`fund_holdings_v2` with rollup-based aggregation.
 
 ---
 
-## 5. `summary_by_ticker` — BROKEN
+## 5. `summary_by_ticker` — ALIGNED
 
 **Prod DDL (12 columns):**
 ```
@@ -223,11 +240,10 @@ updated_at, PRIMARY KEY (quarter, ticker)
 
 **Column diff:** none.
 
-**Verdict:** BROKEN because source reads are on dropped tables, even
-though DDL is ALIGNED.
-
-**Resolution:** Swap source reads `holdings` → `holdings_v2`. Simple
-retrofit, no schema migration needed.
+**Verdict:** ALIGNED for DDL (12 columns + PK match prod
+column-for-column). Source reads still target dropped `holdings` —
+that's an owner-script retrofit tracked in
+`docs/pipeline_inventory.md`, not a DDL verdict.
 
 ---
 
@@ -360,18 +376,25 @@ fires at end-of-run.
 ## Gate enforcement
 
 Per the v1.2 pipeline plan:
-- Promote scripts for tables marked BROKEN / MISSING_COLUMNS /
-  SCHEMA_MISMATCH must not be written until the drift is resolved.
-- All 5 broken L3/L4 tables (holdings_v2, fund_holdings_v2,
-  beneficial_ownership_v2, summary_by_parent, summary_by_ticker) are
-  downstream of Stage 5 cleanup — they share one root cause.
-- The fix order is: (a) update `load_13f.py` + `fetch_nport.py` +
-  `fetch_13dg.py` to write the `_v2` target directly; (b) add missing
-  Group-2 entity columns at promote time via `entity_gate_check`;
-  (c) extend `build_summaries.py` DDL to match prod's 13-column
-  shape with the new PK and rollup-based source query; (d) migrate
-  via `002_l3_owner_rewrite.py` once promote scripts are written.
+- Promote scripts for a table marked `OWNER_BEHIND` cannot be written
+  until the owning fetch/load script is rewritten — prod schema is
+  fine; owner scripts are the blocker.
+- All 3 `OWNER_BEHIND` tables (holdings_v2, fund_holdings_v2,
+  beneficial_ownership_v2) share one root cause: Stage 5 legacy-table
+  drops on 2026-04-13 were never paired with owner-script rewrites.
+- Fix order:
+  (a) rewrite `load_13f.py` + `fetch_nport.py` + `fetch_13dg.py` to
+      write the `_v2` target directly (this clears all three
+      `OWNER_BEHIND` rows at once);
+  (b) populate Group-2 entity columns at promote time via
+      `entity_gate_check`;
+  (c) rewrite `build_summaries.py` INSERT to read `holdings_v2` +
+      `fund_holdings_v2` with rollup-based aggregation (DDL is already
+      fixed in Batch 1).
 
-None of this is done in this session — this document is the gate
-artifact that blocks each such promote script from being written
-without first resolving its row in the summary table above.
+## Migration History
+
+| # | Script | Date | Scope |
+|---|--------|------|-------|
+| 001 | `scripts/migrations/001_pipeline_control_plane.py` | 2026-04-13 | adds L0 control plane tables (`ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`), confirms `data_freshness`, creates `ingestion_manifest_current` VIEW. Applied to staging (v1.2 framework session) then prod (Batch 1). |
+| — | (`002_resolve_l3_ddl_drift.py`) | **not created** | **Not needed.** Prod L3 schemas already contain every column the owner scripts reference. The remediation path is script rewrites (tracked in `docs/pipeline_inventory.md`), not schema migration. |

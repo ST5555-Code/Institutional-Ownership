@@ -43,3 +43,11 @@ web/static/dist/
 
 # Node modules
 web/react-src/node_modules/
+
+# Per-session prompts (paste-ins, not source)
+PHASE*_PROMPT.md
+
+# Working data CSVs — regenerate-on-demand artefacts. Reference CSVs
+# live under data/reference/ and stay tracked there; anything at
+# data/*.csv is a session scratch file.
+data/*.csv
