@@ -71,6 +71,60 @@ CHECKS: list[tuple[str, str, object, str]] = [
     ("retry_queue pending count",
      "SELECT COUNT(*) FROM cusip_retry_queue WHERE status = 'pending'",
      None, 'INFO'),
+
+    # --- Post-OpenFIGI (Session 2) checks ---
+    #
+    # These gates only matter once the OpenFIGI retry has run and
+    # ``normalize_securities.py`` has ported classifications into the
+    # ``securities`` table.  Queries are written to degrade gracefully
+    # when those steps haven't run yet — INFO-tier retry rates stay 0%,
+    # BLOCK-tier columns are only checked when at least one row has the
+    # new columns populated.
+
+    ("retry_queue resolved rate (post-OpenFIGI)",
+     """SELECT ROUND(
+            COUNT(*) FILTER (WHERE status = 'resolved') * 100.0
+            / NULLIF(COUNT(*), 0),
+            1
+        ) FROM cusip_retry_queue""",
+     50.0, 'WARN_MIN'),
+
+    ("retry_queue unmappable rate",
+     """SELECT ROUND(
+            COUNT(*) FILTER (WHERE status = 'unmappable') * 100.0
+            / NULLIF(COUNT(*), 0),
+            1
+        ) FROM cusip_retry_queue""",
+     30.0, 'WARN'),
+
+    ("securities.canonical_type NULL after normalization",
+     """SELECT CASE
+            WHEN (SELECT COUNT(canonical_type) FROM securities) = 0 THEN 0
+            ELSE (SELECT COUNT(*) FROM securities WHERE canonical_type IS NULL)
+        END""",
+     0, 'BLOCK_POST'),
+
+    ("securities.is_equity NULL after normalization",
+     """SELECT CASE
+            WHEN (SELECT COUNT(canonical_type) FROM securities) = 0 THEN 0
+            ELSE (SELECT COUNT(*) FROM securities WHERE is_equity IS NULL)
+        END""",
+     0, 'BLOCK_POST'),
+
+    ("securities rows without classification match",
+     """SELECT CASE
+            WHEN (SELECT COUNT(canonical_type) FROM securities) = 0 THEN 0
+            ELSE (
+                SELECT COUNT(*) FROM securities s
+                LEFT JOIN cusip_classifications cc ON s.cusip = cc.cusip
+                WHERE cc.cusip IS NULL
+            )
+        END""",
+     0, 'BLOCK_POST'),
+
+    ("retry_queue pending after OpenFIGI",
+     "SELECT COUNT(*) FROM cusip_retry_queue WHERE status = 'pending'",
+     None, 'INFO'),
 ]
 
 
@@ -121,11 +175,26 @@ def run_checks(db_path: str) -> int:
             val = con.execute(q).fetchone()[0]
         except Exception as e:
             print(f"  [{severity}] {label}: ERROR ({e})")
-            if severity == 'BLOCK':
+            if severity in ('BLOCK', 'BLOCK_POST'):
                 block_failures.append(label)
             continue
 
         if severity == 'BLOCK':
+            ok = val == threshold
+            tag = "PASS" if ok else "FAIL"
+            print(f"  [{tag}]  {label}: {_fmt(val)} (expected {threshold})")
+            if not ok:
+                block_failures.append(label)
+        elif severity == 'BLOCK_POST':
+            # Post-OpenFIGI block — gated on securities having canonical_type
+            # populated (normalize_securities.py has run). Pre-normalize
+            # runs treat these checks as informational.
+            normalized = con.execute(
+                "SELECT COUNT(canonical_type) FROM securities"
+            ).fetchone()[0]
+            if normalized == 0:
+                print(f"  [SKIP]  {label}: securities not yet normalized")
+                continue
             ok = val == threshold
             tag = "PASS" if ok else "FAIL"
             print(f"  [{tag}]  {label}: {_fmt(val)} (expected {threshold})")
@@ -138,6 +207,14 @@ def run_checks(db_path: str) -> int:
                   f"(threshold ≤ {threshold}%)")
             if not ok:
                 warn_triggered.append(f"{label}={_fmt(val)}")
+        elif severity == 'WARN_MIN':
+            # WARN if below minimum threshold (e.g., resolution rate >= 50%)
+            ok = (val is not None and val >= threshold)
+            tag = "PASS" if ok else "WARN"
+            print(f"  [{tag}]  {label}: {_fmt(val)}%  "
+                  f"(threshold ≥ {threshold}%)")
+            if not ok:
+                warn_triggered.append(f"{label}={_fmt(val)}")
         else:  # INFO
             print(f"  [INFO]  {label}: {_fmt(val)}")
 
@@ -145,12 +222,12 @@ def run_checks(db_path: str) -> int:
     if block_failures:
         print(f"BLOCK FAILURES ({len(block_failures)}): "
               + ", ".join(block_failures))
-        print("Ready for Session 2 (OpenFIGI retry): NO")
+        print("READY: NO")
         return 1
 
     if warn_triggered:
         print(f"WARNINGS: {', '.join(warn_triggered)}")
-    print("Ready for Session 2 (OpenFIGI retry): YES")
+    print("READY: YES")
     con.close()
     return 0
 

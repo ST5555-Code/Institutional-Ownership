@@ -31,8 +31,12 @@ import pandas as pd
 MAX_ATTEMPTS = 3  # OpenFIGI retry limit before marking unmappable
 
 US_PRICEABLE_EXCHANGES = frozenset({
+    # Specific exchange codes (yfinance / Yahoo)
     'NMS', 'NYQ', 'NGM', 'NCM', 'PCX', 'BATS', 'ARCX', 'ASE',
     'NYS', 'NAS', 'OBB', 'PNK',
+    # OpenFIGI v3 composite — returned as 'US' for any US-listed security
+    # when no exchCode filter is sent on the request.
+    'US',
 })
 
 

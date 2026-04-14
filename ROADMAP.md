@@ -1,6 +1,27 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 14, 2026 — N-PORT DERA ZIP fetch Session 1 landed (fetch_dera_nport.py + migration 002 fund_universe strategy cols + validate_nport --changes-only). Parity test **APPROVED FOR SESSION 2** — all 7 BLOCK thresholds PASS on 21 accessions from 5 reference funds: 0 row delta, 100% CUSIP coverage, 100% Group 1 populated._
+_Last updated: April 14, 2026 — CUSIP classification v1.4 Session 2 **scripts** landed (run_openfigi_retry + normalize_securities + extended validator). 100-CUSIP staging test: 92 resolved / 8 no_match / 0 errors in 30s. Full 37,833-CUSIP retry authorized for overnight run; results commit follows Session 1 (7081886) once retry + normalization pass validation._
+
+## Session Summary 2026-04-14 (CUSIP v1.4 Session 2) — OpenFIGI retry scripts
+
+Session 2 delivers the scripts that drain `cusip_retry_queue` via OpenFIGI v3 and port classification flags into `securities`. Full overnight retry will run outside this session; these scripts are committed now so they're ready to execute.
+
+- **`scripts/run_openfigi_retry.py`** — standalone driver. Selects `status='pending' AND attempt_count < 3` from `cusip_retry_queue`, POSTs 10-CUSIP batches to `/v3/mapping` with 2.4s sleeps (25 req/min), upserts `_cache_openfigi`, updates `cusip_classifications` (ticker / figi / exchange / market_sector / confidence='high' / ticker_source='openfigi'), marks queue row `resolved`. FOREIGN CUSIPs whose OpenFIGI exchange is US get flipped to `is_priceable=TRUE` inline. Resume-safe via idempotent UPSERT. `--limit N` for batched partial runs. Live 100-CUSIP test: **92 resolved / 8 no_match / 0 errors in 30 seconds** on staging.
+- **`scripts/normalize_securities.py`** — UPDATE `securities` from `cusip_classifications` JOIN. Populates 7 new columns + COALESCE-refreshes ticker/exchange/market_sector. Inserts rows for classification-only CUSIPs (13D/G-only). UPDATE + LEFT-JOIN INSERT; never DROP+CREATE.
+- **`scripts/validate_classifications.py` extended** with 5 new checks: resolution rate ≥ 50% (WARN_MIN), unmappable rate ≤ 30% (WARN), `securities.canonical_type NULL` post-normalization (BLOCK_POST), `securities.is_equity NULL` post-normalization (BLOCK_POST), securities rows without classification match (BLOCK_POST). BLOCK_POST gates auto-SKIP until `normalize_securities.py` has run.
+- **`scripts/pipeline/cusip_classifier.py`** — `US_PRICEABLE_EXCHANGES` extended with `'US'` (OpenFIGI v3 composite code). Without this, the FOREIGN→priceable re-flip in the retry script never fires because v3 returns `exchCode='US'` for US-listed composite queries, not specific codes like NMS/NYQ.
+- **Pre-flight confirmed:** 132,618 classifications, 37,925 pending → 37,833 pending after test batch, `_cache_openfigi` now has 92 rows, securities 7 new columns still all-NULL (normalization defers to post-retry).
+
+**Overnight retry command:**
+```bash
+python3 scripts/run_openfigi_retry.py --staging        # ~2.5h at 250 CUSIPs/min
+python3 scripts/normalize_securities.py --staging
+python3 scripts/validate_classifications.py --staging
+```
+
+**Prod promotion** deferred until post-overnight validation passes; requires explicit authorization before running Migration 003 + full pipeline against prod.
+
+---
 
 ## Session Summary 2026-04-14 (N-PORT DERA ZIP Session 1) — parity test harness
 

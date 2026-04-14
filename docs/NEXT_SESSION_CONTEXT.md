@@ -1,6 +1,35 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (N-PORT DERA ZIP Session 1 close — fetch_dera_nport.py + migration 002 + validate_nport --changes-only. Parity test APPROVED FOR SESSION 2: 21 accessions / 12,633 holdings / 0 row delta / 100% CUSIP coverage / 100% Group 1 populated.)_
+_Last updated: 2026-04-14 (CUSIP v1.4 Session 2 scripts close — run_openfigi_retry + normalize_securities + extended validator delivered. 100-CUSIP staging test passed 92/8/0. Full retry authorized for overnight; retry + normalization commit follows once validation passes.)_
+
+## CUSIP Classification v1.4 — 2026-04-14 Session 2 (scripts)
+
+Scripts to drain the retry queue and finalize the securities schema port. Full retry runs outside this session. Next session picks up after the overnight retry completes and re-validates.
+
+**New files (2):**
+- `scripts/run_openfigi_retry.py` — standalone driver. POSTs 10-CUSIP batches to `/v3/mapping` with 2.4s sleeps (25 req/min → 250 CUSIPs/min). Upserts `_cache_openfigi`; updates `cusip_classifications` (ticker/figi/exchange/market_sector/confidence='high'/ticker_source='openfigi'); marks retry_queue `resolved`. FOREIGN→priceable flip inline when OpenFIGI returns US composite. Resume-safe — interrupted runs pick up on next `--staging` invocation. `--limit N` supports chunked runs on flaky connections.
+- `scripts/normalize_securities.py` — UPDATE + LEFT-JOIN INSERT. Ports 7 new columns + COALESCEs ticker/exchange/market_sector. Creates rows in securities for 13D/G-only CUSIPs that currently live only in cusip_classifications. No DROP+CREATE. Safe to re-run.
+
+**Extended:** `scripts/validate_classifications.py` — 5 new checks (WARN_MIN for resolution rate ≥ 50%, WARN for unmappable ≤ 30%, 3× BLOCK_POST for `securities.canonical_type NULL` / `is_equity NULL` / missing-cc-match after normalization). BLOCK_POST auto-SKIPs when `securities.canonical_type` is still all-NULL (pre-normalize).
+
+**100-CUSIP staging test results:**
+- Queue drained to 92 resolved / 8 no_match / 0 errors in 30 seconds.
+- Full v3 response fields land correctly in `_cache_openfigi` (figi, ticker, exchCode, marketSector, securityType).
+- Retry queue: 37,925 pending → 37,833 pending + 92 resolved.
+- Sample issues observed (not blockers): OpenFIGI occasionally returns semantically wrong tickers for composite CUSIPs (e.g., iShares MSCI Spain ETF → GFL on CN exchange instead of EWP on NYSE). Manual overrides in `data/reference/ticker_overrides.csv` are the fix path — already wired into `build_classifications.py` Step 5.
+
+**Overnight retry plan:**
+```bash
+python3 scripts/run_openfigi_retry.py --staging             # ~2.5h
+python3 scripts/normalize_securities.py --staging
+python3 scripts/validate_classifications.py --staging
+```
+
+The remaining ~37,833 CUSIPs at 250/min = ~2.5h wall-clock. `--limit N` available for chunked runs if needed.
+
+**Next session picks up:** validate staging post-retry, confirm all BLOCK_POST gates pass, report resolution rate, then request explicit authorization for prod promotion (Migration 003 on prod + build_classifications + run_openfigi_retry + normalize_securities + validate, all against prod DB).
+
+**DO NOT re-run** `scripts/build_classifications.py` on staging — that would reset the retry queue statuses. The OpenFIGI retry writes directly into the existing queue rows.
 
 ## N-PORT DERA ZIP — 2026-04-14 Session 1
 
