@@ -39,6 +39,8 @@ Lifecycle observations:
 
 Usage:
   python3 scripts/validate_nport.py --run-id R --staging
+  python3 scripts/validate_nport.py --changes-only --run-id R --staging
+    Run-scoped diff vs prod: NEW_SERIES / NEW_MONTH / AMENDMENT + closures.
 """
 from __future__ import annotations
 
@@ -366,14 +368,192 @@ def _write_report(run_id, n_series, n_holdings, blocks, flags, warns,
     return path
 
 
+# ---------------------------------------------------------------------------
+# --changes-only mode
+# ---------------------------------------------------------------------------
+
+def changes_report(staging_con, prod_con, run_id: str) -> str:
+    """Per-(series, month) diff: staging-for-run_id vs prod.
+
+    Classifies each staged (series_id, report_month) as:
+      NEW_SERIES — series_id absent from prod fund_holdings_v2.
+      AMENDMENT  — same (series_id, report_month) already exists in prod.
+      NEW_MONTH  — series exists in prod but not for this report_month.
+
+    Also reports closures: series present in prod but absent from this run.
+
+    Returns the Markdown report text. Does NOT write to disk — caller
+    decides where to persist (logs/reports/nport_changes_{run_id}.md is
+    the usual location).
+    """
+    changes_sql = """
+    WITH staged AS (
+        SELECT s.series_id, s.fund_name, s.report_month,
+               COUNT(*) AS staged_holdings,
+               SUM(s.market_value_usd) AS staged_aum
+        FROM stg_nport_holdings s
+        JOIN ingestion_manifest m ON s.manifest_id = m.manifest_id
+        WHERE m.run_id = ?
+        GROUP BY 1, 2, 3
+    )
+    SELECT series_id, fund_name, report_month,
+           staged_holdings, staged_aum
+    FROM staged
+    ORDER BY staged_aum DESC NULLS LAST
+    """
+    staged = staging_con.execute(changes_sql, [run_id]).fetchdf()
+
+    # Per-series prod state (run this against prod, not staging)
+    if staged.empty:
+        return f"# N-PORT Changes — Run {run_id}\n\n_No staged rows._\n"
+
+    prod_series = prod_con.execute(
+        """
+        SELECT series_id,
+               MAX(report_month) AS max_month,
+               SUM(market_value_usd) AS prior_aum
+        FROM fund_holdings_v2
+        GROUP BY series_id
+        """
+    ).fetchdf()
+    prior_map = {row["series_id"]: row for _, row in prod_series.iterrows()}
+
+    # Amendment check — per-month presence in prod
+    # Build a set of (series_id, report_month) that already exist in prod
+    placeholders = ",".join("?" * len(staged))
+    series_tuples = list(zip(staged["series_id"].tolist(),
+                             staged["report_month"].tolist()))
+    same_month = set()
+    if series_tuples:
+        series_unique = sorted({s for s, _ in series_tuples})
+        ph = ",".join("?" * len(series_unique))
+        dfm = prod_con.execute(
+            f"""
+            SELECT DISTINCT series_id, report_month
+            FROM fund_holdings_v2
+            WHERE series_id IN ({ph})
+            """,
+            series_unique,
+        ).fetchdf()
+        for _, row in dfm.iterrows():
+            same_month.add((row["series_id"], row["report_month"]))
+
+    # Classify each staged row
+    rows = []
+    for _, s in staged.iterrows():
+        sid = s["series_id"]
+        rm = s["report_month"]
+        prior = prior_map.get(sid)
+        if prior is None:
+            change_type = "NEW_SERIES"
+            prior_aum = None
+        elif (sid, rm) in same_month:
+            change_type = "AMENDMENT"
+            prior_aum = float(prior["prior_aum"]) if prior["prior_aum"] else None
+        else:
+            change_type = "NEW_MONTH"
+            prior_aum = float(prior["prior_aum"]) if prior["prior_aum"] else None
+        aum_change_pct = None
+        if prior_aum and prior_aum > 0 and s["staged_aum"] is not None:
+            aum_change_pct = ((float(s["staged_aum"]) - prior_aum)
+                              / prior_aum * 100)
+        rows.append({
+            "series_id": sid,
+            "fund_name": s["fund_name"],
+            "report_month": rm,
+            "change_type": change_type,
+            "new_holdings": int(s["staged_holdings"]),
+            "aum_bn": round(float(s["staged_aum"]) / 1e9, 2)
+                       if s["staged_aum"] else None,
+            "aum_change_pct": round(aum_change_pct, 1)
+                               if aum_change_pct is not None else None,
+        })
+
+    # Closures — prod series absent from this run. We only count active
+    # funds (non-final, has rows in latest 6 months) to avoid noise from
+    # long-retired series.
+    staged_series = set(staged["series_id"].tolist())
+    closures = prod_con.execute(
+        """
+        SELECT fu.series_id, fu.fund_name, MAX(fh.report_month) AS last_month
+        FROM (SELECT DISTINCT series_id FROM fund_holdings_v2) p
+        JOIN fund_universe fu ON p.series_id = fu.series_id
+        JOIN fund_holdings_v2 fh ON p.series_id = fh.series_id
+        GROUP BY 1, 2
+        """
+    ).fetchdf()
+    closures_list = [
+        {"series_id": row["series_id"], "fund_name": row["fund_name"],
+         "last_month": row["last_month"]}
+        for _, row in closures.iterrows()
+        if row["series_id"] not in staged_series
+    ]
+
+    # Build markdown
+    lines = [f"# N-PORT Changes — Run {run_id}",
+             f"\n_Generated: {datetime.now().isoformat()}_\n"]
+    counts = {"NEW_SERIES": 0, "NEW_MONTH": 0, "AMENDMENT": 0}
+    for r in rows:
+        counts[r["change_type"]] += 1
+    lines.append("## Summary\n")
+    lines.append(f"- Staged (series, month) tuples: **{len(rows)}**")
+    lines.append(f"- NEW_SERIES: **{counts['NEW_SERIES']}**")
+    lines.append(f"- NEW_MONTH:  **{counts['NEW_MONTH']}**")
+    lines.append(f"- AMENDMENT:  **{counts['AMENDMENT']}**")
+    lines.append(f"- Closures vs staged set: **{len(closures_list)}** "
+                 f"(prod series absent from run_id — informational)\n")
+
+    lines.append("## Details (top 50 by AUM)\n")
+    lines.append("| series_id | fund | month | type | holdings | AUM ($B) | Δ AUM % |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for r in sorted(rows, key=lambda x: x["aum_bn"] or 0, reverse=True)[:50]:
+        chg = (f"{r['aum_change_pct']:+.1f}%" if r['aum_change_pct'] is not None
+               else "—")
+        aum = f"{r['aum_bn']:.2f}" if r["aum_bn"] is not None else "—"
+        lines.append(
+            f"| {r['series_id']} | {r['fund_name'] or ''} | {r['report_month']} | "
+            f"{r['change_type']} | {r['new_holdings']} | {aum} | {chg} |"
+        )
+
+    if closures_list:
+        lines.append("\n## Closures (first 30)\n")
+        lines.append("| series_id | fund | last_month_in_prod |")
+        lines.append("|---|---|---|")
+        for c in closures_list[:30]:
+            lines.append(f"| {c['series_id']} | {c['fund_name'] or ''} | "
+                         f"{c['last_month']} |")
+
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate staged N-PORT run")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--staging", action="store_true")
+    parser.add_argument("--changes-only", action="store_true",
+                        help="Skip full validation; print/write the "
+                             "NEW_SERIES/NEW_MONTH/AMENDMENT diff only.")
     args = parser.parse_args()
 
     run_id = args.run_id
     staging_path = STAGING_DB if args.staging else PROD_DB
+
+    # --changes-only: lightweight path, returns before the heavy validation.
+    if args.changes_only:
+        staging_con = duckdb.connect(staging_path, read_only=True)
+        prod_con = duckdb.connect(PROD_DB, read_only=True)
+        try:
+            md = changes_report(staging_con, prod_con, run_id)
+        finally:
+            staging_con.close()
+            prod_con.close()
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        out = os.path.join(REPORTS_DIR, f"nport_changes_{run_id}.md")
+        with open(out, "w") as fh:
+            fh.write(md)
+        print(md)
+        print(f"Report: {out}")
+        sys.exit(0)
 
     staging_con = duckdb.connect(staging_path, read_only=True)
     # Read-only — the running app holds the prod write lock during normal

@@ -1,6 +1,59 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (CUSIP v1.4 Session 1 close — classification layer live in staging, 132,618 CUSIPs classified, 37,925 queued for Session 2 OpenFIGI retry. All 4 BLOCK validation checks PASS.)_
+_Last updated: 2026-04-14 (N-PORT DERA ZIP Session 1 close — fetch_dera_nport.py + migration 002 + validate_nport --changes-only. Parity test APPROVED FOR SESSION 2: 21 accessions / 12,633 holdings / 0 row delta / 100% CUSIP coverage / 100% Group 1 populated.)_
+
+## N-PORT DERA ZIP — 2026-04-14 Session 1
+
+Gated pre-work for Session 2 (full rewrite of `fetch_nport_v2.py` to use DERA ZIP as primary bulk path). Session 1 proves parity; Session 2 integrates.
+
+**New files (2):**
+- `scripts/fetch_dera_nport.py` — DERA quarterly ZIP loader. `--test` runs the 5-fund parity test and writes `logs/nport_parity_{run_id}.md`. `--quarter YYYYQN` loads one full quarter to `data/13f_staging.duckdb` (same shape as `fetch_nport_v2.py`). `--all-missing` is a placeholder (Session 2). Streams TSVs from the ZIP via `zipfile.open` + `csv.DictReader` — FUND_REPORTED_HOLDING.tsv is 988MB and must never be extracted or loaded whole. Parity test uses a dedicated `data/13f_dera_parity.duckdb` so it never contends with live staging.
+- `scripts/migrations/002_fund_universe_strategy.py` — adds 3 nullable columns to `fund_universe`: `strategy_narrative`, `strategy_source`, `strategy_fetched_at`. Session 3+ populates via N-1A / N-CSR narrative enrichment (not built). Staging-applied; prod deferred until app.py write-lock releases.
+
+**Modified files (1):**
+- `scripts/validate_nport.py` — new `--changes-only` flag: run-scoped diff vs prod, classifies each staged (series_id, report_month) as NEW_SERIES / NEW_MONTH / AMENDMENT. Writes `logs/reports/nport_changes_{run_id}.md`. Fast-path — skips the full BLOCK/FLAG/WARN suite.
+
+**Parity test checks — all 7 BLOCK thresholds PASS (2025Q3, 5 ref funds):**
+
+| Check | Result | Threshold |
+|---|---|---|
+| row_count_delta | 0 rows | ±1 |
+| cusip_coverage | 100.00% min Jaccard | ≥99% |
+| series_id_mismatches | 0 | 0 |
+| report_month_mismatches | 0 | 0 |
+| group1_required_populated | 100% | 100% |
+| amendment_latest_wins | 0 violations | 0 |
+| manifest_id_populated | 100% | 100% |
+
+**DERA field mapping (SEC N-PORT Rule -> staging column):**
+- SUBMISSION.ACCESSION_NUMBER / REPORT_DATE (A.3.b) / IS_LAST_FILING (A.4)
+- REGISTRANT.CIK (A.1.c) / REGISTRANT_NAME (A.1.a) -> fund_cik / family_name
+- FUND_REPORTED_INFO.SERIES_ID (A.2.b) / SERIES_NAME / NET_ASSETS (B.1.c)
+- FUND_REPORTED_HOLDING.ISSUER_CUSIP / ISSUER_NAME / BALANCE (C.2.a) / CURRENCY_VALUE (C.2.c, **is USD not native**) / PERCENTAGE (C.2.d) / ASSET_CAT / PAYOFF_PROFILE / FAIR_VALUE_LEVEL / IS_RESTRICTED_SECURITY
+- IDENTIFIERS.IDENTIFIER_ISIN / IDENTIFIER_TICKER
+
+**Parity gotchas discovered:**
+1. **`pandas .count('cusip')` excludes NULLs** — false row-count delta on funds with many N/A-CUSIP positions (derivatives, FX, cash). Fix: `count('series_id')` or `.size()`.
+2. **Prod stores `'N/A'` literally** for CUSIP-less positions (832K of 6.4M rows). Normalising DERA's `'N/A'` to NULL made Jaccard miss by 1 unit (32 vs 33). Fix: preserve `'N/A'` as literal string. Cleanup to real NULL is a separate pass.
+3. **Parity DB requires migration 001 init** — dedicated parity file starts empty; `ingestion_manifest` / `ingestion_impacts` must be re-created. Fetch script now imports `001_pipeline_control_plane.run_migration()` and applies after touching the file.
+
+**Volumetrics (2025Q3 ZIP — 468.9 MB):**
+- 13,199 accessions total; 79 amendments (0.6%) / 13,120 originals
+- 696 accessions missing SERIES_ID (5.3%) — handled via synthetic `{cik}_{accession}` fallback with FLAG-level QC
+- ~13 tables in the ZIP; parity uses 5 (SUBMISSION, REGISTRANT, FUND_REPORTED_INFO, FUND_REPORTED_HOLDING, IDENTIFIERS). Debt/derivative detail tables (DEBT_SECURITY, DERIVATIVE_COUNTERPARTY, etc.) are Session 3+ territory.
+
+**Session 2 preview (separate prompt):**
+- Integrate DERA as primary fetch mode in `fetch_nport_v2.py` for complete quarters.
+- Keep per-accession XML (edgartools) as Mode 2 for monthly top-up / current incomplete quarter. Correct edgartools API: `get_filings(form='NPORT-P', year=Y, quarter=Q)` — not `limit=N` (does not exist).
+- Full promote path tested against amendment chains.
+- Session 2 is gated on this parity report (`logs/nport_parity_dera_parity_*.md`).
+
+**Operational:**
+- Cached ZIP at `data/nport_raw/dera/inspect/2025q3_nport.zip` — Session 2 can reuse.
+- `data/13f_dera_parity.duckdb` is disposable; re-created on each `--test` run.
+- Prod migration 002 apply pending `app.py` restart.
+
+---
 
 ## CUSIP Classification v1.4 — 2026-04-14 Session 1
 

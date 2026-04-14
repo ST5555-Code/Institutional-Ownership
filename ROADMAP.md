@@ -1,6 +1,38 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 14, 2026 — CUSIP classification v1.4 Session 1 landed (Migration 003 + cusip_classifier + build_classifications + validate_classifications + build_cusip v2 + discover_market filter). Staging validated: 132,618 CUSIPs classified, 0.14% OTHER, 37,925 queued for OpenFIGI. All 4 BLOCK checks PASS._
+_Last updated: April 14, 2026 — N-PORT DERA ZIP fetch Session 1 landed (fetch_dera_nport.py + migration 002 fund_universe strategy cols + validate_nport --changes-only). Parity test **APPROVED FOR SESSION 2** — all 7 BLOCK thresholds PASS on 21 accessions from 5 reference funds: 0 row delta, 100% CUSIP coverage, 100% Group 1 populated._
+
+## Session Summary 2026-04-14 (N-PORT DERA ZIP Session 1) — parity test harness
+
+Builds the DERA quarterly-ZIP fetch path as a parallel to `fetch_nport_v2.py` (per-accession XML). One ~470MB ZIP replaces thousands of individual HTTP requests. **Does not replace fetch_nport_v2.py** — Session 2 integrates DERA as the primary bulk path after this parity test passes.
+
+- **New file** `scripts/fetch_dera_nport.py` (~1,000 lines): downloads SEC DERA `{YYYY}q{N}_nport.zip`, streams TSVs from the ZIP without extraction (zipfile.open + csv.DictReader — critical for the 988MB FUND_REPORTED_HOLDING.tsv), joins the 4 metadata tables (SUBMISSION / REGISTRANT / FUND_REPORTED_INFO / IDENTIFIERS) into stg_nport_holdings shape. Amendment resolution: latest accession per (series_id, report_month). CURRENCY_VALUE is already USD per SEC Rule C.2.c (readme confirmed). `--test` routes to a dedicated `data/13f_dera_parity.duckdb` file so it never contends with live staging runs.
+- **New file** `scripts/migrations/002_fund_universe_strategy.py`: adds 3 nullable columns to `fund_universe` — `strategy_narrative`, `strategy_source`, `strategy_fetched_at`. Targets for future N-1A / N-CSR narrative enrichment (Session 3+). Idempotent via `ADD COLUMN IF NOT EXISTS`. Applied to staging; prod apply deferred until dev app releases write lock.
+- **`scripts/validate_nport.py` `--changes-only` mode**: run-scoped per-(series, report_month) diff vs prod — classifies each tuple as NEW_SERIES / NEW_MONTH / AMENDMENT and reports prod series absent from the run as closures. Writes `logs/reports/nport_changes_{run_id}.md`.
+- **Parity test results (2025Q3, 5 reference funds, 21 accessions, 12,633 holdings):**
+  - row_count_delta: max |delta| = **0 rows** (threshold: ±1) ✓
+  - cusip_coverage: min Jaccard = **100.00%** (threshold: ≥99%) ✓
+  - series_id_mismatches: 0 ✓
+  - report_month_mismatches: 0 ✓
+  - group1_required_populated: 100% (fund_cik, series_id, report_month, report_date, market_value_usd, shares_or_principal) ✓
+  - amendment_latest_wins: 0 tuples with >1 accession ✓
+  - manifest_id_populated: 100% ✓
+  - **Verdict: APPROVED FOR SESSION 2**
+- **Key discoveries from DERA readme + real data:**
+  - `SERIES_ID` present in FUND_REPORTED_INFO.tsv (A.2.b), 696 of 13,199 accessions (5.3%) missing — handled with synthetic fallback matching fetch_nport_v2 convention.
+  - Monthly granularity confirmed: 10+ distinct REPORT_DATE values in one quarter ZIP.
+  - 1 series per accession (13,199 accessions ↔ 13,199 FUND_REPORTED_INFO rows in 2025Q3).
+  - `CURRENCY_VALUE` is USD despite the name (SEC N-PORT Rule C.2.c); EXCHANGE_RATE is supplementary. Not native currency.
+  - `ISSUER_CUSIP='N/A'` is how prod stores CUSIP-less positions (832K rows in prod) — parity requires preserving 'N/A' literally, not normalising to NULL.
+  - Two parity-metric bugs caught: `pandas .count('cusip')` excludes NULLs (false row-count delta); CUSIP 'N/A' normalisation diverged from prod.
+
+**Session 2 plan (separate prompt):** Rewrite `fetch_nport_v2.py` to use DERA ZIP as primary bulk path for complete quarters, keep per-accession XML as Mode 2 for monthly top-up. Integrate manifest semantics end-to-end. Full promote path tested against amendment chains.
+
+**Follow-up bookkeeping:**
+- Prod migration 002 pending user app.py restart (cannot apply while write-lock held).
+- Parity DB at `data/13f_dera_parity.duckdb` — regenerated from scratch on each `--test` run, safe to delete.
+
+---
 
 ## Session Summary 2026-04-14 (CUSIP v1.4 Session 1) — classification layer
 
