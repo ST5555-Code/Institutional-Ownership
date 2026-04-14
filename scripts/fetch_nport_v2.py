@@ -31,6 +31,21 @@ Reuses the proven XML parser from fetch_nport.parse_nport_xml() and the
 fund classifier from fetch_nport.classify_fund(). The legacy script
 itself stays in scripts/ until v2 has run cleanly twice (amendment
 chain test) before retiring.
+
+Run modes:
+  python3 scripts/fetch_nport_v2.py --staging --limit 100
+      Fetch 100 accessions, stop, save progress. Re-run to continue.
+  python3 scripts/fetch_nport_v2.py --staging --limit 500
+      Fetch 500 accessions. Good for slow or metered connections.
+  python3 scripts/fetch_nport_v2.py --staging --all
+      Full run — fetch everything available. Best for overnight.
+  python3 scripts/fetch_nport_v2.py --staging
+      Same as --all (default behavior preserved).
+  python3 scripts/fetch_nport_v2.py --dry-run
+      Show what would be fetched. No downloads.
+  python3 scripts/fetch_nport_v2.py --test
+      5 reference funds only (Fidelity, Vanguard, T.Rowe, Dodge Cox,
+      Growth Fund of America).
 """
 from __future__ import annotations
 
@@ -220,8 +235,10 @@ class NPortPipeline:
         finally:
             con.close()
 
-        if self.limit:
-            targets = targets[: self.limit]
+        # NOTE: do NOT slice targets to self.limit here — the limit counts
+        # *successful* fetches in run_pipeline, so failures must not eat
+        # into the batch budget. The fetch loop breaks when the success
+        # counter reaches self.limit.
         return targets
 
     # ----- fetch ---------------------------------------------------------
@@ -628,14 +645,19 @@ def _write_last_run(run_id: str) -> None:
         fh.write(run_id)
 
 
-def run_dry(test_mode: bool, cik_filter: Optional[list[int]]) -> int:
+def run_dry(test_mode: bool, cik_filter: Optional[list[int]],
+            limit: Optional[int], all_mode: bool) -> int:
     print("=" * 60)
     print("fetch_nport_v2.py --dry-run")
     print(f"  test={test_mode}  cik_filter={cik_filter}")
+    if all_mode:
+        print("  Full run mode — fetching all available accessions.")
+    elif limit is not None:
+        print(f"  Batch mode: limit {limit} accessions")
     print("=" * 60)
     run_id = f"nport_{datetime.now().strftime('%Y%m%d_%H%M%S')}_dryrun"
     pipeline = NPortPipeline(run_id=run_id, test_mode=test_mode,
-                             cik_filter=cik_filter)
+                             cik_filter=cik_filter, limit=limit)
     targets = pipeline.discover(run_id)
     print(f"\n  discover returned {len(targets)} accession(s)")
     by_cik: dict[str, int] = {}
@@ -650,13 +672,16 @@ def run_dry(test_mode: bool, cik_filter: Optional[list[int]]) -> int:
 
 def run_pipeline(test_mode: bool,
                  cik_filter: Optional[list[int]],
-                 limit: Optional[int]) -> int:
+                 limit: Optional[int],
+                 all_mode: bool) -> int:
     run_id = f"nport_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     _write_last_run(run_id)
     print("=" * 60)
     print(f"fetch_nport_v2.py  run_id={run_id}")
     print(f"  staging={is_staging_mode()}  test={test_mode}  limit={limit}")
     print(f"  cik_filter={cik_filter}")
+    if all_mode:
+        print("  Full run mode — fetching all available accessions.")
     print("=" * 60)
 
     pipeline = NPortPipeline(run_id=run_id, test_mode=test_mode,
@@ -672,6 +697,9 @@ def run_pipeline(test_mode: bool,
     loaded = 0
     parse_failed = 0
     qc_blocked = 0
+    fetched_ok = 0
+    batch_stopped_early = False
+    next_accession: Optional[str] = None
     series_loaded: set[str] = set()
 
     for i, target in enumerate(targets, start=1):
@@ -681,34 +709,44 @@ def run_pipeline(test_mode: bool,
             print(f"  [{i}/{len(targets)}] {target.accession_number} "
                   f"FETCH FAIL — {fr.error_message!r}", flush=True)
             continue
+        fetched_ok += 1
         pr = pipeline.parse(fr)
         if pr.parse_status == "failed":
             parse_failed += 1
             print(f"  [{i}/{len(targets)}] {target.accession_number} "
                   f"PARSE FAIL — {pr.qc_failures[0].rule if pr.qc_failures else '?'}",
                   flush=True)
-            continue
-        if any(q.severity == "BLOCK" for q in pr.qc_failures):
-            qc_blocked += 1
-        written = pipeline.load_to_staging(pr, staging_path, run_id)
-        loaded += written
-        # Track series_ids seen for summary
-        for r in pr.rows:
-            sid = r.get("series_id")
-            if sid:
-                series_loaded.add(sid)
+        else:
+            if any(q.severity == "BLOCK" for q in pr.qc_failures):
+                qc_blocked += 1
+            written = pipeline.load_to_staging(pr, staging_path, run_id)
+            loaded += written
+            for r in pr.rows:
+                sid = r.get("series_id")
+                if sid:
+                    series_loaded.add(sid)
         if i % 5 == 0 or i == len(targets):
             elapsed = time.time() - t0
-            print(f"    [{i}/{len(targets)}] series={len(series_loaded)} "
+            print(f"    [{i}/{len(targets)}] fetched={fetched_ok} "
+                  f"series={len(series_loaded)} "
                   f"holdings={loaded:,} parse_failed={parse_failed} "
                   f"qc_blocked={qc_blocked} elapsed={elapsed:.1f}s",
                   flush=True)
+        if limit is not None and fetched_ok >= limit:
+            batch_stopped_early = True
+            if i < len(targets):
+                next_accession = targets[i].accession_number
+            break
 
     elapsed = time.time() - t0
-    print(f"\n  DONE  series={len(series_loaded)}  holdings={loaded:,}  "
-          f"parse_failed={parse_failed}  qc_blocked={qc_blocked}  "
-          f"elapsed={elapsed:.1f}s")
+    print(f"\n  DONE  fetched={fetched_ok}  series={len(series_loaded)}  "
+          f"holdings={loaded:,}  parse_failed={parse_failed}  "
+          f"qc_blocked={qc_blocked}  elapsed={elapsed:.1f}s")
     print(f"  run_id: {run_id}  (logs/last_run_id.txt)")
+    if batch_stopped_early:
+        tail = next_accession or "(queue exhausted)"
+        print(f"  Batch complete. {fetched_ok} accessions fetched. "
+              f"Run again to continue from accession {tail}.")
     return 0
 
 
@@ -722,8 +760,26 @@ def main() -> None:
                         help="Comma-separated CIK list (overrides --test selection)")
     parser.add_argument("--staging", action="store_true",
                         help="Write staging DB (default when not --dry-run)")
-    parser.add_argument("--limit", type=int, default=None)
+    # NOTE: --limit and --all are mutually exclusive, enforced below with a
+    # custom error message. argparse.add_mutually_exclusive_group() would
+    # emit its own generic error text and preempt the custom message.
+    parser.add_argument(
+        "--limit", type=int, metavar="N", default=None,
+        help="Stop after fetching N accessions. Resume next run from where stopped.",
+    )
+    parser.add_argument(
+        "--all", action="store_true",
+        help="Fetch all available accessions (full run). Default behavior.",
+    )
     args = parser.parse_args()
+
+    if args.limit is not None and args.all:
+        sys.stderr.write(
+            "ERROR: --limit and --all are mutually exclusive.\n"
+            "  Use --limit N for batched runs.\n"
+            "  Use --all for full overnight runs.\n"
+        )
+        sys.exit(2)
 
     cik_filter: Optional[list[int]] = None
     if args.ciks:
@@ -733,8 +789,8 @@ def main() -> None:
         set_staging_mode(True)
 
     if args.dry_run:
-        sys.exit(run_dry(args.test, cik_filter))
-    sys.exit(run_pipeline(args.test, cik_filter, args.limit))
+        sys.exit(run_dry(args.test, cik_filter, args.limit, args.all))
+    sys.exit(run_pipeline(args.test, cik_filter, args.limit, args.all))
 
 
 if __name__ == "__main__":
