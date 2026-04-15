@@ -231,7 +231,23 @@ def _load_one_dera_quarter(
 
     dataset = build_dera_dataset(zip_path, filter_ciks=None)
     submissions = dataset["submissions"]
-    submissions_kept = resolve_amendments(submissions)
+
+    # Open a short-lived read-only staging connection so resolve_amendments
+    # can consult prior ZIPs' impacts for cross-ZIP dedupe. The load step
+    # takes its own write connection right after this; DuckDB allows the
+    # read handle to be opened and closed around it.
+    try:
+        resolve_con = duckdb.connect(STAGING_DB, read_only=True)
+    except duckdb.IOException:
+        # Another writer holds the lock — fall back to within-ZIP dedupe
+        # only. Cross-ZIP duplicates will surface as _block_dup_series_month
+        # and can be cleaned up post-hoc (see Session 2 close notes).
+        resolve_con = None
+    try:
+        submissions_kept = resolve_amendments(submissions, staging_con=resolve_con)
+    finally:
+        if resolve_con is not None:
+            resolve_con.close()
     n_dropped = len(submissions) - len(submissions_kept)
 
     holdings_written, series_written = dera_load_to_staging(

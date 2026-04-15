@@ -166,93 +166,152 @@ def _run_entity_gate(prod_con, holdings):
 
 
 # ---------------------------------------------------------------------------
-# FLAG checks
+# FLAG checks — set-based SQL
+#
+# Session 1's implementations ran one prod query per series, which hangs
+# for >10K staged series (45+ minutes on a single check). The rewrites
+# below register the staging DataFrames on the prod connection and run
+# one SQL per check, joining prod tables against the staged set. Same
+# semantics, same return shape (list[dict]), orders of magnitude faster.
 # ---------------------------------------------------------------------------
 
 def _flag_reg_cik_changed(prod_con, universe):
     """Compare staged universe.fund_cik vs prod fund_universe.fund_cik."""
-    out = []
-    for _, row in universe.iterrows():
-        sid = row["series_id"]
-        new_cik = row["fund_cik"]
-        prior = prod_con.execute(
-            "SELECT fund_cik FROM fund_universe WHERE series_id = ?",
-            [sid],
-        ).fetchone()
-        if prior and prior[0] and prior[0] != new_cik:
-            out.append({"gate": "reg_cik_changed", "series_id": sid,
-                        "prior_cik": prior[0], "new_cik": new_cik})
-    return out
+    if universe.empty:
+        return []
+    prod_con.register("_stg_u", universe[["series_id", "fund_cik"]])
+    try:
+        df = prod_con.execute("""
+            SELECT u.series_id,
+                   fu.fund_cik AS prior_cik,
+                   u.fund_cik  AS new_cik
+            FROM _stg_u u
+            JOIN fund_universe fu ON fu.series_id = u.series_id
+            WHERE fu.fund_cik IS NOT NULL
+              AND fu.fund_cik <> u.fund_cik
+        """).fetchdf()
+    finally:
+        prod_con.unregister("_stg_u")
+    return [{"gate": "reg_cik_changed", "series_id": r["series_id"],
+             "prior_cik": r["prior_cik"], "new_cik": r["new_cik"]}
+            for _, r in df.iterrows()]
 
 
 def _flag_top10_drift(prod_con, holdings):
-    """Top-10 CUSIP overlap < 10% vs prior quarter, same series."""
-    out = []
-    for sid in holdings["series_id"].unique():
-        cur_top = (
-            holdings[holdings["series_id"] == sid]
-            .sort_values("market_value_usd", ascending=False)["cusip"]
-            .head(10).tolist()
-        )
-        if not cur_top:
-            continue
-        prior_top = prod_con.execute(
-            """
-            SELECT cusip FROM fund_holdings_v2
-            WHERE series_id = ?
-              AND report_month = (
-                SELECT MAX(report_month) FROM fund_holdings_v2
-                WHERE series_id = ?
-              )
-            ORDER BY market_value_usd DESC NULLS LAST LIMIT 10
-            """,
-            [sid, sid],
-        ).fetchdf()
-        if prior_top.empty:
-            continue
-        overlap = len(set(cur_top) & set(prior_top["cusip"].tolist()))
-        if overlap < 1:  # strict: 0 of 10 overlapping = severe drift
-            out.append({"gate": "top10_drift", "series_id": sid,
-                        "overlap": overlap})
-    return out
+    """Top-10 CUSIP overlap < 1 row vs prior month in prod, same series.
+
+    For each staged series S:
+      cur_top10  = top 10 CUSIPs by market_value_usd within the latest
+                   staged report_month for S.
+      prior_top10 = top 10 CUSIPs within the latest prod report_month for S.
+    Flag when cur_top10 ∩ prior_top10 is empty AND prior exists.
+    """
+    if holdings.empty:
+        return []
+    cols = ["series_id", "report_month", "cusip", "market_value_usd"]
+    prod_con.register("_stg_h", holdings[cols])
+    try:
+        df = prod_con.execute("""
+            WITH staged_latest AS (
+                SELECT series_id, MAX(report_month) AS report_month
+                FROM _stg_h GROUP BY series_id
+            ),
+            cur_ranked AS (
+                SELECT h.series_id, h.cusip,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY h.series_id
+                           ORDER BY h.market_value_usd DESC NULLS LAST
+                       ) AS rn
+                FROM _stg_h h
+                JOIN staged_latest sl
+                  ON h.series_id = sl.series_id
+                 AND h.report_month = sl.report_month
+            ),
+            prod_latest AS (
+                SELECT series_id, MAX(report_month) AS report_month
+                FROM fund_holdings_v2
+                WHERE series_id IN (SELECT series_id FROM staged_latest)
+                GROUP BY series_id
+            ),
+            prior_ranked AS (
+                SELECT p.series_id, p.cusip,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY p.series_id
+                           ORDER BY p.market_value_usd DESC NULLS LAST
+                       ) AS rn
+                FROM fund_holdings_v2 p
+                JOIN prod_latest pl
+                  ON p.series_id = pl.series_id
+                 AND p.report_month = pl.report_month
+            ),
+            cur_top AS (SELECT series_id, cusip FROM cur_ranked WHERE rn <= 10),
+            prior_top AS (SELECT series_id, cusip FROM prior_ranked WHERE rn <= 10),
+            overlap AS (
+                SELECT p.series_id,
+                       COUNT(c.cusip) AS hits
+                FROM prior_top p
+                LEFT JOIN cur_top c
+                       ON p.series_id = c.series_id AND p.cusip = c.cusip
+                GROUP BY p.series_id
+            )
+            SELECT series_id, hits FROM overlap WHERE hits < 1
+        """).fetchdf()
+    finally:
+        prod_con.unregister("_stg_h")
+    return [{"gate": "top10_drift", "series_id": r["series_id"],
+             "overlap": int(r["hits"])}
+            for _, r in df.iterrows()]
 
 
 def _flag_aum_delta(prod_con, universe, threshold=0.80):
-    out = []
-    for _, row in universe.iterrows():
-        sid = row["series_id"]
-        new_aum = row.get("total_net_assets")
-        if not new_aum or new_aum <= 0:
-            continue
-        prior = prod_con.execute(
-            "SELECT total_net_assets FROM fund_universe WHERE series_id = ?",
-            [sid],
-        ).fetchone()
-        if not prior or not prior[0] or prior[0] <= 0:
-            continue
-        delta = abs(new_aum - prior[0]) / prior[0]
-        if delta > threshold:
-            out.append({"gate": "aum_delta_huge", "series_id": sid,
-                        "prior": float(prior[0]),
-                        "new": float(new_aum),
-                        "delta_pct": round(100 * delta, 1)})
-    return out
+    if universe.empty:
+        return []
+    prod_con.register("_stg_u", universe[["series_id", "total_net_assets"]])
+    try:
+        df = prod_con.execute("""
+            SELECT u.series_id,
+                   fu.total_net_assets AS prior_aum,
+                   u.total_net_assets  AS new_aum,
+                   ROUND(ABS(u.total_net_assets - fu.total_net_assets)
+                         / fu.total_net_assets * 100, 1) AS delta_pct
+            FROM _stg_u u
+            JOIN fund_universe fu ON fu.series_id = u.series_id
+            WHERE u.total_net_assets IS NOT NULL
+              AND u.total_net_assets > 0
+              AND fu.total_net_assets IS NOT NULL
+              AND fu.total_net_assets > 0
+              AND ABS(u.total_net_assets - fu.total_net_assets)
+                  / fu.total_net_assets > ?
+        """, [threshold]).fetchdf()
+    finally:
+        prod_con.unregister("_stg_u")
+    return [{"gate": "aum_delta_huge", "series_id": r["series_id"],
+             "prior": float(r["prior_aum"]),
+             "new": float(r["new_aum"]),
+             "delta_pct": float(r["delta_pct"])}
+            for _, r in df.iterrows()]
 
 
 def _flag_new_series(prod_con, universe):
-    out = []
-    for _, row in universe.iterrows():
-        sid = row["series_id"]
-        prior = prod_con.execute(
-            "SELECT 1 FROM fund_universe WHERE series_id = ?", [sid],
-        ).fetchone()
-        if not prior:
-            out.append({"gate": "new_series", "series_id": sid,
-                        "fund_name": row.get("fund_name")})
-    return out
+    if universe.empty:
+        return []
+    prod_con.register("_stg_u", universe[["series_id", "fund_name"]])
+    try:
+        df = prod_con.execute("""
+            SELECT u.series_id, u.fund_name
+            FROM _stg_u u
+            LEFT JOIN fund_universe fu ON fu.series_id = u.series_id
+            WHERE fu.series_id IS NULL
+        """).fetchdf()
+    finally:
+        prod_con.unregister("_stg_u")
+    return [{"gate": "new_series", "series_id": r["series_id"],
+             "fund_name": r.get("fund_name")}
+            for _, r in df.iterrows()]
 
 
 def _flag_fund_closed(holdings):
+    """Unchanged — operates on the already-in-memory DataFrame, no prod join."""
     out = []
     closed = holdings[holdings["qc_flags"].notna()]
     for _, row in closed.iterrows():
@@ -265,54 +324,80 @@ def _flag_fund_closed(holdings):
 
 
 # ---------------------------------------------------------------------------
-# WARN checks
+# WARN checks — set-based SQL
 # ---------------------------------------------------------------------------
 
 def _warn_holdings_count_delta(prod_con, holdings, threshold=0.50):
-    out = []
-    series_counts = holdings.groupby("series_id").size().to_dict()
-    for sid, cnt in series_counts.items():
-        prior = prod_con.execute(
-            """
-            SELECT COUNT(*) FROM fund_holdings_v2
-            WHERE series_id = ?
-              AND report_month = (
-                SELECT MAX(report_month) FROM fund_holdings_v2
-                WHERE series_id = ?
-              )
-            """,
-            [sid, sid],
-        ).fetchone()
-        if not prior or not prior[0]:
-            continue
-        delta = abs(cnt - prior[0]) / prior[0]
-        if delta > threshold:
-            out.append({"gate": "holdings_count_delta",
-                        "series_id": sid,
-                        "prior": int(prior[0]),
-                        "new": int(cnt),
-                        "delta_pct": round(100 * delta, 1)})
-    return out
+    """Holdings-count % delta vs prod's most recent report_month for series.
+
+    Compares the staged count (all months in this run) against prod's
+    latest-month count. That's the existing Session-1 semantic — reduced
+    to one set-based query instead of one per series.
+    """
+    if holdings.empty:
+        return []
+    prod_con.register("_stg_h", holdings[["series_id", "report_month"]])
+    try:
+        df = prod_con.execute("""
+            WITH staged_counts AS (
+                SELECT series_id, COUNT(*) AS new_cnt
+                FROM _stg_h GROUP BY series_id
+            ),
+            prod_latest AS (
+                SELECT series_id, MAX(report_month) AS report_month
+                FROM fund_holdings_v2
+                WHERE series_id IN (SELECT series_id FROM staged_counts)
+                GROUP BY series_id
+            ),
+            prior_counts AS (
+                SELECT p.series_id, COUNT(*) AS prior_cnt
+                FROM fund_holdings_v2 p
+                JOIN prod_latest pl
+                  ON p.series_id = pl.series_id
+                 AND p.report_month = pl.report_month
+                GROUP BY p.series_id
+            )
+            SELECT sc.series_id, pc.prior_cnt, sc.new_cnt,
+                   ROUND(ABS(sc.new_cnt - pc.prior_cnt) * 100.0
+                         / pc.prior_cnt, 1) AS delta_pct
+            FROM staged_counts sc
+            JOIN prior_counts pc ON sc.series_id = pc.series_id
+            WHERE pc.prior_cnt > 0
+              AND ABS(sc.new_cnt - pc.prior_cnt) * 1.0 / pc.prior_cnt > ?
+        """, [threshold]).fetchdf()
+    finally:
+        prod_con.unregister("_stg_h")
+    return [{"gate": "holdings_count_delta", "series_id": r["series_id"],
+             "prior": int(r["prior_cnt"]), "new": int(r["new_cnt"]),
+             "delta_pct": float(r["delta_pct"])}
+            for _, r in df.iterrows()]
 
 
 def _warn_aum_delta_medium(prod_con, universe):
-    out = []
-    for _, row in universe.iterrows():
-        sid = row["series_id"]
-        new_aum = row.get("total_net_assets")
-        if not new_aum or new_aum <= 0:
-            continue
-        prior = prod_con.execute(
-            "SELECT total_net_assets FROM fund_universe WHERE series_id = ?",
-            [sid],
-        ).fetchone()
-        if not prior or not prior[0] or prior[0] <= 0:
-            continue
-        delta = abs(new_aum - prior[0]) / prior[0]
-        if 0.50 < delta <= 0.80:
-            out.append({"gate": "aum_delta_medium", "series_id": sid,
-                        "delta_pct": round(100 * delta, 1)})
-    return out
+    if universe.empty:
+        return []
+    prod_con.register("_stg_u", universe[["series_id", "total_net_assets"]])
+    try:
+        df = prod_con.execute("""
+            SELECT u.series_id,
+                   ROUND(ABS(u.total_net_assets - fu.total_net_assets)
+                         / fu.total_net_assets * 100, 1) AS delta_pct
+            FROM _stg_u u
+            JOIN fund_universe fu ON fu.series_id = u.series_id
+            WHERE u.total_net_assets IS NOT NULL
+              AND u.total_net_assets > 0
+              AND fu.total_net_assets IS NOT NULL
+              AND fu.total_net_assets > 0
+              AND ABS(u.total_net_assets - fu.total_net_assets)
+                  / fu.total_net_assets > 0.50
+              AND ABS(u.total_net_assets - fu.total_net_assets)
+                  / fu.total_net_assets <= 0.80
+        """).fetchdf()
+    finally:
+        prod_con.unregister("_stg_u")
+    return [{"gate": "aum_delta_medium", "series_id": r["series_id"],
+             "delta_pct": float(r["delta_pct"])}
+            for _, r in df.iterrows()]
 
 
 # ---------------------------------------------------------------------------

@@ -548,21 +548,92 @@ def build_dera_dataset(
 # Amendment resolution
 # ---------------------------------------------------------------------------
 
-def resolve_amendments(submissions: list[dict]) -> list[dict]:
+def resolve_amendments(
+    submissions: list[dict],
+    staging_con: Optional[duckdb.DuckDBPyConnection] = None,
+) -> list[dict]:
     """For each (series_id, report_month), keep only the LATEST accession.
 
-    SEC accession format is XXXXXXXXXX-YY-NNNNNN — lexicographic sort on the
-    full accession number orders correctly within any reasonable time window
-    (decades), since the 'YY' year field dominates and 'NNNNNN' increases
-    monotonically within a year.
+    Two passes:
+      1. **Within the submission list.** Dedupe so each (series_id,
+         report_month) tuple is represented once, by the latest
+         accession_number in ``submissions``. SEC accession format
+         ``XXXXXXXXXX-YY-NNNNNN`` sorts lexicographically correctly across
+         years, so ``s1 > s2`` iff s1 is newer.
+      2. **Against staging (optional).** When ``staging_con`` is provided,
+         consult ``ingestion_impacts`` for any previously-loaded accession
+         for the same (series_id, report_month) — this is the cross-ZIP
+         case, e.g. the original filing landed via ``2025Q4_nport.zip``
+         and the amendment later via ``2026Q1_nport.zip``. Drop the
+         submission if staging already has the newer accession; otherwise
+         keep and let ``load_to_staging`` delete the superseded impact
+         row before inserting the amendment.
+
+    Idempotent: safe to call with or without ``staging_con``. When
+    ``staging_con`` is omitted the behaviour is identical to Session 1
+    (within-ZIP only).
     """
+    # Pass 1 — within-list dedupe (unchanged from Session 1).
     by_key: dict[tuple[str, str], dict] = {}
     for s in submissions:
         key = (s["series_id"], s["report_month"])
         existing = by_key.get(key)
         if existing is None or s["accession_number"] > existing["accession_number"]:
             by_key[key] = s
-    return list(by_key.values())
+    kept = list(by_key.values())
+
+    if staging_con is None or not kept:
+        return kept
+
+    # Pass 2 — cross-ZIP dedupe. One bulk query gets the max accession
+    # already recorded for any tuple in the submission set; skip the ones
+    # where staging is strictly newer.
+    import pandas as pd  # local import — only used in the cross-ZIP path
+    keys_df = pd.DataFrame([
+        {"series_id": s["series_id"], "report_month": s["report_month"]}
+        for s in kept
+    ])
+    staging_con.register("_resolve_keys", keys_df)
+    try:
+        existing = staging_con.execute("""
+            SELECT
+                JSON_EXTRACT_STRING(i.unit_key_json, '$.series_id')    AS series_id,
+                JSON_EXTRACT_STRING(i.unit_key_json, '$.report_month') AS report_month,
+                MAX(m.accession_number) AS max_accession
+            FROM ingestion_impacts i
+            JOIN ingestion_manifest m ON i.manifest_id = m.manifest_id
+            JOIN _resolve_keys k
+              ON k.series_id    = JSON_EXTRACT_STRING(i.unit_key_json, '$.series_id')
+             AND k.report_month = JSON_EXTRACT_STRING(i.unit_key_json, '$.report_month')
+            WHERE i.unit_type = 'series_month'
+            GROUP BY 1, 2
+        """).fetchdf()
+    finally:
+        staging_con.unregister("_resolve_keys")
+
+    if existing.empty:
+        return kept
+
+    existing_map: dict[tuple[str, str], str] = {
+        (row["series_id"], row["report_month"]): row["max_accession"]
+        for _, row in existing.iterrows()
+        if row["max_accession"]
+    }
+    filtered: list[dict] = []
+    skipped = 0
+    for s in kept:
+        key = (s["series_id"], s["report_month"])
+        prev = existing_map.get(key)
+        if prev is not None and prev >= s["accession_number"]:
+            # Staging already has this amendment or newer.
+            skipped += 1
+            continue
+        filtered.append(s)
+    if skipped:
+        print(f"    cross-ZIP dedupe: dropped {skipped:,} submissions "
+              f"already represented in staging by a newer accession",
+              flush=True)
+    return filtered
 
 
 # ---------------------------------------------------------------------------
@@ -648,6 +719,21 @@ def load_to_staging(
                 "series_id": sub["series_id"],
                 "report_month": sub["report_month"],
             })
+            # Delete any stale impact rows for this (series, month). Handles
+            # the cross-ZIP amendment case where a prior ZIP (or prior run)
+            # loaded an earlier accession: resolve_amendments() dropped the
+            # submission if staging was newer, but if we got here this
+            # submission IS the amendment — clean up the superseded impact
+            # so _block_dup_series_month stays clean.
+            con.execute(
+                """
+                DELETE FROM ingestion_impacts
+                WHERE unit_type = 'series_month'
+                  AND unit_key_json = ?
+                  AND manifest_id <> ?
+                """,
+                [impact_unit_key, manifest_id],
+            )
             write_impact(
                 con,
                 manifest_id=manifest_id,
