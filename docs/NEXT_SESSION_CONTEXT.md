@@ -1,6 +1,51 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (No-DB workstream session — Makefile + freshness gate + record_freshness hooks on 8 pipeline scripts + validate_entities --read-only + last_refreshed_at migration drafted. Ran concurrent with staging-locked CUSIP OpenFIGI retry. HEAD: `831e5b4`.)_
+_Last updated: 2026-04-15 (N-PORT DERA ZIP Session 2 promote complete — 8,125 entity-resolved series promoted to fund_holdings_v2, +2,922,362 rows (6.4M → 9.3M), 5,921 unresolved series queued in pending_entity_resolution for entity MDM follow-up.)_
+
+## N-PORT DERA ZIP — 2026-04-15 Session 2 (staging + promote)
+
+Session 2 code (commit 44bc98e) plus the staging load + validate + promote ran in this session. Prod fund_holdings_v2 now carries DERA ZIP data through 2026-01, up from XML-path data through 2025-11.
+
+**Load stats (run_id `nport_20260415_060422_352131`):**
+- 2025Q4: 5,104,168 holdings, 13,310 accessions, 18 amendments dropped (16.4 min).
+- 2026Q1: 5,934,769 holdings, 13,143 accessions, 5 amendments dropped (18.3 min).
+- Total: 11,038,937 holdings, 14,046 distinct series, 35.7 min.
+
+**Perf fix during load** (scripts/fetch_dera_nport.py):
+Session 1's per-accession CHECKPOINT (fine at 21 accessions) was the dominant cost at 13K accessions. Switched to CHECKPOINT every 2000 accessions with a progress print every 500. Rate: ~13 acc/s post-fix (was ~7.5 acc/s with per-accession CHECKPOINT). Final CHECKPOINT at quarter end so next reader sees everything without WAL replay.
+
+**Validation findings — 3 promote blockers:**
+1. **Entity gate: 5,921 of 14,046 staged series (42%) missing from `entity_identifiers`** — mostly index / bond / money-market funds the legacy XML `classify_fund` path filtered out. BLOCK per `validate_nport.py`'s strict gate.
+2. **1,187 synthetic series_ids** (`{cik}_{accession}` fallback) — subset of the above 5,921 (SPDR-style ETF trusts + other SERIES_ID-less filings).
+3. **8 cross-quarter amendment duplicates** — same (series_id, report_month) filed in 2025Q4 then amended in 2026Q1. `resolve_amendments` dedupes within a ZIP but not across. Stg holdings were fine (DELETE+INSERT wins) but ingestion_impacts had 2 rows per pair.
+
+**Resolution — option B + D:**
+- **D:** Deduped impacts in-place — kept the row whose `manifest_id` matched the stg holdings authoritative link. 8 → 0.
+- **B:** Split staged set into resolved (8,125) + excluded (5,921). Excluded queued in `pending_entity_resolution` for entity MDM follow-up.
+
+**New file:** `scripts/validate_nport_subset.py` — fast set-based validator for subset promotion. O(N) per-series Python loops in `validate_nport.py` hung at 14K series (> 45 min, killed). Subset validator runs BLOCK checks + entity gate (EC + DM rollup) as set-based SQL aggregates in < 1 min. Writes a `logs/reports/nport_{run_id}.md` with `Promote-ready: YES`. Queues the excluded series in `pending_entity_resolution`.
+
+**Promote result:**
+- Tuples promoted: **~12,300** (8,125 series × ~1.5 months avg)
+- Holdings: **-913,898 / +3,836,260** in fund_holdings_v2
+- fund_universe upserts: **8,125**
+
+**Prod state after promote:**
+| | Before | After |
+|---|---|---|
+| fund_holdings_v2 rows | 6,393,206 | 9,315,568 |
+| series | 6,674 | 8,453 |
+| newest report_date | 2025-11-30 | 2026-01-31 |
+| fund_universe | 6,677 | 8,459 |
+| pending_entity_resolution (NPORT) | 0 | 5,921 |
+
+**Follow-ups (not auto-resolved this session):**
+1. **Entity MDM expansion** — resolve 5,921 series in `pending_entity_resolution`. These are index, bond, MM funds newly included via the DERA path. Classification + entity records needed before their data can promote.
+2. **`validate_nport.py` performance** — O(N) per-series Python loops hang at > 10K series. Rewrite `_flag_top10_drift` + `_warn_holdings_count_delta` + `_flag_aum_delta` as set-based SQL. Until fixed, use `scripts/validate_nport_subset.py` for large runs.
+3. **Cross-quarter amendment resolution in `resolve_amendments`** — current implementation is per-ZIP. For multi-ZIP loads, add a post-pass that dedupes (series_id, report_month) across the whole run, keeping latest accession_number. Session 2 used a manual dedup; automate for future runs.
+4. **Prod migration 002 already applied** — `fund_universe` has `strategy_narrative` / `strategy_source` / `strategy_fetched_at` columns. Session 3 can populate via N-1A / N-CSR narrative scraping.
+
+---
 
 ## No-DB workstream — 2026-04-14
 

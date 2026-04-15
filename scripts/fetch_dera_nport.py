@@ -589,13 +589,23 @@ def load_to_staging(
     now = datetime.now()
     db_path = staging_db_path or STAGING_DB
 
+    # CHECKPOINT cadence — once every N accessions. Session 1 did a
+    # checkpoint per accession (21 accessions total, negligible cost).
+    # Session 2 scales to ~13K accessions per quarter × 2 quarters;
+    # per-accession checkpoints turn into the run-dominant cost. Every
+    # 2000 accessions (~8-12 in-flight minutes) keeps crash recovery
+    # bounded without dominating throughput.
+    checkpoint_every = 2000
+    progress_every = 500
+
     con = duckdb.connect(db_path)
     holdings_written = 0
     series_written = 0
+    t_load_start = time.time()
     try:
         _ensure_staging_schema(con)
 
-        for sub in submissions_kept:
+        for idx, sub in enumerate(submissions_kept, start=1):
             acc = sub["accession_number"]
             holdings = holdings_by_acc.get(acc, [])
             if not holdings:
@@ -723,12 +733,26 @@ def load_to_staging(
                     [manifest_id, impact_unit_key],
                 )
                 con.execute("COMMIT")
-                con.execute("CHECKPOINT")
                 holdings_written += len(holdings)
                 series_written += 1
             except Exception:
                 con.execute("ROLLBACK")
                 raise
+
+            if idx % checkpoint_every == 0:
+                con.execute("CHECKPOINT")
+            if idx % progress_every == 0:
+                elapsed = time.time() - t_load_start
+                rate = idx / elapsed if elapsed else 0
+                eta = (len(submissions_kept) - idx) / rate if rate else 0
+                print(f"    [{idx}/{len(submissions_kept)}] "
+                      f"{holdings_written:,} holdings, "
+                      f"{rate:.1f} acc/s, ETA {eta/60:.1f}min",
+                      flush=True)
+
+        # Final checkpoint so the next reader sees everything without a
+        # soft-replay from the WAL.
+        con.execute("CHECKPOINT")
     finally:
         con.close()
     return holdings_written, series_written

@@ -1,6 +1,50 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 14, 2026 — N-PORT DERA ZIP Session 2 code-complete. fetch_nport_v2.py rewritten as 4-mode orchestrator (DERA bulk default, XML topup, parity test, dry-run); --zip flag added; shared utils relocated. Staging load deferred behind concurrent run_openfigi_retry.py --staging. CUSIP v1.4 Session 2 scripts landed earlier today (below)._
+_Last updated: April 15, 2026 — N-PORT DERA ZIP Session 2 staging + promote complete. 8,125 entity-resolved series promoted (+2.9M rows, 6.4M → 9.3M). 5,921 unresolved queued in pending_entity_resolution. fund_holdings_v2 newest report_date now 2026-01-31._
+
+## Session Summary 2026-04-15 (N-PORT DERA ZIP Session 2 — staging + promote)
+
+Executed on top of Session 2 code (commit 44bc98e). Ran the full DERA bulk load, validated, and promoted the entity-resolved subset.
+
+**Load (run_id `nport_20260415_060422_352131`):**
+- Both quarters from pre-downloaded local ZIPs (`--zip data/nport_raw/dera`). No network download.
+- 2025Q4: 5,104,168 holdings, 13,310 accessions, 18 amendments dropped, 16.4 min.
+- 2026Q1: 5,934,769 holdings, 13,143 accessions, 5 amendments dropped, 18.3 min.
+- **Perf fix mid-load (scripts/fetch_dera_nport.py):** per-accession CHECKPOINT was fine at Session-1 scale (21 accessions) but dominated cost at 13K accessions. Changed to CHECKPOINT every 2000 accessions + progress print every 500. Rate: 7.5 → 13 acc/s. Final CHECKPOINT at quarter end.
+
+**Validation — 3 blockers surfaced:**
+1. 5,921 of 14,046 staged series (42%) missing from `entity_identifiers` — index / bond / MM funds the legacy XML `classify_fund` path had filtered out. BLOCK per strict N-PORT entity gate.
+2. 1,187 synthetic series_ids (`{cik}_{accession}` fallback) — subset of the above.
+3. 8 cross-quarter amendment duplicate impact rows — `resolve_amendments` dedupes within a ZIP, not across. `stg_nport_holdings` was fine (DELETE+INSERT wins); only `ingestion_impacts` had dupes.
+
+**Resolution (option B + D per user direction):**
+- **D:** Deduped impacts in place — kept the row whose `manifest_id` matches the stg holdings authoritative link. 8 → 0.
+- **B:** Split staged set into **resolved (8,125)** + **excluded (5,921)**. Excluded queued in `pending_entity_resolution` with `source_type='NPORT'`, `identifier_type='series_id'`, `resolution_status='pending'`.
+
+**New file** `scripts/validate_nport_subset.py` — fast set-based validator for subset promotion. `validate_nport.py`'s O(N) per-series Python loops hung at 14K series (>45 min, killed); subset validator runs BLOCK + entity gate (EC + DM rollup) as SQL aggregates in < 1 min. Writes `logs/reports/nport_{run_id}.md` with `Promote-ready: YES`. Idempotent pending-queue insert.
+
+**Promote** (commit pending — changes to fetch_dera_nport + new validator + .gitignore + docs):
+- Invoked `promote_nport.py --exclude` with the 5,921 series CSV (86KB arg; well under ARG_MAX 1MB).
+- ~12,300 tuples promoted (8,125 series × ~1.5 months avg).
+- Holdings: **−913,898 / +3,836,260** (net +2,922,362).
+- fund_universe upserts: 8,125.
+- Snapshot refreshed at 7.65 GB.
+
+**Prod state after promote:**
+| | Before | After |
+|---|---|---|
+| fund_holdings_v2 rows | 6,393,206 | 9,315,568 |
+| series | 6,674 | 8,453 |
+| newest report_date | 2025-11-30 | 2026-01-31 |
+| fund_universe | 6,677 | 8,459 |
+| pending_entity_resolution (NPORT) | 0 | 5,921 |
+
+**Follow-ups to track:**
+1. Entity MDM expansion for the 5,921 queued series (index / bond / MM funds — Session 3 topic).
+2. `validate_nport.py` performance — rewrite per-series loops (`_flag_top10_drift`, `_warn_holdings_count_delta`, `_flag_aum_delta`) as set-based SQL so the full validator scales past 10K series.
+3. Cross-quarter amendment dedup in `resolve_amendments` — currently per-ZIP; Session 2 used a one-off manual dedup. Automate for future runs.
+
+---
 
 ## Session Summary 2026-04-14 (N-PORT DERA ZIP Session 2) — fetch_nport_v2.py rewrite
 
