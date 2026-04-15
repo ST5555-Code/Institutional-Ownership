@@ -33,7 +33,7 @@ edgar = None
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-from db import get_db_path, set_test_mode, set_staging_mode, is_staging_mode, connect_read, assert_write_safe, crash_handler
+from db import get_db_path, set_test_mode, set_staging_mode, is_staging_mode, connect_read, assert_write_safe, crash_handler, record_freshness
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def _init_edgar():
@@ -742,6 +742,11 @@ def run_phase3(test_mode=False, tickers=None):
     con = duckdb.connect(get_db_path())
     create_tables(con)
     post_process(con, True, TEST_TICKERS if test_mode else tickers)
+    try:
+        con.execute("CHECKPOINT")
+        record_freshness(con, "beneficial_ownership_current")
+    except Exception as e:
+        print(f"  [warn] record_freshness(beneficial_ownership_current) failed: {e}", flush=True)
     con.close()
     print("\nPhase 3 complete.")
 

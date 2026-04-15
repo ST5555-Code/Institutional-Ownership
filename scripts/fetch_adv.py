@@ -20,7 +20,7 @@ import duckdb
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 REF_DIR = os.path.join(DATA_DIR, "reference")
-from db import get_db_path, crash_handler
+from db import get_db_path, crash_handler, record_freshness
 DB_PATH = get_db_path()
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -264,6 +264,8 @@ def save_to_duckdb(df):
     print(f"\nActivist managers ({len(activist_list)}):")
     print(activist_list.to_string(index=False))
 
+    con.execute("CHECKPOINT")
+    record_freshness(con, "adv_managers", row_count=row_count)
     con.close()
 
 

@@ -53,7 +53,7 @@ def _brand_tokens_overlap(a, b):
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import set_staging_mode, get_db_path, crash_handler
+from db import set_staging_mode, get_db_path, crash_handler, record_freshness
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -528,6 +528,11 @@ def run(test_mode=False, staging=False):
         print(f"\n[entity_sync] entities: {ent_count}, relationships: {rel_count}")
         print(f"[entity_sync] identifier conflicts pending review: {staging_count}")
 
+    try:
+        con.execute("CHECKPOINT")
+        record_freshness(con, "ncen_adviser_map")
+    except Exception as e:
+        print(f"  [warn] record_freshness(ncen_adviser_map) failed: {e}", flush=True)
     con.close()
     print("\nDone.")
 

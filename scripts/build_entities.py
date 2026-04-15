@@ -1010,6 +1010,12 @@ def main():
             logger.info("  %-32s %d", t, n)
         logger.info("-" * 72)
         logger.info("Build complete. Run validate_entities.py before merging.")
+
+        try:
+            con.execute("CHECKPOINT")
+            db.record_freshness(con, "entity_rollup_history")
+        except Exception as e:
+            logger.warning("[record_freshness] entity_rollup_history skipped: %s", e)
     finally:
         con.close()
 

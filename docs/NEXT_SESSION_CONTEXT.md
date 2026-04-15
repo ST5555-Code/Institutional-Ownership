@@ -1,6 +1,110 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (N-PORT DERA ZIP Session 2 code-complete — fetch_nport_v2.py rewritten as 4-mode orchestrator; --zip PATH flag added; shared utils relocated. Staging load deferred behind concurrent run_openfigi_retry.py --staging. CUSIP v1.4 Session 2 scripts also landed earlier today.)_
+_Last updated: 2026-04-14 (No-DB workstream session — Makefile + freshness gate + record_freshness hooks on 8 pipeline scripts + validate_entities --read-only + last_refreshed_at migration drafted. Ran concurrent with staging-locked CUSIP OpenFIGI retry.)_
+
+## No-DB workstream — 2026-04-14
+
+Ran while `run_openfigi_retry.py --staging` (PID 58622) held the staging
+write lock. Pure code / file edits; prod DB touched read-only only for
+schema inspection and the `validate_entities.py --read-only --prod` smoke
+run (9 PASS / 0 FAIL / 7 MANUAL — unchanged from prior state).
+
+**New files:**
+- `Makefile` — single-entry pipeline orchestration. Targets:
+  `quarterly-update` (9-step sequence, fails on first non-zero exit),
+  `status`, `freshness` (CI-style gate, exit 1 on stale), plus individual
+  targets for every pipeline step. `DRY_RUN=1 make quarterly-update`
+  prints the plan without executing.
+- `scripts/check_freshness.py` — gate helper. Reads `data_freshness`
+  from prod (read-only), compares each tracked table against
+  per-table staleness thresholds, prints status table, exits 1 if any
+  stale/missing. `--status-only` for informational use (`make status`).
+- `scripts/migrations/add_last_refreshed_at.py` — written **but not
+  run**. Adds `last_refreshed_at TIMESTAMP` to `entity_relationships`
+  with best-effort `created_at` backfill. Rollout is staging-first
+  after the OpenFIGI retry lock releases. Run with `--staging` then
+  `--prod`.
+
+**Modified:**
+- `scripts/validate_entities.py` — new `--read-only` flag. Opens DB with
+  `read_only=True`; all gates are SELECT-only so results are identical.
+  Verified `--read-only --prod` returns the established 9 PASS / 0 FAIL
+  / 7 MANUAL and exit 0.
+- `scripts/entity_sync.py` — `insert_relationship_idempotent()` now
+  stamps / bumps `last_refreshed_at` when the column exists. Behaviour
+  is probe-gated (`_has_last_refreshed_at(con)`), so the same code runs
+  safely against a pre- or post-migration DB. Three stamp sites: on
+  fresh INSERT (CURRENT_TIMESTAMP), on ON-CONFLICT-DO-NOTHING hits
+  (UPDATE the matching open row), and on deferred-primary paths
+  (UPDATE the retained existing_rid).
+- `scripts/db.py` — untouched (`record_freshness` helper already there).
+
+**`record_freshness` hooks added to 8 pipeline scripts:**
+
+| Script | Target table |
+|---|---|
+| `fetch_adv.py` | `adv_managers` |
+| `fetch_ncen.py` | `ncen_adviser_map` |
+| `fetch_finra_short.py` | `short_interest` |
+| `fetch_13dg.py` (legacy run_phase3) | `beneficial_ownership_current` |
+| `build_entities.py` | `entity_rollup_history` |
+| `build_managers.py` | `managers` |
+| `build_fund_classes.py` | `fund_classes` |
+| `build_cusip.py` | `securities` |
+
+**Deliberately skipped** (mapped in the plan, but adding a hook would be
+incorrect):
+- `fetch_13f.py` — no DuckDB write; only downloads SEC quarterly ZIPs
+  to `data/raw/` and extracts TSVs. Holdings load happens elsewhere.
+- `fetch_nport.py` — legacy script writes to the dropped `fund_holdings`
+  table (Stage 5 cleanup). Superseded by `fetch_nport_v2.py`.
+- `fetch_nport_v2.py` / `fetch_13dg_v2.py` — SourcePipelines write to
+  staging only. `promote_nport.py` and `promote_13dg.py` already call
+  `stamp_freshness()` on the prod tables at promote time (verified in
+  `scripts/pipeline/shared.py:169` + `scripts/pipeline/protocol.py:232`).
+- `fetch_market.py` / `compute_flows.py` / `build_summaries.py` — already
+  stamp freshness via the DirectWritePipeline protocol (`fetch_market`)
+  or inline (`compute_flows`, `build_summaries`).
+
+**Docs:**
+- `ARCHITECTURE_REVIEW.md` §Batch 3-A — added "as-shipped schema" note
+  for `fund_family_patterns` (2 cols, 83 rows, PK
+  `(inst_parent_name, pattern)`; `data_freshness` is 3 cols, no
+  `source_label`) and the memoization gotcha for
+  `get_nport_family_patterns()`.
+- `docs/NEXT_SESSION_CONTEXT.md` §y — appended schema reality-check for
+  `fund_family_patterns` against stale 3-col planning docs.
+- `docs/NEXT_SESSION_CONTEXT.md` §gg — new gotcha on `holdings_v2`
+  filing-line grain; true composite key is
+  `(cik, ticker, quarter, put_call, security_type, discretion)`.
+
+**`make status` snapshot at session end:**
+
+```
+fund_holdings_v2               OK (6.39M rows, 1d)
+beneficial_ownership_current   OK (24.8k rows, 1d)
+holdings_v2                    MISSING from data_freshness
+investor_flows                 MISSING
+ticker_flow_stats              MISSING
+market_data                    MISSING
+summary_by_parent              MISSING
+```
+
+MISSING ≠ broken — those tables are populated but their pipeline scripts
+pre-date Batch 3-A freshness wiring. The next quarterly run will stamp
+them (compute_flows / build_summaries / fetch_market already have hooks;
+holdings_v2 needs a stamp added to whichever script loads the 13F TSVs
+— tracked as a follow-up below).
+
+**Follow-up items generated this session:**
+1. `holdings_v2` freshness — find the 13F TSV loader (downstream of
+   `fetch_13f.py`) and add a `record_freshness(con, 'holdings_v2')` hook.
+2. Run the `last_refreshed_at` migration on staging first, then prod,
+   after the OpenFIGI retry finishes. Sequence in the migration file's
+   docstring.
+3. Next session picks up: validate staging post-CUSIP-retry, then
+   N-PORT DERA Session 2 staging load per pre-existing plan
+   (`fetch_nport_v2.py --staging --all --zip data/nport_raw/dera`).
 
 ## N-PORT DERA ZIP — 2026-04-14 Session 2 (code-complete)
 
@@ -622,6 +726,23 @@ ARCH-4C-followup (expand `scripts/schemas.py` to cover full response
 shapes) has shipped and regeneration has parity. Mechanical tab
 migration before that is a compile-time type regression.
 
+### gg. `holdings_v2` true composite key — filing-line grain
+
+`holdings_v2` is **not** unique on `(cik, ticker, quarter)`. The table is
+at 13F filing-line grain. True composite key is:
+`(cik, ticker, quarter, put_call, security_type, discretion)`.
+Separate rows exist for put vs call options on the same underlying
+(`put_call='Put'` and `put_call=NULL`, same `accession_number`) and
+for non-discretionary vs discretionary positions. This is correct —
+13F filers report option legs and discretion states as independent lines.
+
+Any aggregation that wants a "total position" must
+`SUM(shares), SUM(market_value_usd) GROUP BY (cik, ticker, quarter)`.
+`queries.py` already does this via SUM on the hot paths (Register,
+Conviction, Ownership Trend). The landmine is a future dev writing a
+row-count-based join that assumes one row per filer/security/quarter —
+that will silently double-count option legs.
+
 ### ee. INF9d eids (20194/20196/20201/20203) are live PARENT_SEEDS brand shells — Stage 5 discovery
 
 Do not delete eid=20194 (Pacific Life Insurance Company), 20196 (Stowers
@@ -685,6 +806,7 @@ configuration mechanism.
 ### y. `fund_family_patterns` + `data_freshness` (ARCH-3A)
 
 - `get_nport_family_patterns()` in `scripts/queries.py` now reads from `fund_family_patterns` (DB) and falls back to `_FAMILY_PATTERNS_FALLBACK` (in-code dict, identical content). Memoized at module scope — restart the app to pick up a table edit. If you add a new pattern, add it to **both** the DB (via another migration or direct INSERT) **and** `_FAMILY_PATTERNS_FALLBACK` until the fallback is removed.
+- **Schema reality-check (verified 2026-04-14):** `fund_family_patterns` has **2 columns** (`pattern VARCHAR`, `inst_parent_name VARCHAR`), 83 rows, PK `(inst_parent_name, pattern)`. Any planning doc that references a 3-col shape (`family_name` / `match_type`) is stale — ignore and edit against the 2-col reality.
 - `data_freshness (table_name PK, last_computed_at, row_count)` is empty on arrival. Pipeline scripts should `INSERT OR REPLACE` a row at the end of each successful rebuild. `/api/freshness` + `/api/v1/freshness` already serve whatever's in the table.
 - **Staging workflow caveat:** `sync_staging.py` / `diff_staging.py` / `promote_staging.py` are **entity-graph only**. For non-entity reference tables (new tables, schema changes, seed data), use `merge_staging.py --tables <name>` with an entry in `TABLE_KEYS`, or for brand-new tables with no prod data, a one-shot migration script applied first to staging then to prod. `fund_family_patterns: None` and `data_freshness: ["table_name"]` are already registered in `TABLE_KEYS`.
 

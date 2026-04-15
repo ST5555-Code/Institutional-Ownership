@@ -30,7 +30,7 @@ from tqdm import tqdm
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import set_staging_mode, get_db_path, set_test_mode, crash_handler
+from db import set_staging_mode, get_db_path, set_test_mode, crash_handler, record_freshness
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
 FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
@@ -247,6 +247,11 @@ def run(days=30, update_mode=False, test_mode=False):
             else:
                 print(f"  {t}: no data")
 
+    try:
+        con.execute("CHECKPOINT")
+        record_freshness(con, "short_interest")
+    except Exception as e:
+        print(f"  [warn] record_freshness(short_interest) failed: {e}", flush=True)
     con.close()
 
 

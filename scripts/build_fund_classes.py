@@ -10,10 +10,14 @@ Run: python3 scripts/build_fund_classes.py
 
 import glob
 import os
+import sys
 from datetime import datetime
 
 import duckdb
 from lxml import etree
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db import record_freshness  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
@@ -176,6 +180,11 @@ def run():
         for r in fc:
             print(f"  {r[0]:15s} {r[1]:40s} series={r[2]}")
 
+    try:
+        con.execute("CHECKPOINT")
+        record_freshness(con, "fund_classes")
+    except Exception as e:
+        print(f"  [warn] record_freshness(fund_classes) failed: {e}", flush=True)
     con.close()
     print("\nDone.")
 

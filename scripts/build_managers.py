@@ -9,11 +9,15 @@ Run: python3 scripts/build_managers.py
 """
 
 import os
+import sys
 import csv
 import re
 import duckdb
 import pandas as pd
 from rapidfuzz import fuzz, process
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db import record_freshness  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config
@@ -595,6 +599,11 @@ def main():
     # Step 4: Summary
     print_summary(con)
 
+    try:
+        con.execute("CHECKPOINT")
+        record_freshness(con, "managers")
+    except Exception as e:
+        print(f"  [warn] record_freshness(managers) failed: {e}", flush=True)
     con.close()
     print("\nDone.")
 

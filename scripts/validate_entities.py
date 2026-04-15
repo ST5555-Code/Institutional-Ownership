@@ -829,14 +829,23 @@ def main():
                         help="run against the staging DB (data/13f_staging.duckdb)")
     target.add_argument("--prod", action="store_true",
                         help="run against the production DB (default)")
+    parser.add_argument("--read-only", action="store_true",
+                        help="open the DB read-only (safe during concurrent writes; "
+                             "all gates are SELECT-only so results are identical)")
     args = parser.parse_args()
 
     if args.staging:
         db.set_staging_mode(True)
     # else: default = production. Do not call set_staging_mode().
 
-    print(f"Validating against: {db.get_db_path()}")
-    con = db.connect_write()
+    db_path = db.get_db_path()
+    mode = "read-only" if args.read_only else "read-write"
+    print(f"Validating against: {db_path} ({mode})")
+    if args.read_only:
+        import duckdb
+        con = duckdb.connect(db_path, read_only=True)
+    else:
+        con = db.connect_write()
     report = {
         "run_at": datetime.now().isoformat(),
         "db_path": str(db.get_db_path()),

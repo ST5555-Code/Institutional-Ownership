@@ -170,6 +170,27 @@ def get_or_create_fund_entity(
 # =============================================================================
 _LEGACY_SOURCES = frozenset({"parent_bridge", "fuzzy_match"})
 
+# Feature probe: the last_refreshed_at column is added by
+# scripts/migrations/add_last_refreshed_at.py. Until that migration runs on
+# a given DB, we must NOT reference the column — probe once per process
+# and cache. The probe is keyed by DB file path so attaching a second DB
+# (e.g., staging during a promote) doesn't return a stale cached answer.
+_LAST_REFRESHED_AT_CACHE: dict = {}
+
+
+def _has_last_refreshed_at(con) -> bool:
+    key = con.execute("PRAGMA database_list").fetchone()
+    if key in _LAST_REFRESHED_AT_CACHE:
+        return _LAST_REFRESHED_AT_CACHE[key]
+    row = con.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'entity_relationships' "
+        "  AND column_name = 'last_refreshed_at'"
+    ).fetchone()
+    present = row is not None
+    _LAST_REFRESHED_AT_CACHE[key] = present
+    return present
+
 
 def insert_relationship_idempotent(
     con,
@@ -227,9 +248,18 @@ def insert_relationship_idempotent(
                     child_id, existing_parent, existing_source, parent_id, match_score,
                 )
             else:
-                # Keep existing — defer
+                # Keep existing — defer. But the upstream source (N-CEN /
+                # ADV) just re-confirmed this relationship, so bump
+                # last_refreshed_at on the retained row.
                 if is_adv:
                     resolution_policy = "adv_deferred_to_existing"
+                if _has_last_refreshed_at(con):
+                    con.execute(
+                        "UPDATE entity_relationships "
+                        "SET last_refreshed_at = CURRENT_TIMESTAMP "
+                        "WHERE relationship_id = ?",
+                        [existing_rid],
+                    )
                 logger.debug(
                     "primary_parent_exists child=%s existing_parent=%s new_parent=%s policy=%s",
                     child_id, existing_parent, parent_id, resolution_policy,
@@ -238,17 +268,44 @@ def insert_relationship_idempotent(
 
     rid = con.execute("SELECT nextval('relationship_id_seq')").fetchone()[0]
     primary_key = child_id if is_primary else None
-    result = con.execute(
-        """INSERT INTO entity_relationships
-           (relationship_id, parent_entity_id, child_entity_id, relationship_type,
-            control_type, is_primary, primary_parent_key, confidence, source,
-            is_inferred, valid_from, valid_to)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE '2000-01-01', DATE '9999-12-31')
-           ON CONFLICT DO NOTHING
-           RETURNING relationship_id""",
-        [rid, parent_id, child_id, rel_type, control_type, is_primary, primary_key,
-         confidence, source, is_inferred],
-    ).fetchall()
+    include_lra = _has_last_refreshed_at(con)
+    if include_lra:
+        result = con.execute(
+            """INSERT INTO entity_relationships
+               (relationship_id, parent_entity_id, child_entity_id, relationship_type,
+                control_type, is_primary, primary_parent_key, confidence, source,
+                is_inferred, valid_from, valid_to, last_refreshed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE '2000-01-01',
+                       DATE '9999-12-31', CURRENT_TIMESTAMP)
+               ON CONFLICT DO NOTHING
+               RETURNING relationship_id""",
+            [rid, parent_id, child_id, rel_type, control_type, is_primary, primary_key,
+             confidence, source, is_inferred],
+        ).fetchall()
+    else:
+        result = con.execute(
+            """INSERT INTO entity_relationships
+               (relationship_id, parent_entity_id, child_entity_id, relationship_type,
+                control_type, is_primary, primary_parent_key, confidence, source,
+                is_inferred, valid_from, valid_to)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE '2000-01-01', DATE '9999-12-31')
+               ON CONFLICT DO NOTHING
+               RETURNING relationship_id""",
+            [rid, parent_id, child_id, rel_type, control_type, is_primary, primary_key,
+             confidence, source, is_inferred],
+        ).fetchall()
+
+    if not result and include_lra:
+        # ON CONFLICT DO NOTHING hit: the exact (parent, child, type) tuple
+        # already exists as an open row. Bump last_refreshed_at to record
+        # the re-confirmation from this N-CEN / ADV run.
+        con.execute(
+            "UPDATE entity_relationships "
+            "SET last_refreshed_at = CURRENT_TIMESTAMP "
+            "WHERE parent_entity_id = ? AND child_entity_id = ? "
+            "  AND relationship_type = ? AND valid_to = DATE '9999-12-31'",
+            [parent_id, child_id, rel_type],
+        )
     return len(result) > 0
 
 

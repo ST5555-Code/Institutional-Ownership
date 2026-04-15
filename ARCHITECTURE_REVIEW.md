@@ -408,6 +408,18 @@ badge visible in React on at least one tab.
 **Rollback:** `fund_family_patterns` + `data_freshness` are additive DDL — drop
 to revert. `match_nport_family()` revert restores dict lookup.
 
+**As-shipped schema (verified 2026-04-14):**
+- `fund_family_patterns (pattern VARCHAR, inst_parent_name VARCHAR)` — 2
+  columns, 83 rows, primary key `(inst_parent_name, pattern)`. Matches
+  the design above; do not assume a third `match_type` or `family_name`
+  column.
+- `data_freshness (table_name VARCHAR PK, last_computed_at TIMESTAMP, row_count BIGINT)`
+  — 3 columns. No `source_label` column yet; any helper that writes a
+  stamp must match this exact shape.
+- `get_nport_family_patterns()` in `scripts/queries.py` is memoized at
+  module scope. Any direct edit to `fund_family_patterns` requires a
+  Flask/FastAPI restart to take effect.
+
 ---
 
 **Phase 3 exit gate:** `FAMILY_MAP` in DB. `data_freshness` table live and

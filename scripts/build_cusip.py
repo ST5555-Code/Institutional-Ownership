@@ -51,7 +51,7 @@ import requests
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
-from db import set_staging_mode, get_db_path  # noqa: E402
+from db import set_staging_mode, get_db_path, record_freshness  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config
@@ -423,6 +423,10 @@ def main() -> None:
 
         update_securities_from_classifications(con)
         con.execute("CHECKPOINT")
+        try:
+            record_freshness(con, "securities")
+        except Exception as e:
+            print(f"  [warn] record_freshness(securities) failed: {e}", flush=True)
     finally:
         con.close()
 
