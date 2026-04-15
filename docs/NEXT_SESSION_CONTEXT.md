@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-14 (No-DB workstream session — Makefile + freshness gate + record_freshness hooks on 8 pipeline scripts + validate_entities --read-only + last_refreshed_at migration drafted. Ran concurrent with staging-locked CUSIP OpenFIGI retry.)_
+_Last updated: 2026-04-14 (No-DB workstream session — Makefile + freshness gate + record_freshness hooks on 8 pipeline scripts + validate_entities --read-only + last_refreshed_at migration drafted. Ran concurrent with staging-locked CUSIP OpenFIGI retry. HEAD: `831e5b4`.)_
 
 ## No-DB workstream — 2026-04-14
 
