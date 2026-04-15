@@ -1,6 +1,17 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 15, 2026 — CUSIP v1.4 classification layer live in prod (132,618 classifications, 37,925 retry queue, 15,807 OpenFIGI cache, securities expanded 44,929 → 132,618). N-PORT DERA S2 promote also landed today._
+_Last updated: April 15, 2026 — session close. Today's HEAD: `39d5e95`. CUSIP v1.4 layer live in prod (132,618 classifications). N-PORT DERA Session 2 promote live (fund_holdings_v2 6.39M → 9.32M; newest 2026-01-31). Cross-ZIP amendment dedup + validator rewrite round out the cleanup. Batch 3 (enrich_holdings / compute_flows / build_summaries) is now unblocked._
+
+## Session Summary 2026-04-15 (close — cleanup round)
+
+Two Session-2 close items (commit `39d5e95`):
+
+- **`resolve_amendments()` cross-ZIP dedupe** (`scripts/fetch_dera_nport.py`). Optional `staging_con` param adds a second pass that queries `ingestion_impacts` for any `(series_id, report_month)` already represented by a newer accession and drops the submission. `load_to_staging` now deletes superseded impact rows before writing the amendment's impact — clears the `_block_dup_series_month` trigger on multi-ZIP loads automatically.
+- **`validate_nport.py` FLAG/WARN loops rewritten as set-based SQL.** Six functions (`_flag_reg_cik_changed`, `_flag_top10_drift`, `_flag_aum_delta`, `_flag_new_series`, `_warn_holdings_count_delta`, `_warn_aum_delta_medium`) each now run one SQL query that JOINs a registered staging DataFrame against prod tables. Live staging run (14,046 series / 8.5M holdings): **66 seconds vs 45+ min** before. Full-validator smoke test on next promote is tracked as a follow-up.
+
+**Today's commit chain (chronological):** 7081886 → c5eada8 → 5cf3585 → 44bc98e → e868772 → 8a41c48 → 39d5e95. Seven commits across CUSIP v1.4 + N-PORT DERA backfill + cleanup.
+
+---
 
 ## Session Summary 2026-04-15 (CUSIP v1.4 prod promotion)
 

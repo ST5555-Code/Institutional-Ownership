@@ -1,6 +1,7 @@
 # Pipeline Inventory — DB-Writing Script Audit
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
+_Revised 2026-04-15: six REWRITE items cleared by v2 rewrites shipped this week (fetch_nport_v2 + fetch_dera_nport + promote_nport; fetch_13dg_v2 + promote_13dg; fetch_market v2; build_cusip v2). CUSIP v1.4 vertical (build_classifications, run_openfigi_retry, normalize_securities, validate_classifications) and N-PORT v2 validators (validate_nport, validate_nport_subset) added as new SOURCE-tier rows. Legacy scripts retained in `scripts/` but marked **SUPERSEDED** — retirement gated on second clean v2 run per follow-up tracker._
 
 Every `.py` file in `scripts/` that writes to the prod DB, plus the
 utilities the orchestrator needs to know about. Scripts flagged for
@@ -10,16 +11,27 @@ audited for PROCESS_RULES violations.
 | Script | Reads from | Writes to | Legacy refs (file:line) | PROCESS_RULES violations | Action |
 |---|---|---|---|---|---|
 | `fetch_13f.py` | (none) | filesystem only (`data/raw`, `data/extracted`) | none | none (no DB writes) | **OK** |
-| `fetch_nport.py` | EDGAR index, cached XMLs, `fund_universe`, `fund_holdings`, `securities` | `fund_holdings` (dropped!), `fund_universe`, error CSV | `:377` CREATE `fund_holdings`; `:420,:427` `SELECT COUNT FROM fund_holdings`; `:468,:477` INSERT `fund_holdings` | §1 no CHECKPOINT in loop; §2 `is_already_loaded()` COUNT>0 on partial loads (`:414`); §3 no EFTS+Archives failover; §4 `SEC_DELAY=0.2` no monotonic, no 429 backoff; §5 no unresolved gate; §5b no QC gate on shares/pct; §9 `--test` writes to prod | **REWRITE** |
-| `fetch_13dg.py` | EDGAR, curl, `fetched_tickers_13dg`, `beneficial_ownership`, `managers`, `holdings`, `securities` | `beneficial_ownership` (dropped!), `beneficial_ownership_current`, `fetched_tickers_13dg`, `listed_filings_13dg`, `managers.has_13dg` | `:230` CREATE `beneficial_ownership`; `:245,:276,:306,:527,:647` reads; `:259` INSERT; `:332` reads `holdings`; `:872-873` `_seed_test_db` copies `holdings`,`fund_holdings` | §4 hardcoded `time.sleep(0.1)`/`(0.2)` no monotonic/429; §5b no pct_owned 0-100 gate, no shares 1-99 rejection; §9 no `--dry-run`/`--apply`; legacy-table writes | **REWRITE** |
+| `fetch_nport_v2.py` | EDGAR, DERA ZIPs via `fetch_dera_nport` | `stg_nport_holdings`, `stg_nport_fund_universe`, `ingestion_manifest`, `ingestion_impacts` | — | — | **OK** (SourcePipeline; 4 modes: DERA bulk / `--monthly-topup` XML / `--test` / `--dry-run`) |
+| `fetch_dera_nport.py` | SEC DERA ZIPs (`{YYYY}q{N}_nport.zip`) | staging tables (via `fetch_nport_v2`) | — | — | **OK** (transport + parity harness; `--zip` flag for local ZIPs; cross-ZIP amendment dedup live 2026-04-15) |
+| `fetch_nport.py` (legacy) | EDGAR index, cached XMLs, `fund_universe`, `fund_holdings` (dropped) | N/A — pipeline superseded | `:377,:420,:427,:468,:477` legacy refs | **SUPERSEDED by `fetch_nport_v2.py`** — retained for the XML `parse_nport_xml` + `classify_fund` helpers imported by v2. Retire after second clean v2 amendment-chain run. | **SUPERSEDED** |
+| `fetch_13dg_v2.py` | EDGAR efts, `listed_filings_13dg`, `beneficial_ownership_v2` | `beneficial_ownership_v2`, `fetched_tickers_13dg`, `listed_filings_13dg`, `ingestion_manifest`, `ingestion_impacts` | — | — | **OK** (SourcePipeline; scoped reference vertical) |
+| `fetch_13dg.py` (legacy) | EDGAR, curl | N/A — pipeline superseded | legacy-table refs | **SUPERSEDED by `fetch_13dg_v2.py`**. Retire after second clean v2 run. | **SUPERSEDED** |
 | `fetch_adv.py` | SEC ADV ZIP (HTTP) | `adv_managers` (DROP+CTAS) | none | §1 whole CSV loaded to pandas, single DROP+CTAS at end; §5 silent continue on missing columns (`:134-141`); §9 no `--dry-run` | **REWRITE** |
-| `fetch_market.py` | `market_data`, `holdings` | `market_data`, **`holdings` UPDATE at `:422-433` (dropped!)** | `:150` `FROM holdings`; `:422-433` `UPDATE holdings SET market_value_live`/`pct_of_float`; `:434-438` COUNTs | §1 single CHECKPOINT at `:527`; §3 no failover counter; §4 `META_SLEEP_SEC=0.05` no 429 handling; §5 silent continue; §9 no `--dry-run` | **REWRITE** |
+| `fetch_market.py` (v2) | `market_data`, `securities`, `holdings_v2`, `fund_holdings_v2`, `cusip_classifications` | `market_data`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (DirectWritePipeline rewrite, Batch 2A/2B; CUSIP-anchored universe via `securities.canonical_type`) |
 | `fetch_finra_short.py` | `short_interest` | `short_interest` | none | §9 `--test` still writes to prod; otherwise clean (CHECKPOINT per 50k, restart-safe via loaded_dates, 429 backoff) | **RETROFIT** |
 | `fetch_ncen.py` | `fund_universe`, `managers`, entity tables (staging), `ncen_adviser_map` | `ncen_adviser_map`, `managers.adviser_cik`, entity staging tables | none | §6 progress line lacks `flush=True` (relies on `-u`); §9 no `--dry-run`/`--apply`; otherwise clean | **RETROFIT** |
 | `load_13f.py` | TSV files | `raw_submissions`, `raw_infotable`, `raw_coverpage`, `filings`, `filings_deduped`, **`holdings` DROP+CTAS (dropped!)** | `:222-224` `CREATE TABLE holdings`; `:286,:294,:304-305` reads | §1 full DROP+CTAS on every run; §5 silent continue on missing TSV (`:37`); §9 no `--dry-run` | **REWRITE** |
 | `refetch_missing_sectors.py` | `/tmp/refetch_tickers.txt`, Yahoo | `market_data.sector/industry` (staging only) | none | §1 no CHECKPOINT; §4 no sleep between calls; §9 no flag, hardcoded `/tmp` | **RETROFIT** |
 | `sec_shares_client.py` | SEC XBRL cache + API | filesystem cache only | none | N/A (library) | **OK** |
-| `build_cusip.py` | `holdings`, `_cache_openfigi`, `_cache_yfinance` | `securities` (DROP+CTAS), **`holdings.ticker` UPDATE (dropped!)**, caches | `:31,:123,:248,:336-338` reads `holdings`; `:322-332` ALTER+UPDATE `holdings` | §1 no CHECKPOINT; §9 no `--dry-run` (`--staging` exists) | **REWRITE** |
+| `build_cusip.py` (v2) | `cusip_retry_queue`, `_cache_openfigi`, `securities`, `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2` | `securities` (UPSERT-only), `_cache_openfigi`, `logs/unfetchable_orphans.csv` | — | — | **OK** (UPSERT-only; OpenFIGI v3; asset_category seed; legacy at `scripts/retired/build_cusip_legacy.py`) |
+| `build_classifications.py` | 3-source universe (`holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`), `securities`, fund asset_category | `cusip_classifications`, `cusip_retry_queue` | — | — | **OK** (rule-based classifier; no OpenFIGI; feeds `run_openfigi_retry.py`) |
+| `run_openfigi_retry.py` | `cusip_retry_queue`, OpenFIGI v3 API | `_cache_openfigi`, `cusip_classifications`, `cusip_retry_queue` | — | — | **OK** (250 req/min, resume-safe, `--limit N`; FOREIGN→priceable flip inline for US composite) |
+| `normalize_securities.py` | `cusip_classifications` | `securities` (UPDATE 7 new cols + INSERT missing CUSIPs) | — | — | **OK** (UPDATE + LEFT-JOIN INSERT; COALESCE-safe for ticker/exchange/market_sector; safe to re-run) |
+| `validate_classifications.py` | `cusip_classifications`, `securities`, `cusip_retry_queue` | report (stdout) | — | — | **OK** (7 BLOCK + 3 BLOCK_POST + 2 WARN + 2 INFO; post-OpenFIGI-aware) |
+| `validate_nport.py` | `stg_nport_holdings`, `stg_nport_fund_universe`, `ingestion_manifest`, `ingestion_impacts`, entity MDM (read-only) | `logs/reports/nport_{run_id}.md`, `pending_entity_resolution` | — | — | **OK** (set-based SQL rewrite 2026-04-15; 66s on 14K series) |
+| `validate_nport_subset.py` | same + `--resolved-file` / `--excluded-file` | `logs/reports/nport_{run_id}.md`, `pending_entity_resolution` | — | — | **OK** (fast BLOCK+entity-gate-only for large subset promotes) |
+| `promote_nport.py` | staging, prod | `fund_holdings_v2`, `fund_universe`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness`, snapshot | — | — | **OK** (read validation report for Promote-ready: YES; atomic per (series_id, report_month); Group 2 entity enrichment via `entity_current`) |
+| `validate_13dg.py` / `promote_13dg.py` | staging, prod | `beneficial_ownership_v2`, `beneficial_ownership_current`, impacts, snapshot | — | — | **OK** (Batch 2B reference vertical) |
 | `build_managers.py` | `filings_deduped`, `adv_managers`, `cik_crd_*`, `managers` | `parent_bridge`, `cik_crd_links`, `cik_crd_direct`, `managers` (all DROP+CTAS), **`holdings` ALTER+UPDATE (dropped!)** | `:513-532` ALTER+UPDATE `holdings`; `:534` COUNT `holdings` | §1 no CHECKPOINT; §5 `try/except pass` at `:515-521` hides schema failures; §9 hardcoded prod path at `:22`, no `--staging` | **REWRITE** |
 | `build_summaries.py` | **`holdings` (dropped!)** | `summary_by_ticker`, `summary_by_parent`, `data_freshness` | `:73` `FROM holdings h`; `:118` `FROM holdings h` | §9 no `--dry-run`; DDL drift vs prod (see `canonical_ddl.md` §4) | **REWRITE** |
 | `build_fund_classes.py` | local N-PORT XML cache, `fund_classes` | `fund_classes`, `lei_reference`, **`fund_holdings` ALTER+UPDATE (dropped!)** | `:139` ALTER `fund_holdings`; `:146-151` UPDATE; `:152` COUNT | §1 CHECKPOINT every 5000 only; §5 silent `pass`; §9 hardcoded prod path at `:19`, no `--dry-run` | **REWRITE** |
@@ -69,19 +81,26 @@ pipeline framework rewrite and do not participate in the orchestrator.
 
 ## Cross-cutting findings
 
-1. **Eleven scripts still touch legacy Stage-5-dropped tables.** All are
-   marked REWRITE above. None will run successfully against post-Stage-5
-   prod without rewrites. The full list — 8 writers + 3 readers:
-   - Writers: `fetch_nport.py` (`fund_holdings`), `fetch_13dg.py`
-     (`beneficial_ownership`), `fetch_market.py` (`holdings` UPDATE),
-     `load_13f.py` (`holdings` DROP+CTAS), `build_cusip.py`
-     (`holdings.ticker` UPDATE), `build_managers.py` (`holdings`
-     ALTER+UPDATE), `build_fund_classes.py` (`fund_holdings`
-     ALTER+UPDATE), `build_shares_history.py` (`holdings.pct_of_float`
-     UPDATE).
-   - Readers only: `build_summaries.py` (`FROM holdings`),
-     `build_benchmark_weights.py` (`FROM fund_holdings`),
-     `compute_flows.py` (`FROM holdings`).
+1. **Legacy-table writers CLEARED by v2 rewrites (2026-04-13 → 2026-04-15).**
+   Original list had 8 writers + 3 readers touching Stage-5-dropped
+   `holdings` / `fund_holdings` / `beneficial_ownership`. Status as of
+   2026-04-15:
+   - `fetch_nport.py` → SUPERSEDED by `fetch_nport_v2.py` +
+     `fetch_dera_nport.py` + `promote_nport.py`. Writes
+     `fund_holdings_v2` + `fund_universe` directly. ✓
+   - `fetch_13dg.py` → SUPERSEDED by `fetch_13dg_v2.py` +
+     `promote_13dg.py`. Writes `beneficial_ownership_v2`. ✓
+   - `fetch_market.py` → rewritten (Batch 2A/2B); no longer touches
+     `holdings`. CUSIP-anchored universe via `canonical_type`. ✓
+   - `build_cusip.py` → rewritten (UPSERT-only; legacy at
+     `scripts/retired/build_cusip_legacy.py`). No longer UPDATEs
+     `holdings.ticker`. ✓
+   - Still REWRITE: `load_13f.py` (`holdings` DROP+CTAS — replacing
+     with `load_13f_v2.py` in Batch 3), `build_managers.py`,
+     `build_fund_classes.py`, `build_shares_history.py`,
+     `build_summaries.py`, `build_benchmark_weights.py`,
+     `compute_flows.py`. These are the remaining Batch 3 targets; CUSIP
+     v1.4 now unblocks the enrichment pattern they all need.
 
 2. **No `--dry-run` across the SOURCE/DERIVED tier.** Only
    `merge_staging.py`, `sync_staging.py`, `promote_staging.py`,

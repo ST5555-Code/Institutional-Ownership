@@ -1,6 +1,40 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-15 (CUSIP v1.4 prod promotion — Migration 003 applied to prod; 132,618 classifications + 37,925 retry queue + 15,807 OpenFIGI cache copied from staging; normalize_securities expanded securities 44,929 → 132,618; all BLOCK + BLOCK_POST checks PASS. N-PORT DERA S2 promote also landed today.)_
+_Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DERA backfill live + cross-ZIP amendment dedup + set-based validator. Prod at 9.32M fund_holdings_v2 rows, 132,618 classified CUSIPs, 37,925 retry queue, newest N-PORT report_date 2026-01-31. Today's HEAD: `39d5e95`.)_
+
+## Today's sessions — commits and scope
+
+| Commit | Scope |
+|---|---|
+| `7081886` | CUSIP v1.4 Session 1 — migration 003 + classifier + build_classifications + validate_classifications + build_cusip rewrite |
+| `c5eada8` | CUSIP v1.4 Session 2 scripts — run_openfigi_retry + normalize_securities + post-OpenFIGI gates |
+| `5cf3585` | N-PORT DERA ZIP Session 1 — fetch_dera_nport.py + migration 002 + validate_nport `--changes-only` |
+| `44bc98e` | N-PORT DERA Session 2 code — fetch_nport_v2.py 4-mode orchestrator + `--zip` flag |
+| `e868772` | N-PORT DERA S2 promote — 8,125 resolved series live (fund_holdings_v2 6.4M → 9.3M) |
+| `8a41c48` | CUSIP v1.4 prod promotion (docs) — migration 003 + staging→prod copy + normalize + validate |
+| `39d5e95` | N-PORT cleanup — cross-ZIP amendment dedup + validate_nport set-based rewrite (66s vs 45min) |
+
+## Open items for next sessions
+
+1. **Entity MDM expansion.** 5,921 N-PORT series queued in `pending_entity_resolution` (bond / index / money-market funds brought in by the DERA path). Current breakdown: 1,187 synthetic `{cik}_{accession}` fallbacks + 4,734 real SERIES_ID without prior entity records. Resolution unblocks a second promote cycle for these series.
+2. **N-PORT monthly top-up (Feb/Mar 2026).** Run `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when 2026Q2 DERA ZIP isn't yet out but individual NPORT-P filings for current months are posting.
+3. **Batch 3 — `enrich_holdings.py`** (now unblocked). Builds the Group 3 enrichment pass for `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float` via a single UPDATE joined on (accession_number, cusip). Consumes `securities.canonical_type` + `market_data`. Promote-time stays thin — this is a separate post-promote pass.
+4. **Batch 3 — `compute_flows.py` rewrite** (unblocked). Current version still reads legacy `holdings`; rewrite to read `holdings_v2` now that the enrichment layer is canonical.
+5. **Batch 3 — `build_summaries.py` rewrite** (unblocked). Same pattern — legacy-reads → `holdings_v2`.
+6. **Full-validator smoke test on next promote.** The set-based rewrite (commit `39d5e95`) ran in 66s on 14K staged series; run it on the next authorised promote and compare against `validate_nport_subset.py`.
+
+---
+
+## N-PORT cleanup — 2026-04-15 (commit 39d5e95)
+
+Two Session-2 close items shipped together:
+
+- **`resolve_amendments()` cross-ZIP dedupe.** Optional `staging_con` param. Second pass queries `ingestion_impacts` for any `(series_id, report_month)` already represented by a newer accession and drops the submission. `load_to_staging` now deletes the superseded impact row before writing the amendment's impact — eliminates `_block_dup_series_month` triggering on multi-ZIP loads.
+- **`validate_nport.py` FLAG/WARN loops → set-based SQL.** Six functions rewritten: `_flag_reg_cik_changed`, `_flag_top10_drift` (ROW_NUMBER window for top-10 per series), `_flag_aum_delta`, `_flag_new_series`, `_warn_holdings_count_delta`, `_warn_aum_delta_medium`. Registers staging DataFrames on the prod connection and does single JOINs. Live staging run (14,046 series / 8.5M holdings): **66 seconds** vs 45+ min before.
+
+No DB migrations. No promotes. Ruff + pylint 10/10 + bandit green.
+
+---
 
 ## CUSIP Classification v1.4 — 2026-04-15 prod promotion
 

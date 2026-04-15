@@ -1,6 +1,10 @@
 # Pipeline Violations — Per-Script PROCESS_RULES Detail
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
+_Revised 2026-04-15: four entries CLEARED by v2 rewrites landing this
+week (fetch_nport.py → v2 + DERA; fetch_13dg.py → v2; fetch_market.py
+→ v2; build_cusip.py → v2). Blocks retained below for historical
+reference + retirement audit._
 
 One block per script marked REWRITE or RETROFIT in
 `docs/pipeline_inventory.md`. Every violation carries a file:line so
@@ -15,7 +19,37 @@ PROCESS_RULES reference (`docs/PROCESS_RULES.md`):
 
 ---
 
-## fetch_nport.py (REWRITE)
+## CLEARED this session (2026-04-15)
+
+- **`fetch_nport.py` (REWRITE) — CLEARED.** All 10 PROCESS_RULES
+  violations resolved in `fetch_nport_v2.py` + `fetch_dera_nport.py`
+  (commits 5cf3585, 44bc98e, e868772, 39d5e95). Per-accession CHECKPOINT
+  every 2000 rows (§1); restart-safe via `ingestion_impacts.load_status`
+  (§2); DERA bulk replaces per-XML fetch, with XML kept only for
+  `--monthly-topup` (§3); `sec_fetch()` with 5xx exponential backoff +
+  429 60s pause (§4); entity-gate check + synthetic-series FLAG (§5);
+  parameter-bound SQL only, no f-string interpolation (§9); `--test`
+  and `--staging` gates enforced. Amendment handling: latest accession
+  wins, now cross-ZIP (commit 39d5e95).
+- **`fetch_13dg.py` (REWRITE) — CLEARED.** Fully replaced by
+  `fetch_13dg_v2.py` + `validate_13dg.py` + `promote_13dg.py` (commit
+  4880467). Writes `beneficial_ownership_v2` directly; `pct_owned`
+  0–100 gate + `shares_owned` 1–99 rejection shipped in the v2
+  `_extract_fields()`; `--dry-run` / `--apply` gates live.
+- **`fetch_market.py` (REWRITE) — CLEARED.** Rewrites in commits
+  aa7603a (Batch 2B-market) + b95cb31 (Batch 2A) clear all violations.
+  No more `UPDATE holdings SET market_value_live/pct_of_float` — that
+  lives in Batch 3 `enrich_holdings.py` now unblocked. CUSIP-anchored
+  universe via `securities.canonical_type` (CUSIP v1.4).
+- **`build_cusip.py` (REWRITE) — CLEARED.** Rewritten UPSERT-only
+  (commits 7081886 + c5eada8); legacy version archived at
+  `scripts/retired/build_cusip_legacy.py`. OpenFIGI v3 batched (10 per
+  request, 25 req/min); `_cache_openfigi` persistent; no `holdings`
+  UPDATE.
+
+---
+
+## fetch_nport.py (REWRITE) — SUPERSEDED by `fetch_nport_v2.py`; retained for parser helpers only
 
 - §1 (incremental save): no `CHECKPOINT` anywhere in the main loop
   `fetch_nport.py:642-679`. Per-filing inserts accumulate WAL
@@ -44,7 +78,7 @@ PROCESS_RULES reference (`docs/PROCESS_RULES.md`):
 
 ---
 
-## fetch_13dg.py (REWRITE)
+## fetch_13dg.py (REWRITE) — SUPERSEDED by `fetch_13dg_v2.py`; retained for parser helpers only
 
 - §1 (incremental save): OK — `FLUSH_SIZE = 200` at
   `fetch_13dg.py:676`, `batch_insert + CHECKPOINT` at `:718-730`.
@@ -87,7 +121,7 @@ PROCESS_RULES reference (`docs/PROCESS_RULES.md`):
 
 ---
 
-## fetch_market.py (REWRITE)
+## fetch_market.py (REWRITE) — CLEARED 2026-04-13 (Batch 2A/2B)
 
 - §1 (incremental save): **VIOLATION** — Yahoo and SEC upserts flush
   only at `fetch_market.py:527` (single end-of-run CHECKPOINT). 500-
@@ -156,7 +190,7 @@ PROCESS_RULES reference (`docs/PROCESS_RULES.md`):
 
 ---
 
-## build_cusip.py (REWRITE)
+## build_cusip.py (REWRITE) — CLEARED 2026-04-14 (CUSIP v1.4)
 
 - §1 (incremental save): **VIOLATION** — cache writes per-batch
   (`save_figi_cache` at `build_cusip.py:87`) but the `securities`

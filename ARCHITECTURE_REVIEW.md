@@ -1,10 +1,40 @@
 # 13F Institutional Ownership — Architecture & Upgrade Plan
 
 _Prepared: April 12, 2026_
+_Revised: April 15, 2026 — see "§0. Changes since prep date" below._
 _Scope: Stack decisions, API contracts, modularization, deployment, and data
 layer schema changes that directly support the architecture (freshness
 metadata, precomputed artifact tables). Pipeline operations and data quality
 work remain in ROADMAP._
+
+---
+
+## §0. Changes since prep date (2026-04-12 → 2026-04-15)
+
+Material deltas to what this plan assumed; the rest of the document is
+still the source of truth.
+
+**Data layer additions (prod):**
+- **CUSIP classification layer** (commits 7081886 · c5eada8 · 8a41c48). Migration 003 created `cusip_classifications` (132,618 rows, L3), `cusip_retry_queue` (37,925 rows, L0 — 15,807 resolved / 22,118 unmappable), `_cache_openfigi` (15,807 rows, L3 reference cache), `schema_versions` (1 row, L0). Seven new `securities` columns: `canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`. `securities` expanded 44,929 → 132,618. `discover_market()` universe filter: 5,867 → 5,031 (836 non-equities excluded up-front). Batch 3 (enrich / flows / summaries) is now unblocked.
+- **N-PORT DERA ZIP backfill** (commits 5cf3585 · 44bc98e · e868772 · 39d5e95). `fetch_nport_v2.py` rewritten as a 4-mode orchestrator (DERA bulk default · `--monthly-topup` XML · `--test` parity · `--dry-run`); `fetch_dera_nport.py` is the ZIP transport + parity harness; `validate_nport_subset.py` added for large-run subset promotes; `validate_nport.py` FLAG/WARN loops rewritten as set-based SQL (66s at 14K series, was 45+ min). `fund_holdings_v2` 6,393,206 → 9,315,568 rows; newest `report_date` 2025-11-30 → 2026-01-31; `fund_universe` 6,677 → 8,459 rows with three new `strategy_*` columns (migration 002). 5,921 series queued in `pending_entity_resolution` (bond / index / MM funds newly in scope via DERA).
+
+**Owner-script rewrites completed** (see `docs/pipeline_inventory.md` for the
+full cross-reference): `fetch_nport` → `fetch_nport_v2` + `fetch_dera_nport` +
+`promote_nport`; `fetch_13dg` → `fetch_13dg_v2` + `promote_13dg`;
+`fetch_market` → rewritten as DirectWritePipeline; `build_cusip` → rewritten
+as UPSERT-only. Three canonical-DDL blockers (`holdings_v2`,
+`fund_holdings_v2`, `beneficial_ownership_v2`) previously listed as
+OWNER_BEHIND in `docs/canonical_ddl.md` are cleared by the v2 owners — see
+that doc for current verdicts.
+
+**What this does not change in the plan below:** Phase 0/1/2/3/4 structure,
+endpoint budgets, G1–G11 gap list, and the CI → contracts → correctness →
+precompute → modularize → deploy sequence are unchanged. The precomputed
+artifact tables (Phase 2) now have two ready consumers (`canonical_type` for
+the universe filter; `cusip_retry_queue` status as an equity-coverage
+metric).
+
+---
 
 ---
 

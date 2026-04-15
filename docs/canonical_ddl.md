@@ -1,6 +1,7 @@
 # Canonical DDL Audit — L3 Drift Report
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2). Reclassified 2026-04-13 (Batch 1) after direct inspection of prod — drift direction is owner-behind, not prod-missing._
+_Revised 2026-04-15: two of the three OWNER_BEHIND blockers cleared by the v2 owner-script rewrites that shipped this week (fund_holdings_v2, beneficial_ownership_v2). holdings_v2 remains — Batch 3 (enrich_holdings) is the path. CUSIP v1.4 + control-plane tables added below._
 
 For every L3 canonical table, this document compares prod DDL against
 the owner script's INSERT/UPDATE column list.
@@ -19,18 +20,18 @@ the owner script's INSERT/UPDATE column list.
 
 | Table | Owner script | Verdict | Blocker? |
 |-------|--------------|---------|----------|
-| `holdings_v2` | `load_13f.py` (legacy `holdings`) + in-place Phase 4 migration | **OWNER_BEHIND** | yes — rewrite owner to target `holdings_v2`; prod already has all 33 cols |
-| `fund_holdings_v2` | `fetch_nport.py` | **OWNER_BEHIND** | yes — rewrite owner to target `fund_holdings_v2`; prod already has all 26 cols |
-| `beneficial_ownership_v2` | `fetch_13dg.py` | **OWNER_BEHIND** | yes — rewrite owner to target `beneficial_ownership_v2`; prod already has all 21 cols |
+| `holdings_v2` | `load_13f.py` (legacy `holdings`) + `enrich_holdings.py` (Batch 3, unblocked) | **OWNER_BEHIND** | yes — Batch 3 enrichment rewrite will target `holdings_v2`; prod already has all 33 cols |
+| `fund_holdings_v2` | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` | **ALIGNED** (2026-04-15) | no — v2 owners write to `fund_holdings_v2` directly; 9.32M rows promoted live |
+| `beneficial_ownership_v2` | `fetch_13dg_v2.py` → `promote_13dg.py` | **ALIGNED** (2026-04-14) | no — v2 owners write to `beneficial_ownership_v2` directly |
 | `summary_by_parent` | `build_summaries.py` | **ALIGNED** (Batch 1 DDL fix) | no — CREATE DDL now matches prod 13-col shape + PK; INSERT rewrite tracked separately in pipeline_inventory.md |
 | `summary_by_ticker` | `build_summaries.py` | **ALIGNED** | no — CREATE DDL already matched; INSERT rewrite tracked separately |
 | `filings` | `load_13f.py` | ALIGNED | no |
 | `filings_deduped` | `load_13f.py` | ALIGNED | no |
 | `raw_submissions` / `raw_infotable` / `raw_coverpage` | `load_13f.py` | ALIGNED | no |
-| `securities` | `build_cusip.py` | ALIGNED | no |
+| `securities` | `build_cusip.py` + `normalize_securities.py` | **ALIGNED** (2026-04-15; migration 003 added 7 CUSIP classification columns: `canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`. `normalize_securities.py` is a secondary writer.) | no |
 | `market_data` | `fetch_market.py` | ALIGNED | no |
 | `short_interest` | `fetch_finra_short.py` | ALIGNED | no |
-| `fund_universe` | `fetch_nport.py` | ALIGNED | no |
+| `fund_universe` | `fetch_nport_v2.py` → `promote_nport.py` | **ALIGNED** (2026-04-15; migration 002 added `strategy_narrative`, `strategy_source`, `strategy_fetched_at` — currently NULL, Session 3+ enrichment target) | no |
 | `adv_managers` | `fetch_adv.py` | ALIGNED | no |
 | `ncen_adviser_map` | `fetch_ncen.py` | ALIGNED | no |
 | `cik_crd_direct` / `cik_crd_links` | `fetch_adv.py` / `resolve_long_tail.py` | ALIGNED | no |
@@ -38,18 +39,26 @@ the owner script's INSERT/UPDATE column list.
 | `shares_outstanding_history` | `build_shares_history.py` | ALIGNED | no |
 | `other_managers` | `load_13f.py` | ALIGNED | no |
 | `parent_bridge` | `build_entities.py` legacy | ALIGNED | no (retained as evidence) |
-| `fetched_tickers_13dg` / `listed_filings_13dg` | `fetch_13dg.py` | ALIGNED | no |
+| `fetched_tickers_13dg` / `listed_filings_13dg` | `fetch_13dg_v2.py` | ALIGNED | no |
 | `entities` + 5 SCD children + `entity_rollup_history` + `entity_overrides_persistent` | `build_entities.py` + `entity_sync.py` | ALIGNED | no |
 | `managers` (L4) | `build_managers.py` | ALIGNED (CTAS) | no |
-| `investor_flows` / `ticker_flow_stats` (L4) | `compute_flows.py` | ALIGNED (drop + create) | no |
+| `investor_flows` / `ticker_flow_stats` (L4) | `compute_flows.py` (Batch 3 rewrite unblocked) | ALIGNED (drop + create) | no (reads legacy `holdings`; rewrite to `holdings_v2` in Batch 3) |
 | `data_freshness` (L0) | `db.record_freshness()` | ALIGNED | no |
+| `ingestion_manifest` (L0) | `scripts/pipeline/manifest.py` | ALIGNED (migration 001) | no |
+| `ingestion_impacts` (L0) | `scripts/pipeline/manifest.py` | ALIGNED (migration 001) | no |
+| `pending_entity_resolution` (L0) | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` | ALIGNED (migration 001) | no |
+| `cusip_classifications` (L3) | `build_classifications.py` + `run_openfigi_retry.py` | ALIGNED (migration 003, 2026-04-15) | no |
+| `cusip_retry_queue` (L0) | `build_classifications.py` + `run_openfigi_retry.py` | ALIGNED (migration 003) | no |
+| `_cache_openfigi` (L3 cache) | `run_openfigi_retry.py` | ALIGNED (migration 003) | no |
+| `schema_versions` (L0) | migration scripts | ALIGNED (migration 003 — created fresh) | no |
 
-Three tables are OWNER_BEHIND; twenty-two are aligned. All three
-OWNER_BEHIND rows trace back to the Stage 5 legacy-table drops on
-2026-04-13 — owner scripts were never updated to write to the `_v2`
-successor tables. Prod schemas are complete; no DDL migration is
-needed to fix them. The fix path is rewriting the owner scripts
-(tracked as REWRITE in `docs/pipeline_inventory.md`).
+**One table remains OWNER_BEHIND** (`holdings_v2`); the other two legacy
+blockers (`fund_holdings_v2`, `beneficial_ownership_v2`) were cleared by
+v2 rewrites that landed this week. The remaining `holdings_v2` fix path
+is Batch 3 `enrich_holdings.py` — design unblocked by the CUSIP
+classification layer. All newly-added L0/L3 tables (control-plane +
+CUSIP vertical) are ALIGNED by construction since they ship as part of
+their own migrations.
 
 ---
 
