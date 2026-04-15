@@ -1,6 +1,33 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 15, 2026 — session close. Today's HEAD: `39d5e95`. CUSIP v1.4 layer live in prod (132,618 classifications). N-PORT DERA Session 2 promote live (fund_holdings_v2 6.39M → 9.32M; newest 2026-01-31). Cross-ZIP amendment dedup + validator rewrite round out the cleanup. Batch 3 (enrich_holdings / compute_flows / build_summaries) is now unblocked._
+_Last updated: April 15, 2026 — session close. HEAD: `d8a6a01` (docs) on top of `39d5e95` (code). CUSIP v1.4 layer live in prod (132,618 classifications). N-PORT DERA Session 2 promote live (fund_holdings_v2 6.39M → 9.32M; newest 2026-01-31). Parallel 2026-04-14 no-DB workstream (commit 831e5b4 / fd05c92) added: Makefile, check_freshness.py, record_freshness hooks on 8 scripts, validate_entities `--read-only`, add_last_refreshed_at draft. Batch 3 (enrich_holdings / compute_flows / build_summaries) is now unblocked._
+
+## Session Summary 2026-04-14 (parallel no-DB workstream, commit 831e5b4) — Makefile + freshness gates
+
+Ran concurrent with the staging-locked CUSIP OpenFIGI retry; now fully integrated into the doc set.
+
+- **`Makefile`** (155 lines, new). Single-entry pipeline orchestration: 9-step quarterly update, `DRY_RUN=1` support, per-step standalone targets, `make status` and `make freshness` gates that block advancement on stale source tables.
+- **`scripts/check_freshness.py`** (108 lines, new). Exit-1 gate on stale or missing `data_freshness` rows; prod read-only; `--status-only` for informational use.
+- **`record_freshness` hooks** added to 8 pipeline scripts — `fetch_adv`, `fetch_ncen`, `fetch_finra_short`, `fetch_13dg` phase 3, `build_entities`, `build_managers`, `build_fund_classes`, `build_cusip`. `fetch_13f` + v2 SourcePipelines skipped intentionally (v2 stamps via its own promote path).
+- **`validate_entities.py --read-only`** flag. `--prod --read-only` returns the established 9 PASS / 0 FAIL / 7 MANUAL.
+- **`scripts/migrations/add_last_refreshed_at.py`** drafted (124 lines) — **NOT RUN**. Adds `last_refreshed_at TIMESTAMP` to `entity_relationships` with `created_at` backfill; staging-first on next entity session.
+- **`entity_sync.insert_relationship_idempotent`** probe-gated stamping of `last_refreshed_at` when the column exists. Safe on pre- and post-migration DBs. Stamps on INSERT, ON-CONFLICT-DO-NOTHING, and deferred-primary paths.
+- **`ARCHITECTURE_REVIEW.md` §Batch 3-A** — as-shipped schema note for `fund_family_patterns` (2 cols, 83 rows, PK `(inst_parent_name, pattern)`) + `get_nport_family_patterns()` memoization. Corrects stale 3-col planning docs.
+- **`NEXT_SESSION_CONTEXT.md` §gg** — `holdings_v2` filing-line grain: true composite key is `(cik, ticker, quarter, put_call, security_type, discretion)`, not `(cik, cusip, quarter)`.
+
+**Follow-up items surfaced by this workstream** (detailed in `docs/NEXT_SESSION_CONTEXT.md` open-items list):
+- Run `add_last_refreshed_at.py` migration via staging workflow.
+- `entity_id` linkage on `beneficial_ownership_current` + `beneficial_ownership_v2` (13D/G is currently disconnected from the MDM).
+- CRD backfill for top-100 AUM filers.
+- `entity_identifiers_staging_review` backlog (~280 items).
+- DM13/DM14/DM15 decision-maker routing audits.
+- `make freshness` — confirm newly loaded tables (control-plane + CUSIP) register correctly.
+- LEI coverage = 0 despite 13,143 GLEIF rows in `lei_reference` — no `entity_identifiers.identifier_type='lei'` entries.
+- `entity_relationships.valid_from` uniformly at sentinel — refresh age unmeasurable until migration lands.
+- `PARENT_SEEDS` count is **110** (`scripts/build_entities.py:6`), not 50; update any stale planning docs in follow-ups.
+- `schemas.py` Pydantic expansion (~55 models; autogenerate via FastAPI Batch 4-C).
+
+---
 
 ## Session Summary 2026-04-15 (close — cleanup round)
 

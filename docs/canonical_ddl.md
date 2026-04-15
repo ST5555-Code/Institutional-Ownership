@@ -1,7 +1,7 @@
 # Canonical DDL Audit — L3 Drift Report
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2). Reclassified 2026-04-13 (Batch 1) after direct inspection of prod — drift direction is owner-behind, not prod-missing._
-_Revised 2026-04-15: two of the three OWNER_BEHIND blockers cleared by the v2 owner-script rewrites that shipped this week (fund_holdings_v2, beneficial_ownership_v2). holdings_v2 remains — Batch 3 (enrich_holdings) is the path. CUSIP v1.4 + control-plane tables added below._
+_Revised 2026-04-15: two of the three OWNER_BEHIND blockers cleared by the v2 owner-script rewrites that shipped this week (fund_holdings_v2, beneficial_ownership_v2). holdings_v2 remains — Batch 3 (enrich_holdings) is the path. CUSIP v1.4 + control-plane tables added below. Parallel 2026-04-14 workstream (commit 831e5b4) drafted `scripts/migrations/add_last_refreshed_at.py` for `entity_relationships` (additive column, NOT RUN; tracked below)._
 
 For every L3 canonical table, this document compares prod DDL against
 the owner script's INSERT/UPDATE column list.
@@ -41,6 +41,7 @@ the owner script's INSERT/UPDATE column list.
 | `parent_bridge` | `build_entities.py` legacy | ALIGNED | no (retained as evidence) |
 | `fetched_tickers_13dg` / `listed_filings_13dg` | `fetch_13dg_v2.py` | ALIGNED | no |
 | `entities` + 5 SCD children + `entity_rollup_history` + `entity_overrides_persistent` | `build_entities.py` + `entity_sync.py` | ALIGNED | no |
+| `entity_relationships` pending `last_refreshed_at` | `build_entities.py` + `entity_sync.py` | **MIGRATION DRAFTED, NOT RUN** | no (drift is additive — `scripts/migrations/add_last_refreshed_at.py` drafted in 831e5b4 adds a nullable TIMESTAMP column with `created_at` backfill; `entity_sync.insert_relationship_idempotent` already probe-gates the stamp so pre- and post-migration DBs both work) |
 | `managers` (L4) | `build_managers.py` | ALIGNED (CTAS) | no |
 | `investor_flows` / `ticker_flow_stats` (L4) | `compute_flows.py` (Batch 3 rewrite unblocked) | ALIGNED (drop + create) | no (reads legacy `holdings`; rewrite to `holdings_v2` in Batch 3) |
 | `data_freshness` (L0) | `db.record_freshness()` | ALIGNED | no |

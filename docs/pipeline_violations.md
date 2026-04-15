@@ -19,6 +19,19 @@ PROCESS_RULES reference (`docs/PROCESS_RULES.md`):
 
 ---
 
+## CLEARED by 2026-04-14 parallel session (commit 831e5b4)
+
+`§6` progress-reporting + `data_freshness` stamping across 8 non-v2
+scripts: `fetch_adv`, `fetch_ncen`, `fetch_finra_short`, `fetch_13dg`
+(phase 3), `build_entities`, `build_managers`, `build_fund_classes`,
+`build_cusip`. All now call `record_freshness(con, target_table)` at
+end-of-run. v2 SourcePipelines manage freshness through their promote
+paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
++ `make freshness` gate advancement on missing / stale rows. Per-script
+§6 violations listed below are marked `STAMPED` where applicable.
+
+---
+
 ## CLEARED this session (2026-04-15)
 
 - **`fetch_nport.py` (REWRITE) — CLEARED.** All 10 PROCESS_RULES

@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DERA backfill live + cross-ZIP amendment dedup + set-based validator. Prod at 9.32M fund_holdings_v2 rows, 132,618 classified CUSIPs, 37,925 retry queue, newest N-PORT report_date 2026-01-31. Today's HEAD: `39d5e95`.)_
+_Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DERA backfill live + cross-ZIP amendment dedup + set-based validator + no-DB workstream (Makefile / freshness hooks / validate --read-only / add_last_refreshed_at draft) backfilled into docs. Prod at 9.32M fund_holdings_v2 rows, 132,618 classified CUSIPs, 37,925 retry queue, newest N-PORT report_date 2026-01-31. Today's HEAD: `d8a6a01` (docs update following 39d5e95 code).)_
 
 ## Today's sessions — commits and scope
 
@@ -9,21 +9,66 @@ _Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DE
 | `7081886` | CUSIP v1.4 Session 1 — migration 003 + classifier + build_classifications + validate_classifications + build_cusip rewrite |
 | `c5eada8` | CUSIP v1.4 Session 2 scripts — run_openfigi_retry + normalize_securities + post-OpenFIGI gates |
 | `5cf3585` | N-PORT DERA ZIP Session 1 — fetch_dera_nport.py + migration 002 + validate_nport `--changes-only` |
+| `831e5b4` | No-DB workstream (parallel) — Makefile + check_freshness.py + record_freshness hooks on 8 scripts + validate_entities `--read-only` + add_last_refreshed_at draft + entity_sync probe-gated stamping + §Batch 3-A + §gg gotcha |
+| `fd05c92` | HEAD backfill for 831e5b4 |
 | `44bc98e` | N-PORT DERA Session 2 code — fetch_nport_v2.py 4-mode orchestrator + `--zip` flag |
 | `e868772` | N-PORT DERA S2 promote — 8,125 resolved series live (fund_holdings_v2 6.4M → 9.3M) |
 | `8a41c48` | CUSIP v1.4 prod promotion (docs) — migration 003 + staging→prod copy + normalize + validate |
 | `39d5e95` | N-PORT cleanup — cross-ZIP amendment dedup + validate_nport set-based rewrite (66s vs 45min) |
+| `d8a6a01` | Doc session close — full update across 7 docs |
 
-## Open items for next sessions
+## Parallel session deliverables (commit `831e5b4`) — now in-docs
 
-1. **Entity MDM expansion.** 5,921 N-PORT series queued in `pending_entity_resolution` (bond / index / money-market funds brought in by the DERA path). Current breakdown: 1,187 synthetic `{cik}_{accession}` fallbacks + 4,734 real SERIES_ID without prior entity records. Resolution unblocks a second promote cycle for these series.
-2. **N-PORT monthly top-up (Feb/Mar 2026).** Run `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when 2026Q2 DERA ZIP isn't yet out but individual NPORT-P filings for current months are posting.
-3. **Batch 3 — `enrich_holdings.py`** (now unblocked). Builds the Group 3 enrichment pass for `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float` via a single UPDATE joined on (accession_number, cusip). Consumes `securities.canonical_type` + `market_data`. Promote-time stays thin — this is a separate post-promote pass.
-4. **Batch 3 — `compute_flows.py` rewrite** (unblocked). Current version still reads legacy `holdings`; rewrite to read `holdings_v2` now that the enrichment layer is canonical.
-5. **Batch 3 — `build_summaries.py` rewrite** (unblocked). Same pattern — legacy-reads → `holdings_v2`.
-6. **Full-validator smoke test on next promote.** The set-based rewrite (commit `39d5e95`) ran in 66s on 14K staged series; run it on the next authorised promote and compare against `validate_nport_subset.py`.
+Ran concurrent with the staging-locked CUSIP OpenFIGI retry, same day.
+Shipped on 2026-04-14 but not previously rolled forward into the other
+docs.
+
+- **`Makefile`** (new, 155 lines). Single-entry pipeline orchestration — 9-step quarterly update, `DRY_RUN=1` support, per-step standalone targets, `make status` and `make freshness` gates that block advancement on a stale source table.
+- **`scripts/check_freshness.py`** (new, 108 lines). Prod read-only; exit-1 gate on stale or missing `data_freshness` rows. `--status-only` for informational use.
+- **`record_freshness` hooks** added to 8 pipeline scripts: `fetch_adv`, `fetch_ncen`, `fetch_finra_short`, `fetch_13dg` (phase 3), `build_entities`, `build_managers`, `build_fund_classes`, `build_cusip`. v2 SourcePipelines (`fetch_nport_v2`, `fetch_13dg_v2`, `fetch_market`) and `fetch_13f` intentionally skipped — rationale in §z below.
+- **`validate_entities.py --read-only`** flag. Verified `--prod --read-only` returns the established 9 PASS / 0 FAIL / 7 MANUAL.
+- **`scripts/migrations/add_last_refreshed_at.py`** drafted (124 lines) but **NOT RUN**. Adds `last_refreshed_at TIMESTAMP` to `entity_relationships` with `created_at` backfill. Staging-first on next entity session.
+- **`entity_sync.insert_relationship_idempotent`** stamps / bumps `last_refreshed_at` when the column exists (probe-gated — safe on pre- and post-migration DBs). Stamps on INSERT, ON-CONFLICT-DO-NOTHING, and deferred-primary paths.
+- **`ARCHITECTURE_REVIEW.md` §Batch 3-A** — as-shipped schema note for `fund_family_patterns` (2 cols: `pattern VARCHAR`, `inst_parent_name VARCHAR`; PK `(inst_parent_name, pattern)`; 83 rows) + `get_nport_family_patterns()` memoization. Corrects stale 3-col planning docs.
+- **`NEXT_SESSION_CONTEXT.md` §gg** — `holdings_v2` filing-line grain gotcha: true composite key is `(cik, ticker, quarter, put_call, security_type, discretion)`, not `(cik, cusip, quarter)`.
+
+## Open items for next sessions (expanded 2026-04-15)
+
+### N-PORT / holdings
+
+1. **Entity MDM expansion — 5,921 N-PORT series** queued in `pending_entity_resolution` (bond / index / MM funds brought in by the DERA path). Current breakdown: 1,187 synthetic `{cik}_{accession}` fallbacks + 4,734 real SERIES_ID without prior entity records. Resolution unblocks a second promote cycle.
+2. **N-PORT monthly top-up (Feb/Mar 2026).** `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when 2026Q2 DERA ZIP isn't yet out.
+3. **Full-validator smoke test on next promote.** Set-based rewrite (commit `39d5e95`) ran in 66s on 14K staged series; re-run on the next authorised promote and compare against `validate_nport_subset.py`.
+
+### Batch 3 — now unblocked by CUSIP v1.4
+
+4. **`enrich_holdings.py`** — Group 3 enrichment for `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float` via UPDATE joined on (accession_number, cusip). Consumes `securities.canonical_type` + `market_data`.
+5. **`compute_flows.py` rewrite** — currently reads legacy `holdings`; rewrite to `holdings_v2`.
+6. **`build_summaries.py` rewrite** — same pattern.
+
+### Entity MDM follow-ups
+
+7. **`entity_id` linkage on `beneficial_ownership_current`.** Currently the 13D/G fact tables have no entity_id column. Filers are disconnected from the MDM; rollup walks skip 13D/G entirely. Needs a promote-time enrichment step equivalent to `fund_holdings_v2`'s Group 2 pass.
+8. **CRD backfill — top 100 AUM filers.** `entity_identifiers.identifier_type='crd'` coverage is patchy for high-AUM filers; manual CRD resolution via ADV lookup.
+9. **`entity_identifiers_staging_review` backlog (~280 items).** Accumulated conflict queue from staging→promote cycles; each needs human adjudication (merge / reject / separate entity).
+10. **Run `scripts/migrations/add_last_refreshed_at.py`** via staging workflow. Drafted in 831e5b4; not yet executed. Adds `last_refreshed_at` to `entity_relationships` so ADV / N-CEN refresh age becomes measurable.
+11. **DM13/DM14/DM15 decision-maker routing audits** — three pending audits against `rollup_type='decision_maker_v1'` chains where sub-adviser paths diverge from economic-control parents.
+
+### API / contracts
+
+12. **`schemas.py` Pydantic expansion** — ~55 response models still hand-written in `src/types/`; autogenerate via FastAPI when Batch 4-C lands.
+
+### Infrastructure (Makefile / freshness)
+
+13. **`make freshness` — confirm newly loaded tables register correctly.** `check_freshness.py` was designed pre-migration-001; verify that `ingestion_manifest` + `data_freshness` freshness signals interleave cleanly now that both are populated.
+14. **`LEI coverage = 0`** (flagged in the 2026-04-14 infrastructure review). `lei_reference` has 13,143 GLEIF rows but `entity_identifiers.identifier_type='lei'` = 0 — no entity currently carries an LEI. Low priority but blocks any LEI-driven cross-reference.
+15. **13D/G filers have no `entity_id` linkage** — direct consequence of (7). `beneficial_ownership_v2.entity_id` doesn't exist; add it at the same time as the Group 2 pass for 13D/G.
+16. **`entity_relationships.valid_from` uniformly at a sentinel date** (2023-01-01 or similar) — ADV / N-CEN refresh age is currently unmeasurable. The `add_last_refreshed_at.py` migration (item 10) is the fix path; once live, backfill `valid_from` from the source fetch date.
+17. **`PARENT_SEEDS` count is 110** (was documented as 50 in older plans). `scripts/build_entities.py:6` is authoritative — update any stale docs in follow-ups.
 
 ---
+
+## N-PORT cleanup — 2026-04-15 (commit 39d5e95)
 
 ## N-PORT cleanup — 2026-04-15 (commit 39d5e95)
 

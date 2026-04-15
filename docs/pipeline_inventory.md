@@ -1,7 +1,34 @@
 # Pipeline Inventory — DB-Writing Script Audit
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
-_Revised 2026-04-15: six REWRITE items cleared by v2 rewrites shipped this week (fetch_nport_v2 + fetch_dera_nport + promote_nport; fetch_13dg_v2 + promote_13dg; fetch_market v2; build_cusip v2). CUSIP v1.4 vertical (build_classifications, run_openfigi_retry, normalize_securities, validate_classifications) and N-PORT v2 validators (validate_nport, validate_nport_subset) added as new SOURCE-tier rows. Legacy scripts retained in `scripts/` but marked **SUPERSEDED** — retirement gated on second clean v2 run per follow-up tracker._
+_Revised 2026-04-15: six REWRITE items cleared by v2 rewrites shipped this week (fetch_nport_v2 + fetch_dera_nport + promote_nport; fetch_13dg_v2 + promote_13dg; fetch_market v2; build_cusip v2). CUSIP v1.4 vertical (build_classifications, run_openfigi_retry, normalize_securities, validate_classifications) and N-PORT v2 validators (validate_nport, validate_nport_subset) added as new SOURCE-tier rows. Legacy scripts retained in `scripts/` but marked **SUPERSEDED** — retirement gated on second clean v2 run per follow-up tracker. Parallel 2026-04-14 no-DB workstream (commit 831e5b4) added `Makefile` + `scripts/check_freshness.py` + `record_freshness` hooks on 8 scripts + `validate_entities.py --read-only` + `scripts/migrations/add_last_refreshed_at.py` (drafted, NOT RUN)._
+
+## 2026-04-14 freshness-wiring status
+
+Eight scripts got `record_freshness(con, target_table)` hooks at end-of-run in commit `831e5b4` — the v2 SourcePipelines manage freshness through their own promote paths and are intentionally skipped here:
+
+| Hook added (commit 831e5b4) | Rationale |
+|---|---|
+| `fetch_adv.py` | freshness on `adv_managers`, `cik_crd_direct`, `lei_reference` |
+| `fetch_ncen.py` | freshness on `ncen_adviser_map` |
+| `fetch_finra_short.py` | freshness on `short_interest` |
+| `fetch_13dg.py` phase 3 | stamps on `beneficial_ownership_current` (v2 path has its own) |
+| `build_entities.py` | freshness on each entity SCD table |
+| `build_managers.py` | freshness on `managers` |
+| `build_fund_classes.py` | freshness on `fund_classes`, `fund_best_index`, `fund_index_scores`, `fund_name_map`, `index_proxies` |
+| `build_cusip.py` | freshness on `securities` |
+
+| Hook deliberately skipped | Rationale |
+|---|---|
+| `fetch_13f.py` | filesystem-only, no DB writes |
+| `fetch_nport_v2.py` / `fetch_dera_nport.py` | promote_nport.py stamps `fund_holdings_v2` + `fund_universe` |
+| `fetch_13dg_v2.py` | promote_13dg.py stamps `beneficial_ownership_v2` + `beneficial_ownership_current` |
+| `fetch_market.py` (v2) | stamps inline via the DirectWritePipeline protocol |
+
+Gate tooling: `scripts/check_freshness.py` (exit-1 on stale/missing rows; prod read-only; `--status-only` for info). Wired into `make freshness` in `Makefile`.
+
+---
+
 
 Every `.py` file in `scripts/` that writes to the prod DB, plus the
 utilities the orchestrator needs to know about. Scripts flagged for

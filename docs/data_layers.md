@@ -5,7 +5,11 @@ _Revised: 2026-04-15 — CUSIP v1.4 layer live (4 new tables + 7 new
 `securities` columns); N-PORT DERA backfill live (`fund_holdings_v2`
 6.39M → 9.32M, `fund_universe` 6,677 → 8,459, newest `report_date`
 2026-01-31); control-plane tables live in prod; migration 002
-(`fund_universe.strategy_*`) applied._
+(`fund_universe.strategy_*`) applied. Parallel 2026-04-14 workstream
+(commit 831e5b4) wired `record_freshness` on 8 non-v2 scripts and
+drafted `scripts/migrations/add_last_refreshed_at.py` (pending on
+`entity_relationships`) — see `docs/NEXT_SESSION_CONTEXT.md` open-items
+list._
 
 This document is the single source of truth for how every table in the
 prod DB is classified across the four-layer model. Each owning script
@@ -122,7 +126,7 @@ bottom.
 | `index_proxies` | L4 | `build_fund_classes.py` | rebuild | 13,641 rows |
 | `benchmark_weights` | L4 | `build_benchmark_weights.py` | rebuild | 55 rows; per-quarter US-equity sector weights from Vanguard Total Stock Market |
 | `peer_groups` | L4 | manual seed | rebuild | 27 rows; sector peer-group reference |
-| `data_freshness` | L0 | written by every pipeline at end-of-run via `db.record_freshness()` | upsert on table_name | 4 rows on prod (stamped by recent promotes); owner is every pipeline |
+| `data_freshness` | L0 | every pipeline at end-of-run via `db.record_freshness()` — 8 non-v2 scripts wired in commit 831e5b4 (2026-04-14); v2 SourcePipelines stamp through their promote paths | upsert on table_name | 4 rows on prod (stamped by recent promotes); `scripts/check_freshness.py` is the gate + `make freshness` reads it |
 | `ingestion_manifest` | L0 | `scripts/pipeline/manifest.py` | direct_write | **20,807 rows** — live since migration 001 (Batch 1). DERA_ZIP and per-accession keys for N-PORT |
 | `ingestion_impacts` | L0 | `scripts/pipeline/manifest.py` | direct_write | **20,799 rows** — one per promoted `(series_id, report_month)` tuple plus per-quarter DERA ZIP impacts |
 | `pending_entity_resolution` | L0 | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` | direct_write | **5,924 rows** — 5,921 N-PORT series queued for MDM follow-up (bond / index / MM funds) + 3 from 13D/G |
