@@ -1,6 +1,45 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-15 (N-PORT DERA ZIP Session 2 promote complete — 8,125 entity-resolved series promoted to fund_holdings_v2, +2,922,362 rows (6.4M → 9.3M), 5,921 unresolved series queued in pending_entity_resolution for entity MDM follow-up.)_
+_Last updated: 2026-04-15 (CUSIP v1.4 prod promotion — Migration 003 applied to prod; 132,618 classifications + 37,925 retry queue + 15,807 OpenFIGI cache copied from staging; normalize_securities expanded securities 44,929 → 132,618; all BLOCK + BLOCK_POST checks PASS. N-PORT DERA S2 promote also landed today.)_
+
+## CUSIP Classification v1.4 — 2026-04-15 prod promotion
+
+Staging ran overnight (validate_classifications passed); this session moved the classification layer to prod.
+
+**Steps executed (no --staging flag for prod):**
+1. `python3 scripts/migrations/003_cusip_classifications.py` — 4 new tables (cusip_classifications / cusip_retry_queue / _cache_openfigi / schema_versions) + 7 new columns on `securities` (canonical_type, canonical_type_source, is_equity, is_priceable, ticker_expected, is_active, figi).
+2. `ATTACH 'data/13f_staging.duckdb' AS stg (READ_ONLY)` from a prod write connection, then single-transaction copy:
+   - `INSERT INTO cusip_classifications SELECT * FROM stg.cusip_classifications` — 132,618 rows.
+   - `INSERT INTO cusip_retry_queue     SELECT * FROM stg.cusip_retry_queue` — 37,925 rows.
+   - `INSERT INTO _cache_openfigi       SELECT * FROM stg._cache_openfigi` — 15,807 rows.
+3. `python3 scripts/normalize_securities.py` — UPDATE existing 44,929 `securities` rows with 7 new columns (COALESCE-safe for ticker/exchange/market_sector); INSERT 87,689 classification-only rows (13D/G-only CUSIPs). Final count: 132,618.
+4. `python3 scripts/validate_classifications.py` — 12 checks, all BLOCK + BLOCK_POST PASS.
+
+**Validation result (prod):**
+| Check | Result |
+|---|---|
+| canonical_type IS NULL | 0 ✓ |
+| is_permanent=TRUE AND is_priceable=TRUE | 0 ✓ |
+| is_equity=TRUE AND is_permanent=TRUE | 0 ✓ |
+| derivatives misclassified as BOND/PREF | 0 ✓ |
+| OTHER as pct of total | 0.14% (< 5% WARN threshold) ✓ |
+| retry_queue pending count | 0 (INFO) |
+| retry_queue resolved rate (post-OpenFIGI) | 41.70% (< 50% WARN_MIN) ⚠ |
+| retry_queue unmappable rate | 58.30% (> 30% WARN) ⚠ |
+| securities.canonical_type NULL after normalization | 0 ✓ |
+| securities.is_equity NULL after normalization | 0 ✓ |
+| securities rows without classification match | 0 ✓ |
+
+Verdict: **READY: YES**. Two WARNs reflect the universe of CUSIPs OpenFIGI simply can't map (private / delisted / foreign exotics); not blocking.
+
+**canonical_type distribution in prod:**
+BOND 71,328 · COM 30,340 · OPTION 18,730 · ETF 5,580 · CASH 1,882 · FOREIGN 1,150 · PREF 1,078 · MUTUAL_FUND 627 · ADR 610 · WARRANT 555 · OTHER 185 · CLO 121 · REIT 120 · BANK_LOAN 106 · CEF 71 · CONVERT 69 · SPAC 66.
+
+**Why:** Pre-classify every CUSIP so `discover_market()` and the app can pre-filter to equities without an OpenFIGI round-trip; queue genuine equity misses separately for future retry.
+
+**No code changes this step** — ran existing Session-2 scripts against prod. Prior commit pushed: Session 2 of CUSIP was `831e5b4` (from another agent session), Migration 003 was 7081886 (Session 1). This session executes against prod DB only.
+
+---
 
 ## N-PORT DERA ZIP — 2026-04-15 Session 2 (staging + promote)
 

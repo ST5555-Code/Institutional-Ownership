@@ -1,6 +1,26 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 15, 2026 — N-PORT DERA ZIP Session 2 staging + promote complete. 8,125 entity-resolved series promoted (+2.9M rows, 6.4M → 9.3M). 5,921 unresolved queued in pending_entity_resolution. fund_holdings_v2 newest report_date now 2026-01-31._
+_Last updated: April 15, 2026 — CUSIP v1.4 classification layer live in prod (132,618 classifications, 37,925 retry queue, 15,807 OpenFIGI cache, securities expanded 44,929 → 132,618). N-PORT DERA S2 promote also landed today._
+
+## Session Summary 2026-04-15 (CUSIP v1.4 prod promotion)
+
+Overnight staging retry passed `validate_classifications`; this session moved the layer to prod.
+
+- **Migration 003 applied to prod** (`data/13f.duckdb`): 4 new tables — `cusip_classifications`, `cusip_retry_queue`, `_cache_openfigi`, `schema_versions`; 7 new columns on `securities` (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`). `market_sector` already present (column 6) and left alone. Idempotent; rollback-on-failure.
+- **Staging → prod copy** via `ATTACH '...13f_staging.duckdb' AS stg (READ_ONLY)` from a prod write connection, single transaction:
+  - `cusip_classifications`: 132,618 rows
+  - `cusip_retry_queue`: 37,925 rows
+  - `_cache_openfigi`: 15,807 rows
+- **`normalize_securities.py` on prod** — UPDATE + LEFT-JOIN INSERT. `securities` 44,929 → 132,618 (+87,689; mostly 13D/G-only CUSIPs now getting a canonical_type).
+- **`validate_classifications.py` on prod** — 12 checks. All BLOCK + BLOCK_POST PASS (0 NULL canonical_type, 0 derivatives misclassified as BOND/PREF, 0 securities rows without classification match, 0 NULL is_equity/canonical_type after normalization). OTHER=0.14% (threshold ≤ 5%). **Verdict: READY: YES.** Two WARNs (retry resolved 41.7% < 50% WARN_MIN; retry unmappable 58.3% > 30%) reflect CUSIPs OpenFIGI can't map (private/delisted/exotic).
+
+**`canonical_type` distribution on prod:** BOND 71,328 · COM 30,340 · OPTION 18,730 · ETF 5,580 · CASH 1,882 · FOREIGN 1,150 · PREF 1,078 · MUTUAL_FUND 627 · ADR 610 · WARRANT 555 · OTHER 185 · CLO 121 · REIT 120 · BANK_LOAN 106 · CEF 71 · CONVERT 69 · SPAC 66.
+
+**Effect on pipelines:** `discover_market()` can now pre-filter to `canonical_type='COM' OR 'ETF' OR 'ADR' OR 'REIT' OR 'PREF'` before OpenFIGI round-trips; equity universe is `is_equity=TRUE AND is_active=TRUE`. The retry queue for post-OpenFIGI `unmappable` rows (~22K) can be reviewed manually later or scheduled for periodic re-try as OpenFIGI adds mappings.
+
+**No code changes this step** — ran existing scripts against prod. Prior relevant commits on main (already pushed): migration 003 + cusip_classifier + build_classifications (7081886, Session 1), run_openfigi_retry + normalize_securities + validate_classifications (831e5b4, Session 2 scripts).
+
+---
 
 ## Session Summary 2026-04-15 (N-PORT DERA ZIP Session 2 — staging + promote)
 
