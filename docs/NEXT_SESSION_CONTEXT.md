@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DERA backfill live + cross-ZIP amendment dedup + set-based validator + no-DB workstream (Makefile / freshness hooks / validate --read-only / add_last_refreshed_at draft) backfilled into docs. Prod at 9.32M fund_holdings_v2 rows, 132,618 classified CUSIPs, 37,925 retry queue, newest N-PORT report_date 2026-01-31. Today's HEAD: `d8a6a01` (docs update following 39d5e95 code).)_
+_Last updated: 2026-04-15 (Session close #2 — N-PORT monthly topup live (446 accessions, 2026-02-28 max) + pending-series entity MDM resolver (T1 N-CEN / T2+T3 brand substring / S1 sibling-CIK) brought 3,613 new fund entities into prod + full re-promote of DERA Session 2 and topup run_ids against expanded entity gate. Prod now at 11.53M fund_holdings_v2 rows / 12,054 series / 12,060 fund_universe / 12,160 fund entities. 2,330 pending_entity_resolution rows remain (1,144 real residual ETF-specialty trusts + 1,186 deferred synthetics). Today's HEAD: `d8a6a01` (docs update following 39d5e95 code) — commit pending for resolve_pending_series.py.)_
 
 ## Today's sessions — commits and scope
 
@@ -16,6 +16,110 @@ _Last updated: 2026-04-15 (Session close — CUSIP v1.4 live in prod + N-PORT DE
 | `8a41c48` | CUSIP v1.4 prod promotion (docs) — migration 003 + staging→prod copy + normalize + validate |
 | `39d5e95` | N-PORT cleanup — cross-ZIP amendment dedup + validate_nport set-based rewrite (66s vs 45min) |
 | `d8a6a01` | Doc session close — full update across 7 docs |
+| *(pending)* | `scripts/resolve_pending_series.py` + N-PORT DERA S2 & topup re-promote — see §Pending-series MDM resolver below |
+
+## Pending-series MDM resolver — 2026-04-15 (session #2)
+
+Problem: 5,943 N-PORT series sat in `pending_entity_resolution` from the
+DERA Session 2 backfill (5,921) and monthly topup (230 new). Holdings
+for those series were staged but held out of prod promotes to keep the
+strict entity gate intact.
+
+**New script — `scripts/resolve_pending_series.py`** (481 lines).
+Staging-only resolver, follows the standard sync → work → validate →
+diff → review → promote workflow. Four tiers:
+
+| Tier | Signal | Resolved | Confidence |
+|---|---|---:|---|
+| **T1** | Trust's `fund_cik` → `ncen_adviser_map.registrant_cik` → adviser CRD → existing entity | 947 | exact |
+| **T2** | `family_name` brand substring against PARENT_SEEDS + curated `SUPPLEMENTARY_BRANDS` | 2,553 | high |
+| **T3** | `fund_name` brand substring, fallback when family_name is a generic trust shell | 103 | high |
+| **S1** | Synthetic `{cik}_{accession}` whose `fund_cik` is already an entity | 10 | exact |
+| **Total** | | **3,613 / 4,757 real series = 76.0%** | |
+
+**Not resolved (by design, this session):**
+- 1,144 real series — concentrated in ETF specialty trusts (Global X,
+  VanEck, EA Series, Krane Shares, BondBloxx, AIM, Listed Funds, ETF
+  Opportunities). Their advisers don't exist as prod entities yet;
+  resolving them requires creating new adviser entities first — flagged
+  for follow-up via `SUPPLEMENTARY_BRANDS` additions + manual entity
+  seeding.
+- 1,186 deferred synthetics — CIK-level N-PORT filings missing
+  SERIES_ID with no matching `entity_identifiers(cik)`. Resolution path
+  requires either N-PORT XML sub-adviser extraction (D13) or policy
+  decision to drop.
+
+**Gotchas caught during implementation:**
+1. **Fuzzy `_AliasCache` is wrong for trust names.** `token_sort_ratio`
+   ranks "FIRST TRUST" above "ISHARES" when matching "iShares Trust".
+   Replaced with PARENT_SEEDS deterministic substring matching. 50.9%
+   coverage alone → 76.0% after `SUPPLEMENTARY_BRANDS` hand-curated list
+   of 22 ETF-specialist variants.
+2. **DM13 `_verify_adv_relationship` is too strict for brand rollups.**
+   PARENT_SEED entities (eid≤110) almost never have ADV rows by design
+   (they're brand-level targets, not registered advisers). Verification
+   would reject every clean brand match. Fix: trust
+   PARENT_SEEDS + SUPPLEMENTARY_BRANDS canonicals, run verification
+   only for ambiguous sources.
+3. **`sync_staging.py` CTAS strips column defaults + indexes.** The
+   staging `entity_identifiers` table had no `valid_from/valid_to`
+   defaults, so `entity_sync.get_or_create_entity_by_identifier`'s
+   INSERT landed with NULL SCD sentinels — invisible to every `valid_to
+   = DATE '9999-12-31'` filter. Fix: `_ensure_staging_indexes()` in the
+   resolver both sets ALTER COLUMN defaults AND creates the unique
+   indexes that bare `ON CONFLICT DO NOTHING` needs.
+
+**N-PORT re-promotes after MDM (new prod state):**
+
+| | Before MDM | After MDM | Delta |
+|---|---:|---:|---:|
+| `entity_identifiers(series_id, active)` | 8,547 | 12,160 | +3,613 |
+| `entities(entity_type='fund')` | 8,547 | 12,160 | +3,613 |
+| `fund_holdings_v2` rows | 9,332,358 | 11,535,570 | +2,203,212 |
+| `fund_universe` rows | 8,459 | 12,060 | +3,601 |
+| `pending_entity_resolution(series_id, pending)` | 5,943 | 2,330 | -3,613 |
+| Newest `report_date` | 2026-02-28 | 2026-02-28 | - |
+
+**DERA Session 2 re-promote** (`nport_20260415_060422_352131`):
+- Resolved: 11,714 (was 8,125 pre-MDM) / excluded: 2,330
+- Holdings: -3,836,251 / +6,007,254 (net +2,171,003 vs prior partial promote)
+- fund_universe upserts: 11,378
+
+**Topup re-promote** (`nport_topup_20260415_095148_2bd59b`):
+- Resolved: 348 (was 205 pre-MDM) / excluded: 87
+- Holdings: -16,816 / +49,025 (net +32,209)
+- fund_universe upserts: 348
+
+**validate_entities.py --staging** and **--prod** both: 8 PASS / 1 FAIL
+(wellington_sub_advisory baseline) / 7 MANUAL — no structural drift. 0
+violations across all 4 structural gates.
+
+**Follow-ups for next session:**
+1. **Add ETF-specialist brands to `SUPPLEMENTARY_BRANDS`** (or
+   `fund_family_patterns`). Top residual families by count: Global X
+   (103), EA Series (95), ETF Opportunities (69), VanEck (66), AIM (49),
+   Listed Funds (36), Krane Shares (35), BondBloxx (25), SPDR Series
+   (24). Each needs a new adviser entity created + a supplementary
+   variant. Expected uplift: +400-600 more series resolvable on next
+   run.
+2. **Synthetic series policy (D13).** Decide per-filing-type rules for
+   the 1,186 deferred synthetics — drop, create generic fallback
+   entities, or wait for N-PORT XML sub-adviser metadata extraction.
+3. **`pending_entity_resolution.context_json` is NULL for all
+   series_id rows.** The staged-to-pending path in `validate_nport.py`
+   / `validate_nport_subset.py` doesn't capture fund_cik / fund_name /
+   family_name context. Future resolvers have to re-join
+   `stg_nport_*` to recover it. Worth a small patch to both validators.
+4. **`validate_nport_subset.py` synthetic BLOCK is overly strict.**
+   Blocks on any non-S-prefixed series in resolved, even when they're
+   legitimately entity-backed via S1 fund-cik match. 12 synthetics from
+   DERA S2 and 0 from topup had to be manually moved back to
+   excluded for this cycle.
+5. **`promote_nport.py` scales ~O(N) per-tuple.** DERA S2 re-promote
+   (11,714 series × ~3 months avg ≈ 35K tuples) took 1h 31min. Prior
+   topup-only (205 series) ran in seconds. `_enrich_entity` + `DELETE +
+   INSERT + UPSERT universe` per tuple is the dominant cost. Worth a
+   batched-SQL rewrite before the next DERA-scale promote.
 
 ## Parallel session deliverables (commit `831e5b4`) — now in-docs
 
