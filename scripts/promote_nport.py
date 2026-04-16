@@ -323,6 +323,10 @@ def main() -> None:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--exclude", default="",
                         help="Comma-separated series_ids to hold out")
+    parser.add_argument("--exclude-file", default=None,
+                        help="File with one series_id per line to hold out. "
+                             "Merged with --exclude (union). Useful when the "
+                             "exclude list is too large for argv.")
     parser.add_argument("--test", action="store_true",
                         help="Promote whatever the run staged — no extra "
                              "behaviour; flag exists for parity with "
@@ -330,6 +334,10 @@ def main() -> None:
     args = parser.parse_args()
 
     exclude = {s.strip() for s in args.exclude.split(",") if s.strip()}
+    if args.exclude_file:
+        with open(args.exclude_file, encoding="utf-8") as fh:
+            exclude |= {line.strip() for line in fh if line.strip()}
+        print(f"  --exclude-file: loaded {len(exclude):,} series to skip")
     report_text = _read_validation_report(args.run_id)
     _assert_promote_ok(report_text)
 

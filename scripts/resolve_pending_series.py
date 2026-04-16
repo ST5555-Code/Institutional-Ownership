@@ -112,6 +112,45 @@ SUPPLEMENTARY_BRANDS = [
     ("EA SERIES",              2944,    "Empowered Funds (Alpha Architect)"),
     ("ETF OPPORTUNITIES",      9013,    "Tidal Investments"),
     ("LISTED FUNDS",           8646,    "Vident Advisory"),
+    # 2026-04-16 residual-616 additions — 25 Tier A (existing entity reuse)
+    # and 7 Tier B (new entities from bootstrap_residual_advisers.py).
+    # Each variant_upper is chosen as a multi-word prefix of the trust's
+    # family_name to avoid collision with other brands (e.g. MFS MUNICIPAL
+    # SERIES rather than bare MFS, since MFS SERIES already exists above).
+    # Tier A — existing MDM entity reuse:
+    ("MFS MUNICIPAL SERIES",          5047, "Massachusetts Financial Services"),
+    ("MFS ACTIVE EXCHANGE",           5047, "Massachusetts Financial Services"),
+    ("PRINCIPAL EXCHANGE",            6348, "Principal Global Investors"),
+    ("REX ETF",                       3031, "REX Advisers, LLC"),
+    ("NEW YORK LIFE INVESTMENTS ACTIVE", 8473, "New York Life Investment Management"),
+    ("NEW YORK LIFE INVESTMENTS ETF", 8473, "New York Life Investment Management"),
+    ("GUGGENHEIM FUNDS",               195, "Guggenheim Partners Investment Management"),
+    ("SEI EXCHANGE TRADED",           9858, "SEI Investments Management Corp"),
+    ("SEI TAX EXEMPT",                9858, "SEI Investments Management Corp"),
+    ("ANGEL OAK FUNDS",              10620, "Angel Oak Capital Advisors"),
+    ("VIKING MUTUAL",                 7821, "Viking Fund Management LLC"),
+    ("THRIVENT ETF",                  7823, "Thrivent Asset Management"),
+    ("RUSSELL INVESTMENTS EXCHANGE",  7856, "Russell Investments Implementation Services"),
+    ("COHEN & STEERS ETF",             142, "Cohen & Steers Capital Management"),
+    ("CAMBRIA ETF",                   3449, "Cambria Investment Management"),
+    ("VIRTUS ETF",                     676, "Virtus Investment Advisers"),
+    ("VIRTUS MANAGED ACCOUNT",         676, "Virtus Investment Advisers"),
+    ("TCW ETF",                       1238, "TCW Investment Management"),
+    ("TCW METROPOLITAN",              1238, "TCW Investment Management"),
+    ("KURV ETF",                      4559, "Kurv Investment Management"),
+    ("DOUBLELINE ETF",               18058, "DoubleLine Capital LP"),
+    ("ALLSPRING EXCHANGE",            3421, "Allspring Global Investments"),
+    ("VOYA FUNDS",                   17915, "Voya Investment Management"),
+    ("TOUCHSTONE ETF",               18185, "Touchstone Advisors"),
+    ("WESTERN ASSET FUNDS",           4636, "Western Asset Management"),
+    # Tier B — new entities from bootstrap_residual_advisers.py (2026-04-16):
+    ("STONE RIDGE",                  24348, "Stone Ridge Asset Management"),
+    ("BITWISE FUNDS",                24349, "Bitwise Investment Manager"),
+    ("VOLATILITY SHARES",            24350, "Volatility Shares LLC"),
+    ("DUPREE MUTUAL",                24351, "Dupree & Company, Inc."),
+    ("ABACUS FCF",                    3375, "Abacus FCF Advisors LLC"),
+    ("BARON ETF",                    24352, "Baron Capital Management"),
+    ("GRAYSCALE",                    24353, "Grayscale Advisors"),
 ]
 
 # Variants whose target trust hosts multiple sub-advisers per series.
