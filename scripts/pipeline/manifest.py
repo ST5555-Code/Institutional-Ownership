@@ -13,6 +13,45 @@ import pandas as pd
 
 
 # ---------------------------------------------------------------------------
+# PK id generation (self-healing replacement for DEFAULT nextval)
+# ---------------------------------------------------------------------------
+
+# Allow-list of (table, pk_col) that may be id-computed via MAX+1. Prevents
+# accidental misuse against tables where PK isn't a monotonic int.
+_ID_TABLES = frozenset({
+    ("ingestion_manifest", "manifest_id"),
+    ("ingestion_impacts", "impact_id"),
+})
+
+
+def _next_id(con: Any, table: str, pk_col: str) -> int:
+    """Return MAX(pk_col)+1 for `table`. Used in place of the DEFAULT
+    nextval('*_seq') when the sequence is not trustworthy.
+
+    Root cause this compensates for: DuckDB sequences do not auto-advance
+    when rows are INSERTed with explicit PK values. The mirror paths in
+    `promote_nport.py` / `promote_13dg.py` (`INSERT INTO <table> SELECT *
+    FROM staging_copy`) carry the staging-assigned PK into prod without
+    advancing prod's sequence. Over many runs the prod sequence drifts
+    arbitrarily far behind MAX and the next DEFAULT-driven INSERT
+    collides. Computing the next id inline with MAX+1 is race-safe
+    because DuckDB enforces single-writer access per DB file.
+
+    Guarded by `_ID_TABLES` so a typo (e.g. `"ingestion_manifests"`)
+    can't accidentally produce invalid SQL against the wrong table.
+    """
+    if (table, pk_col) not in _ID_TABLES:
+        raise ValueError(
+            f"_next_id: ({table!r}, {pk_col!r}) not in allow-list; "
+            f"extend _ID_TABLES if this is intentional."
+        )
+    row = con.execute(
+        f"SELECT COALESCE(MAX({pk_col}), 0) + 1 FROM {table}"  # nosec B608
+    ).fetchone()
+    return int(row[0])
+
+
+# ---------------------------------------------------------------------------
 # Manifest
 # ---------------------------------------------------------------------------
 
@@ -41,7 +80,17 @@ def get_or_create_manifest_row(
     if existing:
         return existing[0]
 
+    # Compute manifest_id explicitly as MAX+1 rather than relying on the
+    # DEFAULT nextval('manifest_id_seq'). Mirror paths in promote_nport.py
+    # and promote_13dg.py (`INSERT INTO ingestion_manifest SELECT * FROM ...`)
+    # copy manifest_id verbatim without advancing the sequence, so the
+    # sequence drifts arbitrarily far behind MAX(manifest_id) and the
+    # DEFAULT path eventually collides. Self-healing MAX+1 avoids the
+    # collision and has no race — DuckDB is single-writer per DB file.
+    manifest_id = _next_id(con, "ingestion_manifest", "manifest_id")
+
     base = {
+        "manifest_id": manifest_id,
         "source_type": source_type,
         "object_type": object_type,
         "object_key": object_key,
@@ -53,12 +102,11 @@ def get_or_create_manifest_row(
     base.update(kwargs)
     cols = ", ".join(base.keys())
     placeholders = ", ".join(["?"] * len(base))
-    row = con.execute(
-        f"INSERT INTO ingestion_manifest ({cols}) VALUES ({placeholders}) "
-        f"RETURNING manifest_id",
+    con.execute(
+        f"INSERT INTO ingestion_manifest ({cols}) VALUES ({placeholders})",
         list(base.values()),
-    ).fetchone()
-    return row[0]
+    )
+    return manifest_id
 
 
 def update_manifest_status(
@@ -118,8 +166,15 @@ def write_impact(
     load_status: str = "pending",
     **kwargs: Any,
 ) -> int:
-    """Create one ingestion_impacts row. Returns impact_id."""
+    """Create one ingestion_impacts row. Returns impact_id.
+
+    Computes impact_id as MAX(impact_id)+1 rather than relying on the
+    DEFAULT nextval('impact_id_seq'). See get_or_create_manifest_row for
+    the sequence-drift rationale.
+    """
+    impact_id = _next_id(con, "ingestion_impacts", "impact_id")
     base = {
+        "impact_id": impact_id,
         "manifest_id": manifest_id,
         "target_table": target_table,
         "unit_type": unit_type,
@@ -131,12 +186,11 @@ def write_impact(
     base.update(kwargs)
     cols = ", ".join(base.keys())
     placeholders = ", ".join(["?"] * len(base))
-    row = con.execute(
-        f"INSERT INTO ingestion_impacts ({cols}) VALUES ({placeholders}) "
-        f"RETURNING impact_id",
+    con.execute(
+        f"INSERT INTO ingestion_impacts ({cols}) VALUES ({placeholders})",
         list(base.values()),
-    ).fetchone()
-    return row[0]
+    )
+    return impact_id
 
 
 def update_impact_status(
