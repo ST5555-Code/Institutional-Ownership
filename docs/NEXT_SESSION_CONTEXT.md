@@ -284,7 +284,7 @@ docs.
 ### N-PORT / holdings
 
 1. ~~**Entity MDM expansion — 5,921 N-PORT series**~~ **DONE 2026-04-15/16** (commits `e4e6468`, `7770f87`, `08e2400`). 4,141 series resolved via `resolve_pending_series.py` 4-tier T1/T2/T3/S1 + `bootstrap_etf_advisers.py` ETF brand seeding. Residual 1,805 = 619 real ETF specialty (Global X, Krane Shares, AIM, SPDR Series — need new adviser entities created) + 1,186 deferred synthetics per D13.
-2. **March 2026 N-PORT top-up.** Re-run `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when more 2026Q1 filings appear (last topup loaded through 2026-02-28; March 2026 N-PORTs are starting to file at the 60-day deadline).
+2. **March 2026 N-PORT top-up** — **DONE 2026-04-16** (run_id `nport_topup_20260416_083312_9c0936`). 2 accessions fetched (both amendments to Jan 2026 filings for CIK 0001038199 muni-bond series S000012121 / S000012122). Promote: -68 +70 = +2 net rows; `fund_holdings_v2` 11,670,960 → 11,670,962. Newest `report_date` still **2026-02-28** (no new Feb/Mar rows appeared — March 2026 N-PORTs have not yet posted on EDGAR). validate_nport.py: 0 BLOCK / 0 FLAG / 0 WARN, entity gate 2 resolved. Next topup: rerun when SEC begins posting March 2026 filings (expected late April / early May as 60-day deadline approaches).
 3. **Full-validator smoke test on next promote.** Set-based rewrite (commit `39d5e95`) ran in 66s on 14K staged series; re-run on the next authorised promote and compare against `validate_nport_subset.py`.
 
 ### Batch 3 — COMPLETE 2026-04-16
