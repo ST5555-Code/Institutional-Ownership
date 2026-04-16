@@ -752,11 +752,22 @@ def api_admin_entity_override(request: Request, body: bytes = Body(default=b''),
                 ).fetchone()
                 entity_cik = cik_row[0] if cik_row else str(entity_id)
                 try:
+                    # Assign override_id explicitly as MAX+1. Prod schema
+                    # has no DEFAULT / sequence on override_id, so omitting
+                    # it leaves the column NULL and the row becomes
+                    # unpromotable via promote_staging's PK-based diff.
+                    # Self-healing; race-safe under DuckDB single-writer.
+                    new_override_id = con.execute(
+                        "SELECT COALESCE(MAX(override_id), 0) + 1 "
+                        "FROM entity_overrides_persistent"
+                    ).fetchone()[0]
                     con.execute(
                         """INSERT INTO entity_overrides_persistent
-                           (entity_cik, action, field, old_value, new_value, reason, analyst)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                        [entity_cik, action, field, old_value, new_value, reason, analyst],
+                           (override_id, entity_cik, action, field, old_value,
+                            new_value, reason, analyst)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        [new_override_id, entity_cik, action, field, old_value,
+                         new_value, reason, analyst],
                     )
                 except Exception as e:  # pylint: disable=broad-except
                     log.debug("persistent: %s", e)

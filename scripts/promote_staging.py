@@ -158,6 +158,65 @@ def list_snapshots() -> None:
             print(f"    - {t}")
 
 
+def _heal_override_ids(con, db_label: str) -> int:
+    """Backfill NULL override_id in entity_overrides_persistent.
+
+    Two bugs historically landed rows without override_id:
+      * admin_bp.py's earlier INSERT omitted the column (no DEFAULT / no
+        sequence in prod's degraded schema)
+      * Ad-hoc SQL inserts from entity audit sessions
+    Rows with NULL PK cannot be matched by promote_staging's diff tool
+    (EXCEPT on (NULL) is non-deterministic), so they silently fail to
+    promote. This heal runs at the top of the promote path to assign
+    deterministic sequential IDs starting from MAX(override_id)+1, so
+    identical content in staging + prod converges to identical IDs.
+
+    Ordering: (applied_at, created_at, action, identifier_type,
+    identifier_value, entity_cik, reason). Deterministic across DBs
+    because the content of the NULL rows is identical in staging + prod
+    (staging is CTAS'd from prod; this heals prod first, then staging
+    is re-synced or lands on the same tuples).
+
+    Returns the count of rows healed.
+    """
+    n_null = con.execute(
+        "SELECT COUNT(*) FROM entity_overrides_persistent WHERE override_id IS NULL"
+    ).fetchone()[0]
+    if n_null == 0:
+        return 0
+
+    # Rebuild via CTAS-style to get atomic deterministic assignment.
+    # Staging = True on ATTACHED; this function runs against whichever
+    # connection the caller gave us. Temp table keeps both sides clean.
+    con.execute("DROP TABLE IF EXISTS _heal_eop_tmp")
+    con.execute("""
+        CREATE TEMP TABLE _heal_eop_tmp AS
+        SELECT * FROM entity_overrides_persistent WHERE override_id IS NOT NULL
+        UNION ALL
+        SELECT
+          ROW_NUMBER() OVER (
+            ORDER BY
+              COALESCE(CAST(applied_at AS VARCHAR), ''),
+              COALESCE(CAST(created_at AS VARCHAR), ''),
+              COALESCE(action, ''),
+              COALESCE(identifier_type, ''),
+              COALESCE(identifier_value, ''),
+              COALESCE(entity_cik, ''),
+              COALESCE(reason, '')
+          ) + COALESCE((SELECT MAX(override_id) FROM entity_overrides_persistent), 0)
+              AS override_id,
+          entity_cik, action, field, old_value, new_value, reason, analyst,
+          still_valid, applied_at, created_at, identifier_type,
+          identifier_value, rollup_type, relationship_context
+        FROM entity_overrides_persistent WHERE override_id IS NULL
+    """)
+    con.execute("DELETE FROM entity_overrides_persistent")
+    con.execute("INSERT INTO entity_overrides_persistent SELECT * FROM _heal_eop_tmp")
+    con.execute("DROP TABLE _heal_eop_tmp")
+    _log(f"    [{db_label}] healed {n_null} entity_overrides_persistent NULL override_ids")
+    return n_null
+
+
 def _apply_table(con, table: str) -> dict:
     """Apply staging → production for one table via diff-based DELETE+INSERT."""
     pk = PK_COLUMNS[table]
@@ -299,6 +358,25 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
     try:
         # Step 2 — snapshot
         _take_snapshot(con, snapshot_id, tables)
+
+        # Step 3a — heal any NULL override_id in entity_overrides_persistent.
+        # Must run in BOTH prod and staging before diff: staging via the
+        # ATTACH'd connection, prod via the same `con`. Deterministic
+        # ordering ensures identical content gets identical IDs.
+        if "entity_overrides_persistent" in tables:
+            _heal_override_ids(con, "prod")
+            # staging is ATTACH'd READ_ONLY — open a write handle to heal it.
+            # DuckDB forbids two write handles to one DB in one process; we
+            # must DETACH staging from the prod connection before opening a
+            # separate write handle. Re-ATTACH afterwards so the diff has
+            # access to the healed staging table.
+            con.execute("DETACH stg")
+            stg_rw = duckdb.connect(db.STAGING_DB)
+            try:
+                _heal_override_ids(stg_rw, "staging")
+            finally:
+                stg_rw.close()
+            con.execute(f"ATTACH '{db.STAGING_DB}' AS stg (READ_ONLY)")
 
         # Step 3 — apply changes inside one transaction so the
         # whole promotion is atomic from prod's point of view
