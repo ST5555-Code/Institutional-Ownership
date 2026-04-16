@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-15 (Session close #2 — N-PORT monthly topup live (446 accessions, 2026-02-28 max) + pending-series entity MDM resolver (T1 N-CEN / T2+T3 brand substring / S1 sibling-CIK) brought 3,613 new fund entities into prod + full re-promote of DERA Session 2 and topup run_ids against expanded entity gate. Prod now at 11.53M fund_holdings_v2 rows / 12,054 series / 12,060 fund_universe / 12,160 fund entities. 2,330 pending_entity_resolution rows remain (1,144 real residual ETF-specialty trusts + 1,186 deferred synthetics). Today's HEAD: `d8a6a01` (docs update following 39d5e95 code) — commit pending for resolve_pending_series.py.)_
+_Last updated: 2026-04-16 (Session close #3 — ETF brand additions (+528 series) promoted, plus bulk-SQL N-PORT enrichment rewrite, subset-validator synth relaxation, context_json backfill. Prod now at **11,670,960 fund_holdings_v2 rows / 12,594 series / 12,600 fund_universe / 12,688 active series_id identifiers / newest report_date 2026-02-28**. `pending_entity_resolution` now 4,141 resolved / 1,802 pending (616 real residual + 1,186 deferred synthetics). Today's HEAD: `08e2400`. **Next pickup: `scripts/enrich_holdings.py` — proposal drafted and awaiting confirmation (see §Batch 3 — enrich_holdings.py proposal below).**)_
 
 ## Today's sessions — commits and scope
 
@@ -16,7 +16,66 @@ _Last updated: 2026-04-15 (Session close #2 — N-PORT monthly topup live (446 a
 | `8a41c48` | CUSIP v1.4 prod promotion (docs) — migration 003 + staging→prod copy + normalize + validate |
 | `39d5e95` | N-PORT cleanup — cross-ZIP amendment dedup + validate_nport set-based rewrite (66s vs 45min) |
 | `d8a6a01` | Doc session close — full update across 7 docs |
-| *(pending)* | `scripts/resolve_pending_series.py` + N-PORT DERA S2 & topup re-promote — see §Pending-series MDM resolver below |
+| `c31ffcb` | docs: backfill parallel 2026-04-14 no-DB workstream |
+| `e4e6468` | `scripts/resolve_pending_series.py` + N-PORT DERA S2 & topup re-promote (3,613 series resolved) |
+| `7770f87` | `promote_nport.py` bulk-SQL enrichment + `validate_nport_subset.py` synth_resolved allowance + `backfill_pending_context.py` (5,943 rows) |
+| `08e2400` | ETF brand entity additions (`scripts/bootstrap_etf_advisers.py` + 11 SUPPLEMENTARY_BRANDS) — 528 more series resolved; cumulative 4,141 / 5,943 (69.7%) |
+
+## Batch 3 — `enrich_holdings.py` proposal (2026-04-16, awaiting confirmation)
+
+Next pickup. Proposal fully specified in session transcript; summary:
+
+- **Universe gate:** `cusip_classifications.is_equity = TRUE` (row-level: 10.66M of 12.27M `holdings_v2` rows).
+- **Join path:** `holdings_v2.cusip → securities.cusip → cusip_classifications.cusip → market_data.ticker = securities.ticker`.
+- **Four Group 3 columns** on `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live` (= shares × `market_data.price_live`), `pct_of_float` (= shares × 100 / `market_data.float_shares`). Plus `fund_holdings_v2.ticker` as an addon UPDATE.
+- **D6 resolution — option (b): full refresh every run.** Rationale: `market_data.price_live` is current-snapshot only (historical `price_YYYYQN` cols are 90-100% NULL); bulk UPDATE scales fine in DuckDB. Provide `--quarter YYYYQN` for targeted refresh.
+- **Rebuild pattern:** single `UPDATE ... FROM (SELECT ... LEFT JOIN ... LEFT JOIN ... LEFT JOIN ...)` scoped by optional quarter filter. No per-row Python loop. Same pattern as the `promote_nport._bulk_enrich_run` rewrite shipped in `7770f87`.
+- **PROCESS_RULES:** `--staging` default-prod toggle, `--dry-run` projection mode, per-UPDATE CHECKPOINT, freshness stamp to `data_freshness(table_name='holdings_v2_enrichment')`.
+- **Expected deltas on first run** (Option-B cleanup of legacy contamination):
+  - `ticker` populated: 11.26M → 10.40M (−860K legacy tickers on OPTION/BOND/CASH/WARRANT rows NULLed)
+  - `market_value_live`: 10.87M → 9.53M (−1.34M)
+  - `pct_of_float`: 9.46M → 7.59M (−1.87M)
+  - `security_type_inferred`: unchanged (already 100% populated, values agree)
+  - `fund_holdings_v2.ticker`: 3.74M → ~10.4M (68.0% NULL → ~10.8% NULL, major uplift)
+- **Out of scope:** Group 2 entity columns (owned by `promote_13f.py`), `market_data` refresh (owned by `fetch_market.py`), `float_shares` update.
+
+Inspection artifacts captured in session transcript — re-run if needed.
+
+**Next-session entry point:**
+```
+python3 scripts/enrich_holdings.py --dry-run            # projection vs current state
+python3 scripts/enrich_holdings.py --staging --dry-run  # test against staging
+# then on confirmation:
+python3 scripts/enrich_holdings.py                      # prod full refresh
+```
+
+## Session #3 deliverables (2026-04-16 morning close)
+
+**Prod state transitions this session:**
+
+| Metric | Session start (2026-04-15 d8a6a01) | Session end (2026-04-16 08e2400) | Δ |
+|---|---:|---:|---:|
+| `entity_identifiers(series_id, active)` | 8,547 | 12,688 | +4,141 |
+| `entities(fund)` | 8,547 | 12,160* | +3,613* |
+| `fund_holdings_v2` rows | 9,315,568 | 11,670,960 | +2,355,392 |
+| `fund_universe` rows | 8,459 | 12,600 | +4,141 |
+| Newest `report_date` | 2026-01-31 | **2026-02-28** | +1 month |
+| `pending_entity_resolution` pending | 5,943 | 1,802 | −4,141 resolved |
+| Coverage vs real staged | 0% (all held out) | 87.0% | — |
+
+*fund entity count does not match identifier count because 528 ETF-brand-resolved series share existing fund entities created in the earlier 3,613 batch — no double-counting on entities.
+
+**Three scripts shipped this session:**
+1. `scripts/resolve_pending_series.py` — 4-tier staging-first resolver (T1/T2/T3/S1) — commit `e4e6468`.
+2. `scripts/backfill_pending_context.py` — one-off `context_json` backfill — commit `7770f87`.
+3. `scripts/bootstrap_etf_advisers.py` — idempotent ETF adviser seeding (found Van Eck eid=6197 + Aptus eid=8977 pre-existing; created only BondBloxx eid=23819) — commit `08e2400`.
+
+**Infrastructure rewrites:**
+- `promote_nport.py` — per-tuple `_enrich_entity` replaced with single bulk `_bulk_enrich_run` (UPDATE...FROM JOIN). Verified 0/10 mismatch vs legacy. DERA-S2 re-promote this session used the new path successfully.
+- `validate_nport_subset.py` — BLOCK 3 split into `synth_no_entity` (still BLOCK) + `synth_resolved` (allowed when entity-backed).
+- `resolve_pending_series.py` — 11 ETF-specialty variants added to `SUPPLEMENTARY_BRANDS`; `MULTI_SUBADVISER_VARIANTS` set tags EA Series / ETF Opportunities / Listed Funds / Exchange Listed Funds rows with a DM12-deferral caveat in the decision log.
+
+**Validation state:** `validate_entities.py` prod = **8 PASS / 1 FAIL (`wellington_sub_advisory` baseline) / 7 MANUAL** — matches pre-session baseline, no structural drift across 4,141 new entity additions.
 
 ## Pending-series MDM resolver — 2026-04-15 (session #2)
 
