@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-16 (Session close #3 — ETF brand additions (+528 series) promoted, plus bulk-SQL N-PORT enrichment rewrite, subset-validator synth relaxation, context_json backfill. Prod now at **11,670,960 fund_holdings_v2 rows / 12,594 series / 12,600 fund_universe / 12,688 active series_id identifiers / newest report_date 2026-02-28**. `pending_entity_resolution` now 4,141 resolved / 1,802 pending (616 real residual + 1,186 deferred synthetics). Today's HEAD: `08e2400`. **Next pickup: `scripts/enrich_holdings.py` — proposal drafted and awaiting confirmation (see §Batch 3 — enrich_holdings.py proposal below).**)_
+_Last updated: 2026-04-16 (Session close #4 — Batch 3 `enrich_holdings.py` shipped + executed against prod. `holdings_v2` Group 3 now in canonical state: ticker 10,395,053 (-831K), sti 12,270,984 (unchanged), mvl 9,527,773 (-1.35M), pof 7,587,332 (-1.87M). `fund_holdings_v2.ticker` populated 5,184,911 (+1.45M from 3.74M). `data_freshness` stamped for `holdings_v2_enrichment`. Two open follow-ups for Batch 3: `compute_flows.py` rewrite + `build_summaries.py` rewrite — both unblocked. **Next pickup:** `compute_flows.py` rewrite to read `holdings_v2` instead of legacy `holdings`.)_
 
 ## Today's sessions — commits and scope
 
@@ -21,32 +21,38 @@ _Last updated: 2026-04-16 (Session close #3 — ETF brand additions (+528 series
 | `7770f87` | `promote_nport.py` bulk-SQL enrichment + `validate_nport_subset.py` synth_resolved allowance + `backfill_pending_context.py` (5,943 rows) |
 | `08e2400` | ETF brand entity additions (`scripts/bootstrap_etf_advisers.py` + 11 SUPPLEMENTARY_BRANDS) — 528 more series resolved; cumulative 4,141 / 5,943 (69.7%) |
 
-## Batch 3 — `enrich_holdings.py` proposal (2026-04-16, awaiting confirmation)
+## Batch 3 — `enrich_holdings.py` shipped (2026-04-16, session #4)
 
-Next pickup. Proposal fully specified in session transcript; summary:
+Shipped + ran against prod. Full refresh of Group 3 on `holdings_v2` plus `fund_holdings_v2.ticker` populate. Pre-run validation matched proposal numbers; the spec evolved on two points during validation, both confirmed by operator before write:
 
-- **Universe gate:** `cusip_classifications.is_equity = TRUE` (row-level: 10.66M of 12.27M `holdings_v2` rows).
-- **Join path:** `holdings_v2.cusip → securities.cusip → cusip_classifications.cusip → market_data.ticker = securities.ticker`.
-- **Four Group 3 columns** on `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live` (= shares × `market_data.price_live`), `pct_of_float` (= shares × 100 / `market_data.float_shares`). Plus `fund_holdings_v2.ticker` as an addon UPDATE.
-- **D6 resolution — option (b): full refresh every run.** Rationale: `market_data.price_live` is current-snapshot only (historical `price_YYYYQN` cols are 90-100% NULL); bulk UPDATE scales fine in DuckDB. Provide `--quarter YYYYQN` for targeted refresh.
-- **Rebuild pattern:** single `UPDATE ... FROM (SELECT ... LEFT JOIN ... LEFT JOIN ... LEFT JOIN ...)` scoped by optional quarter filter. No per-row Python loop. Same pattern as the `promote_nport._bulk_enrich_run` rewrite shipped in `7770f87`.
-- **PROCESS_RULES:** `--staging` default-prod toggle, `--dry-run` projection mode, per-UPDATE CHECKPOINT, freshness stamp to `data_freshness(table_name='holdings_v2_enrichment')`.
-- **Expected deltas on first run** (Option-B cleanup of legacy contamination):
-  - `ticker` populated: 11.26M → 10.40M (−860K legacy tickers on OPTION/BOND/CASH/WARRANT rows NULLed)
-  - `market_value_live`: 10.87M → 9.53M (−1.34M)
-  - `pct_of_float`: 9.46M → 7.59M (−1.87M)
-  - `security_type_inferred`: unchanged (already 100% populated, values agree)
-  - `fund_holdings_v2.ticker`: 3.74M → ~10.4M (68.0% NULL → ~10.8% NULL, major uplift)
-- **Out of scope:** Group 2 entity columns (owned by `promote_13f.py`), `market_data` refresh (owned by `fetch_market.py`), `float_shares` update.
+**Design adjustments vs original proposal:**
+1. **Join key for Pass B (main UPDATE).** Original spec said `(accession_number, cusip, quarter)`. Live DB check found that key has 1,289,171 dup groups covering 4,969,516 rows on `holdings_v2` — would silently corrupt `mvl`/`pof` (which depend on per-row `shares`). Switched to **lookup keyed by `cusip`** (verified 1:1 across `cusip_classifications`/`securities`/`market_data`); per-row `mvl`/`pof` use the OUTER row's `shares`. Pattern documented in `_LOOKUP_SQL` comment block.
+2. **Two-pass UPDATE.** Added explicit Pass A: NULL Group 3 cols on rows whose `cusip NOT IN cusip_classifications`. Pass A turned out to be a no-op today (every CUSIP in `holdings_v2` is classified post-CUSIP-v1.4 promote) but stays as a safety net for future drift.
+3. **`security_type_inferred` source.** Initial draft pulled from `cusip_classifications.canonical_type` (BOND/COM/OPTION/...) and produced 12.27M sti changes — the proposal said "values agree, unchanged". Switched to `securities.security_type_inferred` (legacy domain `equity/etf/derivative/money_market`) which is what the app's read paths speak. Result: 0 sti changes — proposal "values agree" honored.
+4. **`fund_holdings_v2.ticker` correction.** Proposal estimated +6.7M uplift. Real number is +1.45M (from 3.74M to 5.18M ticker populated). N-PORT's CUSIP universe is dominated by bonds/ABS/derivatives (374K distinct CUSIPs, only 11.7K with a non-null `securities.ticker`).
 
-Inspection artifacts captured in session transcript — re-run if needed.
+**Final prod state (after run):**
 
-**Next-session entry point:**
+| Column | Before | After | Delta | Match proposal? |
+|---|---:|---:|---:|---|
+| `holdings_v2.ticker` | 11,226,520 | 10,395,053 | -831,467 | ✓ ~10.40M |
+| `holdings_v2.security_type_inferred` | 12,270,984 | 12,270,984 | 0 | ✓ unchanged |
+| `holdings_v2.market_value_live` | 10,874,758 | 9,527,773 | -1,346,985 | ✓ ~9.53M |
+| `holdings_v2.pct_of_float` | 9,460,740 | 7,587,332 | -1,873,408 | ✓ ~7.59M |
+| `fund_holdings_v2.ticker` | 3,737,695 | 5,184,911 | +1,447,216 | proposal off-base; real +1.45M |
+| `data_freshness('holdings_v2_enrichment')` | absent | stamped 2026-04-16 05:33:50 UTC | row_count=10,395,053 | — |
+
+**Runtime:** Pass B 706.7s on 12.27M rows. Pass A no-op. Pass C 0.6s on 11.67M rows.
+
+**Spot-check confirmed NULL-tolerance** holds across `query1`, `query3`, `query7` against AAPL — `query1` returns 104 institutional rows with realistic aggregates (`value_live=$2.52T`, `pct_float=67.23%`, 5,797 institutions). All Group 3 readers use SUM/NULLS LAST/IS NOT NULL patterns per data_layers.md §5.
+
+**Next pickup:** `compute_flows.py` rewrite (Batch 3-2) — currently reads legacy `holdings`; rewrite to `holdings_v2`. Then `build_summaries.py` rewrite (Batch 3-3). Both unblocked by Batch 3.
+
+**Re-run entry point:**
 ```
-python3 scripts/enrich_holdings.py --dry-run            # projection vs current state
-python3 scripts/enrich_holdings.py --staging --dry-run  # test against staging
-# then on confirmation:
-python3 scripts/enrich_holdings.py                      # prod full refresh
+python3 scripts/enrich_holdings.py --dry-run --fund-holdings    # projection
+python3 scripts/enrich_holdings.py --fund-holdings              # prod full refresh
+python3 scripts/enrich_holdings.py --quarter 2026Q1             # scope to one quarter
 ```
 
 ## Session #3 deliverables (2026-04-16 morning close)

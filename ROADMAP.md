@@ -1,6 +1,40 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 15, 2026 — session close. HEAD: `d8a6a01` (docs) on top of `39d5e95` (code). CUSIP v1.4 layer live in prod (132,618 classifications). N-PORT DERA Session 2 promote live (fund_holdings_v2 6.39M → 9.32M; newest 2026-01-31). Parallel 2026-04-14 no-DB workstream (commit 831e5b4 / fd05c92) added: Makefile, check_freshness.py, record_freshness hooks on 8 scripts, validate_entities `--read-only`, add_last_refreshed_at draft. Batch 3 (enrich_holdings / compute_flows / build_summaries) is now unblocked._
+_Last updated: April 16, 2026 — session #4 close. HEAD: `d975f72` (docs) on top of Batch 3 ship. **Batch 3 — `scripts/enrich_holdings.py` shipped + executed against prod.** `holdings_v2` Group 3 in canonical state (ticker -831K, sti unchanged, mvl -1.35M, pof -1.87M); `fund_holdings_v2.ticker` +1.45M. `data_freshness('holdings_v2_enrichment')` stamped. Two follow-ups remain unblocked: `compute_flows.py` rewrite + `build_summaries.py` rewrite (both still read legacy `holdings`)._
+
+## Session Summary 2026-04-16 (Batch 3 — `enrich_holdings.py` shipped + executed against prod)
+
+Group 3 enrichment for `holdings_v2` now lives as a separate post-promote pass per the Option-B split (data_layers.md §5). Plus `fund_holdings_v2.ticker` populate.
+
+- **`scripts/enrich_holdings.py`** (new, ~480 lines). Three-pass orchestrator:
+  - **Pass A** — NULL cleanup on `holdings_v2` for rows whose `cusip NOT IN cusip_classifications` (no-op today; safety net for future drift).
+  - **Pass B** — Main enrichment via cusip-keyed `UPDATE...FROM (lookup)`. The lookup is one row per cusip (verified 1:1 across `cusip_classifications` / `securities` / `market_data`); per-row `mvl` / `pof` use the OUTER row's `shares`. Pattern documented inline.
+  - **Pass C** — `fund_holdings_v2.ticker` populate (no `is_equity` gate — N-PORT carries equity-priceable ETF/CEF/ADR positions whose CUSIPs classify as `is_equity=FALSE`).
+- **CLI:** `--staging` (default prod), `--dry-run`, `--quarter YYYYQN`, `--fund-holdings`. Per-pass CHECKPOINT. Per-run log to `logs/enrich_holdings_{ts}.log`. Stamps `data_freshness('holdings_v2_enrichment')` at end of write run with row_count.
+- **Pre-write design adjustments vs original proposal** (all confirmed by operator before write):
+  1. **Join key.** Original spec said `(accession_number, cusip, quarter)` — that key has 1.29M dup groups covering 4.97M rows, would silently corrupt `mvl`/`pof`. Switched to lookup keyed by `cusip`.
+  2. **`security_type_inferred` source.** Drafted to read `cusip_classifications.canonical_type` (BOND/COM/OPTION/...) and produced 12.27M sti changes. Switched to `securities.security_type_inferred` (legacy domain `equity/etf/derivative/money_market`) — the values the app's read paths speak. Result: 0 sti changes, "values agree" honored.
+  3. **`fund_holdings_v2.ticker` projection.** Proposal estimated ~10.4M post-state; real number is 5.18M (+1.45M uplift) — N-PORT's CUSIP universe is dominated by bonds/ABS/derivatives that have no `securities.ticker`.
+
+**Final prod state (after run):**
+
+| Column | Before | After | Delta |
+|---|---:|---:|---:|
+| `holdings_v2.ticker` | 11,226,520 | 10,395,053 | -831,467 |
+| `holdings_v2.security_type_inferred` | 12,270,984 | 12,270,984 | 0 |
+| `holdings_v2.market_value_live` | 10,874,758 | 9,527,773 | -1,346,985 |
+| `holdings_v2.pct_of_float` | 9,460,740 | 7,587,332 | -1,873,408 |
+| `fund_holdings_v2.ticker` | 3,737,695 | 5,184,911 | +1,447,216 |
+
+**Runtime:** Pass B 706.7s on 12.27M rows. Pass A no-op. Pass C 0.6s on 11.67M rows.
+
+**Spot-check confirmed NULL-tolerance** holds across `query1`, `query3`, `query7` against AAPL — `query1` returns 104 institutional rows with realistic aggregates (`value_live=$2.52T`, `pct_float=67.23%`, 5,797 institutions). All Group 3 readers use SUM/NULLS LAST/IS NOT NULL patterns per data_layers.md §5. No code rewrites needed in `queries.py`.
+
+**Lints:** ruff clean / pylint 10/10 / bandit clean (with project `.bandit` config skipping B608 across the codebase).
+
+**Next:** `compute_flows.py` rewrite (Batch 3-2) — currently reads legacy `holdings`; rewrite to `holdings_v2`. Then `build_summaries.py` rewrite (Batch 3-3).
+
+---
 
 ## Session Summary 2026-04-14 (parallel no-DB workstream, commit 831e5b4) — Makefile + freshness gates
 
@@ -640,6 +674,7 @@ economic_control_v1 as 'Fund Sponsor / Voting' to make this explicit.
 
 | Date | Item | Details |
 |------|------|---------|
+| 2026-04-16 | **Batch 3 — `enrich_holdings.py` shipped + executed against prod** | New `scripts/enrich_holdings.py` (~480 lines, Pass A NULL cleanup → Pass B cusip-keyed UPDATE → Pass C `fund_holdings_v2.ticker`). Three pre-write design adjustments vs original proposal: switched from `(accession_number, cusip, quarter)` join key (1.29M dup groups, would corrupt `mvl`/`pof`) to lookup keyed by `cusip` (1:1 verified); switched `security_type_inferred` source from `cusip_classifications.canonical_type` (12.27M unwanted changes) to `securities.security_type_inferred` (0 changes, "values agree"); confirmed `fund_holdings_v2.ticker` real uplift is +1.45M not +6.7M (N-PORT CUSIP universe dominated by bonds/ABS). **Final prod deltas:** `holdings_v2.ticker` -831,467 (11.23M → 10.40M), `sti` 0 (unchanged), `market_value_live` -1,346,985 (10.87M → 9.53M), `pct_of_float` -1,873,408 (9.46M → 7.59M); `fund_holdings_v2.ticker` +1,447,216 (3.74M → 5.18M). `data_freshness('holdings_v2_enrichment')` stamped 2026-04-16 05:33:50 UTC, row_count=10,395,053. Pass B took 706.7s on 12.27M rows. NULL-tolerance spot-check on `query1/query3/query7` confirms readers handle the new NULL distribution (query1 AAPL returns 104 institutional rows, $2.52T total `value_live`, 67.23% `pct_float`, 5,797 institutions). Ruff + pylint 10/10 + bandit clean. CLI: `--staging --dry-run --quarter YYYYQN --fund-holdings`. Per-pass CHECKPOINT, per-run log to `logs/enrich_holdings_{ts}.log`. **Next unblocked:** `compute_flows.py` and `build_summaries.py` rewrites (still read legacy `holdings`). |
 | 2026-04-13 | **BL-9 — `/api/v1/short_long` KeyError 'long_value_k' fixed** | Commit `9572844`. Two bugs in `get_short_long_comparison` (`scripts/queries.py:3864`): (1) `_has_table('fund_holdings')` silently short-circuited the endpoint to empty after Stage 5 dropped the legacy table — fixed to `_has_table('fund_holdings_v2')` which is the table the SQL actually reads; (2) `long_row['long_value_k']` raised KeyError because the SELECT aliases the column as `long_value`. Renamed the output dict key to `long_value` for parity with `short_value`. Verified: `?ticker=EQT` returns 200 with 53 long_short_managers + 2 short_only_funds; `?ticker=AAPL` returns 21 + 2. Pre-commit (ruff + pylint + bandit) clean. |
 | 2026-04-13 | **BL-10 — 4 broken Excel exports (q6/q10/q11/q15) fixed** | Commit `9ea3557`. Root cause: the extractor in `api_export` (`scripts/api_register.py`) only handled dict responses with `positions` or `rows` keys. q6/q10/q11 are multi-list dicts; q15 is `list[1]` wrapping nested lists + a nested dict. The whole structure was being passed into openpyxl which choked on dict-as-row iteration and nested list cell values. **Fix:** new `build_excel_multisheet(sheets)` helper in `scripts/export.py` taking `{sheet_name: list[dict] | dict}` → one formatted sheet per entry. Sheet name sanitization (31-char cap, Excel-illegal char stripping, collision suffixes). Cell writer defensively str()s any list/dict the flattener misses. `api_export` detects multi-table shapes at runtime: (a) dict without `positions`/`rows` → one sheet per key; (b) `list[1]` with list/dict-valued fields → Overview sheet for scalars + one sheet per nested list/dict. Single-sheet path (q1, q2, q7, q16) unchanged. Verified: q6→5 sheets (activist_13d, passive_5pct, history, activist_13f, short_interest), q10→2 (new_entries, exits), q11→2 (same), q15→3 (Overview, quarters, coverage); all xlsx magic bytes `504b0304`; openpyxl round-trip load succeeds. Pre-commit clean. |
 | 2026-04-13 | **ARCH-4C-followup discovered — React type migration blocked on schemas.py** | Original queue: "migrate React tabs from hand-written `src/types/api.ts` to auto-generated `src/types/api-generated.ts`, tab by tab". Attempt during this session uncovered that `api-generated.ts` has 7 named schemas vs ~55 in `api.ts`, and 5 of 7 generated schemas (`ConvictionPayload`, `OwnershipTrendPayload`, `FlowAnalysisPayload`, `EntityGraphPayload`, `RegisterPayload`) are `{[key: string]: unknown}` opaque or only type top-level keys while row shapes stay opaque. `RegisterRow` generated has 1 field typed (`institution`) vs 17 in `api.ts`. Mechanical migration would regress type safety. **Deferred as ARCH-4C-followup (two-step):** (1) expand `scripts/schemas.py` Pydantic models to carry full field-level shapes for all ~55 responses currently in `api.ts` (4-6 hours of schema authoring); (2) regenerate `api-generated.ts`, migrate React tabs, delete `api.ts`. Step 2 must not start until step 1 is complete. Zero code changes this session — ROADMAP + NEXT_SESSION_CONTEXT notes only. |
