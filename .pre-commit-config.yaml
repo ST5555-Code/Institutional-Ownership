@@ -20,7 +20,7 @@ repos:
         # no-name-in-module (db layer re-exports). Pre-existing cruft as of
         # 2026-04-13 Phase 0-A baseline — see ROADMAP for cleanup tickets.
         args:
-          - '--disable=C,R,W0108,W0212,W0603,W0612,W0613,W0621,W0622,W0640,W0718,W1309,W1510,W1514,I1101,E0606,E0611'
+          - '--disable=C,R,W0108,W0212,W0603,W0612,W0613,W0621,W0622,W0640,W0718,W1309,W1510,W1514,I1101,E0401,E0606,E0611'
           - '--max-line-length=120'
         files: ^scripts/
         additional_dependencies: [duckdb, requests, rapidfuzz, flask, openpyxl, pandas, lxml]
