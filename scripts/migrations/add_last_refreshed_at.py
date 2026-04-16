@@ -37,7 +37,9 @@ order is:
 
 Usage
 -----
+  python3 scripts/migrations/add_last_refreshed_at.py --staging --dry-run
   python3 scripts/migrations/add_last_refreshed_at.py --staging
+  python3 scripts/migrations/add_last_refreshed_at.py --prod --dry-run
   python3 scripts/migrations/add_last_refreshed_at.py --prod
   python3 scripts/migrations/add_last_refreshed_at.py --path path/to/db
 """
@@ -49,12 +51,12 @@ import os
 import duckdb
 
 
-def run_migration(db_path: str) -> None:
+def run_migration(db_path: str, dry_run: bool = False) -> None:
     if not os.path.exists(db_path):
         print(f"  SKIP: {db_path} does not exist")
         return
 
-    con = duckdb.connect(db_path)
+    con = duckdb.connect(db_path, read_only=dry_run)
     try:
         cols_before = con.execute("""
             SELECT column_name FROM information_schema.columns
@@ -66,7 +68,25 @@ def run_migration(db_path: str) -> None:
             print(f"  {db_path}: last_refreshed_at already present — no-op")
             return
 
-        print(f"  {db_path}: adding last_refreshed_at …")
+        n_total = con.execute(
+            "SELECT COUNT(*) FROM entity_relationships"
+        ).fetchone()[0]
+        n_with_created = con.execute(
+            "SELECT COUNT(*) FROM entity_relationships "
+            "WHERE created_at IS NOT NULL"
+        ).fetchone()[0]
+        print(f"  {db_path}: dry_run={dry_run}")
+        print(f"    rows total              : {n_total:,}")
+        print(f"    rows with created_at    : {n_with_created:,}")
+        print(f"    rows without created_at : {n_total - n_with_created:,}")
+        print("  WILL ADD: last_refreshed_at TIMESTAMP")
+        print("  WILL BACKFILL: last_refreshed_at = created_at "
+              "WHERE created_at IS NOT NULL")
+
+        if dry_run:
+            print("  DRY-RUN — no writes.")
+            return
+
         con.execute(
             "ALTER TABLE entity_relationships "
             "ADD COLUMN last_refreshed_at TIMESTAMP"
@@ -84,16 +104,12 @@ def run_migration(db_path: str) -> None:
         """)
         con.execute("CHECKPOINT")
 
-        n_total = con.execute(
-            "SELECT COUNT(*) FROM entity_relationships"
-        ).fetchone()[0]
         n_backfilled = con.execute(
             "SELECT COUNT(*) FROM entity_relationships "
             "WHERE last_refreshed_at IS NOT NULL"
         ).fetchone()[0]
-        print(f"    total rows: {n_total:,}")
-        print(f"    backfilled: {n_backfilled:,}")
-        print(f"    NULL (no created_at): {n_total - n_backfilled:,}")
+        print(f"  AFTER: backfilled {n_backfilled:,} / {n_total:,}  "
+              f"NULL (no created_at): {n_total - n_backfilled:,}")
     finally:
         con.close()
 
@@ -107,6 +123,8 @@ def main() -> None:
                         help="apply to data/13f.duckdb")
     p.add_argument("--path", default=None,
                    help="explicit DB path (overrides --staging / --prod)")
+    p.add_argument("--dry-run", action="store_true",
+                   help="report actions; no writes")
     args = p.parse_args()
 
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -117,7 +135,7 @@ def main() -> None:
     else:  # default / --prod
         db_path = os.path.join(here, "data", "13f.duckdb")
 
-    run_migration(db_path)
+    run_migration(db_path, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
