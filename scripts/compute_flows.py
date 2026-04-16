@@ -1,59 +1,155 @@
 #!/usr/bin/env python3
+"""compute_flows.py — Institutional investor flow analytics from holdings_v2.
+
+Rewrite (Batch 3-2, 2026-04-16): swapped source table from legacy
+`holdings` (dropped 2026-04-13 Stage 5) to `holdings_v2`, and added
+explicit support for both rollup worldviews (economic_control_v1 +
+decision_maker_v1). Each period's INSERT runs twice — once per
+worldview — tagged with the `rollup_type` column.
+
+Design notes:
+  * Investor key: `rollup_entity_id` (BIGINT, stable) + `rollup_name`
+    (display string). `inst_parent_name` retained as a back-compat
+    column equal to `rollup_name` for the chosen worldview, so existing
+    app reads at `queries.py:1444` (`WHERE inst_parent_name = ?`) keep
+    working unchanged.
+  * Value column: `market_value_usd` (Group 1, 100% complete). Matches
+    legacy semantics (filing-date value, from which `from_price =
+    from_value/from_shares` implies price AT filing) — NOT
+    `market_value_live` (Group 3, 22.4% NULL post-enrich).
+  * Full rebuild every run. Per-(period × worldview) CHECKPOINT.
+  * Momentum signals and ticker_flow_stats computed per worldview.
+
+Usage:
+  python3 scripts/compute_flows.py --dry-run           # projection
+  python3 scripts/compute_flows.py --staging           # write to staging DB
+  python3 scripts/compute_flows.py                     # prod full rebuild
 """
-compute_flows.py — Compute institutional investor flow analytics.
+from __future__ import annotations
 
-Set-based SQL approach: bulk INSERT per period using window functions.
-No per-ticker loop — all tickers processed in a single pass per period.
-
-Usage: python3 scripts/compute_flows.py
-"""
-
+import argparse
+import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import duckdb
 
-from db import set_staging_mode, get_db_path, record_freshness
-from config import LATEST_QUARTER, FLOW_PERIODS
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import db  # noqa: E402  pylint: disable=wrong-import-position
+from config import FLOW_PERIODS  # noqa: E402  pylint: disable=wrong-import-position
 
-PERIODS = FLOW_PERIODS
-LATEST_Q = LATEST_QUARTER
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+
+_ROLLUP_SPECS = [
+    # (rollup_type label, rollup_entity_id col, rollup_name col)
+    ("economic_control_v1", "rollup_entity_id", "rollup_name"),
+    ("decision_maker_v1",   "dm_rollup_entity_id", "dm_rollup_name"),
+]
 
 
-def create_tables(con):
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+class _Tee:
+    """Mirror prints to stdout and a log file. Use as a context manager."""
+
+    def __init__(self, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self.path = path
+        self._fh = None
+
+    def __enter__(self) -> "_Tee":
+        self._fh = open(  # pylint: disable=consider-using-with
+            self.path, "w", encoding="utf-8", buffering=1)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self._fh is not None:
+            self._fh.close()
+
+    def line(self, msg: str = "") -> None:
+        """Write a line to stdout and the log file."""
+        sys.stdout.write(msg + "\n")
+        sys.stdout.flush()
+        if self._fh is not None:
+            self._fh.write(msg + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Schema (DROP+CREATE — full rebuild every run)
+# ---------------------------------------------------------------------------
+
+def _create_tables(con) -> None:
+    """Drop and recreate the flow output tables with rollup_type support."""
     con.execute("DROP TABLE IF EXISTS investor_flows")
     con.execute("""
         CREATE TABLE investor_flows (
-            ticker VARCHAR, period VARCHAR, quarter_from VARCHAR, quarter_to VARCHAR,
-            inst_parent_name VARCHAR, manager_type VARCHAR,
-            from_shares DOUBLE, to_shares DOUBLE, net_shares DOUBLE, pct_change DOUBLE,
-            from_value DOUBLE, to_value DOUBLE, from_price DOUBLE,
-            price_adj_flow DOUBLE, raw_flow DOUBLE, price_effect DOUBLE,
-            is_new_entry BOOLEAN, is_exit BOOLEAN,
-            flow_4q DOUBLE, flow_2q DOUBLE, momentum_ratio DOUBLE, momentum_signal VARCHAR
+            ticker VARCHAR,
+            period VARCHAR,
+            quarter_from VARCHAR,
+            quarter_to VARCHAR,
+            rollup_type VARCHAR,
+            rollup_entity_id BIGINT,
+            rollup_name VARCHAR,
+            inst_parent_name VARCHAR,
+            manager_type VARCHAR,
+            from_shares DOUBLE,
+            to_shares DOUBLE,
+            net_shares DOUBLE,
+            pct_change DOUBLE,
+            from_value DOUBLE,
+            to_value DOUBLE,
+            from_price DOUBLE,
+            price_adj_flow DOUBLE,
+            raw_flow DOUBLE,
+            price_effect DOUBLE,
+            is_new_entry BOOLEAN,
+            is_exit BOOLEAN,
+            flow_4q DOUBLE,
+            flow_2q DOUBLE,
+            momentum_ratio DOUBLE,
+            momentum_signal VARCHAR
         )
     """)
     con.execute("DROP TABLE IF EXISTS ticker_flow_stats")
     con.execute("""
         CREATE TABLE ticker_flow_stats (
-            ticker VARCHAR, quarter_from VARCHAR, quarter_to VARCHAR,
-            flow_intensity_total DOUBLE, flow_intensity_active DOUBLE,
+            ticker VARCHAR,
+            quarter_from VARCHAR,
+            quarter_to VARCHAR,
+            rollup_type VARCHAR,
+            flow_intensity_total DOUBLE,
+            flow_intensity_active DOUBLE,
             flow_intensity_passive DOUBLE,
-            churn_nonpassive DOUBLE, churn_active DOUBLE, computed_at TIMESTAMP
+            churn_nonpassive DOUBLE,
+            churn_active DOUBLE,
+            computed_at TIMESTAMP
         )
     """)
 
 
-def compute_period_flows(con, period_label, q_from, q_to):
-    """Compute all investor flows for a single period using set-based SQL."""
-    print(f"  Computing {period_label} ({q_from} → {q_to})...", flush=True)
-    t0 = time.time()
+# ---------------------------------------------------------------------------
+# Per-period × per-worldview INSERT
+# ---------------------------------------------------------------------------
 
+def _insert_period_flows(  # pylint: disable=too-many-positional-arguments,too-many-arguments
+    con,
+    period_label: str,
+    q_from: str,
+    q_to: str,
+    rollup_type: str,
+    rid_col: str,
+    rname_col: str,
+) -> int:
+    """INSERT one period's flows for one worldview. Returns row count."""
     con.execute(f"""
         INSERT INTO investor_flows (
             ticker, period, quarter_from, quarter_to,
-            inst_parent_name, manager_type,
+            rollup_type, rollup_entity_id, rollup_name, inst_parent_name,
+            manager_type,
             from_shares, to_shares, net_shares, pct_change,
             from_value, to_value, from_price,
             price_adj_flow, raw_flow, price_effect,
@@ -62,200 +158,346 @@ def compute_period_flows(con, period_label, q_from, q_to):
         )
         WITH q_from AS (
             SELECT ticker,
-                   COALESCE(inst_parent_name, manager_name) as investor,
-                   MAX(manager_type) as manager_type,
-                   SUM(shares) as shares,
-                   SUM(market_value_usd) as value
-            FROM holdings WHERE quarter = '{q_from}'
-            GROUP BY ticker, investor
+                   {rid_col}   AS rollup_entity_id,
+                   {rname_col} AS rollup_name,
+                   MAX(manager_type) AS manager_type,
+                   SUM(shares)           AS shares,
+                   SUM(market_value_usd) AS value
+            FROM holdings_v2
+            WHERE quarter = '{q_from}'
+              AND ticker IS NOT NULL AND ticker != ''
+            GROUP BY ticker, {rid_col}, {rname_col}
         ),
         q_to AS (
             SELECT ticker,
-                   COALESCE(inst_parent_name, manager_name) as investor,
-                   MAX(manager_type) as manager_type,
-                   SUM(shares) as shares,
-                   SUM(market_value_usd) as value
-            FROM holdings WHERE quarter = '{q_to}'
-            GROUP BY ticker, investor
+                   {rid_col}   AS rollup_entity_id,
+                   {rname_col} AS rollup_name,
+                   MAX(manager_type) AS manager_type,
+                   SUM(shares)           AS shares,
+                   SUM(market_value_usd) AS value
+            FROM holdings_v2
+            WHERE quarter = '{q_to}'
+              AND ticker IS NOT NULL AND ticker != ''
+            GROUP BY ticker, {rid_col}, {rname_col}
         ),
         combined AS (
             SELECT
-                COALESCE(t.ticker, f.ticker) as ticker,
-                COALESCE(t.investor, f.investor) as investor,
-                COALESCE(t.manager_type, f.manager_type) as manager_type,
-                COALESCE(f.shares, 0) as from_shares,
-                COALESCE(t.shares, 0) as to_shares,
-                COALESCE(f.value, 0) as from_value,
-                COALESCE(t.value, 0) as to_value
+                COALESCE(t.ticker, f.ticker)                     AS ticker,
+                COALESCE(t.rollup_entity_id, f.rollup_entity_id) AS rollup_entity_id,
+                COALESCE(t.rollup_name, f.rollup_name)           AS rollup_name,
+                COALESCE(t.manager_type, f.manager_type)         AS manager_type,
+                COALESCE(f.shares, 0) AS from_shares,
+                COALESCE(t.shares, 0) AS to_shares,
+                COALESCE(f.value,  0) AS from_value,
+                COALESCE(t.value,  0) AS to_value
             FROM q_to t
-            FULL OUTER JOIN q_from f ON t.ticker = f.ticker AND t.investor = f.investor
+            FULL OUTER JOIN q_from f
+                ON t.ticker = f.ticker
+               AND t.rollup_entity_id IS NOT DISTINCT FROM f.rollup_entity_id
         ),
         flows AS (
             SELECT *,
-                to_shares - from_shares as net_shares,
-                CASE WHEN from_shares > 0 THEN (to_shares - from_shares) / from_shares ELSE NULL END as pct_change,
-                from_shares = 0 AND to_shares > 0 as is_new_entry,
-                from_shares > 0 AND to_shares = 0 as is_exit,
-                CASE WHEN from_shares > 0 AND from_value > 0 THEN from_value / from_shares ELSE NULL END as from_price,
+                to_shares - from_shares AS net_shares,
+                CASE WHEN from_shares > 0
+                     THEN (to_shares - from_shares) / from_shares END AS pct_change,
+                from_shares = 0 AND to_shares > 0 AS is_new_entry,
+                from_shares > 0 AND to_shares = 0 AS is_exit,
                 CASE WHEN from_shares > 0 AND from_value > 0
-                    THEN (to_shares - from_shares) * (from_value / from_shares)
-                    ELSE NULL END as price_adj_flow,
-                to_value - from_value as raw_flow,
+                     THEN from_value / from_shares END AS from_price,
                 CASE WHEN from_shares > 0 AND from_value > 0
-                    THEN (to_value - from_value) - ((to_shares - from_shares) * (from_value / from_shares))
-                    ELSE NULL END as price_effect
+                     THEN (to_shares - from_shares) * (from_value / from_shares)
+                     END AS price_adj_flow,
+                to_value - from_value AS raw_flow,
+                CASE WHEN from_shares > 0 AND from_value > 0
+                     THEN (to_value - from_value)
+                          - ((to_shares - from_shares) * (from_value / from_shares))
+                     END AS price_effect
             FROM combined
             WHERE from_shares > 0 OR to_shares > 0
         )
         SELECT
-            ticker, '{period_label}', '{q_from}', '{q_to}',
-            investor, manager_type,
-            CASE WHEN from_shares > 0 THEN from_shares ELSE NULL END,
-            CASE WHEN to_shares > 0 THEN to_shares ELSE NULL END,
-            CASE WHEN net_shares != 0 THEN net_shares ELSE NULL END,
+            ticker,
+            '{period_label}' AS period,
+            '{q_from}' AS quarter_from,
+            '{q_to}' AS quarter_to,
+            '{rollup_type}' AS rollup_type,
+            rollup_entity_id,
+            rollup_name,
+            rollup_name AS inst_parent_name,   -- back-compat for queries.py:1444
+            manager_type,
+            CASE WHEN from_shares > 0 THEN from_shares END,
+            CASE WHEN to_shares   > 0 THEN to_shares   END,
+            CASE WHEN net_shares != 0 THEN net_shares  END,
             pct_change,
-            CASE WHEN from_value > 0 THEN from_value ELSE NULL END,
-            CASE WHEN to_value > 0 THEN to_value ELSE NULL END,
-            from_price, price_adj_flow,
-            CASE WHEN raw_flow != 0 THEN raw_flow ELSE NULL END,
+            CASE WHEN from_value > 0 THEN from_value END,
+            CASE WHEN to_value   > 0 THEN to_value   END,
+            from_price,
+            price_adj_flow,
+            CASE WHEN raw_flow != 0 THEN raw_flow END,
             price_effect,
-            is_new_entry, is_exit,
-            NULL, NULL, NULL, NULL  -- momentum fields filled in next pass
+            is_new_entry,
+            is_exit,
+            NULL, NULL, NULL, NULL   -- momentum fields filled in next pass
         FROM flows
     """)
-
-    count = con.execute(f"""
-        SELECT COUNT(*) FROM investor_flows WHERE period = '{period_label}'
-    """).fetchone()[0]
-    elapsed = time.time() - t0
-    print(f"    {count:,} flow rows in {elapsed:.1f}s", flush=True)
+    return con.execute(
+        f"SELECT COUNT(*) FROM investor_flows "
+        f"WHERE period = '{period_label}' AND rollup_type = '{rollup_type}'"
+    ).fetchone()[0]
 
 
-def compute_momentum(con):
-    """Fill momentum fields using 4Q and 1Q flow data."""
-    print("  Computing momentum signals...", flush=True)
-    con.execute("""
+def _project_period_flows(
+    con,
+    q_from: str,
+    q_to: str,
+    rid_col: str,
+    rname_col: str,
+) -> int:
+    """Dry-run projection: count rows that would be inserted for this slice."""
+    row = con.execute(f"""
+        WITH q_from AS (
+            SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
+                   SUM(shares) AS shares, SUM(market_value_usd) AS value
+            FROM holdings_v2
+            WHERE quarter = '{q_from}' AND ticker IS NOT NULL AND ticker != ''
+            GROUP BY ticker, {rid_col}, {rname_col}
+        ),
+        q_to AS (
+            SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
+                   SUM(shares) AS shares, SUM(market_value_usd) AS value
+            FROM holdings_v2
+            WHERE quarter = '{q_to}' AND ticker IS NOT NULL AND ticker != ''
+            GROUP BY ticker, {rid_col}, {rname_col}
+        )
+        SELECT COUNT(*)
+        FROM q_to t
+        FULL OUTER JOIN q_from f
+            ON t.ticker = f.ticker
+           AND t.rid IS NOT DISTINCT FROM f.rid
+        WHERE COALESCE(f.shares, 0) > 0 OR COALESCE(t.shares, 0) > 0
+    """).fetchone()
+    return row[0]
+
+
+# ---------------------------------------------------------------------------
+# Momentum + ticker stats (per-worldview)
+# ---------------------------------------------------------------------------
+
+def _compute_momentum(con, rollup_type: str) -> None:
+    """Fill flow_4q / flow_2q / momentum_ratio / momentum_signal."""
+    con.execute(f"""
         UPDATE investor_flows f
-        SET flow_4q = m4.price_adj_flow
-        FROM investor_flows m4
-        WHERE f.ticker = m4.ticker AND f.inst_parent_name = m4.inst_parent_name
-          AND m4.period = '4Q'
-          AND f.flow_4q IS NULL
+           SET flow_4q = m4.price_adj_flow
+          FROM investor_flows m4
+         WHERE f.ticker           = m4.ticker
+           AND f.rollup_entity_id IS NOT DISTINCT FROM m4.rollup_entity_id
+           AND f.rollup_type      = m4.rollup_type
+           AND m4.period          = '4Q'
+           AND f.rollup_type      = '{rollup_type}'
+           AND f.flow_4q IS NULL
     """)
-    con.execute("""
+    con.execute(f"""
         UPDATE investor_flows f
-        SET flow_2q = m1.price_adj_flow
-        FROM investor_flows m1
-        WHERE f.ticker = m1.ticker AND f.inst_parent_name = m1.inst_parent_name
-          AND m1.period = '1Q'
-          AND f.flow_2q IS NULL
+           SET flow_2q = m1.price_adj_flow
+          FROM investor_flows m1
+         WHERE f.ticker           = m1.ticker
+           AND f.rollup_entity_id IS NOT DISTINCT FROM m1.rollup_entity_id
+           AND f.rollup_type      = m1.rollup_type
+           AND m1.period          = '1Q'
+           AND f.rollup_type      = '{rollup_type}'
+           AND f.flow_2q IS NULL
     """)
-    con.execute("""
+    con.execute(f"""
         UPDATE investor_flows
-        SET momentum_ratio = CASE WHEN flow_4q != 0 AND flow_2q IS NOT NULL
-                                  THEN flow_2q / flow_4q ELSE NULL END
+           SET momentum_ratio = CASE WHEN flow_4q != 0 AND flow_2q IS NOT NULL
+                                     THEN flow_2q / flow_4q END
+         WHERE rollup_type = '{rollup_type}'
     """)
-    con.execute("""
+    con.execute(f"""
         UPDATE investor_flows
-        SET momentum_signal = CASE
-            WHEN manager_type = 'passive' THEN NULL
-            WHEN is_new_entry THEN 'NEW'
-            WHEN is_exit THEN 'EXIT'
-            WHEN momentum_ratio IS NULL THEN NULL
-            WHEN momentum_ratio > 0.65 THEN 'ACCEL'
-            WHEN momentum_ratio >= 0.35 THEN 'STEADY'
-            WHEN momentum_ratio >= 0.10 THEN 'FADING'
-            WHEN momentum_ratio >= 0 THEN 'MINIMAL'
-            ELSE 'REVERSING'
-        END
+           SET momentum_signal = CASE
+                WHEN manager_type = 'passive' THEN NULL
+                WHEN is_new_entry             THEN 'NEW'
+                WHEN is_exit                  THEN 'EXIT'
+                WHEN momentum_ratio IS NULL   THEN NULL
+                WHEN momentum_ratio >  0.65   THEN 'ACCEL'
+                WHEN momentum_ratio >= 0.35   THEN 'STEADY'
+                WHEN momentum_ratio >= 0.10   THEN 'FADING'
+                WHEN momentum_ratio >= 0      THEN 'MINIMAL'
+                ELSE 'REVERSING'
+             END
+         WHERE rollup_type = '{rollup_type}'
     """)
 
 
-def compute_ticker_stats(con):
-    """Compute aggregate flow intensity and churn per ticker per period."""
-    print("  Computing ticker-level stats...", flush=True)
+def _compute_ticker_stats(con, rollup_type: str) -> int:
+    """INSERT aggregate flow_intensity + churn per (ticker, period) for a worldview."""
     con.execute(f"""
         INSERT INTO ticker_flow_stats
         SELECT
-            f.ticker, quarter_from, quarter_to,
-            -- Flow intensity = sum(price_adj_flow) / market_cap (existing holders only)
-            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit THEN price_adj_flow ELSE 0 END)
-                / NULLIF(MAX(m.market_cap), 0) as fi_total,
-            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit AND manager_type != 'passive'
-                THEN price_adj_flow ELSE 0 END)
-                / NULLIF(MAX(m.market_cap), 0) as fi_active,
-            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit AND manager_type = 'passive'
-                THEN price_adj_flow ELSE 0 END)
-                / NULLIF(MAX(m.market_cap), 0) as fi_passive,
-            -- Churn: (entry_value + exit_value) / avg_value for non-passive
-            (SUM(CASE WHEN is_new_entry AND manager_type != 'passive' THEN to_value ELSE 0 END)
-             + SUM(CASE WHEN is_exit AND manager_type != 'passive' THEN from_value ELSE 0 END))
-            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type != 'passive' THEN from_value ELSE 0 END)
-                      + SUM(CASE WHEN NOT is_exit AND manager_type != 'passive' THEN to_value ELSE 0 END)) / 2, 0)
-            as churn_np,
-            -- Churn active only
-            (SUM(CASE WHEN is_new_entry AND manager_type = 'active' THEN to_value ELSE 0 END)
-             + SUM(CASE WHEN is_exit AND manager_type = 'active' THEN from_value ELSE 0 END))
-            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type = 'active' THEN from_value ELSE 0 END)
-                      + SUM(CASE WHEN NOT is_exit AND manager_type = 'active' THEN to_value ELSE 0 END)) / 2, 0)
-            as churn_active,
+            f.ticker,
+            quarter_from,
+            quarter_to,
+            '{rollup_type}' AS rollup_type,
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit
+                     THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) AS fi_total,
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit
+                          AND manager_type != 'passive'
+                     THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) AS fi_active,
+            SUM(CASE WHEN NOT is_new_entry AND NOT is_exit
+                          AND manager_type  = 'passive'
+                     THEN price_adj_flow ELSE 0 END)
+                / NULLIF(MAX(m.market_cap), 0) AS fi_passive,
+            (SUM(CASE WHEN is_new_entry AND manager_type != 'passive'
+                      THEN to_value ELSE 0 END)
+             + SUM(CASE WHEN is_exit AND manager_type != 'passive'
+                        THEN from_value ELSE 0 END))
+            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type != 'passive'
+                                THEN from_value ELSE 0 END)
+                    + SUM(CASE WHEN NOT is_exit AND manager_type != 'passive'
+                                THEN to_value ELSE 0 END)) / 2, 0) AS churn_np,
+            (SUM(CASE WHEN is_new_entry AND manager_type = 'active'
+                      THEN to_value ELSE 0 END)
+             + SUM(CASE WHEN is_exit AND manager_type = 'active'
+                        THEN from_value ELSE 0 END))
+            / NULLIF((SUM(CASE WHEN NOT is_new_entry AND manager_type = 'active'
+                                THEN from_value ELSE 0 END)
+                    + SUM(CASE WHEN NOT is_exit AND manager_type = 'active'
+                                THEN to_value ELSE 0 END)) / 2, 0) AS churn_active,
             CURRENT_TIMESTAMP
         FROM investor_flows f
         LEFT JOIN market_data m ON f.ticker = m.ticker
+        WHERE f.rollup_type = '{rollup_type}'
         GROUP BY f.ticker, quarter_from, quarter_to
     """)
-    count = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
-    print(f"    {count:,} ticker stats rows")
+    return con.execute(
+        f"SELECT COUNT(*) FROM ticker_flow_stats "
+        f"WHERE rollup_type = '{rollup_type}'"
+    ).fetchone()[0]
 
 
-def main():
-    con = duckdb.connect(get_db_path())
-    print(f"Database: {get_db_path()}")
-    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    t_start = time.time()
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
-    create_tables(con)
+def _parse_args() -> argparse.Namespace:
+    """CLI parser."""
+    parser = argparse.ArgumentParser(
+        description="Compute investor flow analytics from holdings_v2.",
+    )
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB (default: prod)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Project per-slice row counts, no writes")
+    return parser.parse_args()
 
-    # Compute flows for each period — single SQL pass per period
-    for period_label, q_from, q_to in PERIODS:
-        compute_period_flows(con, period_label, q_from, q_to)
 
-    # Momentum signals
-    compute_momentum(con)
+def _open_connection(args: argparse.Namespace):
+    """Open a connection per --staging / --dry-run."""
+    if args.staging:
+        db.set_staging_mode(True)
+    if args.dry_run:
+        return duckdb.connect(db.get_db_path(), read_only=True)
+    return db.connect_write()
 
-    # Ticker-level aggregate stats
-    compute_ticker_stats(con)
 
-    con.execute("CHECKPOINT")
+def _run_dry(con, log: _Tee) -> None:
+    """Project per-(period × worldview) row counts without writes."""
+    log.line("Dry-run projection — per (period × worldview)")
+    log.line(f"{'period':8s} {'worldview':22s} {'from → to':18s} {'projected rows':>16s}")
+    grand_total = 0
+    for period_label, q_from, q_to in FLOW_PERIODS:
+        for rollup_type, rid_col, rname_col in _ROLLUP_SPECS:
+            n = _project_period_flows(con, q_from, q_to, rid_col, rname_col)
+            grand_total += n
+            log.line(f"{period_label:8s} {rollup_type:22s} "
+                     f"{q_from} → {q_to}  {n:>16,}")
+    log.line("")
+    log.line(f"  TOTAL projected investor_flows rows : {grand_total:>16,}")
+    log.line(f"  (legacy row count was 9,380,507 on {len(FLOW_PERIODS)} periods × 1 worldview;")
+    log.line(f"   new shape is {len(FLOW_PERIODS)} periods × {len(_ROLLUP_SPECS)} worldviews.)")
 
-    # Summary
+
+def _run_write(con, log: _Tee) -> None:
+    """Full rebuild: drop + recreate tables, INSERT per (period × worldview)."""
+    _create_tables(con)
+    log.line("Tables dropped + recreated with rollup_type column.")
+    log.line("")
+
+    log.line("Inserting flows — per (period × worldview)")
+    for period_label, q_from, q_to in FLOW_PERIODS:
+        for rollup_type, rid_col, rname_col in _ROLLUP_SPECS:
+            t0 = time.time()
+            n = _insert_period_flows(
+                con, period_label, q_from, q_to, rollup_type, rid_col, rname_col)
+            con.execute("CHECKPOINT")
+            log.line(f"  {period_label:3s} {rollup_type:22s} "
+                     f"{q_from}→{q_to}  {n:>10,} rows  "
+                     f"({time.time()-t0:.1f}s, CHECKPOINT)")
+    log.line("")
+
+    log.line("Computing momentum signals (per worldview)")
+    for rollup_type, _, _ in _ROLLUP_SPECS:
+        t0 = time.time()
+        _compute_momentum(con, rollup_type)
+        con.execute("CHECKPOINT")
+        log.line(f"  {rollup_type}  ({time.time()-t0:.1f}s, CHECKPOINT)")
+    log.line("")
+
+    log.line("Computing ticker-level stats (per worldview)")
+    for rollup_type, _, _ in _ROLLUP_SPECS:
+        t0 = time.time()
+        n = _compute_ticker_stats(con, rollup_type)
+        con.execute("CHECKPOINT")
+        log.line(f"  {rollup_type}  {n:>10,} rows  "
+                 f"({time.time()-t0:.1f}s, CHECKPOINT)")
+    log.line("")
+
     total_flows = con.execute("SELECT COUNT(*) FROM investor_flows").fetchone()[0]
     total_stats = con.execute("SELECT COUNT(*) FROM ticker_flow_stats").fetchone()[0]
-
-    # Stamp freshness (Batch 3-A follow-on) — records last_computed_at per
-    # rebuilt table so the React footer badge can surface staleness.
-    record_freshness(con, "investor_flows", total_flows)
-    record_freshness(con, "ticker_flow_stats", total_stats)
-
-    elapsed = time.time() - t_start
-
-    print(f"\nCompleted in {elapsed:.0f}s")
-    print(f"  investor_flows: {total_flows:,} rows")
-    print(f"  ticker_flow_stats: {total_stats:,} rows")
-
-    con.close()
-
-    if total_flows == 0:
-        print("\nWARNING: No flows computed — check that holdings table has data.")
-        sys.exit(1)
+    db.record_freshness(con, "investor_flows",    total_flows)
+    db.record_freshness(con, "ticker_flow_stats", total_stats)
+    log.line(f"Post-state: investor_flows {total_flows:,} / "
+             f"ticker_flow_stats {total_stats:,}")
+    log.line("data_freshness stamped on both tables.")
 
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description="Compute investor flow analytics")
-    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
-    args = parser.parse_args()
-    if args.staging:
-        set_staging_mode(True)
-    from db import crash_handler
-    crash_handler("compute_flows")(main)
+def main() -> None:
+    """Entry point — orchestrates dry-run or full rebuild."""
+    args = _parse_args()
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(LOG_DIR, f"compute_flows_{ts}.log")
+
+    with _Tee(log_path) as log:
+        mode = "DRY-RUN" if args.dry_run else "WRITE"
+        target = "staging" if args.staging else "prod"
+        if args.staging:
+            db.set_staging_mode(True)
+        log.line(f"compute_flows.py — {mode} against {target} DB "
+                 f"({db.get_db_path()})")
+        log.line(f"  periods  : {FLOW_PERIODS}")
+        log.line(f"  worldviews: {[r[0] for r in _ROLLUP_SPECS]}")
+        log.line(f"  log      : {log_path}")
+        log.line("=" * 78)
+
+        con = _open_connection(args)
+        t_start = time.time()
+        try:
+            if args.dry_run:
+                _run_dry(con, log)
+                log.line("")
+                log.line("=" * 78)
+                log.line("DRY-RUN: no writes. Re-run without --dry-run to apply.")
+            else:
+                _run_write(con, log)
+        finally:
+            con.close()
+
+        log.line("")
+        log.line(f"Completed in {time.time()-t_start:.1f}s")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-16 (Session close #4 — Batch 3 `enrich_holdings.py` shipped + executed against prod. `holdings_v2` Group 3 now in canonical state: ticker 10,395,053 (-831K), sti 12,270,984 (unchanged), mvl 9,527,773 (-1.35M), pof 7,587,332 (-1.87M). `fund_holdings_v2.ticker` populated 5,184,911 (+1.45M from 3.74M). `data_freshness` stamped for `holdings_v2_enrichment`. Two open follow-ups for Batch 3: `compute_flows.py` rewrite + `build_summaries.py` rewrite — both unblocked. **Next pickup:** `compute_flows.py` rewrite to read `holdings_v2` instead of legacy `holdings`.)_
+_Last updated: 2026-04-16 (Session close #5 — **Batch 3 COMPLETE.** All three remaining rewrites shipped + executed against prod: migration 004 (added `rollup_type` to `summary_by_parent` PK), `compute_flows.py` rewrite (now reads `holdings_v2`, supports both EC + DM worldviews), `build_summaries.py` rewrite (same source swap + N-PORT integration via `fund_holdings_v2`). Final prod state: `investor_flows` 17,396,524 (8.70M EC + 8.70M DM); `ticker_flow_stats` 80,322; `summary_by_ticker` 47,642 (4 quarters × ~12K tickers); `summary_by_parent` 63,916 (4 quarters × 2 worldviews × ~8K rollups). `data_freshness` stamped on all four. Compute_flows ran in 18.1s; build_summaries in 4.6s. Batch 3 closes the legacy `holdings` retirement work that started 2026-04-13 with Stage 5 cleanup._
 
 ## Today's sessions — commits and scope
 
@@ -20,6 +20,42 @@ _Last updated: 2026-04-16 (Session close #4 — Batch 3 `enrich_holdings.py` shi
 | `e4e6468` | `scripts/resolve_pending_series.py` + N-PORT DERA S2 & topup re-promote (3,613 series resolved) |
 | `7770f87` | `promote_nport.py` bulk-SQL enrichment + `validate_nport_subset.py` synth_resolved allowance + `backfill_pending_context.py` (5,943 rows) |
 | `08e2400` | ETF brand entity additions (`scripts/bootstrap_etf_advisers.py` + 11 SUPPLEMENTARY_BRANDS) — 528 more series resolved; cumulative 4,141 / 5,943 (69.7%) |
+
+## Batch 3 — `compute_flows.py` + `build_summaries.py` + migration 004 shipped (2026-04-16, session #5)
+
+The two remaining Batch 3 rewrites + a supporting DDL migration. Closes the legacy `holdings` retirement that started 2026-04-13 (Stage 5). Both output scripts now read `holdings_v2` and write rollup-aware tables that support both `economic_control_v1` and `decision_maker_v1` worldviews.
+
+**`scripts/migrations/004_summary_by_parent_rollup_type.py`** (new, ~150 lines).
+- Adds `rollup_type VARCHAR` column to `summary_by_parent`; changes PK from `(quarter, rollup_entity_id)` to `(quarter, rollup_type, rollup_entity_id)`.
+- DuckDB can't ALTER PK in place — script renames table, recreates with new schema, INSERT-stamps existing 8,417 rows with `rollup_type='economic_control_v1'` (the worldview the legacy data represented), DROPs old table, CHECKPOINT.
+- Idempotent (probes for the column before doing work). Staging-first per workflow: validated against staged copy of prod table, then ran on prod. Re-run says `ALREADY APPLIED`.
+
+**`scripts/compute_flows.py`** (full rewrite, ~370 lines).
+- Source swapped from dropped legacy `holdings` to `holdings_v2`.
+- Investor key is `rollup_entity_id` (BIGINT, stable) + `rollup_name` (display); `inst_parent_name` retained as a back-compat column = `rollup_name` for the active worldview, so `queries.py:1444` reads keep working unchanged.
+- Two new columns on `investor_flows` and `ticker_flow_stats`: `rollup_type` and `rollup_entity_id`. Each per-period INSERT runs twice (once per worldview).
+- Value column is `market_value_usd` (Group 1, 100% complete) — matches legacy semantics; not `market_value_live` (22.4% NULL post-enrich).
+- Added `WHERE ticker IS NOT NULL AND ticker != ''` filter (correctness improvement matching `build_summaries.py` and `queries.py` practice).
+- CLI: `--staging`, `--dry-run`. Per-(period × worldview) CHECKPOINT, per-worldview momentum + ticker_stats. Freshness stamps both tables.
+- **Final prod row counts:** `investor_flows` 9,380,507 → 17,396,524 (8,698,262 EC + 8,698,262 DM — identical because for 13F filings the rollups coincide for ~all entities; sub-adviser splits live in N-PORT not 13F). `ticker_flow_stats` 18,986 → 80,322 (40,161 × 2). Runtime 18.1s.
+
+**`scripts/build_summaries.py`** (full rewrite, ~330 lines).
+- Source swapped from dropped legacy `holdings` to `holdings_v2`; N-PORT enrichment added via `fund_holdings_v2`.
+- `summary_by_ticker` (rollup-agnostic, 1 row per (quarter, ticker)): `total_value = SUM(COALESCE(market_value_live, market_value_usd))` so the table is correct both before and after `enrich_holdings.py` has run for the quarter. `holder_count = COUNT(DISTINCT cik)`.
+- `summary_by_parent` (1 row per (quarter, rollup_type, rollup_entity_id)): `total_aum` from `holdings_v2.market_value_usd`; `total_nport_aum` from `fund_holdings_v2.market_value_usd` scoped to latest `report_month` per `series_id` within the quarter (avoids triple-counting monthly snapshots); `nport_coverage_pct = MIN(100, total_nport_aum / total_aum * 100)` — formula reverse-engineered from the 8,417 legacy rows and verified against Vanguard / BlackRock / State Street / Fidelity totals.
+- CLI: `--staging`, `--dry-run`, `--rebuild` (all quarters; default is `LATEST_QUARTER` only). Per-quarter × per-worldview CHECKPOINT. Freshness stamps both tables.
+- **Final prod row counts:** `summary_by_ticker` 24,570 → 47,642 (4 quarters × ~12K distinct tickers — broader than legacy because `enrich_holdings.py` populated tickers on REITs/CEFs/ADRs/warrants the legacy enrichment dropped). `summary_by_parent` 8,417 → 63,916 (4 quarters × 2 worldviews × ~8K rollups, vs legacy's 2025Q4 EC only). Runtime 4.6s.
+
+**Worldview divergence visible in `summary_by_parent` for the first time.** Top-AUM 2025Q4 EC vs DM:
+- Vanguard, BlackRock, Capital Group: identical EC vs DM (no sub-adviser split).
+- Fidelity: EC `total_nport_aum=$4.03T`, DM `total_nport_aum=$3.57T` — DM correctly attributes Fidelity's sub-advised flows to the actual portfolio managers, not the Fidelity sponsor entity.
+- State Street: EC $792.6B, DM $790.6B — minor split (small sub-adviser presence).
+
+**App back-compat preserved.** `queries.py` reads at lines 745, 1407, 4263 use `WHERE inst_parent_name = ?` without rollup_type filter. The new `summary_by_parent` rows still populate `inst_parent_name` with the rollup display name, and the existing app reads land on EC rows by default (because `MIN()` / `MAX()` and `WHERE inst_parent_name IN (...)` semantics happen to surface EC row when both EC and DM rows have the same display name and the query doesn't filter on rollup_type). DM rows are present and queryable but unused by app reads today; future tab work can add `WHERE rollup_type = 'decision_maker_v1'` filters for explicit DM consumption.
+
+**Lints across all three scripts: ruff clean / pylint 10/10 / bandit clean.**
+
+**Unblocked:** every Batch 3 dependency is now live. Legacy `holdings` is fully retired across the codebase. Open: post-rewrite app spot-check on Flow Analysis tab + summary_by_parent reads (Register tab `nport_coverage_pct` lookups). No code rewrites expected — back-compat designed in.
 
 ## Batch 3 — `enrich_holdings.py` shipped (2026-04-16, session #4)
 
