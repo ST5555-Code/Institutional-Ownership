@@ -257,7 +257,7 @@ def main() -> None:
     print(f"FLAG:             {len(flags)}")
     print(f"WARN:             {len(warns)}")
     print()
-    print(f"Entity gate:")
+    print("Entity gate:")
     print(f"  Resolved:       {len(gate.promotable)}")
     print(f"  Blocked (new):  {len(gate.blocked)}")
     print(f"  Pending review: {len(gate.new_entities_pending)}")

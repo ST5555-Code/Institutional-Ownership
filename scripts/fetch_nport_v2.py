@@ -383,7 +383,7 @@ def run_dera_bulk(limit: Optional[int], all_mode: bool, dry_run: bool,
     print(f"DONE — {len(stats)} quarter(s) loaded, "
           f"{total_h:,} holdings, {total_s:,} series entries")
     print(f"run_id: {run_id}")
-    print(f"  logs/last_run_id.txt written")
+    print("  logs/last_run_id.txt written")
     print("Next:")
     print(f"  python3 scripts/validate_nport.py --changes-only --run-id {run_id} --staging")
     print(f"  python3 scripts/validate_nport.py --run-id {run_id} --staging")

@@ -369,11 +369,11 @@ def main(apply=False):
         "SELECT COUNT(*) FROM beneficial_ownership WHERE name_resolved = TRUE"
     ).fetchone()[0]
 
-    print(f"\n--- FINAL STATUS ---")
+    print("\n--- FINAL STATUS ---")
     print(f"  Total rows:     {total_rows:,}")
     print(f"  Resolved names: {resolved_db:,} ({100*resolved_db/total_rows:.1f}%)")
     if not still_agent:
-        print(f"  Filing agents:  0 (all resolved)")
+        print("  Filing agents:  0 (all resolved)")
 
     con.execute("CHECKPOINT")
     con.close()

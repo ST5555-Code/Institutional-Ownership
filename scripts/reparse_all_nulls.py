@@ -263,7 +263,7 @@ def main(apply=False):
         FROM beneficial_ownership GROUP BY filing_type ORDER BY total DESC
     """).fetchall()
     total_rows = sum(t for _, t, _, _, _ in r)
-    print(f"\n--- POST-FIX STATUS ---")
+    print("\n--- POST-FIX STATUS ---")
     for ft, t, np, ns, b in r:
         print(f"  {ft:12s}  {t:>6,}  pct={np:>4,} ({100*np/t:.1f}%)  "
               f"shares={ns:>4,} ({100*ns/t:.1f}%)  both={b}")

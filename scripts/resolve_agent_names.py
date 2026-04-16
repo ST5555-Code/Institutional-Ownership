@@ -254,7 +254,7 @@ def main(apply=False, workers=2):
         SELECT COUNT(*) FROM beneficial_ownership WHERE name_resolved = TRUE
     """).fetchone()[0]
 
-    print(f"\n--- FINAL STATUS ---")
+    print("\n--- FINAL STATUS ---")
     print(f"  Total rows:           {total_rows:,}")
     print(f"  Resolved names:       {resolved_total:,} ({100*resolved_total/total_rows:.1f}%)")
     print(f"  Still filing agent:   {still_agent:,} ({100*still_agent/total_rows:.1f}%)")

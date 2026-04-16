@@ -282,7 +282,7 @@ def main(apply=False):
         FROM beneficial_ownership WHERE filing_type LIKE 'SC 13D%'
     """).fetchone()
     total_13d = still_null[2]
-    print(f"\n--- POST-FIX 13D STATUS ---")
+    print("\n--- POST-FIX 13D STATUS ---")
     print(f"  Total 13D rows:       {total_13d:,}")
     print(f"  pct_owned still null: {still_null[0]:,} ({100*still_null[0]/total_13d:.1f}%)")
     print(f"  shares_owned null:    {still_null[1]:,} ({100*still_null[1]/total_13d:.1f}%)")

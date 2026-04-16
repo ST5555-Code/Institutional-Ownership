@@ -218,7 +218,7 @@ def main() -> None:
     with open(path, "w") as fh:
         fh.write(f"# VALIDATION REPORT — N-PORT Run {run_id}\n\n")
         fh.write(f"_Generated: {datetime.now().isoformat()}_\n")
-        fh.write(f"_Validator: validate_nport_subset.py (fast set-based)_\n\n")
+        fh.write("_Validator: validate_nport_subset.py (fast set-based)_\n\n")
         fh.write("## Scope\n\n")
         fh.write(f"- Resolved (to promote): **{len(resolved):,}** series\n")
         fh.write(f"- Excluded (queued):     **{len(excluded):,}** series\n")

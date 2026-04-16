@@ -317,7 +317,7 @@ def main(apply=False):
     print(f"  Named filers:      {named:,} ({100*named/total_rows:.1f}%)")
     print(f"  Filing agents:     {agent_rows:,} ({100*agent_rows/total_rows:.1f}%)")
     print(f"  Raw CIK remaining: {total_unresolved_after:,}")
-    print(f"  Resolved this run:")
+    print("  Resolved this run:")
     print(f"    via holdings:         {len(holdings_resolved)} CIKs")
     print(f"    via EDGAR:            {len(edgar_resolved)} CIKs")
     print(f"    via company_tickers:  {len(ct_resolved)} CIKs")
