@@ -456,6 +456,208 @@ def write_impact_row(
 
 
 # ---------------------------------------------------------------------------
+# 13D/G Group 2 entity enrichment (bulk)
+# ---------------------------------------------------------------------------
+
+def bulk_enrich_bo_filers(
+    con: Any,
+    filer_ciks: Optional[set[str]] = None,
+) -> int:
+    """Populate entity_id + rollup columns on beneficial_ownership_v2.
+
+    Mirrors promote_nport.py `_bulk_enrich_run` in shape, keyed on
+    filer CIK instead of series_id. Scoped to the filer_ciks set when
+    supplied; None → full refresh of the entire table.
+
+    Column outputs:
+      * entity_id           ← entity_identifiers.entity_id (the filer)
+      * rollup_entity_id    ← economic_control_v1 rollup target
+      * rollup_name         ← preferred alias of ec.rollup_entity_id
+      * dm_rollup_entity_id ← decision_maker_v1 rollup target
+      * dm_rollup_name      ← preferred alias of dm.rollup_entity_id
+
+    Unmatched filers (no active entity_identifiers row of type='cik')
+    leave all five columns NULL. Rows where a filer resolves but lacks
+    a rollup_history row in one worldview get entity_id set and that
+    worldview's rollup columns NULL.
+
+    Returns the count of rows actually updated (`changes()` from DuckDB).
+    """
+    if filer_ciks is not None and not filer_ciks:
+        return 0
+
+    norm_ciks = (
+        sorted({_normalize_cik(c) for c in filer_ciks if c})
+        if filer_ciks is not None
+        else None
+    )
+
+    before = con.execute(
+        "SELECT COUNT(*) FROM beneficial_ownership_v2 "
+        "WHERE entity_id IS NOT NULL"
+    ).fetchone()[0]
+
+    if norm_ciks is None:
+        con.execute(
+            """
+            UPDATE beneficial_ownership_v2 AS b
+               SET entity_id           = e.entity_id,
+                   rollup_entity_id    = e.ec_rollup_entity_id,
+                   rollup_name         = e.ec_rollup_name,
+                   dm_rollup_entity_id = e.dm_rollup_entity_id,
+                   dm_rollup_name      = e.dm_rollup_name
+              FROM (
+                  SELECT ei.identifier_value    AS filer_cik,
+                         ei.entity_id           AS entity_id,
+                         ec.rollup_entity_id    AS ec_rollup_entity_id,
+                         ea_ec.alias_name       AS ec_rollup_name,
+                         dm.rollup_entity_id    AS dm_rollup_entity_id,
+                         ea_dm.alias_name       AS dm_rollup_name
+                    FROM entity_identifiers ei
+                    LEFT JOIN entity_rollup_history ec
+                           ON ec.entity_id = ei.entity_id
+                          AND ec.rollup_type = 'economic_control_v1'
+                          AND ec.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_rollup_history dm
+                           ON dm.entity_id = ei.entity_id
+                          AND dm.rollup_type = 'decision_maker_v1'
+                          AND dm.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_aliases ea_ec
+                           ON ea_ec.entity_id = ec.rollup_entity_id
+                          AND ea_ec.is_preferred = TRUE
+                          AND ea_ec.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_aliases ea_dm
+                           ON ea_dm.entity_id = dm.rollup_entity_id
+                          AND ea_dm.is_preferred = TRUE
+                          AND ea_dm.valid_to = DATE '9999-12-31'
+                   WHERE ei.identifier_type = 'cik'
+                     AND ei.valid_to = DATE '9999-12-31'
+              ) AS e
+             WHERE b.filer_cik = e.filer_cik
+            """
+        )
+    else:
+        placeholders = ",".join("?" * len(norm_ciks))
+        con.execute(
+            f"""
+            UPDATE beneficial_ownership_v2 AS b
+               SET entity_id           = e.entity_id,
+                   rollup_entity_id    = e.ec_rollup_entity_id,
+                   rollup_name         = e.ec_rollup_name,
+                   dm_rollup_entity_id = e.dm_rollup_entity_id,
+                   dm_rollup_name      = e.dm_rollup_name
+              FROM (
+                  SELECT ei.identifier_value    AS filer_cik,
+                         ei.entity_id           AS entity_id,
+                         ec.rollup_entity_id    AS ec_rollup_entity_id,
+                         ea_ec.alias_name       AS ec_rollup_name,
+                         dm.rollup_entity_id    AS dm_rollup_entity_id,
+                         ea_dm.alias_name       AS dm_rollup_name
+                    FROM entity_identifiers ei
+                    LEFT JOIN entity_rollup_history ec
+                           ON ec.entity_id = ei.entity_id
+                          AND ec.rollup_type = 'economic_control_v1'
+                          AND ec.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_rollup_history dm
+                           ON dm.entity_id = ei.entity_id
+                          AND dm.rollup_type = 'decision_maker_v1'
+                          AND dm.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_aliases ea_ec
+                           ON ea_ec.entity_id = ec.rollup_entity_id
+                          AND ea_ec.is_preferred = TRUE
+                          AND ea_ec.valid_to = DATE '9999-12-31'
+                    LEFT JOIN entity_aliases ea_dm
+                           ON ea_dm.entity_id = dm.rollup_entity_id
+                          AND ea_dm.is_preferred = TRUE
+                          AND ea_dm.valid_to = DATE '9999-12-31'
+                   WHERE ei.identifier_type = 'cik'
+                     AND ei.valid_to = DATE '9999-12-31'
+                     AND ei.identifier_value IN ({placeholders})
+              ) AS e
+             WHERE b.filer_cik = e.filer_cik
+               AND b.filer_cik IN ({placeholders})
+            """,
+            norm_ciks + norm_ciks,
+        )
+
+    after = con.execute(
+        "SELECT COUNT(*) FROM beneficial_ownership_v2 "
+        "WHERE entity_id IS NOT NULL"
+    ).fetchone()[0]
+    return int(after - before)
+
+
+def rebuild_beneficial_ownership_current(con: Any) -> int:
+    """Rebuild beneficial_ownership_current from beneficial_ownership_v2.
+
+    DROP + CREATE AS SELECT — picks up any BO v2 columns added via
+    migration. Carries the five entity columns (entity_id,
+    rollup_entity_id, rollup_name, dm_rollup_entity_id, dm_rollup_name)
+    through so the L4 table matches the enriched L3 shape.
+
+    Partitions by (filer_cik, subject_ticker), keeps the row with the
+    latest filing_date per partition, annotates with amendment_count
+    and prior_intent (LAG).
+
+    Returns the post-rebuild row count.
+    """
+    con.execute("DROP TABLE IF EXISTS beneficial_ownership_current")
+    con.execute(
+        """
+        CREATE TABLE beneficial_ownership_current AS
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY filer_cik, subject_ticker
+                    ORDER BY filing_date DESC
+                ) AS rn,
+                COUNT(*) OVER (PARTITION BY filer_cik, subject_ticker)
+                    AS amendment_count,
+                LAG(intent) OVER (
+                    PARTITION BY filer_cik, subject_ticker
+                    ORDER BY filing_date DESC
+                ) AS next_older_intent
+            FROM beneficial_ownership_v2
+            WHERE subject_ticker IS NOT NULL
+        ),
+        first_13g AS (
+            SELECT filer_cik, subject_ticker,
+                   MIN(filing_date) AS first_13g_date
+            FROM beneficial_ownership_v2
+            WHERE subject_ticker IS NOT NULL
+              AND filing_type LIKE 'SC 13G%'
+            GROUP BY filer_cik, subject_ticker
+        )
+        SELECT r.filer_cik, r.filer_name, r.subject_ticker, r.subject_cusip,
+               r.filing_type AS latest_filing_type,
+               r.filing_date AS latest_filing_date,
+               r.pct_owned, r.shares_owned, r.intent,
+               r.report_date AS crossing_date,
+               CAST(CURRENT_DATE - r.filing_date AS INTEGER) AS days_since_filing,
+               CASE WHEN r.filing_date >= CURRENT_DATE - INTERVAL '2 years'
+                    THEN TRUE ELSE FALSE END AS is_current,
+               r.accession_number,
+               g.first_13g_date IS NOT NULL AS crossed_5pct,
+               r.next_older_intent AS prior_intent,
+               r.amendment_count,
+               r.entity_id,
+               r.rollup_entity_id,
+               r.rollup_name,
+               r.dm_rollup_entity_id,
+               r.dm_rollup_name
+        FROM ranked r
+        LEFT JOIN first_13g g
+            ON r.filer_cik = g.filer_cik
+           AND r.subject_ticker = g.subject_ticker
+        WHERE r.rn = 1
+        """
+    )
+    return int(con.execute(
+        "SELECT COUNT(*) FROM beneficial_ownership_current"
+    ).fetchone()[0])
+
+
+# ---------------------------------------------------------------------------
 # object_key synthesis
 # ---------------------------------------------------------------------------
 

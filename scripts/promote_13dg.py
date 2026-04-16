@@ -35,7 +35,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import PROD_DB, STAGING_DB  # noqa: E402
-from pipeline.shared import refresh_snapshot, stamp_freshness  # noqa: E402
+from pipeline.shared import (  # noqa: E402
+    bulk_enrich_bo_filers,
+    rebuild_beneficial_ownership_current,
+    refresh_snapshot,
+    stamp_freshness,
+)
 
 
 REPORTS_DIR = os.path.join(BASE_DIR, "logs", "reports")
@@ -129,59 +134,18 @@ def _promote(prod_con, rows) -> tuple[int, int]:
 
 
 def _rebuild_current(prod_con) -> int:
-    prod_con.execute("DROP TABLE IF EXISTS beneficial_ownership_current")
-    prod_con.execute(
-        """
-        CREATE TABLE beneficial_ownership_current AS
-        WITH ranked AS (
-            SELECT *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY filer_cik, subject_ticker
-                    ORDER BY filing_date DESC
-                ) AS rn,
-                COUNT(*) OVER (PARTITION BY filer_cik, subject_ticker)
-                    AS amendment_count,
-                LAG(intent) OVER (
-                    PARTITION BY filer_cik, subject_ticker
-                    ORDER BY filing_date DESC
-                ) AS next_older_intent
-            FROM beneficial_ownership_v2
-            WHERE subject_ticker IS NOT NULL
-        ),
-        first_13g AS (
-            SELECT filer_cik, subject_ticker,
-                   MIN(filing_date) AS first_13g_date
-            FROM beneficial_ownership_v2
-            WHERE subject_ticker IS NOT NULL
-              AND filing_type LIKE 'SC 13G%'
-            GROUP BY filer_cik, subject_ticker
-        )
-        SELECT r.filer_cik, r.filer_name, r.subject_ticker, r.subject_cusip,
-               r.filing_type AS latest_filing_type,
-               r.filing_date AS latest_filing_date,
-               r.pct_owned, r.shares_owned, r.intent,
-               r.report_date AS crossing_date,
-               CAST(CURRENT_DATE - r.filing_date AS INTEGER) AS days_since_filing,
-               CASE WHEN r.filing_date >= CURRENT_DATE - INTERVAL '2 years'
-                    THEN TRUE ELSE FALSE END AS is_current,
-               r.accession_number,
-               g.first_13g_date IS NOT NULL AS crossed_5pct,
-               r.next_older_intent AS prior_intent,
-               r.amendment_count
-        FROM ranked r
-        LEFT JOIN first_13g g
-            ON r.filer_cik = g.filer_cik
-           AND r.subject_ticker = g.subject_ticker
-        WHERE r.rn = 1
-        """
-    )
-    return prod_con.execute(
-        "SELECT COUNT(*) FROM beneficial_ownership_current"
-    ).fetchone()[0]
+    """Rebuild beneficial_ownership_current from BO v2. Delegates to shared.
+
+    The shared implementation carries the five entity columns
+    (entity_id, rollup_entity_id, rollup_name, dm_rollup_entity_id,
+    dm_rollup_name) through from BO v2 — must run AFTER the bulk
+    enrichment pass so L4 picks up the fresh rollups.
+    """
+    return rebuild_beneficial_ownership_current(prod_con)
 
 
 def _update_impacts(prod_con, run_id: str) -> int:
-    res = prod_con.execute(
+    prod_con.execute(
         """
         UPDATE ingestion_impacts
         SET promote_status = 'promoted',
@@ -293,12 +257,33 @@ def main() -> None:
         prod_con.execute("CHECKPOINT")
         print(f"  beneficial_ownership_v2: -{deleted} +{inserted}")
 
+        # Group 2 entity enrichment: resolve entity_id + rollup columns
+        # for the filers touched by this run. Scoped — full-refresh lives
+        # in scripts/enrich_13dg.py. Must run before _rebuild_current so
+        # the L4 table inherits enriched values.
+        filer_ciks = set(rows["filer_cik"].dropna().tolist())
+        enriched = bulk_enrich_bo_filers(prod_con, filer_ciks=filer_ciks)
+        prod_con.execute("CHECKPOINT")
+        print(f"  bo_v2 Group 2 enriched: {enriched:+,} entity_id delta "
+              f"across {len(filer_ciks)} filer_cik(s)")
+
         cur_rows = _rebuild_current(prod_con)
         prod_con.execute("CHECKPOINT")
         print(f"  beneficial_ownership_current rebuilt: {cur_rows:,} rows")
 
         stamp_freshness(prod_con, "beneficial_ownership_v2")
         stamp_freshness(prod_con, "beneficial_ownership_current")
+        # Logical label (not a real table) — pass explicit row_count
+        # so record_freshness does not COUNT(*) a missing table.
+        bo_v2_enriched = prod_con.execute(
+            "SELECT COUNT(*) FROM beneficial_ownership_v2 "
+            "WHERE entity_id IS NOT NULL"
+        ).fetchone()[0]
+        stamp_freshness(
+            prod_con,
+            "beneficial_ownership_v2_enrichment",
+            row_count=bo_v2_enriched,
+        )
 
         promoted = _update_impacts(prod_con, args.run_id)
         prod_con.execute("CHECKPOINT")
