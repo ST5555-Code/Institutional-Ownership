@@ -105,21 +105,60 @@ violations across all 4 structural gates.
 2. **Synthetic series policy (D13).** Decide per-filing-type rules for
    the 1,186 deferred synthetics — drop, create generic fallback
    entities, or wait for N-PORT XML sub-adviser metadata extraction.
-3. **`pending_entity_resolution.context_json` is NULL for all
-   series_id rows.** The staged-to-pending path in `validate_nport.py`
-   / `validate_nport_subset.py` doesn't capture fund_cik / fund_name /
-   family_name context. Future resolvers have to re-join
-   `stg_nport_*` to recover it. Worth a small patch to both validators.
-4. **`validate_nport_subset.py` synthetic BLOCK is overly strict.**
-   Blocks on any non-S-prefixed series in resolved, even when they're
-   legitimately entity-backed via S1 fund-cik match. 12 synthetics from
-   DERA S2 and 0 from topup had to be manually moved back to
-   excluded for this cycle.
+3. ~~**`pending_entity_resolution.context_json` is NULL for all
+   series_id rows.**~~ **Resolved (this session):** one-off
+   `scripts/backfill_pending_context.py` populates
+   `{fund_name, family_name, fund_cik, reg_cik}` from
+   `stg_nport_holdings` (most-recent loaded_at) with `fund_universe`
+   fallback. Backfilled all 5,943 NULL rows; future runs need a small
+   patch to `validate_nport.py` / `validate_nport_subset.py` to write
+   context_json at insert time.
+4. ~~**`validate_nport_subset.py` synthetic BLOCK is overly strict.**~~
+   **Resolved (this session):** BLOCK now distinguishes
+   `synth_no_entity` (still BLOCK) from `synth_resolved` (synthetic
+   key with active `entity_identifiers` row — allowed, no longer
+   blocks promote).
 5. **`promote_nport.py` scales ~O(N) per-tuple.** DERA S2 re-promote
    (11,714 series × ~3 months avg ≈ 35K tuples) took 1h 31min. Prior
    topup-only (205 series) ran in seconds. `_enrich_entity` + `DELETE +
    INSERT + UPSERT universe` per tuple is the dominant cost. Worth a
-   batched-SQL rewrite before the next DERA-scale promote.
+   batched-SQL rewrite before the next DERA-scale promote. **Resolved
+   (this session):** `_enrich_entity` per-call replaced with
+   `_bulk_enrich_run` — single UPDATE...FROM JOIN scoped by
+   series_touched. Per-tuple DELETE + INSERT loop unchanged (per-tuple
+   atomicity preserved per the CHECKPOINT GRANULARITY POLICY at
+   promote_nport.py:2). Per-tuple CHECKPOINT cost remains the next
+   optimization target if needed.
+
+### D13 — Synthetic series deferral
+
+`pending_entity_resolution` currently holds **1,186 synthetic
+`{cik}_{accession}` series** with `resolution_status='deferred_synthetic'`,
+all originating from CIK-level N-PORT filings that lacked a real
+SERIES_ID at fetch time. The S1 path of
+`scripts/resolve_pending_series.py` only resolves the small subset
+(10) whose `fund_cik` is already an entity; the remaining 1,176 have no
+existing entity hook.
+
+**Resolution requires N-PORT XML sub-adviser metadata extraction
+(D13).** The legacy `parse_nport_xml` helper does not currently lift
+the `<sub_adviser>` / `<series_name>` blocks per
+FUND_REPORTED_INFO. Without that data we cannot deterministically map a
+CIK-level filing to its operating adviser, and assigning a synthetic
+fund-entity per accession would create graph noise without rollup
+value.
+
+**Decision deferred — do NOT auto-resolve synthetics until D13 policy
+is confirmed by the operator.** Action items when D13 is scoped:
+1. Extend `scripts/pipeline/parse_nport_xml.py` to capture
+   sub-adviser CIK + name from each `FUND_REPORTED_INFO` block.
+2. Backfill `stg_nport_holdings.sub_adviser_cik` (new column) on
+   re-parse of the cached XMLs in `data/nport_raw/`.
+3. New resolver tier (call it D13/T4) — synthetic series whose
+   sub-adviser CIK is in `entity_identifiers` get wired by that hook,
+   not by `fund_cik`.
+4. Until then, the 1,186 synthetics stay deferred and their holdings
+   remain held back from `fund_holdings_v2` promotes.
 
 ## Parallel session deliverables (commit `831e5b4`) — now in-docs
 

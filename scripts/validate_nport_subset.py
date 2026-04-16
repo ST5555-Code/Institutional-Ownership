@@ -108,16 +108,40 @@ def main() -> None:
               SELECT series_id FROM resolved)
     """, [run_id]).fetchone()[0]
 
-    # BLOCK 3 — no synthetic series in resolved subset (they should all be
-    # in excluded; this is a belt-and-suspenders check).
-    synthetic_in_resolved = stg.execute("""
-        SELECT COUNT(DISTINCT s.series_id) AS n
+    # BLOCK 3 — synthetic series in resolved subset.
+    # A synthetic key (`{cik}_{accession}`, no leading 'S') normally must
+    # live in the excluded set. The S1 path of resolve_pending_series.py
+    # legitimately wires synthetics whose `fund_cik` is already an entity
+    # — those have an active `entity_identifiers(identifier_type='series_id')`
+    # row and pass the EC + DM rollup gates above. Only BLOCK on synthetics
+    # that are NOT entity-backed (`synth_no_entity`); allow `synth_resolved`
+    # synthetics through.
+    synth_in_resolved = stg.execute("""
+        SELECT DISTINCT s.series_id
         FROM stg_nport_holdings s
         JOIN ingestion_manifest m ON s.manifest_id = m.manifest_id
         WHERE m.run_id = ?
           AND s.series_id IN (SELECT series_id FROM resolved)
           AND NOT s.series_id LIKE 'S%'
-    """, [run_id]).fetchone()[0]
+    """, [run_id]).fetchdf()
+    synth_no_entity = 0
+    synth_resolved = 0
+    if not synth_in_resolved.empty:
+        prod.register("synth_in_resolved", synth_in_resolved)
+        synth_with_entity = {
+            r[0] for r in prod.execute("""
+                SELECT s.series_id
+                FROM synth_in_resolved s
+                JOIN entity_identifiers ei
+                  ON ei.identifier_type = 'series_id'
+                 AND ei.identifier_value = s.series_id
+                 AND ei.valid_to = DATE '9999-12-31'
+            """).fetchall()
+        }
+        prod.unregister("synth_in_resolved")
+        all_synth = set(synth_in_resolved["series_id"].tolist())
+        synth_resolved = len(synth_with_entity)
+        synth_no_entity = len(all_synth - synth_with_entity)
 
     # Entity gate (set-based) — resolved subset intersected with
     # entity_identifiers + both rollup worldviews (economic_control_v1 and
@@ -178,8 +202,9 @@ def main() -> None:
         blocks.append(f"{len(dup)} duplicate (series_id, report_month) impact tuples")
     if partials:
         blocks.append(f"{partials} partial load rows")
-    if synthetic_in_resolved:
-        blocks.append(f"{synthetic_in_resolved} synthetic series in resolved subset")
+    if synth_no_entity:
+        blocks.append(f"{synth_no_entity} synth_no_entity series in resolved subset "
+                      f"(synthetic key with no active entity_identifiers row)")
     if missing_ec:
         blocks.append(f"{missing_ec} series missing economic_control_v1 rollup")
     if missing_dm:
@@ -204,8 +229,10 @@ def main() -> None:
         fh.write("## BLOCK checks\n\n")
         fh.write(f"- Duplicate impacts: **{len(dup)}** (threshold 0)\n")
         fh.write(f"- Partial loads: **{partials}** (threshold 0)\n")
-        fh.write(f"- Synthetic series leaking into resolved: "
-                 f"**{synthetic_in_resolved}** (threshold 0)\n")
+        fh.write(f"- Synthetic series in resolved subset: "
+                 f"**{synth_no_entity + synth_resolved}** total — "
+                 f"**{synth_no_entity}** synth_no_entity (BLOCK, threshold 0), "
+                 f"**{synth_resolved}** synth_resolved (allowed; entity-backed via S1)\n")
         fh.write(f"- Resolved series missing economic_control_v1 rollup: "
                  f"**{missing_ec}** / {total} (threshold 0)\n")
         fh.write(f"- Resolved series missing decision_maker_v1 rollup: "
@@ -233,7 +260,7 @@ def main() -> None:
     print(f"Excluded (queued):  {len(excluded):,} series")
     print(f"Staged rows:        {resolved_rows[0]:,}")
     print(f"BLOCK checks: dup={len(dup)} partial={partials} "
-          f"synth={synthetic_in_resolved} "
+          f"synth_no_entity={synth_no_entity} synth_resolved={synth_resolved} "
           f"missing_ec={missing_ec} missing_dm={missing_dm}")
     print(f"\nPromote-ready: {'YES' if promote_ok else 'NO'}")
     print(f"Report: {path}")

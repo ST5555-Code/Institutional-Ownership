@@ -121,61 +121,75 @@ def _mirror_manifest_and_impacts(prod_con, staging_con, run_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Group 2 entity enrichment
+# Group 2 entity enrichment (bulk)
 # ---------------------------------------------------------------------------
 
-def _enrich_entity(prod_con, series_id: str) -> dict:
-    """Return Group 2 entity columns for one series_id from entity_current.
+def _bulk_enrich_run(prod_con, series_touched: set[str]) -> int:
+    """Single bulk UPDATE...FROM JOIN to populate Group 2 entity columns.
 
-    Looks up entity_id via entity_identifiers (identifier_type='series_id',
-    valid_to='9999-12-31'), then resolves both rollup worldviews via
-    entity_rollup_history and the EC rollup_name via entity_aliases
-    preferred lookup. Returns a dict with keys matching the Group 2
-    columns in fund_holdings_v2; NULLs for any column that can't be
-    resolved (validate_nport should have caught BLOCK-level gaps but
-    we don't trust the gate to be perfect — defensive NULL).
+    Replaces the per-tuple Python loop that called `_enrich_entity()` once
+    per series — at DERA-Session-2 scale (~12K series × ~3 months) the
+    per-call overhead dominated promote runtime (~1h31m on the 2026-04-15
+    re-promote). One JOIN against the full prod entity graph plus a
+    `series_id IN (...)` scope keeps the work O(touched series) and runs
+    in seconds.
+
+    Column outputs are bit-for-bit identical to the legacy
+    `_enrich_entity()` per-call SQL:
+      * entity_id            ← entity_identifiers.entity_id (the fund)
+      * rollup_entity_id     ← economic_control_v1 rollup
+      * dm_entity_id         ← entity_identifiers.entity_id (the fund —
+                               legacy aliased dm.entity_id which equals
+                               ei.entity_id by JOIN constraint)
+      * dm_rollup_entity_id  ← decision_maker_v1 rollup
+      * dm_rollup_name       ← preferred alias of EC rollup_entity_id
+                               (NOT the DM rollup; preserved to match
+                               legacy behaviour)
+
+    Returns the count of distinct series the UPDATE scoped over (one row
+    per fund-holdings record receives the same enrichment values).
     """
-    row = prod_con.execute(
-        """
-        SELECT ec.rollup_entity_id   AS rollup_entity_id,
-               dm.rollup_entity_id   AS dm_rollup_entity_id,
-               ec.entity_id          AS entity_id,
-               dm.entity_id          AS dm_entity_id,
-               (SELECT alias_name FROM entity_aliases
-                  WHERE entity_id = ec.rollup_entity_id
-                    AND is_preferred = TRUE
-                    AND valid_to = DATE '9999-12-31'
-                  LIMIT 1)           AS dm_rollup_name
-        FROM entity_identifiers ei
-        LEFT JOIN entity_rollup_history ec
-               ON ec.entity_id = ei.entity_id
-              AND ec.rollup_type = 'economic_control_v1'
-              AND ec.valid_to = DATE '9999-12-31'
-        LEFT JOIN entity_rollup_history dm
-               ON dm.entity_id = ei.entity_id
-              AND dm.rollup_type = 'decision_maker_v1'
-              AND dm.valid_to = DATE '9999-12-31'
-        WHERE ei.identifier_type = 'series_id'
-          AND ei.identifier_value = ?
-          AND ei.valid_to = DATE '9999-12-31'
-        LIMIT 1
+    if not series_touched:
+        return 0
+    sids = sorted(series_touched)
+    placeholders = ",".join("?" * len(sids))
+    prod_con.execute(
+        f"""
+        UPDATE fund_holdings_v2 AS fh
+           SET entity_id           = e.entity_id,
+               rollup_entity_id    = e.ec_rollup_entity_id,
+               dm_entity_id        = e.entity_id,
+               dm_rollup_entity_id = e.dm_rollup_entity_id,
+               dm_rollup_name      = e.dm_rollup_name
+          FROM (
+              SELECT ei.identifier_value      AS series_id,
+                     ei.entity_id             AS entity_id,
+                     ec.rollup_entity_id      AS ec_rollup_entity_id,
+                     dm.rollup_entity_id      AS dm_rollup_entity_id,
+                     ea.alias_name            AS dm_rollup_name
+                FROM entity_identifiers ei
+                LEFT JOIN entity_rollup_history ec
+                       ON ec.entity_id = ei.entity_id
+                      AND ec.rollup_type = 'economic_control_v1'
+                      AND ec.valid_to = DATE '9999-12-31'
+                LEFT JOIN entity_rollup_history dm
+                       ON dm.entity_id = ei.entity_id
+                      AND dm.rollup_type = 'decision_maker_v1'
+                      AND dm.valid_to = DATE '9999-12-31'
+                LEFT JOIN entity_aliases ea
+                       ON ea.entity_id = ec.rollup_entity_id
+                      AND ea.is_preferred = TRUE
+                      AND ea.valid_to = DATE '9999-12-31'
+               WHERE ei.identifier_type = 'series_id'
+                 AND ei.valid_to = DATE '9999-12-31'
+                 AND ei.identifier_value IN ({placeholders})
+          ) AS e
+         WHERE fh.series_id = e.series_id
+           AND fh.series_id IN ({placeholders})
         """,
-        [series_id],
-    ).fetchone()
-    if row is None:
-        return {
-            "entity_id": None, "rollup_entity_id": None,
-            "dm_entity_id": None, "dm_rollup_entity_id": None,
-            "dm_rollup_name": None,
-        }
-    rollup_id, dm_rollup_id, entity_id, dm_entity_id, dm_name = row
-    return {
-        "entity_id":            entity_id,
-        "rollup_entity_id":     rollup_id,
-        "dm_entity_id":         dm_entity_id,
-        "dm_rollup_entity_id":  dm_rollup_id,
-        "dm_rollup_name":       dm_name,
-    }
+        sids + sids,
+    )
+    return len(sids)
 
 
 # ---------------------------------------------------------------------------
@@ -197,9 +211,26 @@ def _staged_tuples(staging_con, run_id: str, exclude: set[str]):
     return [(s, m) for (s, m) in rows if s not in exclude]
 
 
+# Stable column lists. Group 2 entity columns are filled by
+# `_bulk_enrich_run` after all per-tuple inserts complete; the per-tuple
+# INSERT leaves them NULL, then a single UPDATE...FROM JOIN populates
+# them once for every series in series_touched.
+_STAGED_COLS = [
+    "fund_cik", "fund_name", "family_name", "series_id",
+    "quarter", "report_month", "report_date", "cusip", "isin",
+    "issuer_name", "ticker", "asset_category",
+    "shares_or_principal", "market_value_usd", "pct_of_nav",
+    "fair_value_level", "is_restricted", "payoff_profile",
+    "loaded_at", "fund_strategy", "best_index",
+]
+
+
 def _promote_tuple(prod_con, staging_con, manifest_ids,
                    series_id: str, report_month: str) -> tuple[int, int]:
     """Replace prod rows for (series_id, report_month) with staged rows.
+
+    Inserts the staged rows with Group 2 entity columns left NULL —
+    `_bulk_enrich_run` fills them in a single UPDATE after the loop.
 
     Returns (deleted, inserted).
     """
@@ -214,18 +245,10 @@ def _promote_tuple(prod_con, staging_con, manifest_ids,
         [series_id, report_month],
     )
 
-    enrich = _enrich_entity(prod_con, series_id)
-
-    # Pull staged rows for this tuple
     placeholders = ",".join("?" * len(manifest_ids))
     df = staging_con.execute(
         f"""
-        SELECT fund_cik, fund_name, family_name, series_id,
-               quarter, report_month, report_date,
-               cusip, isin, issuer_name, ticker, asset_category,
-               shares_or_principal, market_value_usd, pct_of_nav,
-               fair_value_level, is_restricted, payoff_profile,
-               loaded_at, fund_strategy, best_index
+        SELECT {','.join(_STAGED_COLS)}
         FROM stg_nport_holdings
         WHERE series_id = ?
           AND report_month = ?
@@ -236,30 +259,10 @@ def _promote_tuple(prod_con, staging_con, manifest_ids,
     if df.empty:
         return int(deleted), 0
 
-    # Add Group 2 columns
-    df["entity_id"] = enrich["entity_id"]
-    df["rollup_entity_id"] = enrich["rollup_entity_id"]
-    df["dm_entity_id"] = enrich["dm_entity_id"]
-    df["dm_rollup_entity_id"] = enrich["dm_rollup_entity_id"]
-    df["dm_rollup_name"] = enrich["dm_rollup_name"]
-
-    # Match prod fund_holdings_v2 column order
-    prod_cols = [
-        "fund_cik", "fund_name", "family_name", "series_id",
-        "quarter", "report_month", "report_date", "cusip", "isin",
-        "issuer_name", "ticker", "asset_category",
-        "shares_or_principal", "market_value_usd", "pct_of_nav",
-        "fair_value_level", "is_restricted", "payoff_profile",
-        "loaded_at", "fund_strategy", "best_index",
-        "entity_id", "rollup_entity_id", "dm_entity_id",
-        "dm_rollup_entity_id", "dm_rollup_name",
-    ]
-    df = df[prod_cols]
-
     prod_con.register("ins_df", df)
     prod_con.execute(
-        f"INSERT INTO fund_holdings_v2 ({','.join(prod_cols)}) "
-        f"SELECT {','.join(prod_cols)} FROM ins_df"
+        f"INSERT INTO fund_holdings_v2 ({','.join(_STAGED_COLS)}) "
+        f"SELECT {','.join(_STAGED_COLS)} FROM ins_df"
     )
     prod_con.unregister("ins_df")
     return int(deleted), len(df)
@@ -362,6 +365,12 @@ def main() -> None:
             series_touched.add(sid)
             prod_con.execute("CHECKPOINT")
             print(f"    {sid} {rm}: -{d} +{i}")
+
+        # Single bulk enrichment pass — fills Group 2 entity columns for
+        # every row inserted above. Replaces the per-tuple `_enrich_entity`
+        # call that previously dominated promote runtime at DERA scale.
+        enriched_series = _bulk_enrich_run(prod_con, series_touched)
+        print(f"  bulk enrichment: {enriched_series} series")
 
         u = _upsert_universe(
             prod_con, staging_con, manifest_ids, series_touched,
