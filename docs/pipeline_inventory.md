@@ -1,7 +1,7 @@
 # Pipeline Inventory — DB-Writing Script Audit
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
-_Revised 2026-04-15: six REWRITE items cleared by v2 rewrites shipped this week (fetch_nport_v2 + fetch_dera_nport + promote_nport; fetch_13dg_v2 + promote_13dg; fetch_market v2; build_cusip v2). CUSIP v1.4 vertical (build_classifications, run_openfigi_retry, normalize_securities, validate_classifications) and N-PORT v2 validators (validate_nport, validate_nport_subset) added as new SOURCE-tier rows. Legacy scripts retained in `scripts/` but marked **SUPERSEDED** — retirement gated on second clean v2 run per follow-up tracker. Parallel 2026-04-14 no-DB workstream (commit 831e5b4) added `Makefile` + `scripts/check_freshness.py` + `record_freshness` hooks on 8 scripts + `validate_entities.py --read-only` + `scripts/migrations/add_last_refreshed_at.py` (drafted, NOT RUN)._
+_Revised 2026-04-16: Batch 3 closed. Three more REWRITE items cleared this session: `enrich_holdings.py` shipped as a new OK entry (Group 3 enrichment for `holdings_v2` + `fund_holdings_v2.ticker`, commit `559058d`); `compute_flows.py` rewritten to read `holdings_v2` with EC + DM worldview support (commit `87ee955`); `build_summaries.py` rewritten to read `holdings_v2` + `fund_holdings_v2` with rollup_type doubled writes (commit `87ee955`). New migration `004_summary_by_parent_rollup_type.py` shipped + applied prod (PK now `(quarter, rollup_type, rollup_entity_id)`). Entity MDM expansion (commits `e4e6468`, `7770f87`, `08e2400`) added `resolve_pending_series.py` (4-tier T1/T2/T3/S1 resolver), `backfill_pending_context.py` (one-off `context_json` backfill), `bootstrap_etf_advisers.py` (idempotent ETF adviser seeding) — 4,141 N-PORT pending series wired to entity MDM. Earlier 2026-04-15 work also live: six v2 rewrites (fetch_nport_v2 + fetch_dera_nport + promote_nport; fetch_13dg_v2 + promote_13dg; fetch_market v2; build_cusip v2); CUSIP v1.4 vertical (build_classifications, run_openfigi_retry, normalize_securities, validate_classifications); N-PORT v2 validators (validate_nport, validate_nport_subset). Parallel 2026-04-14 no-DB workstream (commit 831e5b4) added `Makefile` + `scripts/check_freshness.py` + `record_freshness` hooks on 8 scripts + `validate_entities.py --read-only` + `scripts/migrations/add_last_refreshed_at.py` (drafted, still NOT RUN)._
 
 ## 2026-04-14 freshness-wiring status
 
@@ -60,13 +60,14 @@ audited for PROCESS_RULES violations.
 | `promote_nport.py` | staging, prod | `fund_holdings_v2`, `fund_universe`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness`, snapshot | — | — | **OK** (read validation report for Promote-ready: YES; atomic per (series_id, report_month); Group 2 entity enrichment via `entity_current`) |
 | `validate_13dg.py` / `promote_13dg.py` | staging, prod | `beneficial_ownership_v2`, `beneficial_ownership_current`, impacts, snapshot | — | — | **OK** (Batch 2B reference vertical) |
 | `build_managers.py` | `filings_deduped`, `adv_managers`, `cik_crd_*`, `managers` | `parent_bridge`, `cik_crd_links`, `cik_crd_direct`, `managers` (all DROP+CTAS), **`holdings` ALTER+UPDATE (dropped!)** | `:513-532` ALTER+UPDATE `holdings`; `:534` COUNT `holdings` | §1 no CHECKPOINT; §5 `try/except pass` at `:515-521` hides schema failures; §9 hardcoded prod path at `:22`, no `--staging` | **REWRITE** |
-| `build_summaries.py` | **`holdings` (dropped!)** | `summary_by_ticker`, `summary_by_parent`, `data_freshness` | `:73` `FROM holdings h`; `:118` `FROM holdings h` | §9 no `--dry-run`; DDL drift vs prod (see `canonical_ddl.md` §4) | **REWRITE** |
+| `build_summaries.py` (v2) | `holdings_v2`, `fund_holdings_v2` | `summary_by_ticker`, `summary_by_parent`, `data_freshness` | — | — | **OK** (rewritten 2026-04-16, commit `87ee955`; rollup_type doubled INSERT for `summary_by_parent`; `total_value` uses `COALESCE(market_value_live, market_value_usd)` for graceful pre/post-enrich behavior; N-PORT side scoped to latest report_month per series_id; `--staging --dry-run --rebuild`; per-quarter × per-worldview CHECKPOINT) |
+| `enrich_holdings.py` | `holdings_v2`, `fund_holdings_v2`, `cusip_classifications`, `securities`, `market_data` | `holdings_v2.{ticker, security_type_inferred, market_value_live, pct_of_float}`, `fund_holdings_v2.ticker`, `data_freshness('holdings_v2_enrichment')` | — | — | **OK** (new 2026-04-16, commit `559058d`; cusip-keyed lookup `UPDATE...FROM`; Pass A NULL cleanup + Pass B main + Pass C fund_holdings_v2 ticker; `--staging --dry-run --quarter --fund-holdings`; per-pass CHECKPOINT) |
 | `build_fund_classes.py` | local N-PORT XML cache, `fund_classes` | `fund_classes`, `lei_reference`, **`fund_holdings` ALTER+UPDATE (dropped!)** | `:139` ALTER `fund_holdings`; `:146-151` UPDATE; `:152` COUNT | §1 CHECKPOINT every 5000 only; §5 silent `pass`; §9 hardcoded prod path at `:19`, no `--dry-run` | **REWRITE** |
 | `build_entities.py` | `managers`, `adv_managers`, `fund_universe`, `ncen_adviser_map`, etc. | entity MDM tables (staging only) | none | §1 no per-step CHECKPOINT; §9 staging-only gate is the safety rail | **RETROFIT** |
 | `build_benchmark_weights.py` | **`fund_holdings` (dropped!)**, `market_data` | `benchmark_weights` | `:79,:90` `FROM fund_holdings` | **BROKEN IMPORT** `get_connection` did not exist in db.py — fixed this session (D11); §1 no CHECKPOINT; §9 no `--dry-run` | **REWRITE** |
 | `build_shares_history.py` | `market_data`, **`holdings` (dropped!)**, SEC XBRL cache | `shares_outstanding_history`, **`holdings.pct_of_float` UPDATE (dropped!)** | `:161-164,:201-203` reads; `:177-184,:190-199` UPDATE `holdings` | §1 CHECKPOINT at end only; §9 no `--dry-run` | **REWRITE** |
 | `build_fixture.py` | prod DB (ATTACH READ_ONLY) | fixture DB file only | none (uses `_v2` throughout) | §9 `--dry-run` + `--force` + `--yes` gates; otherwise clean | **OK** |
-| `compute_flows.py` | **`holdings` (dropped!)**, `market_data` | `investor_flows`, `ticker_flow_stats`, `data_freshness` | `:69,:78` `FROM holdings WHERE quarter=...` | §9 no `--dry-run` (`--staging` exists) | **REWRITE** |
+| `compute_flows.py` (v2) | `holdings_v2`, `market_data` | `investor_flows`, `ticker_flow_stats`, `data_freshness` | — | — | **OK** (rewritten 2026-04-16, commit `87ee955`; investor key = `rollup_entity_id` + `rollup_name`; `inst_parent_name` retained for back-compat = `rollup_name` for active worldview; per-period × per-worldview INSERT — EC + DM both written; value column = `market_value_usd` Group 1 not `market_value_live`; `WHERE ticker IS NOT NULL AND ticker != ''` filter; `--staging --dry-run`) |
 | `entity_sync.py` | entity tables | entity tables + staging | none | N/A (library) | **OK** |
 | `sync_staging.py` | prod (ATTACH READ_ONLY) | staging CTAS | none | §9 `--dry-run` OK; clean | **OK** |
 | `diff_staging.py` | prod + staging (READ_ONLY) | log file only | none | read-only | **OK** |
@@ -108,10 +109,10 @@ pipeline framework rewrite and do not participate in the orchestrator.
 
 ## Cross-cutting findings
 
-1. **Legacy-table writers CLEARED by v2 rewrites (2026-04-13 → 2026-04-15).**
+1. **Legacy-table writers CLEARED by v2 rewrites (2026-04-13 → 2026-04-16).**
    Original list had 8 writers + 3 readers touching Stage-5-dropped
    `holdings` / `fund_holdings` / `beneficial_ownership`. Status as of
-   2026-04-15:
+   2026-04-16:
    - `fetch_nport.py` → SUPERSEDED by `fetch_nport_v2.py` +
      `fetch_dera_nport.py` + `promote_nport.py`. Writes
      `fund_holdings_v2` + `fund_universe` directly. ✓
@@ -122,12 +123,18 @@ pipeline framework rewrite and do not participate in the orchestrator.
    - `build_cusip.py` → rewritten (UPSERT-only; legacy at
      `scripts/retired/build_cusip_legacy.py`). No longer UPDATEs
      `holdings.ticker`. ✓
+   - `compute_flows.py` → rewritten (Batch 3-2, commit `87ee955`); reads
+     `holdings_v2`; rollup_type doubled writes. ✓
+   - `build_summaries.py` → rewritten (Batch 3-3, commit `87ee955`); reads
+     `holdings_v2` + `fund_holdings_v2`; rollup_type doubled writes. ✓
+   - `enrich_holdings.py` → new (Batch 3-1, commit `559058d`); enriches
+     `holdings_v2` Group 3 + `fund_holdings_v2.ticker`. ✓
    - Still REWRITE: `load_13f.py` (`holdings` DROP+CTAS — replacing
-     with `load_13f_v2.py` in Batch 3), `build_managers.py`,
+     with `load_13f_v2.py` post-Batch-3), `build_managers.py`,
      `build_fund_classes.py`, `build_shares_history.py`,
-     `build_summaries.py`, `build_benchmark_weights.py`,
-     `compute_flows.py`. These are the remaining Batch 3 targets; CUSIP
-     v1.4 now unblocks the enrichment pattern they all need.
+     `build_benchmark_weights.py`. The Batch 3 trio is now closed;
+     the remaining REWRITEs are scoped for future framework work but
+     no longer block any analytical workflow.
 
 2. **No `--dry-run` across the SOURCE/DERIVED tier.** Only
    `merge_staging.py`, `sync_staging.py`, `promote_staging.py`,

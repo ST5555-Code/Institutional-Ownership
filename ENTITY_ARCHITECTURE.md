@@ -1,7 +1,7 @@
 # Entity Master Data Management (MDM) Architecture
 
-_Last updated: April 8, 2026_
-_Status: Phase 3.5 — Complete. Phase 4 ready to scope._
+_Last updated: April 16, 2026_
+_Status: Phase 4 cutover complete (2026-04-09). Stage 5 cleanup complete (2026-04-13 — legacy `holdings`, `fund_holdings`, `beneficial_ownership` dropped). Entity MDM now at 24,347 entities / 33,234 identifiers / 17,826 relationships / 24,683 aliases / 24,390 classification rows / 55,138 rollup rows (both worldviews × ~24K entities). 2026-04-15/16 — Entity MDM expansion this week added 4,141 N-PORT pending series via `resolve_pending_series.py` (4-tier T1/T2/T3/S1) and `bootstrap_etf_advisers.py` (idempotent ETF adviser seeding). Pending residual: 1,805 (619 real ETF specialty + 1,186 deferred synthetics per D13)._
 
 ---
 
@@ -43,7 +43,7 @@ This document tracks the design, implementation status, deferred items, and vali
 
 ### Rollup Types
 
-Two rollup worldviews coexist via the `rollup_type` field. Each entity has one row per type in `entity_rollup_history` (both at 20,205 rows).
+Two rollup worldviews coexist via the `rollup_type` field. Each entity has one row per type in `entity_rollup_history` (~24,347 entities × 2 worldviews ≈ 49K active rows; 55,138 total including closed history rows). As of 2026-04-16, both worldviews are also wired into the L4 derived tables: `summary_by_parent` PK is `(quarter, rollup_type, rollup_entity_id)` (per migration 004), and `investor_flows` / `ticker_flow_stats` carry `rollup_type` columns with EC + DM rows written per period.
 
 | Rollup Type | Purpose | Data Source | Status |
 |-------------|---------|-------------|--------|
@@ -255,7 +255,9 @@ python3 scripts/resolve_adv_ownership.py --qc --staging
 2. ✅ App switched to v2 tables — all 34 query functions updated, COALESCE(rollup_name, inst_parent_name) pattern, shadow logging on 5 key endpoints
 3. ✅ Parity validation — 8/8 gates pass: row_count exact, entity/rollup coverage 100%, total AUM 0.00% diff, top 50 entity AUM 0.00% diff, 10/10 known merges, shadow log clean
 4. ✅ Cutover authorized 2026-04-09 — app running cleanly on v2 tables, zero 500 errors, shadow log shows only expected discrepancies (new_gain, legacy_only name changes, value_diff consolidation)
-5. ⏳ Stage 5 cleanup — legacy tables retained 30 days. Rename to _legacy scheduled on or after 2026-05-09. Requires explicit authorization.
+5. ✅ Stage 5 cleanup — legacy `holdings`, `fund_holdings`, `beneficial_ownership` tables dropped 2026-04-13 from both prod and staging DBs after `EXPORT DATABASE` backup, zero code references confirmed via grep, validate_entities.py 9 PASS / 0 FAIL / 7 MANUAL unchanged. Holdings_v2/fund_holdings_v2/beneficial_ownership_v2 are the canonical fact tables.
+
+**Batch 3 (2026-04-16) — Group 3 enrichment + L4 rebuild path live.** With Stage 5 complete, the Batch 3 trio (`enrich_holdings.py` + `compute_flows.py` rewrite + `build_summaries.py` rewrite + migration 004) closes the entity-MDM-driven rebuild path: every L4 derived table now reads from `holdings_v2` / `fund_holdings_v2` and writes both rollup worldviews. See `docs/data_layers.md` for the per-table state.
 
 **Rollup wiring fixes applied during migration:**
 - Northern Trust (eid=4435), Wellington (eid=11220), Franklin (eid=4805), Dimensional (eid=5026), Ameriprise (eid=10178), First Trust (eid=136) — corrected from subsidiary-rollup to self-rollup

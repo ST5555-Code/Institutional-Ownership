@@ -1,15 +1,13 @@
 # Data Layers — Table Classification
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
-_Revised: 2026-04-15 — CUSIP v1.4 layer live (4 new tables + 7 new
-`securities` columns); N-PORT DERA backfill live (`fund_holdings_v2`
-6.39M → 9.32M, `fund_universe` 6,677 → 8,459, newest `report_date`
-2026-01-31); control-plane tables live in prod; migration 002
-(`fund_universe.strategy_*`) applied. Parallel 2026-04-14 workstream
-(commit 831e5b4) wired `record_freshness` on 8 non-v2 scripts and
-drafted `scripts/migrations/add_last_refreshed_at.py` (pending on
-`entity_relationships`) — see `docs/NEXT_SESSION_CONTEXT.md` open-items
-list._
+_Revised: 2026-04-16 — Batch 3 closed. Three deliveries this week brought all L4 tables back into a clean rebuilt state:_
+_  - `enrich_holdings.py` shipped (commit `559058d`) — `holdings_v2` Group 3 fully populated (ticker / sti / mvl / pof); `fund_holdings_v2.ticker` + 1.45M; `data_freshness('holdings_v2_enrichment')` stamped._
+_  - `compute_flows.py` rewrite + `build_summaries.py` rewrite + migration 004 shipped (commit `87ee955`) — both scripts now `holdings_v2`-sourced and write rollup-aware tables (EC + DM worldviews); `summary_by_parent` PK is now `(quarter, rollup_type, rollup_entity_id)`._
+_  - Entity MDM expansion (commits `e4e6468`, `7770f87`, `08e2400`) — 4,141 N-PORT pending series resolved; `fund_holdings_v2` 9.32M → 11.67M; entity layer at 24,347 entities / 33,234 identifiers / 55,138 rollup rows._
+_  - All 4 L4 output tables stamped fresh on `data_freshness`: `holdings_v2_enrichment`, `investor_flows`, `ticker_flow_stats`, `summary_by_parent`, `summary_by_ticker`._
+_Earlier 2026-04-15 work also live: CUSIP v1.4 layer (4 new tables + 7 new `securities` columns); N-PORT DERA backfill; control-plane tables; migration 002 (`fund_universe.strategy_*`)._
+_Parallel 2026-04-14 workstream (commit 831e5b4) wired `record_freshness` on 8 non-v2 scripts and drafted `scripts/migrations/add_last_refreshed_at.py` (still pending on `entity_relationships`)._
 
 This document is the single source of truth for how every table in the
 prod DB is classified across the four-layer model. Each owning script
@@ -74,7 +72,7 @@ _Tables: `beneficial_ownership_current`, `summary_by_parent`,
 ## 2. Complete table inventory
 
 Every table returned by `SHOW TABLES` on prod (counts below as of
-2026-04-15) is classified. Entity `_snapshot_*` rollback artifacts from
+2026-04-16) is classified. Entity `_snapshot_*` rollback artifacts from
 `promote_staging.py` and `entity_*_staging` tables are grouped at the
 bottom.
 
@@ -85,11 +83,11 @@ bottom.
 | `raw_coverpage` | L1 | `load_13f.py` | direct_write | 13F COVERPAGE.tsv mirror; 43,358 rows |
 | `filings` | L3 | `fetch_13dg.py` + `load_13f.py` | upsert on accession_number | 43,358 rows; mixed 13F + 13D/G accession metadata |
 | `filings_deduped` | L3 | derived from `filings` | rebuild | 40,140 rows; dedup-on-accession view materialized as table |
-| `holdings_v2` | L3 | `load_13f.py` → `enrich_holdings.py` (Batch 3, unblocked) | delete_insert on (quarter) | 12.27M rows; canonical 13F fact table |
-| `fund_holdings_v2` | L3 | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` | delete_insert on (series_id, report_month) | **9,315,568 rows** (2026-04-15); oldest 2024-10-31, newest 2026-01-31; DERA bulk path is primary |
+| `holdings_v2` | L3 | `load_13f.py` → `enrich_holdings.py` (Batch 3, **LIVE** since 2026-04-16) | delete_insert on (quarter) | **12,270,984 rows** (2026-04-16); canonical 13F fact table; Group 3 fully enriched (ticker 91.49% / sti 100% / mvl 77.64% / pof 61.83%) |
+| `fund_holdings_v2` | L3 | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` → `enrich_holdings.py --fund-holdings` | delete_insert on (series_id, report_month) | **11,670,960 rows** (2026-04-16); 12,594 distinct series; newest `report_date` 2026-02-28; DERA bulk path is primary; ticker 44.43% populated post-enrich (was 32.03%) |
 | `beneficial_ownership_v2` | L3 | `fetch_13dg_v2.py` → `promote_13dg.py` | upsert on accession_number | 51,905 rows; canonical 13D/G fact table |
-| `beneficial_ownership_current` | L4 | `promote_13dg.py` step 7 | rebuild | 24,753+ rows; latest-per-(filer_cik, subject_cusip) with amendment logic |
-| `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **8,459 rows** (2026-04-15); now includes bond / index / MM funds via DERA path. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
+| `beneficial_ownership_current` | L4 | `promote_13dg.py` step 7 | rebuild | 24,756 rows; latest-per-(filer_cik, subject_cusip) with amendment logic |
+| `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,600 rows** (2026-04-16); now includes bond / index / MM funds via DERA path + 4,141 ETF brand series resolved this week. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
 | `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 7 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`) |
 | `market_data` | L3 | `fetch_market.py` | upsert on ticker | 6,424 rows; latest price, market_cap, float, sector |
 | `short_interest` | L3 | `fetch_finra_short.py` | upsert on (ticker, report_date) | 328,595 rows; daily FINRA short vol (app reads directly at `api_market.py:191`) |
@@ -103,20 +101,20 @@ bottom.
 | `parent_bridge` | L3 | `build_entities.py` legacy | rebuild | 11,135 rows; legacy keyword-match parent bridge — retained as evidence source, superseded by ADV/N-CEN |
 | `fetched_tickers_13dg` | L3 | `fetch_13dg.py` | upsert on ticker | 6,075 rows; ticker-level fetch progress marker |
 | `listed_filings_13dg` | L3 | `fetch_13dg.py` | upsert on accession | 60,247 rows; EDGAR 13D/G accession index |
-| `entities` | L3 | `build_entities.py` | staging→promote | 20,205 rows; entity MDM root |
-| `entity_identifiers` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | 29,092 rows; CIK/CRD/SERIES_ID bridge |
-| `entity_relationships` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | 13,685 rows; graph with `is_primary` parent flag |
-| `entity_aliases` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | 20,541 rows; name variants with type + preferred |
-| `entity_classification_history` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | 20,248 rows |
-| `entity_rollup_history` | L3 | `build_entities.py` step 7 | staging→promote (SCD) | 46,854 rows; both rollup_type worldviews × 20,205 entities = ~40k, plus history |
+| `entities` | L3 | `build_entities.py` | staging→promote | **24,347 rows** (2026-04-16, +4,142 from week-start via N-PORT pending series resolution + ETF brand seeding); entity MDM root |
+| `entity_identifiers` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | **33,234 rows** (2026-04-16, +4,142 from series_id additions); CIK/CRD/SERIES_ID bridge |
+| `entity_relationships` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | **17,826 rows** (2026-04-16, +4,141 sub_adviser/fund_sponsor edges); graph with `is_primary` parent flag |
+| `entity_aliases` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | **24,683 rows** (2026-04-16); name variants with type + preferred |
+| `entity_classification_history` | L3 | `build_entities.py` + `entity_sync.py` | staging→promote (SCD) | **24,390 rows** (2026-04-16) |
+| `entity_rollup_history` | L3 | `build_entities.py` step 7 | staging→promote (SCD) | **55,138 rows** (2026-04-16); both rollup_type worldviews × 24,347 entities ≈ 49K active, plus closed history rows |
 | `entity_overrides_persistent` | L3 | manual via CSV / `entity_sync.py` | staging→promote | 47 rows; replayed on `build_entities.py --reset` |
 | `entity_identifiers_staging` | L3 (staging-only) | `entity_sync.py` | staging_only | 3,503 rows; conflict soft-landing queue |
 | `entity_relationships_staging` | L3 (staging-only) | `entity_sync.py` | staging_only | 0 rows (INF1 framework live) |
 | `entity_current` | L4 (VIEW) | `entity_schema.sql` | rebuild (view) | VIEW over entity_identifiers JOIN entity_relationships JOIN entity_rollup_history — open rows only |
-| `summary_by_parent` | L4 | `build_summaries.py` | rebuild per quarter | 8,417 rows; **DDL drift vs owner script — see canonical_ddl.md** |
-| `summary_by_ticker` | L4 | `build_summaries.py` | rebuild per quarter | 24,570 rows |
-| `investor_flows` | L4 | `compute_flows.py` | rebuild | 9.38M rows; set-based window-function rebuild |
-| `ticker_flow_stats` | L4 | `compute_flows.py` | rebuild | 18,986 rows |
+| `summary_by_parent` | L4 | `build_summaries.py` (rewritten 2026-04-16, commit `87ee955`) | rebuild per (quarter, rollup_type) | **63,916 rows** (2026-04-16, last_run 06:41:31 UTC); 4 quarters × 2 worldviews × ~8K rollups; PK now `(quarter, rollup_type, rollup_entity_id)` per migration 004 |
+| `summary_by_ticker` | L4 | `build_summaries.py` (rewritten 2026-04-16, commit `87ee955`) | rebuild per quarter | **47,642 rows** (2026-04-16, last_run 06:41:31 UTC); 4 quarters × ~12K distinct tickers; rollup-agnostic |
+| `investor_flows` | L4 | `compute_flows.py` (rewritten 2026-04-16, commit `87ee955`) | rebuild per (period, rollup_type) | **17,396,524 rows** (2026-04-16, last_run 06:21:29 UTC); 4 periods × 2 worldviews; 8.70M EC + 8.70M DM (identical because for 13F filings the rollups coincide for ~all entities) |
+| `ticker_flow_stats` | L4 | `compute_flows.py` (rewritten 2026-04-16, commit `87ee955`) | rebuild per (period, rollup_type) | **80,322 rows** (2026-04-16, last_run 06:21:29 UTC); 40,161 × 2 worldviews |
 | `managers` | L4 | `build_managers.py` | rebuild | 12,005 rows; rebuilt from `entity_current` + `adv_managers` (decision D1 — keep, do not retire yet) |
 | `fund_classes` | L4 | `build_fund_classes.py` | rebuild | 31,056 rows; fund class → series mapping |
 | `fund_family_patterns` | L4 | `migrate_batch_3a.py` | seeded once, manual edits | 83 rows; N-PORT fund-family regex patterns (ARCH-3A) |
@@ -126,14 +124,14 @@ bottom.
 | `index_proxies` | L4 | `build_fund_classes.py` | rebuild | 13,641 rows |
 | `benchmark_weights` | L4 | `build_benchmark_weights.py` | rebuild | 55 rows; per-quarter US-equity sector weights from Vanguard Total Stock Market |
 | `peer_groups` | L4 | manual seed | rebuild | 27 rows; sector peer-group reference |
-| `data_freshness` | L0 | every pipeline at end-of-run via `db.record_freshness()` — 8 non-v2 scripts wired in commit 831e5b4 (2026-04-14); v2 SourcePipelines stamp through their promote paths | upsert on table_name | 4 rows on prod (stamped by recent promotes); `scripts/check_freshness.py` is the gate + `make freshness` reads it |
-| `ingestion_manifest` | L0 | `scripts/pipeline/manifest.py` | direct_write | **20,807 rows** — live since migration 001 (Batch 1). DERA_ZIP and per-accession keys for N-PORT |
-| `ingestion_impacts` | L0 | `scripts/pipeline/manifest.py` | direct_write | **20,799 rows** — one per promoted `(series_id, report_month)` tuple plus per-quarter DERA ZIP impacts |
-| `pending_entity_resolution` | L0 | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` | direct_write | **5,924 rows** — 5,921 N-PORT series queued for MDM follow-up (bond / index / MM funds) + 3 from 13D/G |
+| `data_freshness` | L0 | every pipeline at end-of-run via `db.record_freshness()` — 8 non-v2 scripts wired in commit 831e5b4 (2026-04-14); v2 SourcePipelines stamp through their promote paths; Batch 3 outputs (`enrich_holdings.py`, `compute_flows.py`, `build_summaries.py`) stamp on completion | upsert on table_name | **9 rows** on prod (2026-04-16) — includes `holdings_v2_enrichment`, `investor_flows`, `ticker_flow_stats`, `summary_by_parent`, `summary_by_ticker`, `fund_holdings_v2`, `fund_universe`, `beneficial_ownership_v2`, `beneficial_ownership_current`; `scripts/check_freshness.py` is the gate + `make freshness` reads it |
+| `ingestion_manifest` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,253 rows** (2026-04-16) — live since migration 001 (Batch 1). DERA_ZIP and per-accession keys for N-PORT |
+| `ingestion_impacts` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,245 rows** (2026-04-16) — one per promoted `(series_id, report_month)` tuple plus per-quarter DERA ZIP impacts |
+| `pending_entity_resolution` | L0 | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` + `resolve_pending_series.py` | direct_write | **5,946 rows** (2026-04-16) — 4,141 resolved (status=`resolved` after `resolve_pending_series.py` 4-tier T1/T2/T3/S1 + ETF brand seeding) / 1,805 pending (619 real residual ETF specialty + 1,186 deferred synthetics per D13) |
 | `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py` |
 | `cusip_retry_queue` | L0 | `build_classifications.py` + `run_openfigi_retry.py` | direct_write | **37,925 rows** — 15,807 resolved via OpenFIGI, 22,118 unmappable (private / delisted / exotic); status = pending \| resolved \| unmappable |
 | `_cache_openfigi` | L3 (reference cache) | `run_openfigi_retry.py` | upsert on cusip | **15,807 rows** — full v3 response per CUSIP (figi, ticker, exchange, security_type, market_sector). Durable cache; survives re-runs |
-| `schema_versions` | L0 | migration scripts (001, 002, 003) | direct_write | 1 row currently (003 stamped 2026-04-15); prior migrations not retroactively stamped |
+| `schema_versions` | L0 | migration scripts (001, 002, 003, 004) | direct_write | 1 row currently (003 stamped 2026-04-15); migration 004 is idempotent and probes column presence rather than stamping; prior migrations not retroactively stamped |
 | `positions` | **RETIRE** | `unify_positions.py` (RETIRE) | — | 18.68M rows; legacy combined-positions table. Decision D2: delete. No app reads confirmed (only `unify_positions.py` self-reads). Not retired this session — documented only. |
 | `fund_classification` | **RETIRE** | `fix_fund_classification.py` (RETIRE) | — | 5,717 rows; superseded by `fund_best_index` + `fund_universe.best_index`. Decision: fold into `fund_universe`; only one script reads it — `fix_fund_classification.py` (itself RETIRE). |
 | `entities_snapshot_*` (16 tables) | L3 rollback artifact | `promote_staging.py` | auto-created | Intra-DB promotion snapshots. Retention policy is **D7 (open decision)**. |
@@ -210,18 +208,27 @@ required `cik` is not present in `entity_identifiers` with an active row
 - `is_passive`, `is_activist` — booleans derived from classification + `entity_classification_history.is_activist`
 - `classification_source` — provenance of the classification (ADV, N-CEN, SIC, manual_l4, etc.)
 
-### Group 3 — Market/reference enrichment (owner: `enrich_holdings.py` [proposed], NULLABLE)
+### Group 3 — Market/reference enrichment (owner: `enrich_holdings.py`, **LIVE** since 2026-04-16, NULLABLE)
 
 Enrichment pass that runs **after** promote — NOT at promote time
 (Decision D4). Nullability guarantee: queries.py must handle every
-column in this group as potentially NULL. Enrichment pass rewrites these
-columns in place with a row-level UPDATE joined on
-`(accession_number, cusip)`.
+column in this group as potentially NULL. The shipped script
+(`scripts/enrich_holdings.py`, commit `559058d`) uses a cusip-keyed
+lookup pattern (NOT `(accession_number, cusip)` as originally
+proposed — that key is non-unique on `holdings_v2` with 1.29M dup
+groups; cusip-keyed lookup is verified 1:1 across
+`cusip_classifications` / `securities` / `market_data`).
 
-- `ticker` — resolved from `securities` by cusip. Null when CUSIP has no listed equity.
-- `security_type_inferred` — derived from `securities.security_type_inferred`
-- `market_value_live` — `shares × market_data.price` at latest market_data snapshot. Null for delisted / foreign / non-equity.
-- `pct_of_float` — `shares × 100.0 / market_data.float_shares`. Null when float is missing.
+D6 **resolved** (option b): full refresh every run. Per-row `mvl` /
+`pof` use the OUTER row's `shares`. Run with `--quarter YYYYQN` to
+scope to one quarter.
+
+- `ticker` — resolved from `securities` by cusip when `cusip_classifications.is_equity=TRUE`. Null when CUSIP is non-equity (OPTION/BOND/CASH/WARRANT/...).
+- `security_type_inferred` — pulled from `securities.security_type_inferred` (legacy domain `equity/etf/derivative/money_market`); **not** from `cusip_classifications.canonical_type` (which uses BOND/COM/OPTION/... — different domain the app's read paths don't speak).
+- `market_value_live` — `shares × market_data.price_live`. Null for delisted / foreign / non-equity / missing market_data.
+- `pct_of_float` — `shares × 100.0 / market_data.float_shares`. Null when float is missing (~30% of `market_data` rows lack `float_shares`).
+
+Live coverage on prod (2026-04-16, post first run): ticker 91.49% (10,395,053 / 12,270,984); sti 100.00%; mvl 77.64% (9,527,773); pof 61.83% (7,587,332).
 
 ---
 

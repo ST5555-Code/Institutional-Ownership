@@ -20,6 +20,9 @@ _Last updated: 2026-04-16 (Session close #5 — **Batch 3 COMPLETE.** All three 
 | `e4e6468` | `scripts/resolve_pending_series.py` + N-PORT DERA S2 & topup re-promote (3,613 series resolved) |
 | `7770f87` | `promote_nport.py` bulk-SQL enrichment + `validate_nport_subset.py` synth_resolved allowance + `backfill_pending_context.py` (5,943 rows) |
 | `08e2400` | ETF brand entity additions (`scripts/bootstrap_etf_advisers.py` + 11 SUPPLEMENTARY_BRANDS) — 528 more series resolved; cumulative 4,141 / 5,943 (69.7%) |
+| `d975f72` | docs: session #3 close — ETF brands live + enrich_holdings.py pickup pointer |
+| `559058d` | **Batch 3-1** — `scripts/enrich_holdings.py` shipped + executed against prod. Group 3 enrichment for `holdings_v2` + `fund_holdings_v2.ticker` populate. Cusip-keyed lookup (not `(acc, cusip)` — that's non-unique). holdings_v2 ticker 10.40M / sti 12.27M / mvl 9.53M / pof 7.59M; fund_holdings_v2.ticker +1.45M to 5.18M. data_freshness('holdings_v2_enrichment') stamped, row_count=10,395,053. Pass B 706.7s on 12.27M rows |
+| `87ee955` | **Batch 3 close** — migration `004_summary_by_parent_rollup_type.py` (PK now `(quarter, rollup_type, rollup_entity_id)`) + `compute_flows.py` rewrite (holdings → holdings_v2, EC + DM doubled writes; investor_flows 9.38M → 17.40M; ticker_flow_stats 18,986 → 80,322; runtime 18.1s) + `build_summaries.py` rewrite (summary_by_ticker 24,570 → 47,642; summary_by_parent 8,417 → 63,916; runtime 4.6s). All 4 L4 outputs freshness-stamped. Worldview divergence visible for first time: Fidelity DM total_nport_aum=$3.57T vs EC $4.03T (sub-adviser routing) |
 
 ## Batch 3 — `compute_flows.py` + `build_summaries.py` + migration 004 shipped (2026-04-16, session #5)
 
@@ -276,27 +279,29 @@ docs.
 - **`ARCHITECTURE_REVIEW.md` §Batch 3-A** — as-shipped schema note for `fund_family_patterns` (2 cols: `pattern VARCHAR`, `inst_parent_name VARCHAR`; PK `(inst_parent_name, pattern)`; 83 rows) + `get_nport_family_patterns()` memoization. Corrects stale 3-col planning docs.
 - **`NEXT_SESSION_CONTEXT.md` §gg** — `holdings_v2` filing-line grain gotcha: true composite key is `(cik, ticker, quarter, put_call, security_type, discretion)`, not `(cik, cusip, quarter)`.
 
-## Open items for next sessions (expanded 2026-04-15)
+## Open items for next sessions (refreshed 2026-04-16)
 
 ### N-PORT / holdings
 
-1. **Entity MDM expansion — 5,921 N-PORT series** queued in `pending_entity_resolution` (bond / index / MM funds brought in by the DERA path). Current breakdown: 1,187 synthetic `{cik}_{accession}` fallbacks + 4,734 real SERIES_ID without prior entity records. Resolution unblocks a second promote cycle.
-2. **N-PORT monthly top-up (Feb/Mar 2026).** `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when 2026Q2 DERA ZIP isn't yet out.
+1. ~~**Entity MDM expansion — 5,921 N-PORT series**~~ **DONE 2026-04-15/16** (commits `e4e6468`, `7770f87`, `08e2400`). 4,141 series resolved via `resolve_pending_series.py` 4-tier T1/T2/T3/S1 + `bootstrap_etf_advisers.py` ETF brand seeding. Residual 1,805 = 619 real ETF specialty (Global X, Krane Shares, AIM, SPDR Series — need new adviser entities created) + 1,186 deferred synthetics per D13.
+2. **March 2026 N-PORT top-up.** Re-run `python3 scripts/fetch_nport_v2.py --staging --monthly-topup` when more 2026Q1 filings appear (last topup loaded through 2026-02-28; March 2026 N-PORTs are starting to file at the 60-day deadline).
 3. **Full-validator smoke test on next promote.** Set-based rewrite (commit `39d5e95`) ran in 66s on 14K staged series; re-run on the next authorised promote and compare against `validate_nport_subset.py`.
 
-### Batch 3 — now unblocked by CUSIP v1.4
+### Batch 3 — COMPLETE 2026-04-16
 
-4. **`enrich_holdings.py`** — Group 3 enrichment for `holdings_v2`: `ticker`, `security_type_inferred`, `market_value_live`, `pct_of_float` via UPDATE joined on (accession_number, cusip). Consumes `securities.canonical_type` + `market_data`.
-5. **`compute_flows.py` rewrite** — currently reads legacy `holdings`; rewrite to `holdings_v2`.
-6. **`build_summaries.py` rewrite** — same pattern.
+4. ~~**`enrich_holdings.py`**~~ **DONE 2026-04-16** (commit `559058d`). Group 3 fully enriched on prod; cusip-keyed lookup pattern (not `(accession_number, cusip)` — that key is non-unique). Run `python3 scripts/enrich_holdings.py --fund-holdings` for full refresh; `--quarter YYYYQN` to scope.
+5. ~~**`compute_flows.py` rewrite**~~ **DONE 2026-04-16** (commit `87ee955`). Reads `holdings_v2`; rollup_type doubled writes (EC + DM); investor_flows 17.40M / ticker_flow_stats 80,322. Runtime 18.1s.
+6. ~~**`build_summaries.py` rewrite**~~ **DONE 2026-04-16** (commit `87ee955`). Reads `holdings_v2` + `fund_holdings_v2`; rollup_type doubled writes; summary_by_ticker 47,642 / summary_by_parent 63,916. Runtime 4.6s. Migration `004_summary_by_parent_rollup_type.py` shipped + applied prod.
 
 ### Entity MDM follow-ups
 
-7. **`entity_id` linkage on `beneficial_ownership_current`.** Currently the 13D/G fact tables have no entity_id column. Filers are disconnected from the MDM; rollup walks skip 13D/G entirely. Needs a promote-time enrichment step equivalent to `fund_holdings_v2`'s Group 2 pass.
+7. **13D/G `entity_id` linkage** — `beneficial_ownership_v2.entity_id` column does NOT exist; filers are disconnected from the MDM and rollup walks skip 13D/G entirely. Needs a Group 2 enrichment pass at promote time equivalent to `fund_holdings_v2`'s pattern. Add the column via migration, populate via `entity_current` join on `filer_cik`, then enrich at promote in `promote_13dg.py`. Highest-priority entity work for next session.
 8. **CRD backfill — top 100 AUM filers.** `entity_identifiers.identifier_type='crd'` coverage is patchy for high-AUM filers; manual CRD resolution via ADV lookup.
 9. **`entity_identifiers_staging_review` backlog (~280 items).** Accumulated conflict queue from staging→promote cycles; each needs human adjudication (merge / reject / separate entity).
 10. **Run `scripts/migrations/add_last_refreshed_at.py`** via staging workflow. Drafted in 831e5b4; not yet executed. Adds `last_refreshed_at` to `entity_relationships` so ADV / N-CEN refresh age becomes measurable.
 11. **DM13/DM14/DM15 decision-maker routing audits** — three pending audits against `rollup_type='decision_maker_v1'` chains where sub-adviser paths diverge from economic-control parents.
+12. **D13 — synthetic series deferral** (1,186 series with `resolution_status='deferred_synthetic'`). CIK-level N-PORT filings missing SERIES_ID; resolution requires N-PORT XML sub-adviser metadata extraction (extend `parse_nport_xml`). Deferred until D13 policy is confirmed.
+13. **Residual 619 real pending series** — concentrated in ETF specialty trusts not yet seeded as advisers. Each needs a new adviser entity created via `bootstrap_etf_advisers.py` + a `SUPPLEMENTARY_BRANDS` variant. Top families by count: Global X (103), EA Series (95), ETF Opportunities (69), Krane Shares (35), BondBloxx residual, AIM, SPDR Series, Listed Funds.
 
 ### API / contracts
 
