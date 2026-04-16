@@ -21,7 +21,10 @@ import subprocess
 import time
 from datetime import datetime
 
-print = functools.partial(print, flush=True)
+# Intentional shadow: force flush=True so background-run logs appear
+# in real time. See feedback_buffered_output. Rename would require
+# updating every print() call site in this script — do not refactor.
+print = functools.partial(print, flush=True)  # pylint: disable=redefined-builtin
 
 import duckdb
 
