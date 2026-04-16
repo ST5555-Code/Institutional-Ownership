@@ -91,7 +91,39 @@ SUPPLEMENTARY_BRANDS = [
     ("EXCHANGE TRADED CONCEPTS", 3738,  "Exchange Traded Concepts"),
     ("ALLIANCEBERNSTEIN",        57,    "AllianceBernstein"),
     ("AB ACTIVE",                57,    "AllianceBernstein"),
+    # 2026-04-15 ETF brand additions — confirmed against adv_managers.
+    # Wires each trust family's series to its primary adviser.
+    ("GLOBAL X",               8005,    "Global X Management"),
+    ("KRANE",                  5640,    "Krane Funds Advisors"),
+    ("SPDR SERIES",               3,    "State Street / SSGA"),       # PARENT_SEED brand
+    ("COLUMBIA ETF",             52,    "Columbia Threadneedle"),     # PARENT_SEED brand
+    ("EXCHANGE LISTED FUNDS", 3738,    "Exchange Traded Concepts"),
+    # NEW entity created via scripts/bootstrap_etf_advisers.py (2026-04-15);
+    # Van Eck and Aptus already existed in the entity graph and the
+    # bootstrap script reused those eids instead of creating duplicates.
+    ("VANECK",                 6197,    "Van Eck Associates"),       # existing
+    ("AIM ETF",                8977,    "Aptus Capital Advisors"),    # existing
+    ("BONDBLOXX",             23819,    "BondBloxx Investment Management"),
+    # Multi-sub-adviser series-trust families. The trust's primary adviser
+    # holds the advisory contract; per-series sub-adviser routing
+    # (decision_maker_v1) is deferred to a future DM12-style audit and
+    # should not be inferred from this wiring.
+    # See `MULTI_SUBADVISER_VARIANTS` below for the runtime caveat tag.
+    ("EA SERIES",              2944,    "Empowered Funds (Alpha Architect)"),
+    ("ETF OPPORTUNITIES",      9013,    "Tidal Investments"),
+    ("LISTED FUNDS",           8646,    "Vident Advisory"),
 ]
+
+# Variants whose target trust hosts multiple sub-advisers per series.
+# Surfaces as a caveat string in the resolver decision log so that the
+# DM12 audit can recover the rows that need per-series sub-adviser
+# routing.
+MULTI_SUBADVISER_VARIANTS = {
+    "EA SERIES",
+    "ETF OPPORTUNITIES",
+    "LISTED FUNDS",
+    "EXCHANGE LISTED FUNDS",
+}
 
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
 PROD_DB = os.path.join(BASE_DIR, "data", "13f.duckdb")
@@ -431,11 +463,15 @@ def try_brand_substring(
                 confidence="low", reason=f"{tier}_{vreason}",
             )
 
+    reason = f"brand substring {variant!r} in {name!r} → {canonical}"
+    if variant in MULTI_SUBADVISER_VARIANTS:
+        reason += (" [PRIMARY-ADVISER ATTRIBUTION ONLY — multi-sub-adviser trust;"
+                   " per-series sub-adviser routing deferred to future DM12 audit]")
     return Decision(
         series_id=p.series_id, tier=tier,
         adviser_entity_id=eid, match_name=canonical,
         score=100, confidence="high",
-        reason=f"brand substring {variant!r} in {name!r} → {canonical}",
+        reason=reason,
     )
 
 
@@ -710,6 +746,11 @@ def main():
             if d.tier == "verification_failed":
                 decisions.append(d)
                 stats.verification_failed += 1
+                continue
+            if d.tier.endswith("_ambiguous"):
+                # Both T2 and T3 returned ambiguous matches — log + skip.
+                decisions.append(d)
+                stats.unresolved += 1
                 continue
 
             # Wire the fund entity
