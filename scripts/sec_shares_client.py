@@ -318,14 +318,14 @@ if __name__ == "__main__":
     c = SECSharesClient()
     print(f"Loaded {len(c._ticker_to_cik):,} ticker→CIK mappings")
     tickers = sys.argv[1:] or ["AAPL", "MSFT", "NVDA", "SMLR", "CIVI", "ZZZZ_NOTREAL"]
-    for t in tickers:
-        r = c.fetch(t)
-        if r is None:
-            print(f"  {t}: not found")
+    for sym in tickers:
+        sh = c.fetch(sym)
+        if sh is None:
+            print(f"  {sym}: not found")
             continue
-        print(f"  {t} (CIK {r['cik']}): "
-              f"shares={r['shares_outstanding']:,} as of {r['shares_as_of']} "
-              f"({r['shares_form']} filed {r['shares_filed']}) | "
-              f"float=${r['public_float_usd']:,.0f}" if r.get("public_float_usd") else
-              f"  {t} (CIK {r['cik']}): shares={r['shares_outstanding']:,} as of {r['shares_as_of']} "
-              f"({r['shares_form']} filed {r['shares_filed']}) | float=n/a")
+        print(f"  {sym} (CIK {sh['cik']}): "
+              f"shares={sh['shares_outstanding']:,} as of {sh['shares_as_of']} "
+              f"({sh['shares_form']} filed {sh['shares_filed']}) | "
+              f"float=${sh['public_float_usd']:,.0f}" if sh.get("public_float_usd") else
+              f"  {sym} (CIK {sh['cik']}): shares={sh['shares_outstanding']:,} as of {sh['shares_as_of']} "
+              f"({sh['shares_form']} filed {sh['shares_filed']}) | float=n/a")

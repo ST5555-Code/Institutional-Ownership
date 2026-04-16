@@ -222,9 +222,6 @@ def check_routing_drift(con):
     Log any series where N-CEN now shows a different sub-adviser than our manual
     routing so human reviewers can update manual fixes when source data changes.
     """
-    import os  # pylint: disable=reimported
-    from datetime import datetime  # pylint: disable=reimported
-
     try:
         drifted = con.execute("""
             SELECT

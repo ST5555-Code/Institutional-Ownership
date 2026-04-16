@@ -188,10 +188,10 @@ if __name__ == "__main__":
     print(f"quote batch: {len(syms)} symbols")
     q = c.fetch_quote_batch(syms)
     for s in syms:
-        row = q.get(s, {})
-        print(f"  {s:8} {row.get('price')!s:>10}  cap={row.get('market_cap')}")
+        quote = q.get(s, {})
+        print(f"  {s:8} {quote.get('price')!s:>10}  cap={quote.get('market_cap')}")
     print("\nmetadata AAPL:")
     m = c.fetch_metadata("AAPL")
     if m:
-        for k, v in m.items():
-            print(f"  {k}: {v}")
+        for k, val in m.items():
+            print(f"  {k}: {val}")
