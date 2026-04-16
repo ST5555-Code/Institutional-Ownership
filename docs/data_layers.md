@@ -1,6 +1,7 @@
 # Data Layers — Table Classification
 
 _Prepared: 2026-04-13 — pipeline framework foundation (v1.2)_
+_Revised: 2026-04-16 (later) — 13D/G entity linkage shipped. Migration 005 + `bulk_enrich_bo_filers()` in `pipeline/shared.py` + `scripts/enrich_13dg.py` (commit `e231633`). `beneficial_ownership_v2` now carries `rollup_entity_id` / `rollup_name` / `dm_rollup_entity_id` / `dm_rollup_name` alongside the pre-existing `entity_id`; `beneficial_ownership_current` rebuilt with all 5 entity columns. First prod full-refresh: 40,009 / 51,905 rows enriched (77.08%); 66-row drift repaired; `data_freshness('beneficial_ownership_v2_enrichment')` stamped. Remaining 11,896 rows (2,591 filer CIKs) are 13D/G long-tail individuals/corporations outside the MDM — resolution via a follow-up `resolve_13dg_filers.py`._
 _Revised: 2026-04-16 — Batch 3 closed. Three deliveries this week brought all L4 tables back into a clean rebuilt state:_
 _  - `enrich_holdings.py` shipped (commit `559058d`) — `holdings_v2` Group 3 fully populated (ticker / sti / mvl / pof); `fund_holdings_v2.ticker` + 1.45M; `data_freshness('holdings_v2_enrichment')` stamped._
 _  - `compute_flows.py` rewrite + `build_summaries.py` rewrite + migration 004 shipped (commit `87ee955`) — both scripts now `holdings_v2`-sourced and write rollup-aware tables (EC + DM worldviews); `summary_by_parent` PK is now `(quarter, rollup_type, rollup_entity_id)`._
@@ -85,8 +86,8 @@ bottom.
 | `filings_deduped` | L3 | derived from `filings` | rebuild | 40,140 rows; dedup-on-accession view materialized as table |
 | `holdings_v2` | L3 | `load_13f.py` → `enrich_holdings.py` (Batch 3, **LIVE** since 2026-04-16) | delete_insert on (quarter) | **12,270,984 rows** (2026-04-16); canonical 13F fact table; Group 3 fully enriched (ticker 91.49% / sti 100% / mvl 77.64% / pof 61.83%) |
 | `fund_holdings_v2` | L3 | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` → `enrich_holdings.py --fund-holdings` | delete_insert on (series_id, report_month) | **11,670,960 rows** (2026-04-16); 12,594 distinct series; newest `report_date` 2026-02-28; DERA bulk path is primary; ticker 44.43% populated post-enrich (was 32.03%) |
-| `beneficial_ownership_v2` | L3 | `fetch_13dg_v2.py` → `promote_13dg.py` | upsert on accession_number | 51,905 rows; canonical 13D/G fact table |
-| `beneficial_ownership_current` | L4 | `promote_13dg.py` step 7 | rebuild | 24,756 rows; latest-per-(filer_cik, subject_cusip) with amendment logic |
+| `beneficial_ownership_v2` | L3 | `fetch_13dg_v2.py` → `promote_13dg.py` → `enrich_13dg.py` (commit `e231633`, **LIVE** 2026-04-16) | upsert on accession_number | 51,905 rows; canonical 13D/G fact table. Group 2 entity columns (`entity_id`, `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`, `dm_rollup_name`) enriched at 77.08% (40,009 rows) post-migration 005 |
+| `beneficial_ownership_current` | L4 | `promote_13dg.py` + `scripts/pipeline/shared.rebuild_beneficial_ownership_current` | rebuild | 24,756 rows; latest-per-(filer_cik, subject_ticker) with amendment logic; now carries all 5 entity columns from BO v2 (18,229 rows / 73.64% enriched) |
 | `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,600 rows** (2026-04-16); now includes bond / index / MM funds via DERA path + 4,141 ETF brand series resolved this week. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
 | `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 7 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`) |
 | `market_data` | L3 | `fetch_market.py` | upsert on ticker | 6,424 rows; latest price, market_cap, float, sector |
@@ -131,7 +132,7 @@ bottom.
 | `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py` |
 | `cusip_retry_queue` | L0 | `build_classifications.py` + `run_openfigi_retry.py` | direct_write | **37,925 rows** — 15,807 resolved via OpenFIGI, 22,118 unmappable (private / delisted / exotic); status = pending \| resolved \| unmappable |
 | `_cache_openfigi` | L3 (reference cache) | `run_openfigi_retry.py` | upsert on cusip | **15,807 rows** — full v3 response per CUSIP (figi, ticker, exchange, security_type, market_sector). Durable cache; survives re-runs |
-| `schema_versions` | L0 | migration scripts (001, 002, 003, 004) | direct_write | 1 row currently (003 stamped 2026-04-15); migration 004 is idempotent and probes column presence rather than stamping; prior migrations not retroactively stamped |
+| `schema_versions` | L0 | migration scripts (001, 002, 003, 004, 005) | direct_write | 2 rows currently (003 stamped 2026-04-15; 005 stamped 2026-04-16); migration 004 is idempotent and probes column presence rather than stamping; prior migrations not retroactively stamped |
 | `positions` | **RETIRE** | `unify_positions.py` (RETIRE) | — | 18.68M rows; legacy combined-positions table. Decision D2: delete. No app reads confirmed (only `unify_positions.py` self-reads). Not retired this session — documented only. |
 | `fund_classification` | **RETIRE** | `fix_fund_classification.py` (RETIRE) | — | 5,717 rows; superseded by `fund_best_index` + `fund_universe.best_index`. Decision: fold into `fund_universe`; only one script reads it — `fix_fund_classification.py` (itself RETIRE). |
 | `entities_snapshot_*` (16 tables) | L3 rollback artifact | `promote_staging.py` | auto-created | Intra-DB promotion snapshots. Retention policy is **D7 (open decision)**. |
@@ -288,6 +289,70 @@ Same post-promote pass as `holdings_v2`.
 - `ticker` — resolved from `securities` by cusip. Null for bonds, illiquid, or unlisted.
 
 ---
+
+## 4b. Column ownership — `beneficial_ownership_v2`
+
+Prod DDL (2026-04-16, post migration 005):
+
+```sql
+CREATE TABLE beneficial_ownership_v2(
+    accession_number VARCHAR, filer_cik VARCHAR, filer_name VARCHAR,
+    subject_cusip VARCHAR, subject_ticker VARCHAR, subject_name VARCHAR,
+    filing_type VARCHAR, filing_date DATE, report_date DATE,
+    pct_owned DOUBLE, shares_owned BIGINT, aggregate_value DOUBLE,
+    intent VARCHAR, is_amendment BOOLEAN, prior_accession VARCHAR,
+    purpose_text VARCHAR, group_members VARCHAR, manager_cik VARCHAR,
+    loaded_at TIMESTAMP, name_resolved BOOLEAN,
+    entity_id BIGINT, rollup_entity_id BIGINT, rollup_name VARCHAR,
+    dm_rollup_entity_id BIGINT, dm_rollup_name VARCHAR
+);
+```
+
+### Group 1 — Core 13D/G facts (owner: `fetch_13dg_v2.py` + `promote_13dg.py`, mostly NOT NULL)
+
+Filing facts sourced from the EDGAR Schedule 13D/G filing.
+
+- `accession_number` — SEC accession (PK)
+- `filer_cik` — reporting person CIK (zero-padded 10-digit)
+- `filer_name` — reporting person name
+- `subject_cusip` — subject company CUSIP9
+- `subject_ticker` — subject company ticker (resolved at parse time
+  via `securities` lookup)
+- `subject_name` — subject company name
+- `filing_type` — `SC 13D`, `SC 13D/A`, `SC 13G`, `SC 13G/A`
+- `filing_date`, `report_date` — filing + event dates
+- `pct_owned`, `shares_owned`, `aggregate_value` — reported position
+- `intent` — categorical parse (activist / passive / arbitrage / etc.)
+- `is_amendment`, `prior_accession` — amendment chain
+- `purpose_text` — free-text Item 4 purpose
+- `group_members` — co-filer list (joint filing)
+- `manager_cik` — optional manager on whose behalf the filer reports
+- `loaded_at` — pipeline timestamp
+- `name_resolved` — flag for downstream name resolution
+
+### Group 2 — Entity enrichment (owner: `bulk_enrich_bo_filers` in `scripts/pipeline/shared.py`, NULLABLE for unmatched filers)
+
+Populated at promote time (scoped to the run's filer CIKs) and
+refreshable via `scripts/enrich_13dg.py` (full refresh). Resolved
+through the entity MDM via `filer_cik → entity_identifiers(type='cik')`.
+
+- `entity_id` — resolved filer `entity_id`. Legacy-populated at ~77%;
+  overwritten idempotently by each enrichment pass.
+- `rollup_entity_id` — `economic_control_v1` rollup target.
+- `rollup_name` — preferred alias of `rollup_entity_id`.
+- `dm_rollup_entity_id` — `decision_maker_v1` rollup target.
+- `dm_rollup_name` — preferred alias of `dm_rollup_entity_id`.
+
+Nullability: unmatched filers (no active `entity_identifiers` row of
+type `'cik'`) leave all five columns NULL. As of 2026-04-16, 40,009 /
+51,905 rows (77.08%) are enriched. The 11,896 unmatched rows span
+2,591 filer CIKs — 13D/G long-tail individuals, small corporations,
+and activist investors not in the 13F-centric MDM. Follow-up:
+`resolve_13dg_filers.py` for placeholder entity creation.
+
+Unlike `holdings_v2`, BO v2 does **not** carry `manager_type`,
+`is_passive`, `is_activist`, `entity_type`, or `classification_source`
+— Schedule 13D/G disclosures are not manager classifications.
 
 ## 5. Option B split contract
 
