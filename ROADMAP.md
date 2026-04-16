@@ -1,6 +1,75 @@
 # 13F Institutional Ownership Database — Roadmap
 
-_Last updated: April 16, 2026 — session #5 close. HEAD: `559058d` + Batch 3 close. **Batch 3 COMPLETE.** All three remaining rewrites shipped + executed: migration 004 (`summary_by_parent` PK now `(quarter, rollup_type, rollup_entity_id)`), `compute_flows.py` rewrite (now `holdings_v2`-sourced, supports both EC + DM worldviews), `build_summaries.py` rewrite (same swap + N-PORT integration via `fund_holdings_v2`). Final state: `investor_flows` 17,396,524 (8.70M EC + 8.70M DM); `ticker_flow_stats` 80,322; `summary_by_ticker` 47,642; `summary_by_parent` 63,916. `data_freshness` stamped on all four. Legacy `holdings` retirement is fully closed across the codebase._
+_Last updated: April 16, 2026 (part 2) — session #5 close. HEAD: `d330d8f`. **Second half of 2026-04-16** shipped five more commits beyond Batch 3 close: (1) 13D/G entity linkage (`e231633` + docs `f40ffa2`) — migration 005, `bulk_enrich_bo_filers` + `rebuild_beneficial_ownership_current` in `pipeline/shared.py`, `promote_13dg.py` wired, `scripts/enrich_13dg.py`. BO v2 40,009 / 51,905 rows (77.08%) enriched; BO current 18,229 / 24,756 (73.64%). 66-row drift repaired. (2) `add_last_refreshed_at.py` migration (`7b3928d`) run on staging + prod — 13,685 / 17,826 rows (76.77%) backfilled. (3) Mar 2026 N-PORT top-up (`bac4448`) — 2 late amendments, Mar filings not yet on EDGAR. (4) ETF residual Tier A+B (`d330d8f`) — `bootstrap_residual_advisers.py` + 32 SUPPLEMENTARY_BRANDS → 279 pending series resolved across 27 sponsors + 6 new institution entities. (5) N-PORT re-promote recovery via new `--exclude-file` flag on `promote_nport.py`. Final prod: 24,632 entities / 33,521 identifiers / 18,105 relationships / fund_holdings_v2 13,943,029 (entity coverage 84.47%) / beneficial_ownership_v2 51,905 with rollups / entity_relationships now carries `last_refreshed_at`. validate_entities.py baseline preserved. See `docs/NEXT_SESSION_CONTEXT.md` § Known data caveats for `ingestion_impacts.promoted_at` reconstruction note._
+
+_Prior header (part 1): HEAD `559058d` + Batch 3 close. **Batch 3 COMPLETE.** All three remaining rewrites shipped + executed: migration 004 (`summary_by_parent` PK now `(quarter, rollup_type, rollup_entity_id)`), `compute_flows.py` rewrite (now `holdings_v2`-sourced, supports both EC + DM worldviews), `build_summaries.py` rewrite (same swap + N-PORT integration via `fund_holdings_v2`). Final state: `investor_flows` 17,396,524 (8.70M EC + 8.70M DM); `ticker_flow_stats` 80,322; `summary_by_ticker` 47,642; `summary_by_parent` 63,916. `data_freshness` stamped on all four. Legacy `holdings` retirement is fully closed across the codebase._
+
+## Session Summary 2026-04-16 part 2 (five commits beyond Batch 3 — 13D/G linkage, `add_last_refreshed_at`, N-PORT top-up, ETF Tier A+B, recovery)
+
+Continuation of the 2026-04-16 session after part 1 (Batch 3 close). Five commits shipped in order: `e231633` → `f40ffa2` → `7b3928d` → `bac4448` → `d330d8f`.
+
+### 1. 13D/G entity linkage (`e231633` + `f40ffa2`)
+
+First implementation of Group 2 entity columns on `beneficial_ownership_v2`. Prior to this, 13D/G filers were disconnected from the MDM and any rollup-walking query skipped 13D/G entirely.
+
+- **Migration 005** (`scripts/migrations/005_beneficial_ownership_entity_rollups.py`, new, ~135 lines). Adds `rollup_entity_id BIGINT`, `rollup_name VARCHAR`, `dm_rollup_entity_id BIGINT`, `dm_rollup_name VARCHAR` to `beneficial_ownership_v2`. `entity_id BIGINT` was already present (77% populated by legacy pass). Idempotent, `--staging / --prod / --dry-run` flags, stamps `schema_versions` version=5.
+- **`bulk_enrich_bo_filers(con, filer_ciks)`** in `scripts/pipeline/shared.py`. Single `UPDATE...FROM` JOIN against `entity_identifiers(type='cik')` + both rollup worldviews + preferred aliases. `filer_ciks=None` → full refresh. Unmatched filers leave all five columns NULL.
+- **`rebuild_beneficial_ownership_current(con)`** lifted into `pipeline/shared.py` so `promote_13dg.py` and `enrich_13dg.py` share the rebuild SQL. Expanded SELECT carries all 5 entity columns through.
+- **`promote_13dg.py`** wired: scoped `bulk_enrich_bo_filers` call between `_promote` and `_rebuild_current`, stamps `data_freshness('beneficial_ownership_v2_enrichment')`.
+- **`scripts/enrich_13dg.py`** (new, ~195 lines). Standalone full-refresh / drift repair. `--staging / --dry-run / --filer-cik` flags. Single atomic UPDATE; restart-safe by virtue of being one statement.
+- **Design doc: `docs/13DG_ENTITY_LINKAGE.md`** — Option C split (promote-time scoped + standalone full-refresh), shipped-state reference.
+
+**Prod state post-first-full-refresh:** BO v2 40,009 / 51,905 rows (77.08%) enriched; BO current 18,229 / 24,756 (73.64%); 66-row legacy `entity_id` drift repaired on first run.
+
+**Coverage gap:** 11,896 rows / 2,591 filer CIKs remain NULL. These are 13D/G-only individuals / small corps / activists outside the MDM entirely. Follow-up: `resolve_13dg_filers.py` (item 18 in NEXT_SESSION_CONTEXT).
+
+### 2. `add_last_refreshed_at.py` migration (`7b3928d`)
+
+Ran the migration drafted in 831e5b4. Adds `last_refreshed_at TIMESTAMP` to `entity_relationships`. `entity_sync.insert_relationship_idempotent`'s probe-gated stamping now activates on next N-CEN / ADV refresh. Script gained a `--dry-run` flag to match migration 005 convention.
+
+**Prod state:** 17,826 rows total, 13,685 (76.77%) backfilled from `created_at`, 4,141 NULL (predate `created_at` column landing). `validate_entities.py` baseline preserved: 8 PASS / 1 FAIL / 7 MANUAL.
+
+### 3. Mar 2026 N-PORT top-up (`bac4448`)
+
+`fetch_nport_v2.py --monthly-topup` discovered 2 candidate accessions — both late amendments to Jan 2026 filings for CIK 0001038199 muni-bond series S000012121 (Unrestricted Series) and S000012122 (Greater Western New York Series). Promote: -68 +70 = +2 net rows. `enrich_holdings.py --fund-holdings` ran (Pass B full refresh 830.9s on 12.27M rows; Pass C +4 ticker changes).
+
+**Newest `fund_holdings_v2.report_date` still 2026-02-28.** March 2026 N-PORTs have not yet posted on EDGAR (expected late April / early May at 60-day deadline). Validator clean: 0 BLOCK / 0 FLAG / 0 WARN, entity gate 2 resolved.
+
+### 4. ETF residual Tier A+B (`d330d8f`)
+
+Bulk resolution of 279 of the 616 real-pending N-PORT series (45.3% coverage). Two new script deliverables:
+
+- **`scripts/bootstrap_residual_advisers.py`** (new, ~235 lines; mirrors `bootstrap_etf_advisers.py` pattern from 2026-04-15). Staging-only seeding for ETF trust sponsors absent from the MDM. Idempotent (first-hit reuse by CRD / CIK / canonical_name). Created 6 new institution entities: Stone Ridge Asset Management LLC (eid 24348), Bitwise Investment Manager LLC (24349), Volatility Shares LLC (24350), Dupree & Company, Inc. (24351), Baron Capital Management, Inc. (24352), Grayscale Advisors (24353). Abacus FCF Advisors reused at existing eid 3375 via canonical_name idempotency.
+- **`scripts/resolve_pending_series.py`** +32 SUPPLEMENTARY_BRANDS entries. 25 Tier A entries reuse existing MDM entities (Cambria, MFS Muni Series, Principal ETF, TCW ETF + MetWest, REX, NYL Active + ETF, Guggenheim, SEI ETF + Tax Exempt, Angel Oak, Viking Mutual, Thrivent, Russell Investments, Cohen & Steers, Virtus ETF + MACS, Kurv, DoubleLine, Allspring, Voya, Touchstone, Western Asset). 7 Tier B entries point to the new bootstrap eids + Abacus FCF at 3375. Variants chosen as multi-word prefixes to avoid collision with prior PARENT_SEEDS / SUPPLEMENTARY_BRANDS entries (e.g. `MFS MUNICIPAL SERIES` not bare `MFS`).
+- **`scripts/promote_nport.py`** +`--exclude-file` flag. Reads newline-delimited series_ids and unions with `--exclude`. Needed because scoping a large subset via argv hits the 128K ARG_MAX limit on macOS.
+
+**Federated Hermes deferred to Tier C** — MDM has 5 candidate US Federated entities (parent eid 4635, primary adviser eid 7633 with CRD 105138 at $542B AUM, plus subsidiaries). Rollup target requires explicit disambiguation before wiring.
+
+**Staging workflow completed:** sync_staging → bootstrap → resolve (279 T2 matches) → validate (8 PASS / 1 FAIL / 7 MANUAL baseline preserved) → diff (2,009 line-level changes) → `promote_staging.py --approved` (285 entities / 287 identifiers / 279 relationships / 570 rollup rows added to prod).
+
+**Per-sponsor resolution breakdown:** MFS 23, TCW 20, NYL 19, Virtus 19, SEI 16, Cambria 15, Stone Ridge 14, Principal 12, Bitwise 11, REX 11, Volatility Shares 11, Guggenheim 10, Kurv 10, Allspring 8, DoubleLine 8, Angel Oak 7, Dupree 7, Touchstone 7, Voya 7, Abacus FCF 6, Viking Mutual 6, Western Asset 6, Baron 5, Cohen & Steers 5, Grayscale 5, Russell Investments 5, Thrivent 5, Nomura 1 (PARENT_SEEDS bonus match).
+
+**N-PORT re-promote for run `nport_20260415_060422_352131`:** scoped to 244 needs-promote series (278 resolved minus 35 previously processed via partial-kill, minus 1 Nomura-match that didn't persist). `--exclude-file` with 13,800 lines skipped everything else. `promote_nport.py`: -0 +81,703 holdings / 235 fund_universe upserts / 244 series. `fund_holdings_v2` 11,670,962 → 13,943,029.
+
+### 5. N-PORT re-promote recovery
+
+An earlier over-scoped attempt at re-promote processed all 20,775 tuples and was killed at ~4,200 tuples in (mid-loop). Consequences:
+
+- `fund_holdings_v2` +2.19M new rows (legitimate — newly-resolvable series).
+- BUT `bulk_enrich_run` (post-loop) didn't fire → 3,879,078 rows / 3,931 series had NULL `entity_id` / rollup columns.
+- `ingestion_impacts._mirror_manifest_and_impacts` had already wiped the original 2026-04-15 `promote_status='promoted'` rows.
+
+**Recovery:**
+
+1. Called `_bulk_enrich_run` directly for the 3,931 NULL series → 2,744 got enriched (1,187 legitimately unresolvable deferred synthetics stayed NULL).
+2. Ran the scoped promote (item 4 above) which also re-fired `bulk_enrich_run` + `stamp_freshness` + `refresh_snapshot`.
+3. Reconstructed `ingestion_impacts.promote_status` via SQL — mark as `promoted` for any tuple with matching rows in `fund_holdings_v2`, using `MAX(loaded_at)` per-tuple as a best-effort `promoted_at` proxy.
+
+**Audit-trail caveat documented in `docs/NEXT_SESSION_CONTEXT.md` § Known data caveats:** `promoted_at` for run `nport_20260415_060422_352131` reflects load time, not original promote time. Not a functional issue — holdings data itself is correct. 522 tuples remain genuinely `pending` (deferred synthetics with no prod rows).
+
+---
+
+
 
 ## Session Summary 2026-04-16 (Batch 3 close — `compute_flows.py` + `build_summaries.py` + migration 004)
 
