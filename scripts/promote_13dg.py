@@ -232,7 +232,11 @@ def main() -> None:
             prod_con.unregister("mf")
 
         # Mirror the impacts too so promoted_at update below has rows
-        # to hit. impact_id is the PK; delete by manifest_id first.
+        # to hit. Audit-trail preservation (2026-04-17 bugfix): impacts
+        # already `promote_status='promoted'` in prod are preserved —
+        # staging rows would overwrite them with `pending` since staging
+        # never marks impacts promoted, wiping the audit trail on every
+        # re-promote.
         im_rows = staging_con.execute(
             f"""
             SELECT * FROM ingestion_impacts
@@ -243,12 +247,24 @@ def main() -> None:
         if not im_rows.empty:
             prod_con.register("im", im_rows)
             prod_con.execute(
-                f"DELETE FROM ingestion_impacts "
-                f"WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})",
+                f"""
+                DELETE FROM ingestion_impacts
+                 WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})
+                   AND promote_status <> 'promoted'
+                """,
                 list(manifest_ids),
             )
             prod_con.execute(
-                "INSERT INTO ingestion_impacts SELECT * FROM im"
+                """
+                INSERT INTO ingestion_impacts
+                SELECT im.* FROM im
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ingestion_impacts p
+                    WHERE p.manifest_id = im.manifest_id
+                      AND p.unit_type   = im.unit_type
+                      AND p.unit_key_json = im.unit_key_json
+                )
+                """
             )
             prod_con.unregister("im")
 

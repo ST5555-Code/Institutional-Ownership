@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CHECKPOINT GRANULARITY POLICY
-# promote_nport.py unit: one (series_id, report_month) tuple.
-# Each tuple is the commit boundary — DELETE prior + INSERT new + impact
-# update happen atomically per (series, month). The full run completes
-# after all tuples are promoted; partial promotion is allowed (any
-# completed tuple stays committed).
+# promote_nport.py unit: one full run.
+# Batch rewrite (2026-04-17) — the run's tuples are promoted as a single
+# DELETE + INSERT + CHECKPOINT, not per-tuple. Pre-rewrite, per-tuple
+# CHECKPOINT at DERA scale (20K+ tuples) took 2+ hours; batch completes
+# in seconds. Partial promotion is no longer a thing — either the whole
+# run commits or nothing does (prod connection closes on error).
 """promote_nport.py — promote staged N-PORT data (staging → prod).
 
 Runs after validate_nport.py marks a run "Promote-ready: YES". Refuses
@@ -78,7 +79,15 @@ def _assert_promote_ok(report_text: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _mirror_manifest_and_impacts(prod_con, staging_con, run_id: str):
-    """Copy this run's ingestion_manifest + ingestion_impacts rows to prod."""
+    """Copy this run's ingestion_manifest + ingestion_impacts rows to prod.
+
+    **Audit-trail preservation (2026-04-17 bugfix):** prod `ingestion_impacts`
+    rows for this run that are already `promote_status='promoted'` are
+    preserved — staging copies would overwrite them with `pending` since
+    staging never marks impacts promoted. Only impacts not yet promoted
+    in prod (or missing entirely) are copied from staging. Manifest rows
+    are replaced wholesale (audit-safe; manifest carries no promote state).
+    """
     mf_rows = staging_con.execute(
         "SELECT * FROM ingestion_manifest "
         "WHERE run_id = ? AND source_type = 'NPORT'",
@@ -109,13 +118,30 @@ def _mirror_manifest_and_impacts(prod_con, staging_con, run_id: str):
         mf_ids,
     ).fetchdf()
     if not im_rows.empty:
+        # Preserve any existing prod impacts already `promoted` — only
+        # insert impacts that either don't exist in prod or are still
+        # `pending` there. This prevents the re-promote audit wipe.
         prod_con.register("im", im_rows)
         prod_con.execute(
-            f"DELETE FROM ingestion_impacts "
-            f"WHERE manifest_id IN ({','.join('?' * len(mf_ids))})",
+            f"""
+            DELETE FROM ingestion_impacts
+             WHERE manifest_id IN ({','.join('?' * len(mf_ids))})
+               AND promote_status <> 'promoted'
+            """,
             mf_ids,
         )
-        prod_con.execute("INSERT INTO ingestion_impacts SELECT * FROM im")
+        prod_con.execute(
+            """
+            INSERT INTO ingestion_impacts
+            SELECT im.* FROM im
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ingestion_impacts p
+                WHERE p.manifest_id = im.manifest_id
+                  AND p.unit_type   = im.unit_type
+                  AND p.unit_key_json = im.unit_key_json
+            )
+            """,
+        )
         prod_con.unregister("im")
     return mf_ids, im_rows
 
@@ -225,47 +251,88 @@ _STAGED_COLS = [
 ]
 
 
-def _promote_tuple(prod_con, staging_con, manifest_ids,
-                   series_id: str, report_month: str) -> tuple[int, int]:
-    """Replace prod rows for (series_id, report_month) with staged rows.
+def _promote_batch(prod_con, staging_con, manifest_ids,
+                   tuples: list[tuple[str, str]]) -> tuple[int, int]:
+    """Replace prod rows for every (series_id, report_month) in `tuples`
+    with their staged equivalents.
 
-    Inserts the staged rows with Group 2 entity columns left NULL —
-    `_bulk_enrich_run` fills them in a single UPDATE after the loop.
+    Executes as a single DELETE + INSERT + CHECKPOINT, not per-tuple —
+    pre-rewrite per-tuple CHECKPOINTs took 2+ hours on DERA-scale runs.
 
-    Returns (deleted, inserted).
+    Group 2 entity columns are inserted NULL; `_bulk_enrich_run` fills
+    them in one UPDATE after this returns.
+
+    Returns (total_deleted, total_inserted).
     """
+    if not tuples:
+        return 0, 0
+
+    # Build a two-column TEMP table of the tuples to promote — DuckDB
+    # doesn't accept tuple-IN-tuple list bindings directly, and a very
+    # large (series, month) IN (...) expression would blow argv/parse
+    # limits. A TEMP table with an index on (series_id, report_month)
+    # is the clean path and cheap at these sizes.
+    prod_con.execute("DROP TABLE IF EXISTS _promote_scope")
+    prod_con.execute(
+        "CREATE TEMP TABLE _promote_scope "
+        "(series_id VARCHAR, report_month VARCHAR)"
+    )
+    import pandas as pd
+    scope_df = pd.DataFrame(tuples, columns=["series_id", "report_month"])
+    prod_con.register("_scope_df", scope_df)
+    prod_con.execute(
+        "INSERT INTO _promote_scope SELECT * FROM _scope_df"
+    )
+    prod_con.unregister("_scope_df")
+
     deleted = prod_con.execute(
-        "SELECT COUNT(*) FROM fund_holdings_v2 "
-        "WHERE series_id = ? AND report_month = ?",
-        [series_id, report_month],
+        """
+        SELECT COUNT(*) FROM fund_holdings_v2 fh
+        WHERE (fh.series_id, fh.report_month) IN (
+            SELECT series_id, report_month FROM _promote_scope
+        )
+        """
     ).fetchone()[0]
     prod_con.execute(
-        "DELETE FROM fund_holdings_v2 "
-        "WHERE series_id = ? AND report_month = ?",
-        [series_id, report_month],
+        """
+        DELETE FROM fund_holdings_v2
+        WHERE (series_id, report_month) IN (
+            SELECT series_id, report_month FROM _promote_scope
+        )
+        """
     )
 
-    placeholders = ",".join("?" * len(manifest_ids))
+    # Pull the whole scoped staged slice in one shot.
+    m_placeholders = ",".join("?" * len(manifest_ids))
     df = staging_con.execute(
         f"""
         SELECT {','.join(_STAGED_COLS)}
-        FROM stg_nport_holdings
-        WHERE series_id = ?
-          AND report_month = ?
-          AND manifest_id IN ({placeholders})
+        FROM stg_nport_holdings s
+        WHERE s.manifest_id IN ({m_placeholders})
+          AND (s.series_id, s.report_month) IN (
+              SELECT series_id, report_month FROM (
+                  SELECT UNNEST(?) AS series_id, UNNEST(?) AS report_month
+              )
+          )
         """,
-        [series_id, report_month] + list(manifest_ids),
+        list(manifest_ids) + [
+            [t[0] for t in tuples],
+            [t[1] for t in tuples],
+        ],
     ).fetchdf()
-    if df.empty:
-        return int(deleted), 0
 
-    prod_con.register("ins_df", df)
-    prod_con.execute(
-        f"INSERT INTO fund_holdings_v2 ({','.join(_STAGED_COLS)}) "
-        f"SELECT {','.join(_STAGED_COLS)} FROM ins_df"
-    )
-    prod_con.unregister("ins_df")
-    return int(deleted), len(df)
+    inserted = 0
+    if not df.empty:
+        prod_con.register("ins_df", df)
+        prod_con.execute(
+            f"INSERT INTO fund_holdings_v2 ({','.join(_STAGED_COLS)}) "
+            f"SELECT {','.join(_STAGED_COLS)} FROM ins_df"
+        )
+        prod_con.unregister("ins_df")
+        inserted = len(df)
+
+    prod_con.execute("DROP TABLE IF EXISTS _promote_scope")
+    return int(deleted), inserted
 
 
 def _upsert_universe(prod_con, staging_con, manifest_ids,
@@ -362,21 +429,15 @@ def main() -> None:
         print(f"Promoting run_id={args.run_id}  test={args.test}")
         print(f"  tuples to promote: {len(tuples)}")
 
-        total_deleted = total_inserted = 0
-        series_touched: set[str] = set()
-        for sid, rm in tuples:
-            d, i = _promote_tuple(
-                prod_con, staging_con, manifest_ids, sid, rm,
-            )
-            total_deleted += d
-            total_inserted += i
-            series_touched.add(sid)
-            prod_con.execute("CHECKPOINT")
-            print(f"    {sid} {rm}: -{d} +{i}")
+        total_deleted, total_inserted = _promote_batch(
+            prod_con, staging_con, manifest_ids, tuples,
+        )
+        series_touched: set[str] = {s for s, _m in tuples}
+        prod_con.execute("CHECKPOINT")
+        print(f"  batch promote: -{total_deleted} +{total_inserted} holdings")
 
         # Single bulk enrichment pass — fills Group 2 entity columns for
-        # every row inserted above. Replaces the per-tuple `_enrich_entity`
-        # call that previously dominated promote runtime at DERA scale.
+        # every row inserted above.
         enriched_series = _bulk_enrich_run(prod_con, series_touched)
         print(f"  bulk enrichment: {enriched_series} series")
 
@@ -385,31 +446,47 @@ def main() -> None:
         )
         print(f"  fund_universe upserts: {u}")
 
-        # Update impacts → promoted in prod copy
-        prod_con.execute(
-            """
-            UPDATE ingestion_impacts
-               SET promote_status = 'promoted',
-                   rows_promoted = rows_staged,
-                   promoted_at = CURRENT_TIMESTAMP
-             WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
-                                    WHERE run_id = ? AND source_type = 'NPORT')
-               AND unit_type = 'series_month'
-               AND unit_key_json IN ({})
-            """.format(",".join("?" * len(tuples))) if tuples else
-            """
-            UPDATE ingestion_impacts SET promote_status = 'promoted',
-                rows_promoted = rows_staged, promoted_at = CURRENT_TIMESTAMP
-             WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
-                                    WHERE run_id = ? AND source_type = 'NPORT')
-               AND unit_type = 'series_month'
-            """,
-            [args.run_id] + (
-                [json.dumps({"series_id": s, "report_month": m})
-                 for s, m in tuples]
-                if tuples else []
-            ),
-        )
+        # Batch UPDATE: mark every promoted tuple as `promoted`. The
+        # unit_key_json is a JSON object — build the string with the same
+        # formatting DuckDB produces to ensure IN-match works.
+        if tuples:
+            unit_keys = [
+                json.dumps({"series_id": s, "report_month": m})
+                for s, m in tuples
+            ]
+            prod_con.register(
+                "_tuple_keys",
+                __import__("pandas").DataFrame(
+                    {"unit_key_json": unit_keys}
+                ),
+            )
+            prod_con.execute(
+                """
+                UPDATE ingestion_impacts
+                   SET promote_status = 'promoted',
+                       rows_promoted  = rows_staged,
+                       promoted_at    = CURRENT_TIMESTAMP
+                 WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
+                                        WHERE run_id = ? AND source_type = 'NPORT')
+                   AND unit_type = 'series_month'
+                   AND unit_key_json IN (SELECT unit_key_json FROM _tuple_keys)
+                """,
+                [args.run_id],
+            )
+            prod_con.unregister("_tuple_keys")
+        else:
+            prod_con.execute(
+                """
+                UPDATE ingestion_impacts
+                   SET promote_status = 'promoted',
+                       rows_promoted  = rows_staged,
+                       promoted_at    = CURRENT_TIMESTAMP
+                 WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
+                                        WHERE run_id = ? AND source_type = 'NPORT')
+                   AND unit_type = 'series_month'
+                """,
+                [args.run_id],
+            )
         prod_con.execute("CHECKPOINT")
 
         stamp_freshness(prod_con, "fund_holdings_v2")
