@@ -149,8 +149,69 @@ SUPPLEMENTARY_BRANDS = [
     ("VOLATILITY SHARES",            24350, "Volatility Shares LLC"),
     ("DUPREE MUTUAL",                24351, "Dupree & Company, Inc."),
     ("ABACUS FCF",                    3375, "Abacus FCF Advisors LLC"),
-    ("BARON ETF",                    24352, "Baron Capital Management"),
+    # Baron ETF Trust's adviser is BAMCO Inc. (CRD=110789, CIK=0001017918),
+    # which is already in MDM as eid=4830. The earlier bootstrap created
+    # eid=24352 "Baron Capital Management" (a distinct Baron Group entity,
+    # CRD=110791) but Baron ETF Trust does NOT use that advisory contract.
+    # eid=24352 is retained but flagged for DM15b merge-cleanup review
+    # (distinct entity, no downstream attribution yet).
+    ("BARON ETF",                     4830, "BAMCO Inc. (Baron Capital)"),
     ("GRAYSCALE",                    24353, "Grayscale Advisors"),
+
+    # 2026-04-17 Tier C additions — existing MDM eid reuse (76 families,
+    # 475 pending series). Variants chosen as distinctive family-name
+    # prefixes/fragments that won't collide with existing PARENT_SEEDS or
+    # earlier SUPPLEMENTARY_BRANDS entries. All targets verified via
+    # adv_managers CRD or preferred alias exact match.
+    ("STRATEGY SHARES",              5731, "Rational Advisors, Inc."),
+    ("WEBS ETF",                     7586, "BlackRock Fund Advisors"),
+    ("ARK ETF",                      1531, "ARK Investment Management"),
+    ("ETFIS SERIES",                  676, "Virtus Investment Advisers"),
+    # FEDERATED HERMES covers ETF Trust + Core Trust + Institutional Trust
+    # + Municipal Securities + ~8 other sub-trusts all advised by the US
+    # entity (eid=7633), NOT the UK LLP (eid=4635 FEDERATED HERMES INC).
+    ("FEDERATED HERMES",             7633, "Federated Investment Management Co"),
+    ("FLEXSHARES",                   3704, "Northern Trust Investments"),
+    ("GMO ETF",                      7119, "Grantham, Mayo, Van Otterloo"),
+    ("E-VALUATOR",                   1275, "Systelligence, LLC"),
+    ("ALLIANZ VARIABLE INSURANCE",   7807, "Allianz Investment Management"),
+    ("MASSMUTUAL ADVANTAGE",        17969, "MML Investment Advisers"),
+    ("DAVIS FUNDAMENTAL",            3703, "Davis Selected Advisers"),
+    ("MADISON ETFS",                 4314, "Madison Asset Management"),
+    ("TEXAS CAPITAL FUNDS",          6207, "Texas Capital Bank Wealth Mgmt"),
+    ("THORNBURG ETF",                2925, "Thornburg Investment Management"),
+    ("VALKYRIE ETF",                 1057, "Valkyrie Funds LLC"),
+    ("ABSOLUTE SHARES",              1000, "WBI Investments, LLC"),
+    ("ASPIRIANT TRUST",              8201, "Aspiriant, LLC"),
+    ("AMERICAN BEACON SELECT",      10486, "American Beacon Advisors"),
+    ("GUGGENHEIM STRATEGY",           195, "Guggenheim Partners Investment Mgmt"),
+    ("GUGGENHEIM VARIABLE",           195, "Guggenheim Partners Investment Mgmt"),
+    ("MILLER INVESTMENT",            7858, "Miller Value Partners, LLC"),
+    ("SEI DAILY INCOME",             9858, "SEI Investments Management Corp"),
+    ("SIT MUTUAL",                   4281, "Sit Investment Associates"),
+    ("SIT U S GOVERNMENT",           4281, "Sit Investment Associates"),
+    ("STRATEGIC TRUST",              5687, "Charles Schwab Investment Mgmt"),
+    ("TEMPLETON INCOME",             1355, "Franklin Advisers, Inc."),
+    ("ABRDN",                        4450, "abrdn Inc."),
+    ("HOMESTEAD",                    7816, "Homestead Advisers Corp"),
+    ("HUMANKIND",                    8920, "Humankind Investments LLC"),
+    ("INTERNATIONAL INCOME PORTFOLIO", 3586, "BlackRock Advisors, LLC"),
+    ("MASTER INVESTMENT PORTFOLIO",  7586, "BlackRock Fund Advisors"),
+    ("NATIXIS ETF",                  2271, "Natixis Advisors, LLC"),
+    ("POPULAR HIGH GRADE",          19360, "Popular Asset Management"),
+    ("POPULAR INCOME",              19360, "Popular Asset Management"),
+    ("THRIVE SERIES",                1022, "Thrive Wealth Management"),
+    ("AB CORPORATE SHARES",            57, "AllianceBernstein"),
+    ("AB MUNICIPAL INCOME",            57, "AllianceBernstein"),
+
+    # 2026-04-17 Tier C bootstraps — 6 new entities from
+    # scripts/bootstrap_tier_c_advisers.py (eids 24633-24638).
+    ("COLLABORATIVE INVESTMENT SERIES", 24633, "Collaborative Fund Management"),
+    ("SPINNAKER ETF SERIES",           24634, "Spinnaker Financial Advisors"),
+    ("TRUTH SOCIAL",                   24635, "Yorkville Capital Management"),
+    ("FUNDX INVESTMENT",               24636, "FundX Investment Group"),
+    ("PROCURE ETF",                    24637, "Procure AM, LLC"),
+    ("COMMUNITY DEVELOPMENT FUND",     24638, "Community Development Fund Advisors"),
 ]
 
 # Variants whose target trust hosts multiple sub-advisers per series.
@@ -462,6 +523,12 @@ def try_brand_substring(
     if not name:
         return None
     query = name.upper()
+    # Word-boundary guard: pad both sides so substring matches only fire
+    # at whitespace/string boundaries (e.g. 'ARK ETF' no longer matches
+    # inside 'CROSSMARK ETF TRUST'). The padded comparison still accepts
+    # legitimate mid-string brand tokens that are themselves word-bounded
+    # (e.g. 'LISTED FUNDS' in 'EXCHANGE LISTED FUNDS TRUST').
+    padded = " " + query + " "
 
     # Collect substring hits; dedupe on entity_id so PARENT_SEEDS +
     # fund_family_patterns both resolving to the same brand don't trigger
@@ -470,7 +537,7 @@ def try_brand_substring(
     hits: list[tuple[str, int, str]] = []  # (variant, entity_id, canonical)
     seen_eids: set[int] = set()
     for variant, eid, canonical in brands:
-        if variant in query and eid not in seen_eids:
+        if f" {variant} " in padded and eid not in seen_eids:
             hits.append((variant, eid, canonical))
             seen_eids.add(eid)
 
