@@ -176,7 +176,7 @@ def map_report_period_to_quarter(rep_pd_end_str):
 # ---------------------------------------------------------------------------
 # XML download and parse
 # ---------------------------------------------------------------------------
-def download_xml(cik, accession_number, quarter_label):
+def download_xml(cik, accession_number, _quarter_label):
     """Download N-PORT XML and save to disk. Returns XML bytes or None."""
     acc_fmt = accession_number.replace("-", "")
 

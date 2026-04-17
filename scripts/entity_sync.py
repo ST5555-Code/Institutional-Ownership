@@ -1226,7 +1226,7 @@ def _lookup_adv_row(con, entity_id: int) -> dict | None:
     return {"aum": row[0], "state": row[1], "city": row[2]}
 
 
-def _verify_adv_relationship(
+def _verify_adv_relationship(  # pylint: disable=W0613  # owner_name kept for callers; not needed post-Tier 1a
     con,
     child_entity_id: int,
     parent_entity_id: int,
@@ -1303,7 +1303,7 @@ def _stage_adv_verification_failure(
     parent_entity_id: int,
     owner_name: str,
     relationship_type: str,
-    reason: str,
+    _reason: str,
     schedule_type: str,
 ) -> None:
     """
@@ -1336,7 +1336,7 @@ def insert_adv_ownership(
     child_entity_id: int,
     owner_name: str,
     relationship_type: str,
-    ownership_code: str,
+    _ownership_code: str,
     schedule_type: str,
     *,
     alias_cache: _AliasCache | None = None,

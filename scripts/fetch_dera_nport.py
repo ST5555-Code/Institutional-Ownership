@@ -848,7 +848,7 @@ def load_to_staging(
 # Parity test
 # ---------------------------------------------------------------------------
 
-def _prod_rows_for_ciks(con_prod, ciks: list[int], quarter_label: str) -> Any:
+def _prod_rows_for_ciks(con_prod, ciks: list[int], _quarter_label: str) -> Any:
     """Pull prod fund_holdings_v2 rows for the reference CIKs within one
     quarter's reporting window (report_month YYYY-MM between first and last
     month in the DERA ZIP)."""

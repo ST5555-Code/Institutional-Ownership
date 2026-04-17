@@ -1632,7 +1632,7 @@ def query5(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 
 
-def query6(ticker, quarter=LQ):
+def query6(ticker, quarter=LQ):  # pylint: disable=W0613  # dispatch protocol: query fn signature; quarter unused here
     """Activist & beneficial ownership tracker — combines 13D/G and 13F data."""
     con = get_db()
     try:
@@ -2370,7 +2370,7 @@ def query14(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 
 
-def query15(ticker=None, quarter=LQ):
+def query15(ticker=None, quarter=LQ):  # pylint: disable=W0613  # dispatch protocol: query fn signature; ticker unused (global stats)
     """Database statistics."""
     con = get_db()
     try:
@@ -4276,7 +4276,7 @@ def get_market_summary(limit=25, quarter=LQ):
 # Peer Rotation — per-ticker substitution analysis within sector
 # ---------------------------------------------------------------------------
 
-def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='economic_control_v1', quarter=LQ):
+def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Peer rotation analysis: how institutional money rotates between a
     subject ticker and its sector/industry peers across quarters.
 
@@ -4980,7 +4980,7 @@ def get_entity_sub_advisers(child_entity_id, quarter, con):
     return out
 
 
-def build_entity_graph(entity_id, quarter, depth, include_sub_advisers, top_n_funds, con):
+def build_entity_graph(entity_id, quarter, _depth, include_sub_advisers, top_n_funds, con):
     """Assemble the node/edge/metadata payload for the Entity Graph tab.
 
     The caller resolves the institution root (walking up to rollup_entity_id

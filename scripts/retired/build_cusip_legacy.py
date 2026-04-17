@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pylint: disable=W0613  # retired script — not maintained
 """
 build_cusip.py — Build securities table mapping CUSIP to ticker and metadata.
                  Sources: SEC 13F securities list, OpenFIGI API, yfinance.

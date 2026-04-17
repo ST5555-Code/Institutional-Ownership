@@ -226,7 +226,7 @@ class Dg13DgPipeline:
 
     # ----- discover ------------------------------------------------------
 
-    def discover(self, run_id: str) -> list[DownloadTarget]:
+    def discover(self, _run_id: str) -> list[DownloadTarget]:
         """EDGAR full-text search for each subject CIK in the scoped set.
 
         Anti-joins ingestion_manifest on accession_number to skip
@@ -483,7 +483,7 @@ class Dg13DgPipeline:
     # ----- load_to_staging ----------------------------------------------
 
     def load_to_staging(self, parse_result: ParseResult,
-                        staging_db_path: str, run_id: str) -> int:
+                        staging_db_path: str, _run_id: str) -> int:
         """Upsert stg_13dg_filings + write ingestion_impacts row."""
         if not parse_result.rows:
             return 0

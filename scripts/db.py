@@ -67,7 +67,7 @@ def connect_write():
     return duckdb.connect(get_db_path())
 
 
-def assert_write_safe(con):
+def assert_write_safe(_con):
     """Raise if test mode is on but connection points to production DB."""
     if not _test_mode:
         return

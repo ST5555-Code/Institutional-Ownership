@@ -679,7 +679,7 @@ class MarketDataPipeline:
     # --- write_to_canonical ----------------------------------------------
 
     def write_to_canonical(self, fetch_result: FetchResult,
-                           prod_db_path: str, run_id: str) -> int:
+                           prod_db_path: str, _run_id: str) -> int:
         """Upsert one batch into market_data + write one impact row per ticker.
 
         Before upsert, strips the ``_long_name`` / ``_quote_type`` /
@@ -943,7 +943,7 @@ class MarketDataPipeline:
 
     # --- stamp_freshness --------------------------------------------------
 
-    def stamp_freshness(self, run_id: str, prod_db_path: str) -> None:
+    def stamp_freshness(self, _run_id: str, prod_db_path: str) -> None:
         """Upsert data_freshness row for market_data."""
         con = duckdb.connect(prod_db_path)
         try:

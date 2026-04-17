@@ -55,7 +55,7 @@ FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions"
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}
 
 
-def _retry_edgar(fn, label="", max_retries=5):
+def _retry_edgar(fn, _label="", max_retries=5):
     """Call fn() with exponential backoff on 403/429/network errors."""
     for attempt in range(max_retries):
         try:
@@ -626,7 +626,7 @@ def run_phase1(tickers=None, test_mode=False, max_workers=MAX_WORKERS_PHASE1):
     return filing_cache
 
 
-def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=False):
+def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=False):  # pylint: disable=W0613  # uniform phase signature: test_mode unused in phase 2
     """Phase 2: Parse all unparsed filings from listed_filings_13dg."""
     con = duckdb.connect(get_db_path())
     create_tables(con)

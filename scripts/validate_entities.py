@@ -598,7 +598,7 @@ def gate_wellington_sub_advisory(con):
     return status, findings
 
 
-def gate_phase3_resolution_rate(con):
+def gate_phase3_resolution_rate(_con):
     """
     Phase 3 gate: long-tail CIK resolution rate.
 

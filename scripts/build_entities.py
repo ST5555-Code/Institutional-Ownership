@@ -351,7 +351,7 @@ def step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_row
 # Step 4 — Populate entity_relationships
 # =============================================================================
 def step4_populate_relationships(
-    con, seed_map, series_to_entity, manager_rows,
+    con, seed_map, _series_to_entity, manager_rows,
 ):
     """
     Populate entity_relationships from two sources:
