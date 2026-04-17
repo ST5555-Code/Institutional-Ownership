@@ -302,8 +302,19 @@ def get_processed_ciks(con):
 
 
 def insert_records(con, records):
-    """Bulk insert records."""
+    """Bulk insert records. Idempotent: deletes existing rows for the
+    registrant CIKs in the incoming batch before inserting (same pattern as
+    DERA N-PORT loader)."""
+    if not records:
+        return
     now = datetime.now().isoformat()
+    # Dedupe guard: clear prior rows for any registrant CIK being reloaded
+    ciks = sorted({r["registrant_cik"] for r in records})
+    placeholders = ",".join(["?"] * len(ciks))
+    con.execute(
+        f"DELETE FROM ncen_adviser_map WHERE registrant_cik IN ({placeholders})",
+        ciks,
+    )
     for r in records:
         con.execute("""
             INSERT INTO ncen_adviser_map
