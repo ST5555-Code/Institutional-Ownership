@@ -53,11 +53,14 @@ Two rollup worldviews coexist via the `rollup_type` field. Each entity has one r
 **decision_maker_v1 details:**
 - 2,389 N-CEN sub-adviser routings applied (rule: `ncen_sub_adviser`)
 - 2,371 produce a different rollup than `economic_control_v1`
-- **DM8 intra-firm fix**: 621 routings collapsed back to brand parent where sub-adviser is a wholly-owned subsidiary of the primary adviser (Fidelity HK/UK → Fidelity, DFA Australia → Dimensional, BlackRock Singapore → BlackRock, T. Rowe Price International → T. Rowe Price)
+- **DM8 intra-firm fix (2026-04-10)**: 621 routings collapsed back to brand parent where sub-adviser is a wholly-owned subsidiary of the primary adviser (Fidelity HK/UK → Fidelity, DFA Australia → Dimensional, BlackRock Singapore → BlackRock, T. Rowe Price International → T. Rowe Price)
   - 485 via shared `economic_control_v1` rollup
   - 17 via `entity_relationships` parent links
   - 119 via name-based brand matching
-- Top cross-firm routings visible: BlueCove ($178B from Fidelity sub-advice), GQG Partners ($107B from Goldman), Franklin Advisers ($83B from Putnam), T. Rowe Price ($88B from Fidelity Strategic Advisers), Jennison ($58B from Harbor), Sands Capital ($52B from Bessemer), Wellington ($36B from Hartford)
+- **DM13 BlueCove sweep (2026-04-16, `ef3f302`)**: 20 `sub_adviser` false-match relationships closed, 17 DM rollups retargeted to correct EC parents ($235B+ Strategic Advisers Fidelity funds moved back to FMR LLC; Boston Partners / Matson Money / Altair retargeted), 15 sub-adviser parents classified unknown→active. 35 `entity_overrides_persistent` rows written. Broader 410-row non-BlueCove false-match audit still pending.
+- **DM14 Layer 1 (2026-04-16, `d684e4e`)**: 8 additional intra-firm collapses via bilateral `wholly_owned` / `parent_brand` chain walk (extending DM8 beyond the shared-EC case). Retargets: 4 AMG Yacktman + 1 AMG Frontier ($9.65B) → AMG; 2 Vaughan Nelson ($2.50B) → Natixis IM; 1 Calvert EM ($0.01B) → MORGAN STANLEY. Rule applied: `manual_override`. $12.15B AUM total.
+- **DM14b (pending)**: 7 bigger ROADMAP-named candidates (Manulife IM / FIAM / Principal RE / Voya / Davis / PGIM Ltd / Cohen & Steers Asia) blocked on missing `wholly_owned` / `parent_brand` edges in the graph — ~$170B AUM, 123 funds. Per-entity ADV corroboration required before edges land. Once added, DM14 Layer 1 chain walk picks them up automatically. See ROADMAP.md row DM14b.
+- Top cross-firm routings visible: BlueCove-cleared funds now back to FMR ($235B+), GQG Partners ($107B from Goldman), Franklin Advisers ($83B from Putnam), T. Rowe Price ($88B from Fidelity Strategic Advisers), Jennison ($58B from Harbor), Sands Capital ($52B from Bessemer), Wellington ($36B from Hartford)
 
 **Global UI toggle** in app header selects between "Fund Sponsor / Voting" (`economic_control_v1`, default) and "Decision Maker" (`decision_maker_v1`). Toggle propagates via `?rollup_type=` query param to all 20+ parameterized query functions.
 
@@ -356,7 +359,7 @@ sessions where the snapshot mechanism alone isn't enough insurance.
 
 Production currently has a degraded schema relative to `entity_schema.sql`:
 - `entities` and other tables were created without `PRIMARY KEY` / `NOT NULL` constraints
-- `entity_overrides_persistent` is declared in the schema but not yet created in production
+- `entity_overrides_persistent` exists in prod (**90 rows as of 2026-04-16** — 82 originals + 8 added by DM14 Layer 1; all `override_id`s now assigned post-INF22 heal: 58 NULL rows backfilled to 25-82 via `_heal_override_ids`, new rows at 83-90). Schema still has no DEFAULT / sequence on `override_id` — hotfix `_heal_override_ids` runs on every `promote_staging` invocation; migration 006 pending to add `DEFAULT nextval('override_id_seq')` at the schema level.
 - Some `entity_identifiers` rows have NULL `confidence` despite the schema's `NOT NULL` declaration
 
 `sync_staging.py` works around this by using `CREATE TABLE AS SELECT` to mirror production's column structure rather than re-applying `entity_schema.sql`. Staging therefore inherits the same constraint-free schema. Hardening the production schema is tracked separately and is out of scope for the staging framework.
