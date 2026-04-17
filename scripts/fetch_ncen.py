@@ -396,7 +396,7 @@ def _entity_tables_exist(con):
         return False
 
 
-def run(test_mode=False, staging=False):
+def run(test_mode=False, staging=False, cik_filter=None):
     con = duckdb.connect(get_db_path())
     create_tables(con)
 
@@ -406,22 +406,29 @@ def run(test_mode=False, staging=False):
         print("  [entity_sync] entity tables not found in staging — skipping entity sync.")
         print("  [entity_sync] Run build_entities.py --reset first to create entity tables.")
 
-    # Get target fund CIKs from fund_universe
-    fund_ciks = con.execute("""
-        SELECT DISTINCT fund_cik FROM fund_universe
-        ORDER BY fund_cik
-    """).fetchall()
-    fund_ciks = [r[0] for r in fund_ciks]
+    if cik_filter:
+        # Scoped run — caller-supplied CIK list overrides universe + processed filter.
+        # Zero-pads to 10 chars to match fund_universe.fund_cik format.
+        fund_ciks = [str(c).strip().zfill(10) for c in cik_filter]
+        print(f"Scoped run: {len(fund_ciks)} caller-supplied CIKs "
+              f"(bypassing processed filter)")
+    else:
+        # Get target fund CIKs from fund_universe
+        fund_ciks = con.execute("""
+            SELECT DISTINCT fund_cik FROM fund_universe
+            ORDER BY fund_cik
+        """).fetchall()
+        fund_ciks = [r[0] for r in fund_ciks]
 
-    if test_mode:
-        fund_ciks = fund_ciks[:10]
+        if test_mode:
+            fund_ciks = fund_ciks[:10]
 
-    processed = get_processed_ciks(con)
-    print(f"Fund CIKs to process: {len(fund_ciks)} ({len(processed)} already done)")
+        processed = get_processed_ciks(con)
+        print(f"Fund CIKs to process: {len(fund_ciks)} ({len(processed)} already done)")
 
-    # Filter to unprocessed
-    fund_ciks = [c for c in fund_ciks if c not in processed]
-    print(f"Remaining: {len(fund_ciks)}")
+        # Filter to unprocessed
+        fund_ciks = [c for c in fund_ciks if c not in processed]
+        print(f"Remaining: {len(fund_ciks)}")
 
     total_records = 0
     errors = 0
@@ -538,9 +545,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch N-CEN adviser mappings")
     parser.add_argument("--test", action="store_true", help="Test on 10 fund CIKs")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--ciks", type=str, default=None,
+                        help="Comma-separated registrant CIK list — scoped fetch, "
+                             "bypasses fund_universe + processed filter")
     args = parser.parse_args()
+
+    cik_list = None
+    if args.ciks:
+        cik_list = [c.strip() for c in args.ciks.split(",") if c.strip()]
 
     is_staging = hasattr(args, 'staging') and args.staging
     if is_staging:
         set_staging_mode(True)
-    crash_handler("fetch_ncen")(lambda: run(test_mode=args.test, staging=is_staging))
+    crash_handler("fetch_ncen")(
+        lambda: run(test_mode=args.test, staging=is_staging, cik_filter=cik_list)
+    )
