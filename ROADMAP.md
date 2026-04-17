@@ -626,6 +626,16 @@ criteria are the per-script violation lists in `docs/pipeline_violations.md`.
 
 ---
 
+## Regulatory Watch
+
+| Item | Status | Details |
+|---|---|---|
+| SEC N-PORT proposed rule change | Monitoring | Feb 18, 2026 proposal would limit public N-PORT data to month-3 of each quarter only, with 60-day lag after quarter end. If adopted, months 1 and 2 disappear from future DERA ZIPs. Action: monitor comment deadline and final rule. If adoption looks likely, archive all available month-1/month-2 data before cutoff. |
+| Q1 2026 13F availability | May 16 target | Early filers appearing (e.g. First Merchants Corp filed Apr 6). Bulk of institutional filings expected May 1-15. Run fetch_13f.py after May 15 deadline. |
+| DERA 2026Q1 N-PORT ZIP | ~Late June | Not yet available. Standard 60-90 day lag after quarter close. Continue using fetch_nport_v2.py --monthly-topup for interim data. |
+
+---
+
 ## ARCHITECTURE BACKLOG — from ARCHITECTURE_REVIEW.md (2026-04-12)
 
 Source: `ARCHITECTURE_REVIEW.md` (repo root). Prerequisites and phase
