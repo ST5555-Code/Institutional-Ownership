@@ -316,7 +316,7 @@ class SECSharesClient:
 if __name__ == "__main__":
     import sys
     c = SECSharesClient()
-    print(f"Loaded {len(c._ticker_to_cik):,} ticker→CIK mappings")
+    print(f"Loaded {len(c._ticker_to_cik):,} ticker→CIK mappings")  # pylint: disable=W0212  # internal access: CLI self-test on own class
     tickers = sys.argv[1:] or ["AAPL", "MSFT", "NVDA", "SMLR", "CIVI", "ZZZZ_NOTREAL"]
     for sym in tickers:
         sh = c.fetch(sym)

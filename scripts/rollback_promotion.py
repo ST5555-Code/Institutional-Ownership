@@ -41,9 +41,9 @@ def main() -> None:
 
     if args.restore:
         # Use the same restore path as promote_staging so behavior is identical
-        promote_staging._log(f"=== ROLLBACK START — snapshot={args.restore} ===")
+        promote_staging._log(f"=== ROLLBACK START — snapshot={args.restore} ===")  # pylint: disable=W0212  # internal access: sibling module shares the same log sink
         promote_staging.rollback(args.restore, list(db.ENTITY_TABLES))
-        promote_staging._log("=== ROLLBACK DONE ===")
+        promote_staging._log("=== ROLLBACK DONE ===")  # pylint: disable=W0212  # internal access: sibling module shares the same log sink
 
 
 if __name__ == "__main__":
