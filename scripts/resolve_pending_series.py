@@ -206,6 +206,14 @@ SUPPLEMENTARY_BRANDS = [
 
     # 2026-04-17 Tier C bootstraps — 6 new entities from
     # scripts/bootstrap_tier_c_advisers.py (eids 24633-24638).
+    # Explicit long-form variant for Exchange Listed Funds Trust — paired
+    # with the longest-match tiebreaker in try_brand_substring to beat the
+    # legacy `LISTED FUNDS` → 8646 (Vident) collision on this family.
+    ("EXCHANGE LISTED FUNDS TRUST",     3738, "Exchange Traded Concepts"),
+    # 2026-04-17 Tier D additions:
+    ("TEMA ETF",                        7238, "TEMA ETFS LLC"),
+    ("PALMER SQUARE FUNDS",           24862, "Palmer Square Capital Management"),
+    ("RAYLIANT FUNDS",                24863, "Rayliant Investment Research"),
     ("COLLABORATIVE INVESTMENT SERIES", 24633, "Collaborative Fund Management"),
     ("SPINNAKER ETF SERIES",           24634, "Spinnaker Financial Advisors"),
     ("TRUTH SOCIAL",                   24635, "Yorkville Capital Management"),
@@ -543,6 +551,23 @@ def try_brand_substring(
 
     if not hits:
         return None
+
+    # Longest-match tiebreaker: when multiple hits exist and one variant
+    # is a strict superstring of another covering the same match, prefer
+    # the more specific one. Example: 'EXCHANGE LISTED FUNDS TRUST'
+    # (3738) wins over 'LISTED FUNDS' (8646) inside 'Exchange Listed
+    # Funds Trust'. `brands` is pre-sorted longest-variant-first at load
+    # time, so the first hit is always the longest — if it covers any
+    # shorter hit's variant as a substring at the same query position,
+    # drop the shorter hit.
+    if len(hits) > 1:
+        primary_variant, _pri_eid, _pri_canonical = hits[0]
+        filtered = [hits[0]]
+        for h_variant, h_eid, h_canonical in hits[1:]:
+            if f" {h_variant} " in f" {primary_variant} ":
+                continue
+            filtered.append((h_variant, h_eid, h_canonical))
+        hits = filtered
 
     if len(hits) != 1:
         return Decision(
