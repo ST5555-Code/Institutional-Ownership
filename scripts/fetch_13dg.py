@@ -38,7 +38,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 def _init_edgar():
     """Lazy-init edgar library — only needed for Phase 1."""
-    global edgar
+    global edgar  # pylint: disable=W0603  # module-level cache: lazy import of edgar library
     if edgar is None:
         import edgar as _edgar
         _edgar.set_identity("serge.tismen@gmail.com")

@@ -33,7 +33,7 @@ _last_t = 0.0
 
 
 def _rate_wait():
-    global _last_t
+    global _last_t  # pylint: disable=W0603  # module-level cache: SEC rate-limit timestamp
     now = time.monotonic()
     wait = 0.13 - (now - _last_t)
     if wait > 0:

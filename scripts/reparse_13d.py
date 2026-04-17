@@ -38,7 +38,7 @@ _MIN_INTERVAL = 0.13
 
 
 def _rate_wait():
-    global _last_request_time
+    global _last_request_time  # pylint: disable=W0603  # module-level cache: SEC rate-limit timestamp
     now = time.monotonic()
     wait = _MIN_INTERVAL - (now - _last_request_time)
     if wait > 0:

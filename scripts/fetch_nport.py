@@ -822,7 +822,7 @@ def main():
     if args.staging:
         set_staging_mode(True)
     if args.include_index:
-        global _include_index
+        global _include_index  # pylint: disable=W0603  # module-level cache: CLI flag for filter
         _include_index = True
         print("  Including index/ETF funds in this run")
 

@@ -61,7 +61,7 @@ _last_sec_time = 0.0
 
 
 def _wait_efts():
-    global _last_efts_time
+    global _last_efts_time  # pylint: disable=W0603  # module-level cache: EFTS rate-limit timestamp
     now = time.monotonic()
     wait = _EFTS_MIN_INTERVAL - (now - _last_efts_time)
     if wait > 0:
@@ -70,7 +70,7 @@ def _wait_efts():
 
 
 def _wait_sec():
-    global _last_sec_time
+    global _last_sec_time  # pylint: disable=W0603  # module-level cache: SEC rate-limit timestamp
     now = time.monotonic()
     wait = _SEC_MIN_INTERVAL - (now - _last_sec_time)
     if wait > 0:

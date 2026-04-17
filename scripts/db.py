@@ -20,12 +20,12 @@ _staging_mode = False
 
 
 def set_test_mode(enabled=True):
-    global _test_mode
+    global _test_mode  # pylint: disable=W0603  # module-level cache: runtime flag toggled by CLI
     _test_mode = enabled
 
 
 def set_staging_mode(enabled=True):
-    global _staging_mode
+    global _staging_mode  # pylint: disable=W0603  # module-level cache: runtime flag toggled by CLI
     _staging_mode = enabled
 
 
