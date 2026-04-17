@@ -320,8 +320,21 @@ def insert_records(con, records):
         ])
 
 
+def _has_table(con, table_name):
+    try:
+        con.execute(f"SELECT 1 FROM {table_name} LIMIT 0")
+        return True
+    except Exception:
+        return False
+
+
 def update_managers_adviser_cik(con):
     """Add adviser_cik to managers table by fuzzy matching adviser names."""
+    # managers table was dropped in Stage 5 cleanup (2026-04-13); skip if absent
+    if not _has_table(con, "managers"):
+        print("  Skipped: managers table not present (dropped in Stage 5 cleanup)")
+        return
+
     try:
         con.execute("ALTER TABLE managers ADD COLUMN adviser_cik VARCHAR")
     except Exception:  # nosec B110 — column already exists on subsequent runs
