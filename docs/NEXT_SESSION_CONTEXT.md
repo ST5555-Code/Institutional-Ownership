@@ -327,6 +327,31 @@ docs.
 - **`ARCHITECTURE_REVIEW.md` §Batch 3-A** — as-shipped schema note for `fund_family_patterns` (2 cols: `pattern VARCHAR`, `inst_parent_name VARCHAR`; PK `(inst_parent_name, pattern)`; 83 rows) + `get_nport_family_patterns()` memoization. Corrects stale 3-col planning docs.
 - **`NEXT_SESSION_CONTEXT.md` §gg** — `holdings_v2` filing-line grain gotcha: true composite key is `(cik, ticker, quarter, put_call, security_type, discretion)`, not `(cik, cusip, quarter)`.
 
+## Open items (session #10 close — refreshed 2026-04-17)
+
+### Done this session
+- **DM14c Voya** ✅ (`8136434`) — 108 series / ~$74B retargeted; 3 wholly_owned edges.
+- **Exchange Listed Funds regex fix** ✅ (`8136434`) — longest-match tiebreaker + 13 series resolved.
+- **Amundi → Victory Capital rollup** ✅ (`8136434`) — corporate action encoded, April 2025.
+- **promote_nport.py batch rewrite** ✅ (`6f4fdfc`) — per-tuple → single batch; 2+hr → seconds.
+- **promote_13dg.py audit-wipe fix** ✅ (`6f4fdfc`) — same `_mirror_manifest_and_impacts` fix applied (already batch at row level so no perf rewrite needed).
+- **_mirror_manifest_and_impacts audit-trail bug** ✅ (`6f4fdfc`) — no longer wipes `promoted` history on re-runs.
+- **ETF Tier D (Palmer Square, Rayliant, Tema, Victory Holdings)** ✅ — 3 bootstraps + 4 SUPPLEMENTARY_BRANDS entries.
+
+### New deferrals / open items
+- **DM15c — Amundi geo-audit.** 9 other children of eid=752 Amundi Taiwan Ltd. (eids 1318/1414/3217/3975/4667/5403/6006/7079/8338) still rolling via `parent_bridge_sync` artifact. Need Amundi SA/Japan/Europe/Australia seed entities + proper attribution before retargeting.
+- **Quaker Investment Trust** — user-supplied CRD 114114 belongs to TRUNORTH FINANCIAL SERVICES in `adv_managers`. Need correct Quaker CRD before bootstrapping. 1 pending series.
+- **Financial Partners Group** — prior-batch research premise (eid=9722→1600 as TruNorth merge with CRD 111308) did not match MDM data. CRD 111308 is TruNorth in Chambersburg PA; neither FPG entity matches. Needs re-investigation or abandonment.
+- **Baron eid=24352 orphan** — originally bootstrapped for Baron ETF Trust in session #9; session #10 retargeted BARON ETF SUPPLEMENTARY_BRANDS → eid=4830 BAMCO Inc. (correct legal adviser). eid=24352 "Baron Capital Management" (distinct CRD 110791) still exists with no downstream attribution. Minor DM15b cleanup: either delete or repurpose as Baron parent-group brand entity.
+- **N-PORT re-promote opportunity** — the 31 new Tier D / Tier C wave2 fund entities created in session #10 may have staged N-PORT holdings in existing DERA/topup runs that are still `promote_status='pending'`. Next session: query `ingestion_impacts` where `unit_key_json.series_id` ∈ the 31 newly-resolved series, re-run `promote_nport.py` for those runs (now fast with batch rewrite). Likely incremental rows to `fund_holdings_v2`.
+
+### Carried forward (still open from prior sessions)
+- **DM15b (132 series / ~$105B)** — blocked on D13 (sub-adviser semantic disambiguation).
+- **`resolve_13dg_filers.py`** — 2,591 filer CIKs outside MDM; 13D/G long-tail individuals/small corps.
+- **Smith Capital CIK deferred** (from INF23) — `adv_managers` row has `cik=None`; requires SEC-EDGAR external lookup.
+- **eid=7 legacy DFA shell** — noted but out of scope for current sessions.
+- **BL-8 category (c)** — E501 908, W0718 163, B608 239 (bulk lint cleanups).
+
 ## Open items for next sessions (refreshed 2026-04-16)
 
 ### N-PORT / holdings
