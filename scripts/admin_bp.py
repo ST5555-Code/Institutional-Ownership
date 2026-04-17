@@ -255,8 +255,10 @@ def api_admin_run_script(body: dict = Body(default={})):
     flags = body.get('flags', [])
 
     # INF12: run_pipeline.sh and merge_staging.py removed — never web-triggerable.
+    # BLOCK-1 (2026-04-17 audit): fetch_nport.py retired; removed from allowlist
+    # to prevent resurrection of legacy fund_holdings.
     allowed = {
-        'fetch_13dg.py', 'fetch_nport.py', 'fetch_market.py',
+        'fetch_13dg.py', 'fetch_market.py',
         'fetch_finra_short.py', 'fetch_ncen.py', 'compute_flows.py',
         'build_cusip.py', 'build_summaries.py', 'unify_positions.py',
         'refresh_snapshot.sh',
