@@ -39,10 +39,30 @@ DEFAULT_TICKER_FILE = '/tmp/refetch_tickers.txt'  # nosec B108 — legacy defaul
 DEFAULT_PROGRESS_FILE = 'logs/sector_coverage_progress.json'
 
 # Rate-limit detection thresholds.
-THROTTLE_TRIGGER_FAILURES = 5   # consecutive Nones before suspecting throttle
-THROTTLE_INITIAL_SLEEP    = 60  # seconds for first cooldown
-THROTTLE_MAX_SLEEP        = 600 # cap per cooldown step
-THROTTLE_MAX_RETRIES      = 5   # cooldown attempts on the stuck ticker
+#
+# Three-state heuristic, tuned after the 2026-04-18 1B2 false-positive: the
+# alphabetically-sorted NULL-sector ticker list starts with a long tail of
+# foreign/structured-instrument codes (07WA, 0E41, 0HQK, 1B2, ...) that Yahoo
+# genuinely cannot resolve. A flat 5-consecutive-None threshold trips cooldown
+# on these head-of-list junk tickers even though nothing is throttled.
+#
+#   1. Before the first successful sector resolution, tolerate a long run of
+#      Nones — they are head-of-list data quality, not throttle.
+#   2. After the first success, Yahoo is proven reachable; a shorter streak of
+#      Nones is a more credible throttle signal, but still loosened from the
+#      original 5 to reduce cooldown trips on natural clusters of unresolvable
+#      codes mid-list.
+#   3. Regardless of state, 200 consecutive Nones is a hard-stop — at that
+#      point either Yahoo is rate-limiting us out or the run is broken; keep
+#      sleeping is not useful. Abort so a human can investigate.
+#
+# Cooldown schedule and 5-retry per-ticker cap are unchanged.
+THROTTLE_TRIGGER_BEFORE_FIRST_SUCCESS = 100
+THROTTLE_TRIGGER_AFTER_FIRST_SUCCESS  = 15
+CONSECUTIVE_FAILURE_ABORT             = 200
+THROTTLE_INITIAL_SLEEP = 60   # seconds for first cooldown
+THROTTLE_MAX_SLEEP     = 600  # cap per cooldown step
+THROTTLE_MAX_RETRIES   = 5    # cooldown attempts on the stuck ticker
 
 FLUSH_EVERY = 25  # progress + log cadence
 
@@ -74,10 +94,13 @@ def write_progress_atomic(path, entries):
     os.rename(tmp, path)
 
 
-def cooldown_retry(client, ticker, progress_entries):
+def cooldown_retry(client, ticker, progress_entries, resolved_count):
     """Progressive backoff retry for a single ticker. Logs each attempt.
 
     Returns (sector, industry) or None if all retries exhausted.
+    `resolved_count` is recorded in each progress entry so a post-hoc review
+    can tell whether cooldown fired before/after the first real success —
+    the heuristic's primary failure mode.
     """
     sleep_s = THROTTLE_INITIAL_SLEEP
     for attempt in range(1, THROTTLE_MAX_RETRIES + 1):
@@ -87,9 +110,11 @@ def cooldown_retry(client, ticker, progress_entries):
             'result': 'rate_limit',
             'cooldown_attempt': attempt,
             'sleep_s': sleep_s,
+            'resolved_count_at_entry': resolved_count,
         })
         print(f"  [rate-limit] suspected throttle on {ticker}; sleeping {sleep_s}s "
-              f"(attempt {attempt}/{THROTTLE_MAX_RETRIES})", flush=True)
+              f"(attempt {attempt}/{THROTTLE_MAX_RETRIES}, resolved_count={resolved_count})",
+              flush=True)
         time.sleep(sleep_s)
         m = client.fetch_metadata(ticker)
         if m is not None:
@@ -151,6 +176,8 @@ def main():
     still_null = 0
     errors = 0
     consecutive_failures = 0
+    resolved_count = 0
+    aborted = False
 
     try:
         for i, tk in enumerate(pending, 1):
@@ -162,14 +189,37 @@ def main():
 
             if m is None:
                 consecutive_failures += 1
-                if consecutive_failures >= THROTTLE_TRIGGER_FAILURES:
-                    # Suspected rate-limit storm. Back off and retry the
-                    # current ticker progressively.
-                    recovered = cooldown_retry(client, tk, progress_entries)
+
+                # Hard cap — regardless of state, this many in a row means
+                # something is systemically wrong. Don't keep sleeping.
+                if consecutive_failures >= CONSECUTIVE_FAILURE_ABORT:
+                    msg = (f"ABORT: {CONSECUTIVE_FAILURE_ABORT} consecutive failures "
+                           f"— likely genuine throttle or systemic issue, not data "
+                           f"quality. Re-launch with --resume after investigation.")
+                    print(msg, flush=True)
+                    progress_entries.append({
+                        'processed_at': now_iso(),
+                        'ticker': tk,
+                        'result': 'abort',
+                        'consecutive_failures': consecutive_failures,
+                        'resolved_count_at_abort': resolved_count,
+                    })
+                    aborted = True
+                    break
+
+                # Success-gated cooldown trigger. Before the first resolution
+                # we tolerate a long run of Nones (head-of-list junk). After,
+                # a much shorter streak is a more credible throttle signal.
+                trigger = (THROTTLE_TRIGGER_BEFORE_FIRST_SUCCESS
+                           if resolved_count == 0
+                           else THROTTLE_TRIGGER_AFTER_FIRST_SUCCESS)
+
+                if consecutive_failures >= trigger:
+                    recovered = cooldown_retry(client, tk, progress_entries, resolved_count)
                     if recovered is None:
                         # All retries exhausted; mark error and reset counter
-                        # so we don't immediately re-enter cooldown on the next
-                        # genuinely-missing ticker.
+                        # so we don't immediately re-enter cooldown on the
+                        # next genuinely-missing ticker.
                         result = 'error'
                         sector, industry = (None, None)
                         errors += 1
@@ -179,6 +229,7 @@ def main():
                         result = 'populated' if sector else 'still_null'
                         if sector:
                             fixed += 1
+                            resolved_count += 1
                         else:
                             still_null += 1
                         consecutive_failures = 0
@@ -193,6 +244,7 @@ def main():
                 if sector:
                     result = 'populated'
                     fixed += 1
+                    resolved_count += 1
                 else:
                     result = 'still_null'
                     still_null += 1
@@ -220,6 +272,8 @@ def main():
         con.close()
 
     print(f"\nDone. populated={fixed}  still_null={still_null}  errors={errors}")
+    if aborted:
+        sys.exit(2)
 
 
 if __name__ == '__main__':
