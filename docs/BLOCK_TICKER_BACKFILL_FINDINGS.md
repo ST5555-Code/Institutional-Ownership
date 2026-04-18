@@ -233,3 +233,126 @@ After BLOCK-TICKER-BACKFILL lands in prod, the BLOCK-3 Phase 2 dry-run report at
 missing-rows stop-condition will no longer hold. BLOCK-3 Phase 4 cannot proceed
 until a fresh Phase 2 dry-run re-runs against the repaired `fund_holdings_v2`
 state. This block's Phase 4 stop message records that dependency explicitly.
+
+---
+
+## 10. Addendum (2026-04-18)
+
+### 10.1 — 2025-08+ `cusip_not_in_securities` step-change (BLOCK-CUSIP-COVERAGE context)
+
+The per-month table in §2 shows a sharp step-change in `cusip_not_in_securities`
+starting at 2025-08:
+
+| period | typical monthly `cusip_not_in_securities` |
+|---|---:|
+| 2024-11 → 2025-07 | 18K – 93K / month |
+| 2025-08 | 283,963 |
+| 2025-09 | 265,517 |
+| 2025-10 | 405,451 |
+| 2025-11 | **1,274,491** |
+| 2025-12 | 902,921 |
+| 2026-01 | 439,116 |
+
+This is not slow drift. Something changed around 2025-08 in how CUSIPs flow from
+N-PORT ingestion into `securities`. **Not investigated in this block.**
+
+- The step-change exists and is material.
+- **Out of scope for BLOCK-TICKER-BACKFILL.** Pass C cannot recover these rows; a
+  CUSIP not in `securities` cannot acquire a ticker via DB-only join.
+- Material context for **BLOCK-CUSIP-COVERAGE** scoping when that block kicks off.
+- Candidate hypotheses to test then (not now):
+  1. N-PORT filings from 2025-08 onward carry CUSIPs that `build_cusip.py` does
+     not register (e.g., new ETF share classes, foreign issuers, private-placement
+     identifiers).
+  2. A fetch gap opened between ingestion (`fetch_nport_v2.py` / `fetch_dera_nport.py`)
+     and CUSIP classification (`build_cusip.py`) — classifications stopped running
+     per-promote, or started skipping rows.
+  3. A specific filer type or instrument class came online at 2025-08 whose CUSIPs
+     flow a different path (e.g., the DERA ZIP session-2 landing on 2026-04-15
+     brought 2.9M rows for 2025-11/12 report_months — temporal alignment).
+
+Flagged here so the BLOCK-CUSIP-COVERAGE kickoff inherits the context without
+requiring re-investigation.
+
+### 10.2 — Phase 1b hook placement verification
+
+§6 proposed hooking the subprocess call at the end of `build_cusip.py` only.
+Read-only verification against the full `securities` writer landscape changes
+that recommendation.
+
+#### Writer inventory
+
+`rg -n "UPDATE securities|INSERT INTO securities|MERGE INTO securities|CREATE OR REPLACE TABLE securities|CREATE TABLE securities" scripts/` result:
+
+| File:Line | Pattern | Role |
+|---|---|---|
+| `scripts/build_cusip.py:291` | INSERT (UPSERT via LEFT-JOIN filter) | **Canonical pipeline writer.** Ports `cusip_classifications` → `securities` for new CUSIPs. |
+| `scripts/build_cusip.py:308` | UPDATE | Same script — updates existing rows from `cusip_classifications`. Paired with the INSERT above in `update_securities_from_classifications()` at `:324`, wrapped in `BEGIN … COMMIT`. |
+| `scripts/normalize_securities.py:37` | UPDATE | **Second canonical pipeline writer.** Per the file docstring at `:3-10`: "port `cusip_classifications` → `securities`". Writes the same 7 classification columns plus `ticker`/`exchange`/`market_sector` with `COALESCE` to preserve manual overrides. |
+| `scripts/normalize_securities.py:54` | INSERT (UPSERT via LEFT-JOIN) | Same script — inserts rows present in `cusip_classifications` but not in `securities`. Paired with the UPDATE above in `normalize()` at `:73`, wrapped in `BEGIN … COMMIT`. |
+| `scripts/enrich_tickers.py:275` | UPDATE (targeted, one CUSIP) | Narrow ticker-only fills from an enrichment fetch; not a cusip_classifications port. |
+| `scripts/auto_resolve.py:394, :397` | UPDATE (targeted, one CUSIP) | **Manual override tool** (CUSIP-resolver workflow). Not pipeline. |
+| `scripts/approve_overrides.py:48, :51` | UPDATE (targeted, one CUSIP) | **Manual override approval UI.** Not pipeline. |
+| `scripts/retired/build_cusip_legacy.py:320` | CTAS | **Retired.** Excluded per `scripts/retired/` convention. |
+| `scripts/run_openfigi_retry.py:107-113` | — | Writes `cusip_classifications`, **not** `securities`. Hooking here fires before the securities port, so the `fund_holdings_v2.ticker` UPDATE would join against stale data. Wrong site. |
+
+**Active automated writers:** 3 scripts (`build_cusip.py`, `normalize_securities.py`,
+`enrich_tickers.py`). **Manual writers:** 2 scripts (`auto_resolve.py`,
+`approve_overrides.py`). **Retired:** 1. No mutual-update loops — each writer
+consumes an upstream source and writes a distinct column subset. Landscape
+tractable.
+
+#### End-of-chain analysis
+
+The "normal CUSIP-learning flow" has **two parallel canonical end-of-chain
+writers** that port `cusip_classifications` → `securities`:
+
+```
+OpenFIGI API
+  → cusip_classifications.ticker          (run_openfigi_retry.py :107-113)
+    → securities.*                         (EITHER build_cusip.py :324 update_securities_from_classifications()
+                                                OR normalize_securities.py :73 normalize())
+      → fund_holdings_v2.ticker            (enrich_holdings.py Pass C — the missing hook)
+```
+
+Which one runs depends on the invocation:
+- `build_cusip.py` runs as part of the CUSIP resolution main flow (OpenFIGI batch
+  + classification compute + securities port in one pass).
+- `normalize_securities.py` is a standalone port script (the docstring at `:3-17`
+  calls it "safe to re-run" — intended for standalone invocation after OpenFIGI
+  retries or cusip_classifications edits).
+
+Either may be the last writer in a given pipeline session. Pass C is idempotent
+(NULL→ticker only, no-op on second pass), so firing the hook at the end of both
+is safe but does a few seconds of wasted work if both ran in the same session.
+
+#### Recommendation: option (d) — hook at end of BOTH `build_cusip.py` AND `normalize_securities.py`
+
+- **Correctness.** Either writer can be the last one to land new CUSIP→ticker
+  mappings; hooking only one misses sessions that invoke the other.
+- **Idempotency.** Pass C's `WHERE ticker IS NOT NULL` (on `securities`) plus the
+  existing `AND s.ticker IS NOT NULL` join filter at `enrich_holdings.py:307`
+  means a duplicate invocation finds zero additional NULL→ticker transitions and
+  exits cleanly. Wasted wall-time on a duplicate run: seconds.
+- **REWRITE resilience.** Both scripts are listed REWRITE targets. Subprocess
+  call pattern (`subprocess.run([sys.executable, "scripts/enrich_holdings.py",
+  "--fund-holdings"], cwd=BASE_DIR, check=False)`) is version-independent — it
+  survives internal refactors to either writer as long as the CLI shape of
+  `enrich_holdings.py --fund-holdings` stays stable (which is already its
+  documented external contract).
+- **Ignored writers.** `enrich_tickers.py` is narrower in scope (single-CUSIP
+  UPDATE from a separate enrichment source) and runs on a different cadence
+  than the classification port. Hooking it adds noise without meaningful
+  coverage — a nightly cron invocation of `enrich_holdings.py --fund-holdings`
+  (separate, outside this block) handles the gap it creates. The two manual
+  override scripts (`auto_resolve.py`, `approve_overrides.py`) are interactive
+  tools; operators invoke Pass C manually after a batch of overrides.
+
+**This supersedes §6's Phase 1b proposal (end of `build_cusip.py` only).**
+§6 remains unedited as the original design record; Phase 1b implementation
+follows §10.2.
+
+**Not a stop condition.** Phase 1b scope is ~10-20 LOC × 2 files = ~20-40 LOC
+total (two subprocess-call blocks with try/except wrappers). No mutual-update
+loops detected; landscape is well-bounded.
+
