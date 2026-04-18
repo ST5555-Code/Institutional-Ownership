@@ -41,7 +41,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import PROD_DB, STAGING_DB  # noqa: E402
-from pipeline.cusip_classifier import MAX_ATTEMPTS, US_PRICEABLE_EXCHANGES  # noqa: E402
+from pipeline.cusip_classifier import (  # noqa: E402
+    MAX_ATTEMPTS,
+    US_PRICEABLE_EXCHANGES,
+    US_PRICEABLE_EXCHCODES,
+)
 
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
@@ -250,8 +254,13 @@ def run_retry(con, limit: Optional[int] = None, dry_run: bool = False) -> dict:
             continue
 
         for cusip, result in zip(batch, response):
-            if 'data' in result and result['data']:
-                _update_resolved(con, cusip, result['data'][0])
+            data = result.get('data') or []
+            if data:
+                preferred = next(
+                    (d for d in data if d.get('exchCode') in US_PRICEABLE_EXCHCODES),
+                    None,
+                )
+                _update_resolved(con, cusip, preferred or data[0])
                 resolved += 1
             elif 'warning' in result:
                 _update_no_match(con, cusip, 'no_result')
