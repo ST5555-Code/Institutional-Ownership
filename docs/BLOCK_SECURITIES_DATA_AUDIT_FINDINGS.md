@@ -432,3 +432,36 @@ After RC1 + RC2 code fixes are deployed:
 - Every data claim cited to query. Every code claim cited to file:line.
 
 **Safe to proceed to Phase 1 (fix ingest path) after sign-off.**
+
+---
+
+## 7. Addendum (2026-04-18) — Universe expansion accepted
+
+Phase 2 surfaced cusip_classifications universe growth from historical
+132,618 rows to 430K on re-seed. Mechanism: `get_cusip_universe()` reads
+`securities` + `fund_holdings_v2` + `beneficial_ownership_v2` in UNION ALL.
+The three sources collectively hold ~430K distinct CUSIPs. Phase 0 baseline
+was measured against the pre-existing 132,618-row snapshot which was a
+subset — origin of that subset not fully diagnosed, likely natural state at
+CUSIP v1.4 cutover (2026-04-15) rather than a deliberate gate.
+
+Decision: accept 430K as the intended canonical universe. Rationale:
+`cusip_classifications` should hold every CUSIP the system has data on. The
+132K subset was incidental, not deliberate. Downstream readers
+(`normalize_securities` → `securities`, Pass C → `fund_holdings_v2.ticker`)
+benefit from broader coverage.
+
+Scope implication: BLOCK-SECURITIES-DATA-AUDIT now ships both contamination
+fixes (RC1, RC2, scope guard, RC3 flagging) and a universe expansion (132K
+→ 430K classification surface). Phase 3 prod sync will promote the expanded
+surface. Downstream BLOCK-TICKER-BACKFILL resume must account for altered
+Pass C behavior — more rows populated, potentially more swaps surfaced.
+
+Side effect on RC3 triage queue: the 82 flagged rows in
+`logs/override_triage_queue.csv` were generated against the 430K staging
+universe, so they reflect post-expansion state. No re-run needed.
+
+Note on `admin_bp.py:108`: `data[0]` pattern in ticker→CUSIP direction
+exists in admin debug UI. Diagnostic only, no persistent writes. Out of
+scope for BLOCK-SECURITIES-DATA-AUDIT. Revisit if admin path gains write
+semantics.
