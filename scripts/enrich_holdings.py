@@ -252,14 +252,27 @@ def _pass_b_apply(con, quarter: str | None) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Pass C — fund_holdings_v2.ticker populate (no is_equity gate)
+# Pass C — fund_holdings_v2.ticker populate (is_priceable gate, no is_equity gate)
 # ---------------------------------------------------------------------------
-# Intentional: N-PORT holds many ETF / CEF / ADR positions whose CUSIPs
-# carry a real ticker in `securities` but classify as is_equity=FALSE
-# (asset_category EC is broader than 13F equity). Gating on is_equity
-# would suppress legitimate fund-level ticker enrichment. This pass
-# populates ticker from any securities row with a non-null ticker; it
-# does NOT clear stale tickers (idempotent populate, not a refresh).
+# Pass C populates ticker from `securities` rows that are both non-null and
+# `is_priceable = TRUE`. Two intentional choices:
+#
+#   1. No is_equity gate. N-PORT holds many ETF / CEF / ADR positions
+#      whose CUSIPs carry a real ticker in `securities` but classify as
+#      is_equity=FALSE (asset_category EC is broader than 13F equity).
+#      Gating on is_equity would suppress legitimate fund-level ticker
+#      enrichment.
+#
+#   2. is_priceable = TRUE gate. Post-BLOCK-SECURITIES-DATA-AUDIT the
+#      securities universe (~430K rows) carries ~389K is_priceable=FALSE
+#      rows — foreign-shape tickers (HO1, FT2, CB1A), non-US composite
+#      exchange listings, preferreds, warrants, and OTC grey-market codes.
+#      Without this gate, Pass C would stamp ~517K fund_holdings_v2 rows
+#      with functionally-wrong tickers (foreign secondary listings in
+#      place of US primaries). is_priceable is broader than is_equity, so
+#      the ETF/CEF/ADR inclusion above is preserved.
+#
+# Idempotent populate, not a refresh — does NOT clear stale tickers.
 
 def _pass_c_project(con, quarter: str | None) -> dict:
     """Project Pass C: NULL→ticker populates and ticker→ticker changes."""
@@ -271,7 +284,9 @@ def _pass_c_project(con, quarter: str | None) -> dict:
             SELECT fh.ticker AS old_ticker,
                    s.ticker  AS new_ticker
               FROM fund_holdings_v2 fh
-              LEFT JOIN securities s ON s.cusip = fh.cusip
+              LEFT JOIN securities s
+                     ON s.cusip = fh.cusip
+                    AND s.is_priceable = TRUE
              WHERE 1=1 {where_q}
         )
         SELECT
@@ -307,6 +322,7 @@ def _pass_c_apply(con, quarter: str | None) -> int:
           FROM securities s
          WHERE s.cusip = fh.cusip
            AND s.ticker IS NOT NULL
+           AND s.is_priceable = TRUE
            {where_q}
         """,
         params,
