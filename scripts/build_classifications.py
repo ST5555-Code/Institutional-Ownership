@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import re
 import sys
 import time
 from datetime import date
@@ -42,6 +43,60 @@ from pipeline.cusip_classifier import classify_cusip, get_cusip_universe  # noqa
 BATCH_SIZE = 1_000
 PROGRESS_EVERY = 10_000
 OVERRIDES_PATH = os.path.join(BASE_DIR, "data", "reference", "ticker_overrides.csv")
+OVERRIDE_TRIAGE_PATH = os.path.join(BASE_DIR, "logs", "override_triage_queue.csv")
+
+# RC3 triage — tokens stripped from both override.company_name and the
+# system-believed issuer_name before comparing. Covers legal-form suffixes,
+# share-class markers, and currency/ADR tags observed in the datasets.
+_NAME_NOISE_TOKENS = frozenset({
+    'INC', 'INCORPORATED', 'CORP', 'CORPORATION', 'CO', 'COMPANY',
+    'LTD', 'LIMITED', 'LLC', 'LP', 'LLP', 'PLC', 'COM',
+    'HOLDINGS', 'HLDGS', 'HOLDING', 'HLDG', 'GROUP', 'GRP',
+    'TRUST', 'TR', 'FUND', 'PARTNERS', 'PARTNERSHIP',
+    'ASSOCIATION', 'ASSOC', 'BANCORP',
+    'NV', 'SA', 'SE', 'AG', 'SPA', 'AB', 'AS', 'OYJ', 'BV',
+    'USD', 'EUR', 'GBP', 'CAD', 'JPY',
+    'SHARES', 'SHS', 'CLASS', 'SPONSORED', 'ADR', 'ADS',
+    'REIT', 'REITS',
+    'THE', 'AND', '&',
+    'A', 'B', 'C',
+})
+
+
+def _normalize_name(name: str) -> str:
+    """Uppercase, strip punctuation, drop trailing legal-form suffixes.
+
+    Used only for RC3 override triage comparisons. Not authoritative.
+    """
+    if not name:
+        return ''
+    s = re.sub(r'[^A-Z0-9 ]', ' ', name.upper())
+    s = re.sub(r'\s+', ' ', s).strip()
+    tokens = s.split()
+    # Strip noise tokens from the tail AND head so "THE APPLE INC" matches
+    # "APPLE", but preserve at least one token.
+    while len(tokens) > 1 and tokens[-1] in _NAME_NOISE_TOKENS:
+        tokens.pop()
+    while len(tokens) > 1 and tokens[0] in _NAME_NOISE_TOKENS:
+        tokens.pop(0)
+    return ' '.join(tokens)
+
+
+def _triage_severity(override_company: str, system_issuer: str) -> str:
+    """Classify (override.company_name, system.issuer_name) similarity.
+
+    Returns one of 'exact', 'fuzzy', 'none'. 'exact' rows are not logged to
+    the triage queue — they confirm the override targets the right CUSIP.
+    """
+    a = _normalize_name(override_company)
+    b = _normalize_name(system_issuer)
+    if not a or not b:
+        return 'none'
+    if a == b:
+        return 'exact'
+    if a in b or b in a:
+        return 'fuzzy'
+    return 'none'
 
 
 UPSERT_SQL = """
@@ -174,6 +229,7 @@ def _load_manual_overrides() -> dict[str, dict]:
                 'ticker': (row.get('correct_ticker') or '').strip() or None,
                 'security_type_override': (row.get('security_type_override') or '').strip() or None,
                 'note': (row.get('note') or '').strip() or None,
+                'company_name': (row.get('company_name') or '').strip() or None,
             }
     return result
 
@@ -243,6 +299,7 @@ def run(read_db: str, write_db: str, *, dry_run: bool = False) -> dict:
     classified: list[dict] = []
     retry_rows: list[tuple] = []
     type_counts: dict[str, int] = {}
+    triage_rows: list[dict] = []  # RC3 — override/system issuer_name mismatches
 
     t0 = time.time()
     for i, src in enumerate(rows_iter, start=1):
@@ -263,6 +320,20 @@ def run(read_db: str, write_db: str, *, dry_run: bool = False) -> dict:
 
         ov = overrides.get(src['cusip'])
         if ov is not None:
+            # RC3 — compare override.company_name to system-believed issuer
+            # name BEFORE applying the override (the override does not touch
+            # issuer_name, so pre/post values are identical for this field,
+            # but we snapshot at the moment of decision for clarity).
+            sev = _triage_severity(ov.get('company_name') or '',
+                                   cls.get('issuer_name') or '')
+            if sev != 'exact':
+                triage_rows.append({
+                    'cusip': src['cusip'],
+                    'override_ticker': ov.get('ticker') or '',
+                    'override_company': ov.get('company_name') or '',
+                    'openfigi_name': cls.get('issuer_name') or '',
+                    'mismatch_severity': sev,
+                })
             cls = _apply_override(cls, ov)
 
         classified.append(cls)
@@ -285,10 +356,33 @@ def run(read_db: str, write_db: str, *, dry_run: bool = False) -> dict:
     print(f"  Classification complete: {total:,} rows in {elapsed:.1f}s "
           f"({total/elapsed:,.0f} rows/s)")
 
+    # RC3 — write the triage queue regardless of dry_run. The queue is an
+    # observational artifact, not part of DB state, and users may want to
+    # inspect it during dry-run inspection.
+    if triage_rows:
+        os.makedirs(os.path.dirname(OVERRIDE_TRIAGE_PATH), exist_ok=True)
+        with open(OVERRIDE_TRIAGE_PATH, 'w', newline='') as f:
+            w = csv.DictWriter(
+                f,
+                fieldnames=['cusip', 'override_ticker', 'override_company',
+                            'openfigi_name', 'mismatch_severity'],
+            )
+            w.writeheader()
+            w.writerows(triage_rows)
+        sev_counts: dict[str, int] = {}
+        for r in triage_rows:
+            sev_counts[r['mismatch_severity']] = sev_counts.get(r['mismatch_severity'], 0) + 1
+        print(f"  RC3 override triage queue: {len(triage_rows):,} mismatches "
+              f"→ {OVERRIDE_TRIAGE_PATH} (severity: {dict(sev_counts)})")
+    else:
+        print("  RC3 override triage queue: 0 mismatches (all override "
+              "company_name values matched system issuer_name)")
+
     summary = {
         'total': total,
         'type_counts': dict(sorted(type_counts.items(), key=lambda x: -x[1])),
         'retry_queue': len(retry_rows),
+        'triage_queue': len(triage_rows),
         'other_pct': type_counts.get('OTHER', 0) * 100.0 / total if total else 0.0,
     }
 
