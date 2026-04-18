@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 
 import duckdb
@@ -138,6 +139,19 @@ def main() -> None:
         normalize(con)
     finally:
         con.close()
+
+    # BLOCK-TICKER-BACKFILL: re-stamp historical fund_holdings_v2.ticker on
+    # securities mapping changes. Pass C in enrich_holdings.py is
+    # is_priceable-gated (commit db27cbd). Subprocess pattern (not inline
+    # import) is resilient to future REWRITE refactors of enrich_holdings.py.
+    cmd = [sys.executable, "scripts/enrich_holdings.py", "--fund-holdings"]
+    if args.staging:
+        cmd.append("--staging")
+    try:
+        subprocess.run(cmd, cwd=BASE_DIR, check=False, timeout=1800)
+        print("  [hook] post-build ticker backfill triggered", flush=True)
+    except Exception as e:
+        print(f"  [warn] post-build ticker backfill hook failed: {e}", flush=True)
 
 
 if __name__ == "__main__":
