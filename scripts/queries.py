@@ -789,7 +789,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
         # N-PORT fund series lookup — batched to eliminate N+1 (ARCH-2A.1).
         nport_by_parent = {}
-        if has_table('fund_holdings'):
+        if has_table('fund_holdings_v2'):
             nport_by_parent = get_nport_children_batch(parent_names, ticker, quarter, con, limit=5)
             for kids in nport_by_parent.values():
                 for k in kids:
@@ -1361,7 +1361,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
         # Batch N-PORT fund series for all parents (single query)
         parent_names = [r.get('parent_name') or r.get('manager_name') for r in records]
         nport_by_parent = {}
-        if parent_names and has_table('fund_holdings') and has_table('fund_universe'):
+        if parent_names and has_table('fund_holdings_v2') and has_table('fund_universe'):
             try:
                 patterns = []
                 for p in parent_names:
@@ -1475,7 +1475,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
             # 13F entities that don't file N-PORT — show as fund-equivalent
             entity_children = []
-            if has_table('holdings'):
+            if has_table('holdings_v2'):
                 try:
                     entities = con.execute(f"""
                         SELECT fund_name, SUM(shares) as shares, SUM(market_value_live) as value
