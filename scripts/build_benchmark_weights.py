@@ -9,12 +9,13 @@ period-appropriate benchmarks. Auto-updates with each new quarter.
 
 Run as part of the quarterly pipeline after fetch_nport.py and market_data.
 """
+import argparse
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import duckdb  # noqa: E402
-from db import get_db_path  # noqa: E402
+from db import get_db_path, set_staging_mode  # noqa: E402
 from config import QUARTERS  # noqa: E402
 
 # Vanguard Total Stock Market Index Fund — broadest US equity coverage
@@ -143,5 +144,18 @@ def build():
     print('\nDone.')
 
 
+def _parse_args() -> argparse.Namespace:
+    """CLI parser — `--staging` redirects the write target to the staging DB."""
+    parser = argparse.ArgumentParser(
+        description="Build benchmark_weights from Vanguard Total Stock Market.",
+    )
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB instead of prod.")
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    _args = _parse_args()
+    if _args.staging:
+        set_staging_mode(True)
     build()

@@ -8,6 +8,7 @@ Also extracts LEI data from N-PORT (leiOfSeries / seriesLei).
 Run: python3 scripts/build_fund_classes.py
 """
 
+import argparse
 import glob
 import os
 import sys
@@ -17,10 +18,9 @@ import duckdb
 from lxml import etree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from db import record_freshness  # noqa: E402
+from db import get_db_path, record_freshness, set_staging_mode  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 NS = {"n": "http://www.sec.gov/edgar/nport"}
 
@@ -82,7 +82,7 @@ def parse_xml_for_classes(xml_path):
 
 
 def run():
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     create_tables(con)
 
     # Find all cached N-PORT XMLs
@@ -193,5 +193,20 @@ def run():
     print("\nDone.")
 
 
+def _parse_args() -> argparse.Namespace:
+    """CLI parser — `--staging` redirects the write target to the staging DB."""
+    parser = argparse.ArgumentParser(
+        description=("Extract share-class + LEI data from cached N-PORT XMLs "
+                     "into fund_classes / lei_reference / "
+                     "fund_holdings_v2.lei."),
+    )
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB instead of prod.")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    _args = _parse_args()
+    if _args.staging:
+        set_staging_mode(True)
     run()
