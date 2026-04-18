@@ -45,7 +45,8 @@ SET
     figi                  = COALESCE(cc.figi, s.figi),
     ticker                = COALESCE(cc.ticker, s.ticker),
     exchange              = COALESCE(cc.exchange, s.exchange),
-    market_sector         = COALESCE(cc.market_sector, s.market_sector)
+    market_sector         = COALESCE(cc.market_sector, s.market_sector),
+    issuer_name           = COALESCE(cc.issuer_name, s.issuer_name)
 FROM cusip_classifications cc
 WHERE s.cusip = cc.cusip
 """
