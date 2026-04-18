@@ -138,22 +138,26 @@ def run():
 
     con.execute("CHECKPOINT")
 
-    # Also add LEI to fund_holdings table if not already present
+    # Also add LEI to fund_holdings_v2 table if not already present.
+    # Repointed from legacy `fund_holdings` in BLOCK-3 (audit §10 / Pass 2
+    # §2). ALTER is wrapped in try/except for idempotency on re-run.
     try:
-        con.execute("ALTER TABLE fund_holdings ADD COLUMN lei VARCHAR")
-        print("  Added lei column to fund_holdings")
+        con.execute("ALTER TABLE fund_holdings_v2 ADD COLUMN lei VARCHAR")
+        print("  Added lei column to fund_holdings_v2")
     except Exception:
         pass
 
-    # Update fund_holdings.lei from lei_reference
+    # Update fund_holdings_v2.lei from lei_reference
     con.execute("""
-        UPDATE fund_holdings
+        UPDATE fund_holdings_v2
         SET lei = lr.lei
         FROM lei_reference lr
-        WHERE fund_holdings.series_id = lr.series_id
-          AND fund_holdings.lei IS NULL
+        WHERE fund_holdings_v2.series_id = lr.series_id
+          AND fund_holdings_v2.lei IS NULL
     """)
-    updated_lei = con.execute("SELECT COUNT(*) FROM fund_holdings WHERE lei IS NOT NULL").fetchone()[0]
+    updated_lei = con.execute(
+        "SELECT COUNT(*) FROM fund_holdings_v2 WHERE lei IS NOT NULL"
+    ).fetchone()[0]
 
     # Summary
     total_classes = con.execute("SELECT COUNT(*) FROM fund_classes").fetchone()[0]
@@ -166,7 +170,7 @@ def run():
     print(f"Fund classes: {total_classes} (new: {classes_added})")
     print(f"Unique series with classes: {unique_series}")
     print(f"LEI references: {total_leis} (new: {leis_added})")
-    print(f"fund_holdings with LEI: {updated_lei:,}")
+    print(f"fund_holdings_v2 with LEI: {updated_lei:,}")
 
     # Test: Fidelity Contrafund classes
     fc = con.execute("""
