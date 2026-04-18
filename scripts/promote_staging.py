@@ -36,9 +36,18 @@ import db  # noqa: E402
 
 PROMOTION_LOG = ROOT / "logs" / "promotion_history.log"
 
-# Primary key columns per entity table — used to compute the diff PK
-# set and to drive DELETE/INSERT during apply.
+# Primary key columns per promotable table — used to compute the diff
+# PK set and to drive DELETE/INSERT during apply. Not all prod tables
+# declare a formal PK constraint (prod's "degraded schema" pattern —
+# see ENTITY_ARCHITECTURE.md), so this dict defines the logical key
+# promote_staging.py uses regardless of DB-level constraints.
+#
+# For `securities` specifically: no DB-level PK/UNIQUE is declared in
+# prod OR staging, but `cusip` is empirically unique (0 duplicates,
+# 0 NULLs in both DBs as of BLOCK-SECURITIES-DATA-AUDIT Phase 2b).
+# Same pattern as the entity tables above.
 PK_COLUMNS = {
+    # Entity MDM layer
     "entities": ["entity_id"],
     "entity_identifiers": ["entity_id", "identifier_type", "identifier_value", "valid_from"],
     "entity_relationships": ["relationship_id"],
@@ -48,6 +57,34 @@ PK_COLUMNS = {
     "entity_identifiers_staging": ["staging_id"],
     "entity_relationships_staging": ["id"],
     "entity_overrides_persistent": ["override_id"],
+    # Canonical reference tables (added 2026-04-18 — Phase 3)
+    "cusip_classifications": ["cusip"],
+    "securities": ["cusip"],
+}
+
+# Per-table validator registration. Each value is one of:
+#   - a string naming a validator "kind" handled by _run_validators()
+#   - None → promotion proceeds without validation, with an explicit warn
+#     printed so the absence is visible rather than silent.
+#
+# Entity tables share validate_entities.py (one subprocess call covers the
+# whole set). Canonical tables have no registered validator yet — follow-on
+# work. The explicit None entry is load-bearing: it documents the known gap
+# and triggers the warn path in _run_validators().
+VALIDATOR_MAP = {
+    # Entity tables → validate_entities.py
+    "entities": "validate_entities",
+    "entity_identifiers": "validate_entities",
+    "entity_relationships": "validate_entities",
+    "entity_aliases": "validate_entities",
+    "entity_classification_history": "validate_entities",
+    "entity_rollup_history": "validate_entities",
+    "entity_identifiers_staging": "validate_entities",
+    "entity_relationships_staging": "validate_entities",
+    "entity_overrides_persistent": "validate_entities",
+    # Canonical tables — no validator registered yet
+    "cusip_classifications": None,
+    "securities": None,
 }
 
 
@@ -309,6 +346,113 @@ def _apply_table(con, table: str) -> dict:
     }
 
 
+def _count_diff(con, table: str) -> dict:
+    """Read-only diff counts for a single table. Same semantics as
+    _apply_table but without the DELETE/INSERT. Expects staging attached
+    as 'stg'. Used by --dry-run."""
+    pk = PK_COLUMNS[table]
+    pk_csv = ", ".join(pk)
+
+    deleted = con.execute(
+        f"""
+        SELECT COUNT(*) FROM (
+          SELECT {pk_csv} FROM {table}
+          EXCEPT
+          SELECT {pk_csv} FROM stg.{table}
+        )
+        """
+    ).fetchone()[0]
+
+    modified = con.execute(
+        f"""
+        SELECT COUNT(*) FROM (
+          SELECT * FROM stg.{table}
+          EXCEPT
+          SELECT * FROM {table}
+        ) s
+        WHERE EXISTS (
+          SELECT 1 FROM {table} p
+          WHERE {' AND '.join(f'p.{c} = s.{c}' for c in pk)}
+        )
+        """
+    ).fetchone()[0]
+
+    added_or_replaced = con.execute(
+        f"""
+        SELECT COUNT(*) FROM (
+          SELECT {pk_csv} FROM stg.{table}
+          EXCEPT
+          SELECT {pk_csv} FROM {table}
+        )
+        """
+    ).fetchone()[0]
+
+    return {
+        "deleted": deleted,
+        "modified": modified,
+        "added_only": added_or_replaced,  # same-PK modifieds already in prod; this counts PKs new to prod
+    }
+
+
+def dry_run(tables: list[str]) -> dict:
+    """Preview diff counts without snapshotting or applying. Opens both
+    DBs READ_ONLY so the operation cannot perturb state."""
+    import duckdb
+
+    con = duckdb.connect(db.PROD_DB, read_only=True)
+    con.execute(f"ATTACH '{db.STAGING_DB}' AS stg (READ_ONLY)")
+
+    existing_in_prod = {
+        r[0] for r in con.execute(
+            "SELECT table_name FROM duckdb_tables() "
+            "WHERE database_name = current_database()"
+        ).fetchall()
+    }
+    existing_in_stg = {
+        r[0] for r in con.execute(
+            "SELECT table_name FROM duckdb_tables() "
+            "WHERE database_name = 'stg'"
+        ).fetchall()
+    }
+
+    summary: dict = {"dry_run": True, "tables": {}}
+    try:
+        for t in tables:
+            if t not in existing_in_stg:
+                _log(f"  SKIP {t}: not present in staging")
+                continue
+            if t not in existing_in_prod:
+                # Full-insert scenario: staging has the table, prod doesn't yet.
+                n_stg = con.execute(f"SELECT COUNT(*) FROM stg.{t}").fetchone()[0]
+                _log(
+                    f"  {t}: prod table MISSING — would require CREATE TABLE "
+                    f"+ INSERT of {n_stg:,} rows (not supported by the current "
+                    f"diff-apply path; out of dry-run scope)"
+                )
+                summary["tables"][t] = {"note": "prod missing; create-path unsupported"}
+                continue
+            stats = _count_diff(con, t)
+            summary["tables"][t] = stats
+            _log(
+                f"  {t}: would_delete={stats['deleted']}  "
+                f"would_modify={stats['modified']}  "
+                f"would_add={stats['added_only'] - stats['modified']}  "
+                f"(PK-only delta {stats['added_only']})"
+            )
+    finally:
+        con.execute("DETACH stg")
+        con.close()
+
+    # Validator pass-through — warn even in dry-run so reviewers see the gap.
+    for t in tables:
+        if t in summary["tables"] and VALIDATOR_MAP.get(t) is None:
+            _log(
+                f"  [warn] No validator registered for table {t}. "
+                f"Actual promotion would proceed without validation for this table."
+            )
+    return summary
+
+
 def promote(tables: list[str], snapshot_id: str) -> dict:
     import duckdb
 
@@ -403,57 +547,92 @@ def promote(tables: list[str], snapshot_id: str) -> dict:
         con.execute("DETACH stg")
         con.close()
 
-    # Step 5 — validate (subprocess so it gets a fresh connection
-    # and clean staging-mode state).
-    #
-    # validate_entities.py exit codes:
-    #   0 = all gates PASS
-    #   1 = at least one non-structural gate FAILed (do NOT auto-rollback;
-    #       these gates can have transient or expected failures, and a
-    #       human should decide whether they block this promotion)
-    #   2 = at least one STRUCTURAL gate FAILed (auto-rollback — the DB
-    #       is in a logically broken state)
-    _log("  running validate_entities.py against production ...")
-    result = subprocess.run(  # nosec B603
-        [sys.executable, "-u", "scripts/validate_entities.py", "--prod"],
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    summary["validate_returncode"] = result.returncode
-    summary["validate_stdout_tail"] = "\n".join(result.stdout.splitlines()[-20:])
+    # Step 5 — validate per VALIDATOR_MAP. Tables with None get an
+    # explicit warn (load-bearing: signals a known gap, not a silent skip).
+    summary.update(_run_validators(tables, snapshot_id))
 
-    if result.returncode == 0:
-        _log("  validation PASSED (all gates green)")
-    elif result.returncode == 1:
-        _log("  validation: non-structural FAILs present (NOT auto-rolling back)")
-        _log("    review logs/entity_validation_report.json before next session")
-        for line in result.stdout.splitlines()[-6:]:
-            if line.strip():
-                _log(f"    {line}")
-    elif result.returncode == 2:
-        _log("  validation: STRUCTURAL FAILURE (rc=2) — auto-restoring snapshot")
-        for line in result.stdout.splitlines()[-6:]:
-            if line.strip():
-                _log(f"    {line}")
-        con = duckdb.connect(db.PROD_DB)
-        try:
-            con.execute("BEGIN TRANSACTION")
-            try:
-                _restore_snapshot(con, snapshot_id, tables)
-                con.execute("COMMIT")
-            except Exception:
-                con.execute("ROLLBACK")
-                raise
-        finally:
-            con.close()
-        _log("  rollback complete; production restored to pre-promotion state")
-        summary["restored"] = True
-    else:
-        _log(f"  validation: unexpected exit code {result.returncode} — leaving promotion in place")
-
+    # If the validator path auto-rolled back, reflect it in the summary
+    # so main() can exit non-zero. Otherwise promotion stays in place.
     return summary
+
+
+def _run_validators(tables: list[str], snapshot_id: str) -> dict:
+    """Run every validator referenced by VALIDATOR_MAP for the tables
+    being promoted, deduplicated. Tables mapped to None get an explicit
+    warn. Returns a dict merged into the outer summary.
+
+    Current validator kinds:
+      'validate_entities' → subprocess call to validate_entities.py
+      None                → no-op with warn
+    """
+    import duckdb
+
+    out: dict = {"validators_run": [], "validators_skipped": []}
+
+    # Warn once per None-mapped table.
+    for t in tables:
+        if VALIDATOR_MAP.get(t) is None:
+            _log(
+                f"  [warn] No validator registered for table {t}. "
+                f"Promotion proceeding without validation for this table."
+            )
+            out["validators_skipped"].append(t)
+
+    kinds = {VALIDATOR_MAP.get(t) for t in tables if VALIDATOR_MAP.get(t)}
+
+    if "validate_entities" in kinds:
+        # validate_entities.py exit codes:
+        #   0 = all gates PASS
+        #   1 = at least one non-structural gate FAILed (do NOT auto-rollback;
+        #       these gates can have transient or expected failures, and a
+        #       human should decide whether they block this promotion)
+        #   2 = at least one STRUCTURAL gate FAILed (auto-rollback — the DB
+        #       is in a logically broken state)
+        _log("  running validate_entities.py against production ...")
+        result = subprocess.run(  # nosec B603
+            [sys.executable, "-u", "scripts/validate_entities.py", "--prod"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        out["validate_returncode"] = result.returncode
+        out["validate_stdout_tail"] = "\n".join(result.stdout.splitlines()[-20:])
+        out["validators_run"].append("validate_entities")
+
+        if result.returncode == 0:
+            _log("  validation PASSED (all gates green)")
+        elif result.returncode == 1:
+            _log("  validation: non-structural FAILs present (NOT auto-rolling back)")
+            _log("    review logs/entity_validation_report.json before next session")
+            for line in result.stdout.splitlines()[-6:]:
+                if line.strip():
+                    _log(f"    {line}")
+        elif result.returncode == 2:
+            _log("  validation: STRUCTURAL FAILURE (rc=2) — auto-restoring snapshot")
+            for line in result.stdout.splitlines()[-6:]:
+                if line.strip():
+                    _log(f"    {line}")
+            con = duckdb.connect(db.PROD_DB)
+            try:
+                con.execute("BEGIN TRANSACTION")
+                try:
+                    _restore_snapshot(con, snapshot_id, tables)
+                    con.execute("COMMIT")
+                except Exception:
+                    con.execute("ROLLBACK")
+                    raise
+            finally:
+                con.close()
+            _log("  rollback complete; production restored to pre-promotion state")
+            out["restored"] = True
+        else:
+            _log(
+                f"  validation: unexpected exit code {result.returncode} "
+                "— leaving promotion in place"
+            )
+
+    return out
 
 
 def rollback(snapshot_id: str, tables: list[str]) -> None:
@@ -475,9 +654,15 @@ def rollback(snapshot_id: str, tables: list[str]) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--approved", action="store_true",
-                   help="REQUIRED. Confirms human review of diff_staging.py output.")
+                   help="REQUIRED for apply path. Confirms human review of the diff.")
     p.add_argument("--tables", default=None,
-                   help="comma-separated subset of entity tables (default: all)")
+                   help=(
+                       "comma-separated subset of promotable tables "
+                       "(default: all entity tables). See db.PROMOTABLE_TABLES."
+                   ))
+    p.add_argument("--dry-run", action="store_true",
+                   help="Preview diff counts without snapshotting or applying. "
+                        "Read-only; --approved not required.")
     p.add_argument("--rollback", metavar="SNAPSHOT_ID",
                    help="restore production from the named snapshot")
     p.add_argument("--list-snapshots", action="store_true",
@@ -490,12 +675,18 @@ def main() -> None:
 
     if args.tables:
         requested = [t.strip() for t in args.tables.split(",") if t.strip()]
-        invalid = [t for t in requested if t not in db.ENTITY_TABLES]
+        invalid = [t for t in requested if t not in db.PROMOTABLE_TABLES]
         if invalid:
-            print(f"ERROR: unknown entity tables: {invalid}", file=sys.stderr)
+            print(
+                f"ERROR: unknown promotable tables: {invalid}. "
+                f"Known: {list(db.PROMOTABLE_TABLES)}",
+                file=sys.stderr,
+            )
             sys.exit(2)
         tables = requested
     else:
+        # Default preserves prior behaviour: promote every entity table.
+        # Canonical tables must be opted in via --tables.
         tables = list(db.ENTITY_TABLES)
 
     if args.rollback:
@@ -507,10 +698,16 @@ def main() -> None:
         _log("=== ROLLBACK DONE ===")
         return
 
+    if args.dry_run:
+        _log(f"=== DRY-RUN — tables={tables} ===")
+        summary = dry_run(tables)
+        _log("=== DRY-RUN DONE — no writes performed ===")
+        return
+
     if not args.approved:
         print(
             "ERROR: --approved is required. The staging diff MUST be reviewed "
-            "by a human before promotion.",
+            "by a human before promotion. Use --dry-run to preview.",
             file=sys.stderr,
         )
         sys.exit(2)

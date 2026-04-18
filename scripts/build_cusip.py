@@ -52,6 +52,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import set_staging_mode, get_db_path, record_freshness  # noqa: E402
+from pipeline.cusip_classifier import US_PRICEABLE_EXCHCODES  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config
@@ -204,7 +205,11 @@ def openfigi_retry(con_write, limit: Optional[int] = None) -> dict:
         for cusip, result in zip(batch, results):
             data = result.get("data") or []
             if data:
-                item = data[0]
+                preferred = next(
+                    (d for d in data if d.get('exchCode') in US_PRICEABLE_EXCHCODES),
+                    None,
+                )
+                item = preferred or data[0]
                 ticker = item.get("ticker") or None
                 figi = item.get("compositeFIGI") or item.get("figi")
                 exchange = item.get("exchCode")

@@ -108,6 +108,19 @@ ENTITY_SEQUENCES = [
     ("identifier_staging_id_seq", "entity_identifiers_staging", "staging_id"),
 ]
 
+# Canonical reference tables outside the entity MDM layer. Added 2026-04-18
+# for BLOCK-SECURITIES-DATA-AUDIT Phase 3 so promote_staging.py can ship
+# cusip_classifications + securities through the same snapshot/diff/restore
+# machinery used for entities. No sequences (cusip-keyed).
+CANONICAL_TABLES = [
+    "cusip_classifications",
+    "securities",
+]
+
+# Union used by promote_staging.py as its argparse allowlist. Grows as more
+# non-entity tables join the staging → prod promotion workflow.
+PROMOTABLE_TABLES = ENTITY_TABLES + CANONICAL_TABLES
+
 
 def seed_staging():
     """Copy reference tables from production to staging DB for read access.

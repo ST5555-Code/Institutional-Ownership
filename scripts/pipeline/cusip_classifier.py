@@ -39,6 +39,14 @@ US_PRICEABLE_EXCHANGES = frozenset({
     'US',
 })
 
+# OpenFIGI v3 per-listing exchCodes for US venues. Used to pick the
+# preferred listing when the API returns multiple entries per CUSIP
+# (US composite + Frankfurt/XETRA/OTC secondary listings). See
+# docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md RC1.
+US_PRICEABLE_EXCHCODES = frozenset({
+    'US', 'UN', 'UW', 'UQ', 'UR', 'UA', 'UF', 'UP', 'UV', 'UD', 'UX',
+})
+
 
 # N-PORT asset_category → classification seed.
 #
@@ -543,14 +551,7 @@ def get_cusip_universe(con) -> pd.DataFrame:
     to all three — in staging mode, pass the prod read connection.
     """
     return con.execute("""
-        SELECT
-            cusip,
-            MAX(issuer_name_sample)        AS issuer_name_sample,
-            MAX(security_type)             AS raw_type_mode,
-            COUNT(DISTINCT security_type)  AS raw_type_count,
-            MAX(security_type_inferred)    AS security_type_inferred,
-            MAX(asset_category_seed)       AS asset_category_seed
-        FROM (
+        WITH all_sources AS (
             -- Source 1: 13F holdings via securities (has security_type + inferred)
             SELECT
                 s.cusip                            AS cusip,
@@ -586,6 +587,47 @@ def get_cusip_universe(con) -> pd.DataFrame:
             FROM beneficial_ownership_v2 bo
             WHERE bo.subject_cusip IS NOT NULL
               AND LENGTH(bo.subject_cusip) = 9
-        ) all_sources
-        GROUP BY cusip
+        ),
+        name_counts AS (
+            -- Pre-aggregate (cusip, name) frequency so the window function
+            -- below can order by a scalar column (DuckDB does not allow a
+            -- window function inside another window's ORDER BY).
+            SELECT
+                cusip,
+                issuer_name_sample,
+                COUNT(*) AS name_freq
+            FROM all_sources
+            WHERE issuer_name_sample IS NOT NULL
+            GROUP BY cusip, issuer_name_sample
+        ),
+        issuer_name_pick AS (
+            -- RC2: pick most-common issuer_name_sample per CUSIP.
+            -- Tie-breakers: longer name (less likely clipped), alphabetic.
+            SELECT cusip, issuer_name_sample
+            FROM (
+                SELECT
+                    cusip,
+                    issuer_name_sample,
+                    name_freq,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY cusip
+                        ORDER BY
+                            name_freq DESC,
+                            LENGTH(issuer_name_sample) DESC,
+                            issuer_name_sample ASC
+                    ) AS rn
+                FROM name_counts
+            ) ranked
+            WHERE rn = 1
+        )
+        SELECT
+            a.cusip,
+            ip.issuer_name_sample              AS issuer_name_sample,
+            MAX(a.security_type)               AS raw_type_mode,
+            COUNT(DISTINCT a.security_type)    AS raw_type_count,
+            MAX(a.security_type_inferred)      AS security_type_inferred,
+            MAX(a.asset_category_seed)         AS asset_category_seed
+        FROM all_sources a
+        LEFT JOIN issuer_name_pick ip USING (cusip)
+        GROUP BY a.cusip, ip.issuer_name_sample
     """).fetchdf()
