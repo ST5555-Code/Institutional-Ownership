@@ -566,6 +566,68 @@ columns in one pass. Each step narrows the exposure before the next.
 **Not in scope.** Class A columns stay as stamps. `cusip` and `shares`
 on `holdings_v2` are the filing-time record and do not join anywhere.
 
+### COALESCE preservation pattern for source-side coverage regression
+
+When a writer is repointed from one source to another and the new
+source has lower coverage than the old, COALESCE preserves historical
+values while letting new-source values win where populated:
+
+```sql
+UPDATE holdings_v2 t
+SET manager_type = COALESCE(src.manager_type, t.manager_type),
+    inst_parent_name = COALESCE(src.inst_parent_name, t.inst_parent_name),
+    is_passive = COALESCE(src.is_passive, t.is_passive),
+    is_activist = COALESCE(src.is_activist, t.is_activist)
+FROM (<new source>) src
+WHERE t.<join key> = src.<join key>;
+```
+
+**Precedent.** Rewrite5 Phase 4 (commit `7747af2`) applied this
+pattern on all four `build_managers` enrichment columns
+(`manager_type`, `inst_parent_name`, `is_passive`, `is_activist`).
+The new source (`managers.strategy_type` populated by
+`fetch_adv.py` + hand-curated
+`data/reference/categorized_institutions_funds_v2.csv`) covers only
+~60% of CIKs against legacy's 100%; the 40% gap is structural
+(non-ADV filers, $25T+ AUM). COALESCE preserved legacy values in
+that gap, including the 14-category hand-curated taxonomy that ADV
+alone cannot supply.
+
+**Auxiliary pattern: pre-rewrite snapshot as audit artifact.** Before
+the COALESCE-repoint pass writes, snapshot the legacy column set into
+a dated table — e.g. `holdings_v2_manager_type_legacy_snapshot_20260419`
+(Rewrite5; 12,270,984 rows, 9,121 CIKs, 13 types). The snapshot is a
+full point-in-time reference and supports:
+
+- Rollback to pre-rewrite state without data loss if the new source
+  turns out to be broken.
+- Diff validation after the repoint — "how many rows changed, where
+  did they land, and were the changes expected."
+- Long-tail audit against future ADV enrichments — compare a fresh
+  pull to the snapshot to see coverage drift direction.
+
+**When to use.**
+- Source-side coverage regression is known (the legacy source had
+  more rows populated than the new source will).
+- Legacy provenance is defensible — the legacy data was populated by
+  a trusted process, even if that process has been retired.
+- Taxonomies are strictly compatible: legacy is a superset of new, or
+  the merge is semantically safe (e.g., new source refines legacy
+  values rather than contradicting them).
+
+**When not to use.**
+- Taxonomies conflict — same column name, different meanings (e.g.,
+  `status='active'` meaning "activist investor" in legacy vs.
+  "actively-managed fund" in new). COALESCE would silently produce a
+  meaningless mix.
+- Legacy data is of unknown provenance — prefer a full-replace repoint
+  so the column carries a single, auditable source of truth.
+
+**Subsection cross-references.** `ENTITY_ARCHITECTURE.md → Design
+Decision Log` carries the dated rationale entry (2026-04-19);
+`docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the Rewrite5
+application of this pattern.
+
 **Cross-references.**
 - `ENTITY_ARCHITECTURE.md → Known Limitations` carries a pointer to
   this section from the entity side.
@@ -573,3 +635,132 @@ on `holdings_v2` are the filing-time record and do not join anywhere.
   rationale entry (2026-04-18).
 - ROADMAP → INFRASTRUCTURE → Open items → INF25 carries the
   sequencing row.
+
+---
+
+## 8. Writers orphaned by Stage 5 holdings drop — observed pattern
+
+Stage 5 (2026-04-13, BLOCK-3 preparatory work) dropped the legacy
+`holdings` table. Three writers continued to target `holdings` for
+writes after the drop, producing silent no-ops in prod. The pattern
+is worth documenting: when a table is retired, downstream readers
+break loudly, but downstream *writers* — especially those running
+`DROP TABLE IF EXISTS` + `CREATE TABLE AS SELECT` — can fail silently
+because the create succeeds and the write succeeds against a table
+no other reader consults.
+
+**Three documented instances.**
+
+1. **`OTHERMANAGER2` / `other_managers`.** The registry declared
+   `load_13f.py` as the owner of the `other_managers` write path, but
+   the actual loader had never been implemented — parsed
+   `OTHERMANAGER2` rows were dropped on the floor. Because no
+   downstream reader joined `other_managers`, the gap went unnoticed
+   until Rewrite4 Phase 0 addendum (commit `0a7ae35`) surveyed the
+   registry vs. actual writes. **15,405 rows** were recovered from
+   ghost data and materialized once the loader was implemented in
+   Rewrite4 (commit `14a5152`).
+
+2. **`build_managers.py` holdings ALTER+UPDATE (`:513-532`).** The
+   manager enrichment pass ran `ALTER TABLE holdings ADD COLUMN ...` +
+   `UPDATE holdings SET ...` after the core manager-table build. After
+   Stage 5 dropped `holdings`, these statements targeted the legacy
+   table name and ran silently every quarter with no observable
+   effect. **100% of the legacy 14-category `manager_type` data was
+   unpopulated on new data loads** between Stage 5 and Rewrite5
+   detection. Fix: repoint to `holdings_v2` at commit `1719320`.
+
+3. **`backfill_manager_types.py`.** A hand-curated backfill of manager
+   types from `data/reference/categorized_institutions_funds_v2.csv`
+   targeted the dropped `holdings` table. **5,782 curated rows** were
+   silently not applied on each cycle between Stage 5 and Rewrite5.
+   Fix: repoint to `holdings_v2` at commit `7b8a2b7`.
+
+**Detection characteristics.** The pattern is silent at runtime:
+`DROP TABLE IF EXISTS holdings; CREATE TABLE holdings AS SELECT ...`
+succeeds (table name is usable again); subsequent `INSERT / UPDATE /
+ALTER` against the recreated table succeeds; no reader joins it, so
+the write has no observable effect. `data_freshness` stamps, when
+present, go against the dropped table name and are themselves
+orphaned. The only observable symptom is data-coverage regression,
+typically caught by a smoke test or a manual audit, often weeks later.
+
+**Mitigation going forward.** When retiring a table, audit all writers
+named in `scripts/pipeline/registry.py` / `docs/canonical_ddl.md`, not
+just downstream readers. The `pipeline_violations.md` doc already lists
+`Legacy refs:` for each script — a table-retirement audit should treat
+those lines as a kill-list: every `Legacy refs:` entry against the
+retired table is a writer that needs repointing or deletion, not just
+a reader that needs rewriting.
+
+**Cross-references.**
+- `docs/REWRITE_LOAD_13F_FINDINGS.md` — Rewrite4 Phase 0 addendum
+  documents the OTHERMANAGER2 recovery.
+- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` — Rewrite5 documents the
+  `build_managers.py` + `backfill_manager_types.py` repoints.
+- `docs/pipeline_violations.md` — each affected script carries a
+  CLEARED note with commit citations (2026-04-19).
+
+---
+
+## 9. `promote_staging.py` promote-kind machinery
+
+`promote_staging.py` carries two distinct promotion contracts,
+selected per-table via the `PROMOTE_KIND` dict:
+
+**`pk_diff` (existing behavior, default).** Diff staging against prod
+by PK, produce `INSERT` / `UPDATE` / `DELETE` statements, apply inside
+one transaction with validate_entities gates. Safe when the producer
+script writes individually-keyed rows with a stable PK — every
+staging row corresponds to a prod row (present, absent, or updated)
+determined by the PK alone. This is the contract used by all entity
+tables (`entity_current`, `entity_aliases`, `entity_identifiers`,
+`entity_relationships`, `entity_rollup_history`,
+`entity_classification_history`, `entity_overrides_persistent`).
+Preserves row-level history and supports precise rollback by replaying
+the inverse diff.
+
+**`rebuild` (new kind, added Rewrite5 Phase 0, commit `6079220`).**
+Full-replace semantics: snapshot prod to a dated table, `DROP TABLE`
+prod, `CREATE TABLE AS SELECT` from staging, stamp `data_freshness`.
+Safe for `DROP+CTAS` producer patterns where PK-diff is not viable
+because staging row sets are not PK-keyed (fan-out from upstream
+joins, dedup semantics that would treat perfectly-valid duplicate
+keys as mutual deletions, or derived tables that are fully regenerated
+every cycle and carry no historical state in prod).
+
+**Registration.** Table-keyed `PROMOTE_KIND` dict in
+`promote_staging.py`. Default is implicit `pk_diff` for backward
+compatibility; tables that require `rebuild` are listed explicitly.
+
+**When to use which.**
+
+| Case | Kind |
+|---|---|
+| Staging row set has stable PK, diff semantics preserve history | `pk_diff` |
+| Producer uses `DROP+CTAS`; every cycle fully regenerates prod | `rebuild` |
+| Producer fans out via join + dedupe, dupes-on-PK are expected from the join | `rebuild` |
+| Historical state must survive across promotes | `pk_diff` |
+| Derived / materialized aggregates with no independent history | `rebuild` |
+
+**Rewrite5 registrations.**
+- `parent_bridge` → `pk_diff` (existing behavior preserved — history matters).
+- `cik_crd_direct` → `pk_diff` (existing — history matters).
+- `managers` → **`rebuild`** (new — DROP+CTAS producer, dupes-on-CIK expected from ADV joins).
+- `cik_crd_links` → **`rebuild`** (new — derived materialization, no independent history).
+
+**Snapshot retention.** `rebuild` snapshots land as
+`{table}_legacy_snapshot_{YYYYMMDD}` dated tables and are retained as
+audit artifacts. Precedent: `holdings_v2_manager_type_legacy_snapshot_20260419`
+preserved the pre-Rewrite5 state of the `manager_type` column.
+Retention policy open (see ROADMAP D7 — snapshot table retention
+policy).
+
+**Cross-references.**
+- `ARCHITECTURE_REVIEW.md §Batch 3-A` carries the sibling note on
+  `fund_family_patterns` + `data_freshness` table additions.
+- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the first use of
+  `rebuild` kind.
+- ROADMAP → INFRASTRUCTURE → Open items → `INF30` is the
+  `merge_staging.py` analogue (NULL-only / column-scoped merge mode)
+  for the seed-time reference-table layer.

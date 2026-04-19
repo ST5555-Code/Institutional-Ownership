@@ -176,7 +176,27 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 ---
 
-## load_13f.py (REWRITE)
+## load_13f.py (REWRITE) — CLEARED 2026-04-19 (Rewrite4, 7e68cf9 / prod apply a58c107)
+
+**CLEARED 2026-04-19** — Full rewrite landed at commit `7e68cf9`, Phase 4
+prod apply at `a58c107`. Rewrite4 Findings at
+`docs/REWRITE_LOAD_13F_FINDINGS.md`:
+
+- Dead `holdings` DROP+CTAS at `:222-284` retired — script no longer
+  writes the legacy table. `holdings_v2` is the canonical fact table
+  and is produced by the downstream enrichment chain.
+- `--dry-run` and `--staging` plumbed through `main()` end-to-end;
+  no more hardcoded prod writes.
+- `OTHERMANAGER2` loader added (Phase 0 addendum, commit `0a7ae35`):
+  materialized 15,405 `other_managers` rows from ghost data that the
+  legacy script silently dropped on the floor. Fix shipped in the
+  same rewrite at commit `14a5152`.
+- `--quarter` gate retained; CHECKPOINT per filing batch, error-log
+  on missing `filings_txt` / `filings_xml` halts the quarter rather
+  than silently loading a 0-row partition.
+- `data_freshness` hook live on both `filings` and `filings_deduped`.
+
+Original violations retained below for historical reference.
 
 - §1 (incremental save): **VIOLATION** — full `DROP+CREATE` on
   `filings` at `load_13f.py:182`, `filings_deduped` at `:200`,
@@ -218,7 +238,38 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 ---
 
-## build_managers.py (REWRITE)
+## build_managers.py (REWRITE) — CLEARED 2026-04-19 (Rewrite5, 223b4d9 / prod apply 7747af2)
+
+**CLEARED 2026-04-19** — Full rewrite + `backfill_manager_types.py`
+repoint landed at merge commit `223b4d9`, Phase 4 prod apply at
+`7747af2`. Rewrite5 Findings at
+`docs/REWRITE_BUILD_MANAGERS_FINDINGS.md`:
+
+- `holdings` ALTER+UPDATE at `:513-532` retired — manager enrichment
+  now writes `holdings_v2` (repoint commit `1719320`) and
+  `backfill_manager_types.py` retargeted to `holdings_v2` (commit
+  `7b8a2b7`).
+- COALESCE preservation applied across all four enrichment columns
+  (`manager_type`, `inst_parent_name`, `is_passive`, `is_activist`) so
+  legacy 14-category taxonomy survives the repoint even though
+  `managers.strategy_type` from `fetch_adv.py` covers only ~60% of
+  CIKs (structural ADV filing gap — ~$25T+ AUM of non-ADV filers).
+- Pre-rewrite audit artifact: `holdings_v2_manager_type_legacy_snapshot_20260419`
+  created at commit `c2c2bac` (12,270,984 rows, 9,121 CIKs, 13 types) —
+  full point-in-time reference for rollback or diff validation.
+- Entity staging workflow (INF1) respected — `parent_bridge` and
+  `cik_crd_direct` promote as `pk_diff`; `managers` and
+  `cik_crd_links` promote as `rebuild` via the new `PROMOTE_KIND`
+  machinery in `promote_staging.py` (commit `6079220`).
+- `--dry-run` and `--staging` plumbed; try/except/pass at
+  `:515-521` replaced with explicit error handling.
+- `data_freshness` hook live on all rebuilt tables.
+
+Residual: 14,368 rows / 9 entities have `manager_type` NULL after
+backfill (not in `categorized_institutions_funds_v2.csv`, not
+ADV-covered) — logged as ongoing curation, not a regression.
+
+Original violations retained below for historical reference.
 
 - §1 (incremental save): **VIOLATION** — every target table is
   DROP+CREATE AS SELECT. No CHECKPOINT.
@@ -312,7 +363,29 @@ below for historical reference.
 
 ---
 
-## build_shares_history.py (REWRITE)
+## build_shares_history.py (REWRITE) — CLEARED 2026-04-19 (Rewrite1, d7ba1c2 / prod apply 443e37a)
+
+**CLEARED 2026-04-19** — Full rewrite + PROCESS_RULES retrofits landed
+at commit `d7ba1c2`, Phase 4 prod apply at `443e37a`. Rewrite1 Findings
+at `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md`:
+
+- Legacy `holdings` reads at `:161-164,:201-203` and
+  `holdings.pct_of_float` UPDATEs at `:177-184,:190-199` retired —
+  script no longer touches the dropped table. `--update-holdings`
+  gate removed.
+- `--dry-run` flag live alongside `--staging`; dry-run opens a
+  read-only connection and projects per-slice counts without writes.
+- Per-batch CHECKPOINT retrofit: every `_upsert_batch` call flushes
+  WAL, not just the two end-of-phase CHECKPOINTs.
+- `db.record_freshness` hook stamps `shares_history` at end-of-run.
+- Silent-continue on empty history replaced with explicit log +
+  propagated exit status.
+
+Deferred: period-accurate `pct_of_float` via ASOF JOIN in
+`enrich_holdings.py` Pass B tracked separately as
+**BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY** (see ROADMAP).
+
+Original violations retained below for historical reference.
 
 - §1 (incremental save): weak — `BATCH=1000` at
   `build_shares_history.py:74`, `_upsert_batch` commits, but only two

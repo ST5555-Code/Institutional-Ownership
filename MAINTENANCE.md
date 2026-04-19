@@ -169,3 +169,52 @@ All items below must go through the staging workflow:
 
 Drop original holdings / fund_holdings / beneficial_ownership tables.
 Authorized on or after **2026-05-09**. See `ROADMAP.md`.
+
+## Post-hoc Writer Ordering on `managers`
+
+Three scripts mutate the `managers` table in sequence, and later
+writers depend on the earlier writers' schema state:
+
+1. **`build_managers.py`** — canonical builder. DROP+CTAS rebuild;
+   materializes the base schema.
+2. **`fetch_13dg.py`** Phase 3 — runs after `build_managers.py`;
+   `ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN` + `UPDATE` to
+   stamp the 13D/G-filer flag.
+3. **`fetch_ncen.py`** — runs after `build_managers.py`; `ALTER
+   TABLE managers ADD COLUMN adviser_cik VARCHAR` + `UPDATE` from
+   `ncen_adviser_map`.
+
+The ordering is currently implicit — enforced only by the Makefile
+`quarterly-update` target and the scheduler that invokes it. There
+is no code-level sentinel that refuses to run `fetch_13dg` or
+`fetch_ncen` if `build_managers` has not run in the current cycle.
+
+**Hazard scenarios.**
+- If `build_managers.py` runs without `fetch_13dg.py` / `fetch_ncen.py`
+  afterward, `managers` ends the cycle with the base schema only —
+  `has_13dg` and `adviser_cik` are missing. Downstream readers that
+  expect either column will error.
+- If `fetch_13dg.py` or `fetch_ncen.py` runs before `build_managers.py`
+  in a cycle, the ALTER+UPDATE writes against the *previous cycle's*
+  `managers` table (`build_managers` uses DROP+CTAS, so every cycle
+  starts fresh). The writes succeed but are immediately overwritten
+  on the next `build_managers.py` invocation.
+
+**Current discipline.** Makefile + scheduler sequencing. Adequate for
+the quarterly cadence; the hazard window is narrow because the chain
+is automated end-to-end.
+
+**Follow-on candidates (not scheduled).**
+- (x) Sentinel check at top of `fetch_13dg.py` Phase 3 and
+  `fetch_ncen.py`: read `data_freshness('managers')` and fail if the
+  stamp is older than the current cycle's `build_managers.py` run.
+  Makes the ordering contract explicit at the code layer. Small fix,
+  straightforward.
+- (y) Document and rely on ops discipline (status quo). Accept the
+  hazard as bounded to manual out-of-sequence invocations.
+
+If writer ordering is ever bundled into broader convention-hardening
+work, fold into `INF31` (BLOCK-MARKET-DATA-WRITER-CONVENTION), which
+covers the analogous issue for `market_data` writers.
+
+This section captures the state, not a change.
