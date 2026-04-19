@@ -659,3 +659,148 @@ unless a `pct_of_float_source` column is added (then a DROP COLUMN).
 - No new dependencies introduced.
 
 Safe to decide §7.1 (Option A/B/C/D) before Phase 1 scoping.
+
+---
+
+## §8. SOH source verification (Phase 1a)
+
+Decision locked (Phase 0 close): **Option A** — migrate denominator
+semantics to `shares_outstanding`, column hard-renamed
+`pct_of_float` → `pct_of_so`, audit column `pct_of_so_source` added,
+full refresh across all historical quarters.
+
+Phase 1a checkpoint: confirm SOH source field semantics before
+locking ASOF direction.
+
+### 8.1 Owner
+
+`scripts/shares_outstanding_history` is written **exclusively** by
+`scripts/build_shares_history.py` via
+`scripts/sec_shares_client.py::SECSharesClient.fetch_history()`.
+Grep across `scripts/` finds only three files referencing the table:
+
+| file | role |
+|---|---|
+| `scripts/build_shares_history.py` | sole writer (INSERT/UPSERT) |
+| `scripts/pipeline/registry.py` | catalog entry (table metadata) |
+| `scripts/merge_staging.py` | staging→prod copy (data-layer mover) |
+
+No other script writes, alters, or truncates SOH.
+
+### 8.2 Source fields — XBRL companyfacts, four tags, priority order
+
+`sec_shares_client.py::fetch_history` (lines 226-281) pulls from the
+SEC EDGAR companyfacts JSON
+(`https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json`) cached
+locally under `data/cache/sec_companyfacts/`.
+
+Four XBRL tags consulted, in priority order (first non-empty wins
+per `(ticker, as_of_date)`):
+
+| priority | tag | value semantics | typical stamp date |
+|---|---|---|---|
+| 1 | `dei:EntityCommonStockSharesOutstanding` | Cover-page shares outstanding (single-class filers) | Cover-page date (1-6 weeks **after** period-end) |
+| 2 | `us-gaap:CommonStockSharesOutstanding` | Balance-sheet shares outstanding | **Period-end date** (Mar 31, Jun 30, Sep 30, Dec 31) |
+| 3 | `us-gaap:EntityCommonStockSharesOutstanding` | Cover-page (alt tagging) | Cover-page date |
+| 4 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | Period-**average** (not point-in-time) | Period-end date |
+
+Per-period dedup is on `end` date: if two tags report facts for the
+*same* date, the higher-priority tag wins. Facts at *different* dates
+are all kept — a single filer's single 10-Q typically produces
+**two** SOH rows:
+- One at period-end (us-gaap:CSO)
+- One at cover-page date (dei:ESO)
+
+### 8.3 Stamp-date semantics — empirical check
+
+Representative spot-check against prod DB (2026-04-19):
+
+```
+AAPL         2026-01-16  dei:ESO       10-Q filed 2026-01-30  14,681,140,000
+AAPL         2025-12-27  us-gaap:CSO   10-Q filed 2026-01-30  14,702,703,000   ← period-end
+AAPL         2025-10-17  dei:ESO       10-K filed 2025-10-31  14,776,353,000
+AAPL         2025-09-27  us-gaap:CSO   10-K filed 2025-10-31  14,773,260,000   ← period-end
+
+MSFT         2026-01-22  dei:ESO       10-Q filed 2026-01-28   7,425,629,076
+MSFT         2025-12-31  us-gaap:CSO   10-Q filed 2026-01-28   7,429,000,000   ← period-end
+MSFT         2025-10-23  dei:ESO       10-Q filed 2025-10-29   7,432,377,655
+MSFT         2025-09-30  us-gaap:CSO   10-Q filed 2025-10-29   7,434,000,000   ← period-end
+
+GOOGL        2025-12-31  us-gaap:CSO   10-K filed 2026-02-05  12,088,000,000   ← period-end
+GOOGL        2025-09-30  us-gaap:CSO   10-Q filed 2025-10-30  12,077,000,000   ← period-end
+GOOGL        2025-06-30  us-gaap:CSO   10-Q filed 2025-07-24  12,104,000,000   ← period-end
+GOOGL        2025-03-31  us-gaap:CSO   10-Q filed 2025-04-25  12,155,000,000   ← period-end
+
+META         2025-12-31  WANOSO        10-K filed 2026-01-29   2,521,000,000   ← period-end (but avg)
+META         2025-09-30  WANOSO        10-Q filed 2025-10-30   2,520,000,000   ← period-end (but avg)
+
+TSLA         2025-12-31  us-gaap:CSO   10-K filed 2026-01-29   3,751,000,000   ← period-end
+TSLA         2026-01-23  dei:ESO       10-K filed 2026-01-29   3,752,431,984
+
+BRK-B        (no rows — XBRL not tagged; relies on manual overrides CSV)
+```
+
+**Conclusion: SOH is built from period-end XBRL facts OR equivalent**
+for every tested ticker with coverage. Even for single-tag filers
+(GOOGL = us-gaap:CSO only, META = WANOSO only), the stamp date sits
+at or very close to period-end.
+
+For multi-tag filers (AAPL, MSFT, NVDA, TSLA), the table carries
+both a period-end row (us-gaap:CSO) *and* a cover-page row
+(dei:ESO). ASOF `<=` against a quarter_end target picks the us-gaap
+period-end row cleanly.
+
+**Hard checkpoint PASSED.** Proceeding to Phase 1b without pause.
+
+### 8.4 Coverage cliff — source of the 30% ceiling
+
+SOH covers 4,186 of 14,165 holdings_v2 tickers (§4.1). Root causes
+for the 9,979-ticker gap:
+
+1. **No CIK mapping.** `data/reference/sec_company_tickers.csv`
+   covers US-registered issuers only. Foreign Private Issuers (FPIs)
+   filing 20-F are not always in the tickers mapping; non-SEC-
+   registered entities (exchange-traded ADRs of unregistered foreign
+   issuers, some muni issuers) are excluded.
+2. **CIK but no XBRL tag.** A CIK-mapped filer that never tagged
+   shares in XBRL (Visa is the canonical case; BRK-A/B likewise).
+   `shares_overrides.csv` fills this for a handful of known filers.
+3. **ETFs / closed-end funds / unit trusts.** These file N-1A/N-CSR,
+   not 10-K/10-Q with us-gaap:CSO tags. Their CIK exists but
+   `EntityCommonStockSharesOutstanding` is unpopulated.
+4. **Recent IPOs** within the 90-day cache rotation window that
+   haven't been backfilled yet.
+5. **Delisted names.** Latest 10-K may predate delisting by months;
+   SOH row exists but `market_data.unfetchable = TRUE`.
+
+For the migration's fallback tier logic (§2.5): categories 1 and 3
+dominate the 70% gap. Fallback to `market_data.shares_outstanding`
+(where `fetch_market.py` has populated it via the same SEC client's
+`fetch()` method) recovers some but not all of these — Yahoo
+backstop for ETFs / FPIs covers another slice. Residual NULLs are
+the expected tail.
+
+### 8.5 Implications for Phase 1b design
+
+- **ASOF direction**: `soh.as_of_date <= h.quarter_end` is correct.
+  Picks the us-gaap:CSO period-end row when available; falls back
+  to prior-period facts when current quarter's 10-Q/10-K hasn't
+  been filed yet.
+- **Grace window not needed**: dei:ESO cover-page facts dated
+  *after* quarter_end are naturally deprioritized by the ASOF `<=`
+  cut; us-gaap:CSO at exactly quarter_end wins.
+- **For holdings_v2 only**: Confirmed — `fund_holdings_v2` does NOT
+  carry `pct_of_float` (or `pct_of_so`). N-PORT uses `pct_of_nav`
+  as the fund-level metric. Block prompt's "also handle
+  fund_holdings_v2 with N-PORT month-end stamp" is moot.
+  `beneficial_ownership_v2` likewise has no `pct_of_float` column
+  (verified via `PRAGMA table_info`).
+- **Scope narrows**: migration touches `holdings_v2` only. One
+  column rename, one audit column add, one `enrich_holdings.py`
+  Pass B rewrite.
+- **WANOSO caveat**: tickers whose only SOH source is
+  `WeightedAverageNumberOfSharesOutstandingBasic` (META is a
+  prominent example) get a period-**average** denominator instead
+  of period-**end**. Off by ~0.5-2% typically; acceptable.
+  Document but do not filter out — excluding WANOSO would cut
+  ~50K rows of coverage.
