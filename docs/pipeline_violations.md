@@ -326,7 +326,36 @@ below for historical reference.
 
 ---
 
-## compute_flows.py (REWRITE)
+## compute_flows.py (REWRITE) — CLEARED 2026-04-19 (Batch 3 close, 87ee955)
+
+**CLEARED 2026-04-19** — Work landed at commit `87ee955` on
+2026-04-16 ("feat: Batch 3 close — compute_flows + build_summaries
+rewrites + migration 004"), an ancestor of HEAD `bc43d25`. Precheck
+audit (main=`bc43d25`) confirmed:
+
+- Legacy `holdings` reads retired — script now reads `holdings_v2`
+  at `compute_flows.py:166,:178` (write path) and `:261,:268`
+  (dry-run projection). Docstring/help at `:388` also references
+  `holdings_v2`. `rg "FROM holdings\b" scripts/compute_flows.py`
+  returns 0 matches.
+- `--dry-run` flag live at `compute_flows.py:392` alongside existing
+  `--staging`; dry-run opens a read-only connection at `:402` and
+  projects per-slice row counts via `_project_period_flows()` with
+  no writes.
+- Per-(period × worldview) `CHECKPOINT` at `:435`, per-worldview
+  momentum `CHECKPOINT` at `:445`, per-worldview ticker-stats
+  `CHECKPOINT` at `:453`.
+- `db.record_freshness` hook at `:460–461` for both output tables
+  (`investor_flows`, `ticker_flow_stats`).
+- Line-buffered logging: `_Tee.line` at `:73–78` calls
+  `sys.stdout.flush()` after every write; log file opened with
+  `buffering=1` (line-buffered) at `:66`. Equivalent to `flush=True`
+  per write — no retrofit needed.
+- Error propagation via `try/finally` at `:487–496`; no silent
+  `except` clauses anywhere in the file.
+
+No Phase 1–4 rewrite work required. Original violations retained
+below for historical reference.
 
 - §9 (dry-run): **VIOLATION** — no `--dry-run`. `--staging` at `:256`
   exists.
