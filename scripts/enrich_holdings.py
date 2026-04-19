@@ -6,7 +6,8 @@ Owns the post-promote enrichment pass for:
   - holdings_v2.ticker
   - holdings_v2.security_type_inferred
   - holdings_v2.market_value_live
-  - holdings_v2.pct_of_float
+  - holdings_v2.pct_of_so               (renamed from pct_of_float in 008)
+  - holdings_v2.pct_of_so_source        (audit column added in 008)
   - fund_holdings_v2.ticker  (when --fund-holdings)
 
 Design notes:
@@ -20,6 +21,14 @@ Design notes:
     lookup-keyed-by-cusip pattern is safe even though
     (accession_number, cusip, quarter) is NOT unique on holdings_v2
     (~1.29M dup groups, ~4.97M rows).
+  * Pass B period-accuracy (BLOCK-PCT-OF-SO-PERIOD-ACCURACY, 2026-04-19):
+    pct_of_so denominator is the ASOF match from
+    `shares_outstanding_history` keyed by (ticker, as_of_date <= quarter_end)
+    — not `market_data.float_shares` (latest, period-agnostic). Fallback
+    tier when no SOH match: `market_data.shares_outstanding` (or
+    `float_shares` backstop). Each row is stamped with a
+    `pct_of_so_source` audit value: 'soh_period_accurate' or
+    'market_data_latest'.
   * D6 resolved as option (b): full refresh of historical rows on every
     run. Provide --quarter YYYYQN to scope to one quarter.
 
@@ -65,16 +74,99 @@ QUARTER_RE = re.compile(r"^\d{4}Q[1-4]$")
 # `cusip_classifications.canonical_type` (BOND/COM/OPTION/ETF/...) lives
 # in a different domain that the app's read-paths don't speak; introducing
 # it here would change ~12.27M rows for no downstream consumer.
+#
+# `md_shares_outstanding` / `md_float_shares` are the LATEST market_data
+# denominator columns, used only as fallback when SOH has no period
+# match for a (ticker, quarter_end) pair. Period-accurate pct_of_so
+# uses `shares_outstanding_history.shares` via ASOF JOIN in
+# `_pass_b_resolved_cte` below.
 _LOOKUP_SQL = """
     SELECT c.cusip,
            s.security_type_inferred,
            c.is_equity,
            CASE WHEN c.is_equity THEN s.ticker END AS new_ticker,
            md.price_live,
-           md.float_shares
+           md.shares_outstanding AS md_shares_outstanding,
+           md.float_shares       AS md_float_shares
       FROM cusip_classifications c
       LEFT JOIN securities  s  ON s.cusip = c.cusip
       LEFT JOIN market_data md ON md.ticker = s.ticker
+"""
+
+
+# Period-accurate denominator resolution for Pass B.
+#
+# For every distinct (cusip, report_date) pair in holdings_v2, resolve:
+#   - lookup columns (is_equity, ticker, price_live, md fallbacks)
+#   - SOH row at `as_of_date <= strptime(report_date)` (greatest prior)
+#
+# DuckDB ASOF LEFT JOIN keeps rows with no SOH match — those fall through
+# to the market_data fallback tier. Equality predicate `soh.ticker =
+# lookup.new_ticker` + inequality `soh.as_of_date <= qe` yields the latest
+# prior stamp for each (ticker, quarter_end) pair.
+#
+# The per-row UPDATE then joins holdings_v2 back to resolved on
+# (cusip, report_date). Multiple holdings_v2 rows with the same
+# (cusip, report_date) key (intentional dup groups) all receive the same
+# denominator — correct, since denominator is a ticker-level quantity.
+_RESOLVED_CTE = f"""
+    WITH lookup AS ({_LOOKUP_SQL}),
+    keys AS (
+        SELECT DISTINCT h.cusip, h.report_date,
+               strptime(h.report_date, '%d-%b-%Y')::DATE AS quarter_end
+          FROM holdings_v2 h
+         WHERE h.report_date IS NOT NULL
+           {{where_q_keys}}
+    ),
+    resolved AS (
+        SELECT k.cusip, k.report_date, k.quarter_end,
+               lookup.security_type_inferred,
+               lookup.is_equity,
+               lookup.new_ticker,
+               lookup.price_live,
+               lookup.md_shares_outstanding,
+               lookup.md_float_shares,
+               soh.shares     AS soh_shares,
+               soh.as_of_date AS soh_as_of_date
+          FROM keys k
+          JOIN lookup ON lookup.cusip = k.cusip
+          ASOF LEFT JOIN shares_outstanding_history soh
+            ON soh.ticker = lookup.new_ticker
+           AND soh.as_of_date <= k.quarter_end
+    )
+"""
+
+
+# pct_of_so value + source expressions, used by both project and apply.
+# Three-tier fallback:
+#   1. soh.shares > 0                       → 'soh_period_accurate'
+#   2. md_shares_outstanding > 0            → 'market_data_latest' (SO)
+#   3. md_float_shares > 0                  → 'market_data_latest' (float backstop)
+#   4. otherwise                            → NULL
+#
+# Tiers 2 and 3 share the 'market_data_latest' source value; the
+# numerator's semantic drift within that tier (shares_outstanding vs
+# float as backstop) is documented but not differentiated in the audit
+# flag, since both are "not period-accurate" from the consumer's
+# perspective.
+_POF_VALUE_EXPR = """
+    CASE
+        WHEN r.is_equity AND r.soh_shares             > 0
+            THEN h.shares * 100.0 / r.soh_shares
+        WHEN r.is_equity AND r.md_shares_outstanding  > 0
+            THEN h.shares * 100.0 / r.md_shares_outstanding
+        WHEN r.is_equity AND r.md_float_shares        > 0
+            THEN h.shares * 100.0 / r.md_float_shares
+        ELSE NULL
+    END
+"""
+_POF_SOURCE_EXPR = """
+    CASE
+        WHEN r.is_equity AND r.soh_shares             > 0 THEN 'soh_period_accurate'
+        WHEN r.is_equity AND r.md_shares_outstanding  > 0 THEN 'market_data_latest'
+        WHEN r.is_equity AND r.md_float_shares        > 0 THEN 'market_data_latest'
+        ELSE NULL
+    END
 """
 
 
@@ -122,7 +214,7 @@ def _pass_a_project(con, quarter: str | None) -> dict:
             COUNT(*) FILTER (WHERE ticker                 IS NOT NULL) AS ticker_clear,
             COUNT(*) FILTER (WHERE security_type_inferred IS NOT NULL) AS sti_clear,
             COUNT(*) FILTER (WHERE market_value_live      IS NOT NULL) AS mvl_clear,
-            COUNT(*) FILTER (WHERE pct_of_float           IS NOT NULL) AS pof_clear
+            COUNT(*) FILTER (WHERE pct_of_so              IS NOT NULL) AS pof_clear
         FROM holdings_v2
         WHERE cusip NOT IN (SELECT cusip FROM cusip_classifications)
           {where_q}
@@ -148,7 +240,8 @@ def _pass_a_apply(con, quarter: str | None) -> int:
            SET ticker                 = NULL,
                security_type_inferred = NULL,
                market_value_live      = NULL,
-               pct_of_float           = NULL
+               pct_of_so              = NULL,
+               pct_of_so_source       = NULL
          WHERE cusip NOT IN (SELECT cusip FROM cusip_classifications)
            {where_q}
         """,
@@ -169,77 +262,108 @@ def _pass_a_apply(con, quarter: str | None) -> int:
 # ---------------------------------------------------------------------------
 
 def _pass_b_project(con, quarter: str | None) -> dict:
-    """Project Pass B per-column changes and projected post-state populations."""
+    """Project Pass B per-column changes and projected post-state populations.
+
+    Uses the period-accurate ASOF-resolved CTE (SOH → market_data fallback).
+    Also returns per-source population counts and a staleness counter
+    (SOH matches older than 60 days relative to quarter_end).
+    """
     where_q = "AND h.quarter = ?" if quarter else ""
+    where_q_keys = "AND h.quarter = ?" if quarter else ""
     params = [quarter] if quarter else []
+    # Projection query uses the full resolved CTE. keys CTE needs its own
+    # where_q binding (same quarter value when scoped).
+    resolved_cte = _RESOLVED_CTE.format(where_q_keys=where_q_keys)
     row = con.execute(
         f"""
-        WITH lookup AS ({_LOOKUP_SQL}),
+        {resolved_cte},
         proj AS (
             SELECT
                 h.shares,
                 h.ticker                 AS old_ticker,
                 h.security_type_inferred AS old_sti,
                 h.market_value_live      AS old_mvl,
-                h.pct_of_float           AS old_pof,
-                lookup.new_ticker        AS new_ticker,
-                lookup.security_type_inferred AS new_sti,
-                CASE WHEN lookup.is_equity AND lookup.price_live IS NOT NULL
-                     THEN h.shares * lookup.price_live END AS new_mvl,
-                CASE WHEN lookup.is_equity AND lookup.float_shares > 0
-                     THEN h.shares * 100.0 / lookup.float_shares END AS new_pof
+                h.pct_of_so              AS old_pof,
+                h.pct_of_so_source       AS old_pof_source,
+                r.new_ticker,
+                r.security_type_inferred AS new_sti,
+                r.soh_shares,
+                r.soh_as_of_date,
+                r.quarter_end,
+                CASE WHEN r.is_equity AND r.price_live IS NOT NULL
+                     THEN h.shares * r.price_live END               AS new_mvl,
+                {_POF_VALUE_EXPR}                                   AS new_pof,
+                {_POF_SOURCE_EXPR}                                  AS new_pof_source
             FROM holdings_v2 h
-            JOIN lookup ON lookup.cusip = h.cusip
+            JOIN resolved r
+              ON r.cusip = h.cusip
+             AND r.report_date = h.report_date
             WHERE 1=1 {where_q}
         )
         SELECT
             COUNT(*) AS rows_in_scope,
-            COUNT(*) FILTER (WHERE old_ticker IS DISTINCT FROM new_ticker) AS ticker_changes,
-            COUNT(*) FILTER (WHERE old_sti    IS DISTINCT FROM new_sti)    AS sti_changes,
-            COUNT(*) FILTER (WHERE old_mvl    IS DISTINCT FROM new_mvl)    AS mvl_changes,
-            COUNT(*) FILTER (WHERE old_pof    IS DISTINCT FROM new_pof)    AS pof_changes,
-            COUNT(*) FILTER (WHERE new_ticker IS NOT NULL) AS ticker_post,
-            COUNT(*) FILTER (WHERE new_sti    IS NOT NULL) AS sti_post,
-            COUNT(*) FILTER (WHERE new_mvl    IS NOT NULL) AS mvl_post,
-            COUNT(*) FILTER (WHERE new_pof    IS NOT NULL) AS pof_post
+            COUNT(*) FILTER (WHERE old_ticker     IS DISTINCT FROM new_ticker)     AS ticker_changes,
+            COUNT(*) FILTER (WHERE old_sti        IS DISTINCT FROM new_sti)        AS sti_changes,
+            COUNT(*) FILTER (WHERE old_mvl        IS DISTINCT FROM new_mvl)        AS mvl_changes,
+            COUNT(*) FILTER (WHERE old_pof        IS DISTINCT FROM new_pof)        AS pof_changes,
+            COUNT(*) FILTER (WHERE old_pof_source IS DISTINCT FROM new_pof_source) AS pof_source_changes,
+            COUNT(*) FILTER (WHERE new_ticker     IS NOT NULL)                      AS ticker_post,
+            COUNT(*) FILTER (WHERE new_sti        IS NOT NULL)                      AS sti_post,
+            COUNT(*) FILTER (WHERE new_mvl        IS NOT NULL)                      AS mvl_post,
+            COUNT(*) FILTER (WHERE new_pof        IS NOT NULL)                      AS pof_post,
+            COUNT(*) FILTER (WHERE new_pof_source = 'soh_period_accurate')          AS pof_source_soh,
+            COUNT(*) FILTER (WHERE new_pof_source = 'market_data_latest')           AS pof_source_md,
+            COUNT(*) FILTER (
+                WHERE new_pof_source = 'soh_period_accurate'
+                  AND soh_as_of_date IS NOT NULL
+                  AND (quarter_end - soh_as_of_date) > 60
+            )                                                                       AS pof_stale_gt60
         FROM proj
         """,
-        params,
+        params + params,  # where_q_keys + where_q
     ).fetchone()
     return {
-        "rows_in_scope":  row[0],
-        "ticker_changes": row[1],
-        "sti_changes":    row[2],
-        "mvl_changes":    row[3],
-        "pof_changes":    row[4],
-        "ticker_post":    row[5],
-        "sti_post":       row[6],
-        "mvl_post":       row[7],
-        "pof_post":       row[8],
+        "rows_in_scope":      row[0],
+        "ticker_changes":     row[1],
+        "sti_changes":        row[2],
+        "mvl_changes":        row[3],
+        "pof_changes":        row[4],
+        "pof_source_changes": row[5],
+        "ticker_post":        row[6],
+        "sti_post":           row[7],
+        "mvl_post":           row[8],
+        "pof_post":           row[9],
+        "pof_source_soh":     row[10],
+        "pof_source_md":      row[11],
+        "pof_stale_gt60":     row[12],
     }
 
 
 def _pass_b_apply(con, quarter: str | None) -> int:
-    """Run Pass B: cusip-keyed UPDATE...FROM (lookup) populating Group 3."""
+    """Run Pass B: period-accurate ASOF UPDATE populating Group 3 + pof audit."""
     where_q = "AND h.quarter = ?" if quarter else ""
+    where_q_keys = "AND h.quarter = ?" if quarter else ""
     params = [quarter] if quarter else []
+    resolved_cte = _RESOLVED_CTE.format(where_q_keys=where_q_keys)
+    # resolved is a CTE, so UPDATE ... FROM pulls from it. DuckDB supports
+    # WITH ... UPDATE ... FROM <cte-name> syntax.
     con.execute(
         f"""
+        {resolved_cte}
         UPDATE holdings_v2 AS h
-           SET ticker                 = lookup.new_ticker,
-               security_type_inferred = lookup.security_type_inferred,
-               market_value_live      = CASE WHEN lookup.is_equity
-                                              AND lookup.price_live IS NOT NULL
-                                             THEN h.shares * lookup.price_live END,
-               pct_of_float           = CASE WHEN lookup.is_equity
-                                              AND lookup.float_shares > 0
-                                             THEN h.shares * 100.0
-                                                  / lookup.float_shares END
-          FROM ({_LOOKUP_SQL}) AS lookup
-         WHERE h.cusip = lookup.cusip
+           SET ticker                 = r.new_ticker,
+               security_type_inferred = r.security_type_inferred,
+               market_value_live      = CASE WHEN r.is_equity
+                                              AND r.price_live IS NOT NULL
+                                             THEN h.shares * r.price_live END,
+               pct_of_so              = {_POF_VALUE_EXPR},
+               pct_of_so_source       = {_POF_SOURCE_EXPR}
+          FROM resolved r
+         WHERE h.cusip = r.cusip
+           AND h.report_date = r.report_date
            {where_q}
         """,
-        params,
+        params + params,  # where_q_keys + where_q
     )
     return con.execute(
         f"""
@@ -352,7 +476,7 @@ def _baseline_h(con, quarter: str | None) -> dict:
             COUNT(*) FILTER (WHERE ticker                 IS NOT NULL),
             COUNT(*) FILTER (WHERE security_type_inferred IS NOT NULL),
             COUNT(*) FILTER (WHERE market_value_live      IS NOT NULL),
-            COUNT(*) FILTER (WHERE pct_of_float           IS NOT NULL)
+            COUNT(*) FILTER (WHERE pct_of_so              IS NOT NULL)
         FROM holdings_v2
         {where_q}
         """,
@@ -410,17 +534,22 @@ def _print_pass_a(log: _Tee, proj: dict) -> None:
 
 def _print_pass_b(log: _Tee, proj: dict) -> None:
     """Emit Pass B (main enrichment) projection block."""
-    log.line("Pass B — Main enrichment on holdings_v2 (cusip-keyed lookup)")
+    log.line("Pass B — Main enrichment on holdings_v2 "
+             "(cusip-keyed lookup + ASOF SOH)")
     log.line(f"  rows in scope (equity-classifiable cusip) : {proj['rows_in_scope']:>14,}")
-    log.line(f"  ticker changes                            : {proj['ticker_changes']:>14,}")
-    log.line(f"  sti    changes                            : {proj['sti_changes']:>14,}")
-    log.line(f"  mvl    changes                            : {proj['mvl_changes']:>14,}")
-    log.line(f"  pof    changes                            : {proj['pof_changes']:>14,}")
+    log.line(f"  ticker      changes                       : {proj['ticker_changes']:>14,}")
+    log.line(f"  sti         changes                       : {proj['sti_changes']:>14,}")
+    log.line(f"  mvl         changes                       : {proj['mvl_changes']:>14,}")
+    log.line(f"  pct_of_so   changes                       : {proj['pof_changes']:>14,}")
+    log.line(f"  pof_source  changes                       : {proj['pof_source_changes']:>14,}")
     log.line("  projected post-state in scope:")
-    log.line(f"    ticker populated : {proj['ticker_post']:>14,}")
-    log.line(f"    sti    populated : {proj['sti_post']:>14,}")
-    log.line(f"    mvl    populated : {proj['mvl_post']:>14,}")
-    log.line(f"    pof    populated : {proj['pof_post']:>14,}")
+    log.line(f"    ticker             populated        : {proj['ticker_post']:>14,}")
+    log.line(f"    sti                populated        : {proj['sti_post']:>14,}")
+    log.line(f"    mvl                populated        : {proj['mvl_post']:>14,}")
+    log.line(f"    pct_of_so          populated        : {proj['pof_post']:>14,}")
+    log.line(f"      via soh_period_accurate           : {proj['pof_source_soh']:>14,}")
+    log.line(f"      via market_data_latest (fallback) : {proj['pof_source_md']:>14,}")
+    log.line(f"    SOH matches with staleness > 60 days : {proj['pof_stale_gt60']:>14,}")
 
 
 def _print_pass_c(log: _Tee, baseline_fh: dict, proj: dict) -> None:
