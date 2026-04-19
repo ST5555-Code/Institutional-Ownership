@@ -132,6 +132,11 @@ def main():
            "ticker")
 
     # ── 3. Ticker + latest-quarter ─────────────────────────────────────────
+    create("shares_outstanding_history",
+           f"""SELECT * FROM prod.shares_outstanding_history
+               WHERE ticker IN ({tickers_sql})""",
+           "ticker, as_of_date")
+
     create("holdings_v2",
            f"""SELECT * FROM prod.holdings_v2
                WHERE ticker IN ({tickers_sql}) AND quarter = '{quarter}'""",
