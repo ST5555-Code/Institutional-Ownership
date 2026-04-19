@@ -344,3 +344,211 @@ they just have an unknown provenance. Decision required in Phase 1
 (§6.4), not a stop condition.
 
 Proceeding to Phase 1 on sign-off.
+
+---
+
+## 9. Addendum — `other_managers` ghost data investigation
+
+Follow-up read-only investigation. Hypothesis entering: an earlier
+iteration of `load_13f.py` (or a sibling script) wrote `other_managers`
+and the path was removed or refactored out, leaving the registry claim
+stale and the data orphaned. **Result: that hypothesis is wrong.** No
+committed code — retired, renamed, or otherwise — has ever written
+`other_managers`. The data is real and sourced from
+`OTHERMANAGER2.tsv`, but the load was performed out-of-band (REPL or
+one-shot script never checked in).
+
+### 9.1 Git history
+
+Full-history searches (all branches, all files) for the writer signals:
+
+| Query | Matching commits |
+|---|---|
+| `git log --all --oneline -S "other_managers" -- scripts/` | **1 commit:** `3816577` (pipeline-framework foundation) |
+| `git log --all --oneline -S "other_managers" -- docs/` | 3 commits (all docs-only: `0ffb093`, `cdf2cae`, `3816577`) |
+| `git log --all --oneline -S "INSERT INTO other_managers"` | **0 commits** |
+| `git log --all --oneline -S "CREATE TABLE other_managers"` | **0 commits** |
+| `git log --all --oneline -S "OTHERMANAGER.tsv"` | 0 commits (only added in `0ffb093` findings doc) |
+| `git log --all --oneline -S "OTHERMANAGER2.tsv"` | 0 commits (same) |
+| `git log --all --diff-filter=D --name-only -S "other_managers"` | **0 deleted files** |
+
+Inspection of `3816577` (Apr 13, 2026 — "feat: pipeline framework
+foundation"): the only script-side addition was the new
+`DatasetSpec("other_managers", ..., owner="scripts/load_13f.py", ...)`
+entry in `scripts/pipeline/registry.py:174` (line 1342 of that commit's
+diff). The registry entry was a **declarative owner claim based on
+context (13F-shaped data, load_13f looked like the closest fit)**, not
+a refactor of an existing writer. No CREATE or INSERT statement was
+added or removed in that commit or anywhere else in history.
+
+Commit `4105689` ("N-PORT pipeline built and tested") mentions
+`OTHERMANAGER` only as the uppercase column name inside the
+`INSERT INTO raw_infotable` projection (the `OTHERMANAGER` source
+column at `scripts/load_13f.py:71`), which is an unrelated scalar
+field on `INFOTABLE.tsv`, not the `other_managers` table.
+
+Non-commit references in the working tree:
+
+| Path | Line | Nature |
+|---|---|---|
+| `scripts/pipeline/registry.py` | 174 | declarative owner claim (from `3816577`) |
+| `docs/data_layers.md` | 105 | documentation claim (from `3816577`) |
+| `docs/canonical_ddl.md` | 40, 326 | documentation claim (from `3816577`) |
+| `notebooks/research.ipynb` | 21 | non-writer — listed in a static `DESCRIBE` enumeration of available tables |
+| `docs/REWRITE_LOAD_13F_FINDINGS.md` | multiple | this finding |
+| `scripts/load_13f.py` | 71 | `OTHERMANAGER` scalar column on `INFOTABLE.tsv`, unrelated to the `other_managers` table |
+
+### 9.2 Retired scripts
+
+`scripts/retired/` contents: `build_cusip_legacy.py`, `fetch_nport.py`,
+`unify_positions.py`. Grep for `other_managers` across all three:
+**no hits.** None of the retired scripts ever referenced the table.
+
+### 9.3 SQL / migration files
+
+No `*.sql` files in the repo (`rg --glob '*.sql' OTHERMANAGER` → zero).
+Migration scripts under `scripts/migrations/` (001–007 plus
+`add_last_refreshed_at.py`) do not create or populate
+`other_managers`. No CREATE TABLE DDL for it exists anywhere.
+
+### 9.4 Prod data forensics
+
+Row-count parity against the source TSV:
+
+| Quarter | `other_managers` rows | `OTHERMANAGER2.tsv` rows | Match |
+|---|---:|---:|---|
+| 2025Q1 | 3,811 | 3,811 | **exact** |
+| 2025Q2 | 3,910 | 3,910 | **exact** |
+| 2025Q3 | 3,759 | 3,759 | **exact** |
+| 2025Q4 | 3,925 | 3,925 | **exact** |
+
+Exact per-quarter match across all four quarters. The prod table is a
+direct 1:1 copy of `OTHERMANAGER2.tsv` (not `OTHERMANAGER.tsv`, which
+has ~25% more rows: Q4 = 4,751).
+
+Accession-level sanity:
+
+- `COUNT(DISTINCT accession_number)` = 4,817 (vs 43,358 filings) —
+  only ~11% of filings disclose co-filed other managers, consistent
+  with real-world 13F co-filing patterns.
+- All 15,405 rows have a matching accession in `filings` (EXISTS
+  check returns 15,405/15,405).
+- Per-accession row count averages ~3.2, with max observed sequence
+  numbers in the single digits — consistent with a small number of
+  co-filers per filing.
+
+Sample rows (heads of 2025Q4):
+
+```
+0002056656-26-000004 | 1 | NULL | NULL | 000316475 | 801-122390 | Brooklyn Investment Group
+0002056656-26-000004 | 3 | NULL | NULL | 000107038 | 801-21011  | JP Morgan Asset Management
+0000919574-26-001412 | 1 | 0001946122 | 028-22661 | NULL | NULL | Kosmin Fund Ltd
+```
+
+No timestamp column exists (`DESCRIBE other_managers` returns 8
+columns, all VARCHAR, no ingestion timestamp). No way to directly
+date the writes from the data, but row-count parity with the static
+quarterly TSV rules out any recent incremental writer — whoever ran
+the load did so quarterly with the complete TSV bundle.
+
+### 9.5 Schema lineage
+
+`OTHERMANAGER2.tsv` header:
+
+```
+ACCESSION_NUMBER  SEQUENCENUMBER  CIK  FORM13FFILENUMBER  CRDNUMBER  SECFILENUMBER  NAME
+```
+
+Prod `other_managers` schema:
+
+```
+accession_number  sequence_number  other_cik  form13f_file_number  crd_number  sec_file_number  name  quarter
+```
+
+1:1 column mapping with `CIK` → `other_cik` (renamed to disambiguate
+from the filer's CIK) and a `quarter` tag appended. Identical to the
+style used by `load_13f.py`'s existing `INSERT INTO raw_submissions`
+projection at `:41-52`. The missing write path would fit naturally as
+a fourth SEC-TSV loader inside `load_quarter()`.
+
+Contrast with `OTHERMANAGER.tsv`: 7 columns headed
+`ACCESSION_NUMBER OTHERMANAGER_SK CIK FORM13FFILENUMBER CRDNUMBER SECFILENUMBER NAME` —
+different second column (`OTHERMANAGER_SK` vs `SEQUENCENUMBER`) and
+25% higher row counts. The table does **not** derive from this TSV.
+
+### 9.6 Classification
+
+**Scenario A (with qualifier): historical writer identifiable but
+never checked in.** The original logic is trivially recoverable — it
+is a column-rename projection over `OTHERMANAGER2.tsv` with the
+same `quarter` tag used elsewhere in `load_13f.py`. But there is no
+retired script, no git commit, and no notebook that performed the
+load. The writer was ad-hoc (REPL or uncommitted local script) and
+the table has been sitting in prod unmaintained since at least
+2025Q1 (earliest quarter with data).
+
+Neither Scenario B (logic unclear) nor Scenario C (no trace) nor
+Scenario D (derivable from a live table) fit. The data has a clear
+TSV lineage; it just was never captured as code.
+
+### 9.7 Recommendation
+
+**Option (A) — add write path to `load_13f.py`.** Scope in Phase 1:
+
+1. Extend `load_quarter(con, quarter)` to load a fourth TSV
+   (`OTHERMANAGER2.tsv`) into `other_managers` using the same
+   pattern as `raw_submissions` / `raw_infotable` / `raw_coverpage`
+   (column-rename projection + `quarter` tag). Est. ~25 LOC mirroring
+   the existing INSERT blocks.
+2. Add `other_managers` to `create_staging_tables(con)` (`:108-158`)
+   with the observed 8-column schema.
+3. Add `other_managers` to `prepare_incremental(con, quarter)`
+   (`:164-177`) so `--quarter` reload works.
+4. Add `other_managers` to `print_summary(con)` (`:293`).
+5. Add `other_managers` to the `data_freshness` retrofit (R2) along
+   with the other five tables.
+6. Leave `OTHERMANAGER.tsv` (the `_SK`-keyed variant) unloaded —
+   prod does not use it and it would be a new surface.
+
+Validation in Phase 1:
+
+- Dry run: row counts per quarter match prior table exactly
+  (3,811 / 3,910 / 3,759 / 3,925).
+- Staging full load: `other_managers` row count in staging DB
+  matches prod (15,405) after loading all four quarters.
+- Downstream: zero live readers (§3), so no consumer regression
+  check required. Just row-count + schema match.
+
+Not recommended:
+
+- **Option (B) reassign owner:** no other script is a better
+  owner. The TSV is part of the 13F EDGAR bundle and the only
+  existing TSV-to-DB loader for that bundle is `load_13f.py`.
+- **Option (C) retire the table:** no evidence the data is unused
+  in downstream analysis (zero code readers does not prove zero
+  analytical / notebook readers). Cheaper to make it maintained
+  than to retire and risk a future need.
+
+### 9.8 Guardrail check
+
+- Git log volume: 4 commits total touching `other_managers`, all
+  identifiable as registry/docs additions or this audit. Not the
+  ">20 commits" ghost-with-complex-history trigger.
+- Recent writes check: no timestamp column, but row-count parity
+  with the static TSV bundle means the writes are quarterly
+  snapshots, not active. 2025Q4 was populated from the 2025Q4 TSV
+  at some point between EDGAR publication (late Oct 2025) and now.
+  No evidence of an active unknown writer.
+
+### 9.9 Phase 1 scope impact
+
+Net addition to Phase 1 scope (small):
+
+- `+other_managers` CREATE, INSERT, DELETE, summary line, and
+  freshness stamp in `load_13f.py`.
+- `+other_managers` staging validation in the test plan.
+- No change to registry (`scripts/pipeline/registry.py:174`
+  already correctly names `load_13f.py` as owner — the claim simply
+  becomes true in Phase 1).
+- No change to `docs/canonical_ddl.md` or `docs/data_layers.md`.
+
