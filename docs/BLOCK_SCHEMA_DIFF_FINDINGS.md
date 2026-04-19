@@ -463,3 +463,175 @@ Recommendation: start narrow (only the three in §7.4); expand only when Phase 2
 ---
 
 _End of Phase 0 findings. No code changes, no DB writes, no migrations. Findings doc is the only artifact._
+
+---
+
+## §11. Phase 0.5 — Staging rebuild dry-run (2026-04-19)
+
+Phase 0 picked Option B (remediate all §3 drift before the script ships) as the recommended v1 seed. Phase 0.5 dry-runs that rebuild — produces the plan, surfaces surprises, does not modify either DB. The Phase 1 prompt then either approves the plan or splits into Phase 1a (rebuild) + Phase 1b (script).
+
+### §11.1 Strategy selection
+
+Three candidates evaluated against the 13 divergent tables:
+
+| Strategy | Fidelity | Control | Time | Verdict |
+|----------|----------|---------|------|---------|
+| **A** — CTAS + manually re-apply indexes/constraints | Partial — same class of loss that produced the current state | Low | Fastest | **Rejected** — reproduces the root cause |
+| **B** — `EXPORT DATABASE prod` → drop staging → import | Full-fidelity IF DuckDB EXPORT preserves indexes + constraints + defaults; needs verification against our version | Medium — all-or-nothing | Large — exports full prod (14.5 GB), re-imports | **Rejected** — coarse grain, binds all 55 prod tables and all snapshots into one operation, no per-table rollback |
+| **C** — Per-table capture-and-recreate: capture `duckdb_tables().sql` + `duckdb_indexes().sql` + `duckdb_constraints()`, DROP + recreate from captured DDL, `INSERT ... SELECT * FROM p.t` via ATTACH | Full-fidelity (DuckDB's own DDL strings round-trip cleanly — verified on `holdings_v2` sample) | High — per-table, per-dimension, transactional | Comparable to B but with per-table commit points | **Recommended** |
+
+**Strategy C chosen.** Identical mechanism to the migration 008 capture-and-recreate pattern (`ea4ae99`) already proven on the pct-of-so Phase 4 prod apply. Reuses validated idiom; no new infrastructure.
+
+Sample of captured DDL cleanliness (from `/tmp/schema_diff_rebuild_capture.pkl`):
+
+- `duckdb_tables().sql` returns a valid `CREATE TABLE ...(...)` that re-executes without edits.
+- `duckdb_indexes().sql` returns `CREATE INDEX ... ON t(...);` verbatim, including composite column order and quoted reserved words (`"quarter"`).
+- `duckdb_constraints().constraint_text` returns usable PK column lists (`PRIMARY KEY(series_id)`, `PRIMARY KEY(ticker, as_of_date)`); NOT NULL rows are column-less and must be paired with §2.1 `is_nullable` — acceptable because NOT NULL is embedded in the table-level CTAS output already.
+
+### §11.2 Data-preservation audit
+
+For each L3 table, classified as **MIRROR** (staging row count equals prod, safe to drop and reload) or **DRIFT** (staging diverges; rebuild loses or masks data).
+
+| Table | Prod rows | Stg rows | Δ | Classification |
+|-------|-----------|----------|---|----------------|
+| `holdings_v2` | 12,270,984 | 12,270,984 | 0 | MIRROR |
+| `fund_holdings_v2` | 14,090,397 | 14,090,397 | 0 | MIRROR |
+| `beneficial_ownership_v2` | 51,905 | 51,905 | 0 | MIRROR |
+| `securities` | 430,149 | 430,149 | 0 | MIRROR |
+| `market_data` | 10,064 | 10,064 | 0 | MIRROR |
+| `short_interest` | 328,595 | 328,595 | 0 | MIRROR |
+| `fund_universe` | 12,870 | 12,870 | 0 | MIRROR |
+| `shares_outstanding_history` | 338,053 | 338,053 | 0 | MIRROR |
+| `adv_managers` | 16,606 | 16,606 | 0 | MIRROR |
+| `ncen_adviser_map` | 11,209 | 11,106 | +103 | DRIFT (prod ahead — normal) |
+| `filings` | 43,358 | 43,358 | 0 | MIRROR |
+| `filings_deduped` | 40,140 | 40,140 | 0 | MIRROR |
+| `cusip_classifications` | 430,149 | 430,149 | 0 | MIRROR |
+| `_cache_openfigi` | 15,807 | **16,291** | **−484** | **DRIFT (STAGING AHEAD)** — surprise S1 |
+| `entities` | 26,535 | 26,535 | 0 | MIRROR |
+| `entity_identifiers` | 35,444 | 35,444 | 0 | MIRROR |
+| `entity_relationships` | 18,365 | 18,365 | 0 | MIRROR |
+| `entity_aliases` | 26,874 | 26,874 | 0 | MIRROR |
+| `entity_classification_history` | 26,595 | 26,595 | 0 | MIRROR |
+| `entity_rollup_history` | 59,804 | 59,804 | 0 | MIRROR |
+| `entity_overrides_persistent` | 245 | 245 | 0 | MIRROR |
+| `cik_crd_direct` | 4,059 | 4,059 | 0 | MIRROR |
+| `cik_crd_links` | 353 | 353 | 0 | MIRROR |
+| `lei_reference` | 13,143 | 13,143 | 0 | MIRROR |
+| `other_managers` | 15,405 | 15,405 | 0 | MIRROR |
+| `parent_bridge` | 11,135 | 11,135 | 0 | MIRROR |
+| `fetched_tickers_13dg` | 6,075 | **0** | +6,075 | DRIFT (staging empty; prod-only progress marker) |
+| `listed_filings_13dg` | 60,247 | **0** | +60,247 | DRIFT (staging empty; prod-only progress marker) |
+| `entity_identifiers_staging` | 3,503 | 3,503 | 0 | MIRROR (but intentionally staging-only class — see below) |
+| `entity_relationships_staging` | 0 | 0 | 0 | MIRROR (empty on both sides) |
+
+Totals: **26 MIRROR / 4 DRIFT** across the 30 L3 tables.
+
+**`*_staging` companions.** `entity_identifiers_staging` + `entity_relationships_staging` straddle the L3 line — they are soft-landing queues, not prod canonical. In Phase 0 they appeared in the divergence count because their DDL diverged (missing indexes + NOT NULL on staging). For the rebuild:
+
+- Their data is mirrored today (3,503 = 3,503; 0 = 0).
+- Their purpose is exactly to hold staging-only rows pending review; rebuilding them from prod is semantically correct at the moment but could destroy pending queue items in the future.
+- **Rebuild decision:** include in this pass (they currently mirror), but document that future rebuilds must inspect queue contents before dropping. Add a pre-flight row-diff check to the Phase 1 script.
+
+**Scope-unique tables (prod-only):** `fund_best_index`, `fund_classification`, `fund_index_scores`, `fund_name_map`, `index_proxies`, `investor_flows`, `peer_groups`, `summary_by_ticker`, `ticker_flow_stats` — all L4 derived; out of this block's rebuild scope. Flagged to INF45.
+
+**Scope-unique tables (staging-only):** `stg_13dg_filings`, `stg_nport_fund_universe`, `stg_nport_holdings` — pipeline staging prefix, out of L3 scope. No action.
+
+**Dependencies constraining rebuild order.** No foreign keys declared anywhere in the codebase (codebase policy; see `docs/data_layers.md` §10 and `scripts/pipeline/shared.entity_gate_check()`). So ordering is not semantically required, but for safety we order entity MDM core tables (`entities` first, then identifiers/relationships/aliases/classification/rollup/overrides) before anything that references `entity_id`. Fact tables last. Order matters only for crash recovery, not correctness.
+
+### §11.3 Per-table rebuild plan — estimated wall clock
+
+Rough scale based on row count and observed DuckDB INSERT-from-ATTACH throughput (~5M rows/min/core on sequential columnar copy, based on prior migration runs):
+
+| Tier | Row range | Tables | Est. per-table time |
+|------|-----------|--------|---------------------|
+| XL | ≥ 10M | `holdings_v2` (12.3M), `fund_holdings_v2` (14.1M) | 2–3 min each |
+| L | 1M–10M | none | — |
+| M | 100K–1M | `securities`, `cusip_classifications` (each 430K), `shares_outstanding_history` (338K), `short_interest` (329K) | 5–20 s each |
+| S | 10K–100K | 11 tables | 1–5 s each |
+| XS | < 10K | 13 tables | < 1 s each |
+
+**Estimated total wall clock: 6–8 minutes** for the data copy.
+DDL capture + drop + recreate phase: < 30 seconds (tiny).
+Post-check queries (row counts): <30 seconds total.
+CHECKPOINT at end: 30–60 seconds to flush 4 GB+ to disk.
+
+**Aggregate envelope: 8–10 minutes wall clock.**
+
+Per-table rebuild shape (applied uniformly via Strategy C):
+
+```
+-- per table t
+SELECT COUNT(*) FROM p.t;           -- pre-check
+DROP INDEX IF EXISTS idx1; ...      -- drop captured indexes
+DROP TABLE IF EXISTS t;
+<captured CREATE TABLE t(...) ;>    -- from duckdb_tables().sql
+<captured CREATE INDEX ... ;> ...   -- from duckdb_indexes().sql
+INSERT INTO t SELECT * FROM p.t;    -- data reload via ATTACH
+SELECT COUNT(*) FROM t;             -- post-check
+-- verify row count matches, index count matches, column list matches
+```
+
+**Full per-table SQL generated to:** `docs/SCHEMA_DIFF_PHASE_0_5_REBUILD_DRY_RUN.sql` (641 lines, all 30 tables, human-reviewable, not executable until Phase 1 authorization).
+
+### §11.4 Surprises
+
+**S1 — `_cache_openfigi` is AHEAD on staging (+484 rows).** OpenFIGI cache on staging has accreted entries that prod does not have. Cache is durable by design (`docs/data_layers.md` §2: "Durable cache; survives re-runs"). Dropping staging and reloading from prod would destroy 484 resolved CUSIP cache entries.
+
+*Proposed handling:* **do not drop `_cache_openfigi` in the rebuild.** Instead, (a) drop and recreate only its indexes (there are none on prod or staging for this table, so nothing to do) and (b) treat it as an exception — the table-level DDL on staging should be rewritten to match prod via ALTER TABLE or column-level introspection, preserving all existing rows. Alternatively, back-merge staging rows into prod first (out of block scope). Serge to decide.
+
+**S2 — `ncen_adviser_map` prod ahead (+103 rows).** Normal — prod carries the DM15b scoped fetch (commit `9ce5b17`); staging was not updated. Not a rebuild surprise; staging gains the 103 rows after rebuild. No action beyond note.
+
+**S3 — `fetched_tickers_13dg` + `listed_filings_13dg` empty on staging.** These are prod-only 13D/G progress markers; staging has never run the 13D/G fetch. Rebuild loads 66,322 rows into staging where currently there are zero. *Proposed handling:* proceed — staging should mirror prod on canonical L3 tables, progress markers included. No data loss.
+
+**S4 — `holdings_v2` DDL already reflects pct-of-so migration 008.** Captured DDL shows `pct_of_so DOUBLE` and `pct_of_so_source VARCHAR` — migration 008 applied to prod on 2026-04-19 (commit `ea4ae99`). Staging was renamed in Phase 1b per the rewrite block. No action; confirmation only.
+
+**S5 — `entity_overrides_persistent` defaults use `nextval('override_id_seq')` + `now()`.** The sequence exists on both DBs (verified §3.5). DDL round-trip is clean; no action.
+
+**S6 — `entity_relationships_staging` zero rows on both DBs but has its own DDL drift.** Empty on both sides, but DDL is what we're remediating. No data consideration; proceed normally.
+
+**S7 — DuckDB `duckdb_tables().sql` trailing semicolon produces double `;;` when we append our own delimiter.** Cosmetic only; cleaned in the dry-run SQL file by a post-processing pass. Phase 1 script needs the same normalization.
+
+**Count: 7 surprises. None of them are rebuild-blocking. S1 is the only one requiring a genuine policy decision; the rest are cosmetic or informational.**
+
+### §11.5 Risk assessment
+
+| Risk | Assessment | Mitigation |
+|------|-----------|-----------|
+| Disk headroom | **Low**. Staging is 3.93 GB; prod is 14.5 GB; free space 113 GB. Peak disk during rebuild (staging holds old table + new table briefly, plus checkpoint WAL): ≤ 8 GB additional. | None needed. |
+| Interruptibility | **Single-transaction** (Strategy C inside one `BEGIN/COMMIT`): atomic but no partial recovery. **Per-table transactions** (recommended for long tables): recoverable mid-rebuild at table boundary. | Recommend per-table commits for XL tables. |
+| Rollback | `ROLLBACK` reverts the in-flight transaction. If staging file corrupts, restore from a pre-rebuild backup copy of `13f_staging.duckdb`. | **Mandatory pre-rebuild step:** `cp data/13f_staging.duckdb data/13f_staging.duckdb.pre_inf39_backup`. |
+| Data loss — `_cache_openfigi` S1 | **Real.** 484 cache entries destroyed by naive drop+reload. | Skip the drop for this table; remediate its DDL via ALTER or column-level introspection. |
+| Data loss — staging-unique | None beyond S1. `*_staging` companions mirror today; `stg_*` pipeline tables are out of scope. | Verify at rebuild time with row-count diff. |
+| Pipeline in-flight at rebuild time | Staging may be written by `sync → diff → promote` flow when rebuild runs. | Coordinate rebuild window; block is paused, no active sync. |
+| DuckDB DDL round-trip edge cases | Whitespace / quoting tested clean on `holdings_v2`; not exhaustively tested on all 30. | Phase 1 verifies per-table column list + index count + sample row equality as rebuild post-check. |
+| Sequences state | Sequences (`override_id_seq` etc.) are DB-global, not per-table. Dropping + recreating tables does not affect sequence state. | No action. |
+
+### §11.6 Go/no-go recommendation
+
+**GO — Phase 1 approved to execute Strategy C rebuild + ship validator script.**
+
+Rationale:
+- All rebuild mechanics verified (DDL capture round-trips; ATTACH-based reload is fast and well-understood).
+- Only one surprise (S1, `_cache_openfigi` staging-ahead) requires a policy micro-decision — not a scope change.
+- Risk profile is low: pre-rebuild backup covers catastrophic failure; per-table post-checks cover individual drift; pipeline is quiet.
+- Wall clock (8–10 min) is acceptable for a one-time operation.
+
+**Split recommendation:** **keep Phase 1 unified** (rebuild + script in one commit). Surprise count (7) is modest and all surprises are understood. Splitting Phase 1a / 1b would add ceremony without reducing risk; the rebuild is the prerequisite to the script starting at exit 0, so they ship together.
+
+**Pre-conditions for Phase 1 start:**
+1. Serge confirms S1 handling (skip `_cache_openfigi` drop vs. back-merge vs. destroy 484 cache rows).
+2. Serge confirms `*_staging` companions included in rebuild scope (§11.2).
+3. Pre-rebuild backup of `data/13f_staging.duckdb` copied to `data/13f_staging.duckdb.pre_inf39_backup` (Serge runs this Terminal op).
+4. No concurrent staging writers (Serge confirms pipeline quiet).
+5. Phase 1 prompt issued with these decisions encoded.
+
+**Open items for Phase 1 prompt carry-over from Phase 0 §10:**
+- Q1 remediation policy — **resolved** in favor of B (remediate-all), per this §11 work.
+- Q2 script location — still open.
+- Q3 include `entity_current` (L4 VIEW) — still open.
+- Q4 Phase 2 pre-flight wrapper scope — still open.
+- Q5 CI integration — still open.
+- Q6 normalizer aggressiveness — still open.
+
+_End of Phase 0.5 addendum._
