@@ -16,12 +16,23 @@ beneficial_ownership_v2 do not carry pct_of_float, verified Phase 1a §8.5):
   1. RENAME COLUMN pct_of_float TO pct_of_so
   2. ADD COLUMN   pct_of_so_source VARCHAR
 
-Values for pct_of_so_source are written by enrich_holdings.py Pass B:
-  - 'soh_period_accurate' : denominator from shares_outstanding_history
-                            ASOF match at or before quarter_end
-  - 'market_data_latest'  : fallback to market_data.shares_outstanding
-                            (or float_shares backstop) when no SOH match
-  - NULL                  : no denominator available; pct_of_so is NULL
+Values for pct_of_so_source are written by enrich_holdings.py Pass B.
+Three-tier fallback cascade, each surfaced as a distinct audit value
+(Phase 1c, 2026-04-19 — widened from two values to three so tier 3
+rows are no longer silently labeled "market_data_latest"):
+  - 'soh_period_accurate'     : tier 1 — denominator from
+                                shares_outstanding_history ASOF at or
+                                before quarter_end (period-accurate)
+  - 'market_data_so_latest'   : tier 2 — fallback to latest
+                                market_data.shares_outstanding (not
+                                period-accurate, still SO semantics)
+  - 'market_data_float_latest': tier 3 — fallback to latest
+                                market_data.float_shares (pct_of_float
+                                stored in pct_of_so column; semantic
+                                mixing made transparent via this flag)
+  - NULL                      : no denominator available; pct_of_so
+                                is NULL (not equity, or no SOH / md
+                                coverage)
 
 Idempotent: probes the current schema before each step. Re-running after
 success is a no-op.
