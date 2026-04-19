@@ -351,6 +351,160 @@ C-BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY for C (move ASOF into
 User to confirm A (preferred) or B (if period-accuracy restoration
 cannot wait for the follow-up block) before Phase 1.
 
+## 3.2.1 — Downstream readers survey
+
+Amendment 2026-04-19 — read-only grep pass for every consumer of
+`holdings.pct_of_float` and `holdings_v2.pct_of_float`.
+
+### Grep commands run
+
+```
+rg -n "pct_of_float" scripts/
+rg -n "pct_of_float" scripts/api_market.py scripts/api_register.py scripts/admin_bp.py scripts/build_summaries.py
+rg -n "pct_of_float" web/react-app/src/
+rg -n "pct_of_float" web/datasette_config.yaml
+rg -n "pct_of_float" docs/ --glob '!*FINDINGS.md'
+rg -n "pct_of_float" notebooks/research.ipynb ROADMAP.md
+```
+
+Directories `sql/`, `migrations/`, `reports/` do not exist in the repo
+(checked). No hits outside the surfaces listed above.
+
+### Hit counts by classification
+
+| classification | count | scope |
+|---|---:|---|
+| **READ (live, `holdings_v2` or `summary_by_parent`)** | **~30** | Flask/API/TSX consumers, see table below |
+| **WRITE (live, `holdings_v2`)** | **2** | `enrich_holdings.py` Pass A + Pass B (sole live writer) |
+| **WRITE (dead, `holdings` dropped)** | **10** | spread across 5 scripts, all RETIRE/REWRITE |
+| **SCHEMA** | **2** | `summary_by_parent` DDL + React `api.ts` TypeScript type |
+| **DOC** | **~30** | prose references in `docs/*`, ROADMAP, module docstrings |
+| **COMMENT** | **5** | inline comments or Python docstrings |
+| **BROKEN (references dropped `holdings`)** | **~18** | `notebooks/research.ipynb` (17), `web/datasette_config.yaml` (1 YAML block with 3 queries) |
+
+### Live READ consumers (holdings_v2 / summary_by_parent)
+
+| file:line | endpoint / purpose | user-facing impact |
+|---|---|---|
+| `scripts/queries.py:574` | `holder_aggregation` by quarter | feeds Holders tab — displayed to user |
+| `scripts/queries.py:693-705` | parent rollups by child | Parent Detail — displayed |
+| `scripts/queries.py:763` | rollup SUM by entity | Register tab — displayed |
+| `scripts/queries.py:865` | ownership by manager_type | Market tab — displayed |
+| `scripts/queries.py:1308-1346` | top-holders CTE + output | Ticker Detail — displayed |
+| `scripts/queries.py:1587` | total_pct_float aggregate | Ticker summary card — displayed |
+| `scripts/queries.py:1691` | per-holding row list | Fund Portfolio — displayed |
+| `scripts/queries.py:1763-1765` | per-holding rollup with market_cap | Ticker Detail (peers) — displayed |
+| `scripts/queries.py:1876` | q4 snapshot SELECT | Quarter Compare — displayed |
+| `scripts/queries.py:1918-1924` | ownership concentration top-20 | Concentration widget — displayed + `WHERE pct_of_float IS NOT NULL` filter |
+| `scripts/queries.py:2355-2357` | peer matrix rollup | Peers tab — displayed |
+| `scripts/queries.py:2401-2403` | data-quality COUNT | Admin/QC — count only, NULL-tolerant |
+| `scripts/queries.py:2894-2903` | quarter-over-quarter by entity | Flows / Change Detail — displayed |
+| `scripts/queries.py:2919` | `_get_pf` Python helper | safe extractor w/ compute-fallback |
+| `scripts/queries.py:3992-3994` | total_pct_float summary | Summary card — displayed |
+| `scripts/api_market.py:153` | `/api/top-holders` | top-10 holders JSON → React Market tab |
+| `scripts/api_market.py:259` | `/api/heatmap` | ownership concentration heatmap (top 15 managers × tickers) → React |
+| `scripts/api_register.py:293` | `/api/register/holdings` | Register tab holdings grid → React |
+| `scripts/admin_bp.py:500` | admin data-quality counter | `COUNT(pct_of_float)` — coverage metric only |
+| `scripts/build_summaries.py:188` | reads `holdings_v2`, writes `summary_by_parent.pct_of_float` | precomputed summary table feeding many queries.py endpoints |
+| `scripts/enrich_holdings.py:125,184,355` | self-QC projection / baseline / final | internal run-metrics only |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:119` | CSV export column | end-user downloads |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:243` | `<td>` rendering | displayed as `fmtPct2(p.pct_of_float)` |
+
+### Live WRITE site
+
+- `scripts/enrich_holdings.py:151` — Pass A: `SET pct_of_float = NULL`
+  for cusips not in `cusip_classifications`.
+- `scripts/enrich_holdings.py:234-237` — Pass B: `SET pct_of_float = h.shares * 100.0 / lookup.float_shares`
+  where `lookup.float_shares = market_data.float_shares` (**latest**, period-agnostic).
+- Sole writer. No other live script touches `holdings_v2.pct_of_float`.
+
+### Dead / legacy WRITE sites (all targeting the dropped `holdings` table)
+
+| file:line | action | status |
+|---|---|---|
+| `scripts/build_shares_history.py:177-184, :190-199` | UPDATE holdings SET pct_of_float | dead — this rewrite's target |
+| `scripts/approve_overrides.py:159-164` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list (`pipeline_inventory.md:108`) |
+| `scripts/auto_resolve.py:536-540` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list |
+| `scripts/enrich_tickers.py:385-408` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list |
+| `scripts/load_13f.py:273` | `NULL::DOUBLE as pct_of_float` in `CREATE TABLE holdings AS SELECT` | dead — script is REWRITE target (future `load_13f_v2.py`) |
+
+All five above are documented as RETIRE or REWRITE in `docs/pipeline_inventory.md`
+and are not part of the live pipeline. None would be affected by retiring
+`build_shares_history.py`'s `update_holdings_pct_of_float()`.
+
+### Broken / stale references (documented, not live)
+
+- `notebooks/research.ipynb` — 17 hits, all querying `FROM holdings`. The
+  notebook is stale since Stage 5 dropped `holdings`. Not a live consumer.
+  Any attempt to run would throw CatalogException. Separate cleanup,
+  not this block.
+- `web/datasette_config.yaml:11-93` — 3 canned queries reference
+  `FROM holdings h WHERE h.quarter = '2025Q4'` and expose `pct_of_float`.
+  Datasette is local-only tooling; the config is broken today
+  (any query would error). Flag only.
+
+### Assessment — retire impact (Option A)
+
+**Retiring `update_holdings_pct_of_float()` creates ZERO NULL
+regressions in the live read surface.** Mechanical check:
+
+1. All 30 live READ sites query `holdings_v2.pct_of_float` or
+   `summary_by_parent.pct_of_float`.
+2. `holdings_v2.pct_of_float` is written exclusively by
+   `scripts/enrich_holdings.py` Pass B.
+3. `summary_by_parent.pct_of_float` is written by
+   `scripts/build_summaries.py:188` which reads `holdings_v2.pct_of_float`.
+4. `build_shares_history.py`'s `update_holdings_pct_of_float()` does
+   **not** write `holdings_v2` or `summary_by_parent`. It writes the
+   dropped `holdings` table and fails on any invocation.
+5. Removing it changes no data in any live consumer surface.
+
+**The broader accuracy concern persists unchanged**: all 30 live READ
+sites return `pct_of_float` computed against **latest**
+`market_data.float_shares`, not the historical `shares_outstanding_history`
+facts. That is the latent period-accuracy bug the original script was
+built to fix. Option A does **not** fix it. It simply clears dead code.
+
+**Consumers most sensitive to the latent bug** (where period
+accuracy matters most — pre/post-split, pre/post-buyback, pre/post-
+secondary-offering quarters):
+- `queries.py:1918-1924` — ownership concentration top-20 per ticker:
+  ranking is affected; a manager with correct shares at report_date
+  can look artificially large/small today.
+- `api_market.py:259` — heatmap: colors are tied to latest-float, not
+  period-float. Visual distortion for split/buyback tickers.
+- Quarter-over-quarter views (`queries.py:2894-2903`): the same position
+  shown for two consecutive quarters uses the *same* current float,
+  masking a split that happened between them.
+
+Magnitude was documented at cut-over time
+(`docs/NEXT_SESSION_CONTEXT.md:922`):
+> GOOGL 2020 pct_of_float corrected from 0.4% to 7.3% (20:1 split).
+
+That order-of-magnitude correction is exactly what's missing today.
+
+### Unknown-blast-radius check
+
+No grep hits outside the surfaces enumerated above. No external
+dashboards, vendor integrations, or third-party consumers found in
+the repo. All consumers are internal (Python/TSX/SQL/docs).
+
+### Updated recommendation
+
+**Still Option A for Phase 1 — evidence-strengthened.** The
+downstream-readers survey shows retirement is a pure dead-code
+removal: no NULL regressions, no consumer-visible change in values,
+no data refresh cadence change.
+
+**Elevate the follow-up block.** The 30-site live read surface —
+including user-facing React tabs (Register, Market, Ticker Detail,
+Fund Portfolio, Holders, Peers), CSV exports, and the heatmap /
+concentration widgets — is materially sensitive to the period-
+accuracy bug. Option C (move ASOF into `enrich_holdings.py`) is
+higher-priority than the original Phase 0 doc suggested.
+Recommend creating `BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY` as the
+immediate next block after `rewrite-build-shares-history` merges.
+
 ### 3.3 Retrofit violations
 
 Uniform with `fetch_finra_short.py` / `fetch_ncen.py` retrofits (per
