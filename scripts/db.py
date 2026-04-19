@@ -111,10 +111,20 @@ ENTITY_SEQUENCES = [
 # Canonical reference tables outside the entity MDM layer. Added 2026-04-18
 # for BLOCK-SECURITIES-DATA-AUDIT Phase 3 so promote_staging.py can ship
 # cusip_classifications + securities through the same snapshot/diff/restore
-# machinery used for entities. No sequences (cusip-keyed).
+# machinery used for entities. No sequences.
+#
+# Extended 2026-04-19 for the build_managers.py REWRITE (Batch 3 close):
+# parent_bridge + cik_crd_direct via pk_diff (empirical PK=cik, unique);
+# managers + cik_crd_links via the new "rebuild" promote kind because
+# their natural keys are not empirically unique. See
+# promote_staging.PROMOTE_KIND and REWRITE_BUILD_MANAGERS_FINDINGS.md.
 CANONICAL_TABLES = [
     "cusip_classifications",
     "securities",
+    "parent_bridge",
+    "cik_crd_direct",
+    "managers",
+    "cik_crd_links",
 ]
 
 # Union used by promote_staging.py as its argparse allowlist. Grows as more

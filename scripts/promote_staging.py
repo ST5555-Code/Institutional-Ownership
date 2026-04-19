@@ -60,6 +60,12 @@ PK_COLUMNS = {
     # Canonical reference tables (added 2026-04-18 — Phase 3)
     "cusip_classifications": ["cusip"],
     "securities": ["cusip"],
+    # build_managers.py outputs (added 2026-04-19 — Batch 3 close).
+    # parent_bridge.cik and cik_crd_direct.cik are empirically unique;
+    # managers and cik_crd_links route through the rebuild kind instead
+    # (see PROMOTE_KIND), so they do not need PK_COLUMNS entries.
+    "parent_bridge": ["cik"],
+    "cik_crd_direct": ["cik"],
 }
 
 # Per-table validator registration. Each value is one of:
@@ -85,6 +91,11 @@ VALIDATOR_MAP = {
     # Canonical tables — no validator registered yet
     "cusip_classifications": None,
     "securities": None,
+    # build_managers.py outputs (2026-04-19 — Batch 3 close)
+    "parent_bridge": None,
+    "cik_crd_direct": None,
+    "managers": None,
+    "cik_crd_links": None,
 }
 
 # Promotion strategy per table. Default for any table not listed here is
@@ -103,8 +114,9 @@ VALIDATOR_MAP = {
 # on `managers`) are wiped and must be re-applied by those stages after
 # promote — identical to build_managers.py's existing DROP+CTAS semantics.
 PROMOTE_KIND = {
-    # "rebuild" entries land in later commits as build_managers.py
-    # output tables are registered.
+    # build_managers.py outputs with non-unique natural keys
+    "managers": "rebuild",
+    "cik_crd_links": "rebuild",
 }
 
 
