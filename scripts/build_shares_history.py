@@ -6,21 +6,24 @@ For every ticker with a CIK mapping, pulls ALL historical
 EntityCommonStockSharesOutstanding / CommonStockSharesOutstanding facts from
 the local SEC companyfacts cache (refresh via fetch_market.py --sec-only).
 
-The resulting table is used to compute period-accurate `pct_of_float` for
-13F holdings via DuckDB ASOF JOIN: each holding's `report_date` is matched
-to the most recent XBRL fact on-or-before that date.
+The resulting table is the canonical period-accurate share-count source.
+Consumers matching a holding's `report_date` to the most recent XBRL fact
+on-or-before that date (e.g. via DuckDB ASOF JOIN) get a denominator that
+respects splits, buybacks, and offerings between report_date and today.
 
-This is the fix for a latent accuracy bug where `holdings.pct_of_float` used
-`market_data.shares_outstanding` (latest) as the denominator for all historical
-quarters, inflating or deflating ratios for companies with splits, buybacks, or
-offerings between the holding's report_date and today.
+Writer discipline note: this script is the sole writer of
+`shares_outstanding_history`. The historical `update_holdings_pct_of_float`
+path that wrote `holdings.pct_of_float` via ASOF JOIN was retired in the
+2026-04-19 rewrite after the `holdings` table was dropped at Stage 5.
+Period-accurate `pct_of_float` restoration is tracked separately under
+BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY (move ASOF into `enrich_holdings.py`).
 
 Usage:
-    python3 scripts/build_shares_history.py [--staging] [--update-holdings]
+    python3 scripts/build_shares_history.py [--staging] [--dry-run]
 
 Flags:
     --staging            Write to staging DB instead of production
-    --update-holdings    Recompute holdings.pct_of_float via ASOF JOIN after build
+    --dry-run            Project what would be written; no DB mutations
 """
 
 import argparse
@@ -34,8 +37,15 @@ import duckdb
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
-from db import set_staging_mode, is_staging_mode, get_db_path, connect_read  # noqa: E402
+from db import set_staging_mode, is_staging_mode, get_db_path, connect_read, record_freshness  # noqa: E402
 from sec_shares_client import SECSharesClient  # noqa: E402
+
+
+# Warn threshold: fraction of CIK-resolved tickers that yield no XBRL history.
+# Above this, the summary prints a WARN banner — indicates systemic cache or
+# parser problems. Does not raise; the build still completes so partial
+# coverage is preserved.
+UNRESOLVED_WARN_THRESHOLD = 0.20
 
 
 SCHEMA = """
@@ -52,33 +62,48 @@ CREATE TABLE IF NOT EXISTS shares_outstanding_history (
 """
 
 
-def build(con, client: SECSharesClient):
+def build(con, client: SECSharesClient, dry_run: bool = False):
     # Source of tickers: everything in market_data that has either a CIK (SEC
-    # resolved) or could potentially resolve. Read from prod when in staging
-    # mode so holdings stays the source of truth.
+    # resolved) or could potentially resolve. Read from prod in staging mode
+    # so market_data stays the source of truth.
     read_con = connect_read() if is_staging_mode() else con
     tickers = read_con.execute("""
         SELECT DISTINCT ticker FROM market_data
         WHERE (unfetchable IS NULL OR unfetchable = FALSE)
     """).fetchdf()["ticker"].tolist()
-    print(f"  Candidate tickers: {len(tickers):,}")
+    print(f"  Candidate tickers: {len(tickers):,}", flush=True)
 
-    con.execute(SCHEMA)
+    if not dry_run:
+        con.execute(SCHEMA)
 
     total_rows = 0
     with_history = 0
     no_cik = 0
+    no_history_with_cik = 0
+    fetch_errors = 0
+    checkpoints = 0
     t0 = time.time()
 
     batch = []
     BATCH = 1000
+    CHECKPOINT_EVERY_N_BATCHES = 10  # flush WAL every ~10K rows
+    batches_since_checkpoint = 0
 
     for i, tkr in enumerate(tickers, 1):
-        history = client.fetch_history(tkr)
+        try:
+            history = client.fetch_history(tkr)
+        except Exception as e:  # pylint: disable=broad-except
+            fetch_errors += 1
+            print(f"    [fetch_error] {tkr}: {type(e).__name__}: {e}", flush=True)
+            continue
+
         if not history:
             if client.get_cik(tkr) is None:
                 no_cik += 1
+            else:
+                no_history_with_cik += 1
             continue
+
         with_history += 1
         for row in history:
             filed = row.get("filed")
@@ -94,27 +119,52 @@ def build(con, client: SECSharesClient):
         total_rows += len(history)
 
         if len(batch) >= BATCH:
-            _upsert_batch(con, batch)
+            if not dry_run:
+                _upsert_batch(con, batch)
+                batches_since_checkpoint += 1
+                if batches_since_checkpoint >= CHECKPOINT_EVERY_N_BATCHES:
+                    con.execute("CHECKPOINT")
+                    checkpoints += 1
+                    batches_since_checkpoint = 0
             batch.clear()
 
         if i % 500 == 0:
-            print(f"    [{i:,}/{len(tickers):,}] with_history={with_history:,} total_rows={total_rows:,}")
+            print(f"    [{i:,}/{len(tickers):,}] with_history={with_history:,} "
+                  f"total_rows={total_rows:,}", flush=True)
 
-    if batch:
+    if batch and not dry_run:
         _upsert_batch(con, batch)
+        batches_since_checkpoint += 1
 
     dt = time.time() - t0
-    print(f"\n  Built in {dt:.1f}s")
-    print(f"    tickers with history: {with_history:,}")
-    print(f"    tickers without CIK:  {no_cik:,}")
-    print(f"    total history rows:   {total_rows:,}")
+    print(f"\n  Built in {dt:.1f}s", flush=True)
+    print(f"    tickers with history: {with_history:,}", flush=True)
+    print(f"    tickers without CIK:  {no_cik:,}", flush=True)
+    print(f"    tickers with CIK but no history: {no_history_with_cik:,}", flush=True)
+    print(f"    fetch errors:         {fetch_errors:,}", flush=True)
+    print(f"    total history rows:   {total_rows:,}", flush=True)
 
-    # Index
-    con.execute("""
-        CREATE INDEX IF NOT EXISTS idx_soh_ticker_date
-        ON shares_outstanding_history(ticker, as_of_date)
-    """)
-    con.execute("CHECKPOINT")
+    # Unresolved-% gate: CIK-resolved tickers that yielded no XBRL history.
+    with_cik = len(tickers) - no_cik
+    if with_cik > 0:
+        unresolved_pct = no_history_with_cik / with_cik
+        if unresolved_pct > UNRESOLVED_WARN_THRESHOLD:
+            print(f"\n  [WARN] unresolved rate {100*unresolved_pct:.1f}% exceeds "
+                  f"{100*UNRESOLVED_WARN_THRESHOLD:.0f}% threshold — possible "
+                  f"systemic cache or parser issue.", flush=True)
+
+    if dry_run:
+        print(f"\n  [DRY-RUN] would upsert {total_rows:,} rows across "
+              f"{with_history:,} tickers; no DB mutations performed.", flush=True)
+    else:
+        # Index + final CHECKPOINT
+        con.execute("""
+            CREATE INDEX IF NOT EXISTS idx_soh_ticker_date
+            ON shares_outstanding_history(ticker, as_of_date)
+        """)
+        con.execute("CHECKPOINT")
+        checkpoints += 1
+        print(f"    CHECKPOINTs executed: {checkpoints}", flush=True)
 
     if is_staging_mode() and read_con is not con:
         read_con.close()
@@ -135,82 +185,12 @@ def _upsert_batch(con, batch):
     """, batch)
 
 
-def update_holdings_pct_of_float(con):
-    """Recompute holdings.pct_of_float using period-accurate SEC shares via
-    DuckDB ASOF JOIN.
-
-    For each holding row, find the most recent shares_outstanding fact whose
-    `as_of_date <= holdings.report_date`. Fall back to the LATEST
-    shares_outstanding in market_data (or float_shares) when no historical
-    fact exists — this preserves current coverage for tickers without SEC
-    history (ETFs, recent IPOs, override-based entries).
-    """
-    if is_staging_mode():
-        print("\n  Staging mode: skipping holdings update (run after merge)")
-        return
-
-    print("\nUpdating holdings.pct_of_float via ASOF JOIN...")
-
-    # Build per-(ticker, report_date) lookup with ASOF JOIN, then update.
-    # holdings.report_date is stored as VARCHAR in DD-MON-YYYY format
-    # (e.g. "31-MAR-2025"), so parse via strptime before comparing.
-    con.execute("""
-        CREATE OR REPLACE TEMP TABLE _period_shares AS
-        SELECT h.ticker, h.report_date, soh.shares AS period_shares
-        FROM (
-            SELECT DISTINCT ticker, report_date,
-                   strptime(report_date, '%d-%b-%Y')::DATE AS report_date_d
-            FROM holdings
-            WHERE ticker IS NOT NULL AND report_date IS NOT NULL
-        ) h
-        ASOF LEFT JOIN shares_outstanding_history soh
-          ON h.ticker = soh.ticker
-         AND h.report_date_d >= soh.as_of_date
-    """)
-
-    matched = con.execute("SELECT COUNT(*) FROM _period_shares WHERE period_shares IS NOT NULL").fetchone()[0]
-    total_pairs = con.execute("SELECT COUNT(*) FROM _period_shares").fetchone()[0]
-    print(f"  (ticker, report_date) pairs: {total_pairs:,} — matched to SEC history: {matched:,} ({100*matched/max(1,total_pairs):.1f}%)")
-
-    # Primary update: use period-accurate shares
-    con.execute("""
-        UPDATE holdings h SET pct_of_float = ROUND(
-            h.shares * 100.0 / ps.period_shares, 4)
-        FROM _period_shares ps
-        WHERE h.ticker = ps.ticker
-          AND h.report_date = ps.report_date
-          AND ps.period_shares IS NOT NULL
-          AND ps.period_shares > 0
-    """)
-
-    # Fallback: for (ticker, report_date) pairs with no SEC history, use the
-    # current market_data value. This preserves coverage where SEC XBRL has no
-    # data at all (ETFs, very recent IPOs).
-    con.execute("""
-        UPDATE holdings h SET pct_of_float = ROUND(
-            h.shares * 100.0 / COALESCE(m.shares_outstanding, m.float_shares), 4)
-        FROM market_data m, _period_shares ps
-        WHERE h.ticker = m.ticker
-          AND h.ticker = ps.ticker
-          AND h.report_date = ps.report_date
-          AND ps.period_shares IS NULL
-          AND COALESCE(m.shares_outstanding, m.float_shares) IS NOT NULL
-          AND COALESCE(m.shares_outstanding, m.float_shares) > 0
-    """)
-
-    total_h = con.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
-    pctf = con.execute("SELECT COUNT(*) FROM holdings WHERE pct_of_float IS NOT NULL").fetchone()[0]
-    print(f"  holdings with pct_of_float: {pctf:,}/{total_h:,} ({100*pctf/total_h:.1f}%)")
-
-    con.execute("DROP TABLE _period_shares")
-    con.execute("CHECKPOINT")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Build shares_outstanding_history from SEC XBRL")
-    parser.add_argument("--staging", action="store_true")
-    parser.add_argument("--update-holdings", action="store_true",
-                        help="Recompute holdings.pct_of_float with period-accurate shares")
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB instead of production")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Project what would be written; no DB mutations")
     args = parser.parse_args()
 
     if args.staging:
@@ -218,15 +198,19 @@ def main():
 
     print("=" * 60)
     print("build_shares_history.py — SEC XBRL period-accurate shares")
-    print(f"  staging={is_staging_mode()}  update_holdings={args.update_holdings}")
+    print(f"  staging={is_staging_mode()}  dry_run={args.dry_run}")
     print("=" * 60)
 
-    con = duckdb.connect(get_db_path())
+    con = duckdb.connect(get_db_path(), read_only=args.dry_run)
     client = SECSharesClient()
-    build(con, client)
+    build(con, client, dry_run=args.dry_run)
 
-    if args.update_holdings:
-        update_holdings_pct_of_float(con)
+    if not args.dry_run:
+        try:
+            record_freshness(con, "shares_outstanding_history")
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"  [warn] record_freshness(shares_outstanding_history) failed: {e}",
+                  flush=True)
 
     con.close()
     print("\nDone.")
