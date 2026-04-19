@@ -138,17 +138,15 @@ _RESOLVED_CTE = f"""
 
 
 # pct_of_so value + source expressions, used by both project and apply.
-# Three-tier fallback:
+# Three-tier fallback, each distinctly audited (Phase 1c, 2026-04-19):
 #   1. soh.shares > 0                       → 'soh_period_accurate'
-#   2. md_shares_outstanding > 0            → 'market_data_latest' (SO)
-#   3. md_float_shares > 0                  → 'market_data_latest' (float backstop)
+#   2. md_shares_outstanding > 0            → 'market_data_so_latest'
+#   3. md_float_shares > 0                  → 'market_data_float_latest'
 #   4. otherwise                            → NULL
 #
-# Tiers 2 and 3 share the 'market_data_latest' source value; the
-# numerator's semantic drift within that tier (shares_outstanding vs
-# float as backstop) is documented but not differentiated in the audit
-# flag, since both are "not period-accurate" from the consumer's
-# perspective.
+# Tier 3 is the "pct_of_float stored in pct_of_so column" case —
+# semantic mixing kept visible in the audit flag so downstream readers
+# (admin quality widgets, analytics) can filter it out or warn.
 _POF_VALUE_EXPR = """
     CASE
         WHEN r.is_equity AND r.soh_shares             > 0
@@ -163,8 +161,8 @@ _POF_VALUE_EXPR = """
 _POF_SOURCE_EXPR = """
     CASE
         WHEN r.is_equity AND r.soh_shares             > 0 THEN 'soh_period_accurate'
-        WHEN r.is_equity AND r.md_shares_outstanding  > 0 THEN 'market_data_latest'
-        WHEN r.is_equity AND r.md_float_shares        > 0 THEN 'market_data_latest'
+        WHEN r.is_equity AND r.md_shares_outstanding  > 0 THEN 'market_data_so_latest'
+        WHEN r.is_equity AND r.md_float_shares        > 0 THEN 'market_data_float_latest'
         ELSE NULL
     END
 """
@@ -287,6 +285,7 @@ def _pass_b_project(con, quarter: str | None) -> dict:
                 h.pct_of_so_source       AS old_pof_source,
                 r.new_ticker,
                 r.security_type_inferred AS new_sti,
+                r.is_equity,
                 r.soh_shares,
                 r.soh_as_of_date,
                 r.quarter_end,
@@ -312,7 +311,9 @@ def _pass_b_project(con, quarter: str | None) -> dict:
             COUNT(*) FILTER (WHERE new_mvl        IS NOT NULL)                      AS mvl_post,
             COUNT(*) FILTER (WHERE new_pof        IS NOT NULL)                      AS pof_post,
             COUNT(*) FILTER (WHERE new_pof_source = 'soh_period_accurate')          AS pof_source_soh,
-            COUNT(*) FILTER (WHERE new_pof_source = 'market_data_latest')           AS pof_source_md,
+            COUNT(*) FILTER (WHERE new_pof_source = 'market_data_so_latest')        AS pof_source_md_so,
+            COUNT(*) FILTER (WHERE new_pof_source = 'market_data_float_latest')     AS pof_source_md_float,
+            COUNT(*) FILTER (WHERE is_equity AND new_pof_source IS NULL)            AS pof_source_null_equity,
             COUNT(*) FILTER (
                 WHERE new_pof_source = 'soh_period_accurate'
                   AND soh_as_of_date IS NOT NULL
@@ -323,19 +324,21 @@ def _pass_b_project(con, quarter: str | None) -> dict:
         params + params,  # where_q_keys + where_q
     ).fetchone()
     return {
-        "rows_in_scope":      row[0],
-        "ticker_changes":     row[1],
-        "sti_changes":        row[2],
-        "mvl_changes":        row[3],
-        "pof_changes":        row[4],
-        "pof_source_changes": row[5],
-        "ticker_post":        row[6],
-        "sti_post":           row[7],
-        "mvl_post":           row[8],
-        "pof_post":           row[9],
-        "pof_source_soh":     row[10],
-        "pof_source_md":      row[11],
-        "pof_stale_gt60":     row[12],
+        "rows_in_scope":            row[0],
+        "ticker_changes":           row[1],
+        "sti_changes":              row[2],
+        "mvl_changes":              row[3],
+        "pof_changes":              row[4],
+        "pof_source_changes":       row[5],
+        "ticker_post":              row[6],
+        "sti_post":                 row[7],
+        "mvl_post":                 row[8],
+        "pof_post":                 row[9],
+        "pof_source_soh":           row[10],
+        "pof_source_md_so":         row[11],
+        "pof_source_md_float":      row[12],
+        "pof_source_null_equity":   row[13],
+        "pof_stale_gt60":           row[14],
     }
 
 
@@ -536,20 +539,25 @@ def _print_pass_b(log: _Tee, proj: dict) -> None:
     """Emit Pass B (main enrichment) projection block."""
     log.line("Pass B — Main enrichment on holdings_v2 "
              "(cusip-keyed lookup + ASOF SOH)")
-    log.line(f"  rows in scope (equity-classifiable cusip) : {proj['rows_in_scope']:>14,}")
-    log.line(f"  ticker      changes                       : {proj['ticker_changes']:>14,}")
-    log.line(f"  sti         changes                       : {proj['sti_changes']:>14,}")
-    log.line(f"  mvl         changes                       : {proj['mvl_changes']:>14,}")
-    log.line(f"  pct_of_so   changes                       : {proj['pof_changes']:>14,}")
-    log.line(f"  pof_source  changes                       : {proj['pof_source_changes']:>14,}")
+    log.line(f"  rows in scope (equity-classifiable cusip)   : {proj['rows_in_scope']:>14,}")
+    log.line(f"  ticker       changes                        : {proj['ticker_changes']:>14,}")
+    log.line(f"  sti          changes                        : {proj['sti_changes']:>14,}")
+    log.line(f"  mvl          changes                        : {proj['mvl_changes']:>14,}")
+    log.line(f"  pct_of_so    changes                        : {proj['pof_changes']:>14,}")
+    log.line(f"  pof_source   changes                        : {proj['pof_source_changes']:>14,}")
     log.line("  projected post-state in scope:")
-    log.line(f"    ticker             populated        : {proj['ticker_post']:>14,}")
-    log.line(f"    sti                populated        : {proj['sti_post']:>14,}")
-    log.line(f"    mvl                populated        : {proj['mvl_post']:>14,}")
-    log.line(f"    pct_of_so          populated        : {proj['pof_post']:>14,}")
-    log.line(f"      via soh_period_accurate           : {proj['pof_source_soh']:>14,}")
-    log.line(f"      via market_data_latest (fallback) : {proj['pof_source_md']:>14,}")
-    log.line(f"    SOH matches with staleness > 60 days : {proj['pof_stale_gt60']:>14,}")
+    log.line(f"    ticker                populated           : {proj['ticker_post']:>14,}")
+    log.line(f"    sti                   populated           : {proj['sti_post']:>14,}")
+    log.line(f"    mvl                   populated           : {proj['mvl_post']:>14,}")
+    log.line(f"    pct_of_so             populated           : {proj['pof_post']:>14,}")
+    # Tier distribution — every equity row lands in exactly one tier.
+    # Sum of (soh + md_so + md_float + null_equity) == is_equity count.
+    log.line("  tier distribution (equity rows):")
+    log.line(f"    1. soh_period_accurate     (tier 1)       : {proj['pof_source_soh']:>14,}")
+    log.line(f"    2. market_data_so_latest   (tier 2 SO)    : {proj['pof_source_md_so']:>14,}")
+    log.line(f"    3. market_data_float_latest(tier 3 float) : {proj['pof_source_md_float']:>14,}")
+    log.line(f"    4. NULL (equity, no denom) (tier 4)       : {proj['pof_source_null_equity']:>14,}")
+    log.line(f"    SOH matches with staleness > 60 days      : {proj['pof_stale_gt60']:>14,}")
 
 
 def _print_pass_c(log: _Tee, baseline_fh: dict, proj: dict) -> None:
