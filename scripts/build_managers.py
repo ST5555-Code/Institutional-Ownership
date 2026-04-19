@@ -630,6 +630,22 @@ def enrich_holdings_v2(con, dry_run=False):
     correct types (VARCHAR/VARCHAR/BOOLEAN/BOOLEAN), so the historical
     ALTER-to-fix-types block is retired.
 
+    All four columns are updated via COALESCE(m.<src>, h.<dst>) per
+    Risk 1 resolution (Phase 2 report, Pre-Phase-4 investigation).
+    manager_type is the load-bearing case: 4,163 CIKs / 5.33M rows
+    have legacy values from backfill_manager_types.py + the
+    categorized_institutions_funds_v2.csv curation (commit 87e832b),
+    for filer types ADV does not cover (strategic holders like
+    Berkshire, SWFs, pension plans, endowments, wealth-management
+    broker-dealers, foreign market makers). Straight UPDATE would
+    overwrite those with NULL from managers.strategy_type (only 52%
+    populated today). COALESCE preserves the curation for legacy-only
+    CIKs and refreshes every row where the current build has an
+    opinion. inst_parent_name / is_passive / is_activist have
+    effectively zero legacy-only exposure (0 to 3 CIKs) but COALESCE
+    is applied uniformly as defense against any future managers-side
+    NULL regression.
+
     Split out of build_managers_table() so --enrichment-only can invoke
     it in isolation — see Option A flag matrix in the REWRITE findings.
     """
@@ -642,7 +658,7 @@ def enrich_holdings_v2(con, dry_run=False):
         """).fetchone()[0]
         print(
             f"  [dry-run] would UPDATE ~{projected:,} rows in holdings_v2 "
-            f"(join managers on cik)",
+            f"(join managers on cik, preserving legacy via COALESCE)",
             flush=True,
         )
         return projected
@@ -650,10 +666,10 @@ def enrich_holdings_v2(con, dry_run=False):
     con.execute("""
         UPDATE holdings_v2 h
         SET
-            inst_parent_name = m.parent_name,
-            manager_type = m.strategy_type,
-            is_passive = m.is_passive,
-            is_activist = m.is_activist
+            inst_parent_name = COALESCE(m.parent_name,    h.inst_parent_name),
+            manager_type     = COALESCE(m.strategy_type, h.manager_type),
+            is_passive       = COALESCE(m.is_passive,    h.is_passive),
+            is_activist      = COALESCE(m.is_activist,   h.is_activist)
         FROM managers m
         WHERE h.cik = m.cik
     """)
