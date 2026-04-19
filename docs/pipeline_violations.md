@@ -234,7 +234,32 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 ---
 
-## build_summaries.py (REWRITE)
+## build_summaries.py (REWRITE) — CLEARED 2026-04-19 (Batch 3 close, 87ee955)
+
+**CLEARED 2026-04-19** — Work landed at commit `87ee955` on
+2026-04-16 ("feat: Batch 3 close — compute_flows + build_summaries
+rewrites + migration 004"), an ancestor of HEAD `d7ba1c2`. Phase 0
+audit (`docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md`) confirmed:
+
+- Legacy `holdings` reads retired — script now reads `holdings_v2`
+  and `fund_holdings_v2` throughout (0 refs to legacy `holdings`).
+- `--dry-run` flag live at `build_summaries.py:374` alongside
+  existing `--staging` / `--rebuild`.
+- Per-(quarter × worldview) `CHECKPOINT` at `:333` and `:344`.
+- `db.record_freshness` hook at `:355–356` for both output tables.
+- Line-buffered logging with explicit `sys.stdout.flush()` (`:94`),
+  equivalent to `flush=True` per write.
+- Error propagation via `try/finally` at `:411–420`; no silent
+  `except` clauses anywhere in the file.
+- DDL drift: **absent**. `CREATE TABLE IF NOT EXISTS` at `:110–145`
+  matches prod column-for-column for both tables; PK on
+  `summary_by_parent` is `(quarter, rollup_type, rollup_entity_id)`
+  per migration 004 shipped in the same commit. `canonical_ddl.md`
+  §4 and §5 already marked both tables ALIGNED.
+- Downstream readers surveyed: 14 files, 90 hits, no breakage.
+
+No Phase 1–4 rewrite work required. Original violations retained
+below for historical reference.
 
 - §9 (dry-run): **VIOLATION** — no `--dry-run`. `--staging` at `:130`
   and `--rebuild` at `:129` exist.
