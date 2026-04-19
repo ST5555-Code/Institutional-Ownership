@@ -552,6 +552,14 @@ closed rows live in `### Closed items (log)` further down. New
 follow-ups land in `### Open items` and move to the log when they
 close.
 
+**Allocation policy.** INF## IDs are allocated sequentially. The gap
+at **INF19 / INF20 / INF21** is preserved intentionally — IDs jumped
+from INF18 to INF22 during the 2026-04-16 session close (git history
+shows no rows at those IDs on any branch). Treat as reserved / not
+available for reuse; future confusion is avoided by leaving the gap.
+Next free ID at allocation time is `max(in use) + 1`; verify via
+`grep -oE 'INF[0-9]+' ROADMAP.md | sort -u` before claiming.
+
 ### Open items
 
 | # | Item | Priority | Notes |
