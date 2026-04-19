@@ -86,6 +86,54 @@ changes, and auto-rolls back on structural validation failure. Full
 backups are reserved for known-risky sessions where the snapshot
 mechanism alone isn't enough insurance.
 
+## Refetch Pattern for Prod Apply
+
+When a prod apply requires refetching external data (market prices,
+CUSIP classifications, N-PORT holdings), **do not re-hit the external
+API from the prod path.** Run the refetch in staging first, then mirror
+the staging output to prod via an ephemeral helper script.
+
+**Principle:** prod applies are idempotent, deterministic, and make no
+external API calls. Staging owns every external round-trip.
+
+**When to use:**
+
+- Any BLOCK closeout whose prod apply touches a table that was refetched
+  in staging (first documented in BLOCK-3 Phase 4 prod apply —
+  `fund_holdings_v2.ticker` populate mirrored from staging without
+  re-hitting Yahoo).
+- Any backfill of canonical-table columns populated via an external
+  lookup (OpenFIGI, yfinance, SEC XBRL).
+
+**Shape of the helper:**
+
+```bash
+# 1. Run refetch in staging (owns external round-trips)
+python3 scripts/<refetch>.py --staging
+
+# 2. Validate row-level parity against prod
+python3 scripts/<parity_check>.py --staging
+
+# 3. Ephemeral mirror helper: ATTACH staging read-only, UPDATE prod
+#    from staging join. No external network calls in this step.
+python3 scripts/<mirror>_to_prod.py
+
+# 4. Checkpoint prod, stamp data_freshness
+```
+
+**Guardrails:**
+
+- The mirror helper MUST NOT import any external-API client (yfinance,
+  openfigi, edgartools, curl_cffi). Enforce at code review.
+- The mirror helper MUST NOT write outside the target table(s) and the
+  `data_freshness` control-plane row.
+- `CHECKPOINT` before and after the mirror write.
+- If staging-prod parity check fails, stop — do not mirror.
+
+**Precedent:** BLOCK-3 Phase 4 prod apply mirrored
+`fund_holdings_v2.ticker` (+1.45M rows) from staging without
+re-hitting Yahoo; runtime seconds, fully restart-safe.
+
 ## Rollback Procedures
 
 ```bash

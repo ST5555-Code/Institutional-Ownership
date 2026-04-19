@@ -1231,6 +1231,10 @@ See prior versions for full text.
 
 When non-fund entity rolls under parent for EC via transitive_flatten/orphan_scan, verify if subsidiary (keep) or sub-adviser (self-root). 43i found 28 zero-overlap institution pairs; 24 legitimate, 4 Baird sub-advisers fixed.
 
+### t. `admin_bp.py:108` — `data[0]` pattern (conditional revisit)
+
+Filed 2026-04-18 (doc-update workstream). The OpenFIGI response handler at `scripts/admin_bp.py:108` uses a `data[0]` selection in the ticker→CUSIP direction of the admin lookup UI. Today this is diagnostic-only — the handler reads a single candidate and renders it, with **no persistent writes back to `securities` / `cusip_classifications`**. Same class of bug as RC1 in BLOCK-SECURITIES-DATA-AUDIT (first-candidate selection without disambiguation), but currently harmless because nothing downstream trusts the output. **Revisit trigger:** if the admin path ever gains write semantics (e.g., a "Save this mapping" button that promotes the UI selection to `securities` or `cusip_classifications`), this becomes the same class of bug as RC1 and needs the same disambiguation fix. Keep an eye on any PR that adds POST / persistence to admin_bp OpenFIGI routes. Not tracked in ROADMAP — too narrow for canonical scope.
+
 ### t. Conviction tab is served by two separate endpoints
 
 `/api/query3` → `query3()` (Active holder market cap analysis) and `/api/portfolio_context` → `portfolio_context()` (holder sector concentration) are both labeled "Conviction" but are independent. Optimizing one does not speed up the other. `query3` remains slow (~1.4s) due to per-CIK percentile subqueries; `portfolio_context` is ~730ms after the 2026-04-12 vectorization.

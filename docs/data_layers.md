@@ -93,7 +93,7 @@ bottom.
 | `beneficial_ownership_v2` | L3 | `fetch_13dg_v2.py` → `promote_13dg.py` → `enrich_13dg.py` (commit `e231633`, **LIVE** 2026-04-16; design: `docs/13DG_ENTITY_LINKAGE.md`) | upsert on accession_number | 51,905 rows; canonical 13D/G fact table. Group 2 entity columns (`entity_id`, `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`, `dm_rollup_name`) enriched at **94.52%** (49,059 rows; was 77.08% pre-session #11). Coverage jump from 2026-04-17 13D/G filer resolution (commit `5efae66`, +1,640 new institution entities + 23 CIK-merges to existing entities; `scripts/resolve_13dg_filers.py` + `data/reference/13dg_filer_research_v2.csv`) |
 | `beneficial_ownership_current` | L4 | `promote_13dg.py` + `scripts/pipeline/shared.rebuild_beneficial_ownership_current` | rebuild | 24,756 rows; latest-per-(filer_cik, subject_ticker) with amendment logic; now carries all 5 entity columns from BO v2 (18,229 rows / 73.64% enriched) |
 | `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,835 rows** (2026-04-16 part 2, +235 from Tier A+B re-promote); now includes bond / index / MM funds via DERA path. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
-| `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 7 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`) |
+| `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 7 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `ticker_expected`, `is_active`, `figi`). `is_priceable` semantics under review: OTC grey-market rows (e.g., RSMDF-style) currently flagged TRUE but not functionally priceable — see §6 **S1**. Formal PRIMARY KEY / UNIQUE on `cusip` is empirical-only, not declared; VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
 | `market_data` | L3 | `fetch_market.py` | upsert on ticker | **10,064 rows** (2026-04-17, refreshed overnight 2026-04-16; stamped 2026-04-16 23:27 UTC); `make freshness` PASS post-refresh. `enrich_holdings.py --fund-holdings` re-run against fresh prices lifted `holdings_v2.market_value_live` +445K, `pct_of_float` +127K, `fund_holdings_v2.ticker` +488K. |
 | `short_interest` | L3 | `fetch_finra_short.py` | upsert on (ticker, report_date) | 328,595 rows; daily FINRA short vol (app reads directly at `api_market.py:191`) |
 | `shares_outstanding_history` | L3 | `build_shares_history.py` | upsert on (ticker, as_of_date) | 317,049 rows; SEC XBRL-sourced outstanding shares history |
@@ -133,7 +133,7 @@ bottom.
 | `ingestion_manifest` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,253 rows** (2026-04-16) — live since migration 001 (Batch 1). DERA_ZIP and per-accession keys for N-PORT |
 | `ingestion_impacts` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,245 rows** (2026-04-16) — one per promoted `(series_id, report_month)` tuple plus per-quarter DERA ZIP impacts |
 | `pending_entity_resolution` | L0 | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` + `resolve_pending_series.py` + `resolve_13dg_filers.py --prod-exclusions` | direct_write | **6,874 rows** (2026-04-17 session #11 close). Breakdown: `13DG` source_type — 921 `excluded_individual` + 2 `excluded_law_firm` + 5 `excluded_other` + 3 legacy `pending` (from session #2); `NPORT` source_type — 4,420 `resolved` / 1,523 `pending`. 13D/G exclusions landed via new `resolve_13dg_filers.py --prod-exclusions` flag (commit `5efae66`, prod-direct because table is not in `db.ENTITY_TABLES` scope). Separate from the 2,591 13D/G-only filer CIKs that were resolved via MERGE/NEW_ENTITY into the MDM |
-| `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py` |
+| `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py`. Residual coverage gap: ~81 malformed CUSIPs from upstream ingest + legitimately-new CUSIPs in future ingestion — see ROADMAP **INF27** and `BLOCK_TICKER_BACKFILL_FINDINGS.md §10.1`. VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
 | `cusip_retry_queue` | L0 | `build_classifications.py` + `run_openfigi_retry.py` | direct_write | **37,925 rows** — 15,807 resolved via OpenFIGI, 22,118 unmappable (private / delisted / exotic); status = pending \| resolved \| unmappable |
 | `_cache_openfigi` | L3 (reference cache) | `run_openfigi_retry.py` | upsert on cusip | **15,807 rows** — full v3 response per CUSIP (figi, ticker, exchange, security_type, market_sector). Durable cache; survives re-runs |
 | `schema_versions` | L0 | migration scripts (001, 002, 003, 004, 005, 006, 007) | direct_write | 4 rows (003 stamped 2026-04-15; 005 stamped 2026-04-16; **006** stamped 2026-04-17 — `override_id_seq` + NOT NULL on `entity_overrides_persistent.override_id`; **007** stamped 2026-04-17 — DROP NOT NULL on `entity_overrides_persistent.new_value`). Migration 004 is idempotent and probes column presence rather than stamping; prior migrations not retroactively stamped. |
@@ -404,11 +404,19 @@ record-shaping code. Option B is compatible today.
 
 ---
 
-## 6. Open decisions D5–D8
+## 6. Open decisions D5–D8, S1
 
 These cannot be resolved without operational data from the first few
 framework pipeline runs. Recorded here so the orchestrator decision at
 Step 18 has a concrete list.
+
+**ID prefix convention.** `D#` is the pre-existing open-decision
+namespace (D5–D8 below) and is aligned with
+`ENTITY_ARCHITECTURE.md`'s entity-MDM D## deferred-items series.
+**`S#` is a new prefix introduced 2026-04-18 for securities-layer
+open decisions** (columns on `securities` / `cusip_classifications` /
+`market_data`), to avoid cross-scope collision with entity-MDM D##
+items. New entries pick the prefix that matches their scope.
 
 ### D5 — Entity retro-enrichment when merges change historical `rollup_entity_id`
 
@@ -474,3 +482,94 @@ is the obvious first candidate — the right fix is a migration script
 that adds `rollup_entity_id`, `total_nport_aum`, `nport_coverage_pct`
 columns to `build_summaries.py`'s `CREATE TABLE IF NOT EXISTS`, then a
 rebuild. Once that ships, the pattern is proven.
+
+### S1 — `is_priceable` semantic refinement for OTC grey-market rows
+
+**Decision needed:** Define the precise meaning of `is_priceable` — and
+what to do with rows OpenFIGI classifies as US-listed but which are
+functionally non-priceable (OTC grey market, restricted listings, etc.).
+
+**Options:**
+- A: Tighten `is_priceable=TRUE` to exclude specific grey-market exchange
+  codes.
+- B: Add a separate column `is_actively_tradable` and leave
+  `is_priceable` as an OpenFIGI response mirror.
+- C: Treat residual grey-market corruption as classification error,
+  fix in RC3 triage.
+
+**Why unresolved:** Surfaced during BLOCK-TICKER-BACKFILL Pass C
+`is_priceable` gate implementation. RSMDF (ResMed OTC grey) was flagged
+`is_priceable=TRUE` but stamps foreign shape. Scope requires a look at
+OpenFIGI's grey-market classification semantics before choosing
+between (A/B/C). Tracked in ROADMAP as **INF29**.
+
+---
+
+## 7. Denormalized enrichment columns — drift risk and planned retirement
+
+Some L3 v2 tables carry denormalized enrichment columns that answer
+two very different questions. The columns look alike, but they are
+semantically distinct — and only one class is safe to leave denormalized.
+
+**Class A — filing-time facts.** Columns that answer "what did this
+filer report on this date." The filing is immutable history; the
+column is a stamp and should stay denormalized. Examples:
+`holdings_v2.cusip`, `holdings_v2.shares`, `holdings_v2.market_value_usd`,
+`fund_holdings_v2.report_date`, `fund_holdings_v2.cusip`. These never
+drift.
+
+**Class B — current-mapping lookups.** Columns that answer "what is
+the current mapping for this key." The canonical source (a `securities`
+row, an `entity_current` row, a GLEIF LEI record) can update after the
+filing is stamped. The stamp then drifts. Examples:
+`holdings_v2.ticker`, `holdings_v2.entity_id`, `holdings_v2.rollup_entity_id`,
+`fund_holdings_v2.ticker`, `fund_holdings_v2.entity_id`, and (if ever
+added) `lei`. These are the problem columns.
+
+**Principle.** Class B columns should be joins, not stamps — resolved
+at read time against the current canonical source. Class A columns stay
+denormalized.
+
+**Observed drift.**
+- **BLOCK-2 entity_id backfill.** `fund_holdings_v2.entity_id` coverage
+  moved from 40.09% to 84.13% after a one-time backfill pass against
+  `entity_current`. The gap wasn't a bug — rows were stamped against
+  the entity table as it looked at promote time; later entity merges
+  and NEW_ENTITY creates left historical rows pointing at entity_ids
+  that no longer represent the current mapping.
+- **BLOCK-TICKER-BACKFILL ticker drift.** `fund_holdings_v2.ticker`
+  was ~59% populated at 2025-06 and had decayed to ~3.7% at 2025-11
+  before the backfill. Same mechanism: ticker stamped against
+  `securities` at promote; subsequent ticker corrections in
+  `securities` never propagated back.
+
+**Planned retirement sequence.** Incremental — do not retire Class B
+columns in one pass. Each step narrows the exposure before the next.
+
+1. **BLOCK-TICKER-BACKFILL** *(shipped — `3299a9f`)*. One-time full
+   backfill of `fund_holdings_v2.ticker`; forward-looking subprocess
+   hooks at the end of `build_cusip.py` and `normalize_securities.py`
+   so future `securities` updates trigger a ticker re-stamp. Keeps
+   drift bounded, does not remove the column.
+2. **BLOCK-3** *(shipped — `0dc0d5d`)*. Legacy `fetch_nport.py` retired;
+   `build_benchmark_weights` + `build_fund_classes` repointed to
+   `fund_holdings_v2`. Removes readers that would have been broken by
+   a Class B column retirement.
+3. **Batch 3 REWRITE.** Five remaining scripts still reading the
+   denormalized Class B columns as their ground truth. Each one gets
+   repointed to read through a join on `securities` / `entity_current`
+   before the column can be retired.
+4. **BLOCK-DENORM-RETIREMENT.** Drop the stamped Class B columns from
+   v2 fact tables; rely on read-time joins. Tracked in ROADMAP as
+   **INF25**.
+
+**Not in scope.** Class A columns stay as stamps. `cusip` and `shares`
+on `holdings_v2` are the filing-time record and do not join anywhere.
+
+**Cross-references.**
+- `ENTITY_ARCHITECTURE.md → Known Limitations` carries a pointer to
+  this section from the entity side.
+- `ENTITY_ARCHITECTURE.md → Design Decision Log` carries the dated
+  rationale entry (2026-04-18).
+- ROADMAP → INFRASTRUCTURE → Open items → INF25 carries the
+  sequencing row.
