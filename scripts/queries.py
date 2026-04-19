@@ -3649,7 +3649,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
 
                 # Also need is_actively_managed per fund for child type
                 fund_meta_df = con.execute(f"""
-                    SELECT DISTINCT fh.fund_name, MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
+                    SELECT DISTINCT fh.fund_name, COALESCE(MAX(CAST(fu.is_actively_managed AS INTEGER)), 0) as is_active
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.fund_name IN ({ph_funds}) AND fh.quarter = '{quarter}'
