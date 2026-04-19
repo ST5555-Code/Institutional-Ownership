@@ -39,6 +39,15 @@ success is a no-op.
 
 Scope in Phase 1: --staging only. Prod apply is Phase 4.
 
+Phase 4b amendment (2026-04-19): prod has 4 non-PK indexes on
+holdings_v2 that staging lacks — `ALTER TABLE RENAME COLUMN` fails
+with DuckDB DependencyException. Migration now uses a
+capture-and-recreate pattern: enumerate existing non-PK indexes via
+`duckdb_indexes()` at runtime, drop them, execute RENAME + ADD
+COLUMN, recreate from captured DDL. Works identically on prod
+(4 captured) and staging (0 captured — no-op). No hardcoded index
+names. Per-index rebuild timings logged to stdout for audit.
+
 Usage:
   python3 scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py --staging --dry-run
   python3 scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py --staging
@@ -49,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 
 import duckdb
 
@@ -86,8 +96,49 @@ def _already_stamped(con, version: str) -> bool:
     return row is not None
 
 
+def _capture_indexes(con, table: str) -> list[tuple[str, str]]:
+    """Return [(index_name, create_sql), ...] for non-PK indexes on `table`.
+
+    PK / unique constraint indexes carry NULL or empty `sql` in DuckDB's
+    catalog (they're implicit from the constraint), so filtering on
+    non-empty sql keeps only user-defined indexes we can safely drop
+    and recreate. DuckDB's `duckdb_indexes().sql` is the verbatim
+    CREATE INDEX statement the user issued.
+    """
+    rows = con.execute(
+        """
+        SELECT index_name, sql
+          FROM duckdb_indexes()
+         WHERE table_name = ?
+           AND sql IS NOT NULL
+           AND sql <> ''
+        """,
+        [table],
+    ).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
 def run_migration(db_path: str, dry_run: bool) -> None:
-    """Apply migration 008 to `db_path`. --dry-run reports only."""
+    """Apply migration 008 to `db_path`. --dry-run reports only.
+
+    Capture-and-recreate pattern (Phase 4b amendment):
+      1. Probe column + schema_versions state
+      2. Short-circuit if already applied
+      3. Capture non-PK indexes on holdings_v2 (via duckdb_indexes())
+      4. Pre-drop row count sanity check
+      5. DROP captured indexes (logged per-index)
+      6. RENAME pct_of_float -> pct_of_so (if needed)
+      7. ADD COLUMN pct_of_so_source (if needed)
+      8. CREATE captured indexes with original DDL (logged per-index)
+      9. Post-create row count sanity check (must match step 4)
+     10. Stamp schema_versions + CHECKPOINT
+     11. Post-condition verification
+
+    Failure-mode note: if any index recreation at step 8 fails after
+    DROP at step 5 and RENAME/ADD at steps 6-7 have committed, the DB
+    is left without that index. The captured DDL is logged to stdout
+    at step 3 so an operator can manually recreate from the log.
+    """
     if not os.path.exists(db_path):
         print(f"  SKIP: {db_path} does not exist")
         return
@@ -121,52 +172,140 @@ def run_migration(db_path: str, dry_run: bool) -> None:
                 f"{TABLE}; manual resolution required"
             )
 
-        # Step 1: rename pct_of_float → pct_of_so (if needed)
-        if has_old and not has_new:
+        # Capture non-PK indexes — needed only if the RENAME step will run.
+        # If only ADD COLUMN is outstanding, DuckDB allows it without the
+        # index dance, so we can skip capture+drop+recreate.
+        need_rename = has_old and not has_new
+        captured: list[tuple[str, str]] = []
+        if need_rename:
+            captured = _capture_indexes(con, TABLE)
+            print(f"  captured {len(captured)} non-PK index(es) on {TABLE}:")
+            for name, sql in captured:
+                print(f"    {name}")
+                print(f"      DDL: {sql}")
+
+        # Pre-drop row count (sanity — recreation must land same count).
+        pre_count = con.execute(
+            f"SELECT COUNT(*) FROM {TABLE}"
+        ).fetchone()[0]
+        print(f"  pre-apply row count: {pre_count:,}")
+
+        if dry_run:
+            if need_rename:
+                for name, _ in captured:
+                    print(f"    DROP INDEX {name}")
+                print(f"    ALTER TABLE {TABLE} RENAME COLUMN "
+                      f"{OLD_COLUMN} TO {NEW_COLUMN}")
+            if not has_audit:
+                print(f"    ALTER TABLE {TABLE} "
+                      f"ADD COLUMN {AUDIT_COLUMN} VARCHAR")
+            if need_rename:
+                for name, sql in captured:
+                    print(f"    (recreate) {sql}")
+            if not stamped:
+                print(f"    INSERT schema_versions: {VERSION}")
+            print("  DRY-RUN: no writes performed")
+            return
+
+        total_t0 = time.time()
+
+        # Step 5: DROP captured indexes (per-index timing)
+        drop_timings: dict[str, float] = {}
+        for name, _ in captured:
+            t0 = time.time()
+            con.execute(f'DROP INDEX "{name}"')
+            drop_timings[name] = time.time() - t0
+            print(f"    DROP INDEX {name}: {drop_timings[name]:.3f}s")
+
+        # Step 6: RENAME column
+        if need_rename:
             stmt = (
                 f"ALTER TABLE {TABLE} RENAME COLUMN {OLD_COLUMN} TO {NEW_COLUMN}"
             )
-            print(f"    {stmt}")
-            if not dry_run:
-                con.execute(stmt)
+            t0 = time.time()
+            con.execute(stmt)
+            print(f"    {stmt}  ({time.time()-t0:.3f}s)")
 
-        # Step 2: add pct_of_so_source audit column (if needed)
+        # Step 7: ADD audit column
         if not has_audit:
             stmt = f"ALTER TABLE {TABLE} ADD COLUMN {AUDIT_COLUMN} VARCHAR"
-            print(f"    {stmt}")
-            if not dry_run:
-                con.execute(stmt)
+            t0 = time.time()
+            con.execute(stmt)
+            print(f"    {stmt}  ({time.time()-t0:.3f}s)")
 
-        # Stamp + checkpoint
-        if not dry_run:
-            if not stamped:
-                con.execute(
-                    "INSERT INTO schema_versions (version, notes) VALUES (?, ?)",
-                    [VERSION, NOTES],
-                )
-                print(f"  stamped schema_versions: {VERSION}")
-            con.execute("CHECKPOINT")
+        # Step 8: RECREATE indexes (per-index timing). If a recreation
+        # fails, the captured DDL is already logged (step 3) and
+        # drop_timings + recreate_timings up to failure are flushed.
+        recreate_timings: dict[str, float] = {}
+        for name, sql in captured:
+            t0 = time.time()
+            try:
+                con.execute(sql)
+            except Exception as exc:  # pylint: disable=broad-except
+                print(f"    FAILED to recreate {name}: {exc}")
+                print(f"      captured DDL was: {sql}")
+                print("    recoverable — re-run migration (idempotent) "
+                      "or execute captured DDL manually")
+                raise
+            recreate_timings[name] = time.time() - t0
+            print(f"    CREATE INDEX {name}: {recreate_timings[name]:.3f}s")
 
-            # Post-condition verification
-            after_old = _has_column(con, TABLE, OLD_COLUMN)
-            after_new = _has_column(con, TABLE, NEW_COLUMN)
-            after_audit = _has_column(con, TABLE, AUDIT_COLUMN)
-            if after_old:
-                raise SystemExit(
-                    f"  MIGRATION FAILED: {OLD_COLUMN} still present on {TABLE}"
-                )
-            if not after_new:
-                raise SystemExit(
-                    f"  MIGRATION FAILED: {NEW_COLUMN} not created on {TABLE}"
-                )
-            if not after_audit:
-                raise SystemExit(
-                    f"  MIGRATION FAILED: {AUDIT_COLUMN} not created on {TABLE}"
-                )
-            print(
-                f"  AFTER: {OLD_COLUMN}={after_old} {NEW_COLUMN}={after_new} "
-                f"{AUDIT_COLUMN}={after_audit}"
+        # Step 9: Post-create row count sanity
+        post_count = con.execute(
+            f"SELECT COUNT(*) FROM {TABLE}"
+        ).fetchone()[0]
+        if post_count != pre_count:
+            raise SystemExit(
+                f"  ROW COUNT MISMATCH: pre={pre_count:,} "
+                f"post={post_count:,}"
             )
+        print(f"  post-apply row count: {post_count:,} "
+              f"(matches pre-apply)")
+
+        # Step 10: Stamp schema_versions + checkpoint
+        if not stamped:
+            con.execute(
+                "INSERT INTO schema_versions (version, notes) VALUES (?, ?)",
+                [VERSION, NOTES],
+            )
+            print(f"  stamped schema_versions: {VERSION}")
+        con.execute("CHECKPOINT")
+
+        total_dt = time.time() - total_t0
+        print(f"  total wall clock: {total_dt:.1f}s")
+
+        # Step 11: Post-condition verification
+        after_old = _has_column(con, TABLE, OLD_COLUMN)
+        after_new = _has_column(con, TABLE, NEW_COLUMN)
+        after_audit = _has_column(con, TABLE, AUDIT_COLUMN)
+        if after_old:
+            raise SystemExit(
+                f"  MIGRATION FAILED: {OLD_COLUMN} still present on {TABLE}"
+            )
+        if not after_new:
+            raise SystemExit(
+                f"  MIGRATION FAILED: {NEW_COLUMN} not created on {TABLE}"
+            )
+        if not after_audit:
+            raise SystemExit(
+                f"  MIGRATION FAILED: {AUDIT_COLUMN} not created on {TABLE}"
+            )
+        # Verify all captured indexes are back
+        after_indexes = {r[0] for r in con.execute(
+            "SELECT index_name FROM duckdb_indexes() WHERE table_name = ?",
+            [TABLE],
+        ).fetchall()}
+        missing = [name for name, _ in captured if name not in after_indexes]
+        if missing:
+            raise SystemExit(
+                f"  MIGRATION FAILED: captured indexes not recreated: "
+                f"{missing}"
+            )
+        print(
+            f"  AFTER: {OLD_COLUMN}={after_old} {NEW_COLUMN}={after_new} "
+            f"{AUDIT_COLUMN}={after_audit} "
+            f"indexes_recreated={len(captured)}"
+        )
     finally:
         con.close()
 
