@@ -1404,3 +1404,499 @@ All gates met:
 
 HARD STOP — awaiting Serge's explicit Phase 4 sign-off before any
 prod writes.
+
+---
+
+## §14. Phase 4b prod apply (2026-04-19)
+
+### §14.0 Phase 4 first-attempt failure post-mortem
+
+First attempt (commit `a960fc9` migration code, unamended) aborted at
+`ALTER TABLE holdings_v2 RENAME COLUMN pct_of_float TO pct_of_so`:
+
+```
+_duckdb.DependencyException: Dependency Error: Cannot alter entry
+"holdings_v2" because there are entries that depend on it.
+```
+
+**Root cause**: prod has 4 non-PK indexes on `holdings_v2` that
+staging lacks (verified via `SELECT index_name FROM duckdb_indexes()
+WHERE table_name='holdings_v2'`):
+
+```
+idx_hv2_cik_quarter       (cik, quarter)
+idx_hv2_entity_id         (entity_id)
+idx_hv2_rollup            (rollup_entity_id, quarter)
+idx_hv2_ticker_quarter    (ticker, quarter)
+```
+
+DuckDB's ALTER guard rejects column changes on any table with
+user-defined indexes — even when no captured index references the
+renamed column. Staging had zero indexes on `holdings_v2`, so the
+Phase 2 staging validation never exercised this path.
+
+**No partial write**. The DependencyException fired on the first
+ALTER; the ADD COLUMN step was gated after. Prod left in clean
+pre-migration state:
+- `pct_of_float` column intact
+- `pct_of_so`, `pct_of_so_source` absent
+- `schema_versions` 008 absent
+- 4 indexes untouched
+- snapshot table (`holdings_v2_pct_of_so_pre_apply_snapshot_20260419`)
+  created before the migration attempt — preserved
+
+**Fix**: amended migration 008 with a capture-and-recreate pattern
+(commit `ea4ae99`). At runtime, query `duckdb_indexes()` for non-PK
+indexes on `holdings_v2`, log captured (name, DDL) to stdout, DROP
+each, execute RENAME + ADD COLUMN, CREATE each index from captured
+DDL. Works identically on prod (4 captured) and staging (0 captured
+— no-op). Idempotency guards unchanged.
+
+Flagged as **INF39** (`BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE`) — see
+§14.10.
+
+### §14.1 Migration 008 amendment — commit `ea4ae99`
+
+Amendment flow:
+1. Probe column + schema_versions state → short-circuit if applied
+2. Capture non-PK indexes via `duckdb_indexes()` (`sql IS NOT NULL AND sql <> ''`)
+3. Log captured DDL (recovery artifact if step 8 fails)
+4. Pre-drop row count sanity
+5. DROP captured indexes (per-index timing)
+6. RENAME `pct_of_float` → `pct_of_so` (if needed)
+7. ADD COLUMN `pct_of_so_source` (if needed)
+8. CREATE INDEX from captured DDL (per-index timing)
+9. Post-create row count sanity check (must match step 4)
+10. Stamp schema_versions + CHECKPOINT
+11. Post-condition verification — column presence + all indexes back
+
+Mid-recreation failure mode: captured DDL is logged at step 3 before
+any DROP — an operator can recover any specific missing index
+manually. Full re-run is idempotent (already-renamed column +
+present audit + present indexes → no-op short-circuit).
+
+### §14.2 Pre-apply state re-verification
+
+Before retry, all assertions passed:
+
+```
+COLUMNS  OK: pct_of_float present; pct_of_so/_source absent
+INDEXES  OK: [idx_hv2_cik_quarter, idx_hv2_entity_id, idx_hv2_rollup, idx_hv2_ticker_quarter]
+SCHEMA_V OK: 008 absent
+SNAPSHOT OK: 12,270,984 rows
+HV2 rows: 12,270,984
+ALL PRE-APPLY ASSERTIONS PASS
+```
+
+### §14.3 Migration 008 prod apply — timings
+
+```
+captured 4 non-PK index(es) on holdings_v2
+pre-apply row count: 12,270,984
+
+DROP INDEX idx_hv2_cik_quarter      : 0.001s
+DROP INDEX idx_hv2_entity_id         : 0.000s
+DROP INDEX idx_hv2_rollup            : 0.000s
+DROP INDEX idx_hv2_ticker_quarter    : 0.000s
+ALTER TABLE RENAME COLUMN            : 0.000s
+ALTER TABLE ADD COLUMN               : 0.365s
+CREATE INDEX idx_hv2_cik_quarter     : 1.948s
+CREATE INDEX idx_hv2_entity_id       : 1.625s
+CREATE INDEX idx_hv2_rollup          : 1.528s
+CREATE INDEX idx_hv2_ticker_quarter  : 3.114s
+
+post-apply row count: 12,270,984 (matches pre-apply)
+stamped schema_versions: 008_rename_pct_of_float_to_pct_of_so
+total wall clock: 9.0s
+AFTER: pct_of_float=False pct_of_so=True pct_of_so_source=True indexes_recreated=4
+```
+
+Idempotency re-run → `ALREADY APPLIED: no action`. ✓
+
+### §14.4 Pass B prod run
+
+**Execution time: 877.5s (14.6 min)**. Staging ran in 1.4s —
+slowdown driven by incremental maintenance of the 4 indexes during
+the full-table UPDATE, not a code issue.
+
+Tier distribution (identical to Phase 2 staging forecast — prod and
+staging mirror, unchanged data):
+
+| tier | count | % of equity | % of all |
+|---|---:|---:|---:|
+| 1. `soh_period_accurate` | 7,725,062 | 72.4% | 62.9% |
+| 2. `market_data_so_latest` | 792,115 | 7.4% | 6.5% |
+| 3. `market_data_float_latest` | 22,517 | 0.2% | 0.2% |
+| 4. NULL (equity) | 2,123,715 | 19.9% | 17.3% |
+| — non-equity (NULL) | 1,607,575 | — | 13.1% |
+
+Coverage: **8,539,694** post-apply (was 7,786,239 in the snapshot;
++753,455 rows = +9.7% gain).
+
+Staleness counter: **607,814 rows** with SOH as_of_date > 60 days
+before quarter_end (7.9% of tier 1).
+
+`data_freshness('holdings_v2_enrichment')` stamped at
+`2026-04-19 13:32:08` with row_count=10,394,757.
+
+### §14.5 Coverage delta — pre/post transition
+
+rowid is not stable across DuckDB full-table UPDATE + CHECKPOINT +
+index rebuild (physical storage rewrites shift rowids). The
+snapshot was captured with rowid but the join returned 0 matches —
+fell back to **natural-key aggregate comparison** on
+`(accession_number, cusip, quarter, cik)` (8,590,639 groups).
+
+Group-level coverage delta:
+
+| metric | value |
+|---|---:|
+| natural-key groups | 8,590,639 |
+| total rows | 12,270,984 |
+| snap populated rows | 7,786,239 |
+| cur populated rows | 8,539,694 |
+| **net delta** | **+753,455** |
+| groups gained coverage | 589,678 |
+| **groups lost coverage** | **0** |
+| groups unchanged | 8,000,961 |
+| rows gained | 753,455 |
+| rows lost | 0 |
+
+**Zero coverage regressions.** +753K rows came from tier 2/3
+fallback recovering rows where old path had `market_data.float_shares
+IS NULL` — previously-NULL rows that now have a valid denominator.
+
+Value-drift magnitude on 5,150,767 matched groups (both populated
+pre and post):
+
+| drift range | groups | % |
+|---|---:|---:|
+| < 1% | 1,133,392 | 22% |
+| 1–10% | 2,227,382 | 43% |
+| 10–50% | 1,401,228 | 27% |
+| ≥ 50% | **375,858** | **7%** |
+
+The 375,858 ≥50% drift groups are the split/buyback/secondary
+corrections the block was created to fix. 7% of matched groups see
+material period-accuracy restoration.
+
+### §14.6 Staleness percentiles (tier 1)
+
+```
+tier1_rows:  7,725,062
+p50:          0 days
+p75:          1 day
+p90:         44 days
+p95:         92 days
+p99:        750 days
+max_days: 5,479 days  (~15 years)
+gt60d:  607,814  (7.9% of tier 1)
+gt120d: 336,188  (4.4%)
+gt200d: 227,105  (2.9%)
+```
+
+**Interpretation**:
+- p50 = 0 (median match lands exactly at quarter-end — us-gaap:CSO
+  XBRL facts are predominantly period-end-dated, as expected).
+- p99 = 750 days is a **yellow flag** — 1% of tier 1 rows have SOH
+  matches 2+ years older than quarter_end. Driven by the long tail
+  of pre-2023 historical quarters where SOH coverage is sparse.
+- max_days = 5,479 is 15-year-old SOH matched to very old 13F
+  filings. Benign for current-quarter display; an edge for deep
+  historical analysis.
+- 2.9% of tier 1 rows stale > 200 days. Acceptable for Phase 4 sign-
+  off; tracking via the existing `pof_stale_gt60` counter.
+
+### §14.7 Integration smoke — 10 paths
+
+**12/12 PASS** against prod, including the previously unvalidatable
+`flow_analysis` precomputed path. Full matrix:
+
+| # | path | result | notes |
+|---|---|---|---|
+| 1 | `get_nport_children_batch` (Vanguard/AAPL/2025Q4) | **PASS** | src=soh_period_accurate |
+| 2 | `get_nport_children` | **PASS** | src=soh_period_accurate |
+| 3 | `query16` rows | **PASS** | 25 rows, src=soh_period_accurate |
+| 3a | `query16` all_totals | **PASS** | src=soh_period_accurate |
+| 4 | `ownership_trend_summary` level=parent | **PASS** | 2025Q4 pct_so=67.02% src=soh_period_accurate |
+| 4b | `ownership_trend_summary` level=fund | **PASS** | 2025Q4 pct_so=23.47% src=soh_period_accurate |
+| 5 | `_compute_flows_live` level=parent | **PASS\*** | src=None on pre-aggregated rows (documented Phase 1c quirk) |
+| 5b | `_compute_flows_live` level=fund | **PASS** | src=soh_period_accurate |
+| 6 | `flow_analysis` precomputed path | **PASS** | top buyer pct_so=0.257% src=soh_period_accurate — previously unvalidatable on staging, now confirmed |
+| 7 | `get_two_company_overlap` meta | **PASS** | subj_denom=14.7B, both sources=soh_period_accurate |
+| 7a | `get_two_company_overlap` institutional row | **PASS** | Vanguard Group subj_src=soh_period_accurate |
+| 8 | `get_two_company_subject` | **PASS** | subj_src=soh_period_accurate, sec_* all None |
+
+**Tab-to-path mapping for Serge UI smoke** (localhost:8001 after
+Flask restart):
+
+| UI tab | backing query functions |
+|---|---|
+| Register | `get_nport_children_batch`, `get_nport_children`, `query16`, `api_register.py:293` |
+| Ticker Detail | `query1`, `query3`, `query7`, `queries.py:1310-1346` (top holders), `queries.py:1918-1924` (concentration widget) |
+| Holders | `queries.py:574` |
+| Market Tab | `queries.py:865`, `api_market.py:/top-holders`, `/heatmap` |
+| Fund Portfolio | `queries.py:1691` (+ CSV export), `FundPortfolioTab.tsx` |
+| Ownership Trend | `ownership_trend_summary` |
+| Flow Analysis | `_compute_flows_live`, `flow_analysis` (precomputed) |
+| Cross-Ownership / Two Companies | `get_two_company_overlap`, `get_two_company_subject` |
+| Admin / QC | `admin_bp.py:500` coverage counter |
+
+### §14.8 validate_entities + data_freshness confirmation
+
+```
+validate_entities --prod --read-only:
+Summary: {'PASS': 8, 'FAIL': 2, 'MANUAL': 6}
+```
+
+Matches the post-Phase-2 baseline exactly. Two FAILs
+(wellington_sub_advisory + phase3_resolution_rate) are pre-existing
+in prod and unrelated to pct-of-so.
+
+`data_freshness` stamps:
+```
+holdings_v2                 2026-04-19 13:32:08  12,270,984
+holdings_v2_enrichment      2026-04-19 13:32:08  10,394,757
+```
+
+`make freshness` → **PASS — all critical tables are fresh.**
+
+### §14.9 Rollback instructions
+
+Snapshot table remains in place as rollback insurance:
+`holdings_v2_pct_of_so_pre_apply_snapshot_20260419` (12,270,984
+rows; columns: row_id, accession_number, cusip, quarter, cik,
+pct_of_float).
+
+**Rollback SQL** (reverses Phase 4b apply — restores
+`pct_of_float`, drops `pct_of_so_source`, restores values from
+snapshot, reinstates indexes):
+
+```sql
+-- Step 1: Capture current indexes (same pattern as migration 008 amendment)
+-- For prod: 4 expected
+SELECT index_name, sql
+  FROM duckdb_indexes()
+ WHERE table_name = 'holdings_v2'
+   AND sql IS NOT NULL AND sql <> '';
+-- Log results; they are needed at step 5 for recreation.
+
+-- Step 2: DROP captured indexes (by name)
+DROP INDEX idx_hv2_cik_quarter;
+DROP INDEX idx_hv2_entity_id;
+DROP INDEX idx_hv2_rollup;
+DROP INDEX idx_hv2_ticker_quarter;
+
+-- Step 3: Reverse the column changes
+ALTER TABLE holdings_v2 DROP COLUMN pct_of_so_source;
+ALTER TABLE holdings_v2 RENAME COLUMN pct_of_so TO pct_of_float;
+
+-- Step 4: Restore pre-apply pct_of_float values from snapshot.
+-- Natural-key join (rowid not stable; see §14.5). Uses SUM over the
+-- dup-group ambiguity — 221K rows (1.8%) fall in intentional dup
+-- groups and will receive the group's max pre-apply value. Acceptable
+-- for rollback since post-UPDATE values are already overwritten.
+UPDATE holdings_v2 h
+   SET pct_of_float = agg.pct
+  FROM (
+      SELECT accession_number, cusip, quarter, cik,
+             MAX(pct_of_float) AS pct
+        FROM holdings_v2_pct_of_so_pre_apply_snapshot_20260419
+       GROUP BY 1,2,3,4
+  ) AS agg
+ WHERE h.accession_number = agg.accession_number
+   AND h.cusip            = agg.cusip
+   AND h.quarter          = agg.quarter
+   AND h.cik              = agg.cik;
+
+-- Step 5: Recreate indexes from step 1's captured DDL
+CREATE INDEX idx_hv2_cik_quarter ON holdings_v2(cik, "quarter");
+CREATE INDEX idx_hv2_entity_id ON holdings_v2(entity_id);
+CREATE INDEX idx_hv2_rollup ON holdings_v2(rollup_entity_id, "quarter");
+CREATE INDEX idx_hv2_ticker_quarter ON holdings_v2(ticker, "quarter");
+
+-- Step 6: Unstamp schema_versions
+DELETE FROM schema_versions
+ WHERE version = '008_rename_pct_of_float_to_pct_of_so';
+
+-- Step 7: CHECKPOINT
+CHECKPOINT;
+
+-- Step 8: Drop the snapshot table (optional — keep for audit)
+-- DROP TABLE holdings_v2_pct_of_so_pre_apply_snapshot_20260419;
+```
+
+**Verified mentally against amended migration 008 semantics**:
+post-rollback state is `pct_of_float` present, `pct_of_so` and
+`pct_of_so_source` absent, `schema_versions` 008 unstamped, 4
+indexes recreated with original DDL, row count unchanged.
+
+Re-running migration 008 after a rollback would re-execute cleanly
+— the idempotency short-circuit looks at column state, not at
+schema_versions alone.
+
+**Caveat on step 4**: the natural-key ambiguity means the 221K rows
+in intentional dup groups receive `MAX(pct_of_float)` from the
+snapshot rather than each row's original value. Most dup-group
+members had identical `pct_of_float` (same cusip+quarter → same
+denominator → same pct). Where shares differed across dups, the
+rollback yields slightly higher values than pre-apply for some rows
+in the dup group. Acceptable for a rollback scenario; documented.
+
+**Rollback is not needed under current verification state**. This
+section is insurance for a future regression discovery.
+
+### §14.10 Deferred doc updates (comprehensive — source of truth
+for next batched session)
+
+**ROADMAP.md**
+- Current-state header: add completion entry for
+  BLOCK-PCT-OF-SO-PERIOD-ACCURACY (all 10 N-PORT/13F read paths
+  migrated, tier 1 dominance 72.4%, zero coverage regressions,
+  Phase 4b prod apply 2026-04-19).
+- Correct validate_entities baseline: **8/1/7 → 8/2/6**.
+  Pre-existing FAILs are wellington_sub_advisory (known baseline)
+  and phase3_resolution_rate (SEC > 80%, enrichment > 25%
+  threshold). Neither caused by pct-of-so.
+- Mark `pct_of_float` terminology retired across the project;
+  `pct_of_so` is the canonical metric name going forward.
+- Add **INF38 — BLOCK-FLOAT-HISTORY** as new roadmap item.
+  - Scope: quarterly float history from Section 13 beneficial
+    ownership (Schedule 13D/G) + Section 16 insider holdings
+    (Forms 3/4/5); computed as `shares_outstanding - total_insider
+    - restricted`; annual from 10-K Item 5 `EntityPublicFloat`
+    where tagged.
+  - Dependency: Section 16 ingestion infrastructure.
+  - Priority: low-medium.
+  - Use case: squeeze/liquidity analysis, activist targeting,
+    float-adjusted pct_of_float restoration (the semantic the
+    original block prompt wanted but couldn't deliver without float
+    history).
+- Add **INF39 — BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE** as new
+  roadmap item.
+  - Scope: pre-flight schema-diff check at the top of every Phase 2.
+    Compare staging vs prod: indexes (names + DDL), constraints,
+    triggers, column types, column defaults, sequences, views.
+  - Fail loudly if divergence detected before Phase 2 validation
+    proceeds. Remediation: fix divergence in staging before
+    validating, or explicitly document the divergence as
+    known-and-accepted with justification.
+  - Document the **capture-and-recreate pattern** (used in
+    migration 008 amendment, commit `ea4ae99`) as the reusable
+    migration idiom for any L3 canonical table with prod-side
+    indexes.
+  - Precedent cross-reference: pct-of-so Phase 4 DependencyException
+    (documented in §14.0).
+  - Priority: medium (process hardening; prevents same class of
+    failure on every future v2-table migration).
+
+**docs/data_layers.md**
+- §7: add `pct_of_so_source` audit column to the denormalized-
+  columns discussion. Note: Class B "lookup at read time" column
+  that STAYS denormalized because it stamps provenance of the
+  computation tier, not entity/ticker identity. Values: see §9.3.
+- §8: add pct-of-so workstream to the "writers orphaned by table
+  drops" discussion if relevant.
+
+**docs/canonical_ddl.md**
+- `holdings_v2` DDL block: rename `pct_of_float DOUBLE` →
+  `pct_of_so DOUBLE`.
+- `holdings_v2` DDL block: add `pct_of_so_source VARCHAR`.
+- Document the capture-and-recreate pattern for any L3 table
+  migration touching column renames when indexes are present
+  (forward-link to INF39).
+
+**docs/pipeline_inventory.md**
+- Update `enrich_holdings.py` Pass B description: SOH ASOF
+  denominator with three-tier fallback (SOH → md.shares_outstanding
+  → md.float_shares) + `pct_of_so_source` audit stamp. Sole writer
+  of `holdings_v2.pct_of_so` and `holdings_v2.pct_of_so_source`.
+
+**docs/pipeline_violations.md**
+- Close any existing pct_of_float-related violation entry with
+  commit citations (Phase 1b `dd2b5a1`, Phase 1c `b0ba86d`,
+  Phase 4b `ea4ae99`).
+
+**docs/NEXT_SESSION_CONTEXT.md**
+- Add pct-of-so block closure note with commit list `0871178` →
+  post-Phase-4b findings commit.
+- Flag INF39 as strong candidate for next session — the
+  capture-and-recreate pattern is reusable and worth generalizing
+  while context is fresh.
+- Flag INF38 as lower-priority but tracked.
+
+**docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md**
+- §3.2.1: mark the "elevate follow-up block" as DONE. Forward-link
+  to this findings doc
+  (`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`).
+
+**Decisions to document (already resolved but worth recording)**
+- §11.6 mixed-semantics resolution (N-PORT SOH ASOF) — **closed in
+  Phase 1c** (commit `b0ba86d`).
+- `summary_by_ticker` prod rebuild vs migration — decision still
+  open (§12). Current status: `summary_by_ticker.pct_of_so` column
+  definition already exists (via Phase 1b read-site migration of
+  `build_summaries.py:121`). A fresh `scripts/build_summaries.py`
+  run in prod will re-materialize values under the new tier
+  semantics. Serge to decide sequencing — likely next regular
+  `build_summaries.py` cadence picks it up automatically.
+- `_compute_flows_live` parent-level `pct_of_so_source=None` on
+  pre-aggregated rows — **UI behavior check deferred**: confirm
+  React handles NULL source gracefully (shows "—" or blank, not
+  confusing text). Tab-to-path mapping in §14.7 points to Flow
+  Analysis tab for this check.
+
+**INF38 stub content (for the ROADMAP entry copy-paste)**
+```
+INF38 — BLOCK-FLOAT-HISTORY
+Scope: Build float_shares_history table for true float-adjusted
+pct_of_float restoration. Data sources:
+  - 10-K Item 5 EntityPublicFloat XBRL tag (annual snapshot)
+  - Schedule 13D/G filings (beneficial ownership >5%)
+  - Forms 3/4/5 (Section 16 insider holdings)
+  - Derived: shares_outstanding - insider_holdings - restricted
+Trigger: enables true pct_of_float metric alongside current pct_of_so.
+Dependencies: Section 16 ingestion infrastructure (not yet built).
+Priority: low-medium. Tracked but no ETA.
+Use cases: squeeze/liquidity analysis, activist targeting, more
+accurate register %-ownership for closely-held names.
+```
+
+**INF39 stub content (for the ROADMAP entry copy-paste)**
+```
+INF39 — BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE
+Scope: Pre-flight schema-diff check before every Phase 2 staging
+validation. Compare staging vs prod:
+  - Index names + DDL (via duckdb_indexes())
+  - Constraints + triggers
+  - Column types + defaults + nullability
+  - Sequences + views
+  - schema_versions stamps
+Fail loudly if divergence found. Remediation: either resync staging
+to prod, or explicitly document divergence as known-accepted.
+Document capture-and-recreate pattern (migration 008 amendment,
+commit ea4ae99) as the reusable idiom for any L3 migration touching
+columns on an index-bearing table.
+Priority: medium (process hardening).
+Precedent: pct-of-so Phase 4 DependencyException (see
+REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.0).
+```
+
+### §14.11 Phase 4b exit
+
+All gates met:
+- Migration 008 applied cleanly, idempotent, schema diff matches
+  design ✓
+- Pass B full refresh in 877.5s, no anomalies ✓
+- Zero coverage regressions, +753K rows gained, 7% of matched
+  groups see ≥50% period-accuracy restoration ✓
+- Staleness p50=0, p99=750 (yellow flag, acceptable; long-tail
+  historical) ✓
+- 12/12 integration smoke PASS, including prod-only
+  `flow_analysis` precomputed path ✓
+- validate_entities stable at 8/2/6 (prod baseline, no regression) ✓
+- `data_freshness` stamped, `make freshness` PASS ✓
+- Rollback SQL documented and mentally verified ✓
+
+HARD STOP — awaiting Serge's UI smoke + merge sign-off. Block not
+declared complete until then.
