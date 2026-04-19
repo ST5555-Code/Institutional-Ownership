@@ -951,7 +951,7 @@ export interface paths {
         };
         /**
          * Api Heatmap
-         * @description Ownership concentration heatmap: top managers × tickers by pct_of_float.
+         * @description Ownership concentration heatmap: top managers × tickers by pct_of_so.
          */
         get: operations["api_heatmap_api_v1_heatmap_get"];
         put?: never;

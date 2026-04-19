@@ -118,7 +118,7 @@ def _ensure_tables(con) -> None:
             active_value DOUBLE,
             passive_value DOUBLE,
             active_pct DOUBLE,
-            pct_of_float DOUBLE,
+            pct_of_so DOUBLE,
             top10_holders VARCHAR,
             updated_at TIMESTAMP,
             PRIMARY KEY (quarter, ticker)
@@ -185,7 +185,7 @@ def _build_summary_by_ticker(con, quarter: str) -> int:
                      / SUM(COALESCE(h.market_value_live, h.market_value_usd)),
                      1)
                  END AS active_pct,
-            SUM(h.pct_of_float) AS pct_of_float,
+            SUM(h.pct_of_so) AS pct_of_so,
             NULL AS top10_holders,
             CURRENT_TIMESTAMP AS updated_at
         FROM holdings_v2 h

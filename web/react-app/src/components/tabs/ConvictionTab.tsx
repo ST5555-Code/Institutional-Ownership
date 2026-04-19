@@ -361,7 +361,7 @@ export function ConvictionTab() {
                 label: `Top ${visibleSums.count} Shown`,
                 shares_mm: null,
                 value_mm: visibleSums.value / 1e6,
-                pct_float: null,
+                pct_so: null,
               }]} />
             </table>
           </div>

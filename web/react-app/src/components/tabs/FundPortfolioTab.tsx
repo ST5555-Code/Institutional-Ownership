@@ -107,7 +107,7 @@ export function FundPortfolioTab() {
   // CSV export
   function onExcel() {
     if (!portfolio.data) return
-    const h = ['Rank', 'Ticker', 'Company', 'Sector', 'Shares (MM)', 'Value ($MM)', '% Portfolio', '% Float']
+    const h = ['Rank', 'Ticker', 'Company', 'Sector', 'Shares (MM)', 'Value ($MM)', '% Portfolio', '% SO']
     const csv = [h, ...portfolio.data.positions.map(p => [
       p.rank,
       p.ticker || '',
@@ -116,7 +116,7 @@ export function FundPortfolioTab() {
       p.shares != null ? (p.shares / 1e6).toFixed(2) : '',
       p.market_value_live != null ? (p.market_value_live / 1e6).toFixed(0) : '',
       p.pct_of_portfolio != null ? p.pct_of_portfolio.toFixed(2) : '',
-      p.pct_of_float != null ? p.pct_of_float.toFixed(2) : '',
+      p.pct_of_so != null ? p.pct_of_so.toFixed(2) : '',
     ])].map(r => r.join(',')).join('\n')
     downloadCsv(csv, `fund_portfolio_${ticker}_${selectedCik}.csv`)
   }
@@ -198,7 +198,7 @@ export function FundPortfolioTab() {
                 <col style={{ width: 90 }} />   {/* Shares */}
                 <col style={{ width: 90 }} />   {/* Value */}
                 <col style={{ width: 80 }} />   {/* % Portfolio */}
-                <col style={{ width: 72 }} />   {/* % Float */}
+                <col style={{ width: 72 }} />   {/* % SO */}
               </colgroup>
               <thead>
                 <tr>
@@ -209,7 +209,7 @@ export function FundPortfolioTab() {
                   <th style={TH_R}>Shares (MM)</th>
                   <th style={TH_R}>Value ($MM)</th>
                   <th style={TH_R}>% Portfolio</th>
-                  <th style={TH_R}>% Float</th>
+                  <th style={TH_R}>% SO</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +240,7 @@ export function FundPortfolioTab() {
                       <td style={TD_R}>{fmtSharesMm(p.shares)}</td>
                       <td style={TD_R}>{fmtValueMm(p.market_value_live)}</td>
                       <td style={TD_R}>{fmtPct2(p.pct_of_portfolio)}</td>
-                      <td style={TD_R}>{fmtPct2(p.pct_of_float)}</td>
+                      <td style={TD_R}>{fmtPct2(p.pct_of_so)}</td>
                     </tr>
                   )
                 })}
@@ -252,7 +252,7 @@ export function FundPortfolioTab() {
                 label: 'Total',
                 shares_mm: totals.shares / 1e6,
                 value_mm: totals.value / 1e6,
-                pct_float: null,
+                pct_so: null,
               }]} />
             </table>
           </div>

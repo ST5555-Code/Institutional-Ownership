@@ -35,7 +35,7 @@ function fmtAumMm(v: number | null): string {
   return `$${NUM_0.format(v)}`
 }
 
-function fmtPctFloat(v: number | null): string {
+function fmtPctSo(v: number | null): string {
   if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
 }
@@ -131,10 +131,10 @@ const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 //   1  Rank
 //   2  Institution
 //   3  Type
-//   4  (empty spacer — pushes Shares/Value/%Float right by one Type-width)
+//   4  (empty spacer — pushes Shares/Value/%SO right by one Type-width)
 //   5  Shares (MM)
 //   6  Value ($MM)
-//   7  % Float
+//   7  % SO
 //   8  (empty spacer — pushes AUM / % AUM / Port. Coverage further right)
 //   9  AUM ($MM)
 //  10  % of AUM
@@ -381,13 +381,13 @@ export function RegisterTab() {
       fundView === 'fund' ? fundRowsDisplay : groups.map((g) => g.parent)
     let shares = 0
     let valueLive = 0
-    let pctFloat = 0
+    let pctSo = 0
     for (const r of rows) {
       shares += r.shares || 0
       valueLive += r.value_live || 0
-      pctFloat += r.pct_float || 0
+      pctSo += r.pct_so || 0
     }
-    return { count: rows.length, shares, valueLive, pctFloat }
+    return { count: rows.length, shares, valueLive, pctSo }
   }, [groups, fundRowsDisplay, fundView])
 
   function toggle(key: string) {
@@ -437,7 +437,7 @@ export function RegisterTab() {
       'Type',
       'Shares (MM)',
       'Value ($MM)',
-      '% Float',
+      '% SO',
       'AUM ($MM)',
       '% of AUM',
       'Port. Coverage',
@@ -456,7 +456,7 @@ export function RegisterTab() {
       r.type || '',
       r.shares != null ? (r.shares / 1e6).toFixed(2) : '',
       r.value_live != null ? (r.value_live / 1e6).toFixed(0) : '',
-      r.pct_float != null ? r.pct_float.toFixed(2) : '',
+      r.pct_so != null ? r.pct_so.toFixed(2) : '',
       r.aum != null ? r.aum.toFixed(0) : '',
       r.pct_aum != null ? r.pct_aum.toFixed(2) : '',
       r.nport_cov != null ? Math.round(r.nport_cov) : '',
@@ -618,7 +618,7 @@ export function RegisterTab() {
               <col style={{ width: 120 }} /> {/* empty gap 1 */}
               <col style={{ width: 120 }} /> {/* Shares */}
               <col style={{ width: 120 }} /> {/* Value */}
-              <col style={{ width: 120 }} /> {/* % Float */}
+              <col style={{ width: 120 }} /> {/* % SO */}
               <col style={{ width: 120 }} /> {/* empty gap 2 */}
               <col style={{ width: 120 }} /> {/* AUM */}
               <col style={{ width: 120 }} /> {/* % of AUM */}
@@ -644,7 +644,7 @@ export function RegisterTab() {
                 <th style={TH_STYLE} />
                 <th style={TH_RIGHT}>Shares (MM)</th>
                 <th style={TH_RIGHT}>Value ($MM)</th>
-                <th style={TH_RIGHT}>% Float</th>
+                <th style={TH_RIGHT}>% SO</th>
                 <th style={TH_STYLE} />
                 <th style={TH_RIGHT}>AUM ($MM)</th>
                 <th style={TH_RIGHT}>% of AUM</th>
@@ -778,7 +778,7 @@ export function RegisterTab() {
                   label: `Top ${visibleSums.count} Shown`,
                   shares_mm: visibleSums.shares / 1e6,
                   value_mm: visibleSums.valueLive / 1e6,
-                  pct_float: visibleSums.pctFloat,
+                  pct_so: visibleSums.pctSo,
                 },
                 {
                   label: `All Holders (${data.all_totals.count})`,
@@ -790,7 +790,7 @@ export function RegisterTab() {
                     data.all_totals.value_live != null
                       ? data.all_totals.value_live / 1e6
                       : null,
-                  pct_float: data.all_totals.pct_float,
+                  pct_so: data.all_totals.pct_so,
                 },
               ]}
             />
@@ -906,11 +906,11 @@ function renderRow(
           {ts.label}
         </span>
       </td>
-      {/* Gap 1: pushes Shares/Value/%Float one Type-width to the right. */}
+      {/* Gap 1: pushes Shares/Value/%SO one Type-width to the right. */}
       <td style={TD_STYLE} />
       <td style={TD_RIGHT}>{fmtSharesMm(row.shares)}</td>
       <td style={TD_RIGHT}>{fmtValueMm(row.value_live)}</td>
-      <td style={TD_RIGHT}>{fmtPctFloat(row.pct_float)}</td>
+      <td style={TD_RIGHT}>{fmtPctSo(row.pct_so)}</td>
       {/* Gap 2: pushes AUM / %AUM / Port. Coverage one more to the right. */}
       <td style={TD_STYLE} />
       <td style={TD_RIGHT}>{fmtAumMm(row.aum)}</td>
