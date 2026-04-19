@@ -502,3 +502,74 @@ functionally non-priceable (OTC grey market, restricted listings, etc.).
 `is_priceable=TRUE` but stamps foreign shape. Scope requires a look at
 OpenFIGI's grey-market classification semantics before choosing
 between (A/B/C). Tracked in ROADMAP as **INF29**.
+
+---
+
+## 7. Denormalized enrichment columns — drift risk and planned retirement
+
+Some L3 v2 tables carry denormalized enrichment columns that answer
+two very different questions. The columns look alike, but they are
+semantically distinct — and only one class is safe to leave denormalized.
+
+**Class A — filing-time facts.** Columns that answer "what did this
+filer report on this date." The filing is immutable history; the
+column is a stamp and should stay denormalized. Examples:
+`holdings_v2.cusip`, `holdings_v2.shares`, `holdings_v2.market_value_usd`,
+`fund_holdings_v2.report_date`, `fund_holdings_v2.cusip`. These never
+drift.
+
+**Class B — current-mapping lookups.** Columns that answer "what is
+the current mapping for this key." The canonical source (a `securities`
+row, an `entity_current` row, a GLEIF LEI record) can update after the
+filing is stamped. The stamp then drifts. Examples:
+`holdings_v2.ticker`, `holdings_v2.entity_id`, `holdings_v2.rollup_entity_id`,
+`fund_holdings_v2.ticker`, `fund_holdings_v2.entity_id`, and (if ever
+added) `lei`. These are the problem columns.
+
+**Principle.** Class B columns should be joins, not stamps — resolved
+at read time against the current canonical source. Class A columns stay
+denormalized.
+
+**Observed drift.**
+- **BLOCK-2 entity_id backfill.** `fund_holdings_v2.entity_id` coverage
+  moved from 40.09% to 84.13% after a one-time backfill pass against
+  `entity_current`. The gap wasn't a bug — rows were stamped against
+  the entity table as it looked at promote time; later entity merges
+  and NEW_ENTITY creates left historical rows pointing at entity_ids
+  that no longer represent the current mapping.
+- **BLOCK-TICKER-BACKFILL ticker drift.** `fund_holdings_v2.ticker`
+  was ~59% populated at 2025-06 and had decayed to ~3.7% at 2025-11
+  before the backfill. Same mechanism: ticker stamped against
+  `securities` at promote; subsequent ticker corrections in
+  `securities` never propagated back.
+
+**Planned retirement sequence.** Incremental — do not retire Class B
+columns in one pass. Each step narrows the exposure before the next.
+
+1. **BLOCK-TICKER-BACKFILL** *(shipped — `3299a9f`)*. One-time full
+   backfill of `fund_holdings_v2.ticker`; forward-looking subprocess
+   hooks at the end of `build_cusip.py` and `normalize_securities.py`
+   so future `securities` updates trigger a ticker re-stamp. Keeps
+   drift bounded, does not remove the column.
+2. **BLOCK-3** *(shipped — `0dc0d5d`)*. Legacy `fetch_nport.py` retired;
+   `build_benchmark_weights` + `build_fund_classes` repointed to
+   `fund_holdings_v2`. Removes readers that would have been broken by
+   a Class B column retirement.
+3. **Batch 3 REWRITE.** Five remaining scripts still reading the
+   denormalized Class B columns as their ground truth. Each one gets
+   repointed to read through a join on `securities` / `entity_current`
+   before the column can be retired.
+4. **BLOCK-DENORM-RETIREMENT.** Drop the stamped Class B columns from
+   v2 fact tables; rely on read-time joins. Tracked in ROADMAP as
+   **INF25**.
+
+**Not in scope.** Class A columns stay as stamps. `cusip` and `shares`
+on `holdings_v2` are the filing-time record and do not join anywhere.
+
+**Cross-references.**
+- `ENTITY_ARCHITECTURE.md → Known Limitations` carries a pointer to
+  this section from the entity side.
+- `ENTITY_ARCHITECTURE.md → Design Decision Log` carries the dated
+  rationale entry (2026-04-18).
+- ROADMAP → INFRASTRUCTURE → Open items → INF25 carries the
+  sequencing row.
