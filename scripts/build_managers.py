@@ -3,8 +3,12 @@
 build_managers.py — Build managers and parent_bridge tables.
                     Link CIK to CRD via name fuzzy match.
                     Seed top 50 institutional parents.
+                    Enrich holdings_v2 with manager metadata.
 
-Run: python3 scripts/build_managers.py
+Run: python3 scripts/build_managers.py                  # full run, prod
+     python3 scripts/build_managers.py --staging        # full run, staging DB
+     python3 scripts/build_managers.py --dry-run        # no writes, print projections
+     python3 scripts/build_managers.py --enrichment-only # only UPDATE holdings_v2
      (Requires fetch_adv.py and load_13f.py to have run first)
 """
 
@@ -12,18 +16,18 @@ import os
 import sys
 import csv
 import re
-import duckdb
+import argparse
 import pandas as pd
 from rapidfuzz import fuzz, process
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import db  # noqa: E402
 from db import record_freshness  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "13f.duckdb")
 
 # ---------------------------------------------------------------------------
 # INF17 Phase 3 — Brand-token verification gate
@@ -217,9 +221,37 @@ PARENT_SEEDS = [
 ]
 
 
-def build_parent_bridge(con):
+# ---------------------------------------------------------------------------
+# Fail-fast input guards
+# ---------------------------------------------------------------------------
+_REQUIRED_INPUTS = [
+    ("filings_deduped", "load_13f.py"),
+    ("adv_managers", "fetch_adv.py"),
+]
+
+
+def _assert_inputs_present(con):
+    """Raise with an actionable message if a required input table is
+    missing or empty. Prevents the downstream SELECT from emitting an
+    opaque duckdb Catalog/Binder error mid-run."""
+    for tbl, producer in _REQUIRED_INPUTS:
+        try:
+            n = con.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
+        except Exception as e:
+            raise RuntimeError(
+                f"build_managers: required input `{tbl}` is missing "
+                f"(produced by {producer}). {e}"
+            ) from e
+        if n == 0:
+            raise RuntimeError(
+                f"build_managers: required input `{tbl}` is empty "
+                f"(run {producer} first)."
+            )
+
+
+def build_parent_bridge(con, dry_run=False):
     """Build parent_bridge table mapping CIK to parent group."""
-    print("Building parent_bridge table...")
+    print("Building parent_bridge table...", flush=True)
 
     # Get all unique filers from 13F data
     filers = con.execute("""
@@ -281,16 +313,28 @@ def build_parent_bridge(con):
 
     df_bridge_full = pd.DataFrame(records)
 
+    if dry_run:
+        print(
+            f"\n  [dry-run] would DROP+CREATE parent_bridge "
+            f"({len(df_bridge_full):,} rows)",
+            flush=True,
+        )
+        return len(df_bridge_full)
+
     con.execute("DROP TABLE IF EXISTS parent_bridge")
     con.execute("CREATE TABLE parent_bridge AS SELECT * FROM df_bridge_full")
     count = con.execute("SELECT COUNT(*) FROM parent_bridge").fetchone()[0]
-    print(f"\n  parent_bridge table: {count:,} rows")
+    print(f"\n  parent_bridge table: {count:,} rows", flush=True)
+    try:
+        record_freshness(con, "parent_bridge")
+    except Exception as e:
+        print(f"  [warn] record_freshness(parent_bridge) failed: {e}", flush=True)
     return count
 
 
-def link_cik_to_crd(con):
+def link_cik_to_crd(con, dry_run=False):
     """Fuzzy match CIK from 13F data to CRD from ADV data."""
-    print("\nLinking CIK to CRD via fuzzy name match...")
+    print("\nLinking CIK to CRD via fuzzy name match...", flush=True)
 
     # Get 13F filers without CRD
     filers_no_crd = con.execute("""
@@ -394,36 +438,87 @@ def link_cik_to_crd(con):
             if (i + 1) % 1000 == 0:
                 print(
                     f"    Processed {i + 1:,} / {len(filers_list):,} "
-                    f"({len(fuzzy_matches):,} kept, {rejected_count:,} rejected)"
+                    f"({len(fuzzy_matches):,} kept, {rejected_count:,} rejected)",
+                    flush=True,
                 )
 
-    print(f"  Fuzzy matches found: {len(fuzzy_matches):,}  (rejected: {rejected_count:,})")
-    print(f"  Rejection log: {rejections_path}")
+    print(
+        f"  Fuzzy matches found: {len(fuzzy_matches):,}  "
+        f"(rejected: {rejected_count:,})",
+        flush=True,
+    )
+    print(f"  Rejection log: {rejections_path}", flush=True)
+
+    # Build the direct-match frame outside the dry-run branch so row
+    # counts are comparable.
+    direct_records = [
+        {"cik": cik, "crd_number": crd, "match_type": "direct_cik"}
+        for cik, crd in adv_cik_map.items()
+    ]
+
+    if dry_run:
+        print(
+            f"  [dry-run] would DROP+CREATE cik_crd_links "
+            f"({len(fuzzy_matches):,} rows)",
+            flush=True,
+        )
+        print(
+            f"  [dry-run] would DROP+CREATE cik_crd_direct "
+            f"({len(direct_records):,} rows)",
+            flush=True,
+        )
+        total_linked = direct_matches + len(fuzzy_matches)
+        print(f"  Total CIK-CRD links (projected): {total_linked:,}", flush=True)
+        return total_linked
 
     # Save link table
     if fuzzy_matches:
         df_links = pd.DataFrame(fuzzy_matches)
         con.execute("DROP TABLE IF EXISTS cik_crd_links")
         con.execute("CREATE TABLE cik_crd_links AS SELECT * FROM df_links")
+        try:
+            record_freshness(con, "cik_crd_links")
+        except Exception as e:
+            print(f"  [warn] record_freshness(cik_crd_links) failed: {e}", flush=True)
 
     # Also save direct CIK-CRD matches
-    direct_records = [
-        {"cik": cik, "crd_number": crd, "match_type": "direct_cik"}
-        for cik, crd in adv_cik_map.items()
-    ]
     if direct_records:
         df_direct = pd.DataFrame(direct_records)
         con.execute("DROP TABLE IF EXISTS cik_crd_direct")
         con.execute("CREATE TABLE cik_crd_direct AS SELECT * FROM df_direct")
+        try:
+            record_freshness(con, "cik_crd_direct")
+        except Exception as e:
+            print(f"  [warn] record_freshness(cik_crd_direct) failed: {e}", flush=True)
 
     total_linked = direct_matches + len(fuzzy_matches)
-    print(f"  Total CIK-CRD links: {total_linked:,}")
+    print(f"  Total CIK-CRD links: {total_linked:,}", flush=True)
     return total_linked
 
 
-def build_managers_table(con):
+def build_managers_table(con, dry_run=False):
     """Build the managers table joining 13F, ADV, and parent_bridge."""
-    print("\nBuilding managers table...")
+    print("\nBuilding managers table...", flush=True)
+
+    if dry_run:
+        # Project via a CTE that mirrors the CREATE TABLE body — cheaper
+        # than staging the full CTAS, and avoids requiring parent_bridge
+        # to have been materialized in dry-run mode (it hasn't — its
+        # builder also short-circuited).
+        projected = con.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT f.cik
+                FROM (
+                    SELECT cik FROM filings_deduped GROUP BY cik
+                ) f
+            )
+        """).fetchone()[0]
+        print(
+            f"  [dry-run] would DROP+CREATE managers "
+            f"(~{projected:,} rows, ±LEFT-JOIN fan-out)",
+            flush=True,
+        )
+        return projected
 
     con.execute("DROP TABLE IF EXISTS managers")
     con.execute("""
@@ -512,15 +607,39 @@ def build_managers_table(con):
     """)
 
     count = con.execute("SELECT COUNT(*) FROM managers").fetchone()[0]
-    print(f"  managers table: {count:,} rows")
+    print(f"  managers table: {count:,} rows", flush=True)
+    try:
+        record_freshness(con, "managers")
+    except Exception as e:
+        print(f"  [warn] record_freshness(managers) failed: {e}", flush=True)
+    return count
 
-    # Update holdings_v2 with manager metadata. Repointed from the
-    # dropped legacy `holdings` table per the REWRITE findings — see
-    # docs/REWRITE_BUILD_MANAGERS_FINDINGS.md §4. holdings_v2 already
-    # has inst_parent_name/manager_type/is_passive/is_activist with the
-    # correct types (VARCHAR/VARCHAR/BOOLEAN/BOOLEAN), so the historical
-    # ALTER-to-fix-types block is retired.
-    print("\nUpdating holdings_v2 with manager metadata...")
+
+def enrich_holdings_v2(con, dry_run=False):
+    """Update holdings_v2 with manager metadata. Repointed from the
+    dropped legacy `holdings` table per the REWRITE findings — see
+    docs/REWRITE_BUILD_MANAGERS_FINDINGS.md §4. holdings_v2 already has
+    inst_parent_name/manager_type/is_passive/is_activist with the
+    correct types (VARCHAR/VARCHAR/BOOLEAN/BOOLEAN), so the historical
+    ALTER-to-fix-types block is retired.
+
+    Split out of build_managers_table() so --enrichment-only can invoke
+    it in isolation — see Option A flag matrix in the REWRITE findings.
+    """
+    print("\nUpdating holdings_v2 with manager metadata...", flush=True)
+
+    if dry_run:
+        projected = con.execute("""
+            SELECT COUNT(*) FROM holdings_v2 h
+            JOIN managers m ON h.cik = m.cik
+        """).fetchone()[0]
+        print(
+            f"  [dry-run] would UPDATE ~{projected:,} rows in holdings_v2 "
+            f"(join managers on cik)",
+            flush=True,
+        )
+        return projected
+
     con.execute("""
         UPDATE holdings_v2 h
         SET
@@ -534,13 +653,12 @@ def build_managers_table(con):
     updated = con.execute("""
         SELECT COUNT(*) FROM holdings_v2 WHERE manager_type IS NOT NULL
     """).fetchone()[0]
-    print(f"  holdings_v2 updated with manager data: {updated:,}")
+    print(f"  holdings_v2 updated with manager data: {updated:,}", flush=True)
     try:
         record_freshness(con, "holdings_v2")
     except Exception as e:
         print(f"  [warn] record_freshness(holdings_v2) failed: {e}", flush=True)
-
-    return count
+    return updated
 
 
 def print_summary(con):
@@ -581,32 +699,100 @@ def print_summary(con):
     print(parents.to_string(index=False))
 
 
+def _parse_args():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--staging", action="store_true",
+        help="write to the staging DB (13f_staging.duckdb) instead of prod",
+    )
+    p.add_argument(
+        "--test", action="store_true",
+        help="write to the test DB (13f_test.duckdb)",
+    )
+    p.add_argument(
+        "--dry-run", action="store_true",
+        help="no DB writes; print projected row counts for each target",
+    )
+    p.add_argument(
+        "--enrichment-only", action="store_true",
+        help=(
+            "skip the four CTAS builds (parent_bridge, cik_crd_links, "
+            "cik_crd_direct, managers) and only UPDATE holdings_v2 from "
+            "the existing managers table. Used in the Phase 4 three-step "
+            "flow to apply enrichment to prod after staging→prod promote."
+        ),
+    )
+    return p.parse_args()
+
+
 def main():
-    print("=" * 60)
-    print("SCRIPT 2 — build_managers.py")
-    print("=" * 60)
+    # No-flag default runs two architecturally-different operations in
+    # sequence against prod:
+    #   (1) rebuild four canonical tables: parent_bridge, cik_crd_links,
+    #       cik_crd_direct, managers (DROP+CTAS each)
+    #   (2) UPDATE holdings_v2 with per-manager metadata from (1)
+    # Operation (1) is normally routed through staging (build with
+    # --staging then promote via promote_staging.py). Operation (2) is
+    # direct-write to prod because holdings_v2 is too large to route
+    # through snapshot/diff promotion — same pattern as
+    # enrich_holdings.py. The no-flag path is preserved for
+    # backward compatibility with existing scheduler / Makefile / cron
+    # invocations; new operators should prefer the three-step
+    # --staging flow documented in REWRITE_BUILD_MANAGERS_FINDINGS.md.
+    args = _parse_args()
 
-    con = duckdb.connect(DB_PATH)
+    if args.test:
+        db.set_test_mode(True)
+    if args.staging:
+        db.set_staging_mode(True)
 
-    # Step 1: Build parent_bridge
-    build_parent_bridge(con)
+    mode_tags = []
+    if args.test: mode_tags.append("TEST")
+    if args.staging: mode_tags.append("STAGING")
+    if args.dry_run: mode_tags.append("DRY-RUN")
+    if args.enrichment_only: mode_tags.append("ENRICHMENT-ONLY")
+    mode_str = " ".join(mode_tags) if mode_tags else "PROD"
 
-    # Step 2: Link CIK to CRD
-    link_cik_to_crd(con)
+    print("=" * 60, flush=True)
+    print(f"SCRIPT 2 — build_managers.py  [{mode_str}]", flush=True)
+    print("=" * 60, flush=True)
+    print(f"  DB: {db.get_db_path()}", flush=True)
 
-    # Step 3: Build managers table
-    build_managers_table(con)
+    if args.staging:
+        db.seed_staging()
 
-    # Step 4: Summary
-    print_summary(con)
+    con = db.connect_write()
+    db.assert_write_safe(con)
 
-    try:
-        con.execute("CHECKPOINT")
-        record_freshness(con, "managers")
-    except Exception as e:
-        print(f"  [warn] record_freshness(managers) failed: {e}", flush=True)
+    _assert_inputs_present(con)
+
+    if not args.enrichment_only:
+        # Step 1: Build parent_bridge
+        build_parent_bridge(con, dry_run=args.dry_run)
+
+        # Step 2: Link CIK to CRD
+        link_cik_to_crd(con, dry_run=args.dry_run)
+
+        # Step 3: Build managers table
+        build_managers_table(con, dry_run=args.dry_run)
+
+    # Step 4: Enrich holdings_v2 (always runs unless explicitly skipped
+    # in a future flag — --enrichment-only still runs this step, it just
+    # skips the preceding three).
+    enrich_holdings_v2(con, dry_run=args.dry_run)
+
+    # Step 5: Summary (only after a real build — summary queries rely on
+    # the managers table having the expected shape)
+    if not args.dry_run and not args.enrichment_only:
+        print_summary(con)
+
+    if not args.dry_run:
+        try:
+            con.execute("CHECKPOINT")
+        except Exception as e:
+            print(f"  [warn] CHECKPOINT failed: {e}", flush=True)
     con.close()
-    print("\nDone.")
+    print("\nDone.", flush=True)
 
 
 if __name__ == "__main__":
