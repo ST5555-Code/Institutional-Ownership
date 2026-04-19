@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-load_13f.py — Load SUBMISSION, INFOTABLE, and COVERPAGE TSVs from quarterly
-              SEC EDGAR bulk data into DuckDB. Create filings and holdings tables.
+load_13f.py — Load SUBMISSION, INFOTABLE, COVERPAGE, and OTHERMANAGER2
+              TSVs from quarterly SEC EDGAR bulk data into DuckDB; build
+              filings, filings_deduped, and other_managers.
 
 Usage:
     python3 scripts/load_13f.py              # full reload (all quarters)
     python3 scripts/load_13f.py --quarter 2025Q4   # incremental: reload one quarter only
     python3 scripts/load_13f.py --staging    # write to staging DB
+    python3 scripts/load_13f.py --dry-run    # project writes; no DB mutations
 """
 
 import argparse
 import os
-import time
 
 import duckdb
 
 from config import QUARTERS, LATEST_QUARTER
-from db import get_db_path, set_staging_mode
+from db import get_db_path, set_staging_mode, is_staging_mode, record_freshness
 
 # ---------------------------------------------------------------------------
 # Config
@@ -31,11 +32,13 @@ def load_quarter(con, quarter):
     sub_path = os.path.join(qdir, "SUBMISSION.tsv")
     info_path = os.path.join(qdir, "INFOTABLE.tsv")
     cover_path = os.path.join(qdir, "COVERPAGE.tsv")
+    om2_path = os.path.join(qdir, "OTHERMANAGER2.tsv")
 
-    for p in [sub_path, info_path, cover_path]:
+    for p in [sub_path, info_path, cover_path, om2_path]:
         if not os.path.exists(p):
-            print(f"  WARNING: Missing {p}")
-            return 0, 0
+            msg = f"Missing required 13F TSV for {quarter}: {p}"
+            print(f"  ERROR: {msg}", flush=True)
+            raise FileNotFoundError(msg)
 
     # Load SUBMISSION
     con.execute(f"""
@@ -101,7 +104,28 @@ def load_quarter(con, quarter):
         SELECT COUNT(*) FROM raw_coverpage WHERE quarter = '{quarter}'
     """).fetchone()[0]
 
-    print(f"  {quarter}: {sub_count:,} submissions, {info_count:,} holdings, {cover_count:,} cover pages")
+    # Load OTHERMANAGER2 (co-filing manager references; SEQUENCENUMBER-keyed)
+    con.execute(f"""
+        INSERT INTO other_managers
+        SELECT
+            ACCESSION_NUMBER,
+            SEQUENCENUMBER,
+            CIK,
+            FORM13FFILENUMBER,
+            CRDNUMBER,
+            SECFILENUMBER,
+            NAME,
+            '{quarter}' as quarter
+        FROM read_csv_auto('{om2_path}', delim='\t', header=true,
+                           all_varchar=true, ignore_errors=true)
+    """)
+    om2_count = con.execute(f"""
+        SELECT COUNT(*) FROM other_managers WHERE quarter = '{quarter}'
+    """).fetchone()[0]
+
+    print(f"  {quarter}: {sub_count:,} submissions, {info_count:,} holdings, "
+          f"{cover_count:,} cover pages, {om2_count:,} other managers",
+          flush=True)
     return sub_count, info_count
 
 
@@ -110,6 +134,7 @@ def create_staging_tables(con):
     con.execute("DROP TABLE IF EXISTS raw_submissions")
     con.execute("DROP TABLE IF EXISTS raw_infotable")
     con.execute("DROP TABLE IF EXISTS raw_coverpage")
+    con.execute("DROP TABLE IF EXISTS other_managers")
 
     con.execute("""
         CREATE TABLE raw_submissions (
@@ -157,11 +182,25 @@ def create_staging_tables(con):
         )
     """)
 
+    # Schema matches prod other_managers (8 cols) — see findings doc §9.5.
+    con.execute("""
+        CREATE TABLE other_managers (
+            accession_number VARCHAR,
+            sequence_number VARCHAR,
+            other_cik VARCHAR,
+            form13f_file_number VARCHAR,
+            crd_number VARCHAR,
+            sec_file_number VARCHAR,
+            name VARCHAR,
+            quarter VARCHAR
+        )
+    """)
+
 
 def prepare_incremental(con, quarter):
     """For incremental mode: preserve existing staging tables, delete target quarter only."""
     # Ensure staging tables exist
-    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage', 'other_managers']:
         try:
             con.execute(f"SELECT 1 FROM {tbl} LIMIT 0")
         except Exception:
@@ -170,11 +209,11 @@ def prepare_incremental(con, quarter):
             return
 
     # Delete only the target quarter's data from staging tables
-    print(f"  Removing existing {quarter} data from staging tables...")
-    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+    print(f"  Removing existing {quarter} data from staging tables...", flush=True)
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage', 'other_managers']:
         deleted = con.execute(f"DELETE FROM {tbl} WHERE quarter = '{quarter}'").fetchone()
         if deleted:
-            print(f"    {tbl}: removed {deleted[0]:,} rows")
+            print(f"    {tbl}: removed {deleted[0]:,} rows", flush=True)
 
 
 def build_filings(con):
@@ -213,159 +252,169 @@ def build_filings(con):
 
     count = con.execute("SELECT COUNT(*) FROM filings").fetchone()[0]
     deduped = con.execute("SELECT COUNT(*) FROM filings_deduped").fetchone()[0]
-    print(f"  filings: {count:,} total, {deduped:,} after dedup (latest per CIK per quarter)")
+    print(f"  filings: {count:,} total, {deduped:,} after dedup (latest per CIK per quarter)",
+          flush=True)
     return deduped
-
-
-def build_holdings(con):
-    """Build the denormalized holdings table."""
-    con.execute("DROP TABLE IF EXISTS holdings")
-    con.execute("""
-        CREATE TABLE holdings AS
-        WITH base AS (
-            SELECT
-                i.accession_number,
-                f.cik,
-                f.manager_name,
-                f.crd_number,
-                f.quarter,
-                f.report_date,
-                i.cusip,
-                NULL as ticker,
-                i.issuer_name,
-                i.title_of_class as security_type,
-                i.value as market_value_usd,
-                i.shares,
-                i.discretion,
-                i.vote_sole,
-                i.vote_shared,
-                i.vote_none,
-                i.put_call
-            FROM raw_infotable i
-            INNER JOIN filings_deduped f ON i.accession_number = f.accession_number
-        ),
-        with_pct AS (
-            SELECT
-                b.*,
-                CASE
-                    WHEN SUM(b.market_value_usd) OVER (PARTITION BY b.accession_number) > 0
-                    THEN ROUND(b.market_value_usd * 100.0 /
-                         SUM(b.market_value_usd) OVER (PARTITION BY b.accession_number), 4)
-                    ELSE 0
-                END as pct_of_portfolio
-            FROM base b
-        )
-        SELECT
-            accession_number,
-            cik,
-            manager_name,
-            crd_number,
-            NULL as inst_parent_name,
-            quarter,
-            report_date,
-            cusip,
-            ticker,
-            issuer_name,
-            security_type,
-            market_value_usd,
-            shares,
-            pct_of_portfolio,
-            NULL::DOUBLE as pct_of_float,
-            NULL as manager_type,
-            NULL::BOOLEAN as is_passive,
-            NULL::BOOLEAN as is_activist,
-            discretion,
-            vote_sole,
-            vote_shared,
-            vote_none,
-            put_call,
-            NULL::DOUBLE as market_value_live
-        FROM with_pct
-    """)
-
-    count = con.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
-    return count
 
 
 def print_summary(con):
     """Print summary statistics."""
-    print("\n--- Table Row Counts ---")
+    print("\n--- Table Row Counts ---", flush=True)
     tables = ["raw_submissions", "raw_infotable", "raw_coverpage",
-              "filings", "filings_deduped", "holdings"]
+              "filings", "filings_deduped", "other_managers"]
     for t in tables:
         try:
             count = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-            print(f"  {t}: {count:,}")
+            print(f"  {t}: {count:,}", flush=True)
         except Exception:
-            print(f"  {t}: (not found)")
+            print(f"  {t}: (not found)", flush=True)
 
-    print("\n--- Holdings by Quarter ---")
+    print("\n--- Filings by Quarter ---", flush=True)
     qcounts = con.execute("""
-        SELECT quarter, COUNT(*) as holdings, COUNT(DISTINCT cik) as filers
-        FROM holdings
+        SELECT quarter,
+               COUNT(*) as filings,
+               COUNT(DISTINCT cik) as filers
+        FROM filings_deduped
         GROUP BY quarter ORDER BY quarter
     """).fetchdf()
-    print(qcounts.to_string(index=False))
+    print(qcounts.to_string(index=False), flush=True)
+
+
+def project_dry_run(quarters):
+    """Dry-run: verify every TSV exists and project per-quarter row counts.
+
+    Uses an in-memory DuckDB to call `read_csv_auto` without touching
+    the target DB. Raises FileNotFoundError on any missing TSV — same
+    fail-fast behavior as a real run so the projection doubles as a
+    pre-flight check.
+    """
+    print("\n[dry-run] Projecting row counts (no DB mutations)...", flush=True)
+    scratch = duckdb.connect(":memory:")
+    totals = {"sub": 0, "info": 0, "cover": 0, "om2": 0}
+    for q in quarters:
+        qdir = os.path.join(EXTRACT_DIR, q)
+        paths = {
+            "sub":   os.path.join(qdir, "SUBMISSION.tsv"),
+            "info":  os.path.join(qdir, "INFOTABLE.tsv"),
+            "cover": os.path.join(qdir, "COVERPAGE.tsv"),
+            "om2":   os.path.join(qdir, "OTHERMANAGER2.tsv"),
+        }
+        for key, p in paths.items():
+            if not os.path.exists(p):
+                msg = f"Missing required 13F TSV for {q}: {p}"
+                print(f"  ERROR: {msg}", flush=True)
+                raise FileNotFoundError(msg)
+        counts = {}
+        for key, p in paths.items():
+            counts[key] = scratch.execute(
+                f"SELECT COUNT(*) FROM read_csv_auto('{p}', delim='\t', "
+                "header=true, all_varchar=true, ignore_errors=true)"
+            ).fetchone()[0]
+            totals[key] += counts[key]
+        print(
+            f"  {q}: {counts['sub']:,} submissions, {counts['info']:,} infotable, "
+            f"{counts['cover']:,} coverpage, {counts['om2']:,} othermgr2",
+            flush=True,
+        )
+    scratch.close()
+    print(
+        f"\n[dry-run] Totals: {totals['sub']:,} submissions, "
+        f"{totals['info']:,} infotable, {totals['cover']:,} coverpage, "
+        f"{totals['om2']:,} other_managers",
+        flush=True,
+    )
+    print(
+        "[dry-run] Would DROP+CTAS filings and filings_deduped from raw_submissions + raw_coverpage.",
+        flush=True,
+    )
+    print("[dry-run] No DB mutations performed.", flush=True)
+
+
+def _stamp(con, tables):
+    """Write data_freshness rows for each table. Non-fatal on failure."""
+    for t in tables:
+        try:
+            record_freshness(con, t)
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"  [warn] record_freshness({t}) failed: {e}", flush=True)
 
 
 def main():
-    print("=" * 60)
-    print("SCRIPT 4 — load_13f.py")
-    print("=" * 60)
+    print("=" * 60, flush=True)
+    print("SCRIPT 4 — load_13f.py", flush=True)
+    print("=" * 60, flush=True)
 
-    print(f"\nDatabase: {get_db_path()}")
+    print(f"\nDatabase: {get_db_path()}", flush=True)
+    print(f"  staging={is_staging_mode()}  dry_run={args.dry_run}", flush=True)
+
+    quarters_to_load = [args.quarter] if args.quarter else list(QUARTERS)
+
+    if args.dry_run:
+        project_dry_run(quarters_to_load)
+        print("\nDone.", flush=True)
+        return
+
     con = duckdb.connect(get_db_path())
 
     if args.quarter:
         # Incremental mode: reload only the specified quarter
         quarter = args.quarter
         if quarter not in QUARTERS:
-            print(f"WARNING: {quarter} not in QUARTERS list {QUARTERS}. Proceeding anyway.")
-        print(f"\nIncremental mode: reloading {quarter} only")
+            print(f"WARNING: {quarter} not in QUARTERS list {QUARTERS}. Proceeding anyway.",
+                  flush=True)
+        print(f"\nIncremental mode: reloading {quarter} only", flush=True)
 
         # Preserve other quarters, delete+reload target quarter
         prepare_incremental(con, quarter)
 
         # Load only the target quarter
-        print(f"\nLoading {quarter}...")
+        print(f"\nLoading {quarter}...", flush=True)
         s, i = load_quarter(con, quarter)
-        print(f"  Loaded: {s:,} submissions, {i:,} info table rows")
+        print(f"  Loaded: {s:,} submissions, {i:,} info table rows", flush=True)
+        con.execute("CHECKPOINT")
     else:
         # Full mode: drop and recreate everything
-        print("\nFull reload: all quarters")
-        print("\nCreating staging tables...")
+        print("\nFull reload: all quarters", flush=True)
+        print("\nCreating staging tables...", flush=True)
         create_staging_tables(con)
 
-        print("\nLoading quarterly data...")
+        print("\nLoading quarterly data...", flush=True)
         total_subs = 0
         total_info = 0
         for quarter in QUARTERS:
             s, i = load_quarter(con, quarter)
             total_subs += s
             total_info += i
-        print(f"\n  Total: {total_subs:,} submissions, {total_info:,} info table rows")
+            con.execute("CHECKPOINT")
+        print(f"\n  Total: {total_subs:,} submissions, {total_info:,} info table rows",
+              flush=True)
 
-    # Rebuild filings + holdings from all raw data (all quarters present)
-    print("\nBuilding filings table...")
+    # Stamp raw-table freshness after all quarters are loaded.
+    _stamp(con, ["raw_submissions", "raw_infotable", "raw_coverpage",
+                 "other_managers"])
+
+    # Rebuild filings from all raw data (all quarters present)
+    print("\nBuilding filings table...", flush=True)
     build_filings(con)
-
-    print("\nBuilding holdings table...")
-    t0 = time.time()
-    holdings_count = build_holdings(con)
-    elapsed = time.time() - t0
-    print(f"  holdings: {holdings_count:,} rows (built in {elapsed:.1f}s)")
+    con.execute("CHECKPOINT")
+    _stamp(con, ["filings", "filings_deduped"])
 
     # Summary
     print_summary(con)
 
+    con.execute("CHECKPOINT")
     con.close()
-    print("\nDone.")
+    print("\nDone.", flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load 13F data from SEC bulk TSVs")
-    parser.add_argument("--quarter", type=str, help=f"Load only this quarter (e.g. {LATEST_QUARTER})")
-    parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--quarter", type=str,
+                        help=f"Load only this quarter (e.g. {LATEST_QUARTER})")
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Project what would be written; no DB mutations")
     args = parser.parse_args()
     if args.staging:
         set_staging_mode(True)
