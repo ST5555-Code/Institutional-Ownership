@@ -840,14 +840,28 @@ Probes `duckdb_columns` for current state before each step:
 
 ### 9.3 pct_of_so_source values (written by Pass B)
 
-| value | meaning |
-|---|---|
-| `'soh_period_accurate'` | denominator from ASOF match against `shares_outstanding_history` at `as_of_date <= quarter_end` |
-| `'market_data_latest'` | fallback: latest `market_data.shares_outstanding`, or `market_data.float_shares` as tertiary backstop |
-| `NULL` | `is_equity = FALSE`, or no denominator available |
+Widened to three distinct values in Phase 1c (commit `f8caab0`) so
+tier 3 (float-based fallback) is no longer silently labeled the same
+as tier 2 (SO-based fallback):
+
+| value | tier | meaning |
+|---|---|---|
+| `'soh_period_accurate'` | 1 | denominator from ASOF match against `shares_outstanding_history` at `as_of_date <= quarter_end` |
+| `'market_data_so_latest'` | 2 | fallback: latest `market_data.shares_outstanding` |
+| `'market_data_float_latest'` | 3 | fallback: latest `market_data.float_shares` — semantic mixing (pct_of_float stored in a pct_of_so column) made transparent via this distinct flag |
+| `NULL` | 4 | `is_equity = FALSE`, or no denominator available |
+
+**Why three not two**: tier 3 is the exact silent-wrong pattern the
+block was created to eliminate — a float-based percentage stored in a
+column named `pct_of_so`. Collapsing tier 3 into `'market_data_latest'`
+would hide this from downstream audits. Three values let admin
+quality widgets, CSV exports, and analytics filter or warn on
+`market_data_float_latest` rows specifically.
 
 Downstream consumers (admin data-quality widget, audit queries) can
-filter by source to isolate period-accurate rows.
+now filter by exact tier: `WHERE pct_of_so_source = 'soh_period_accurate'`
+for period-accurate only, or `NOT IN ('market_data_float_latest')` for
+"at least SO-semantic" rows.
 
 ### 9.4 Phase 1 scope: staging DB only
 
@@ -903,14 +917,62 @@ ASOF `<= quarter_end` picks:
 - For WANOSO-only filers (META class), period-end WANOSO — value is
   period-average, not point-in-time (~0.5-2% drift).
 
-### 10.4 N-PORT month-end — MOOT
+### 10.4 N-PORT compute paths — Phase 1c rewrite
 
-Phase 1a §8.5 confirmed `fund_holdings_v2` does not carry
-`pct_of_float`. Block prompt's "N-PORT month-end staleness tolerance"
-section does not apply. N-PORT month-end ASOF (Jan, Feb, Apr, May,
-Jul, Aug, Oct, Nov) is not implemented — not needed.
+Phase 1a §8.5 confirmed `fund_holdings_v2` does not carry a stored
+`pct_of_float` column. However, `scripts/queries.py` has **ad-hoc
+compute paths** that produce a `pct_so` value for N-PORT fund holdings
+on the fly (feeding Register children, Market heatmap, OwnershipTrend,
+FlowAnalysis, Two-Company Overlap). Phase 1b renamed the key
+`pct_float` → `pct_so` but left the denominator as latest
+`market_data.float_shares` — same silent-wrong pattern the block was
+created to eliminate.
 
-### 10.5 Staleness counter
+Phase 1c (commit `b0ba86d`) rewrote every such path. The shared
+helper `scripts/queries.py::_resolve_pct_of_so_denom(con, ticker,
+as_of_date)` applies the same three-tier cascade used in
+`enrich_holdings.py` Pass B:
+
+  1. `shares_outstanding_history` ASOF match at/before `as_of_date`
+  2. latest `market_data.shares_outstanding`
+  3. latest `market_data.float_shares`
+  4. `(None, None)` — no denominator available
+
+A companion helper `_quarter_to_date('YYYYQN')` derives the calendar
+quarter-end as the anchor.
+
+### 10.5 N-PORT month-end staleness tolerance
+
+N-PORT `fh.report_date` spans month-ends (Jan-31, Feb-28, Apr-30,
+May-31, Jul-31, Aug-31, Oct-31, Nov-30) plus calendar quarter-ends.
+Phase 1c rewrite anchors the SOH ASOF match at the 13F quarter-end
+derived from `quarter` (not the individual N-PORT row's
+`report_date`). Rationale:
+
+- The queries aggregate N-PORT rows WITHIN a `quarter` argument and
+  return a single per-fund aggregate; per-row ASOF would require
+  splitting the group, which changes the result shape and doesn't
+  meaningfully improve accuracy over the quarter-end anchor.
+- us-gaap:CSO XBRL facts are predominantly filed at calendar
+  quarter-ends. A Jan-31 N-PORT report anchored at its report_date
+  would have the same SOH match as one anchored at the containing
+  quarter_end (2024-12-31 → prior 10-K) since no Jan-31 SOH fact
+  exists.
+- The quarter-end anchor aligns N-PORT pct_so with 13F pct_so for
+  the same ticker/quarter — consumers comparing the two panels see
+  consistent denominators.
+
+**Staleness impact**: for non-quarter N-PORT months, the
+`soh_period_accurate` match is ≤ ~90 days stale relative to the
+N-PORT report_date. Tier 1 is still preferred over Tier 2/3 since
+it reflects the most-recent 10-K/10-Q at the anchor quarter-end.
+Documented in the helper docstring; downstream consumers can
+identify month-end staleness by the row's `pct_of_so_source` field
+plus the mismatch between `quarter` and the N-PORT `report_date`.
+
+### 10.6 Staleness counter (Pass B, 13F)
+
+### 10.6 Staleness counter (Pass B, 13F)
 
 Per-run logged counter: `pof_stale_gt60` — number of rows where the
 SOH ASOF match has `quarter_end - as_of_date > 60 days`. Exposes
@@ -922,7 +984,26 @@ projection output:
   SOH matches with staleness > 60 days : ...
 ```
 
-### 10.6 Join key choice
+### 10.6a Tier distribution counter (Pass B, Phase 1c)
+
+Phase 1c (commit `90514c6`) added per-tier population counts to the
+Pass B projection:
+
+```
+  tier distribution (equity rows):
+    1. soh_period_accurate     (tier 1)       : ...
+    2. market_data_so_latest   (tier 2 SO)    : ...
+    3. market_data_float_latest(tier 3 float) : ...
+    4. NULL (equity, no denom) (tier 4)       : ...
+```
+
+Sum across the four tiers equals the equity-row count. Watching the
+tier 3 count pre/post-promotion is the admin signal for how many rows
+are "pct_of_float stored in pct_of_so column" — staging validation
+threshold TBD (expect double-digit thousands given the 70% no-SOH
+cliff from §4.1).
+
+### 10.7 Join key choice
 
 Resolution is done on distinct `(cusip, report_date)` pairs via the
 `keys` CTE, then the final UPDATE joins back to `holdings_v2` on
@@ -932,7 +1013,7 @@ cusip, quarter)` dup groups (~1.29M / ~4.97M rows per
 is a ticker-level quantity, so dup rows sharing a `(cusip,
 report_date)` correctly get the same value.
 
-### 10.7 Projection query includes audit columns
+### 10.8 Projection query includes audit columns
 
 `_pass_b_project` now returns:
 - `pof_changes` — rows where denominator value changes
@@ -1021,21 +1102,53 @@ is larger because React consumers multiply.
 | `web/datasette_config.yaml` | canned queries on dropped `holdings` table (already broken) |
 | `ROADMAP.md`, `NEXT_SESSION_CONTEXT.md`, `docs/*.md`, `docs/reports/*.md` | deferred to batched doc-update session per prompt constraints |
 
-### 11.6 N-PORT compute-path awkwardness (deferred)
+### 11.6 N-PORT compute-path rewrite — RESOLVED in Phase 1c
 
-`scripts/queries.py` has three locations (≈ lines 441, 499, 2458,
-3043) where an N-PORT fund's display pct is computed ad-hoc from
-`market_data.float_shares`, returned under the key `pct_so` after
-Phase 1b. The label is semantically mixed: the value is still a
-float-based percentage, but the key says "of SO."
+**Status: resolved (commit `b0ba86d`)**. Previously flagged as
+deferred; escalated to Phase 1c scope per block prompt because the
+silent-wrong pattern the flag describes is exactly what the block
+was created to eliminate.
 
-Options for cleanup (not in this block):
-- Switch those compute paths to prefer `market_data.shares_outstanding`
-  (with `float_shares` fallback) to match the label.
-- Accept the mixed semantics and document it.
-- Suppress the computed pct entirely when SO isn't available.
+Shared helpers added at top of `scripts/queries.py`:
+- `_quarter_to_date('YYYYQN')` — calendar quarter-end derivation.
+- `_resolve_pct_of_so_denom(con, ticker, as_of_date)` — three-tier
+  cascade matching Pass B (SOH → md.shares_outstanding → md.float_shares),
+  returns `(denominator, source)`.
 
-Flagged in §12 as deferred.
+Eight queries.py functions rewritten to use the helper:
+
+| function | line (pre-rewrite) | scope |
+|---|---|---|
+| `get_nport_children_batch` | 346-454 | N-PORT children per parent, top-N |
+| `get_nport_children` | 457-510 | N-PORT children per parent, non-batched |
+| `query16` | 2419-2510 | fund-level register (rows + all_totals + type_totals) |
+| `ownership_trend_summary` | 2518-2600 | per-quarter trend (per-quarter denom cache) |
+| `_compute_flows_live` | 2866-… | buyer/seller/new/exit flows (separate denoms for from_q / to_q) |
+| `flow_analysis` precomputed path | 3043-3061 | precomputed flow reader (separate denoms for from_q / to_q) |
+| `get_two_company_overlap` | 5368-… | Two-Company Overlap tab (subject + second) |
+| `get_two_company_subject` | 5535-… | subject-only variant |
+
+Each return row now includes `pct_of_so_source` alongside `pct_so` so
+consumers can match the 13F audit contract. `TwoCompanyMeta` changed
+shape: `subj_float`/`sec_float` replaced with
+`subj_denom`/`subj_pct_of_so_source` and corresponding sec_ fields
+(type definition updated; no React consumer currently reads these
+meta fields — verified via grep).
+
+### 11.7 Backend-only change
+
+Phase 1c added `pct_of_so_source` to N-PORT return payloads but did
+NOT add display badges in React. Consumers that already pass the
+field through TypeScript structural typing work unchanged; any future
+display work (tooltip/warning on tier 3 rows) is out of scope.
+
+Touch list summary:
+- Python: `scripts/queries.py` (extensive — ~+235/-90 lines)
+- TypeScript: `web/react-app/src/types/api.ts` (TwoCompanyMeta shape
+  + TwoCompanyInstitutionalRow / TwoCompanyFundRow audit fields —
+  backward-compatible structural additions)
+- React TSX: no changes — consumers read existing `pct_so` field,
+  ignore new audit fields, render unchanged.
 
 ---
 
@@ -1060,12 +1173,8 @@ update session)." The following docs reference `pct_of_float` /
 | `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` / `REWRITE_BUILD_SUMMARIES_FINDINGS.md` | passing references only — rename in batched pass |
 | `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md` | single reference — rename in batched pass |
 
-### Additional cleanup items flagged during Phase 1b
+### Additional cleanup items flagged during Phase 1b/1c
 
-- **N-PORT compute-path label mismatch** (§11.6): queries.py ad-hoc
-  `pct_so` computation on N-PORT fund rows still uses `float_shares`
-  as denominator. Decide: rebuild to use `shares_outstanding`, or
-  explicitly document the mixed semantics.
 - **`summary_by_ticker` DDL** has `pct_of_so` column. Existing prod
   `summary_by_ticker` table will need either a follow-up migration
   (rename column on that table too) or a full rebuild via
@@ -1073,25 +1182,39 @@ update session)." The following docs reference `pct_of_float` /
 - **`fmtPct` vs `fmtPct2`** utility naming convention — both are used
   in React. Not a Phase 1b concern but flagged for future consistency
   pass.
-- **Obsolete comments** in `queries.py` (e.g. `# Get float_shares for
-  pct_of_so calculation`) read awkwardly post-rename. Cleaning these
-  requires human review since some *intentionally* describe a
-  float-based computation; surgical editing deferred to batched doc
+- **Obsolete comments** in `queries.py` that still reference
+  "float_shares calculation" in context where denominator is now the
+  tier-cascade helper; surgical editing deferred to batched doc
   session.
+- **React tier-3 warning/tooltip** — Phase 1c exposes
+  `pct_of_so_source = 'market_data_float_latest'` on N-PORT and 13F
+  result sets. Current React display ignores the field. Future UX
+  work: show a subtle badge/warning on tier-3 rows so users know the
+  displayed % is float-based. Out of Phase 1c scope.
 - **INF38 tracking** — create ROADMAP entry for BLOCK-FLOAT-HISTORY
   (true float_shares time-series ingestion from 10-K Item 5); noted
   in Phase 0 §2.2 as Option B deferred scope.
 
-### Phase 1b exit criteria (all met)
+### Phase 1 exit criteria (1a + 1b + 1c, all met)
 
 - Findings doc renamed ✓
 - Phase 1a §8 SOH source verification appended ✓
-- Migration `008_rename_pct_of_float_to_pct_of_so.py` written (idempotent, staging-scoped, not yet applied) ✓
-- Pass B rewrite in `enrich_holdings.py` (ASOF against SOH, fallback, audit column) ✓
+- Migration `008_rename_pct_of_float_to_pct_of_so.py` written
+  (idempotent, staging-scoped, not yet applied) ✓
+- Migration 008 docstring widened to three-tier audit semantics ✓
+  (Phase 1c, commit `f8caab0`)
+- Pass B rewrite in `enrich_holdings.py`: ASOF against SOH +
+  three-tier fallback + three-value audit column + tier_distribution
+  counter ✓ (Phase 1b `dd2b5a1` + Phase 1c `90514c6`)
 - Read-site migration across backend + React + test fixtures ✓
-- Findings doc finalized with §9–§12 ✓
+- N-PORT compute paths in `queries.py` rewritten to use the same
+  tier cascade + audit column ✓ (Phase 1c, `b0ba86d`)
+- Findings doc finalized with §8–§12 ✓
 - No prod writes, no fetch runs, no ROADMAP/data_layers/pipeline_inventory churn ✓
 
 Ready for Phase 2 (staging validation) once Serge applies migration
 008 to `data/13f_staging.duckdb` and runs `enrich_holdings.py
---staging --dry-run`.
+--staging --dry-run`. Tier-distribution counter in the dry-run
+output is the first staging signal to watch — tier 3 count pre-apply
+forecasts how many rows carry the silent-wrong float-based semantics
+today.
