@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-load_13f.py — Load SUBMISSION, INFOTABLE, and COVERPAGE TSVs from quarterly
-              SEC EDGAR bulk data into DuckDB. Create filings and holdings tables.
+load_13f.py — Load SUBMISSION, INFOTABLE, COVERPAGE, and OTHERMANAGER2
+              TSVs from quarterly SEC EDGAR bulk data into DuckDB; build
+              filings, filings_deduped, and other_managers.
 
 Usage:
     python3 scripts/load_13f.py              # full reload (all quarters)
     python3 scripts/load_13f.py --quarter 2025Q4   # incremental: reload one quarter only
     python3 scripts/load_13f.py --staging    # write to staging DB
+    python3 scripts/load_13f.py --dry-run    # project writes; no DB mutations
 """
 
 import argparse
 import os
-import time
 
 import duckdb
 
@@ -217,81 +218,11 @@ def build_filings(con):
     return deduped
 
 
-def build_holdings(con):
-    """Build the denormalized holdings table."""
-    con.execute("DROP TABLE IF EXISTS holdings")
-    con.execute("""
-        CREATE TABLE holdings AS
-        WITH base AS (
-            SELECT
-                i.accession_number,
-                f.cik,
-                f.manager_name,
-                f.crd_number,
-                f.quarter,
-                f.report_date,
-                i.cusip,
-                NULL as ticker,
-                i.issuer_name,
-                i.title_of_class as security_type,
-                i.value as market_value_usd,
-                i.shares,
-                i.discretion,
-                i.vote_sole,
-                i.vote_shared,
-                i.vote_none,
-                i.put_call
-            FROM raw_infotable i
-            INNER JOIN filings_deduped f ON i.accession_number = f.accession_number
-        ),
-        with_pct AS (
-            SELECT
-                b.*,
-                CASE
-                    WHEN SUM(b.market_value_usd) OVER (PARTITION BY b.accession_number) > 0
-                    THEN ROUND(b.market_value_usd * 100.0 /
-                         SUM(b.market_value_usd) OVER (PARTITION BY b.accession_number), 4)
-                    ELSE 0
-                END as pct_of_portfolio
-            FROM base b
-        )
-        SELECT
-            accession_number,
-            cik,
-            manager_name,
-            crd_number,
-            NULL as inst_parent_name,
-            quarter,
-            report_date,
-            cusip,
-            ticker,
-            issuer_name,
-            security_type,
-            market_value_usd,
-            shares,
-            pct_of_portfolio,
-            NULL::DOUBLE as pct_of_float,
-            NULL as manager_type,
-            NULL::BOOLEAN as is_passive,
-            NULL::BOOLEAN as is_activist,
-            discretion,
-            vote_sole,
-            vote_shared,
-            vote_none,
-            put_call,
-            NULL::DOUBLE as market_value_live
-        FROM with_pct
-    """)
-
-    count = con.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
-    return count
-
-
 def print_summary(con):
     """Print summary statistics."""
     print("\n--- Table Row Counts ---")
     tables = ["raw_submissions", "raw_infotable", "raw_coverpage",
-              "filings", "filings_deduped", "holdings"]
+              "filings", "filings_deduped"]
     for t in tables:
         try:
             count = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
@@ -299,10 +230,12 @@ def print_summary(con):
         except Exception:
             print(f"  {t}: (not found)")
 
-    print("\n--- Holdings by Quarter ---")
+    print("\n--- Filings by Quarter ---")
     qcounts = con.execute("""
-        SELECT quarter, COUNT(*) as holdings, COUNT(DISTINCT cik) as filers
-        FROM holdings
+        SELECT quarter,
+               COUNT(*) as filings,
+               COUNT(DISTINCT cik) as filers
+        FROM filings_deduped
         GROUP BY quarter ORDER BY quarter
     """).fetchdf()
     print(qcounts.to_string(index=False))
@@ -345,15 +278,9 @@ def main():
             total_info += i
         print(f"\n  Total: {total_subs:,} submissions, {total_info:,} info table rows")
 
-    # Rebuild filings + holdings from all raw data (all quarters present)
+    # Rebuild filings from all raw data (all quarters present)
     print("\nBuilding filings table...")
     build_filings(con)
-
-    print("\nBuilding holdings table...")
-    t0 = time.time()
-    holdings_count = build_holdings(con)
-    elapsed = time.time() - t0
-    print(f"  holdings: {holdings_count:,} rows (built in {elapsed:.1f}s)")
 
     # Summary
     print_summary(con)
