@@ -1882,6 +1882,93 @@ Precedent: pct-of-so Phase 4 DependencyException (see
 REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.0).
 ```
 
+### §14.10 addendum — INF42 + INF34 (added 2026-04-19, branch `fix/post-merge-regressions`)
+
+Post-merge browser smoke on main@`bee49ff` surfaced three live
+regressions (Register %FLOAT blank, Flow Analysis duplicated rows,
+Conviction 500) plus one CI smoke failure (run #108). Two of the
+four traced back to a single new failure class — derived artifacts
+that ship stale while their source has been updated. This warrants
+its own deferred item.
+
+**INF42 — BLOCK-DERIVED-ARTIFACT-HYGIENE**
+
+Compiled and generated artifacts can ship to main with stale content
+while their source has been updated. pct-of-so exposed two instances
+simultaneously:
+
+1. Stale React `web/react-app/dist/` bundle (built before commit
+   `f956096`) still referenced the old field name `pct_float` — the
+   Register tab `% FLOAT` column rendered em-dashes because the API
+   now returns `pct_so`. Source (`.tsx`) was correct; dist/ was not
+   rebuilt at merge time. `dist/` is gitignored so the drift is
+   invisible to code review.
+2. Stale CI smoke fixture DB (`tests/fixtures/13f_fixture.duckdb`)
+   predated migration 008 (column rename) and did not include the
+   new `shares_outstanding_history` table. 4/8 CI smoke tests failed
+   on run #108.
+
+Fix scope (for a future dedicated session, NOT this one):
+- Pre-commit or CI enforcement that rebuilds `web/react-app/dist/`
+  whenever `web/react-app/src/**` changes. Likely path: CI step that
+  runs `npm run build` and asserts the resulting bundle matches the
+  one served. If `dist/` remains gitignored, a deploy-time rebuild
+  must be guaranteed.
+- Pre-commit or CI enforcement that regenerates
+  `tests/fixtures/13f_fixture.duckdb` whenever
+  `scripts/migrations/***.py` or `scripts/build_fixture.py` changes
+  schema. OR: CI job that re-runs `scripts/build_fixture.py` fresh
+  each build so the committed binary becomes unnecessary.
+- Wire `npm run build` into `scripts/start_app.sh` so local dev
+  catches source/dist drift the first time a developer hits the page
+  after pulling.
+- Fail loudly on staleness rather than silently ship drifted
+  artifacts.
+
+Tactical patches already applied in this session (commits on
+`fix/post-merge-regressions`):
+- React dist rebuilt locally (not committable — gitignored). Serge
+  to rebuild after pull; INF42 proper fix needed for durable
+  automation.
+- `scripts/build_fixture.py` extended with
+  `shares_outstanding_history`; fixture DB + response snapshots
+  regenerated and committed (binary).
+
+Cross-reference: pct-of-so post-merge browser smoke (stale dist), CI
+run #108 (stale fixture), `fix/post-merge-regressions` Phase 5.
+
+Sibling to: INF39 / INF40 / INF41 — together form the v2-table
+migration hardening package (schema-diff, surrogate-id, rename-sweep,
+artifact-hygiene).
+
+Priority: medium.
+
+**INF34 — CLEARED (2026-04-19)**
+
+INF34 was "queries.py rollup_type filter missing". The Flow Analysis
+duplicate-row regression exposed a second instance in the same class,
+so Phase 5 took the sweep approach rather than a tactical patch. All
+6 flagged read sites in `scripts/queries.py` against
+`investor_flows` or `summary_by_parent` now filter on the caller's
+`rollup_type`. Fix commit: Task 2 of `fix/post-merge-regressions`
+("post-merge-fixes: Flow Analysis dup — INF34 full sweep..."). No
+residual sites deferred. INF34 is removed from the open-items index.
+
+**INF42 stub content (for the ROADMAP entry copy-paste)**
+```
+INF42 — BLOCK-DERIVED-ARTIFACT-HYGIENE
+Scope: CI / pre-commit automation that fails loudly when a generated
+artifact ships stale.
+Two known classes:
+  - web/react-app/dist/ (gitignored, rebuilt at deploy — no check
+    today that the served bundle matches current src/)
+  - tests/fixtures/13f_fixture.duckdb (committed binary, rebuilt
+    only by hand via scripts/build_fixture.py)
+Priority: medium. Sibling to INF39/INF40/INF41.
+Precedent: pct-of-so post-merge regressions 2026-04-19 — see
+REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.10 addendum.
+```
+
 ### §14.11 Phase 4b exit
 
 All gates met:
