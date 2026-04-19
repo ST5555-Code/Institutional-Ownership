@@ -514,18 +514,15 @@ def build_managers_table(con):
     count = con.execute("SELECT COUNT(*) FROM managers").fetchone()[0]
     print(f"  managers table: {count:,} rows")
 
-    # Update holdings with manager metadata
-    print("\nUpdating holdings with manager metadata...")
-    # Fix column types — they were created as NULL so DuckDB may have inferred wrong types
-    try:
-        con.execute("ALTER TABLE holdings ALTER COLUMN inst_parent_name TYPE VARCHAR")
-        con.execute("ALTER TABLE holdings ALTER COLUMN manager_type TYPE VARCHAR")
-        con.execute("ALTER TABLE holdings ALTER COLUMN is_passive TYPE BOOLEAN")
-        con.execute("ALTER TABLE holdings ALTER COLUMN is_activist TYPE BOOLEAN")
-    except Exception:  # nosec B110 — columns may already be correct type
-        pass
+    # Update holdings_v2 with manager metadata. Repointed from the
+    # dropped legacy `holdings` table per the REWRITE findings — see
+    # docs/REWRITE_BUILD_MANAGERS_FINDINGS.md §4. holdings_v2 already
+    # has inst_parent_name/manager_type/is_passive/is_activist with the
+    # correct types (VARCHAR/VARCHAR/BOOLEAN/BOOLEAN), so the historical
+    # ALTER-to-fix-types block is retired.
+    print("\nUpdating holdings_v2 with manager metadata...")
     con.execute("""
-        UPDATE holdings h
+        UPDATE holdings_v2 h
         SET
             inst_parent_name = m.parent_name,
             manager_type = m.strategy_type,
@@ -535,9 +532,13 @@ def build_managers_table(con):
         WHERE h.cik = m.cik
     """)
     updated = con.execute("""
-        SELECT COUNT(*) FROM holdings WHERE manager_type IS NOT NULL
+        SELECT COUNT(*) FROM holdings_v2 WHERE manager_type IS NOT NULL
     """).fetchone()[0]
-    print(f"  Holdings updated with manager data: {updated:,}")
+    print(f"  holdings_v2 updated with manager data: {updated:,}")
+    try:
+        record_freshness(con, "holdings_v2")
+    except Exception as e:
+        print(f"  [warn] record_freshness(holdings_v2) failed: {e}", flush=True)
 
     return count
 
