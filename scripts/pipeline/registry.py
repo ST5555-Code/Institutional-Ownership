@@ -139,7 +139,7 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         notes="app reads directly at api_market.py:191 — L3 not L4",
     ),
     "fund_universe": DatasetSpec(
-        layer=3, owner="scripts/fetch_nport.py",
+        layer=3, owner="scripts/fetch_nport_v2.py",
         promote_strategy="upsert",
         promote_key=("series_id",),
         downstream=("fund_holdings_v2",),
