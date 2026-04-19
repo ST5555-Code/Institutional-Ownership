@@ -312,6 +312,13 @@ def build_parent_bridge(con, dry_run=False):
         })
 
     df_bridge_full = pd.DataFrame(records)
+    # Dedupe on cik: the unmatched loop iterates `SELECT DISTINCT cik,
+    # manager_name, crd_number FROM filings_deduped` which fans out when
+    # a CIK has multiple (name, crd) variants across quarters. Keep the
+    # first occurrence so cik stays empirically unique and the pk_diff
+    # promote path is sound (see REWRITE_BUILD_MANAGERS_FINDINGS.md §2.3
+    # — this was the 870-dupe pattern surfaced in Phase 2 validation).
+    df_bridge_full = df_bridge_full.drop_duplicates(subset=["cik"], keep="first")
 
     if dry_run:
         print(
