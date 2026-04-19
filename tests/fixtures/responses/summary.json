@@ -2,71 +2,79 @@
   "company_name": "APPLE INC",
   "ticker": "AAPL",
   "latest_quarter": "2025Q4",
-  "total_value": 2521728609725.9014,
-  "total_pct_so": 67.00410000000655,
+  "total_value": 2595433400288.408,
+  "total_pct_so": 67.02188454923922,
   "num_holders": 5928,
   "total_shares": 9853581626,
-  "passive_value": 1061117693799.5201,
-  "active_value": 735124990492.4814,
-  "price": 255.92,
-  "market_cap": 3757197348800.0,
-  "shares_float": 14656035251.0,
-  "price_date": "2026-04-05",
+  "passive_value": 1092131918360.4001,
+  "active_value": 756611138229.597,
+  "price": 263.4,
+  "market_cap": 3867012275999.9995,
+  "shares_float": 14655888439.0,
+  "price_date": "2026-04-16",
   "type_breakdown": [
     {
       "type": "passive",
-      "value": 1118213825840.72
+      "value": 1156541517304.2002
     },
     {
       "type": "mixed",
-      "value": 548912686875.83984
+      "value": 532296001410.60016
     },
     {
       "type": "active",
-      "value": 406915809107.3596
-    },
-    {
-      "type": "wealth_management",
-      "value": 180470527794.48026
+      "value": 498286259101.801
     },
     {
       "type": "pension_insurance",
-      "value": 99086645967.68007
+      "value": 100452820597.19997
     },
     {
-      "type": "quantitative",
-      "value": 68417590099.6
-    },
-    {
-      "type": "strategic",
-      "value": 59283976254.159996
+      "type": "wealth_management",
+      "value": 89723935147.79999
     },
     {
       "type": "hedge_fund",
-      "value": 20723795837.360004
+      "value": 82011315796.80008
     },
     {
-      "type": "SWF",
-      "value": 15351315902.159998
+      "type": "quantitative",
+      "value": 62897582851.799995
     },
     {
-      "type": "endowment_foundation",
-      "value": 4155041879.5199995
-    },
-    {
-      "type": "activist",
-      "value": 190735128.64
-    },
-    {
-      "type": "venture_capital",
-      "value": 6377526.399999999
+      "type": "strategic",
+      "value": 61332162146.4
     },
     {
       "type": "private_equity",
-      "value": 281512.0
+      "value": 5531199025.799999
+    },
+    {
+      "type": "SWF",
+      "value": 4060394234.3999996
+    },
+    {
+      "type": "endowment_foundation",
+      "value": 1291488129.6
+    },
+    {
+      "type": "unknown",
+      "value": 751985401.2
+    },
+    {
+      "type": "multi_strategy",
+      "value": 234180774.59999996
+    },
+    {
+      "type": "activist",
+      "value": 15994438.2
+    },
+    {
+      "type": "venture_capital",
+      "value": 6563927.999999999
     }
   ],
-  "nport_coverage": 31.8,
-  "nport_funds": 1351,
-  "nport_latest_date": "2025-10-31"
+  "nport_coverage": 32.3,
+  "nport_funds": 1495,
+  "nport_latest_date": "2025-09-30"
 }

@@ -3,14 +3,14 @@
     "nodes": [
       {
         "id": "inst-2",
-        "label": "BlackRock / iShares\n$971.3B",
-        "title": "BlackRock / iShares<br>13F AUM as of 2025Q4: $971.3B",
+        "label": "BlackRock / iShares\n$968.4B",
+        "title": "BlackRock / iShares<br>13F AUM as of 2025Q4: $968.4B",
         "level": 0,
         "node_type": "institution",
         "entity_id": 2,
         "display_name": "BlackRock / iShares",
         "classification": "passive",
-        "aum": 971276346571.0,
+        "aum": 968412871786.0,
         "aum_type": "13F AUM as of 2025Q4",
         "color": {
           "background": "#002147",
@@ -21,71 +21,14 @@
         }
       },
       {
-        "id": "filer-3241",
-        "label": "BlackRock, Inc.\n$971.3B",
-        "title": "BlackRock, Inc.<br>CIK: 0002012383<br>13F AUM as of 2025Q4: $971.3B",
+        "id": "filer-2",
+        "label": "BlackRock / iShares\n\u2014",
+        "title": "BlackRock / iShares<br>CIK: 0000884216<br>13F AUM as of 2025Q4: \u2014",
         "level": 1,
         "node_type": "filer",
-        "entity_id": 3241,
-        "display_name": "BlackRock, Inc.",
-        "cik": "0002012383",
-        "aum": 971276346571.0,
-        "aum_type": "13F AUM as of 2025Q4",
-        "color": {
-          "background": "#4A90D9",
-          "border": "#2E6EB5"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "filer-3586",
-        "label": "BLACKROCK ADVISORS LLC\n\u2014",
-        "title": "BLACKROCK ADVISORS LLC<br>CIK: 0001086364<br>13F AUM as of 2025Q4: \u2014",
-        "level": 1,
-        "node_type": "filer",
-        "entity_id": 3586,
-        "display_name": "BLACKROCK ADVISORS LLC",
-        "cik": "0001086364",
-        "aum": null,
-        "aum_type": "13F AUM as of 2025Q4",
-        "color": {
-          "background": "#4A90D9",
-          "border": "#2E6EB5"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "filer-8453",
-        "label": "BLACKROCK FINANCIAL MANAGEMENT INC/DE\n\u2014",
-        "title": "BLACKROCK FINANCIAL MANAGEMENT INC/DE<br>CIK: 0001086363<br>13F AUM as of 2025Q4: \u2014",
-        "level": 1,
-        "node_type": "filer",
-        "entity_id": 8453,
-        "display_name": "BLACKROCK FINANCIAL MANAGEMENT INC/DE",
-        "cik": "0001086363",
-        "aum": null,
-        "aum_type": "13F AUM as of 2025Q4",
-        "color": {
-          "background": "#4A90D9",
-          "border": "#2E6EB5"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "filer-7586",
-        "label": "BlackRock Fund Advisors\n\u2014",
-        "title": "BlackRock Fund Advisors<br>CIK: 0001006249<br>13F AUM as of 2025Q4: \u2014",
-        "level": 1,
-        "node_type": "filer",
-        "entity_id": 7586,
-        "display_name": "BlackRock Fund Advisors",
-        "cik": "0001006249",
+        "entity_id": 2,
+        "display_name": "BlackRock / iShares",
+        "cik": "0000884216",
         "aum": null,
         "aum_type": "13F AUM as of 2025Q4",
         "color": {
@@ -98,14 +41,14 @@
       },
       {
         "id": "fund-17642",
-        "label": "iShares Core S&P 500 ETF\n$701.4B",
-        "title": "iShares Core S&P 500 ETF<br>Series ID: S000004310<br>Fund NAV: $701.4B",
+        "label": "iShares Core S&P 500 ETF\n$760.6B",
+        "title": "iShares Core S&P 500 ETF<br>Series ID: S000004310<br>Fund NAV: $760.6B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17642,
         "display_name": "iShares Core S&P 500 ETF",
         "series_id": "S000004310",
-        "aum": 701369339021.2,
+        "aum": 760624025198.37,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -117,14 +60,14 @@
       },
       {
         "id": "fund-17718",
-        "label": "iShares Russell 1000 Growth ETF\n$122.1B",
-        "title": "iShares Russell 1000 Growth ETF<br>Series ID: S000004346<br>Fund NAV: $122.1B",
+        "label": "iShares Russell 1000 Growth ETF\n$126.0B",
+        "title": "iShares Russell 1000 Growth ETF<br>Series ID: S000004346<br>Fund NAV: $126.0B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17718,
         "display_name": "iShares Russell 1000 Growth ETF",
         "series_id": "S000004346",
-        "aum": 122123027085.41,
+        "aum": 125986755291.03,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -136,33 +79,14 @@
       },
       {
         "id": "fund-17645",
-        "label": "iShares Core S&P Total U.S. Stock Market ETF\n$78.0B",
-        "title": "iShares Core S&P Total U.S. Stock Market ETF<br>Series ID: S000004317<br>Fund NAV: $78.0B",
+        "label": "iShares Core S&P Total U.S. Stock Market ETF\n$80.1B",
+        "title": "iShares Core S&P Total U.S. Stock Market ETF<br>Series ID: S000004317<br>Fund NAV: $80.1B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17645,
         "display_name": "iShares Core S&P Total U.S. Stock Market ETF",
         "series_id": "S000004317",
-        "aum": 77970604341.27,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17672",
-        "label": "iShares S&P 500 Growth ETF\n$65.8B",
-        "title": "iShares S&P 500 Growth ETF<br>Series ID: S000004311<br>Fund NAV: $65.8B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17672,
-        "display_name": "iShares S&P 500 Growth ETF",
-        "series_id": "S000004311",
-        "aum": 65832286577.03,
+        "aum": 80097614330.58,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -174,14 +98,33 @@
       },
       {
         "id": "fund-17715",
-        "label": "iShares Russell 1000 Value ETF\n$64.2B",
-        "title": "iShares Russell 1000 Value ETF<br>Series ID: S000004345<br>Fund NAV: $64.2B",
+        "label": "iShares Russell 1000 Value ETF\n$69.8B",
+        "title": "iShares Russell 1000 Value ETF<br>Series ID: S000004345<br>Fund NAV: $69.8B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17715,
         "display_name": "iShares Russell 1000 Value ETF",
         "series_id": "S000004345",
-        "aum": 64171121607.89,
+        "aum": 69816623378.39,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17672",
+        "label": "iShares S&P 500 Growth ETF\n$66.6B",
+        "title": "iShares S&P 500 Growth ETF<br>Series ID: S000004311<br>Fund NAV: $66.6B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17672,
+        "display_name": "iShares S&P 500 Growth ETF",
+        "series_id": "S000004311",
+        "aum": 66563860642.67,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -193,52 +136,14 @@
       },
       {
         "id": "fund-17606",
-        "label": "iShares MSCI USA Quality Factor ETF\n$52.7B",
-        "title": "iShares MSCI USA Quality Factor ETF<br>Series ID: S000041444<br>Fund NAV: $52.7B",
+        "label": "iShares MSCI USA Quality Factor ETF\n$49.9B",
+        "title": "iShares MSCI USA Quality Factor ETF<br>Series ID: S000041444<br>Fund NAV: $49.9B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17606,
         "display_name": "iShares MSCI USA Quality Factor ETF",
         "series_id": "S000041444",
-        "aum": 52723151718.7,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17651",
-        "label": "iShares Russell Mid-Cap ETF\n$44.9B",
-        "title": "iShares Russell Mid-Cap ETF<br>Series ID: S000004338<br>Fund NAV: $44.9B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17651,
-        "display_name": "iShares Russell Mid-Cap ETF",
-        "series_id": "S000004338",
-        "aum": 44949829033.4,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17714",
-        "label": "iShares Russell 1000 ETF\n$44.0B",
-        "title": "iShares Russell 1000 ETF<br>Series ID: S000004347<br>Fund NAV: $44.0B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17714,
-        "display_name": "iShares Russell 1000 ETF",
-        "series_id": "S000004347",
-        "aum": 44000902005.48,
+        "aum": 49900929393.76,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -250,14 +155,52 @@
       },
       {
         "id": "fund-17668",
-        "label": "iShares S&P 500 Value ETF\n$41.7B",
-        "title": "iShares S&P 500 Value ETF<br>Series ID: S000004312<br>Fund NAV: $41.7B",
+        "label": "iShares S&P 500 Value ETF\n$48.0B",
+        "title": "iShares S&P 500 Value ETF<br>Series ID: S000004312<br>Fund NAV: $48.0B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17668,
         "display_name": "iShares S&P 500 Value ETF",
         "series_id": "S000004312",
-        "aum": 41725935802.44,
+        "aum": 47968679125.26,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17651",
+        "label": "iShares Russell Mid-Cap ETF\n$46.4B",
+        "title": "iShares Russell Mid-Cap ETF<br>Series ID: S000004338<br>Fund NAV: $46.4B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17651,
+        "display_name": "iShares Russell Mid-Cap ETF",
+        "series_id": "S000004338",
+        "aum": 46381094079.93,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17714",
+        "label": "iShares Russell 1000 ETF\n$46.3B",
+        "title": "iShares Russell 1000 ETF<br>Series ID: S000004347<br>Fund NAV: $46.3B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17714,
+        "display_name": "iShares Russell 1000 ETF",
+        "series_id": "S000004347",
+        "aum": 46275311580.75,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -269,14 +212,14 @@
       },
       {
         "id": "fund-17635",
-        "label": "iShares Core Dividend Growth ETF\n$34.6B",
-        "title": "iShares Core Dividend Growth ETF<br>Series ID: S000045648<br>Fund NAV: $34.6B",
+        "label": "iShares Core Dividend Growth ETF\n$37.5B",
+        "title": "iShares Core Dividend Growth ETF<br>Series ID: S000045648<br>Fund NAV: $37.5B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17635,
         "display_name": "iShares Core Dividend Growth ETF",
         "series_id": "S000045648",
-        "aum": 34571459290.54,
+        "aum": 37496945724.71,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -288,33 +231,14 @@
       },
       {
         "id": "fund-17664",
-        "label": "iShares S&P 100 ETF\n$27.3B",
-        "title": "iShares S&P 100 ETF<br>Series ID: S000004306<br>Fund NAV: $27.3B",
+        "label": "iShares S&P 100 ETF\n$29.2B",
+        "title": "iShares S&P 100 ETF<br>Series ID: S000004306<br>Fund NAV: $29.2B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17664,
         "display_name": "iShares S&P 100 ETF",
         "series_id": "S000004306",
-        "aum": 27278196149.77,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17671",
-        "label": "iShares Core S&P U.S. Growth ETF\n$25.5B",
-        "title": "iShares Core S&P U.S. Growth ETF<br>Series ID: S000004340<br>Fund NAV: $25.5B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17671,
-        "display_name": "iShares Core S&P U.S. Growth ETF",
-        "series_id": "S000004340",
-        "aum": 25490908390.99,
+        "aum": 29173193321.93,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -326,14 +250,33 @@
       },
       {
         "id": "fund-17566",
-        "label": "iShares MSCI ACWI ETF\n$23.7B",
-        "title": "iShares MSCI ACWI ETF<br>Series ID: S000021461<br>Fund NAV: $23.7B",
+        "label": "iShares MSCI ACWI ETF\n$26.9B",
+        "title": "iShares MSCI ACWI ETF<br>Series ID: S000021461<br>Fund NAV: $26.9B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17566,
         "display_name": "iShares MSCI ACWI ETF",
         "series_id": "S000021461",
-        "aum": 23654797314.42,
+        "aum": 26911182086.54,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17671",
+        "label": "iShares Core S&P U.S. Growth ETF\n$26.3B",
+        "title": "iShares Core S&P U.S. Growth ETF<br>Series ID: S000004340<br>Fund NAV: $26.3B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17671,
+        "display_name": "iShares Core S&P U.S. Growth ETF",
+        "series_id": "S000004340",
+        "aum": 26319451033.24,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -345,14 +288,14 @@
       },
       {
         "id": "fund-17670",
-        "label": "iShares Core S&P U.S. Value ETF\n$22.7B",
-        "title": "iShares Core S&P U.S. Value ETF<br>Series ID: S000004339<br>Fund NAV: $22.7B",
+        "label": "iShares Core S&P U.S. Value ETF\n$24.4B",
+        "title": "iShares Core S&P U.S. Value ETF<br>Series ID: S000004339<br>Fund NAV: $24.4B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17670,
         "display_name": "iShares Core S&P U.S. Value ETF",
         "series_id": "S000004339",
-        "aum": 22704393713.04,
+        "aum": 24431181957.36,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -364,33 +307,14 @@
       },
       {
         "id": "fund-17610",
-        "label": "iShares MSCI USA Min Vol Factor ETF\n$22.5B",
-        "title": "iShares MSCI USA Min Vol Factor ETF<br>Series ID: S000031838<br>Fund NAV: $22.5B",
+        "label": "iShares MSCI USA Min Vol Factor ETF\n$23.1B",
+        "title": "iShares MSCI USA Min Vol Factor ETF<br>Series ID: S000031838<br>Fund NAV: $23.1B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17610,
         "display_name": "iShares MSCI USA Min Vol Factor ETF",
         "series_id": "S000031838",
-        "aum": 22541394999.61,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17608",
-        "label": "iShares U.S. Technology ETF\n$22.4B",
-        "title": "iShares U.S. Technology ETF<br>Series ID: S000004329<br>Fund NAV: $22.4B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17608,
-        "display_name": "iShares U.S. Technology ETF",
-        "series_id": "S000004329",
-        "aum": 22420252002.46,
+        "aum": 23066967585.06,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -402,14 +326,33 @@
       },
       {
         "id": "fund-17612",
-        "label": "iShares MSCI USA Momentum Factor ETF\n$19.5B",
-        "title": "iShares MSCI USA Momentum Factor ETF<br>Series ID: S000040316<br>Fund NAV: $19.5B",
+        "label": "iShares MSCI USA Momentum Factor ETF\n$21.3B",
+        "title": "iShares MSCI USA Momentum Factor ETF<br>Series ID: S000040316<br>Fund NAV: $21.3B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17612,
         "display_name": "iShares MSCI USA Momentum Factor ETF",
         "series_id": "S000040316",
-        "aum": 19473575078.72,
+        "aum": 21250777281.31,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17608",
+        "label": "iShares U.S. Technology ETF\n$20.8B",
+        "title": "iShares U.S. Technology ETF<br>Series ID: S000004329<br>Fund NAV: $20.8B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17608,
+        "display_name": "iShares U.S. Technology ETF",
+        "series_id": "S000004329",
+        "aum": 20757582071.12,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -421,33 +364,14 @@
       },
       {
         "id": "fund-17678",
-        "label": "iShares Russell 3000 ETF\n$17.1B",
-        "title": "iShares Russell 3000 ETF<br>Series ID: S000004341<br>Fund NAV: $17.1B",
+        "label": "iShares Russell 3000 ETF\n$18.3B",
+        "title": "iShares Russell 3000 ETF<br>Series ID: S000004341<br>Fund NAV: $18.3B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17678,
         "display_name": "iShares Russell 3000 ETF",
         "series_id": "S000004341",
-        "aum": 17126137574.68,
-        "aum_type": "Fund NAV",
-        "color": {
-          "background": "#2E7D32",
-          "border": "#1B5E20"
-        },
-        "font": {
-          "color": "#FFFFFF"
-        }
-      },
-      {
-        "id": "fund-17663",
-        "label": "iShares Russell Top 200 Growth ETF\n$16.0B",
-        "title": "iShares Russell Top 200 Growth ETF<br>Series ID: S000026552<br>Fund NAV: $16.0B",
-        "level": 2,
-        "node_type": "fund",
-        "entity_id": 17663,
-        "display_name": "iShares Russell Top 200 Growth ETF",
-        "series_id": "S000026552",
-        "aum": 16049328286.96,
+        "aum": 18293680674.99,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -459,14 +383,33 @@
       },
       {
         "id": "fund-17647",
-        "label": "iShares Semiconductor ETF\n$14.7B",
-        "title": "iShares Semiconductor ETF<br>Series ID: S000004354<br>Fund NAV: $14.7B",
+        "label": "iShares Semiconductor ETF\n$17.5B",
+        "title": "iShares Semiconductor ETF<br>Series ID: S000004354<br>Fund NAV: $17.5B",
         "level": 2,
         "node_type": "fund",
         "entity_id": 17647,
         "display_name": "iShares Semiconductor ETF",
         "series_id": "S000004354",
-        "aum": 14727819251.01,
+        "aum": 17523822281.57,
+        "aum_type": "Fund NAV",
+        "color": {
+          "background": "#2E7D32",
+          "border": "#1B5E20"
+        },
+        "font": {
+          "color": "#FFFFFF"
+        }
+      },
+      {
+        "id": "fund-17663",
+        "label": "iShares Russell Top 200 Growth ETF\n$16.2B",
+        "title": "iShares Russell Top 200 Growth ETF<br>Series ID: S000026552<br>Fund NAV: $16.2B",
+        "level": 2,
+        "node_type": "fund",
+        "entity_id": 17663,
+        "display_name": "iShares Russell Top 200 Growth ETF",
+        "series_id": "S000026552",
+        "aum": 16198182188.45,
         "aum_type": "Fund NAV",
         "color": {
           "background": "#2E7D32",
@@ -478,8 +421,8 @@
       },
       {
         "id": "expand-2",
-        "label": "Show all 73",
-        "title": "53 more funds available",
+        "label": "Show all 72",
+        "title": "52 more funds available",
         "level": 2,
         "node_type": "expand_trigger",
         "filer_entity_id": 2,
@@ -501,7 +444,7 @@
     "edges": [
       {
         "from": "inst-2",
-        "to": "filer-3241",
+        "to": "filer-2",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -511,7 +454,7 @@
       },
       {
         "from": "inst-2",
-        "to": "filer-3586",
+        "to": "filer-2",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -521,7 +464,7 @@
       },
       {
         "from": "inst-2",
-        "to": "filer-8453",
+        "to": "filer-2",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -531,7 +474,27 @@
       },
       {
         "from": "inst-2",
-        "to": "filer-7586",
+        "to": "filer-2",
+        "arrows": "to",
+        "dashes": false,
+        "color": {
+          "color": "#002147"
+        },
+        "relationship_type": "fund_sponsor"
+      },
+      {
+        "from": "inst-2",
+        "to": "filer-2",
+        "arrows": "to",
+        "dashes": false,
+        "color": {
+          "color": "#002147"
+        },
+        "relationship_type": "fund_sponsor"
+      },
+      {
+        "from": "inst-2",
+        "to": "filer-2",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -571,16 +534,6 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17672",
-        "arrows": "to",
-        "dashes": false,
-        "color": {
-          "color": "#002147"
-        },
-        "relationship_type": "fund_sponsor"
-      },
-      {
-        "from": "inst-2",
         "to": "fund-17715",
         "arrows": "to",
         "dashes": false,
@@ -591,7 +544,27 @@
       },
       {
         "from": "inst-2",
+        "to": "fund-17672",
+        "arrows": "to",
+        "dashes": false,
+        "color": {
+          "color": "#002147"
+        },
+        "relationship_type": "fund_sponsor"
+      },
+      {
+        "from": "inst-2",
         "to": "fund-17606",
+        "arrows": "to",
+        "dashes": false,
+        "color": {
+          "color": "#002147"
+        },
+        "relationship_type": "fund_sponsor"
+      },
+      {
+        "from": "inst-2",
+        "to": "fund-17668",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -621,16 +594,6 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17668",
-        "arrows": "to",
-        "dashes": false,
-        "color": {
-          "color": "#002147"
-        },
-        "relationship_type": "fund_sponsor"
-      },
-      {
-        "from": "inst-2",
         "to": "fund-17635",
         "arrows": "to",
         "dashes": false,
@@ -651,7 +614,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17671",
+        "to": "fund-17566",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -661,7 +624,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17566",
+        "to": "fund-17671",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -691,7 +654,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17608",
+        "to": "fund-17612",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -701,7 +664,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17612",
+        "to": "fund-17608",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -721,7 +684,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17663",
+        "to": "fund-17647",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -731,7 +694,7 @@
       },
       {
         "from": "inst-2",
-        "to": "fund-17647",
+        "to": "fund-17663",
         "arrows": "to",
         "dashes": false,
         "color": {
@@ -758,18 +721,18 @@
       "quarter": "2025Q4",
       "truncated": true,
       "total_funds_by_filer": {
-        "2": 73
+        "2": 72
       },
       "shown_funds_by_filer": {
         "2": 20
       },
-      "filer_count": 4
+      "filer_count": 6
     }
   },
   "error": null,
   "meta": {
     "quarter": null,
     "rollup_type": null,
-    "generated_at": "2026-04-19T12:11:29Z"
+    "generated_at": "2026-04-19T19:27:55Z"
   }
 }
