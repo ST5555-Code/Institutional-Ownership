@@ -49,7 +49,7 @@ export interface SummaryResponse {
   shares_float: number | null
   total_shares: number
   total_value: number
-  total_pct_float: number
+  total_pct_so: number
   active_value: number
   passive_value: number
   num_holders: number
@@ -72,7 +72,7 @@ export interface RegisterRow {
   child_count: number
   shares: number | null
   value_live: number | null
-  pct_float: number | null
+  pct_so: number | null
   pct_aum: number | null
   aum: number | null
   nport_cov: number | null
@@ -84,14 +84,14 @@ export interface RegisterAllTotals {
   count: number
   shares: number | null
   value_live: number | null
-  pct_float: number | null
+  pct_so: number | null
 }
 
 export interface RegisterTypeTotal {
   count: number
   shares: number | null
   value_live: number | null
-  pct_float: number | null
+  pct_so: number | null
 }
 
 export interface RegisterResponse {
@@ -112,7 +112,7 @@ export interface OwnershipTrendQuarter {
   total_inst_shares: number
   total_inst_value: number
   holder_count: number
-  pct_float: number
+  pct_so: number
   active_value: number
   passive_value: number
   active_pct: number
@@ -171,7 +171,7 @@ export interface CohortDetailChild {
   shares: number
   value: number
   avg_position: number
-  pct_float_moved: number
+  pct_so_moved: number
   delta_shares: number | null
   delta_value: number | null
 }
@@ -183,7 +183,7 @@ export interface CohortDetailRow {
   shares: number
   value: number
   avg_position: number
-  pct_float_moved: number
+  pct_so_moved: number
   delta_shares: number | null
   delta_value: number | null
   has_children?: boolean
@@ -296,7 +296,7 @@ export interface FundPortfolioPosition {
   shares: number | null
   market_value_live: number | null
   pct_of_portfolio: number | null
-  pct_of_float: number | null
+  pct_of_so: number | null
   market_cap: number | null
 }
 
@@ -320,7 +320,7 @@ export interface FlowRow {
   net_shares: number
   net_value: number | null
   pct_change: number | null
-  pct_float: number | null
+  pct_so: number | null
   raw_flow: number | null
   price_adj_flow: number | null
   price_effect: number | null
@@ -420,10 +420,10 @@ export interface TwoCompanyInstitutionalRow {
   is_overlap: boolean
   subj_shares: number | null
   subj_dollars: number | null
-  subj_pct_float: number | null
+  subj_pct_so: number | null
   sec_shares: number | null
   sec_dollars: number | null
-  sec_pct_float: number | null
+  sec_pct_so: number | null
 }
 
 export interface TwoCompanyFundRow {
@@ -434,10 +434,10 @@ export interface TwoCompanyFundRow {
   is_overlap: boolean
   subj_shares: number | null
   subj_dollars: number | null
-  subj_pct_float: number | null
+  subj_pct_so: number | null
   sec_shares: number | null
   sec_dollars: number | null
-  sec_pct_float: number | null
+  sec_pct_so: number | null
 }
 
 export interface TwoCompanyOverlapResponse {
@@ -451,7 +451,7 @@ export interface TwoCompanyOverlapResponse {
 export interface CrowdingHolder {
   holder: string
   manager_type: string | null
-  pct_float: number | null
+  pct_so: number | null
   value: number | null
 }
 

@@ -497,13 +497,13 @@ def api_admin_data_quality():
                     COUNT(*) as total,
                     COUNT(ticker) as with_ticker,
                     COUNT(market_value_live) as with_live_value,
-                    COUNT(pct_of_float) as with_float_pct
+                    COUNT(pct_of_so) as with_so_pct
                 FROM holdings_v2 WHERE quarter = '{LQ}'
                 """
             ).fetchone()
             result['holdings'] = {
                 'total': r[0], 'with_ticker': r[1],
-                'with_live_value': r[2], 'with_float_pct': r[3],
+                'with_live_value': r[2], 'with_so_pct': r[3],
                 'ticker_pct': round(r[1] / r[0] * 100, 1) if r[0] else 0,
                 'live_value_pct': round(r[2] / r[0] * 100, 1) if r[0] else 0,
             }

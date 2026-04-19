@@ -97,9 +97,9 @@ export function FlowAnalysisTab() {
 
   function onExcel() {
     if (!data) return
-    const bsH = ['Rank', 'Institution', 'Type', 'From Shares (MM)', 'To Shares (MM)', 'Net Shares (MM)', 'Net Value ($MM)', '% Chg', '% Float', 'Signal']
-    const neH = ['Rank', 'Institution', 'Type', 'Shares (MM)', 'Value ($MM)', '% Float']
-    const exH = ['Rank', 'Institution', 'Type', 'Prior Shares (MM)', 'Prior Value ($MM)', '% Float']
+    const bsH = ['Rank', 'Institution', 'Type', 'From Shares (MM)', 'To Shares (MM)', 'Net Shares (MM)', 'Net Value ($MM)', '% Chg', '% SO', 'Signal']
+    const neH = ['Rank', 'Institution', 'Type', 'Shares (MM)', 'Value ($MM)', '% SO']
+    const exH = ['Rank', 'Institution', 'Type', 'Prior Shares (MM)', 'Prior Value ($MM)', '% SO']
 
     const fmtBS = (rows: FlowRow[]) => rows.map((r, i) => [
       i + 1, `"${r.inst_parent_name.replace(/"/g, '""')}"`, r.manager_type || '',
@@ -108,20 +108,20 @@ export function FlowAnalysisTab() {
       r.net_shares != null ? (r.net_shares / 1e6).toFixed(2) : '',
       r.net_value != null ? (r.net_value / 1e6).toFixed(0) : '',
       r.pct_change != null ? r.pct_change.toFixed(2) : '',
-      r.pct_float != null ? r.pct_float.toFixed(2) : '',
+      r.pct_so != null ? r.pct_so.toFixed(2) : '',
       r.momentum_signal || '',
     ])
     const fmtNE = (rows: FlowRow[]) => rows.map((r, i) => [
       i + 1, `"${r.inst_parent_name.replace(/"/g, '""')}"`, r.manager_type || '',
       r.to_shares != null ? (r.to_shares / 1e6).toFixed(2) : '',
       r.to_value != null ? (r.to_value / 1e6).toFixed(0) : '',
-      r.pct_float != null ? r.pct_float.toFixed(2) : '',
+      r.pct_so != null ? r.pct_so.toFixed(2) : '',
     ])
     const fmtEX = (rows: FlowRow[]) => rows.map((r, i) => [
       i + 1, `"${r.inst_parent_name.replace(/"/g, '""')}"`, r.manager_type || '',
       r.from_shares != null ? (r.from_shares / 1e6).toFixed(2) : '',
       r.from_value != null ? (r.from_value / 1e6).toFixed(0) : '',
-      r.pct_float != null ? r.pct_float.toFixed(2) : '',
+      r.pct_so != null ? r.pct_so.toFixed(2) : '',
     ])
 
     const csv = [
@@ -265,9 +265,9 @@ function FlowSection({ title, rows, type }: SectionProps) {
       netValue: acc.netValue + (r.net_value || 0),
       fromValue: acc.fromValue + (r.from_value || 0),
       toValue: acc.toValue + (r.to_value || 0),
-      pctFloat: acc.pctFloat + (r.pct_float || 0),
+      pctSo: acc.pctSo + (r.pct_so || 0),
     }),
-    { fromShares: 0, toShares: 0, netShares: 0, netValue: 0, fromValue: 0, toValue: 0, pctFloat: 0 },
+    { fromShares: 0, toShares: 0, netShares: 0, netValue: 0, fromValue: 0, toValue: 0, pctSo: 0 },
   )
 
   const FC: React.CSSProperties = {
@@ -359,20 +359,20 @@ function FlowSection({ title, rows, type }: SectionProps) {
                       <td style={TD_R}><Signed v={r.net_shares != null ? r.net_shares / 1e6 : null} /></td>
                       <td style={TD_R}><Signed v={r.net_value != null ? r.net_value / 1e6 : null} decimals={0} /></td>
                       <td style={TD_R}><Signed v={r.pct_change} decimals={1} suffix="%" /></td>
-                      <td style={TD_R}>{fmtPct2(r.pct_float)}</td>
+                      <td style={TD_R}>{fmtPct2(r.pct_so)}</td>
                       <td style={TD}><SignalBadge signal={r.momentum_signal} /></td>
                     </>
                   ) : type === 'new_entries' ? (
                     <>
                       <td style={TD_R}>{fmtSharesMm(r.to_shares)}</td>
                       <td style={TD_R}>{fmtValueMm(r.to_value)}</td>
-                      <td style={TD_R}>{fmtPct2(r.pct_float)}</td>
+                      <td style={TD_R}>{fmtPct2(r.pct_so)}</td>
                     </>
                   ) : (
                     <>
                       <td style={TD_R}>{fmtSharesMm(r.from_shares)}</td>
                       <td style={TD_R}>{fmtValueMm(r.from_value)}</td>
-                      <td style={TD_R}>{fmtPct2(r.pct_float)}</td>
+                      <td style={TD_R}>{fmtPct2(r.pct_so)}</td>
                     </>
                   )}
                 </tr>
@@ -395,20 +395,20 @@ function FlowSection({ title, rows, type }: SectionProps) {
                     <td style={FCR}><span style={{ color: totals.netShares >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netShares !== 0 ? NUM_2.format(totals.netShares / 1e6) : '—'}</span></td>
                     <td style={FCR}><span style={{ color: totals.netValue >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netValue !== 0 ? `$${NUM_0.format(totals.netValue / 1e6)}` : '—'}</span></td>
                     <td style={FC} />
-                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                    <td style={FCR}>{fmtPct2(totals.pctSo)}</td>
                     <td style={FC} />
                   </>
                 ) : type === 'new_entries' ? (
                   <>
                     <td style={FCR}>{fmtSharesMm(totals.toShares)}</td>
                     <td style={FCR}>{fmtValueMm(totals.toValue)}</td>
-                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                    <td style={FCR}>{fmtPct2(totals.pctSo)}</td>
                   </>
                 ) : (
                   <>
                     <td style={FCR}>{fmtSharesMm(totals.fromShares)}</td>
                     <td style={FCR}>{fmtValueMm(totals.fromValue)}</td>
-                    <td style={FCR}>{fmtPct2(totals.pctFloat)}</td>
+                    <td style={FCR}>{fmtPct2(totals.pctSo)}</td>
                   </>
                 )}
               </tr>

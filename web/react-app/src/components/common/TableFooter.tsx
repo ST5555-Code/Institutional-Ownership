@@ -2,7 +2,7 @@ interface FooterRow {
   label: string
   shares_mm: number | null
   value_mm: number | null
-  pct_float: number | null
+  pct_so: number | null
 }
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
   skipAfterNumbers?: number
 }
 
-// Column layout: Rank · Institution · Type · Shares · Value · % Float ·
+// Column layout: Rank · Institution · Type · Shares · Value · % SO ·
 // [filler empties to fill totalColumns]. The caller decides how many total
 // columns the host table has — filler count = totalColumns - 6.
 //
@@ -105,7 +105,7 @@ export function TableFooter({
             ))}
             <td style={cellStyleRight(bottomPx)}>{fmtShares(r.shares_mm)}</td>
             <td style={cellStyleRight(bottomPx)}>{fmtValue(r.value_mm)}</td>
-            <td style={cellStyleRight(bottomPx)}>{fmtPct(r.pct_float)}</td>
+            <td style={cellStyleRight(bottomPx)}>{fmtPct(r.pct_so)}</td>
             {Array.from({ length: skipAfterNumbers }, (_, j) => (
               <td key={`sa${j}`} style={cellStyle(bottomPx)} />
             ))}

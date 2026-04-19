@@ -150,11 +150,11 @@ def api_crowding(ticker: str = ''):
             f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
-                   manager_type, SUM(pct_of_float) as pct_float,
+                   manager_type, SUM(pct_of_so) as pct_so,
                    SUM(market_value_live) as value
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
             GROUP BY holder, manager_type
-            ORDER BY pct_float DESC NULLS LAST LIMIT 20
+            ORDER BY pct_so DESC NULLS LAST LIMIT 20
             """, [ticker]
         ).fetchdf()
         result = {'holders': df_to_records(holders)}
@@ -215,7 +215,7 @@ def api_smart_money(ticker: str = ''):
 
 @market_router.get('/heatmap')
 def api_heatmap(request: Request):
-    """Ownership concentration heatmap: top managers × tickers by pct_of_float."""
+    """Ownership concentration heatmap: top managers × tickers by pct_of_so."""
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     peers = (request.query_params.get('peers') or '').upper().strip()
     con = get_db()
@@ -256,7 +256,7 @@ def api_heatmap(request: Request):
             f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as manager, ticker,
-                   SUM(pct_of_float) as pct_float,
+                   SUM(pct_of_so) as pct_so,
                    SUM(shares) as shares,
                    SUM(market_value_usd) as value
             FROM holdings_v2

@@ -438,7 +438,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
         if not pname:
             continue
         shares = r.get('shares') or 0
-        pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+        pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
         aum_val = r.get('aum_mm')
         aum = int(aum_val) if aum_val and aum_val > 0 else None
         pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
@@ -446,7 +446,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
             'institution': r.get('fund_name'),
             'value_live': r.get('value'),
             'shares': shares,
-            'pct_float': pct_float,
+            'pct_so': pct_so,
             'aum': aum,
             'pct_aum': pct_aum,
             'source': 'N-PORT',
@@ -466,7 +466,7 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         like_patterns = ['%' + p + '%' for p in patterns]
         ph = ','.join(['?'] * len(like_patterns))
         excl_clause, excl_params = _build_excl_clause(patterns)
-        # Get float_shares for pct_of_float calculation
+        # Get float_shares for pct_of_so calculation
         float_row = con.execute(
             "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
         ).fetchone()
@@ -496,13 +496,13 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         result = []
         for r in rows:
             shares = r.get('shares') or 0
-            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
             aum_val = r.get('aum_mm')
             aum = int(aum_val) if aum_val and aum_val > 0 else None
             # % of AUM/NAV: use pct_of_nav from N-PORT (position value as % of fund NAV)
             pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
             result.append({'institution': r.get('fund_name'), 'value_live': r.get('value'),
-                           'shares': shares, 'pct_float': pct_float,
+                           'shares': shares, 'pct_so': pct_so,
                            'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT'})
         return result
     except Exception as e:
@@ -571,7 +571,7 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rol
             COALESCE(h.manager_type, 'unknown') as type,
             SUM(h.market_value_live) as value_live,
             SUM(h.shares) as shares,
-            SUM(h.pct_of_float) as pct_float
+            SUM(h.pct_of_so) as pct_so
         FROM holdings_v2 h
         WHERE h.quarter = '{quarter}'
           AND (h.ticker = ? OR h.cusip = ?)
@@ -582,7 +582,7 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rol
     """, [ticker, cusip, inst_parent_name or '']).fetchdf()
     rows = df_to_records(df)
     return [{'institution': r.get('institution'), 'value_live': r.get('value_live'),
-             'shares': r.get('shares'), 'pct_float': r.get('pct_float'),
+             'shares': r.get('shares'), 'pct_so': r.get('pct_so'),
              'type': r.get('type'), 'source': '13F'} for r in rows]
 
 
@@ -623,7 +623,7 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
             return None
 
         return [{'institution': r.get('fund_name'), 'value_live': r.get('value'),
-                 'shares': r.get('shares'), 'pct_float': r.get('pct_of_nav'),
+                 'shares': r.get('shares'), 'pct_so': r.get('pct_of_nav'),
                  'source': f"N-PORT ({r.get('role', 'adviser')})"} for r in rows]
     except Exception as e:
         logger.error("[get_nport_children_ncen] %s", e, exc_info=True)
@@ -692,7 +692,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     COALESCE(h.manager_type, 'unknown') as type,
                     h.market_value_live,
                     h.shares,
-                    h.pct_of_float
+                    h.pct_of_so
                 FROM holdings_v2 h
                 WHERE h.quarter = '{quarter}'
                   AND (h.ticker = ? OR h.cusip = ?)
@@ -702,7 +702,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 MAX(type) as type,
                 SUM(market_value_live) as total_value_live,
                 SUM(shares) as total_shares,
-                SUM(pct_of_float) as pct_float,
+                SUM(pct_of_so) as pct_so,
                 COUNT(DISTINCT fund_name) as child_count
             FROM by_fund
             GROUP BY parent_name
@@ -760,7 +760,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 COALESCE(h.manager_type, 'unknown') as type,
                 SUM(h.market_value_live) as value_live,
                 SUM(h.shares) as shares,
-                SUM(h.pct_of_float) as pct_float
+                SUM(h.pct_of_so) as pct_so
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}'
               AND (h.ticker = ? OR h.cusip = ?)
@@ -781,7 +781,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     'institution': row['institution'],
                     'value_live': row['value_live'],
                     'shares': row['shares'],
-                    'pct_float': row['pct_float'],
+                    'pct_so': row['pct_so'],
                     'type': row['type'],
                     'source': '13F entity' if note else '13F',
                     'subadviser_note': note,
@@ -826,7 +826,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 'institution': pname,
                 'value_live': parent['total_value_live'],
                 'shares': parent['total_shares'],
-                'pct_float': parent['pct_float'],
+                'pct_so': parent['pct_so'],
                 'aum': parent_aum,
                 'pct_aum': parent_pct_aum,
                 'nport_cov': coverage_map.get(pname),
@@ -845,7 +845,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                         'institution': c.get('institution'),
                         'value_live': c.get('value_live'),
                         'shares': c.get('shares'),
-                        'pct_float': c.get('pct_float'),
+                        'pct_so': c.get('pct_so'),
                         'aum': c.get('aum'),
                         'pct_aum': c.get('pct_aum'),
                         'type': c.get('type', parent['type']),
@@ -862,7 +862,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
                 SUM(h.market_value_live) as total_value,
                 SUM(h.shares) as total_shares,
-                SUM(h.pct_of_float) as pct_float
+                SUM(h.pct_of_so) as pct_so
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?)
             GROUP BY parent_name
@@ -871,7 +871,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         all_totals = {
             'value_live': float(all_totals_df['total_value'].sum()) if len(all_totals_df) else 0,
             'shares': float(all_totals_df['total_shares'].sum()) if len(all_totals_df) else 0,
-            'pct_float': float(all_totals_df['pct_float'].sum()) if len(all_totals_df) else 0,
+            'pct_so': float(all_totals_df['pct_so'].sum()) if len(all_totals_df) else 0,
             'count': len(all_totals_df),
         }
         # By-type totals
@@ -879,10 +879,10 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         for _, trow in all_totals_df.iterrows():
             t = trow['type'] or 'unknown'
             if t not in type_totals:
-                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_float': 0, 'count': 0}
+                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_so': 0, 'count': 0}
             type_totals[t]['value_live'] += float(trow['total_value'] or 0)
             type_totals[t]['shares'] += float(trow['total_shares'] or 0)
-            type_totals[t]['pct_float'] += float(trow['pct_float'] or 0)
+            type_totals[t]['pct_so'] += float(trow['pct_so'] or 0)
             type_totals[t]['count'] += 1
 
         return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
@@ -1307,7 +1307,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     SUM(h.market_value_live) as position_value,
                     SUM(h.shares) as shares,
                     MAX(h.pct_of_portfolio) as pct_of_portfolio,
-                    SUM(h.pct_of_float) as pct_of_float
+                    SUM(h.pct_of_so) as pct_of_so
                 FROM holdings_v2 h
                 WHERE h.quarter = '{quarter}'
                   AND (h.ticker = ? OR h.cusip = ?)
@@ -1343,7 +1343,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 parent_name,
                 position_value,
                 pct_of_portfolio,
-                pct_of_float,
+                pct_of_so,
                 CASE WHEN total_with_mktcap > 0
                      THEN ROUND(holdings_below * 100.0 / total_with_mktcap, 1)
                      ELSE NULL END as mktcap_percentile,
@@ -1527,7 +1527,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     'position_value': c['value'],
                     'shares': c['shares'],
                     'pct_of_portfolio': c['pct_of_nav'],
-                    'pct_of_float': None,
+                    'pct_of_so': None,
                     'mktcap_percentile': None,
                     'manager_type': row.get('manager_type'),
                     'source': 'N-PORT',
@@ -1542,7 +1542,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     'position_value': c['value'],
                     'shares': c['shares'],
                     'pct_of_portfolio': None,
-                    'pct_of_float': None,
+                    'pct_of_so': None,
                     'mktcap_percentile': None,
                     'manager_type': row.get('manager_type'),
                     'source': '13F entity',
@@ -1584,7 +1584,7 @@ def query4(ticker, quarter=LQ):
                 COUNT(DISTINCT cik) as num_holders,
                 SUM(shares) as total_shares,
                 SUM(market_value_live) as total_value,
-                SUM(pct_of_float) as total_pct_float
+                SUM(pct_of_so) as total_pct_so
             FROM holdings_v2
             WHERE quarter = '{quarter}' AND ticker = ?
             GROUP BY category
@@ -1688,7 +1688,7 @@ def query6(ticker, quarter=LQ):  # pylint: disable=W0613  # dispatch protocol: q
                 market_value_usd,
                 market_value_live,
                 pct_of_portfolio,
-                pct_of_float
+                pct_of_so
             FROM holdings_v2
             WHERE ticker = ? AND is_activist = true
             ORDER BY manager_name, quarter
@@ -1762,7 +1762,7 @@ def query7(ticker, cik=None, fund_name=None, quarter=LQ):
                 SUM(h.shares) as shares,
                 SUM(h.market_value_live) as market_value_live,
                 MAX(h.pct_of_portfolio) as pct_of_portfolio,
-                SUM(h.pct_of_float) as pct_of_float,
+                SUM(h.pct_of_so) as pct_of_so,
                 MAX(m.market_cap) as market_cap
             FROM holdings_v2 h
             LEFT JOIN market_data m ON h.ticker = m.ticker
@@ -1873,7 +1873,7 @@ def query10(ticker, quarter=LQ):
             SELECT
                 q4.manager_name, q4.manager_type,
                 q4.shares, q4.market_value_live,
-                q4.pct_of_portfolio, q4.pct_of_float
+                q4.pct_of_portfolio, q4.pct_of_so
             FROM holdings_v2 q4
             LEFT JOIN holdings_v2 q3 ON q4.cik = q3.cik AND q3.ticker = ? AND q3.quarter = '{PQ}'
             WHERE q4.ticker = ? AND q4.quarter = '{quarter}' AND q3.cik IS NULL
@@ -1917,19 +1917,19 @@ def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
             WITH ranked AS (
                 SELECT
                     COALESCE({rn}, inst_parent_name, manager_name) as holder,
-                    SUM(pct_of_float) as total_pct_float,
+                    SUM(pct_of_so) as total_pct_so,
                     SUM(shares) as total_shares,
-                    ROW_NUMBER() OVER (ORDER BY SUM(pct_of_float) DESC) as rn
+                    ROW_NUMBER() OVER (ORDER BY SUM(pct_of_so) DESC) as rn
                 FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{quarter}' AND pct_of_float IS NOT NULL
+                WHERE ticker = ? AND quarter = '{quarter}' AND pct_of_so IS NOT NULL
                 GROUP BY holder
             )
             SELECT
                 rn as rank,
                 holder,
-                total_pct_float,
+                total_pct_so,
                 total_shares,
-                SUM(total_pct_float) OVER (ORDER BY rn) as cumulative_pct
+                SUM(total_pct_so) OVER (ORDER BY rn) as cumulative_pct
             FROM ranked
             ORDER BY rn
             LIMIT 20
@@ -2354,7 +2354,7 @@ def query14(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 m.aum_total / 1e9 as manager_aum_bn,
                 SUM(h.market_value_live) / 1e6 as position_mm,
                 MAX(h.pct_of_portfolio) as pct_of_portfolio,
-                SUM(h.pct_of_float) as pct_of_float,
+                SUM(h.pct_of_so) as pct_of_so,
                 SUM(h.shares) as shares
             FROM holdings_v2 h
             LEFT JOIN managers m ON h.cik = m.cik
@@ -2400,7 +2400,7 @@ def query15(ticker=None, quarter=LQ):  # pylint: disable=W0613  # dispatch proto
                 COUNT(CASE WHEN ticker IS NOT NULL THEN 1 END) as with_ticker,
                 COUNT(CASE WHEN manager_type IS NOT NULL THEN 1 END) as with_manager_type,
                 COUNT(CASE WHEN market_value_live IS NOT NULL THEN 1 END) as with_live_value,
-                COUNT(CASE WHEN pct_of_float IS NOT NULL THEN 1 END) as with_float_pct
+                COUNT(CASE WHEN pct_of_so IS NOT NULL THEN 1 END) as with_so_pct
             FROM holdings_v2 WHERE quarter = '{quarter}'
         """).fetchone()
         total = coverage[0] or 1
@@ -2455,7 +2455,7 @@ def query16(ticker, quarter=LQ):
             aum_val = r['aum_mm']
             aum = int(aum_val) if aum_val and aum_val > 0 else None
             pct_of_nav = round(float(r['pct_of_nav']), 2) if r['pct_of_nav'] else None
-            pct_float = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
             fund_type = _classify_fund_type(fund_name)
 
             results.append({
@@ -2464,7 +2464,7 @@ def query16(ticker, quarter=LQ):
                 'family': r['family_name'] or '',
                 'value_live': value,
                 'shares': shares,
-                'pct_float': pct_float,
+                'pct_so': pct_so,
                 'aum': aum,
                 'pct_aum': pct_of_nav,
                 'type': fund_type,
@@ -2486,7 +2486,7 @@ def query16(ticker, quarter=LQ):
         all_totals = {
             'value_live': float(all_df['total_value'].sum()) if len(all_df) else 0,
             'shares': float(all_df['total_shares'].sum()) if len(all_df) else 0,
-            'pct_float': round(float(all_df['total_shares'].sum()) * 100.0 / float_shares, 2) if float_shares and len(all_df) else 0,
+            'pct_so': round(float(all_df['total_shares'].sum()) * 100.0 / float_shares, 2) if float_shares and len(all_df) else 0,
             'count': len(all_df),
         }
 
@@ -2495,15 +2495,15 @@ def query16(ticker, quarter=LQ):
         for _, trow in all_df.iterrows():
             t = _classify_fund_type(trow['fund_name'])
             if t not in type_totals:
-                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_float': 0, 'count': 0}
+                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_so': 0, 'count': 0}
             type_totals[t]['value_live'] += float(trow['total_value'] or 0)
             s = float(trow['total_shares'] or 0)
             type_totals[t]['shares'] += s
             type_totals[t]['count'] += 1
-        # Compute pct_float per type
+        # Compute pct_so per type
         for t in type_totals:
             if float_shares and type_totals[t]['shares']:
-                type_totals[t]['pct_float'] = round(type_totals[t]['shares'] * 100.0 / float_shares, 2)
+                type_totals[t]['pct_so'] = round(type_totals[t]['shares'] * 100.0 / float_shares, 2)
 
         return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
     finally:
@@ -2565,7 +2565,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
             total_shares = row.get('total_inst_shares') or 0
             total_value = row.get('total_inst_value') or 0
             holders = row.get('holder_count') or 0
-            row['pct_float'] = round(total_shares / float_shares * 100, 2) if float_shares and float_shares > 0 else None
+            row['pct_so'] = round(total_shares / float_shares * 100, 2) if float_shares and float_shares > 0 else None
             active_val = row.get('active_value') or 0
             passive_val = row.get('passive_value') or 0
             row['active_pct'] = round(active_val / total_value * 100, 1) if total_value > 0 else 0
@@ -2623,7 +2623,7 @@ def _build_cohort(q1_map, q4_map):
         c = len(investors)
         s = sum((src[i].get('shares') or 0) for i in investors)
         v = sum((src[i].get('value') or 0) for i in investors)
-        pct_float = round(s / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
+        pct_so = round(s / total_inst_shares * 100, 2) if total_inst_shares > 0 else 0
         # Net deltas
         if delta_src is not None:
             delta_s = sum(((src[i].get('shares') or 0) - (delta_src.get(i, {}).get('shares') or 0)) for i in investors)
@@ -2633,7 +2633,7 @@ def _build_cohort(q1_map, q4_map):
             delta_v = v
         return {'holders': c, 'shares': s, 'value': v,
                 'avg_position': round(v / c, 2) if c > 0 else 0,
-                'pct_float_moved': pct_float,
+                'pct_so_moved': pct_so,
                 'delta_shares': delta_s, 'delta_value': delta_v}
 
     def _top5(investors, src, delta_src=None, sort_key='value', reverse=True):
@@ -2649,7 +2649,7 @@ def _build_cohort(q1_map, q4_map):
                 ds, dv = s_now, v_now  # new = entire position; exits handled by caller
             return {'category': inv, 'holders': 1, 'shares': s_now, 'value': v_now,
                     'avg_position': v_now, 'delta_shares': ds, 'delta_value': dv,
-                    'pct_float_moved': round(s_now / total_inst_shares * 100, 4) if total_inst_shares > 0 else 0,
+                    'pct_so_moved': round(s_now / total_inst_shares * 100, 4) if total_inst_shares > 0 else 0,
                     'level': 2}
         rows = [_entity_delta(i) for i in investors]
         # For exits, flip delta sign
@@ -2690,7 +2690,7 @@ def _build_cohort(q1_map, q4_map):
     detail = [
         {'category': 'Retained', 'holders': ret_holders, 'shares': ret_shares,
          'value': ret_value, 'avg_position': round(ret_value / ret_holders, 2) if ret_holders > 0 else 0,
-         'pct_float_moved': ret_pct, 'delta_shares': ret_delta_s, 'delta_value': ret_delta_v,
+         'pct_so_moved': ret_pct, 'delta_shares': ret_delta_s, 'delta_value': ret_delta_v,
          'level': 0, 'is_parent': True, 'has_children': False},
         {'category': 'Increased', 'level': 1, 'has_children': True, 'children': inc_top5, **inc_stats},
         {'category': 'Decreased', 'level': 1, 'has_children': True, 'children': dec_top5, **dec_stats},
@@ -2745,7 +2745,7 @@ def _build_cohort(q1_map, q4_map):
     detail.append({
         'category': 'Total', 'holders': total_q4_holders, 'shares': total_q4_shares,
         'value': total_q4_value, 'avg_position': round(total_q4_value / total_q4_holders, 2) if total_q4_holders > 0 else 0,
-        'pct_float_moved': 100.0, 'delta_shares': total_delta_s, 'delta_value': total_delta_v,
+        'pct_so_moved': 100.0, 'delta_shares': total_delta_s, 'delta_value': total_delta_v,
         'level': -1, 'is_total': True, 'has_children': False,
     })
 
@@ -2893,14 +2893,14 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
-                   SUM(pct_of_float) as pct_of_float
+                   SUM(pct_of_so) as pct_of_so
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_from}' GROUP BY entity
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
-                   SUM(pct_of_float) as pct_of_float
+                   SUM(pct_of_so) as pct_of_so
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_to}' GROUP BY entity
         """, [ticker]).fetchdf()
 
@@ -2908,21 +2908,21 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     to_map = {r['entity']: r for _, r in to_df.iterrows()}
     from_set, to_set = set(from_map), set(to_map)
 
-    def _pct_float(shares):
+    def _pct_so(shares):
         """Compute % of float from shares, fall back to None if no float data."""
         if float_shares and shares:
             return round(shares / float_shares * 100, 3)
         return None
 
     def _get_pf(entity_row, fallback_shares):
-        """Safely extract pct_of_float from a pandas row, fall back to computed."""
-        raw = entity_row.get('pct_of_float') if entity_row is not None else None
+        """Safely extract pct_of_so from a pandas row, fall back to computed."""
+        raw = entity_row.get('pct_of_so') if entity_row is not None else None
         try:
             if raw is not None and not (isinstance(raw, float) and raw != raw):
                 return float(raw)
         except (TypeError, ValueError):
             pass
-        return _pct_float(fallback_shares)
+        return _pct_so(fallback_shares)
 
     rows = []
     # Retained: compare shares
@@ -2933,13 +2933,13 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         tv = float(to_map[entity].get('value') or 0)
         net_s = ts - fs
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_float(ts)
+        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_so(ts)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': ts, 'net_shares': net_s,
             'from_value': fv, 'to_value': tv, 'net_value': tv - fv,
             'pct_change': (net_s / fs) if fs > 0 else None,
-            'pct_float': pf,
+            'pct_so': pf,
             'is_new_entry': False, 'is_exit': False,
         })
     # New entries
@@ -2947,12 +2947,12 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         ts = float(to_map[entity].get('shares') or 0)
         tv = float(to_map[entity].get('value') or 0)
         mt = to_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_float(ts)
+        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_so(ts)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': 0, 'to_shares': ts, 'net_shares': ts,
             'from_value': 0, 'to_value': tv, 'net_value': tv,
-            'pct_change': None, 'pct_float': pf,
+            'pct_change': None, 'pct_so': pf,
             'is_new_entry': True, 'is_exit': False,
         })
     # Exits
@@ -2960,12 +2960,12 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         fs = float(from_map[entity].get('shares') or 0)
         fv = float(from_map[entity].get('value') or 0)
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(from_map[entity], fs) if level == 'parent' else _pct_float(fs)
+        pf = _get_pf(from_map[entity], fs) if level == 'parent' else _pct_so(fs)
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': 0, 'net_shares': -fs,
             'from_value': fv, 'to_value': 0, 'net_value': -fv,
-            'pct_change': -1.0, 'pct_float': pf,
+            'pct_change': -1.0, 'pct_so': pf,
             'is_new_entry': False, 'is_exit': True,
         })
 
@@ -3040,7 +3040,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ORDER BY net_shares DESC NULLS LAST
             """, [ticker, quarter_from]).fetchdf()
             rows = df_to_records(df)
-            # Compute net_value and pct_of_float using float_shares
+            # Compute net_value and pct_of_so using float_shares
             fr = con.execute("SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]).fetchone()
             flt = float(fr[0]) if fr and fr[0] else None
             for r in rows:
@@ -3048,7 +3048,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ts = r.get('to_shares') or 0
                 fs = r.get('from_shares') or 0
                 ns = abs(r.get('net_shares') or 0)
-                # pct_float = the relevant change as % of float:
+                # pct_so = the relevant change as % of float:
                 #   buyers/sellers: net change / float (how much they added/reduced)
                 #   new entries: to_shares / float (entire new position)
                 #   exits: from_shares / float (entire prior position)
@@ -3058,7 +3058,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                     change_shares = fs
                 else:
                     change_shares = ns
-                r['pct_float'] = round(change_shares / flt * 100, 3) if flt and change_shares else None
+                r['pct_so'] = round(change_shares / flt * 100, 3) if flt and change_shares else None
             buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
                       and (r.get('net_shares') or 0) > 0][:25]
             sellers = sorted([r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
@@ -3991,7 +3991,7 @@ def _get_summary_impl(ticker, quarter=LQ):
         totals = con.execute(f"""
             SELECT
                 SUM(market_value_live) as total_value,
-                SUM(pct_of_float) as total_pct_float,
+                SUM(pct_of_so) as total_pct_so,
                 COUNT(DISTINCT cik) as num_holders,
                 SUM(shares) as total_shares
             FROM holdings_v2
@@ -4050,7 +4050,7 @@ def _get_summary_impl(ticker, quarter=LQ):
             'ticker': ticker,
             'latest_quarter': latest_quarter,
             'total_value': totals[0],
-            'total_pct_float': totals[1],
+            'total_pct_so': totals[1],
             'num_holders': totals[2],
             'total_shares': totals[3],
             'passive_value': split[0] if split else None,
@@ -5242,7 +5242,7 @@ def get_two_company_overlap(subject, second, quarter, con):
     float_map = {row[0]: row[1] for row in float_rows}
     subj_float = float_map.get(subject)
     sec_float = float_map.get(second)
-    # Treat 0 the same as null — guards the per-row pct_float division below.
+    # Treat 0 the same as null — guards the per-row pct_so division below.
     if not subj_float:
         subj_float = None
     if not sec_float:
@@ -5298,10 +5298,10 @@ def get_two_company_overlap(subject, second, quarter, con):
             'manager_type': mtype,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
             'sec_shares': sec_shares_f,
             'sec_dollars': sec_dollars_f,
-            'sec_pct_float': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'sec_pct_so': (sec_shares_f / sec_float * 100.0) if sec_float else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
         })
 
@@ -5361,10 +5361,10 @@ def get_two_company_overlap(subject, second, quarter, con):
             'family_name': family_name,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
             'sec_shares': sec_shares_f,
             'sec_dollars': sec_dollars_f,
-            'sec_pct_float': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'sec_pct_so': (sec_shares_f / sec_float * 100.0) if sec_float else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
             # fund_universe.is_actively_managed — None if the fund isn't in
             # fund_universe; the frontend treats None as "active" (included
@@ -5444,10 +5444,10 @@ def get_two_company_subject(subject, quarter, con):
             'manager_type': mtype,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
             'sec_shares': None,
             'sec_dollars': None,
-            'sec_pct_float': None,
+            'sec_pct_so': None,
             'is_overlap': False,
         })
 
@@ -5490,10 +5490,10 @@ def get_two_company_subject(subject, quarter, con):
             'family_name': family_name,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_float': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
             'sec_shares': None,
             'sec_dollars': None,
-            'sec_pct_float': None,
+            'sec_pct_so': None,
             'is_overlap': False,
             'is_active': bool(is_active) if is_active is not None else None,
         })

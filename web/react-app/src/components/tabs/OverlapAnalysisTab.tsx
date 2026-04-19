@@ -190,13 +190,13 @@ export function OverlapAnalysisTab() {
     const h = ['Rank', 'Holder', 'Type', `${subject} %`, `${second} %`, `${subject} $MM`, `${second} $MM`]
     const instCsv = instRows.map((r, i) => [
       i + 1, `"${r.holder.replace(/"/g, '""')}"`, r.manager_type || '',
-      r.subj_pct_float?.toFixed(2) ?? '', r.sec_pct_float?.toFixed(2) ?? '',
+      r.subj_pct_so?.toFixed(2) ?? '', r.sec_pct_so?.toFixed(2) ?? '',
       r.subj_dollars != null ? (r.subj_dollars / 1e6).toFixed(0) : '',
       r.sec_dollars != null ? (r.sec_dollars / 1e6).toFixed(0) : '',
     ])
     const fundCsv = fundRows.map((r, i) => [
       i + 1, `"${r.holder.replace(/"/g, '""')}"`, r.is_active ? 'active' : 'passive',
-      r.subj_pct_float?.toFixed(2) ?? '', r.sec_pct_float?.toFixed(2) ?? '',
+      r.subj_pct_so?.toFixed(2) ?? '', r.sec_pct_so?.toFixed(2) ?? '',
       r.subj_dollars != null ? (r.subj_dollars / 1e6).toFixed(0) : '',
       r.sec_dollars != null ? (r.sec_dollars / 1e6).toFixed(0) : '',
     ])
@@ -349,9 +349,9 @@ function PanelTable({
                     {r.holder}
                   </td>
                   <td style={TD}>{renderType(r)}</td>
-                  <td style={TD_R}>{fmtPct2(r.subj_pct_float)}</td>
-                  <td style={{ ...TD_R, color: r.sec_pct_float == null ? '#cbd5e1' : '#1e293b' }}>
-                    {fmtPct2(r.sec_pct_float)}
+                  <td style={TD_R}>{fmtPct2(r.subj_pct_so)}</td>
+                  <td style={{ ...TD_R, color: r.sec_pct_so == null ? '#cbd5e1' : '#1e293b' }}>
+                    {fmtPct2(r.sec_pct_so)}
                   </td>
                   <td style={TD_R}>{fmtValueMm(r.subj_dollars)}</td>
                   <td style={{ ...TD_R, color: r.sec_dollars == null ? '#cbd5e1' : '#1e293b' }}>
@@ -392,8 +392,8 @@ interface RowSums {
 function sumRows(rows: AnyRow[]): RowSums {
   let subjPct = 0, secPct = 0, subjVal = 0, secVal = 0
   for (const r of rows) {
-    subjPct += r.subj_pct_float || 0
-    secPct += r.sec_pct_float || 0
+    subjPct += r.subj_pct_so || 0
+    secPct += r.sec_pct_so || 0
     subjVal += r.subj_dollars || 0
     secVal += r.sec_dollars || 0
   }

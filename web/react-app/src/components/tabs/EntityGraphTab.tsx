@@ -248,8 +248,8 @@ export function EntityGraphTab() {
       const csv = [h, ...market.data.map(r => [r.rank, `"${r.institution}"`, (r.total_aum / 1e6).toFixed(0), r.manager_type || '', r.filer_count, r.fund_count, r.num_holdings, r.nport_coverage_pct ?? ''])].map(r => r.join(',')).join('\n')
       downloadCsv(csv, 'market_summary.csv')
     } else if (viewMode === 'market' && ticker && tickerHolders.data) {
-      const h = ['Rank', 'Institution', 'Type', 'Value ($MM)', '% Float', 'AUM ($MM)']
-      const csv = [h, ...tickerHolders.data.rows.filter(r => r.level === 0).map(r => [r.rank, `"${r.institution}"`, r.type, r.value_live ? (r.value_live / 1e6).toFixed(0) : '', r.pct_float?.toFixed(2) ?? '', r.aum ?? ''])].map(r => r.join(',')).join('\n')
+      const h = ['Rank', 'Institution', 'Type', 'Value ($MM)', '% SO', 'AUM ($MM)']
+      const csv = [h, ...tickerHolders.data.rows.filter(r => r.level === 0).map(r => [r.rank, `"${r.institution}"`, r.type, r.value_live ? (r.value_live / 1e6).toFixed(0) : '', r.pct_so?.toFixed(2) ?? '', r.aum ?? ''])].map(r => r.join(',')).join('\n')
       downloadCsv(csv, `entity_holders_${ticker}.csv`)
     } else if (activeCo) {
       const h = ['ID', 'Type', 'Name', 'AUM']
@@ -352,12 +352,12 @@ export function EntityGraphTab() {
                 {tickerHolders.data && (() => {
                   const parentRows = tickerHolders.data.rows.filter(r => r.level === 0)
                   const totalValue = parentRows.reduce((s, r) => s + (r.value_live || 0), 0)
-                  const totalPctFloat = parentRows.reduce((s, r) => s + (r.pct_float || 0), 0)
+                  const totalPctSo = parentRows.reduce((s, r) => s + (r.pct_so || 0), 0)
                   return (
                   <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                     <thead><tr>
                       <th style={{ ...TH, width: 40 }}>#</th><th style={TH}>Institution</th><th style={TH}>Type</th>
-                      <th style={TH_R}>Value ($MM)</th><th style={TH_R}>% Float</th><th style={TH_R}>AUM ($MM)</th>
+                      <th style={TH_R}>Value ($MM)</th><th style={TH_R}>% SO</th><th style={TH_R}>AUM ($MM)</th>
                     </tr></thead>
                     <tbody>
                       {parentRows.map((r, i) => {
@@ -369,7 +369,7 @@ export function EntityGraphTab() {
                             <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                             <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                             <td style={TD_R}>{r.value_live != null && r.value_live !== 0 ? `$${NUM_0.format(r.value_live / 1e6)}` : '—'}</td>
-                            <td style={TD_R}>{r.pct_float != null && r.pct_float !== 0 ? `${NUM_2.format(r.pct_float)}%` : '—'}</td>
+                            <td style={TD_R}>{r.pct_so != null && r.pct_so !== 0 ? `${NUM_2.format(r.pct_so)}%` : '—'}</td>
                             <td style={TD_R}>{r.aum != null && r.aum !== 0 ? `$${NUM_0.format(r.aum)}` : '—'}</td>
                           </tr>
                         )
@@ -378,7 +378,7 @@ export function EntityGraphTab() {
                     <tfoot><tr>
                       <td style={FC} /><td style={FC}>Top {parentRows.length} Total</td><td style={FC} />
                       <td style={FCR}>{totalValue > 0 ? `$${NUM_0.format(totalValue / 1e6)}` : '—'}</td>
-                      <td style={FCR}>{totalPctFloat > 0 ? `${NUM_2.format(totalPctFloat)}%` : '—'}</td>
+                      <td style={FCR}>{totalPctSo > 0 ? `${NUM_2.format(totalPctSo)}%` : '—'}</td>
                       <td style={FC} />
                     </tr></tfoot>
                   </table>)

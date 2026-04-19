@@ -145,10 +145,10 @@ export function OwnershipTrendTab() {
   function onExcel() {
     let csv = ''
     if (subView === 'quarterly' && trend.data) {
-      const h = ['Quarter', 'Holders', 'Shares (MM)', '% Float', 'Value ($MM)', 'Active %', 'Passive %', 'Net Change', 'Signal']
+      const h = ['Quarter', 'Holders', 'Shares (MM)', '% SO', 'Value ($MM)', 'Active %', 'Passive %', 'Net Change', 'Signal']
       csv = [h, ...trend.data.quarters.map(q => [
         q.quarter, q.holder_count, (q.total_inst_shares / 1e6).toFixed(2),
-        q.pct_float.toFixed(2), (q.total_inst_value / 1e6).toFixed(0),
+        q.pct_so.toFixed(2), (q.total_inst_value / 1e6).toFixed(0),
         q.active_pct.toFixed(2), q.passive_pct.toFixed(2),
         q.net_shares_change != null ? (q.net_shares_change / 1e6).toFixed(2) : '',
         q.signal || '',
@@ -162,13 +162,13 @@ export function OwnershipTrendTab() {
         r.change != null ? (r.change / 1e6).toFixed(2) : '', r.change_pct != null ? r.change_pct.toFixed(2) : '',
       ])].map(r => r.join(',')).join('\n')
     } else if (subView === 'cohort' && cohort.data) {
-      const h = ['Category', 'Holders', 'Shares (MM)', 'Value ($MM)', 'Avg Position ($MM)', 'Δ Shares (MM)', 'Δ Value ($MM)', '% Float Moved']
+      const h = ['Category', 'Holders', 'Shares (MM)', 'Value ($MM)', 'Avg Position ($MM)', 'Δ Shares (MM)', 'Δ Value ($MM)', '% SO Moved']
       csv = [h, ...cohort.data.detail.map(r => [
         `"${r.category}"`, r.holders, (r.shares / 1e6).toFixed(2), (r.value / 1e6).toFixed(0),
         (r.avg_position / 1e6).toFixed(1),
         r.delta_shares != null ? (r.delta_shares / 1e6).toFixed(2) : '',
         r.delta_value != null ? (r.delta_value / 1e6).toFixed(0) : '',
-        r.pct_float_moved.toFixed(2),
+        r.pct_so_moved.toFixed(2),
       ])].map(r => r.join(',')).join('\n')
     }
     if (!csv) return
@@ -264,7 +264,7 @@ function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
             <th style={TH}>Quarter</th>
             <th style={TH_R}>Holders</th>
             <th style={TH_R}>Shares (MM)</th>
-            <th style={TH_R}>% Float</th>
+            <th style={TH_R}>% SO</th>
             <th style={TH_R}>Value ($MM)</th>
             <th style={TH_R}>Active %</th>
             <th style={TH_R}>Passive %</th>
@@ -278,7 +278,7 @@ function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
               <td style={{ ...TD, fontWeight: 600 }}>{q.quarter}</td>
               <td style={TD_R}>{NUM_0.format(q.holder_count)}</td>
               <td style={TD_R}>{fmtSharesMm(q.total_inst_shares)}</td>
-              <td style={TD_R}>{fmtPct2(q.pct_float)}</td>
+              <td style={TD_R}>{fmtPct2(q.pct_so)}</td>
               <td style={TD_R}>{fmtValueMm(q.total_inst_value)}</td>
               <td style={TD_R}>{fmtPct2(q.active_pct)}</td>
               <td style={TD_R}>{fmtPct2(q.passive_pct)}</td>
@@ -453,7 +453,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
             <th style={TH_R}>Avg Position ($MM)</th>
             <th style={TH_R}>Δ Shares (MM)</th>
             <th style={TH_R}>Δ Value ($MM)</th>
-            <th style={TH_R}>% Float Moved</th>
+            <th style={TH_R}>% SO Moved</th>
           </tr>
         </thead>
         <tbody>
@@ -486,7 +486,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
                 <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{`$${NUM_1.format(r.avg_position / 1e6)}`}</td>
                 <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_shares != null ? r.delta_shares / 1e6 : null} /></td>
                 <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_value != null ? r.delta_value / 1e6 : null} decimals={0} /></td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtPct2(r.pct_float_moved)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtPct2(r.pct_so_moved)}</td>
               </tr>
             )]
 
@@ -503,7 +503,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
                     <td style={TD_R}>{`$${NUM_1.format(c.avg_position / 1e6)}`}</td>
                     <td style={TD_R}><SignedCell v={c.delta_shares != null ? c.delta_shares / 1e6 : null} /></td>
                     <td style={TD_R}><SignedCell v={c.delta_value != null ? c.delta_value / 1e6 : null} decimals={0} /></td>
-                    <td style={TD_R}>{fmtPct2(c.pct_float_moved)}</td>
+                    <td style={TD_R}>{fmtPct2(c.pct_so_moved)}</td>
                   </tr>
                 )
               })

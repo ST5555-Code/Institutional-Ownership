@@ -290,7 +290,7 @@ def api_manager_profile(manager: str = ''):
             f""  # nosec B608
             f"""
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
-                   pct_of_portfolio, pct_of_float
+                   pct_of_portfolio, pct_of_so
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
             ORDER BY market_value_usd DESC LIMIT 50
