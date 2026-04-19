@@ -32,8 +32,9 @@ def load_quarter(con, quarter):
     sub_path = os.path.join(qdir, "SUBMISSION.tsv")
     info_path = os.path.join(qdir, "INFOTABLE.tsv")
     cover_path = os.path.join(qdir, "COVERPAGE.tsv")
+    om2_path = os.path.join(qdir, "OTHERMANAGER2.tsv")
 
-    for p in [sub_path, info_path, cover_path]:
+    for p in [sub_path, info_path, cover_path, om2_path]:
         if not os.path.exists(p):
             msg = f"Missing required 13F TSV for {quarter}: {p}"
             print(f"  ERROR: {msg}", flush=True)
@@ -103,7 +104,27 @@ def load_quarter(con, quarter):
         SELECT COUNT(*) FROM raw_coverpage WHERE quarter = '{quarter}'
     """).fetchone()[0]
 
-    print(f"  {quarter}: {sub_count:,} submissions, {info_count:,} holdings, {cover_count:,} cover pages",
+    # Load OTHERMANAGER2 (co-filing manager references; SEQUENCENUMBER-keyed)
+    con.execute(f"""
+        INSERT INTO other_managers
+        SELECT
+            ACCESSION_NUMBER,
+            SEQUENCENUMBER,
+            CIK,
+            FORM13FFILENUMBER,
+            CRDNUMBER,
+            SECFILENUMBER,
+            NAME,
+            '{quarter}' as quarter
+        FROM read_csv_auto('{om2_path}', delim='\t', header=true,
+                           all_varchar=true, ignore_errors=true)
+    """)
+    om2_count = con.execute(f"""
+        SELECT COUNT(*) FROM other_managers WHERE quarter = '{quarter}'
+    """).fetchone()[0]
+
+    print(f"  {quarter}: {sub_count:,} submissions, {info_count:,} holdings, "
+          f"{cover_count:,} cover pages, {om2_count:,} other managers",
           flush=True)
     return sub_count, info_count
 
@@ -113,6 +134,7 @@ def create_staging_tables(con):
     con.execute("DROP TABLE IF EXISTS raw_submissions")
     con.execute("DROP TABLE IF EXISTS raw_infotable")
     con.execute("DROP TABLE IF EXISTS raw_coverpage")
+    con.execute("DROP TABLE IF EXISTS other_managers")
 
     con.execute("""
         CREATE TABLE raw_submissions (
@@ -160,11 +182,25 @@ def create_staging_tables(con):
         )
     """)
 
+    # Schema matches prod other_managers (8 cols) — see findings doc §9.5.
+    con.execute("""
+        CREATE TABLE other_managers (
+            accession_number VARCHAR,
+            sequence_number VARCHAR,
+            other_cik VARCHAR,
+            form13f_file_number VARCHAR,
+            crd_number VARCHAR,
+            sec_file_number VARCHAR,
+            name VARCHAR,
+            quarter VARCHAR
+        )
+    """)
+
 
 def prepare_incremental(con, quarter):
     """For incremental mode: preserve existing staging tables, delete target quarter only."""
     # Ensure staging tables exist
-    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage', 'other_managers']:
         try:
             con.execute(f"SELECT 1 FROM {tbl} LIMIT 0")
         except Exception:
@@ -174,7 +210,7 @@ def prepare_incremental(con, quarter):
 
     # Delete only the target quarter's data from staging tables
     print(f"  Removing existing {quarter} data from staging tables...", flush=True)
-    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage']:
+    for tbl in ['raw_submissions', 'raw_infotable', 'raw_coverpage', 'other_managers']:
         deleted = con.execute(f"DELETE FROM {tbl} WHERE quarter = '{quarter}'").fetchone()
         if deleted:
             print(f"    {tbl}: removed {deleted[0]:,} rows", flush=True)
@@ -225,7 +261,7 @@ def print_summary(con):
     """Print summary statistics."""
     print("\n--- Table Row Counts ---", flush=True)
     tables = ["raw_submissions", "raw_infotable", "raw_coverpage",
-              "filings", "filings_deduped"]
+              "filings", "filings_deduped", "other_managers"]
     for t in tables:
         try:
             count = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
@@ -254,13 +290,14 @@ def project_dry_run(quarters):
     """
     print("\n[dry-run] Projecting row counts (no DB mutations)...", flush=True)
     scratch = duckdb.connect(":memory:")
-    totals = {"sub": 0, "info": 0, "cover": 0}
+    totals = {"sub": 0, "info": 0, "cover": 0, "om2": 0}
     for q in quarters:
         qdir = os.path.join(EXTRACT_DIR, q)
         paths = {
             "sub":   os.path.join(qdir, "SUBMISSION.tsv"),
             "info":  os.path.join(qdir, "INFOTABLE.tsv"),
             "cover": os.path.join(qdir, "COVERPAGE.tsv"),
+            "om2":   os.path.join(qdir, "OTHERMANAGER2.tsv"),
         }
         for key, p in paths.items():
             if not os.path.exists(p):
@@ -276,13 +313,14 @@ def project_dry_run(quarters):
             totals[key] += counts[key]
         print(
             f"  {q}: {counts['sub']:,} submissions, {counts['info']:,} infotable, "
-            f"{counts['cover']:,} coverpage",
+            f"{counts['cover']:,} coverpage, {counts['om2']:,} othermgr2",
             flush=True,
         )
     scratch.close()
     print(
         f"\n[dry-run] Totals: {totals['sub']:,} submissions, "
-        f"{totals['info']:,} infotable, {totals['cover']:,} coverpage",
+        f"{totals['info']:,} infotable, {totals['cover']:,} coverpage, "
+        f"{totals['om2']:,} other_managers",
         flush=True,
     )
     print(
@@ -352,7 +390,8 @@ def main():
               flush=True)
 
     # Stamp raw-table freshness after all quarters are loaded.
-    _stamp(con, ["raw_submissions", "raw_infotable", "raw_coverpage"])
+    _stamp(con, ["raw_submissions", "raw_infotable", "raw_coverpage",
+                 "other_managers"])
 
     # Rebuild filings from all raw data (all quarters present)
     print("\nBuilding filings table...", flush=True)
