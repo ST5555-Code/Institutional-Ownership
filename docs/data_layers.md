@@ -700,3 +700,67 @@ a reader that needs rewriting.
   `build_managers.py` + `backfill_manager_types.py` repoints.
 - `docs/pipeline_violations.md` — each affected script carries a
   CLEARED note with commit citations (2026-04-19).
+
+---
+
+## 9. `promote_staging.py` promote-kind machinery
+
+`promote_staging.py` carries two distinct promotion contracts,
+selected per-table via the `PROMOTE_KIND` dict:
+
+**`pk_diff` (existing behavior, default).** Diff staging against prod
+by PK, produce `INSERT` / `UPDATE` / `DELETE` statements, apply inside
+one transaction with validate_entities gates. Safe when the producer
+script writes individually-keyed rows with a stable PK — every
+staging row corresponds to a prod row (present, absent, or updated)
+determined by the PK alone. This is the contract used by all entity
+tables (`entity_current`, `entity_aliases`, `entity_identifiers`,
+`entity_relationships`, `entity_rollup_history`,
+`entity_classification_history`, `entity_overrides_persistent`).
+Preserves row-level history and supports precise rollback by replaying
+the inverse diff.
+
+**`rebuild` (new kind, added Rewrite5 Phase 0, commit `6079220`).**
+Full-replace semantics: snapshot prod to a dated table, `DROP TABLE`
+prod, `CREATE TABLE AS SELECT` from staging, stamp `data_freshness`.
+Safe for `DROP+CTAS` producer patterns where PK-diff is not viable
+because staging row sets are not PK-keyed (fan-out from upstream
+joins, dedup semantics that would treat perfectly-valid duplicate
+keys as mutual deletions, or derived tables that are fully regenerated
+every cycle and carry no historical state in prod).
+
+**Registration.** Table-keyed `PROMOTE_KIND` dict in
+`promote_staging.py`. Default is implicit `pk_diff` for backward
+compatibility; tables that require `rebuild` are listed explicitly.
+
+**When to use which.**
+
+| Case | Kind |
+|---|---|
+| Staging row set has stable PK, diff semantics preserve history | `pk_diff` |
+| Producer uses `DROP+CTAS`; every cycle fully regenerates prod | `rebuild` |
+| Producer fans out via join + dedupe, dupes-on-PK are expected from the join | `rebuild` |
+| Historical state must survive across promotes | `pk_diff` |
+| Derived / materialized aggregates with no independent history | `rebuild` |
+
+**Rewrite5 registrations.**
+- `parent_bridge` → `pk_diff` (existing behavior preserved — history matters).
+- `cik_crd_direct` → `pk_diff` (existing — history matters).
+- `managers` → **`rebuild`** (new — DROP+CTAS producer, dupes-on-CIK expected from ADV joins).
+- `cik_crd_links` → **`rebuild`** (new — derived materialization, no independent history).
+
+**Snapshot retention.** `rebuild` snapshots land as
+`{table}_legacy_snapshot_{YYYYMMDD}` dated tables and are retained as
+audit artifacts. Precedent: `holdings_v2_manager_type_legacy_snapshot_20260419`
+preserved the pre-Rewrite5 state of the `manager_type` column.
+Retention policy open (see ROADMAP D7 — snapshot table retention
+policy).
+
+**Cross-references.**
+- `ARCHITECTURE_REVIEW.md §Batch 3-A` carries the sibling note on
+  `fund_family_patterns` + `data_freshness` table additions.
+- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the first use of
+  `rebuild` kind.
+- ROADMAP → INFRASTRUCTURE → Open items → `INF30` is the
+  `merge_staging.py` analogue (NULL-only / column-scoped merge mode)
+  for the seed-time reference-table layer.
