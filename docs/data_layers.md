@@ -573,3 +573,68 @@ on `holdings_v2` are the filing-time record and do not join anywhere.
   rationale entry (2026-04-18).
 - ROADMAP → INFRASTRUCTURE → Open items → INF25 carries the
   sequencing row.
+
+---
+
+## 8. Writers orphaned by Stage 5 holdings drop — observed pattern
+
+Stage 5 (2026-04-13, BLOCK-3 preparatory work) dropped the legacy
+`holdings` table. Three writers continued to target `holdings` for
+writes after the drop, producing silent no-ops in prod. The pattern
+is worth documenting: when a table is retired, downstream readers
+break loudly, but downstream *writers* — especially those running
+`DROP TABLE IF EXISTS` + `CREATE TABLE AS SELECT` — can fail silently
+because the create succeeds and the write succeeds against a table
+no other reader consults.
+
+**Three documented instances.**
+
+1. **`OTHERMANAGER2` / `other_managers`.** The registry declared
+   `load_13f.py` as the owner of the `other_managers` write path, but
+   the actual loader had never been implemented — parsed
+   `OTHERMANAGER2` rows were dropped on the floor. Because no
+   downstream reader joined `other_managers`, the gap went unnoticed
+   until Rewrite4 Phase 0 addendum (commit `0a7ae35`) surveyed the
+   registry vs. actual writes. **15,405 rows** were recovered from
+   ghost data and materialized once the loader was implemented in
+   Rewrite4 (commit `14a5152`).
+
+2. **`build_managers.py` holdings ALTER+UPDATE (`:513-532`).** The
+   manager enrichment pass ran `ALTER TABLE holdings ADD COLUMN ...` +
+   `UPDATE holdings SET ...` after the core manager-table build. After
+   Stage 5 dropped `holdings`, these statements targeted the legacy
+   table name and ran silently every quarter with no observable
+   effect. **100% of the legacy 14-category `manager_type` data was
+   unpopulated on new data loads** between Stage 5 and Rewrite5
+   detection. Fix: repoint to `holdings_v2` at commit `1719320`.
+
+3. **`backfill_manager_types.py`.** A hand-curated backfill of manager
+   types from `data/reference/categorized_institutions_funds_v2.csv`
+   targeted the dropped `holdings` table. **5,782 curated rows** were
+   silently not applied on each cycle between Stage 5 and Rewrite5.
+   Fix: repoint to `holdings_v2` at commit `7b8a2b7`.
+
+**Detection characteristics.** The pattern is silent at runtime:
+`DROP TABLE IF EXISTS holdings; CREATE TABLE holdings AS SELECT ...`
+succeeds (table name is usable again); subsequent `INSERT / UPDATE /
+ALTER` against the recreated table succeeds; no reader joins it, so
+the write has no observable effect. `data_freshness` stamps, when
+present, go against the dropped table name and are themselves
+orphaned. The only observable symptom is data-coverage regression,
+typically caught by a smoke test or a manual audit, often weeks later.
+
+**Mitigation going forward.** When retiring a table, audit all writers
+named in `scripts/pipeline/registry.py` / `docs/canonical_ddl.md`, not
+just downstream readers. The `pipeline_violations.md` doc already lists
+`Legacy refs:` for each script — a table-retirement audit should treat
+those lines as a kill-list: every `Legacy refs:` entry against the
+retired table is a writer that needs repointing or deletion, not just
+a reader that needs rewriting.
+
+**Cross-references.**
+- `docs/REWRITE_LOAD_13F_FINDINGS.md` — Rewrite4 Phase 0 addendum
+  documents the OTHERMANAGER2 recovery.
+- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` — Rewrite5 documents the
+  `build_managers.py` + `backfill_manager_types.py` repoints.
+- `docs/pipeline_violations.md` — each affected script carries a
+  CLEARED note with commit citations (2026-04-19).
