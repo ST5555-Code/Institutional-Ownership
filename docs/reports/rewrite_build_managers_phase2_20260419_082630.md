@@ -240,3 +240,220 @@ end-to-end including rollback.
    - `build_managers.py --enrichment-only`  (against prod)
 
 All three commands are wired and smoke-tested.
+
+---
+
+## Risk 1 — Pre-Phase-4 investigation (2026-04-19, post `2e59ca3`)
+
+Read-only investigation requested before committing to Option (B)
+COALESCE. Branch head unchanged for code — this section is the only
+delta in the commit following this append.
+
+### Q1 — Composition of the 40% legacy-only set
+
+**The gap is 100% structural. No parser-suspect cases.**
+
+| Classification | CIKs | Rows |
+|---|---:|---:|
+| `no_adv_filing` (structural non-coverage) | 4,163 | 5,330,772 |
+| `adv_filed_parser_null` (parser-suspect) | **0** | **0** |
+| `other` | 0 | 0 |
+| **Total** | **4,163** | **5,330,772** |
+
+Every CIK in the 40% set is absent from `adv_managers` entirely. Not
+a single CIK represents an ADV filing the parser failed to extract.
+This eliminates the "parser follow-on" branch of the decision tree —
+there is nothing for fetch_adv to fix.
+
+**Name-pattern buckets** (of the 4,163 structural CIKs):
+
+| Bucket | CIKs | % |
+|---|---:|---:|
+| LLC_OTHER | 1,852 | 44.5% |
+| OTHER | 1,410 | 33.9% |
+| LP_OTHER | 382 | 9.2% |
+| FOREIGN_SUFFIX | 289 | 6.9% |
+| PENSION | 81 | 1.9% |
+| INSURANCE | 59 | 1.4% |
+| ENDOWMENT_FOUNDATION | 51 | 1.2% |
+| FAMILY_OFFICE | 25 | 0.6% |
+| BANK | 15 | 0.4% |
+
+**Top-20 by AUM — these are major institutions, not edge cases:**
+
+| CIK | Name | Legacy type | AUM |
+|---|---|---|---:|
+| 0001422849 | Capital World Investors | active | $2,772.5B |
+| 0001562230 | Capital International Investors | active | $2,346.5B |
+| 0001595888 | JANE STREET GROUP, LLC | quantitative | $2,221.8B |
+| 0000820027 | AMERIPRISE FINANCIAL INC | mixed | $1,654.1B |
+| 0001403438 | LPL Financial LLC | wealth_management | $1,266.2B |
+| 0000912938 | MASSACHUSETTS FINANCIAL SERVICES CO /MA/ | active | $1,248.8B |
+| 0000720005 | RAYMOND JAMES FINANCIAL INC | wealth_management | $1,193.8B |
+| 0001729829 | Qube Research & Technologies Ltd | quantitative | $1,139.6B |
+| 0001452861 | IMC-Chicago, LLC | quantitative | $952.3B |
+| 0001859606 | Optiver Holding B.V. | quantitative | $901.6B |
+| 0001067983 | Berkshire Hathaway Inc | strategic | $801.3B |
+| 0001166588 | BNP PARIBAS FINANCIAL MARKETS | mixed | $752.5B |
+| 0001642575 | Squarepoint Ops LLC | quantitative | $744.2B |
+| 0000713676 | PNC Financial Services Group | wealth_management | $694.2B |
+| 0000053417 | JENNISON ASSOCIATES LLC | active | $649.5B |
+| 0000919079 | California Public Employees Retirement System | pension_insurance | $648.4B |
+| 0001475365 | Sumitomo Mitsui Trust Group | mixed | $646.0B |
+| 0000815917 | JONES FINANCIAL COMPANIES LLLP | wealth_management | $554.4B |
+| 0001001085 | Brookfield Corp /ON/ | private_equity | $519.0B |
+| 0001445893 | CTC LLC | quantitative | $515.6B |
+
+Accepting the regression (Option A) would strip classifications
+from CalPERS, Berkshire, Capital Group's two bucket funds, Ameriprise,
+Edward Jones (Jones Financial), Raymond James, LPL, PNC, and major
+market makers (Jane Street, IMC, Optiver, Squarepoint). These are not
+obscure filers.
+
+**Assessment: structural.** 100% structural. Zero parser-fixable
+surface. The 4,163 CIKs are filers whose entity types (broker-dealers,
+pension plans, foreign banks, strategic corporate holders, family
+offices) are not ADV-registered investment advisers — they file 13F
+under different regulatory hooks and have no CRD.
+
+### Q2 — Provenance of the legacy 100%
+
+**Confidence: HIGH.** Provenance is traceable, deliberate, and
+semantically richer than the current pipeline produces.
+
+**Writer:** `scripts/backfill_manager_types.py` + hand-curated
+`categorized_institutions_funds_v2.csv` (5,782 rows).
+
+**Introducing commit:** `87e832b` — "Expand manager_type: backfill
+from categorized CSV + legend update" (2026-04-05).
+
+Commit message excerpt:
+```
+Backfilled holdings.manager_type using categorized_institutions_funds_v2.csv,
+which covers 4,434 previously uncategorized institutional entities.
+- scripts/backfill_manager_types.py reads the CSV and updates
+  holdings.manager_type where previous value was NULL or 'unknown'
+- Preserves existing classifications (doesn't overwrite)
+Results (Q4 2025):
+- Unknown entities: 3,314 → 846 (75% recovery)
+- New types added: strategic (637), wealth_management (247),
+  venture_capital (28), endowment_foundation (79), private_equity (76),
+  pension_insurance (7), SWF (1), hedge_fund (487 expanded)
+Frontend legend expanded to 14 buttons (was 6)
+```
+
+**Current writer status.** `backfill_manager_types.py:77-91` targets
+the dropped `holdings` table (not `holdings_v2`). Broken since the
+Stage 5 migration. That is why the enrichment is frozen at its
+2026-04-05 state: the legacy values persist in `holdings_v2` (carried
+over during the `holdings → holdings_v2` migration) but are no longer
+refreshed.
+
+**Value distribution (prod):**
+
+| Category | Rows (legacy holdings_v2) | Rows (current managers) | CIKs (legacy) |
+|---|---:|---:|---:|
+| `active` | 3,573,310 | 3,997 | 4,379 |
+| `mixed` | 4,440,399 | 1,354 | 1,731 |
+| `hedge_fund` | 481,744 | 548 | 1,385 |
+| `passive` | 730,674 | 141 | 48 |
+| `private_equity` | 6,071 | 95 | 88 |
+| `quantitative` | 630,515 | 72 | 78 |
+| `activist` | 14,766 | 23 | 32 |
+| `wealth_management` | 1,999,306 | — | 533 |
+| `pension_insurance` | 297,689 | — | 142 |
+| `strategic` | 50,125 | — | 586 |
+| `endowment_foundation` | 16,386 | — | 68 |
+| `SWF` | 28,999 | — | 17 |
+| `venture_capital` | 1,000 | — | 37 |
+| `unknown` | — | 77 | — |
+
+**Vocabulary drift.** Legacy is **strictly richer**. Six categories
+exist only in legacy:
+`SWF, venture_capital, strategic, wealth_management, pension_insurance, endowment_foundation`.
+Only `unknown` exists only in current. All 7 of the shared categories
+appear in both. This is not incompatible taxonomies — it is
+legacy-richer.
+
+Downstream queries already treat the 13-value legacy vocabulary as
+authoritative (the 2026-04-05 "legend expanded to 14 buttons" change
+wired the frontend to all of them). COALESCE preservation keeps a
+working vocabulary in place; accepting regression would orphan 6
+UI-facing categories with no replacement pipeline.
+
+### Q3 — Combined assessment and recommendation
+
+**Recommendation: Option (B) — COALESCE preservation + capture
+`backfill_manager_types.py` migration to `holdings_v2` as a follow-on
+block (not a Phase 4 blocker).**
+
+Rationale:
+
+1. **Q1 says structural.** The 40% is not a parser bug to fix. Zero
+   CIKs benefit from blocking on an upstream parser change. The
+   "parser follow-on" option from the original decision tree is
+   vacuous.
+2. **Q2 says HIGH provenance.** Hand-curated CSV, deliberate
+   classification, 13-value vocabulary wired into the frontend.
+   Option (A) — accept regression — would discard curation work
+   that current pipelines cannot reconstruct.
+3. **Top-AUM exposure is material.** ~$25T of cumulative AUM across
+   the top-20 legacy-only CIKs (Berkshire, CalPERS, Capital Group,
+   Ameriprise, etc.). Downstream flow / summary / register views
+   would silently lose this classification signal.
+4. **Taxonomy compatibility holds.** Legacy is strictly richer —
+   COALESCE mixes cleanly because the 7 shared categories are
+   identical strings, and the 6 legacy-only categories have no
+   overlapping values to resolve. Existing downstream consumers
+   (frontend legend, compute_flows, build_summaries) were built
+   against the 13-value set already.
+5. **Follow-on, not blocker.** `backfill_manager_types.py` needs
+   migration to `holdings_v2` to keep the curation live as new
+   quarters land, but that work doesn't gate Phase 4 — COALESCE
+   preserves what's there today, and new CIKs that lack a current
+   classification will fall through to NULL as expected. The
+   follow-on block fixes the refresh path; Phase 4 preserves the
+   snapshot.
+
+### Concrete Phase 4 change vs the Phase 2 plan
+
+Amend `enrich_holdings_v2(con, dry_run=False)` UPDATE at
+`scripts/build_managers.py`:
+
+```sql
+UPDATE holdings_v2 h
+SET
+    inst_parent_name = COALESCE(m.parent_name, h.inst_parent_name),
+    manager_type     = COALESCE(m.strategy_type, h.manager_type),
+    is_passive       = COALESCE(m.is_passive, h.is_passive),
+    is_activist      = COALESCE(m.is_activist, h.is_activist)
+FROM managers m
+WHERE h.cik = m.cik
+```
+
+Wrap every column in `COALESCE(m.*, h.*)` — `inst_parent_name`,
+`is_passive`, `is_activist` are 100% non-NULL in the current managers
+build so the COALESCE is a no-op for them today, but the pattern is
+defensive against any future managers-column NULL regression and
+keeps all four columns semantically consistent.
+
+Updated dry-run expectation message: "would UPDATE rows in
+holdings_v2 preserving legacy values where new build is NULL". No
+row-count change to the projection (same join cardinality). Expected
+post-apply `manager_type` coverage: 100.0% on prod (preserves legacy),
+~60% on fresh staging seeded from a stripped baseline (validation
+property only).
+
+### Follow-on block (not Phase 4 scope)
+
+1. Migrate `scripts/backfill_manager_types.py:77-91` from
+   `holdings` → `holdings_v2` so new quarters get the curated
+   classification refreshed against the 5,782-row CSV.
+2. Optional: migrate the CSV-driven enrichment into `managers.strategy_type`
+   directly, so `build_managers.py`'s CTAS produces the richer
+   vocabulary natively and the COALESCE in Phase 4 becomes a
+   no-op over time.
+3. Optional: add a fresh data-quality gate in `validate_entities.py`
+   or similar that alerts if `holdings_v2.manager_type` coverage
+   drops below a threshold (e.g., 95%).
+
