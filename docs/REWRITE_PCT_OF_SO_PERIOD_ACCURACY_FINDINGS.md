@@ -1900,3 +1900,172 @@ All gates met:
 
 HARD STOP — awaiting Serge's UI smoke + merge sign-off. Block not
 declared complete until then.
+
+---
+
+## §14.11 Phase 4c — comprehensive rename sweep + live smoke
+
+### §14.11.1 Missed-rename post-mortem
+
+Live app smoke during Phase 4b surfaced a `BinderException: Referenced
+column "pct_of_float" not found` at `queries.py::_get_summary_impl`.
+Root cause turned out to be Flask running the **main-branch checkout**
+against the post-migration prod DB — the block-branch renames were
+present on origin but the local Flask process loaded main-branch code.
+Not a code bug in the block branch; a deployment mismatch.
+
+The event nonetheless triggered an exhaustive sweep because:
+- Phase 1b's inventory caught 71 references in queries.py via
+  `replace_all`, but future sessions cannot trust "I ran `grep` on
+  a few specific files and replaced all hits" — the sweep needs to
+  be repo-wide with an explicit preserve-list.
+- Phase 1c had already caught 4 N-PORT compute paths the Phase 1b
+  grep missed. Two partial misses suggest systemic risk.
+
+Phase 4c sweep method: `grep -rn pct_of_float` across `*.py`,
+`*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.sql` with explicit preserve-
+list filtering. Plus alias grep for `total_pct_float`, `pct_float\b`,
+`float_pct_pct`, `with_float_pct`.
+
+### §14.11.2 Full Phase 4c inventory
+
+**Category (a) — SITES FIXED**:
+
+| file:line | issue | fix |
+|---|---|---|
+| `scripts/queries.py:2500` | `'float_pct_pct'` response-dict key — underlying query already uses `COUNT(CASE WHEN pct_of_so IS NOT NULL…)` on line 2491, but the key retained the `float_` prefix | Renamed to `'so_pct_pct'`. No React consumer reads this key (grep confirms zero downstream refs). |
+| `scripts/build_shares_history.py:15-20` | Module docstring references "update_holdings_pct_of_float" retired path and forward-links to "BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY" (pre-rename block name) | Docstring updated to reference the landed BLOCK-PCT-OF-SO-PERIOD-ACCURACY. Historical "update_holdings_pct_of_float" symbol name preserved (it's referring to a retired function's name, not the column). |
+
+**Category (b) — INTENTIONAL PRESERVES**:
+
+| file | reason |
+|---|---|
+| `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | migration file — `pct_of_float` is the *source* column the migration renames; must stay |
+| `scripts/enrich_holdings.py:9, :147` | docstring + inline comment explicitly reference the rename history |
+| `scripts/auto_resolve.py:536,540` | dead writer on RETIRE list — targets dropped `holdings` table |
+| `scripts/approve_overrides.py:159,164` | dead writer on RETIRE list |
+| `scripts/enrich_tickers.py:385,399,404,408` | dead writer on RETIRE list |
+| all `docs/REWRITE_*.md` | historical findings docs — intentional context |
+| git commit messages | immutable |
+
+**Category (c) — SURPRISES**:
+
+None. The one non-obvious alias (`float_pct_pct`) was caught by the
+alias grep for `float_pct`. No other missed renames found. The
+block-branch code is clean.
+
+### §14.11.3 Live smoke results
+
+Flask booted from worktree (not main-repo `start_app.sh`) on
+`:8001` against prod DB. All endpoints returned 200 OK with valid
+JSON.
+
+**Baseline endpoints (6/6 PASS)**:
+
+| endpoint | result | sample |
+|---|---|---|
+| `/api/v1/freshness` | PASS | `holdings_v2 last_computed_at 2026-04-19T13:32:08` |
+| `/api/v1/summary?ticker=AAPL` | PASS | `total_pct_so=67.02, shares_float=14,655,888,439, price_date=2026-04-16` |
+| `/api/v1/summary?ticker=MSFT` | PASS | `total_pct_so=86.11` |
+| `/api/v1/summary?ticker=XOM` | PASS | `total_pct_so=67.52` |
+| `/api/v1/tickers` | PASS | 200 OK, ticker list returned |
+| `/api/v1/entity_market_summary?limit=5` | PASS | Vanguard / BlackRock top two |
+
+**10 integration paths via HTTP (10/10 PASS)**:
+
+| # | path | endpoint | result |
+|---|---|---|---|
+| 1 | query1 (Register institutional) | `/api/v1/query1?ticker=AAPL` | 104 rows, top pct_so=9.72 (Vanguard, SUM-aggregated — source inherits from DB rows, dict-level source omitted per Phase 1c pre-aggregate pattern) |
+| 2+3 | get_nport_children_batch / _children | invoked via Register load | exercised through /query1 (nport children embedded) |
+| 3 | query16 | `/api/v1/query16?ticker=AAPL` | 25 rows, top src=`soh_period_accurate`, all_totals: pct_so=23.47 src=`soh_period_accurate` |
+| 4 | ownership_trend_summary parent | `/api/v1/ownership_trend_summary?ticker=AAPL&level=parent` | 4 quarters, 2025Q4 pct_so=67.02 src=`soh_period_accurate` |
+| 4b | ownership_trend_summary fund | same endpoint `level=fund` | 13 quarters, src=`soh_period_accurate` |
+| 5 | _compute_flows_live fund | `/api/v1/flow_analysis?ticker=AAPL&level=fund` | 25 buyers, top pct_so=0.232 src=`soh_period_accurate` |
+| 6 | **flow_analysis precomputed parent** | `/api/v1/flow_analysis?ticker=AAPL&level=parent` | 25 buyers, top pct_so=0.257 **src=`soh_period_accurate`** — previously unvalidatable on staging; now confirmed via live HTTP |
+| 7 | two_company_overlap | `/api/v1/two_company_overlap?subject=AAPL&second=MSFT&quarter=2025Q4` | meta: subj_denom=14.7B src=`soh_period_accurate`, sec_denom=7.4B src=`soh_period_accurate` |
+| 8 | two_company_subject | `/api/v1/two_company_subject?subject=AAPL&quarter=2025Q4` | subj_denom=14.7B src=`soh_period_accurate`, sec_* all None (subject-only variant) |
+
+**Tab-to-path mapping for Serge browser UI smoke**:
+
+| Tab | Endpoints invoked |
+|---|---|
+| Register | `/api/v1/query1`, `/api/v1/query16`, `/api/v1/register/holdings` |
+| Ticker Detail | `/api/v1/summary`, `/api/v1/query1`, `/api/v1/query3`, top-holders widget, concentration widget |
+| Ownership Trend | `/api/v1/ownership_trend_summary` (both parent + fund) |
+| Flow Analysis | `/api/v1/flow_analysis` (both levels) |
+| Cross-Ownership / Two Companies | `/api/v1/two_company_overlap`, `/api/v1/two_company_subject` |
+| Market | `/api/v1/top-holders`, `/api/v1/heatmap`, `/api/v1/crowding`, `/api/v1/smart_money` |
+| Fund Portfolio | `/api/v1/fund_portfolio` + CSV export |
+| Admin / QC | `/api/v1/coverage` (uses renamed `so_pct_pct` dict key) |
+
+### §14.11.4 INF41 — process-hardening deferred item
+
+Added to §14.10 ROADMAP subsection:
+
+**INF41 — BLOCK-READ-SITE-INVENTORY-DISCIPLINE**
+
+Schema-rename migrations require a mechanically exhaustive grep-
+based inventory check, not eyeball enumeration. Precedent:
+- pct-of-so Phase 1b missed 4 N-PORT compute paths (caught Phase
+  1c, commit `b0ba86d`)
+- pct-of-so Phase 4b live smoke surfaced one missed alias
+  `float_pct_pct` (fixed Phase 4c, commit `c1fbce4`)
+
+Fix: pre-migration checklist step that runs
+`grep -rn <old_name>` across the entire repo excluding only the
+migration file and findings docs, then asserts zero hits before
+Phase 4 prod apply. Includes alias search: common transformations
+(`_pct` → `_pct_pct`, `total_` prefix, camelCase variants, field-
+name drift like `with_X_pct`).
+
+Sibling to **INF39** (BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE) and
+**INF40** (surrogate row_id for rollback — noted in §14.5 as
+future infra). Together the three form the canonical v2-table
+migration hardening trilogy:
+- INF39: schema divergence pre-flight check
+- INF40: stable surrogate row-ID for rollback reconstruction
+- INF41: mechanically exhaustive rename sweep
+
+Priority: medium.
+
+### §14.11.5 INF41 stub content (for ROADMAP copy-paste)
+
+```
+INF41 — BLOCK-READ-SITE-INVENTORY-DISCIPLINE
+Scope: Pre-migration checklist requires mechanically exhaustive
+grep-based sweep for any column/field rename, not targeted
+enumeration. Script the check:
+
+  #!/bin/bash
+  OLD_NAME="$1"
+  PRESERVE_PATHS="scripts/migrations/ docs/REWRITE_"
+  HITS=$(grep -rn "$OLD_NAME" \
+    --include='*.py' --include='*.ts' --include='*.tsx' \
+    --include='*.js' --include='*.jsx' --include='*.sql' \
+    --exclude-dir='.git' --exclude-dir='node_modules' \
+    --exclude-dir='.claude' . | \
+    grep -vE "($PRESERVE_PATHS)")
+  if [ -n "$HITS" ]; then
+    echo "FAIL: $OLD_NAME still referenced outside preserve list"
+    echo "$HITS"
+    exit 1
+  fi
+
+Run as final gate before Phase 4 prod apply. Includes alias search
+for common transformations (*_pct → *_pct_pct, total_*, camelCase,
+with_X_pct field-name drift).
+Priority: medium (process hardening).
+Precedent: pct-of-so Phase 1b/1c/4c sweep gaps — see §14.11.
+```
+
+### §14.11.6 Phase 4c exit
+
+- Exhaustive grep inventory: 2 fixes, all preserve-list items
+  accounted for ✓
+- Post-fix grep verification: zero alias hits, all remaining
+  `pct_of_float` references are in the preserve list ✓
+- Live HTTP smoke: 6/6 baseline + 10/10 integration paths PASS ✓
+- Flask killed, DB symlinks removed ✓
+
+Block code is **user-smoke-ready**. Serge performs browser UI walk-
+through before accepting merge.
