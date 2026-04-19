@@ -566,6 +566,68 @@ columns in one pass. Each step narrows the exposure before the next.
 **Not in scope.** Class A columns stay as stamps. `cusip` and `shares`
 on `holdings_v2` are the filing-time record and do not join anywhere.
 
+### COALESCE preservation pattern for source-side coverage regression
+
+When a writer is repointed from one source to another and the new
+source has lower coverage than the old, COALESCE preserves historical
+values while letting new-source values win where populated:
+
+```sql
+UPDATE holdings_v2 t
+SET manager_type = COALESCE(src.manager_type, t.manager_type),
+    inst_parent_name = COALESCE(src.inst_parent_name, t.inst_parent_name),
+    is_passive = COALESCE(src.is_passive, t.is_passive),
+    is_activist = COALESCE(src.is_activist, t.is_activist)
+FROM (<new source>) src
+WHERE t.<join key> = src.<join key>;
+```
+
+**Precedent.** Rewrite5 Phase 4 (commit `7747af2`) applied this
+pattern on all four `build_managers` enrichment columns
+(`manager_type`, `inst_parent_name`, `is_passive`, `is_activist`).
+The new source (`managers.strategy_type` populated by
+`fetch_adv.py` + hand-curated
+`data/reference/categorized_institutions_funds_v2.csv`) covers only
+~60% of CIKs against legacy's 100%; the 40% gap is structural
+(non-ADV filers, $25T+ AUM). COALESCE preserved legacy values in
+that gap, including the 14-category hand-curated taxonomy that ADV
+alone cannot supply.
+
+**Auxiliary pattern: pre-rewrite snapshot as audit artifact.** Before
+the COALESCE-repoint pass writes, snapshot the legacy column set into
+a dated table — e.g. `holdings_v2_manager_type_legacy_snapshot_20260419`
+(Rewrite5; 12,270,984 rows, 9,121 CIKs, 13 types). The snapshot is a
+full point-in-time reference and supports:
+
+- Rollback to pre-rewrite state without data loss if the new source
+  turns out to be broken.
+- Diff validation after the repoint — "how many rows changed, where
+  did they land, and were the changes expected."
+- Long-tail audit against future ADV enrichments — compare a fresh
+  pull to the snapshot to see coverage drift direction.
+
+**When to use.**
+- Source-side coverage regression is known (the legacy source had
+  more rows populated than the new source will).
+- Legacy provenance is defensible — the legacy data was populated by
+  a trusted process, even if that process has been retired.
+- Taxonomies are strictly compatible: legacy is a superset of new, or
+  the merge is semantically safe (e.g., new source refines legacy
+  values rather than contradicting them).
+
+**When not to use.**
+- Taxonomies conflict — same column name, different meanings (e.g.,
+  `status='active'` meaning "activist investor" in legacy vs.
+  "actively-managed fund" in new). COALESCE would silently produce a
+  meaningless mix.
+- Legacy data is of unknown provenance — prefer a full-replace repoint
+  so the column carries a single, auditable source of truth.
+
+**Subsection cross-references.** `ENTITY_ARCHITECTURE.md → Design
+Decision Log` carries the dated rationale entry (2026-04-19);
+`docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the Rewrite5
+application of this pattern.
+
 **Cross-references.**
 - `ENTITY_ARCHITECTURE.md → Known Limitations` carries a pointer to
   this section from the entity side.
