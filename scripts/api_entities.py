@@ -195,11 +195,11 @@ def api_entity_resolve(entity_id: str = ''):
 
 
 @entities_router.get('/entity_market_summary')
-def api_entity_market_summary(limit: int = 25):
+def api_entity_market_summary(limit: int = 25, rollup_type: str = 'economic_control_v1'):
     """Market-wide: top institutions by 13F book value with filer + fund counts."""
     try:
         from queries import get_market_summary
-        result = get_market_summary(limit=limit)
+        result = get_market_summary(limit=limit, rollup_type=rollup_type)
         return result
     except Exception as e:
         log.error("entity_market_summary error: %s", e, exc_info=True)

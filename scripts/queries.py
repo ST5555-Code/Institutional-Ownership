@@ -826,13 +826,17 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             pass
 
         # N-PORT coverage % per parent (from summary_by_parent)
+        # INF34: summary_by_parent has one row per (quarter, inst_parent_name,
+        # rollup_type) since migration 004 — filter on current rollup_type to
+        # avoid duplicated rows / arbitrary row selection.
         coverage_map = {}
         try:
             cov_df = con.execute(f"""
                 SELECT inst_parent_name, nport_coverage_pct
                 FROM summary_by_parent
                 WHERE quarter = '{quarter}' AND inst_parent_name IN ({ph_aum})
-            """, parent_names).fetchdf()
+                  AND rollup_type = ?
+            """, parent_names + [rollup_type]).fetchdf()
             coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                             for _, r in cov_df.iterrows()
                             if r['nport_coverage_pct'] is not None}
@@ -1486,6 +1490,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 logger.error("[query3 nport batch] %s", e, exc_info=True)
 
         # N-PORT coverage % per parent (from summary_by_parent)
+        # INF34: filter on rollup_type (one row per rollup since migration 004).
         coverage_map = {}
         if parent_names:
             try:
@@ -1494,7 +1499,8 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     SELECT inst_parent_name, nport_coverage_pct
                     FROM summary_by_parent
                     WHERE quarter = '{quarter}' AND inst_parent_name IN ({ph_cov})
-                """, parent_names).fetchdf()
+                      AND rollup_type = ?
+                """, parent_names + [rollup_type]).fetchdf()
                 coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                                 for _, r in cov_df.iterrows()
                                 if r['nport_coverage_pct'] is not None}
@@ -1524,6 +1530,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
             row['held_label'] = '{}/{}'.format(held_count, 4)
 
             # Enhancement 2 — Direction from investor_flows
+            # INF34: filter on rollup_type (one row per rollup since migration 004).
             if has_flows:
                 flow = con.execute(f"""
                     SELECT net_shares, pct_change, price_adj_flow, momentum_signal,
@@ -1531,7 +1538,8 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     FROM investor_flows
                     WHERE ticker = ? AND inst_parent_name = ?
                       AND quarter_from = '{FQ}' AND quarter_to = '{quarter}'
-                """, [ticker, parent]).fetchone()
+                      AND rollup_type = ?
+                """, [ticker, parent, rollup_type]).fetchone()
                 if flow:
                     pct_chg = float(flow[1]) if flow[1] is not None else None
                     if flow[4]:  # is_new_entry
@@ -3127,9 +3135,11 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                     'charts': {'flow_intensity': [], 'churn': []}}
 
         # Check if this ticker has data
+        # INF34: filter on rollup_type (one row per rollup since migration 004).
         cnt = con.execute(
-            "SELECT COUNT(*) FROM investor_flows WHERE ticker = ? AND quarter_from = ?",
-            [ticker, quarter_from]
+            "SELECT COUNT(*) FROM investor_flows "
+            "WHERE ticker = ? AND quarter_from = ? AND rollup_type = ?",
+            [ticker, quarter_from, rollup_type]
         ).fetchone()[0]
         if cnt == 0:
             return {'error': 'No flow data for this ticker/period.',
@@ -3160,9 +3170,9 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                        is_new_entry, is_exit, flow_4q, flow_2q,
                        momentum_ratio, momentum_signal
                 FROM investor_flows
-                WHERE ticker = ? AND quarter_from = ?
+                WHERE ticker = ? AND quarter_from = ? AND rollup_type = ?
                 ORDER BY net_shares DESC NULLS LAST
-            """, [ticker, quarter_from]).fetchdf()
+            """, [ticker, quarter_from, rollup_type]).fetchdf()
             rows = df_to_records(df)
             # Period-accurate pct_of_so denominator. Use quarter_from for
             # exits (prior-quarter position) and quarter_to for
@@ -4310,12 +4320,15 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
 # ---------------------------------------------------------------------------
 
 
-def get_market_summary(limit=25, quarter=LQ):
+def get_market_summary(limit=25, quarter=LQ, rollup_type='economic_control_v1'):
     """Top N institutions by total 13F holdings value (market-wide).
 
     Returns a ranked list with AUM, filer count, and fund count per
     institution. Uses holdings_v2 for AUM (avoids polluted managers.aum_total),
     entity_relationships for filer count, and fund children for fund count.
+
+    rollup_type is applied to the summary_by_parent coverage lookup so the
+    returned nport_coverage_pct matches the caller's rollup (INF34 sweep).
     """
     con = get_db()
     try:
@@ -4394,12 +4407,14 @@ def get_market_summary(limit=25, quarter=LQ):
                 r['fund_count'] = 0
 
             # N-PORT coverage from summary_by_parent
+            # INF34: filter on rollup_type (one row per rollup since migration 004).
             try:
                 cov = con.execute(f"""
                     SELECT nport_coverage_pct
                     FROM summary_by_parent
                     WHERE inst_parent_name = ? AND quarter = '{quarter}'
-                """, [r['institution']]).fetchone()
+                      AND rollup_type = ?
+                """, [r['institution'], rollup_type]).fetchone()
                 r['nport_coverage_pct'] = cov[0] if cov and cov[0] is not None else None
             except Exception:  # nosec B110
                 r['nport_coverage_pct'] = None
