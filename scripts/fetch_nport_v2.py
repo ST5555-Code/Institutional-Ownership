@@ -74,7 +74,7 @@ from fetch_dera_nport import (  # noqa: E402
     run_test_mode,
     _ensure_staging_schema,
 )
-from fetch_nport import parse_nport_xml, classify_fund  # noqa: E402
+from pipeline.nport_parsers import parse_nport_xml, classify_fund  # noqa: E402
 
 from pipeline.manifest import (  # noqa: E402
     get_or_create_manifest_row, update_manifest_status, write_impact,

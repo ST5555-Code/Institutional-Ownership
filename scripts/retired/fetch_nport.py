@@ -24,19 +24,30 @@ from collections import Counter
 import requests
 import duckdb
 import pandas as pd
-from lxml import etree
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, set_staging_mode, is_staging_mode, crash_handler
+from db import get_db_path, set_staging_mode, is_staging_mode, crash_handler  # noqa: E402
+# Canonical N-PORT parser / classifier moved to pipeline.nport_parsers in
+# BLOCK-3 (audit §10). Re-imported here so the internal callers at the
+# original line-numbers (and any external importer that does
+# `from fetch_nport import classify_fund`) keep resolving until this
+# script is relocated to scripts/retired/ at BLOCK-3 Phase 4.
+from pipeline import nport_parsers  # noqa: E402
+from pipeline.nport_parsers import (  # noqa: E402,F401  # pylint: disable=W0611  # re-exported for backwards-compat
+    NS,
+    INDEX_PATTERNS,
+    EXCLUDE_PATTERNS,
+    parse_nport_xml,
+    classify_fund,
+)
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.2  # seconds between requests
-NS = {"n": "http://www.sec.gov/edgar/nport"}
 
 # Quarter mapping: our label → N-PORT report period target months
 # Each quarter has 3 months. The third month is the quarter-end.
@@ -69,21 +80,10 @@ EDGAR_QUARTERS = [
     (2025, 4),
 ]
 
-# Index fund name patterns (excluded from active fund universe)
-INDEX_PATTERNS = re.compile(
-    r"\b(index|idx|s&p\s*500|russell\s*\d|nasdaq|dow\s*jones|"
-    r"total\s*(stock|bond|market)|wilshire|msci|ftse|"
-    r"barclays|aggregate|broad\s*market)\b",
-    re.IGNORECASE,
-)
-
-# ETF/money market/bond-only/fund-of-funds exclusion patterns
-EXCLUDE_PATTERNS = re.compile(
-    r"\b(etf|exchange[\s-]*traded|money\s*market|"
-    r"treasury|government\s*money|prime\s*money|"
-    r"fund\s*of\s*funds|master\s*fund|feeder\s*fund)\b",
-    re.IGNORECASE,
-)
+# INDEX_PATTERNS / EXCLUDE_PATTERNS moved to pipeline.nport_parsers (see
+# re-import block above). Left in the re-export list so any external
+# consumer that still reads them via `from fetch_nport import …` stays
+# working until this file retires.
 
 # Test funds (CIKs verified against EDGAR NPORT-P index)
 TEST_FUNDS = {
@@ -220,135 +220,11 @@ def download_xml(cik, accession_number, _quarter_label):
         return None
 
 
-def parse_nport_xml(xml_bytes):
-    """Parse N-PORT XML. Returns (metadata_dict, list_of_holdings) or (None, None)."""
-    try:
-        root = etree.fromstring(xml_bytes)
-    except Exception:
-        return None, None
-
-    gen = root.find(".//n:genInfo", NS)
-    fund_info = root.find(".//n:fundInfo", NS)
-    if gen is None:
-        return None, None
-
-    def get_text(parent, tag):
-        el = parent.find(f"n:{tag}", NS)
-        return el.text.strip() if el is not None and el.text else None
-
-    metadata = {
-        "reg_name": get_text(gen, "regName"),
-        "reg_cik": get_text(gen, "regCik"),
-        "series_name": get_text(gen, "seriesName"),
-        "series_id": get_text(gen, "seriesId"),
-        "rep_pd_end": get_text(gen, "repPdEnd"),
-        "rep_pd_date": get_text(gen, "repPdDate"),
-        "is_final": get_text(gen, "isFinalFiling"),
-    }
-
-    if fund_info is not None:
-        metadata["net_assets"] = get_text(fund_info, "netAssets")
-        metadata["tot_assets"] = get_text(fund_info, "totAssets")
-
-    # Parse holdings
-    holdings = []
-    for inv in root.findall(".//n:invstOrSec", NS):
-        h = {}
-        h["name"] = get_text(inv, "name")
-        h["cusip"] = get_text(inv, "cusip")
-        h["balance"] = get_text(inv, "balance")
-        h["units"] = get_text(inv, "units")
-        h["val_usd"] = get_text(inv, "valUSD")
-        h["pct_val"] = get_text(inv, "pctVal")
-        h["payoff_profile"] = get_text(inv, "payoffProfile")
-        h["fair_val_level"] = get_text(inv, "fairValLevel")
-        h["is_restricted"] = get_text(inv, "isRestrictedSec")
-
-        # Asset category — can be direct element or conditional attribute
-        cat_el = inv.find("n:assetCat", NS)
-        if cat_el is not None and cat_el.text:
-            h["asset_cat"] = cat_el.text.strip()
-        else:
-            cond = inv.find("n:assetConditional", NS)
-            if cond is not None:
-                h["asset_cat"] = cond.get("assetCat", "")
-            else:
-                h["asset_cat"] = ""
-
-        # ISIN — stored as attribute
-        isin_el = inv.find(".//n:isin", NS)
-        if isin_el is not None:
-            h["isin"] = isin_el.get("value", "")
-        else:
-            h["isin"] = ""
-
-        # Ticker — try multiple paths
-        ticker_el = inv.find(".//n:ticker", NS)
-        if ticker_el is not None:
-            h["ticker"] = ticker_el.get("value", "") or (ticker_el.text or "")
-        else:
-            h["ticker"] = ""
-
-        # Currency
-        h["cur_cd"] = get_text(inv, "curCd") or "USD"
-
-        holdings.append(h)
-
-    return metadata, holdings
-
-
-_include_index = False  # set via --include-index flag
-
-
-def classify_fund(metadata, holdings):
-    """Classify a fund. Returns (is_active_equity, fund_category, is_actively_managed).
-
-    is_actively_managed is determined by fund name patterns:
-    - Names matching INDEX_PATTERNS (index, ETF, S&P 500, etc.) → False
-    - All other equity funds → True
-    """
-    series_name = (metadata.get("series_name") or metadata.get("reg_name") or "").strip()
-
-    # Determine active vs passive by name (independent of --include-index filter)
-    is_passive_name = bool(INDEX_PATTERNS.search(series_name))
-    is_actively_managed_flag = not is_passive_name
-
-    # Exclusions (skip index AND ETF filters when --include-index is active)
-    if not _include_index and INDEX_PATTERNS.search(series_name):
-        return False, "index", False
-    if not _include_index and EXCLUDE_PATTERNS.search(series_name):
-        return False, "excluded", False
-    if metadata.get("is_final") == "Y":
-        return False, "final_filing", False
-
-    # Count asset categories
-    cats = Counter(h.get("asset_cat", "") for h in holdings)
-    total = len(holdings)
-    if total == 0:
-        return False, "empty", False
-
-    equity_count = cats.get("EC", 0) + cats.get("EP", 0)
-
-    # Compute value-weighted equity percentage
-    total_val = sum(float(h.get("val_usd") or 0) for h in holdings)
-    equity_val = sum(
-        float(h.get("val_usd") or 0)
-        for h in holdings
-        if h.get("asset_cat") in ("EC", "EP")
-    )
-    equity_val_pct = equity_val / total_val if total_val > 0 else 0
-
-    # Classify
-    if equity_val_pct >= 0.60:
-        if equity_val_pct >= 0.90:
-            category = "equity"
-        else:
-            category = "balanced"
-        return True, category, is_actively_managed_flag
-    elif equity_val_pct >= 0.30:
-        return True, "multi_asset", is_actively_managed_flag
-
-    return False, "bond_or_other", False
+# parse_nport_xml + classify_fund + _include_index now live in
+# pipeline.nport_parsers. They are re-imported at the top of this file so
+# internal callers (see :_fetch_and_load_filing and the --include-index
+# CLI handler below) and any external caller still doing
+# `from fetch_nport import classify_fund` keep resolving.
 
 
 # ---------------------------------------------------------------------------
@@ -822,8 +698,9 @@ def main():
     if args.staging:
         set_staging_mode(True)
     if args.include_index:
-        global _include_index  # pylint: disable=W0603  # module-level cache: CLI flag for filter
-        _include_index = True
+        # Flag lives on pipeline.nport_parsers after BLOCK-3 extraction;
+        # set it there so classify_fund() picks up the override.
+        nport_parsers._include_index = True  # pylint: disable=W0212  # CLI flag: set on canonical module post-BLOCK-3 extraction
         print("  Including index/ETF funds in this run")
 
     print("=" * 60)

@@ -72,8 +72,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import STAGING_DB, PROD_DB, set_staging_mode  # noqa: E402
-import fetch_nport  # noqa: E402
-from fetch_nport import classify_fund  # noqa: E402
+from pipeline import nport_parsers  # noqa: E402
+from pipeline.nport_parsers import classify_fund  # noqa: E402,F401
 
 
 # ---------------------------------------------------------------------------
@@ -917,7 +917,7 @@ def run_parity_test(run_id: str, zip_path: Path, quarter_label: str) -> str:
     # 1. Build + load DERA side
     # Mirror XML path's default (index funds excluded) so parity compares
     # like-for-like. prod fund_holdings_v2 was produced with this default.
-    fetch_nport._include_index = False  # pylint: disable=protected-access
+    nport_parsers._include_index = False  # pylint: disable=protected-access
     filter_ciks = {f["cik"] for f in REFERENCE_FUNDS}
     dataset = build_dera_dataset(zip_path, filter_ciks=filter_ciks)
     submissions_all = dataset["submissions"]

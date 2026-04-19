@@ -9,12 +9,13 @@ period-appropriate benchmarks. Auto-updates with each new quarter.
 
 Run as part of the quarterly pipeline after fetch_nport.py and market_data.
 """
+import argparse
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import duckdb  # noqa: E402
-from db import get_db_path  # noqa: E402
+from db import get_db_path, set_staging_mode  # noqa: E402
 from config import QUARTERS  # noqa: E402
 
 # Vanguard Total Stock Market Index Fund — broadest US equity coverage
@@ -75,24 +76,40 @@ def build():
             print(f'Skipping {q} — no date mapping')
             continue
 
-        # Check if benchmark fund has data for this quarter
+        # Check if benchmark fund has data for this quarter.
+        # `fund_holdings_v2` is per (series_id, report_month) — same
+        # series × quarter shows up as 1–3 rows per holding, once per
+        # filed month. The `> 0` check is unaffected by that.
         cnt = con.execute(
-            "SELECT COUNT(*) FROM fund_holdings WHERE series_id = ? AND quarter = ?",
+            "SELECT COUNT(*) FROM fund_holdings_v2 "
+            "WHERE series_id = ? AND quarter = ?",
             [BENCHMARK_SERIES_ID, q]
         ).fetchone()[0]
         if cnt == 0:
             print(f'Skipping {q} — no benchmark fund data')
             continue
 
+        # Aggregate the quarter-end month only — scope `fund_holdings_v2`
+        # to the MAX(report_month) for this (series, quarter) so a series
+        # that filed all three monthly snapshots isn't triple-counted.
+        # Matches the `latest_per_series` convention used in
+        # build_summaries.py.
         rows = con.execute("""
+            WITH latest_rm AS (
+                SELECT MAX(report_month) AS rm
+                  FROM fund_holdings_v2
+                 WHERE series_id = ? AND quarter = ?
+            )
             SELECT COALESCE(m.sector, 'Unknown') as yf_sector,
                    COALESCE(m.industry, '') as yf_industry,
                    SUM(fh.market_value_usd) as val
-            FROM fund_holdings fh
-            LEFT JOIN market_data m ON fh.ticker = m.ticker
-            WHERE fh.series_id = ? AND fh.quarter = ? AND fh.market_value_usd > 0
-            GROUP BY m.sector, m.industry
-        """, [BENCHMARK_SERIES_ID, q]).fetchall()
+              FROM fund_holdings_v2 fh
+              JOIN latest_rm lrm ON fh.report_month = lrm.rm
+              LEFT JOIN market_data m ON fh.ticker = m.ticker
+             WHERE fh.series_id = ? AND fh.quarter = ?
+               AND fh.market_value_usd > 0
+             GROUP BY m.sector, m.industry
+        """, [BENCHMARK_SERIES_ID, q, BENCHMARK_SERIES_ID, q]).fetchall()
 
         gics_totals = {}
         total = 0.0
@@ -127,5 +144,18 @@ def build():
     print('\nDone.')
 
 
+def _parse_args() -> argparse.Namespace:
+    """CLI parser — `--staging` redirects the write target to the staging DB."""
+    parser = argparse.ArgumentParser(
+        description="Build benchmark_weights from Vanguard Total Stock Market.",
+    )
+    parser.add_argument("--staging", action="store_true",
+                        help="Write to staging DB instead of prod.")
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    _args = _parse_args()
+    if _args.staging:
+        set_staging_mode(True)
     build()
