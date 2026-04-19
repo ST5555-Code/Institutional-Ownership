@@ -60,6 +60,12 @@ PK_COLUMNS = {
     # Canonical reference tables (added 2026-04-18 — Phase 3)
     "cusip_classifications": ["cusip"],
     "securities": ["cusip"],
+    # build_managers.py outputs (added 2026-04-19 — Batch 3 close).
+    # parent_bridge.cik and cik_crd_direct.cik are empirically unique;
+    # managers and cik_crd_links route through the rebuild kind instead
+    # (see PROMOTE_KIND), so they do not need PK_COLUMNS entries.
+    "parent_bridge": ["cik"],
+    "cik_crd_direct": ["cik"],
 }
 
 # Per-table validator registration. Each value is one of:
@@ -85,7 +91,38 @@ VALIDATOR_MAP = {
     # Canonical tables — no validator registered yet
     "cusip_classifications": None,
     "securities": None,
+    # build_managers.py outputs (2026-04-19 — Batch 3 close)
+    "parent_bridge": None,
+    "cik_crd_direct": None,
+    "managers": None,
+    "cik_crd_links": None,
 }
+
+# Promotion strategy per table. Default for any table not listed here is
+# "pk_diff" — the PK-keyed DELETE-then-INSERT path established for entity
+# tables and extended to canonical tables by BLOCK-SECURITIES-DATA-AUDIT
+# Phase 3.
+#
+# "rebuild" — full-replace semantics: snapshot prod, DROP prod, CREATE AS
+# SELECT * FROM staging. Use when PK-diff is semantically wrong. Added for
+# build_managers.py outputs whose natural keys are not empirically unique
+# (managers.cik has ~7.3% duplication from LEFT JOIN fan-out; cik_crd_links
+# has 3 duplicate CIKs). See REWRITE_BUILD_MANAGERS_FINDINGS.md §2.4.
+#
+# The rebuild path inherits staging's schema. Any post-hoc columns added
+# by later pipeline stages (fetch_13dg `has_13dg`, fetch_ncen `adviser_cik`
+# on `managers`) are wiped and must be re-applied by those stages after
+# promote — identical to build_managers.py's existing DROP+CTAS semantics.
+PROMOTE_KIND = {
+    # build_managers.py outputs with non-unique natural keys
+    "managers": "rebuild",
+    "cik_crd_links": "rebuild",
+}
+
+
+def _kind_for(table: str) -> str:
+    """Return the promote strategy for `table`. Defaults to `pk_diff`."""
+    return PROMOTE_KIND.get(table, "pk_diff")
 
 
 def _log(msg: str) -> None:
@@ -113,7 +150,11 @@ def _take_snapshot(con, snapshot_id: str, tables: list[str]) -> None:
 
 def _restore_snapshot(con, snapshot_id: str, tables: list[str]) -> None:
     _log(f"  RESTORING from snapshot {snapshot_id} ...")
-    # Reverse order so child tables drop first (FK-safe)
+    # Reverse order so child tables drop first (FK-safe). For pk_diff
+    # tables, DELETE keeps the schema in place for the subsequent INSERT.
+    # For rebuild tables, the forward path may have changed the schema
+    # (DROP + CREATE AS SELECT from staging), so restore must also
+    # DROP + CREATE AS SELECT from the snapshot rather than DELETE.
     for t in reversed(tables):
         snap = _snapshot_name(t, snapshot_id)
         exists = con.execute(
@@ -123,7 +164,10 @@ def _restore_snapshot(con, snapshot_id: str, tables: list[str]) -> None:
         if not exists:
             _log(f"    WARN: no snapshot for {t} ({snap}) — skipping")
             continue
-        con.execute(f"DELETE FROM {t}")
+        if _kind_for(t) == "rebuild":
+            con.execute(f"DROP TABLE IF EXISTS {t}")
+        else:
+            con.execute(f"DELETE FROM {t}")
     for t in tables:
         snap = _snapshot_name(t, snapshot_id)
         exists = con.execute(
@@ -132,7 +176,10 @@ def _restore_snapshot(con, snapshot_id: str, tables: list[str]) -> None:
         ).fetchone()[0]
         if not exists:
             continue
-        con.execute(f"INSERT INTO {t} SELECT * FROM {snap}")
+        if _kind_for(t) == "rebuild":
+            con.execute(f"CREATE TABLE {t} AS SELECT * FROM {snap}")
+        else:
+            con.execute(f"INSERT INTO {t} SELECT * FROM {snap}")
         n = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
         _log(f"    {t}: restored {n} rows")
     _reset_sequences(con)
@@ -254,8 +301,26 @@ def _heal_override_ids(con, db_label: str) -> int:
     return n_null
 
 
+def _apply_table_rebuild(con, table: str) -> dict:
+    """Full-replace promote: DROP prod + CREATE AS SELECT from staging.
+    Snapshot must have been taken already. Inherits staging's schema —
+    see PROMOTE_KIND comment for the multi-writer implications."""
+    prev = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    con.execute(f"DROP TABLE {table}")
+    con.execute(f"CREATE TABLE {table} AS SELECT * FROM stg.{table}")
+    inserted = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    return {
+        "deleted": prev,
+        "modified": 0,
+        "inserted_or_replaced": inserted,
+        "added_only": inserted,
+    }
+
+
 def _apply_table(con, table: str) -> dict:
-    """Apply staging → production for one table via diff-based DELETE+INSERT."""
+    """Apply staging → production for one table. Dispatches on PROMOTE_KIND."""
+    if _kind_for(table) == "rebuild":
+        return _apply_table_rebuild(con, table)
     pk = PK_COLUMNS[table]
     pk_csv = ", ".join(pk)
     pk_join = " AND ".join(f"prod.{c} = stg.{c}" for c in pk)
@@ -350,6 +415,10 @@ def _count_diff(con, table: str) -> dict:
     """Read-only diff counts for a single table. Same semantics as
     _apply_table but without the DELETE/INSERT. Expects staging attached
     as 'stg'. Used by --dry-run."""
+    if _kind_for(table) == "rebuild":
+        prod_n = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        stg_n = con.execute(f"SELECT COUNT(*) FROM stg.{table}").fetchone()[0]
+        return {"deleted": prod_n, "modified": 0, "added_only": stg_n}
     pk = PK_COLUMNS[table]
     pk_csv = ", ".join(pk)
 
@@ -433,12 +502,18 @@ def dry_run(tables: list[str]) -> dict:
                 continue
             stats = _count_diff(con, t)
             summary["tables"][t] = stats
-            _log(
-                f"  {t}: would_delete={stats['deleted']}  "
-                f"would_modify={stats['modified']}  "
-                f"would_add={stats['added_only'] - stats['modified']}  "
-                f"(PK-only delta {stats['added_only']})"
-            )
+            if _kind_for(t) == "rebuild":
+                _log(
+                    f"  {t} [rebuild]: would_replace_all  "
+                    f"prod={stats['deleted']} → staging={stats['added_only']}"
+                )
+            else:
+                _log(
+                    f"  {t}: would_delete={stats['deleted']}  "
+                    f"would_modify={stats['modified']}  "
+                    f"would_add={stats['added_only'] - stats['modified']}  "
+                    f"(PK-only delta {stats['added_only']})"
+                )
     finally:
         con.execute("DETACH stg")
         con.close()
