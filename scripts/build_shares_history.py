@@ -15,8 +15,10 @@ Writer discipline note: this script is the sole writer of
 `shares_outstanding_history`. The historical `update_holdings_pct_of_float`
 path that wrote `holdings.pct_of_float` via ASOF JOIN was retired in the
 2026-04-19 rewrite after the `holdings` table was dropped at Stage 5.
-Period-accurate `pct_of_float` restoration is tracked separately under
-BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY (move ASOF into `enrich_holdings.py`).
+Period-accurate denominator restoration landed under
+BLOCK-PCT-OF-SO-PERIOD-ACCURACY (2026-04-19 — ASOF moved into
+`enrich_holdings.py` Pass B, column renamed `pct_of_float` → `pct_of_so`
+via migration 008).
 
 Usage:
     python3 scripts/build_shares_history.py [--staging] [--dry-run]

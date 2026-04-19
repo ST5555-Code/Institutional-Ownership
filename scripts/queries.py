@@ -2497,7 +2497,7 @@ def query15(ticker=None, quarter=LQ):  # pylint: disable=W0613  # dispatch proto
             'ticker_pct': round(coverage[1] / total * 100, 1),
             'manager_type_pct': round(coverage[2] / total * 100, 1),
             'live_value_pct': round(coverage[3] / total * 100, 1),
-            'float_pct_pct': round(coverage[4] / total * 100, 1),
+            'so_pct_pct': round(coverage[4] / total * 100, 1),
         }
         return clean_for_json([stats])
     finally:
