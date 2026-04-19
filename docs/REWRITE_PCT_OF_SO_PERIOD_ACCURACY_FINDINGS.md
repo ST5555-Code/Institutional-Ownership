@@ -804,3 +804,294 @@ the expected tail.
   of period-**end**. Off by ~0.5-2% typically; acceptable.
   Document but do not filter out — excluding WANOSO would cut
   ~50K rows of coverage.
+
+---
+
+## §9. Migration design (commit `8969dd1`)
+
+`scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py`. Applies
+to `holdings_v2` only — verified in §8.5 that `fund_holdings_v2` and
+`beneficial_ownership_v2` don't carry the column.
+
+**Note on numbering**: the prompt specified `007_rename_...`; that
+number is already in use by `007_override_new_value_nullable.py`
+(2026-04-17). Used `008` instead.
+
+### 9.1 DDL changes
+
+```
+ALTER TABLE holdings_v2 RENAME COLUMN pct_of_float TO pct_of_so;
+ALTER TABLE holdings_v2 ADD COLUMN pct_of_so_source VARCHAR;
+INSERT INTO schema_versions (version, notes) VALUES
+    ('008_rename_pct_of_float_to_pct_of_so',
+     'holdings_v2 pct_of_float → pct_of_so rename + pct_of_so_source audit column');
+```
+
+### 9.2 Idempotency
+
+Probes `duckdb_columns` for current state before each step:
+- If `pct_of_so` already exists and `pct_of_float` is gone and stamped
+  → no-op.
+- If both columns exist simultaneously (e.g. an aborted prior run that
+  added the new before dropping the old) → abort with human-resolvable
+  message.
+- Individual steps (rename, add column, stamp) skipped when already
+  satisfied.
+
+### 9.3 pct_of_so_source values (written by Pass B)
+
+| value | meaning |
+|---|---|
+| `'soh_period_accurate'` | denominator from ASOF match against `shares_outstanding_history` at `as_of_date <= quarter_end` |
+| `'market_data_latest'` | fallback: latest `market_data.shares_outstanding`, or `market_data.float_shares` as tertiary backstop |
+| `NULL` | `is_equity = FALSE`, or no denominator available |
+
+Downstream consumers (admin data-quality widget, audit queries) can
+filter by source to isolate period-accurate rows.
+
+### 9.4 Phase 1 scope: staging DB only
+
+Migration is applied to `data/13f_staging.duckdb` in Phase 1. Prod
+apply is Phase 4 (post Phase 2 staging validation + Phase 3 sign-off).
+
+---
+
+## §10. ASOF semantics (commit `dd2b5a1`)
+
+`scripts/enrich_holdings.py` Pass B rewritten from latest-float join
+to ASOF JOIN against SOH. Key design points:
+
+### 10.1 ASOF direction
+
+```sql
+ASOF LEFT JOIN shares_outstanding_history soh
+  ON soh.ticker = lookup.new_ticker
+ AND soh.as_of_date <= k.quarter_end
+```
+
+DuckDB ASOF picks the greatest `soh.as_of_date` that satisfies the
+inequality — i.e. "latest SOH stamp at or before quarter_end." Rows
+with no match are kept by `LEFT JOIN` semantics and fall through to
+the market_data fallback.
+
+### 10.2 Three-tier fallback
+
+```
+CASE
+    WHEN r.is_equity AND r.soh_shares            > 0 THEN h.shares * 100.0 / r.soh_shares
+    WHEN r.is_equity AND r.md_shares_outstanding > 0 THEN h.shares * 100.0 / r.md_shares_outstanding
+    WHEN r.is_equity AND r.md_float_shares       > 0 THEN h.shares * 100.0 / r.md_float_shares
+    ELSE NULL
+END
+```
+
+Tier 1 is period-accurate (`soh_period_accurate`). Tiers 2 and 3 are
+the latest market_data values (`market_data_latest` in the audit
+column). Tier 3 is a tertiary backstop for tickers where
+`market_data.shares_outstanding` is NULL but `float_shares` is
+populated — common for Yahoo-backfilled tickers without SEC XBRL.
+
+### 10.3 13F quarter-end scope
+
+`holdings_v2.report_date` is always a calendar quarter-end
+(2025-03-31, 2025-06-30, 2025-09-30, 2025-12-31 verified Phase 1a).
+ASOF `<= quarter_end` picks:
+- Period-end us-gaap:CSO row when the filer's 10-Q/10-K has been
+  filed — exact match.
+- Previous quarter's us-gaap:CSO row when current quarter's filing
+  is pending — 3 months stale.
+- For WANOSO-only filers (META class), period-end WANOSO — value is
+  period-average, not point-in-time (~0.5-2% drift).
+
+### 10.4 N-PORT month-end — MOOT
+
+Phase 1a §8.5 confirmed `fund_holdings_v2` does not carry
+`pct_of_float`. Block prompt's "N-PORT month-end staleness tolerance"
+section does not apply. N-PORT month-end ASOF (Jan, Feb, Apr, May,
+Jul, Aug, Oct, Nov) is not implemented — not needed.
+
+### 10.5 Staleness counter
+
+Per-run logged counter: `pof_stale_gt60` — number of rows where the
+SOH ASOF match has `quarter_end - as_of_date > 60 days`. Exposes
+cases where a filer's XBRL coverage skipped a quarter (common for
+late filers and mid-year 10-K/A amendments). Surfaced in dry-run
+projection output:
+
+```
+  SOH matches with staleness > 60 days : ...
+```
+
+### 10.6 Join key choice
+
+Resolution is done on distinct `(cusip, report_date)` pairs via the
+`keys` CTE, then the final UPDATE joins back to `holdings_v2` on
+those two columns. This handles the intentional `(accession_number,
+cusip, quarter)` dup groups (~1.29M / ~4.97M rows per
+`enrich_holdings.py:20-22`) without overcounting — the denominator
+is a ticker-level quantity, so dup rows sharing a `(cusip,
+report_date)` correctly get the same value.
+
+### 10.7 Projection query includes audit columns
+
+`_pass_b_project` now returns:
+- `pof_changes` — rows where denominator value changes
+- `pof_source_changes` — rows where audit flag changes
+- `pof_source_soh` / `pof_source_md` — post-run population by source
+- `pof_stale_gt60` — staleness counter
+
+Surfaced via `_print_pass_b` at dry-run time.
+
+---
+
+## §11. Read-site migration — final reconciled count
+
+Commit `f956096` migrated every live read surface. Reconciliation:
+
+### 11.1 Python backend (5 files)
+
+| file | renames applied |
+|---|---|
+| `scripts/queries.py` | `pct_of_float` → `pct_of_so` (column), `pct_float` → `pct_so` (alias), `total_pct_float` → `total_pct_so`, `with_float_pct` → `with_so_pct`, incidental local vars `_pct_float` helper and loop-locals (`pct_float_moved` → `pct_so_moved`, `subj_pct_float` → `subj_pct_so`, `sec_pct_float` → `sec_pct_so`) |
+| `scripts/api_market.py` | column + alias |
+| `scripts/api_register.py` | column |
+| `scripts/admin_bp.py` | column + `with_float_pct` alias |
+| `scripts/build_summaries.py` | DDL column + aggregation alias (`summary_by_ticker.pct_of_float` column definition also renamed) |
+| `scripts/enrich_holdings.py` | Pass B rewrite (`dd2b5a1`) |
+
+### 11.2 React frontend (10 files)
+
+| file | renames applied |
+|---|---|
+| `web/react-app/src/types/api.ts` | `pct_of_float`, `pct_float`, `total_pct_float`, `pct_float_moved`, `subj_pct_float`, `sec_pct_float` — all TS field types |
+| `web/react-app/src/types/api-generated.ts` | auto-gen OpenAPI description |
+| `web/react-app/src/components/common/TableFooter.tsx` | `pct_float` field, `% Float` label |
+| `web/react-app/src/components/tabs/RegisterTab.tsx` | `pct_float` field, `pctFloat` local, `fmtPctFloat` util, `% Float`, `%Float` labels |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx` | `pct_of_float`, `pct_float`, `% Float` label + CSV header |
+| `web/react-app/src/components/tabs/OwnershipTrendTab.tsx` | `pct_float`, `pct_float_moved`, `% Float`, `% Float Moved` labels |
+| `web/react-app/src/components/tabs/FlowAnalysisTab.tsx` | `pct_float`, `pctFloat`, `% Float` label |
+| `web/react-app/src/components/tabs/EntityGraphTab.tsx` | `pct_float`, `totalPctFloat`, `% Float` label |
+| `web/react-app/src/components/tabs/OverlapAnalysisTab.tsx` | `subj_pct_float`, `sec_pct_float` |
+| `web/react-app/src/components/tabs/ConvictionTab.tsx` | `pct_float` field |
+
+### 11.3 Test fixtures (2 files)
+
+| file | renames |
+|---|---|
+| `tests/fixtures/responses/query1.json` | 118 `pct_float` → `pct_so` occurrences |
+| `tests/fixtures/responses/summary.json` | `total_pct_float` → `total_pct_so` |
+
+### 11.4 Reconciliation against Phase 0 and peer findings
+
+| estimate source | count | actual |
+|---|---:|---|
+| Phase 0 §3.6 "Total live across surfaces" | ~28 | **matched for backend SQL sites**; underestimated React + CSV labels |
+| Peer findings doc (`REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md` §3.2.1) "~30 live" | ~30 | same — both estimates counted backend-SQL consumers, not frontend-render consumers |
+
+**Delta explanation**: Phase 0's inventory counted `queries.py`
+SELECT sites and API endpoints (the *read surfaces that the backend
+produces*). It undercounted the downstream TSX/JSX consumers that
+render each result (a single backend row with `pct_float` is rendered
+by RegisterTab + CSV export + footer + type def, producing 4 distinct
+JS references). The true count of **token-level references** touched
+in Phase 1b is:
+
+| category | file count | ref count |
+|---|---:|---:|
+| Python backend column/alias references | 6 | ~95 |
+| React types + components | 10 | ~60 |
+| Test fixtures | 2 | 119 |
+| **Total token refs** | **18** | **~274** |
+
+Phase 0's ~28 "live sites" estimate is correct when interpreted as
+"distinct backend query locations." The per-token churn of Phase 1b
+is larger because React consumers multiply.
+
+### 11.5 Intentional non-renames (dead code / out of scope)
+
+| file | reason |
+|---|---|
+| `scripts/approve_overrides.py` | on RETIRE list — targets dropped `holdings` |
+| `scripts/auto_resolve.py` | on RETIRE list |
+| `scripts/enrich_tickers.py` | on RETIRE list |
+| `scripts/build_shares_history.py` | docstring mentions old block name; actual update path already retired |
+| `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | migration *performs* the rename; old column name is a constant in the file |
+| `scripts/enrich_holdings.py` | module docstring has one backward-reference note `(renamed from pct_of_float in 008)` — intentional |
+| `notebooks/research.ipynb` | stale since Stage 5 dropped `holdings` table |
+| `web/datasette_config.yaml` | canned queries on dropped `holdings` table (already broken) |
+| `ROADMAP.md`, `NEXT_SESSION_CONTEXT.md`, `docs/*.md`, `docs/reports/*.md` | deferred to batched doc-update session per prompt constraints |
+
+### 11.6 N-PORT compute-path awkwardness (deferred)
+
+`scripts/queries.py` has three locations (≈ lines 441, 499, 2458,
+3043) where an N-PORT fund's display pct is computed ad-hoc from
+`market_data.float_shares`, returned under the key `pct_so` after
+Phase 1b. The label is semantically mixed: the value is still a
+float-based percentage, but the key says "of SO."
+
+Options for cleanup (not in this block):
+- Switch those compute paths to prefer `market_data.shares_outstanding`
+  (with `float_shares` fallback) to match the label.
+- Accept the mixed semantics and document it.
+- Suppress the computed pct entirely when SO isn't available.
+
+Flagged in §12 as deferred.
+
+---
+
+## §12. Deferred doc updates (for future batched session)
+
+Per block prompt constraint: "Do not modify `ROADMAP.md`,
+`data_layers.md`, or other top-level docs (deferred to batched doc-
+update session)." The following docs reference `pct_of_float` /
+`pct_float` and need updating in that session:
+
+| doc | action |
+|---|---|
+| `ROADMAP.md` | add completed block under BLOCK-PCT-OF-SO-PERIOD-ACCURACY; rename prior BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY refs; INF38 entry for BLOCK-FLOAT-HISTORY (deferred float preservation workstream) |
+| `docs/data_layers.md` | §7 cross-ref for the new `pct_of_so_source` audit column on `holdings_v2`; update the column list |
+| `docs/canonical_ddl.md` | update `holdings_v2` DDL reference to show `pct_of_so DOUBLE` + `pct_of_so_source VARCHAR` |
+| `docs/pipeline_inventory.md` | update enrichment writers list |
+| `docs/pipeline_violations.md` | update §5 / §9 references if any name the old column |
+| `docs/NEXT_SESSION_CONTEXT.md` | session wrap with commit list + block completion note |
+| `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md` | §3.2.1 amendment — the "elevate follow-up block" section is now complete; mark done with forward link |
+| `docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md` | historical report; leave in place |
+| `docs/CI_SMOKE_FAILURE_DIAGNOSIS_20260419.md` | single `pct_float` reference in snapshot-vs-actual narrative; rename to `pct_so` |
+| `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` / `REWRITE_BUILD_SUMMARIES_FINDINGS.md` | passing references only — rename in batched pass |
+| `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md` | single reference — rename in batched pass |
+
+### Additional cleanup items flagged during Phase 1b
+
+- **N-PORT compute-path label mismatch** (§11.6): queries.py ad-hoc
+  `pct_so` computation on N-PORT fund rows still uses `float_shares`
+  as denominator. Decide: rebuild to use `shares_outstanding`, or
+  explicitly document the mixed semantics.
+- **`summary_by_ticker` DDL** has `pct_of_so` column. Existing prod
+  `summary_by_ticker` table will need either a follow-up migration
+  (rename column on that table too) or a full rebuild via
+  `build_summaries.py`. Confirm at Phase 2 staging.
+- **`fmtPct` vs `fmtPct2`** utility naming convention — both are used
+  in React. Not a Phase 1b concern but flagged for future consistency
+  pass.
+- **Obsolete comments** in `queries.py` (e.g. `# Get float_shares for
+  pct_of_so calculation`) read awkwardly post-rename. Cleaning these
+  requires human review since some *intentionally* describe a
+  float-based computation; surgical editing deferred to batched doc
+  session.
+- **INF38 tracking** — create ROADMAP entry for BLOCK-FLOAT-HISTORY
+  (true float_shares time-series ingestion from 10-K Item 5); noted
+  in Phase 0 §2.2 as Option B deferred scope.
+
+### Phase 1b exit criteria (all met)
+
+- Findings doc renamed ✓
+- Phase 1a §8 SOH source verification appended ✓
+- Migration `008_rename_pct_of_float_to_pct_of_so.py` written (idempotent, staging-scoped, not yet applied) ✓
+- Pass B rewrite in `enrich_holdings.py` (ASOF against SOH, fallback, audit column) ✓
+- Read-site migration across backend + React + test fixtures ✓
+- Findings doc finalized with §9–§12 ✓
+- No prod writes, no fetch runs, no ROADMAP/data_layers/pipeline_inventory churn ✓
+
+Ready for Phase 2 (staging validation) once Serge applies migration
+008 to `data/13f_staging.duckdb` and runs `enrich_holdings.py
+--staging --dry-run`.
