@@ -68,6 +68,91 @@ def has_table(name):
 
 
 
+# ---------------------------------------------------------------------------
+# pct_of_so denominator resolution (BLOCK-PCT-OF-SO-PERIOD-ACCURACY Phase 1c)
+# ---------------------------------------------------------------------------
+#
+# Shared helpers for the N-PORT / flow compute paths that previously used
+# `market_data.float_shares` as a latest-value denominator. Matches the 13F
+# enrichment cascade in scripts/enrich_holdings.py Pass B:
+#
+#   tier 1 — shares_outstanding_history ASOF match at/before as_of_date
+#            → source 'soh_period_accurate'
+#   tier 2 — market_data.shares_outstanding (latest)
+#            → source 'market_data_so_latest'
+#   tier 3 — market_data.float_shares (latest)
+#            → source 'market_data_float_latest'
+#   tier 4 — no data available
+#            → (None, None); caller stores pct_of_so=None, source=None
+#
+# Staleness tolerance note for N-PORT month-ends: N-PORT `fh.report_date`
+# values include non-quarter months (Jan, Feb, Apr, May, Jul, Aug, Oct, Nov).
+# us-gaap:CSO XBRL facts are predominantly filed at calendar quarter-ends,
+# so the ASOF match for a Jan-31 N-PORT report can be up to ~90 days stale
+# (prior Dec-31 10-K). Tier-1 match is still preferred over latest market_data,
+# but downstream consumers may want to flag stale matches in display.
+
+_QUARTER_END_DATES = {
+    'Q1': ('{year}-03-31', 31),
+    'Q2': ('{year}-06-30', 30),
+    'Q3': ('{year}-09-30', 30),
+    'Q4': ('{year}-12-31', 31),
+}
+
+
+def _quarter_to_date(quarter):
+    """Convert 'YYYYQN' -> ISO date string 'YYYY-MM-DD' for quarter-end.
+
+    Returns None for malformed input — callers pass None through as
+    as_of_date, which disables the SOH tier and falls through to
+    market_data.
+    """
+    if not quarter or len(quarter) != 6 or quarter[4] != 'Q':
+        return None
+    spec = _QUARTER_END_DATES.get(quarter[4:6])
+    if not spec:
+        return None
+    template, _ = spec
+    return template.format(year=quarter[:4])
+
+
+def _resolve_pct_of_so_denom(con, ticker, as_of_date=None):
+    """Three-tier denominator + source for pct_of_so.
+
+    as_of_date : ISO 'YYYY-MM-DD' or None.
+                 If provided, ASOF-matches SOH at/before that date.
+                 If None, SOH tier skipped.
+    Returns    : (denominator: float | None, source: str | None).
+    """
+    if not ticker:
+        return None, None
+    if as_of_date:
+        row = con.execute(
+            """
+            SELECT shares FROM shares_outstanding_history
+             WHERE ticker = ? AND as_of_date <= ?
+             ORDER BY as_of_date DESC
+             LIMIT 1
+            """,
+            [ticker, as_of_date],
+        ).fetchone()
+        if row and row[0] and row[0] > 0:
+            return float(row[0]), 'soh_period_accurate'
+
+    row = con.execute(
+        "SELECT shares_outstanding, float_shares FROM market_data WHERE ticker = ?",
+        [ticker],
+    ).fetchone()
+    if not row:
+        return None, None
+    md_so, md_float = row
+    if md_so and md_so > 0:
+        return float(md_so), 'market_data_so_latest'
+    if md_float and md_float > 0:
+        return float(md_float), 'market_data_float_latest'
+    return None, None
+
+
 def get_cusip(con, ticker):
     """Resolve ticker to CUSIP."""
     row = con.execute(
@@ -372,10 +457,11 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
     if not parent_patterns:
         return {}
 
-    float_row = con.execute(
-        "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
-    ).fetchone()
-    float_shares = float_row[0] if float_row and float_row[0] else None
+    # N-PORT month-end staleness: this function resolves the denominator at
+    # calendar quarter-end derived from `quarter`. For non-quarter N-PORT
+    # report months the 90-day staleness tolerance applies (see helper docs).
+    denom, denom_source = _resolve_pct_of_so_denom(
+        con, ticker, _quarter_to_date(quarter))
 
     pp_ph = ', '.join(['(?, ?)'] * len(parent_patterns))
     pp_params = [v for row in parent_patterns for v in row]
@@ -438,7 +524,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
         if not pname:
             continue
         shares = r.get('shares') or 0
-        pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+        pct_so = round(shares * 100.0 / denom, 2) if denom and shares else None
         aum_val = r.get('aum_mm')
         aum = int(aum_val) if aum_val and aum_val > 0 else None
         pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
@@ -447,6 +533,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
             'value_live': r.get('value'),
             'shares': shares,
             'pct_so': pct_so,
+            'pct_of_so_source': denom_source if pct_so is not None else None,
             'aum': aum,
             'pct_aum': pct_aum,
             'source': 'N-PORT',
@@ -466,11 +553,11 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         like_patterns = ['%' + p + '%' for p in patterns]
         ph = ','.join(['?'] * len(like_patterns))
         excl_clause, excl_params = _build_excl_clause(patterns)
-        # Get float_shares for pct_of_so calculation
-        float_row = con.execute(
-            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
-        ).fetchone()
-        float_shares = float_row[0] if float_row and float_row[0] else None
+        # Period-accurate denominator (tier cascade: SOH → md.so → md.float).
+        # Anchored at calendar quarter-end derived from `quarter`; N-PORT
+        # month-end staleness caveat applies (see helper docs).
+        denom, denom_source = _resolve_pct_of_so_denom(
+            con, ticker, _quarter_to_date(quarter))
 
         df = con.execute(f"""
             SELECT
@@ -496,13 +583,14 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
         result = []
         for r in rows:
             shares = r.get('shares') or 0
-            pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            pct_so = round(shares * 100.0 / denom, 2) if denom and shares else None
             aum_val = r.get('aum_mm')
             aum = int(aum_val) if aum_val and aum_val > 0 else None
             # % of AUM/NAV: use pct_of_nav from N-PORT (position value as % of fund NAV)
             pct_aum = round(float(r.get('pct_of_nav')), 2) if r.get('pct_of_nav') else None
             result.append({'institution': r.get('fund_name'), 'value_live': r.get('value'),
                            'shares': shares, 'pct_so': pct_so,
+                           'pct_of_so_source': denom_source if pct_so is not None else None,
                            'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT'})
         return result
     except Exception as e:
@@ -2421,11 +2509,12 @@ def query16(ticker, quarter=LQ):
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
-        # Get float_shares for % of float calculation
-        float_row = con.execute(
-            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
-        ).fetchone()
-        float_shares = float_row[0] if float_row and float_row[0] else None
+        # Period-accurate pct_of_so denominator via tier cascade
+        # (SOH at quarter_end → md.shares_outstanding → md.float_shares).
+        # N-PORT rows aggregate across month-ends within the quarter;
+        # quarter-end anchor is the representative reference date.
+        denom, denom_source = _resolve_pct_of_so_denom(
+            con, ticker, _quarter_to_date(quarter))
 
         df = con.execute(f"""
             SELECT
@@ -2455,7 +2544,7 @@ def query16(ticker, quarter=LQ):
             aum_val = r['aum_mm']
             aum = int(aum_val) if aum_val and aum_val > 0 else None
             pct_of_nav = round(float(r['pct_of_nav']), 2) if r['pct_of_nav'] else None
-            pct_so = round(shares * 100.0 / float_shares, 2) if float_shares and shares else None
+            pct_so = round(shares * 100.0 / denom, 2) if denom and shares else None
             fund_type = _classify_fund_type(fund_name)
 
             results.append({
@@ -2465,6 +2554,7 @@ def query16(ticker, quarter=LQ):
                 'value_live': value,
                 'shares': shares,
                 'pct_so': pct_so,
+                'pct_of_so_source': denom_source if pct_so is not None else None,
                 'aum': aum,
                 'pct_aum': pct_of_nav,
                 'type': fund_type,
@@ -2486,7 +2576,8 @@ def query16(ticker, quarter=LQ):
         all_totals = {
             'value_live': float(all_df['total_value'].sum()) if len(all_df) else 0,
             'shares': float(all_df['total_shares'].sum()) if len(all_df) else 0,
-            'pct_so': round(float(all_df['total_shares'].sum()) * 100.0 / float_shares, 2) if float_shares and len(all_df) else 0,
+            'pct_so': round(float(all_df['total_shares'].sum()) * 100.0 / denom, 2) if denom and len(all_df) else 0,
+            'pct_of_so_source': denom_source if denom and len(all_df) else None,
             'count': len(all_df),
         }
 
@@ -2495,17 +2586,20 @@ def query16(ticker, quarter=LQ):
         for _, trow in all_df.iterrows():
             t = _classify_fund_type(trow['fund_name'])
             if t not in type_totals:
-                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_so': 0, 'count': 0}
+                type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_so': 0,
+                                  'pct_of_so_source': None, 'count': 0}
             type_totals[t]['value_live'] += float(trow['total_value'] or 0)
             s = float(trow['total_shares'] or 0)
             type_totals[t]['shares'] += s
             type_totals[t]['count'] += 1
         # Compute pct_so per type
         for t in type_totals:
-            if float_shares and type_totals[t]['shares']:
-                type_totals[t]['pct_so'] = round(type_totals[t]['shares'] * 100.0 / float_shares, 2)
+            if denom and type_totals[t]['shares']:
+                type_totals[t]['pct_so'] = round(type_totals[t]['shares'] * 100.0 / denom, 2)
+                type_totals[t]['pct_of_so_source'] = denom_source
 
-        return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals}
+        return {'rows': results, 'all_totals': all_totals, 'type_totals': type_totals,
+                'pct_of_so_source': denom_source}
     finally:
         pass
 
@@ -2523,10 +2617,17 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
     rn = _rollup_col(rollup_type)
     con = get_db()
     try:
-        float_row = con.execute(
-            "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
-        ).fetchone()
-        float_shares = float_row[0] if float_row and float_row[0] else None
+        # Per-quarter denominator cache (avoids per-row queries in the loop).
+        # Each quarter resolves to its own (denom, source) via the tier
+        # cascade. Fund-level N-PORT rows are aggregated per `quarter` so
+        # the quarter-end anchor is the representative reference.
+        denom_cache: dict = {}
+
+        def _qdenom(q):
+            if q not in denom_cache:
+                denom_cache[q] = _resolve_pct_of_so_denom(
+                    con, ticker, _quarter_to_date(q))
+            return denom_cache[q]
 
         if level == 'fund':
             # Fund-level: aggregate from fund_holdings joined to fund_universe.
@@ -2565,7 +2666,13 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
             total_shares = row.get('total_inst_shares') or 0
             total_value = row.get('total_inst_value') or 0
             holders = row.get('holder_count') or 0
-            row['pct_so'] = round(total_shares / float_shares * 100, 2) if float_shares and float_shares > 0 else None
+            denom, denom_source = _qdenom(row.get('quarter'))
+            if denom and denom > 0:
+                row['pct_so'] = round(total_shares / denom * 100, 2)
+                row['pct_of_so_source'] = denom_source
+            else:
+                row['pct_so'] = None
+                row['pct_of_so_source'] = None
             active_val = row.get('active_value') or 0
             passive_val = row.get('passive_value') or 0
             row['active_pct'] = round(active_val / total_value * 100, 1) if total_value > 0 else 0
@@ -2868,11 +2975,13 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     Returns (buyers, sellers, new_entries, exits) lists.
     """
     rn = _rollup_col(rollup_type)
-    # Get float_shares once for fund-level % float calculation
-    float_row = con.execute(
-        "SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]
-    ).fetchone()
-    float_shares = float(float_row[0]) if float_row and float_row[0] else None
+    # Period-accurate pct_of_so denominator per quarter (fund-level uses
+    # to_quarter for retained/new, from_quarter for exits). Tier cascade:
+    # SOH quarter-end → md.shares_outstanding → md.float_shares.
+    from_denom, from_denom_source = _resolve_pct_of_so_denom(
+        con, ticker, _quarter_to_date(quarter_from))
+    to_denom, to_denom_source = _resolve_pct_of_so_denom(
+        con, ticker, _quarter_to_date(quarter_to))
 
     if level == 'fund':
         # Filter via fund_universe.is_actively_managed
@@ -2908,21 +3017,33 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     to_map = {r['entity']: r for _, r in to_df.iterrows()}
     from_set, to_set = set(from_map), set(to_map)
 
-    def _pct_so(shares):
-        """Compute % of float from shares, fall back to None if no float data."""
-        if float_shares and shares:
-            return round(shares / float_shares * 100, 3)
-        return None
+    def _pct_so(shares, use='to'):
+        """Compute % of SO from shares using the tier-cascade denominator.
 
-    def _get_pf(entity_row, fallback_shares):
-        """Safely extract pct_of_so from a pandas row, fall back to computed."""
+        use: 'to' (default) uses quarter_to denominator; 'from' uses
+        quarter_from denominator. Returns (pct, source_str).
+        """
+        denom = to_denom if use == 'to' else from_denom
+        source = to_denom_source if use == 'to' else from_denom_source
+        if denom and shares:
+            return round(shares / denom * 100, 3), source
+        return None, None
+
+    def _get_pf(entity_row, fallback_shares, use='to'):
+        """Safely extract pct_of_so from a pandas row, fall back to computed.
+
+        Returns (pct, source_str). When the pandas row already has a
+        pre-computed pct_of_so (from a SUM over holdings_v2), the source
+        is inherited from the underlying rows — surface None here rather
+        than claim the tier; the per-entity aggregation may mix tiers.
+        """
         raw = entity_row.get('pct_of_so') if entity_row is not None else None
         try:
             if raw is not None and not (isinstance(raw, float) and raw != raw):
-                return float(raw)
+                return float(raw), None  # pre-aggregated; tier unknown
         except (TypeError, ValueError):
             pass
-        return _pct_so(fallback_shares)
+        return _pct_so(fallback_shares, use=use)
 
     rows = []
     # Retained: compare shares
@@ -2933,13 +3054,14 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         tv = float(to_map[entity].get('value') or 0)
         net_s = ts - fs
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_so(ts)
+        pf, pf_src = (_get_pf(to_map[entity], ts, use='to') if level == 'parent'
+                      else _pct_so(ts, use='to'))
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': ts, 'net_shares': net_s,
             'from_value': fv, 'to_value': tv, 'net_value': tv - fv,
             'pct_change': (net_s / fs) if fs > 0 else None,
-            'pct_so': pf,
+            'pct_so': pf, 'pct_of_so_source': pf_src,
             'is_new_entry': False, 'is_exit': False,
         })
     # New entries
@@ -2947,12 +3069,13 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         ts = float(to_map[entity].get('shares') or 0)
         tv = float(to_map[entity].get('value') or 0)
         mt = to_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(to_map[entity], ts) if level == 'parent' else _pct_so(ts)
+        pf, pf_src = (_get_pf(to_map[entity], ts, use='to') if level == 'parent'
+                      else _pct_so(ts, use='to'))
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': 0, 'to_shares': ts, 'net_shares': ts,
             'from_value': 0, 'to_value': tv, 'net_value': tv,
-            'pct_change': None, 'pct_so': pf,
+            'pct_change': None, 'pct_so': pf, 'pct_of_so_source': pf_src,
             'is_new_entry': True, 'is_exit': False,
         })
     # Exits
@@ -2960,12 +3083,13 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         fs = float(from_map[entity].get('shares') or 0)
         fv = float(from_map[entity].get('value') or 0)
         mt = from_map[entity].get('manager_type') if level == 'parent' else None
-        pf = _get_pf(from_map[entity], fs) if level == 'parent' else _pct_so(fs)
+        pf, pf_src = (_get_pf(from_map[entity], fs, use='from') if level == 'parent'
+                      else _pct_so(fs, use='from'))
         rows.append({
             'inst_parent_name': entity, 'manager_type': mt or '',
             'from_shares': fs, 'to_shares': 0, 'net_shares': -fs,
             'from_value': fv, 'to_value': 0, 'net_value': -fv,
-            'pct_change': -1.0, 'pct_so': pf,
+            'pct_change': -1.0, 'pct_so': pf, 'pct_of_so_source': pf_src,
             'is_new_entry': False, 'is_exit': True,
         })
 
@@ -3040,25 +3164,38 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ORDER BY net_shares DESC NULLS LAST
             """, [ticker, quarter_from]).fetchdf()
             rows = df_to_records(df)
-            # Compute net_value and pct_of_so using float_shares
-            fr = con.execute("SELECT float_shares FROM market_data WHERE ticker = ?", [ticker]).fetchone()
-            flt = float(fr[0]) if fr and fr[0] else None
+            # Period-accurate pct_of_so denominator. Use quarter_from for
+            # exits (prior-quarter position) and quarter_to for
+            # buyers/sellers/new (current-quarter position). Tier cascade:
+            # SOH quarter-end → md.shares_outstanding → md.float_shares.
+            from_flt, from_src = _resolve_pct_of_so_denom(
+                con, ticker, _quarter_to_date(quarter_from))
+            to_flt, to_src = _resolve_pct_of_so_denom(
+                con, ticker, _quarter_to_date(quarter_to))
             for r in rows:
                 r['net_value'] = (r.get('to_value') or 0) - (r.get('from_value') or 0)
                 ts = r.get('to_shares') or 0
                 fs = r.get('from_shares') or 0
                 ns = abs(r.get('net_shares') or 0)
-                # pct_so = the relevant change as % of float:
-                #   buyers/sellers: net change / float (how much they added/reduced)
-                #   new entries: to_shares / float (entire new position)
-                #   exits: from_shares / float (entire prior position)
+                # pct_so = the relevant change as % of SO:
+                #   buyers/sellers: net change / SO@to (how much they added/reduced)
+                #   new entries: to_shares / SO@to (entire new position)
+                #   exits: from_shares / SO@from (entire prior position)
                 if r.get('is_new_entry'):
                     change_shares = ts
+                    flt, src = to_flt, to_src
                 elif r.get('is_exit'):
                     change_shares = fs
+                    flt, src = from_flt, from_src
                 else:
                     change_shares = ns
-                r['pct_so'] = round(change_shares / flt * 100, 3) if flt and change_shares else None
+                    flt, src = to_flt, to_src
+                if flt and change_shares:
+                    r['pct_so'] = round(change_shares / flt * 100, 3)
+                    r['pct_of_so_source'] = src
+                else:
+                    r['pct_so'] = None
+                    r['pct_of_so_source'] = None
             buyers = [r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
                       and (r.get('net_shares') or 0) > 0][:25]
             sellers = sorted([r for r in rows if not r.get('is_new_entry') and not r.get('is_exit')
@@ -5233,20 +5370,13 @@ def get_two_company_overlap(subject, second, quarter, con):
 
     Returns: {'institutional': [...], 'fund': [...], 'meta': {...}}
     """
-    # --- 3a. Float shares for both tickers (null-safe) -------------------
-    float_rows = con.execute("""
-        SELECT ticker, float_shares
-        FROM market_data
-        WHERE ticker IN (?, ?)
-    """, [subject, second]).fetchall()
-    float_map = {row[0]: row[1] for row in float_rows}
-    subj_float = float_map.get(subject)
-    sec_float = float_map.get(second)
-    # Treat 0 the same as null — guards the per-row pct_so division below.
-    if not subj_float:
-        subj_float = None
-    if not sec_float:
-        sec_float = None
+    # --- 3a. Period-accurate denominator for both tickers (null-safe) ----
+    # Tier cascade: SOH quarter-end → md.shares_outstanding → md.float_shares.
+    # N-PORT fund holdings aggregate to `quarter`; quarter-end anchor is
+    # the representative reference date (same staleness caveat applies).
+    qe = _quarter_to_date(quarter)
+    subj_denom, subj_denom_source = _resolve_pct_of_so_denom(con, subject, qe)
+    sec_denom, sec_denom_source = _resolve_pct_of_so_denom(con, second, qe)
 
     # --- 3b. Institutional panel (top 50 by Subject $) -------------------
     inst_rows = con.execute("""
@@ -5298,10 +5428,12 @@ def get_two_company_overlap(subject, second, quarter, con):
             'manager_type': mtype,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_denom * 100.0) if subj_denom else None,
+            'subj_pct_of_so_source': subj_denom_source if subj_denom else None,
             'sec_shares': sec_shares_f,
             'sec_dollars': sec_dollars_f,
-            'sec_pct_so': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'sec_pct_so': (sec_shares_f / sec_denom * 100.0) if sec_denom else None,
+            'sec_pct_of_so_source': sec_denom_source if sec_denom else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
         })
 
@@ -5361,10 +5493,12 @@ def get_two_company_overlap(subject, second, quarter, con):
             'family_name': family_name,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_denom * 100.0) if subj_denom else None,
+            'subj_pct_of_so_source': subj_denom_source if subj_denom else None,
             'sec_shares': sec_shares_f,
             'sec_dollars': sec_dollars_f,
-            'sec_pct_so': (sec_shares_f / sec_float * 100.0) if sec_float else None,
+            'sec_pct_so': (sec_shares_f / sec_denom * 100.0) if sec_denom else None,
+            'sec_pct_of_so_source': sec_denom_source if sec_denom else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
             # fund_universe.is_actively_managed — None if the fund isn't in
             # fund_universe; the frontend treats None as "active" (included
@@ -5385,8 +5519,10 @@ def get_two_company_overlap(subject, second, quarter, con):
         'subject': subject,
         'second': second,
         'quarter': quarter,
-        'subj_float': subj_float,
-        'sec_float': sec_float,
+        'subj_denom': subj_denom,
+        'subj_pct_of_so_source': subj_denom_source,
+        'sec_denom': sec_denom,
+        'sec_pct_of_so_source': sec_denom_source,
         'subject_name': name_map.get(subject),
         'second_name': name_map.get(second),
     }
@@ -5409,14 +5545,10 @@ def get_two_company_subject(subject, quarter, con):
     panels are top 50 holders ordered by dollar value, same as the overlap
     endpoint's left-hand side.
     """
-    # --- Float shares for percent-of-float computation -------------------
-    float_row = con.execute(
-        "SELECT float_shares FROM market_data WHERE ticker = ?",
-        [subject],
-    ).fetchone()
-    subj_float = float_row[0] if float_row else None
-    if not subj_float:
-        subj_float = None
+    # --- Period-accurate denominator for percent-of-SO computation -------
+    # Tier cascade: SOH quarter-end → md.shares_outstanding → md.float_shares.
+    subj_denom, subj_denom_source = _resolve_pct_of_so_denom(
+        con, subject, _quarter_to_date(quarter))
 
     # --- Institutional panel (top 50 holders of subject) -----------------
     inst_rows = con.execute("""
@@ -5444,10 +5576,12 @@ def get_two_company_subject(subject, quarter, con):
             'manager_type': mtype,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_denom * 100.0) if subj_denom else None,
+            'subj_pct_of_so_source': subj_denom_source if subj_denom else None,
             'sec_shares': None,
             'sec_dollars': None,
             'sec_pct_so': None,
+            'sec_pct_of_so_source': None,
             'is_overlap': False,
         })
 
@@ -5490,10 +5624,12 @@ def get_two_company_subject(subject, quarter, con):
             'family_name': family_name,
             'subj_shares': subj_shares_f,
             'subj_dollars': subj_dollars_f,
-            'subj_pct_so': (subj_shares_f / subj_float * 100.0) if subj_float else None,
+            'subj_pct_so': (subj_shares_f / subj_denom * 100.0) if subj_denom else None,
+            'subj_pct_of_so_source': subj_denom_source if subj_denom else None,
             'sec_shares': None,
             'sec_dollars': None,
             'sec_pct_so': None,
+            'sec_pct_of_so_source': None,
             'is_overlap': False,
             'is_active': bool(is_active) if is_active is not None else None,
         })
@@ -5510,8 +5646,10 @@ def get_two_company_subject(subject, quarter, con):
         'subject': subject,
         'second': None,
         'quarter': quarter,
-        'subj_float': subj_float,
-        'sec_float': None,
+        'subj_denom': subj_denom,
+        'subj_pct_of_so_source': subj_denom_source,
+        'sec_denom': None,
+        'sec_pct_of_so_source': None,
         'subject_name': subject_name,
         'second_name': None,
     }

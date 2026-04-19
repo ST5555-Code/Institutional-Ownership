@@ -410,8 +410,10 @@ export interface TwoCompanyMeta {
   subject_name: string | null
   second: string | null
   second_name: string | null
-  subj_float: number | null
-  sec_float: number | null
+  subj_denom: number | null
+  subj_pct_of_so_source: string | null
+  sec_denom: number | null
+  sec_pct_of_so_source: string | null
 }
 
 export interface TwoCompanyInstitutionalRow {
@@ -421,9 +423,11 @@ export interface TwoCompanyInstitutionalRow {
   subj_shares: number | null
   subj_dollars: number | null
   subj_pct_so: number | null
+  subj_pct_of_so_source: string | null
   sec_shares: number | null
   sec_dollars: number | null
   sec_pct_so: number | null
+  sec_pct_of_so_source: string | null
 }
 
 export interface TwoCompanyFundRow {
@@ -435,9 +439,11 @@ export interface TwoCompanyFundRow {
   subj_shares: number | null
   subj_dollars: number | null
   subj_pct_so: number | null
+  subj_pct_of_so_source: string | null
   sec_shares: number | null
   sec_dollars: number | null
   sec_pct_so: number | null
+  sec_pct_of_so_source: string | null
 }
 
 export interface TwoCompanyOverlapResponse {
