@@ -1,20 +1,17 @@
 {
-  "active_value": 735124990492.4814,
   "company_name": "APPLE INC",
-  "latest_quarter": "2025Q4",
-  "market_cap": 3757197348800.0,
-  "nport_coverage": 31.8,
-  "nport_funds": 1351,
-  "nport_latest_date": "2025-10-31",
-  "num_holders": 5928,
-  "passive_value": 1061117693799.5201,
-  "price": 255.92,
-  "price_date": "2026-04-05",
-  "shares_float": 14656035251.0,
   "ticker": "AAPL",
-  "total_pct_float": 67.00410000000655,
-  "total_shares": 9853581626,
+  "latest_quarter": "2025Q4",
   "total_value": 2521728609725.9014,
+  "total_pct_float": 67.00410000000655,
+  "num_holders": 5928,
+  "total_shares": 9853581626,
+  "passive_value": 1061117693799.5201,
+  "active_value": 735124990492.4814,
+  "price": 255.92,
+  "market_cap": 3757197348800.0,
+  "shares_float": 14656035251.0,
+  "price_date": "2026-04-05",
   "type_breakdown": [
     {
       "type": "passive",
@@ -68,5 +65,8 @@
       "type": "private_equity",
       "value": 281512.0
     }
-  ]
+  ],
+  "nport_coverage": 31.8,
+  "nport_funds": 1351,
+  "nport_latest_date": "2025-10-31"
 }
