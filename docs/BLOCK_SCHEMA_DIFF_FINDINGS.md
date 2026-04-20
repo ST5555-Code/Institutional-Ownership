@@ -635,3 +635,265 @@ Rationale:
 - Q6 normalizer aggressiveness — still open.
 
 _End of Phase 0.5 addendum._
+
+---
+
+## §13. Phase 1 implementation summary
+
+_Executed 2026-04-19, branch `block/schema-diff-inf39`. Unified phase per
+Phase 0.5 §11.6 recommendation: rebuild + validator + tests + Phase 2
+wrapper + baseline in one session._
+
+### §13.1 Rebuild execution
+
+Strategy C (per-table capture-and-recreate) executed via
+`scripts/inf39_rebuild_staging.py` against `data/13f_staging.duckdb` with prod
+attached read-only. Per-table CHECKPOINT for interruptibility per §11.5.
+
+**Wall clock: 37.05 seconds** (Phase 0.5 §11.3 estimate: 8–10 minutes). The
+over-estimate came from assuming large-table INSERT-from-ATTACH would be
+bottlenecked on WAL flushes; in practice the columnar copy plus a single
+per-table CHECKPOINT is nearly sequential-scan fast.
+
+Timings breakdown:
+- 28 MIRROR tables (full schema + data reload from prod): 36.0s
+- 2 SCHEMA-ONLY companions (schema rebuilt, no data copy): 0.49s
+- Aggregate rows reloaded into staging: 28,394,565
+
+Tables that ran > 1 second (rows × compression × index count all contribute):
+- `holdings_v2` (12.27M rows, 4 indexes) — 15.57s
+- `fund_holdings_v2` (14.09M rows, 3 indexes) — 12.31s
+- `cusip_classifications` (430,149 rows, 3 indexes) — 0.99s
+
+All 30 tables verdict **OK** (row count, column count, index count all match prod).
+
+**Surprises vs dry-run:** one mid-execution bug found and fixed on the first
+attempt — `duckdb_columns()` / `duckdb_indexes()` return rows for attached
+databases too, inflating staging column counts by 2x whenever prod was
+ATTACHed. Added `WHERE database_name = current_database()` filter to all
+introspection queries in both the rebuild script and the validator. No other
+deviations from the Phase 0.5 dry-run plan.
+
+`_cache_openfigi` S1 decision executed as planned: staging's 16,291 rows
+dropped and re-seeded with prod's 15,807 rows (−484 regenerable OpenFIGI
+cache entries). `entity_identifiers_staging` and `entity_relationships_staging`
+rebuilt schema-only (schema mismatches resolved; 3,503 staging queue rows
+discarded per Phase 1 prompt decision).
+
+Full per-table execution log: `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md`.
+
+### §13.2 Post-rebuild parity — baseline achieved
+
+Re-ran the §3 five-dimension comparison against the rebuilt staging:
+
+| Metric | Phase 0 baseline | Post-rebuild |
+|--------|------------------|--------------|
+| L3 tables compared | 30 | 30 |
+| Tables with drift | 13 | 0 |
+| Total divergence rows | 60 | 0 |
+
+**Verdict: ✓ zero divergences.** All 29 missing-in-staging indexes, 19 column
+default/nullability diffs, 11 PK/NOT NULL constraint diffs, and the 1 missing-
+in-prod index from §3.2 are resolved by the Strategy C rebuild. No residuals
+to document.
+
+### §13.3 Validator implementation
+
+`scripts/pipeline/validate_schema_parity.py` (~550 LOC).
+
+Module structure:
+- `L3_TABLES` constant (30 tables, matches §1 inventory)
+- `Divergence` + `AcceptEntry` dataclasses
+- Introspection layer: `introspect_columns/indexes/constraints/ddl(con, table)`
+- Normalizers: `normalize_ddl_whitespace`, `normalize_pk_index_equivalence`,
+  `dedupe_not_null_constraint`
+- Comparators: one per dimension, return `list[Divergence]`
+- Accept-list: `load_accept_list(path)` YAML parser with field validation;
+  `match_accept(divergence, entries)` exact-match lookup; expiry check
+- Reporters: `format_human` + `format_json` with stable shape
+- Orchestration: `run(...)` → `(exit_code, report_dict)`; `main(argv)` adds CLI
+
+CLI flags per §5.2: `--prod`, `--staging`, `--tables`, `--dimensions`,
+`--accept-list`, `--fail-on-accepted`, `--json`, `--verbose`.
+
+Exit codes per §5.3: 0 parity, 1 unaccepted divergence or expired entry, 2
+invocation error.
+
+Normalizer behavior (conservative, Q6 resolution):
+- DDL whitespace: collapse multi-space, normalize line endings, strip trailing
+  semicolon. Does NOT rewrite punctuation spacing.
+- PK ↔ UNIQUE-index equivalence: pair when column sets match exactly
+  (order-free). Bidirectional: prod-PK/staging-UNIQUE and staging-PK/prod-UNIQUE
+  both collapse.
+- NOT NULL cross-dimension dedupe: strip bare `NOT NULL` rows from constraints
+  (they duplicate `is_nullable=False` in columns and have no column identity).
+- Names compared case-insensitively but preserved as-is in reports.
+
+Accept-list at `config/schema_parity_accept.yaml` ships **empty**. Runtime
+rejects:
+- Entries missing any of `table`/`dimension`/`detail`/`justification`/`reviewer`.
+- Justifications < 30 chars (prevents "tbd" laziness).
+- Unknown dimensions.
+
+Expired entries FAIL regardless of divergence match (forces re-review).
+Stale entries (accept-list references a divergence that no longer exists) WARN
+but pass.
+
+### §13.4 Unit test coverage
+
+`tests/pipeline/test_validate_schema_parity.py` — 50 tests across 13 classes.
+All pass in 0.63s.
+
+| Class | Tests | Focus |
+|-------|-------|-------|
+| `TestDDLWhitespaceNormalizer` | 5 | multi-space, line endings, trailing `;`, empty, whitespace-only |
+| `TestPKIndexEquivalence` | 5 | prod→staging pairing, column-order flex, reverse direction, non-match guards, non-unique guard |
+| `TestNotNullDedupe` | 1 | strips NOT NULL only, keeps PK/CHECK |
+| `TestCompareColumns` | 5 | identity, type mismatch, nullability, missing col, case-insensitive |
+| `TestCompareIndexes` | 3 | identity, missing, SQL whitespace |
+| `TestCompareDDL` | 2 | whitespace-tolerant, real diff |
+| `TestCompareConstraints` | 1 | missing PK |
+| `TestLoadAcceptList` | 7 | missing file, empty list, valid, short justification, missing field, bad dim, malformed YAML |
+| `TestAcceptEntryExpiry` | 5 | no date, future, past, today, bad format |
+| `TestMatchAccept` | 3 | exact, case-insensitive, no match |
+| `TestRunExitCodes` | 8 | parity, unaccepted, all-accepted, --fail-on-accepted, expired, stale, missing DB, bad YAML |
+| `TestJsonOutputShape` | 2 | parity shape, unaccepted populated |
+| `TestCliMain` | 3 | bad dim, bad table, --json parseable |
+
+Test-level bug found: `PyYAML` parses `YYYY-MM-DD` as `datetime.date`, not
+`str`. `AcceptEntry.is_expired()` now handles both inputs.
+
+### §13.5 Phase 2 pre-flight wiring
+
+`Makefile` target `make schema-parity-check` added. Emits the validator's
+default human-mode report against the default prod+staging paths with the
+default accept-list. Exits 0 on parity, non-zero to halt Phase 2.
+
+Block-shape documentation update applied to
+`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.12. Future Rewrite
+blocks must run `make schema-parity-check` before any Phase 2 validation
+workload.
+
+### §13.6 Baseline run output
+
+Human mode:
+
+```
+$ python3 scripts/pipeline/validate_schema_parity.py
+═══ Schema parity report ═══
+  tables scanned  : L3 (30 tables inc. staging companions)
+  divergences     : 0 total (0 accepted, 0 unaccepted)
+  accept-list     : 0 entries (0 stale, 0 expired)
+  fail-on-accepted: False
+
+✓ PARITY — no unaccepted divergences
+$ echo $?
+0
+```
+
+JSON mode:
+
+```json
+{
+  "summary": {
+    "total": 0,
+    "accepted": 0,
+    "unaccepted": 0,
+    "stale_accepts": 0,
+    "expired_accepts": 0,
+    "fail_on_accepted": false,
+    "verdict": "PARITY"
+  },
+  "divergences": [],
+  "unaccepted": [],
+  "accepted": [],
+  "stale_accepts": [],
+  "expired_accepts": []
+}
+```
+
+Baseline state at Phase 1 close: **schema parity is the new default**. Any
+future divergence surfaces as failure (exit 1), forcing remediation or an
+accept-list entry with justification + expiry + reviewer.
+
+---
+
+## §14. Deferred extensions
+
+Three sibling INF## items captured at Phase 1 close, batched for
+`docs/DEFERRED_FOLLOWUPS.md`:
+
+### INF45 — extend schema-parity to L4 derived tables
+
+**Scope:** Add L4 tables (`summary_by_parent`, `summary_by_ticker`,
+`investor_flows`, `ticker_flow_stats`, `managers`, `benchmark_weights`,
+`fund_classes`, `fund_best_index`, `fund_index_scores`, `fund_name_map`,
+`index_proxies`, `peer_groups`, `fund_family_patterns`,
+`beneficial_ownership_current`) and the L4 VIEW `entity_current` to the parity
+comparator. Today L4 is DROP+CTAS regenerated each cycle so drift self-
+corrects; INF45 is triggered by the first concrete incident where an L4 build
+fails on prod but passed on staging.
+
+**Priority:** Low.
+
+### INF46 — extend schema-parity to L0 control-plane tables
+
+**Scope:** Add L0 tables (`ingestion_manifest`, `ingestion_impacts`,
+`pending_entity_resolution`, `data_freshness`, `cusip_retry_queue`,
+`schema_versions`) to the parity comparator. L0 has single-writer-per-table
+discipline (`scripts/pipeline/manifest.py` + migration scripts) and migrations
+stamp `schema_versions`, so drift is rare. Trigger on any control-plane
+migration producing silent staging/prod drift.
+
+**Priority:** Low.
+
+### INF47 — CI wiring for schema-parity gate
+
+**Scope:** Wire `scripts/pipeline/validate_schema_parity.py --json` into the
+existing smoke CI job. Deferred because CI runs against a fixture DB, not
+prod/staging paths — the fixture is rebuilt fresh every run and therefore
+never exhibits drift. INF47 is triggered once CI has access to a realistic
+staging snapshot (or once a CI target learns to regenerate a canonical L3
+fixture and compare).
+
+**Priority:** Low.
+
+---
+
+## §15. Residual concerns and open questions for Serge
+
+None blocking merge. Captured for awareness:
+
+1. **3,503 staging queue rows discarded** on
+   `entity_identifiers_staging` rebuild per explicit Phase 1 prompt
+   instruction. Current staging rebuild drops any pending soft-landing queue
+   contents. The sync → diff → promote workflow will re-seed as needed, but
+   if there were genuinely staging-local (not prod-mirrored) entries awaiting
+   human review, they're gone. The next run of `resolve_pending_series` or
+   equivalent will surface them again from source data.
+
+2. **484 OpenFIGI cache rows discarded** on `_cache_openfigi` mirror from
+   prod (S1 decision). Next OpenFIGI CUSIP run will repopulate naturally;
+   cost is one extra round-trip per CUSIP for those 484 entries.
+
+3. **Rebuild wall clock was 37s, not the estimated 8–10 minutes.** The
+   Phase 0.5 estimate assumed WAL flushes dominated. In practice DuckDB's
+   columnar ATTACH-based INSERT is ~30× faster than estimated. This means
+   future rebuilds at similar scale are ~1 min operations — the 10-minute
+   estimate can be tightened in any follow-up block.
+
+4. **Backup preservation.** `data/13f_staging.duckdb.pre_inf39_backup`
+   (3.7 GB, untracked) is still on disk. Recommend retention through
+   Serge's merge sign-off, then delete to reclaim space. Not committed
+   to git (outside gitignore but too large to track).
+
+5. **Q3 — `entity_current` L4 VIEW** was deferred to INF45 per scope lock,
+   consistent with Phase 0 §10 open question. No action required.
+
+6. **Q4 — Phase 2 pre-flight wrapper** shipped as a Makefile target rather
+   than as a dedicated `scripts/pipeline/phase2_preflight.py` orchestrator.
+   If a future block needs to sequence schema-parity + entity-gate +
+   freshness into one callable, promote the Makefile target into a Python
+   wrapper then.
+
+_End of Phase 1 implementation summary. Block awaits Serge's merge sign-off._
