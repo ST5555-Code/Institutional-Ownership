@@ -40,7 +40,10 @@
 <body>
     <div class="header">
         <h1>13F Institutional Ownership — Admin Dashboard</h1>
-        <a href="/">← Back to Research App</a>
+        <div style="display:flex;gap:12px;align-items:center">
+            <button class="btn btn-outline" id="logout-btn" onclick="adminLogout()" style="padding:4px 10px;font-size:12px">Logout</button>
+            <a href="/">← Back to Research App</a>
+        </div>
     </div>
 
     <div class="container">
@@ -177,31 +180,55 @@
     </div>
 
     <script>
-    // INF12: all /api/admin/* endpoints require X-Admin-Token header.
-    // Token is prompted once and stored in localStorage under 'admin_token'.
-    // On 403 (bad token) we clear and re-prompt; on 503 (admin disabled) we
-    // surface the server message so the operator knows env vars aren't set.
-    function getAdminToken() {
-        let t = localStorage.getItem('admin_token');
-        if (!t) {
-            t = prompt('Admin token (X-Admin-Token) — set ADMIN_TOKEN env var on the server and enter it here:');
-            if (t) localStorage.setItem('admin_token', t);
-        }
-        return t || '';
-    }
-    async function adminFetch(url, opts = {}) {
-        const headers = Object.assign({}, opts.headers || {}, {
-            'X-Admin-Token': getAdminToken(),
+    // sec-01: authentication is cookie-based. The server sets an HttpOnly
+    // `admin_session` cookie on POST /api/admin/login (Path=/api/admin,
+    // SameSite=Strict, Max-Age=8h). adminFetch() relies on the browser
+    // to attach that cookie; on 401/403 it prompts for the token and
+    // retries once. Legacy `localStorage['admin_token']` is no longer
+    // written or read; one-time cleanup below removes any lingering
+    // pre-migration entry.
+    try { localStorage.removeItem('admin_token'); } catch (e) { /* non-fatal */ }
+
+    async function adminLogin() {
+        const t = prompt('Admin token — enter ADMIN_TOKEN env value:');
+        if (!t) return false;
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({token: t}),
         });
-        const res = await fetch(url, Object.assign({}, opts, { headers }));
-        if (res.status === 403) {
-            localStorage.removeItem('admin_token');
-            throw new Error('Admin token rejected (403) — refresh to re-enter');
+        if (res.status === 503) {
+            throw new Error('Admin disabled on server (503) — set ENABLE_ADMIN=1 and ADMIN_TOKEN');
+        }
+        return res.ok;
+    }
+
+    async function adminFetch(url, opts = {}) {
+        const init = Object.assign({credentials: 'same-origin'}, opts);
+        let res = await fetch(url, init);
+        if (res.status === 401 || res.status === 403) {
+            if (await adminLogin()) {
+                res = await fetch(url, Object.assign({credentials: 'same-origin'}, opts));
+                if (res.ok) return res;
+            }
+            throw new Error('Admin auth failed — refresh to retry');
         }
         if (res.status === 503) {
             throw new Error('Admin disabled on server (503) — set ENABLE_ADMIN=1 and ADMIN_TOKEN');
         }
         return res;
+    }
+
+    async function adminLogout() {
+        try {
+            await fetch('/api/admin/logout', {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+        } catch (e) { /* swallow — cookie will also be cleared server-side */ }
+        // Force re-auth on the next request.
+        location.reload();
     }
 
     async function loadStats() {
