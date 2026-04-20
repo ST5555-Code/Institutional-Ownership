@@ -128,13 +128,17 @@ class AcceptEntry:
         if not self.expiry_date:
             return False
         today = today or date.today()
-        try:
-            exp = date.fromisoformat(self.expiry_date)
-        except ValueError as exc:
-            raise ValueError(
-                f"accept-list entry for {self.table}/{self.dimension}/{self.detail}: "
-                f"expiry_date {self.expiry_date!r} is not ISO format"
-            ) from exc
+        raw = self.expiry_date
+        if isinstance(raw, date):
+            exp = raw
+        else:
+            try:
+                exp = date.fromisoformat(str(raw))
+            except ValueError as exc:
+                raise ValueError(
+                    f"accept-list entry for {self.table}/{self.dimension}/{self.detail}: "
+                    f"expiry_date {raw!r} is not ISO format"
+                ) from exc
         return today >= exp
 
 
