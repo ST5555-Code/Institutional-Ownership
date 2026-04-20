@@ -2156,3 +2156,55 @@ Precedent: pct-of-so Phase 1b/1c/4c sweep gaps — see §14.11.
 
 Block code is **user-smoke-ready**. Serge performs browser UI walk-
 through before accepting merge.
+
+---
+
+## §14.12 Rewrite block shape addendum — Phase 2 schema-parity pre-flight (INF39)
+
+_Added 2026-04-19 at close of block/schema-diff-inf39 Phase 1._
+
+Every future Rewrite block (and any schema-touching canonical migration) must
+include a schema-parity pre-flight before Phase 2 staging validation.
+
+### Updated block shape
+
+```
+Phase 0 — investigation / findings doc
+Phase 1 — implementation (staging DB only)
+Phase 2 — staging validation
+  § Phase 2 pre-flight (NEW since INF39):
+      make schema-parity-check
+    MUST exit 0 before any validation workload runs.
+    On non-zero exit, halt Phase 2. Remediate drift (either resync staging
+    to prod, or add an accept-list entry with justification + expiry +
+    reviewer in config/schema_parity_accept.yaml) and re-run the pre-flight.
+  § Phase 2 validation proper
+HARD STOP — await Serge's explicit Phase 4 sign-off
+Phase 4 — prod apply
+```
+
+### Rationale
+
+The pct-of-so Phase 4 prod apply aborted on `DependencyException` because
+staging had 0 non-PK indexes on `holdings_v2` while prod had 4 (see §14.0).
+Staging-only Phase 2 validation passed silently because the ALTER guard path
+the failure exercised only fires when indexes are present. The
+`make schema-parity-check` gate turns that divergence into a hard stop before
+Phase 2 ever begins.
+
+### Pre-flight usage
+
+- Standalone: `make schema-parity-check` (exits 0 on parity, 1 on unaccepted
+  divergence or expired accept-list entry, 2 on invocation error).
+- JSON mode for scripting: `python3 scripts/pipeline/validate_schema_parity.py --json`.
+- Accept-list: `config/schema_parity_accept.yaml` — ships empty; entries require
+  a prose justification ≥30 chars and are optionally bounded by an ISO
+  `expiry_date` that forces re-review.
+
+### What the gate covers today (INF39)
+
+L3 canonical tables only: columns, indexes, constraints, DDL text. L4 derived
+tables are deferred to **INF45** (drift self-corrects on L4 rebuild today) and
+L0 control-plane tables are deferred to **INF46** (single-writer-per-table
+discipline makes drift rare). CI wiring is deferred to **INF47** once the
+fixture DB reproduces canonical L3 structure — see docs/DEFERRED_FOLLOWUPS.md.
