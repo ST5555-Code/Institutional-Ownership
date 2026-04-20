@@ -16,8 +16,11 @@ When ENABLE_ADMIN or ADMIN_TOKEN is unset, every route returns 503
 or idle past 30 min, returns 401. When a wrong token is presented to
 /api/admin/login, returns 403.
 
-See docs/findings/sec-01-p0-findings.md for the full design; migration
-009_admin_sessions.py creates the backing table.
+See docs/findings/sec-01-p0-findings.md for the full design. Migration
+009_admin_sessions.py originally created the backing table in PROD_DB;
+the sec-01-p1 hotfix moved it into its own file (data/admin.duckdb),
+attached READ_WRITE to the app's existing connection — see the block
+comment on ADMIN_DB below for the "why".
 
 Name retained as `admin_bp.py` for git history continuity even though
 the exported symbol is now an APIRouter (`admin_router`).
@@ -93,9 +96,80 @@ def _client_ip(request: Request) -> str | None:
     return client.host if client else None
 
 
+# sec-01-p1 hotfix: previously this opened a fresh read-write connection to
+# PROD_DB on every admin request. Because app_db.get_db() keeps a read-only
+# handle cached per request thread, a second open in a different mode hits
+# DuckDB's "Can't open a connection to same database file with a different
+# configuration" error, and concurrent admin requests race to lose. The fix:
+#
+#   1. Move admin_sessions out of PROD_DB into its own file (ADMIN_DB below).
+#   2. Per-request, ATTACH that file READ_WRITE to the app's existing RO
+#      connection — DuckDB allows per-attach modes independent of the main
+#      database's mode, so no cross-configuration conflict can arise.
+#   3. Bootstrap the attached schema once on module init.
+#
+# Existing sessions in PROD_DB.admin_sessions (created by migration 009)
+# are dropped on the floor: one forced re-login is the cost of the fix.
+ADMIN_DB = os.path.join(BASE_DIR, 'data', 'admin.duckdb')
+_ADMIN_SCHEMA_NAME = 'adm'
+_ADMIN_BOOTSTRAPPED = False
+
+_ADMIN_SESSIONS_DDL = """
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    session_id   VARCHAR PRIMARY KEY,
+    issued_at    TIMESTAMP NOT NULL,
+    expires_at   TIMESTAMP NOT NULL,
+    last_used_at TIMESTAMP NOT NULL,
+    ip           VARCHAR,
+    user_agent   VARCHAR,
+    revoked_at   TIMESTAMP
+)
+"""
+_ADMIN_SESSIONS_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires "
+    "ON admin_sessions(expires_at)"
+)
+
+
+def _bootstrap_admin_db() -> None:
+    """Create ADMIN_DB + admin_sessions if they don't already exist.
+
+    Runs once per process. Uses a fresh RW connection to the dedicated admin
+    file (which no other process/thread touches), so it cannot conflict with
+    app_db's PROD_DB handle.
+    """
+    global _ADMIN_BOOTSTRAPPED  # pylint: disable=global-statement
+    if _ADMIN_BOOTSTRAPPED:
+        return
+    con = duckdb.connect(ADMIN_DB, read_only=False)
+    try:
+        con.execute(_ADMIN_SESSIONS_DDL)
+        con.execute(_ADMIN_SESSIONS_INDEX_DDL)
+    finally:
+        con.close()
+    _ADMIN_BOOTSTRAPPED = True
+
+
 def _session_db() -> duckdb.DuckDBPyConnection:
-    """Read-write connection for admin_sessions ops (see findings §5/§6)."""
-    return duckdb.connect(PROD_DB, read_only=False)
+    """Return the app's shared connection with admin_sessions accessible.
+
+    Reuses app_db.get_db() — which is the single shared handle the rest of
+    the app already talks through — and ATTACHes ADMIN_DB as 'adm' in
+    READ_WRITE mode on first use per connection. The fully-qualified name
+    `adm.admin_sessions` is used by every caller.
+    """
+    _bootstrap_admin_db()
+    con = _get_db()
+    try:
+        con.execute(
+            f"ATTACH '{ADMIN_DB}' AS {_ADMIN_SCHEMA_NAME} (READ_WRITE)"
+        )
+    except duckdb.BinderException:
+        # Already attached on this connection — the common path after the
+        # first request on a given thread. DuckDB raises BinderException
+        # ("database X is already attached") which we can safely ignore.
+        pass
+    return con
 
 
 def _sweep_expired(con: duckdb.DuckDBPyConnection) -> None:
@@ -107,7 +181,7 @@ def _sweep_expired(con: duckdb.DuckDBPyConnection) -> None:
     """
     con.execute(
         """
-        DELETE FROM admin_sessions
+        DELETE FROM adm.admin_sessions
          WHERE expires_at < NOW()
             OR (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL 7 DAY)
         """
@@ -136,39 +210,45 @@ def require_admin_session(request: Request) -> None:
         raise HTTPException(status_code=401, detail={'error': 'No admin session'})
 
     con = _session_db()
+    row = con.execute(
+        """
+        SELECT issued_at, expires_at, last_used_at, revoked_at
+          FROM adm.admin_sessions
+         WHERE session_id = ?
+           AND revoked_at IS NULL
+        """,
+        [sid],
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=401, detail={'error': 'Invalid session'})
+    _issued_at, expires_at, last_used_at, _revoked_at = row
+
+    now = datetime.now()
+    if expires_at < now:
+        raise HTTPException(status_code=401, detail={'error': 'Session expired'})
+    if now - last_used_at > timedelta(seconds=SESSION_IDLE_TIMEOUT):
+        raise HTTPException(status_code=401, detail={'error': 'Session idle'})
+
+    # sec-01-p1 hotfix: the admin dashboard fires 6+ parallel requests on
+    # load, each of which touches this same row. get_db() is thread-local,
+    # so concurrent requests UPDATE from distinct connections and MVCC raises
+    # TransactionException on the losers. A stale last_used_at is harmless:
+    # the expiry check above uses the previously-committed value, and the
+    # next non-contending request will push it forward — so swallow and move on.
     try:
-        row = con.execute(
-            """
-            SELECT issued_at, expires_at, last_used_at, revoked_at
-              FROM admin_sessions
-             WHERE session_id = ?
-               AND revoked_at IS NULL
-            """,
-            [sid],
-        ).fetchone()
-        if row is None:
-            raise HTTPException(status_code=401, detail={'error': 'Invalid session'})
-        _issued_at, expires_at, last_used_at, _revoked_at = row
-
-        now = datetime.now()
-        if expires_at < now:
-            raise HTTPException(status_code=401, detail={'error': 'Session expired'})
-        if now - last_used_at > timedelta(seconds=SESSION_IDLE_TIMEOUT):
-            raise HTTPException(status_code=401, detail={'error': 'Session idle'})
-
         con.execute(
-            "UPDATE admin_sessions SET last_used_at = NOW() WHERE session_id = ?",
+            "UPDATE adm.admin_sessions SET last_used_at = NOW() WHERE session_id = ?",
             [sid],
         )
+    except duckdb.TransactionException as e:
+        log.debug("last_used_at contention: %s", e)
 
-        # ~1% opportunistic sweep.
-        if _secrets.randbelow(100) == 0:
-            try:
-                _sweep_expired(con)
-            except Exception as e:  # pylint: disable=broad-except
-                log.debug("session sweep: %s", e)
-    finally:
-        con.close()
+    # ~1% opportunistic sweep.
+    if _secrets.randbelow(100) == 0:
+        try:
+            _sweep_expired(con)
+        except Exception as e:  # pylint: disable=broad-except
+            log.debug("session sweep: %s", e)
 
 
 admin_router = APIRouter(
@@ -234,17 +314,14 @@ def api_admin_login(request: Request, response: Response, body: dict = Body(defa
     ip = _client_ip(request)
 
     con = _session_db()
-    try:
-        con.execute(
-            """
-            INSERT INTO admin_sessions
-              (session_id, issued_at, expires_at, last_used_at, ip, user_agent, revoked_at)
-            VALUES (?, ?, ?, ?, ?, ?, NULL)
-            """,
-            [sid, now, expires_at, now, ip, ua],
-        )
-    finally:
-        con.close()
+    con.execute(
+        """
+        INSERT INTO adm.admin_sessions
+          (session_id, issued_at, expires_at, last_used_at, ip, user_agent, revoked_at)
+        VALUES (?, ?, ?, ?, ?, ?, NULL)
+        """,
+        [sid, now, expires_at, now, ip, ua],
+    )
 
     _set_session_cookie(response, sid, secure=(request.url.scheme == 'https'))
     return {'status': 'ok'}
@@ -256,18 +333,15 @@ def api_admin_logout(request: Request, response: Response):
     sid = request.cookies.get(SESSION_COOKIE_NAME)
     if sid:
         con = _session_db()
-        try:
-            con.execute(
-                """
-                UPDATE admin_sessions
-                   SET revoked_at = NOW()
-                 WHERE session_id = ?
-                   AND revoked_at IS NULL
-                """,
-                [sid],
-            )
-        finally:
-            con.close()
+        con.execute(
+            """
+            UPDATE adm.admin_sessions
+               SET revoked_at = NOW()
+             WHERE session_id = ?
+               AND revoked_at IS NULL
+            """,
+            [sid],
+        )
     _clear_session_cookie(response)
     return {'status': 'ok'}
 
@@ -276,15 +350,12 @@ def api_admin_logout(request: Request, response: Response):
 def api_admin_logout_all(response: Response):
     """Revoke every active admin session. Clears the caller's cookie."""
     con = _session_db()
-    try:
-        pre = con.execute(
-            "SELECT COUNT(*) FROM admin_sessions WHERE revoked_at IS NULL"
-        ).fetchone()
-        con.execute(
-            "UPDATE admin_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL"
-        )
-    finally:
-        con.close()
+    pre = con.execute(
+        "SELECT COUNT(*) FROM adm.admin_sessions WHERE revoked_at IS NULL"
+    ).fetchone()
+    con.execute(
+        "UPDATE adm.admin_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL"
+    )
     _clear_session_cookie(response)
     count = int(pre[0]) if pre and pre[0] is not None else 0
     return {'status': 'ok', 'revoked': count}
