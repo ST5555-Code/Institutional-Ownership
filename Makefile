@@ -26,7 +26,8 @@ endif
         backup-db validate \
         freshness status \
         fetch-13dg fetch-adv fetch-ncen fetch-finra-short \
-        build-managers build-fund-classes build-cusip
+        build-managers build-fund-classes build-cusip \
+        schema-parity-check
 
 help:
 	@echo "13F pipeline targets:"
@@ -47,6 +48,9 @@ help:
 	@echo "    make build-classifications— Step 7: manager / entity classifications"
 	@echo "    make backup-db            — Step 8: EXPORT DATABASE backup"
 	@echo "    make validate             — Step 9: validate_entities.py --prod"
+	@echo ""
+	@echo "  Phase 2 pre-flight:"
+	@echo "    make schema-parity-check  — validate staging↔prod L3 schema parity"
 	@echo ""
 	@echo "  Supplementary:"
 	@echo "    make fetch-13dg           — 13D/G beneficial ownership"
@@ -153,3 +157,11 @@ freshness:
 
 status:
 	@$(PY) $(SCRIPTS)/check_freshness.py --status-only
+
+# ---------------------------------------------------------------------------
+# Phase 2 pre-flight: schema parity between prod and staging L3 tables.
+# Exit non-zero halts Phase 2. See docs/BLOCK_SCHEMA_DIFF_FINDINGS.md §6.
+# ---------------------------------------------------------------------------
+schema-parity-check:
+	@echo "--- Schema parity: prod ↔ staging (L3) ---"
+	@$(PY) $(SCRIPTS)/pipeline/validate_schema_parity.py

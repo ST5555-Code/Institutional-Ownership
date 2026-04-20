@@ -1,0 +1,905 @@
+# BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE (INF39) — Phase 0 Findings
+
+_Prepared: 2026-04-19 — branch `block/schema-diff-inf39` off main HEAD `12e172b`._
+
+_Precedent: `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.0 — pct-of-so Phase 4 prod apply aborted on `DependencyException` because staging had 0 non-PK indexes on `holdings_v2` while prod had 4. Staging-only Phase 2 validation passed silently. Tactical fix: capture-and-recreate in migration 008 amendment (commit `ea4ae99`). This block builds the pre-flight detection that would have caught the divergence before Phase 4 ever started._
+
+Scope locked per block prompt:
+- L3 canonical tables only.
+- Python script, structured output + YAML accept-list.
+- Read-only comparison; no auto-remediation.
+- Future extensions captured as **INF45** (L4 derived) and **INF46** (L0 control plane). Explicitly in-scope as deferred items.
+
+Phase 0 is investigation only — no code files outside this doc, no DB writes, no pipeline runs.
+
+---
+
+## §1. L3 table inventory
+
+Source: `docs/data_layers.md` §1 (layer definitions) + §2 (complete inventory).
+Cross-checked against live prod (`data/13f.duckdb`) and staging (`data/13f_staging.duckdb`) — every table listed is present in prod.
+
+**30 tables** fall in the L3 comparison set:
+
+**Core facts (3)** — `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`
+
+**Reference / other L3 (11)** — `securities`, `market_data`, `short_interest`, `fund_universe`, `shares_outstanding_history`, `adv_managers`, `ncen_adviser_map`, `filings`, `filings_deduped`, `cusip_classifications`, `_cache_openfigi`
+
+**Entity MDM — core tables (7)** — `entities`, `entity_identifiers`, `entity_relationships`, `entity_aliases`, `entity_classification_history`, `entity_rollup_history`, `entity_overrides_persistent`
+
+**Entity MDM — additional L3 tables (6)** — `cik_crd_direct`, `cik_crd_links`, `lei_reference`, `other_managers`, `parent_bridge`, and the two 13D/G progress tables `fetched_tickers_13dg`, `listed_filings_13dg`
+
+**Staging-only companions (2)** — `entity_identifiers_staging`, `entity_relationships_staging`. These are L3-staging-only per §2 but they exist on both DBs (soft-landing queues / INF1 framework). Included because their DDL also drifts.
+
+**Ambiguity flagged:**
+- `entity_current` (L4 VIEW) is not in the L3 table set for this block — it lives in prod but not in staging. Flagged for **INF45** (L4 derived extension). Recorded in §9.
+- `_cache_openfigi` is labeled "L3 (reference cache)" — included despite the parenthetical; it is a canonical table, not derived.
+- The 2 `*_staging` tables straddle the L3 line. Including them is worth it because they drive the MDM soft-landing queue and already show divergence (see §3).
+
+Rollback / snapshot artifacts (`*_snapshot_*`) are **excluded** from the parity check by design — they are per-promote audit tables, not canonical.
+
+---
+
+## §2. Schema-dimension taxonomy
+
+For each L3 table the parity check compares five dimensions. Introspection path, whether comparison is meaningful, and known edge cases below.
+
+### 2.1 Columns
+
+**Source:** `duckdb_columns()` filtered by `schema_name='main' AND table_name=?`, ordered by `column_index`.
+**Fields captured:** `column_name`, `data_type`, `is_nullable`, `column_default`.
+**Comparable:** yes — every field. Order matters (CTAS preserves column order; out-of-order columns signal a broken DDL pair).
+**Edge cases:**
+- `column_default` is a free-text SQL expression. Lexical diffs cause noise: prod stores `'cik'` while staging may store it without quoting depending on how the default was added. Normalize by parsing through DuckDB's own pretty-printer where possible, or accept a free-text mismatch that the accept-list can cover.
+- `is_nullable` can differ silently from the NOT NULL constraint view in §2.3 — both are authoritative on DuckDB.
+- Generated columns and IDENTITY columns are rare here but surface as `column_default = 'nextval(...)'`. See §3 for live examples on `entity_overrides_persistent.override_id` and `entity_relationships_staging.id`.
+
+### 2.2 Indexes
+
+**Source:** `duckdb_indexes()` filtered by `schema_name='main' AND table_name=?`.
+**Fields captured:** `index_name`, `is_unique`, `is_primary`, `sql`.
+**Comparable:** yes. Filter `is_primary=false` if PK indexes are tracked separately via §2.3; otherwise include. The PK-auto index DuckDB creates is not surfaced here — only user-declared indexes and UNIQUE indexes appear.
+**Edge cases:**
+- The `sql` column is the canonical DDL. String-compare works if both DBs created the index from identical DDL. Whitespace / quoting differences will cause false-positive diffs.
+- Composite index column order is significant (`(cik, quarter)` ≠ `(quarter, cik)`). Do not normalize.
+- `is_unique=true` + `is_primary=false` is a UNIQUE constraint backed by an index. Example on prod: `idx_market_ticker` UNIQUE on `market_data(ticker)`.
+- A PK declared on the table (`shares_outstanding_history`) surfaces as a UNIQUE index named `idx_soh_pk` in some states; the parity check must reconcile "PK in constraints" vs "UNIQUE-not-primary index" as equivalent, or the two presentations will diff.
+- **This is the dimension that bit us.** Missing prod-side index ⇒ staging validation never exercises the ALTER guard path.
+
+### 2.3 Constraints
+
+**Source:** `duckdb_constraints()` filtered by `schema_name='main' AND table_name=?`.
+**Fields captured:** `constraint_type`, `constraint_text`.
+**Types seen on L3:** `PRIMARY KEY`, `NOT NULL`. **Not seen:** `UNIQUE` (declared as indexes instead), `CHECK`, `FOREIGN KEY` (codebase avoids FKs on purpose — promote is app-enforced).
+**Comparable:** yes. `constraint_text` is useful for PK column list; NOT NULL rows have `constraint_text='NOT NULL'` without column identity (you pair with §2.1 `is_nullable` to identify the column).
+**Edge cases:**
+- Same logical NOT NULL can appear in §2.1 `is_nullable=false` AND §2.3 as a `NOT NULL` row. Treat §2.1 `is_nullable` as the authoritative per-column field; use §2.3 to surface PK / CHECK / FK only.
+- PK presentation can be either a `PRIMARY KEY` constraint row here OR a UNIQUE index in §2.2. DuckDB is inconsistent depending on CTAS vs CREATE TABLE path. The parity check must dedupe.
+
+### 2.4 Triggers
+
+**Source:** DuckDB has **no trigger support** (confirmed empirically; no `duckdb_triggers()` system function exists; `CREATE TRIGGER` is not supported in DuckDB 0.10.x–1.x).
+**Comparable:** vacuous. The dimension exists in the taxonomy for completeness but the check is a constant `no triggers on either side, confirm empty set`. If DuckDB adds trigger support this slot pre-exists.
+**Recommendation:** keep the dimension in the script but make it a single-shot assertion that should always pass; fail-with-warning if a future DuckDB version surfaces one.
+
+### 2.5 Table-level DDL / metadata
+
+**Source:** `duckdb_tables()` column `sql` (CTAS-reconstructed DDL) + `estimated_size`.
+**Fields captured:** `sql` (canonical CREATE TABLE ...), `internal`, row count (via `SELECT COUNT(*)` — separate query, for sanity only).
+**Comparable:**
+- `sql` **no** — DuckDB's `duckdb_tables().sql` reflects how the table was last created (CTAS, CREATE TABLE, or recreated after migration). Two tables with identical columns + types + defaults can produce different `sql` text. Use §2.1 + §2.3 as the canonical column-level comparison; treat `sql` as an advisory diff only.
+- Row count **no** — explicitly out of scope for a schema-parity check (staging is a subset by design). Surface only as sanity context in the report header ("prod 12.27M rows, staging 12.27M rows — same order of magnitude").
+
+### Dimension comparison matrix
+
+| Dimension | Prod vs staging comparison makes sense? | Catches pct-of-so class of bug? |
+|-----------|-----------------------------------------|--------------------------------|
+| Columns | yes | no (pct-of-so was column-identical) |
+| Indexes | yes | **yes — this is the one** |
+| Constraints | yes | no |
+| Triggers | vacuous on DuckDB | n/a |
+| Table-level DDL / metadata | row count no; DDL text advisory | no |
+
+---
+
+## §3. Current divergence survey (empirical baseline)
+
+Introspection run: 2026-04-19, read-only against `data/13f.duckdb` and `data/13f_staging.duckdb`. Raw dump pickled to `/tmp/schema_diff_raw.pkl` during Phase 0 (not committed).
+
+### 3.1 Summary numbers
+
+- **L3 tables compared:** 30
+- **Tables with at least one schema divergence:** 13 / 30
+- **Tables clean:** 17 / 30 (no differences across any dimension)
+- **Total divergence rows:** 60
+  - Index divergences: 11 tables → 30 rows (29 missing-in-staging, 1 missing-in-prod)
+  - Column default / nullability diffs: 7 tables → 19 rows
+  - Constraint (PK + NOT NULL) diffs: 5 tables → 11 rows
+  - Trigger divergences: 0 (DuckDB has no triggers)
+  - Table-DDL text divergences: not counted — advisory only
+
+### 3.2 Index divergences (11 tables)
+
+**Missing-in-staging (29 rows across 10 tables):**
+
+| Table | Missing indexes | Notes |
+|-------|-----------------|-------|
+| `holdings_v2` | `idx_hv2_cik_quarter`, `idx_hv2_entity_id`, `idx_hv2_rollup`, `idx_hv2_ticker_quarter` | **The pct-of-so precedent.** 4 indexes. |
+| `fund_holdings_v2` | `idx_fhv2_entity`, `idx_fhv2_rollup`, `idx_fhv2_series` | 3 indexes — next v2 rename would have hit the same trap. |
+| `beneficial_ownership_v2` | `idx_bov2_entity` | 1 index. |
+| `cusip_classifications` | `idx_cc_canonical`, `idx_cc_priceable_active`, `idx_cc_retry` | 3 indexes. |
+| `market_data` | `idx_market_ticker` | 1 UNIQUE index on `ticker`. Functions as a de-facto UNIQUE constraint in prod that staging lacks. |
+| `entity_aliases` | `idx_ea_active`, `idx_ea_name` | 2 indexes. |
+| `entity_relationships` | `idx_er_child`, `idx_er_parent` | 2 indexes. |
+| `entity_rollup_history` | `idx_rollup_parent` | 1 index. |
+| `entity_identifiers_staging` | `idx_eis_entity`, `idx_eis_identifier`, `idx_eis_pending` | 3 indexes on staging-soft-landing table. |
+| `entity_relationships_staging` | `idx_ers_child`, `idx_ers_status` | 2 indexes. |
+
+**Missing-in-prod (1 row across 1 table):**
+
+| Table | Missing index | Notes |
+|-------|---------------|-------|
+| `shares_outstanding_history` | `idx_soh_pk` — UNIQUE on `(ticker, as_of_date)` | Staging has explicit UNIQUE index; prod has the same uniqueness declared as a `PRIMARY KEY` constraint. Likely equivalent semantically but the parity check will flag it until the comparator normalizes PK ↔ UNIQUE-index. |
+
+### 3.3 Column default / nullability divergences (7 tables, 19 rows)
+
+Pattern: prod has rich defaults and NOT NULL stamps; staging has loose nullable columns with no defaults. Every diff is prod-tighter-than-staging. Zero column name or type mismatches — staging has the right shape, just without the constraints.
+
+| Table | Columns with diff | Nature of diff |
+|-------|-------------------|----------------|
+| `entity_overrides_persistent` | `override_id`, `action`, `still_valid`, `applied_at`, `created_at`, `identifier_type`, `rollup_type` | 7 cols — defaults (`nextval`, `now()`, literal strings, bool cast) + NOT NULL, all dropped in staging |
+| `entity_relationships_staging` | `id`, `child_entity_id`, `owner_name`, `review_status`, `created_at` | 5 cols — sequence default, NOT NULLs, `'pending'` default, `CURRENT_TIMESTAMP` |
+| `entity_rollup_history` | `routing_confidence` | 1 col — `'high'` default missing in staging |
+| `fund_universe` | `series_id` | 1 col — NOT NULL missing in staging |
+| `lei_reference` | `lei` | 1 col — NOT NULL missing in staging |
+| `securities` | `is_active` | 1 col — `CAST('t' AS BOOLEAN)` default missing in staging |
+| `shares_outstanding_history` | `ticker`, `as_of_date`, `shares` | 3 cols — NOT NULLs missing in staging |
+
+### 3.4 Constraint divergences (5 tables)
+
+Prod has explicit PRIMARY KEY and NOT NULL declarations that staging lacks. Five tables in this bucket:
+
+| Table | Prod constraints | Staging constraints |
+|-------|------------------|----------------------|
+| `entity_overrides_persistent` | 3× NOT NULL | none |
+| `entity_relationships_staging` | 2× NOT NULL | none |
+| `fund_universe` | 1× NOT NULL + PRIMARY KEY(`series_id`) | none |
+| `lei_reference` | 1× NOT NULL + PRIMARY KEY(`lei`) | none |
+| `shares_outstanding_history` | 3× NOT NULL + PRIMARY KEY(`ticker`, `as_of_date`) | none |
+
+Note overlap with §3.3 — the NOT NULL surfaces in both §3.3 (via `is_nullable`) and §3.4 (via `duckdb_constraints`). The script must dedupe these so a single NOT NULL drift is one divergence row, not two.
+
+### 3.5 Sequences & views (peripheral — tracked for context)
+
+**Sequences:** identical on both DBs (7 sequences: `entity_id_seq`, `identifier_staging_id_seq`, `impact_id_seq`, `manifest_id_seq`, `override_id_seq`, `relationship_id_seq`, `resolution_id_seq`). No action.
+
+**Views:**
+- Prod: `entity_current`, `ingestion_manifest_current` (2 user views)
+- Staging: `entity_identifiers_staging_review`, `ingestion_manifest_current` (2 user views)
+- Divergence: `entity_current` missing in staging; `entity_identifiers_staging_review` missing in prod.
+
+`entity_current` is an L4 VIEW (memory + §data_layers §2). Out of L3 scope — flagged for **INF45**. `entity_identifiers_staging_review` is a staging-only review helper — out of scope.
+
+### 3.6 What §3 tells us
+
+- pct-of-so exposed **one** table with drift. The real state is **13 L3 tables with drift** — the pct-of-so failure was not an outlier, it was the first time a v2 rename happened to land on one of the 13.
+- All index drift is prod-tighter except for `shares_outstanding_history` where staging has the extra index — that one is a PK-presentation mismatch, not a real divergence.
+- Column drift is purely constraint/default loss in staging, not column-shape drift. This is consistent with staging being built from CTAS patterns (`CREATE TABLE ... AS SELECT`) which do not preserve defaults or NOT NULL from the source. The root cause is structural, not accidental.
+- Next v2 rename on `fund_holdings_v2`, `beneficial_ownership_v2`, `securities`, or any entity MDM table would have hit the same `DependencyException` class of bug.
+
+---
+
+## §4. Accept-list design
+
+### 4.1 Format
+
+Proposed path: `config/schema_parity_accept.yaml`. Top-level `accepted:` list; each entry is one divergence row.
+
+```yaml
+accepted:
+  - table: holdings_v2
+    dimension: indexes
+    detail: idx_hv2_cik_quarter
+    justification: |
+      Staging is a row-subset and does not need the prod read-path index.
+      Known-absent until staging rebuild pattern is fixed (INF40).
+    expiry_date: 2026-05-31
+    reviewer: serge.tismen
+  - table: shares_outstanding_history
+    dimension: indexes
+    detail: idx_soh_pk
+    justification: |
+      Staging carries an explicit UNIQUE(ticker, as_of_date) index;
+      prod expresses the same constraint as a PRIMARY KEY. Equivalent
+      semantically. Normalize PK↔UNIQUE-index in comparator (v1.1) and
+      remove this entry.
+    expiry_date: 2026-04-30
+    reviewer: serge.tismen
+```
+
+### 4.2 Field contract
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `table` | yes | L3 table name |
+| `dimension` | yes | one of `columns`, `indexes`, `constraints`, `triggers`, `ddl` |
+| `detail` | yes | dimension-specific: index name, column name, constraint text, etc. |
+| `justification` | yes | prose; enforced length floor (e.g., ≥30 chars) so "tbd" is rejected |
+| `expiry_date` | optional | ISO date; warn 14 days before; **fail** on/after expiry with reason "accept-list entry expired — reconsider" |
+| `reviewer` | yes | who accepted; email or GH handle |
+
+### 4.3 Script behavior toward the accept-list
+
+- **Divergence matches an accept-list entry** → log at WARN, do not fail.
+- **Divergence does not match** → FAIL, exit code 1.
+- **Accept-list entry has no matching divergence** (stale entry) → WARN "accept-list entry X matches no current divergence — remove"; does not fail unless `--strict-accept` set.
+- **Accept-list entry expired** → FAIL, regardless of divergence. Forces re-review.
+- **`--fail-on-accepted`** → treat accept-list entries as still-fail. Use in CI "drift-hardening" mode to ratchet toward zero accepted drift over time.
+
+### 4.4 First seed entry (for v1 ship)
+
+Draft includes one entry for `shares_outstanding_history.idx_soh_pk` (the PK↔UNIQUE-index equivalence) with a short expiry forcing the comparator normalization in v1.1. **All other divergences in §3 are `FAIL`** at v1 ship — Serge decides per-entry at block close whether to accept, remediate, or defer.
+
+---
+
+## §5. Script interface design
+
+### 5.1 Invocation
+
+```
+python3 scripts/validate_schema_parity.py [options]
+```
+
+Default behavior: L3 tables, full dimension check, compare `data/13f.duckdb` vs `data/13f_staging.duckdb`.
+
+### 5.2 Flags
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `--prod PATH` | prod DB path | `data/13f.duckdb` |
+| `--staging PATH` | staging DB path | `data/13f_staging.duckdb` |
+| `--tables t1,t2,...` | subset of L3 tables | all 30 |
+| `--dimensions d1,d2` | subset of `columns,indexes,constraints,triggers,ddl` | all 5 |
+| `--accept-list PATH` | accept-list path override | `config/schema_parity_accept.yaml` |
+| `--fail-on-accepted` | treat accept-list entries as still-fail | false |
+| `--json` | emit JSON to stdout | false (default: human table) |
+| `--verbose` | per-table trace to stderr | false |
+
+### 5.3 Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | parity — no unaccepted divergence |
+| 1 | unaccepted divergence OR expired accept-list entry |
+| 2 | invocation error (missing file, bad YAML, etc.) |
+
+### 5.4 Output contract
+
+- **Default (human):** markdown-esque table per dimension with table count header; colored FAIL / WARN / OK if stdout is a tty.
+- **`--json`:** structured payload `{ "divergences": [ ... ], "accepted": [ ... ], "summary": { "total": N, "accepted": M, "unaccepted": K } }`. One object per divergence row so CI can count and diff between runs.
+- stderr: logging / warnings only. stdout: the authoritative result.
+
+### 5.5 Integration shape
+
+- Invoke from `make schema-parity` target (add to Makefile in Phase 1).
+- Invoke from `scripts/pipeline/phase2_preflight.py` (new wrapper added Phase 1; sequences schema-parity + entity-gate + freshness into one pre-Phase-2 gate).
+- Invoke standalone from ad hoc investigation ("did my migration drift anything?").
+
+---
+
+## §6. Integration into block shape — proposed patch
+
+### 6.1 Current Rewrite block shape
+
+From `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`:
+
+```
+Phase 0 — investigation / findings doc
+Phase 1 — implementation (staging DB only)
+Phase 2 — staging validation (all gates must pass)
+HARD STOP — await Serge's explicit Phase 4 sign-off
+Phase 4 — prod apply
+```
+
+Phase 2's implicit assumption was that staging schema equals prod schema up to row content. That assumption failed quietly on pct-of-so.
+
+### 6.2 Proposed post-INF39 shape
+
+```
+Phase 0 — investigation / findings doc
+Phase 1 — implementation (staging DB only)
+Phase 2 — staging validation
+  § Phase 2 pre-flight (NEW):
+    - validate_schema_parity.py MUST pass before any validation workload runs.
+    - Any unaccepted divergence halts Phase 2 with a structured report.
+    - Remediation: either resync staging to prod, or add an accept-list entry
+      with justification + expiry + reviewer. Re-run Phase 2.
+  § Phase 2 validation proper
+HARD STOP — await Serge's explicit Phase 4 sign-off
+Phase 4 — prod apply
+```
+
+### 6.3 Draft addendum patch (to be applied in Phase 1, not Phase 0)
+
+Append to `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` as §14.11 or to the generic Rewrite-block template doc (if one exists; if not, create `docs/BLOCK_TEMPLATE.md`):
+
+> ### Phase 2 schema-parity pre-flight (INF39)
+>
+> Before any Phase 2 staging validation workload begins, run
+> `python3 scripts/validate_schema_parity.py`. Expected exit 0 with
+> no unaccepted divergences. Any divergence surfaces as one of:
+>
+> 1. **Drift to remediate** — apply migration/DDL to staging so it
+>    matches prod. Re-run pre-flight.
+> 2. **Drift to accept** — add accept-list entry with prose
+>    justification, expiry date, and reviewer. Re-run pre-flight.
+>
+> Pre-flight failure halts Phase 2. Do not bypass.
+>
+> Precedent: pct-of-so Phase 4 `DependencyException` on
+> `holdings_v2` RENAME (`§14.0`). Staging had zero indexes; prod
+> had four; the ALTER guard only fires with indexes present.
+
+**Do not apply the patch in Phase 0** — drafted here, applied at Phase 1 close once the script lands.
+
+---
+
+## §7. Phase 1 implementation plan
+
+Ordered tasks. Phase 1 = build the script. No schema changes to either DB.
+
+1. **Scaffold** `scripts/validate_schema_parity.py` with CLI (argparse), DB path discovery (default paths from `scripts/pipeline/shared.py` if it defines them, else hardcoded), and logging setup.
+2. **L3 table list** as a module-level constant sourced from §1 of this doc. Option to read from `docs/data_layers.md` at runtime is out of scope — keep the list in code for v1.
+3. **Introspection layer** — one function per dimension (`compare_columns`, `compare_indexes`, `compare_constraints`, `compare_triggers`, `compare_ddl`). Each returns `list[Divergence]`. `Divergence` dataclass: `(table, dimension, detail, prod_value, staging_value)`.
+4. **Comparator normalizer** for known-equivalent shapes:
+   - PK constraint ↔ UNIQUE index with `is_primary=False` + same columns (drop the `idx_soh_pk` false-positive).
+   - `is_nullable=False` in columns ↔ `NOT NULL` row in constraints (dedupe — surface once, not twice).
+   - Whitespace in `sql` text normalized before comparison.
+5. **Accept-list parser** — YAML → `list[AcceptEntry]`; schema-validate with `jsonschema` or a small hand-rolled validator; reject missing-required-field entries with exit 2.
+6. **Matcher** — one divergence vs accept-list entries; match requires `(table, dimension, detail)` exact; expiry check inline.
+7. **Reporter** — human table, JSON mode, colored tty output, summary header.
+8. **Exit code logic** per §5.3.
+9. **Unit tests** — `tests/test_schema_parity.py` with fixtures for each normalization case (PK↔index, nullable-dedupe, stale accept entry, expired entry, `--fail-on-accepted` mode). Target ≥90% branch coverage of the matcher.
+10. **Integration wiring** — add `make schema-parity` target; optionally wire a Phase 2 pre-flight wrapper (decide with Serge whether to ship that in Phase 1 or a follow-up block).
+11. **Seed `config/schema_parity_accept.yaml`** with the single v1 seed entry from §4.4, committed alongside the script.
+12. **Run once against current DBs** — expect the §3 baseline: ~60 divergence rows. Accept-list is empty at seed time; script exits 1 with the full list. That list becomes the Phase 2 test input.
+
+Commit shape: one commit for script + tests + accept-list stub + Makefile target.
+Message: `INF39 Phase 1: validate_schema_parity.py + L3 schema parity check`.
+
+---
+
+## §8. Phase 2 staging validation plan
+
+Phase 2 validates the script itself against current DB state (not a pipeline workload; the script has no data dependency).
+
+### 8.1 Test cases — expected outcomes
+
+| # | Scenario | Expected exit | Expected report |
+|---|----------|---------------|-----------------|
+| 1 | Baseline run, empty accept-list | 1 | ~60 divergence rows across 13 tables per §3 |
+| 2 | Baseline run, all §3 divergences accepted | 0 | WARN rows only |
+| 3 | `--tables holdings_v2` with empty accept-list | 1 | 4 index rows |
+| 4 | `--dimensions columns` with empty accept-list | 1 | 19 column rows (§3.3) |
+| 5 | Accept-list entry with expired date | 1 | expired entry reason surfaced |
+| 6 | Stale accept-list entry (matches no divergence) | 0 with WARN | "remove stale entry" warning |
+| 7 | `--fail-on-accepted` with any accept-list matches | 1 | accepted entries also counted as fail |
+| 8 | Same DB vs itself (`--prod X --staging X`) | 0 | zero divergences |
+| 9 | Missing staging file | 2 | invocation error |
+| 10 | Malformed YAML | 2 | YAML error surfaced |
+
+### 8.2 Hard gate for Phase 2 close
+
+Test 1 must produce the exact §3 row count (60). Deviation indicates either (a) DBs changed since 2026-04-19 — re-baseline; or (b) comparator logic is wrong — fix.
+
+### 8.3 Staging / prod state at Phase 2 close
+
+Unchanged. No DDL applied to either DB during Phase 2 (the script is read-only). Remediation of the actual §3 divergences is a separate decision taken at block close (§10 open question Q1).
+
+---
+
+## §9. Future extensions — INF45, INF46
+
+Recorded now so they don't get lost at block close.
+
+### INF45 — extend schema-parity to L4 derived tables
+
+**Scope:** add L4 tables (`summary_by_parent`, `summary_by_ticker`, `investor_flows`, `ticker_flow_stats`, `managers`, `benchmark_weights`, `fund_classes`, `fund_best_index`, `fund_index_scores`, `fund_name_map`, `index_proxies`, `peer_groups`, `fund_family_patterns`, `beneficial_ownership_current`) and the L4 VIEW `entity_current` to the parity comparator.
+
+**Trigger:** concrete incident — an L4 build fails on prod where it passed on staging due to schema drift. Until that happens, L4 is rebuilt from L3 every cycle so drift self-corrects.
+
+**Why deferred:** L4 tables are `DROP+CREATE-AS-SELECT` regenerated (mostly). Index and constraint drift there is lower-impact because each rebuild reshapes the table anyway. Adding L4 to the parity set now would be noisy without being informative.
+
+**Priority:** low.
+
+### INF46 — extend schema-parity to L0 control-plane tables
+
+**Scope:** add L0 tables (`ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`, `data_freshness`, `cusip_retry_queue`, `schema_versions`) to the parity comparator.
+
+**Trigger:** when a control-plane migration produces a silent staging/prod drift (pattern seen once historically on `data_freshness` when v2 vs non-v2 scripts wrote different schemas).
+
+**Why deferred:** L0 is owned by `scripts/pipeline/manifest.py` + migration scripts. Drift is rare because there is a single writer per table and migrations stamp `schema_versions`. Adding L0 is process-tidiness; not prompted by incident.
+
+**Priority:** low.
+
+---
+
+## §10. Open questions for Phase 1 sign-off
+
+### Q1. Remediation of the §3 baseline — policy decision
+
+The script will ship and immediately report ~60 divergence rows. Three options:
+
+- **A. Accept all 60 at v1 seed.** Accept-list has 60 entries on day 1; script exits 0; real work = remediate over weeks, burning down the accept-list toward zero.
+- **B. Fix all 60 at v1 seed.** Resync staging schema to prod before the script ships; accept-list is empty; script exits 0 because no divergence exists. Requires a staging DDL pass (~1 hour of work; §3 lists every change needed).
+- **C. Hybrid — fix the index/constraint cluster, accept the PK-vs-index normalization, leave the defaults drift.** Cleanest operationally.
+
+Recommendation: **B**. The §3 drift is mechanical and recovery is a single targeted staging rebuild. Starting the script at exit 0 makes "parity" the baseline state; anything new shows up as new drift. Option A poisons the well — every future run carries 60 background rows that humans stop reading.
+
+Serge: A/B/C decision needed before Phase 1 ship.
+
+### Q2. Script location — `scripts/` vs `scripts/pipeline/` vs `tools/`
+
+`scripts/` is the bulk folder; `scripts/pipeline/` holds pipeline-coupled modules (`shared.py`, `manifest.py`, `registry.py`). Schema parity is a pipeline gate, so `scripts/pipeline/validate_schema_parity.py` fits. But it is also invoked ad hoc from the CLI, so top-level `scripts/validate_schema_parity.py` fits too. Convention check needed.
+
+### Q3. `entity_current` (L4 VIEW) — include in this block or defer to INF45?
+
+Memory note (2026-04-13): "entity_current is a VIEW — only user-defined view in prod; fixture/snapshot rebuilds must recreate it after tables land." Staging is missing the view. Including it in v1 makes sense; deferring to INF45 is consistent with scope lock. Serge's call.
+
+### Q4. Phase 2 pre-flight wrapper — Phase 1 scope or follow-up?
+
+The script runs standalone fine. Wiring it into a `scripts/pipeline/phase2_preflight.py` wrapper that sequences schema-parity + entity-gate + freshness is convenient but not strictly required for INF39. Include in Phase 1 scope or defer to a follow-up block?
+
+### Q5. CI integration — in scope for this block?
+
+Adding `validate_schema_parity.py --json` to the existing smoke CI job is one line. But CI runs against a fixture DB, not prod/staging paths. Does the fixture reproduce the drift? (Likely not — fixture is built fresh every run.) Decision: probably ship Phase 1 without CI integration; revisit once the §3 drift is remediated and parity is the baseline.
+
+### Q6. Comparator normalization — how aggressive?
+
+The §2 edge cases (PK↔UNIQUE-index, nullable-dedupe, whitespace in SQL text) are the known-safe normalizations. Are there others Serge wants normalized away by default (e.g., `CAST('t' AS BOOLEAN)` vs `TRUE`; `now()` vs `CURRENT_TIMESTAMP`)? Each normalization is a lossy simplification — easier to read, harder to audit.
+
+Recommendation: start narrow (only the three in §7.4); expand only when Phase 2 test 1 surfaces a noise pattern that obscures real drift.
+
+---
+
+_End of Phase 0 findings. No code changes, no DB writes, no migrations. Findings doc is the only artifact._
+
+---
+
+## §11. Phase 0.5 — Staging rebuild dry-run (2026-04-19)
+
+Phase 0 picked Option B (remediate all §3 drift before the script ships) as the recommended v1 seed. Phase 0.5 dry-runs that rebuild — produces the plan, surfaces surprises, does not modify either DB. The Phase 1 prompt then either approves the plan or splits into Phase 1a (rebuild) + Phase 1b (script).
+
+### §11.1 Strategy selection
+
+Three candidates evaluated against the 13 divergent tables:
+
+| Strategy | Fidelity | Control | Time | Verdict |
+|----------|----------|---------|------|---------|
+| **A** — CTAS + manually re-apply indexes/constraints | Partial — same class of loss that produced the current state | Low | Fastest | **Rejected** — reproduces the root cause |
+| **B** — `EXPORT DATABASE prod` → drop staging → import | Full-fidelity IF DuckDB EXPORT preserves indexes + constraints + defaults; needs verification against our version | Medium — all-or-nothing | Large — exports full prod (14.5 GB), re-imports | **Rejected** — coarse grain, binds all 55 prod tables and all snapshots into one operation, no per-table rollback |
+| **C** — Per-table capture-and-recreate: capture `duckdb_tables().sql` + `duckdb_indexes().sql` + `duckdb_constraints()`, DROP + recreate from captured DDL, `INSERT ... SELECT * FROM p.t` via ATTACH | Full-fidelity (DuckDB's own DDL strings round-trip cleanly — verified on `holdings_v2` sample) | High — per-table, per-dimension, transactional | Comparable to B but with per-table commit points | **Recommended** |
+
+**Strategy C chosen.** Identical mechanism to the migration 008 capture-and-recreate pattern (`ea4ae99`) already proven on the pct-of-so Phase 4 prod apply. Reuses validated idiom; no new infrastructure.
+
+Sample of captured DDL cleanliness (from `/tmp/schema_diff_rebuild_capture.pkl`):
+
+- `duckdb_tables().sql` returns a valid `CREATE TABLE ...(...)` that re-executes without edits.
+- `duckdb_indexes().sql` returns `CREATE INDEX ... ON t(...);` verbatim, including composite column order and quoted reserved words (`"quarter"`).
+- `duckdb_constraints().constraint_text` returns usable PK column lists (`PRIMARY KEY(series_id)`, `PRIMARY KEY(ticker, as_of_date)`); NOT NULL rows are column-less and must be paired with §2.1 `is_nullable` — acceptable because NOT NULL is embedded in the table-level CTAS output already.
+
+### §11.2 Data-preservation audit
+
+For each L3 table, classified as **MIRROR** (staging row count equals prod, safe to drop and reload) or **DRIFT** (staging diverges; rebuild loses or masks data).
+
+| Table | Prod rows | Stg rows | Δ | Classification |
+|-------|-----------|----------|---|----------------|
+| `holdings_v2` | 12,270,984 | 12,270,984 | 0 | MIRROR |
+| `fund_holdings_v2` | 14,090,397 | 14,090,397 | 0 | MIRROR |
+| `beneficial_ownership_v2` | 51,905 | 51,905 | 0 | MIRROR |
+| `securities` | 430,149 | 430,149 | 0 | MIRROR |
+| `market_data` | 10,064 | 10,064 | 0 | MIRROR |
+| `short_interest` | 328,595 | 328,595 | 0 | MIRROR |
+| `fund_universe` | 12,870 | 12,870 | 0 | MIRROR |
+| `shares_outstanding_history` | 338,053 | 338,053 | 0 | MIRROR |
+| `adv_managers` | 16,606 | 16,606 | 0 | MIRROR |
+| `ncen_adviser_map` | 11,209 | 11,106 | +103 | DRIFT (prod ahead — normal) |
+| `filings` | 43,358 | 43,358 | 0 | MIRROR |
+| `filings_deduped` | 40,140 | 40,140 | 0 | MIRROR |
+| `cusip_classifications` | 430,149 | 430,149 | 0 | MIRROR |
+| `_cache_openfigi` | 15,807 | **16,291** | **−484** | **DRIFT (STAGING AHEAD)** — surprise S1 |
+| `entities` | 26,535 | 26,535 | 0 | MIRROR |
+| `entity_identifiers` | 35,444 | 35,444 | 0 | MIRROR |
+| `entity_relationships` | 18,365 | 18,365 | 0 | MIRROR |
+| `entity_aliases` | 26,874 | 26,874 | 0 | MIRROR |
+| `entity_classification_history` | 26,595 | 26,595 | 0 | MIRROR |
+| `entity_rollup_history` | 59,804 | 59,804 | 0 | MIRROR |
+| `entity_overrides_persistent` | 245 | 245 | 0 | MIRROR |
+| `cik_crd_direct` | 4,059 | 4,059 | 0 | MIRROR |
+| `cik_crd_links` | 353 | 353 | 0 | MIRROR |
+| `lei_reference` | 13,143 | 13,143 | 0 | MIRROR |
+| `other_managers` | 15,405 | 15,405 | 0 | MIRROR |
+| `parent_bridge` | 11,135 | 11,135 | 0 | MIRROR |
+| `fetched_tickers_13dg` | 6,075 | **0** | +6,075 | DRIFT (staging empty; prod-only progress marker) |
+| `listed_filings_13dg` | 60,247 | **0** | +60,247 | DRIFT (staging empty; prod-only progress marker) |
+| `entity_identifiers_staging` | 3,503 | 3,503 | 0 | MIRROR (but intentionally staging-only class — see below) |
+| `entity_relationships_staging` | 0 | 0 | 0 | MIRROR (empty on both sides) |
+
+Totals: **26 MIRROR / 4 DRIFT** across the 30 L3 tables.
+
+**`*_staging` companions.** `entity_identifiers_staging` + `entity_relationships_staging` straddle the L3 line — they are soft-landing queues, not prod canonical. In Phase 0 they appeared in the divergence count because their DDL diverged (missing indexes + NOT NULL on staging). For the rebuild:
+
+- Their data is mirrored today (3,503 = 3,503; 0 = 0).
+- Their purpose is exactly to hold staging-only rows pending review; rebuilding them from prod is semantically correct at the moment but could destroy pending queue items in the future.
+- **Rebuild decision:** include in this pass (they currently mirror), but document that future rebuilds must inspect queue contents before dropping. Add a pre-flight row-diff check to the Phase 1 script.
+
+**Scope-unique tables (prod-only):** `fund_best_index`, `fund_classification`, `fund_index_scores`, `fund_name_map`, `index_proxies`, `investor_flows`, `peer_groups`, `summary_by_ticker`, `ticker_flow_stats` — all L4 derived; out of this block's rebuild scope. Flagged to INF45.
+
+**Scope-unique tables (staging-only):** `stg_13dg_filings`, `stg_nport_fund_universe`, `stg_nport_holdings` — pipeline staging prefix, out of L3 scope. No action.
+
+**Dependencies constraining rebuild order.** No foreign keys declared anywhere in the codebase (codebase policy; see `docs/data_layers.md` §10 and `scripts/pipeline/shared.entity_gate_check()`). So ordering is not semantically required, but for safety we order entity MDM core tables (`entities` first, then identifiers/relationships/aliases/classification/rollup/overrides) before anything that references `entity_id`. Fact tables last. Order matters only for crash recovery, not correctness.
+
+### §11.3 Per-table rebuild plan — estimated wall clock
+
+Rough scale based on row count and observed DuckDB INSERT-from-ATTACH throughput (~5M rows/min/core on sequential columnar copy, based on prior migration runs):
+
+| Tier | Row range | Tables | Est. per-table time |
+|------|-----------|--------|---------------------|
+| XL | ≥ 10M | `holdings_v2` (12.3M), `fund_holdings_v2` (14.1M) | 2–3 min each |
+| L | 1M–10M | none | — |
+| M | 100K–1M | `securities`, `cusip_classifications` (each 430K), `shares_outstanding_history` (338K), `short_interest` (329K) | 5–20 s each |
+| S | 10K–100K | 11 tables | 1–5 s each |
+| XS | < 10K | 13 tables | < 1 s each |
+
+**Estimated total wall clock: 6–8 minutes** for the data copy.
+DDL capture + drop + recreate phase: < 30 seconds (tiny).
+Post-check queries (row counts): <30 seconds total.
+CHECKPOINT at end: 30–60 seconds to flush 4 GB+ to disk.
+
+**Aggregate envelope: 8–10 minutes wall clock.**
+
+Per-table rebuild shape (applied uniformly via Strategy C):
+
+```
+-- per table t
+SELECT COUNT(*) FROM p.t;           -- pre-check
+DROP INDEX IF EXISTS idx1; ...      -- drop captured indexes
+DROP TABLE IF EXISTS t;
+<captured CREATE TABLE t(...) ;>    -- from duckdb_tables().sql
+<captured CREATE INDEX ... ;> ...   -- from duckdb_indexes().sql
+INSERT INTO t SELECT * FROM p.t;    -- data reload via ATTACH
+SELECT COUNT(*) FROM t;             -- post-check
+-- verify row count matches, index count matches, column list matches
+```
+
+**Full per-table SQL generated to:** `docs/SCHEMA_DIFF_PHASE_0_5_REBUILD_DRY_RUN.sql` (641 lines, all 30 tables, human-reviewable, not executable until Phase 1 authorization).
+
+### §11.4 Surprises
+
+**S1 — `_cache_openfigi` is AHEAD on staging (+484 rows).** OpenFIGI cache on staging has accreted entries that prod does not have. Cache is durable by design (`docs/data_layers.md` §2: "Durable cache; survives re-runs"). Dropping staging and reloading from prod would destroy 484 resolved CUSIP cache entries.
+
+*Proposed handling:* **do not drop `_cache_openfigi` in the rebuild.** Instead, (a) drop and recreate only its indexes (there are none on prod or staging for this table, so nothing to do) and (b) treat it as an exception — the table-level DDL on staging should be rewritten to match prod via ALTER TABLE or column-level introspection, preserving all existing rows. Alternatively, back-merge staging rows into prod first (out of block scope). Serge to decide.
+
+**S2 — `ncen_adviser_map` prod ahead (+103 rows).** Normal — prod carries the DM15b scoped fetch (commit `9ce5b17`); staging was not updated. Not a rebuild surprise; staging gains the 103 rows after rebuild. No action beyond note.
+
+**S3 — `fetched_tickers_13dg` + `listed_filings_13dg` empty on staging.** These are prod-only 13D/G progress markers; staging has never run the 13D/G fetch. Rebuild loads 66,322 rows into staging where currently there are zero. *Proposed handling:* proceed — staging should mirror prod on canonical L3 tables, progress markers included. No data loss.
+
+**S4 — `holdings_v2` DDL already reflects pct-of-so migration 008.** Captured DDL shows `pct_of_so DOUBLE` and `pct_of_so_source VARCHAR` — migration 008 applied to prod on 2026-04-19 (commit `ea4ae99`). Staging was renamed in Phase 1b per the rewrite block. No action; confirmation only.
+
+**S5 — `entity_overrides_persistent` defaults use `nextval('override_id_seq')` + `now()`.** The sequence exists on both DBs (verified §3.5). DDL round-trip is clean; no action.
+
+**S6 — `entity_relationships_staging` zero rows on both DBs but has its own DDL drift.** Empty on both sides, but DDL is what we're remediating. No data consideration; proceed normally.
+
+**S7 — DuckDB `duckdb_tables().sql` trailing semicolon produces double `;;` when we append our own delimiter.** Cosmetic only; cleaned in the dry-run SQL file by a post-processing pass. Phase 1 script needs the same normalization.
+
+**Count: 7 surprises. None of them are rebuild-blocking. S1 is the only one requiring a genuine policy decision; the rest are cosmetic or informational.**
+
+### §11.5 Risk assessment
+
+| Risk | Assessment | Mitigation |
+|------|-----------|-----------|
+| Disk headroom | **Low**. Staging is 3.93 GB; prod is 14.5 GB; free space 113 GB. Peak disk during rebuild (staging holds old table + new table briefly, plus checkpoint WAL): ≤ 8 GB additional. | None needed. |
+| Interruptibility | **Single-transaction** (Strategy C inside one `BEGIN/COMMIT`): atomic but no partial recovery. **Per-table transactions** (recommended for long tables): recoverable mid-rebuild at table boundary. | Recommend per-table commits for XL tables. |
+| Rollback | `ROLLBACK` reverts the in-flight transaction. If staging file corrupts, restore from a pre-rebuild backup copy of `13f_staging.duckdb`. | **Mandatory pre-rebuild step:** `cp data/13f_staging.duckdb data/13f_staging.duckdb.pre_inf39_backup`. |
+| Data loss — `_cache_openfigi` S1 | **Real.** 484 cache entries destroyed by naive drop+reload. | Skip the drop for this table; remediate its DDL via ALTER or column-level introspection. |
+| Data loss — staging-unique | None beyond S1. `*_staging` companions mirror today; `stg_*` pipeline tables are out of scope. | Verify at rebuild time with row-count diff. |
+| Pipeline in-flight at rebuild time | Staging may be written by `sync → diff → promote` flow when rebuild runs. | Coordinate rebuild window; block is paused, no active sync. |
+| DuckDB DDL round-trip edge cases | Whitespace / quoting tested clean on `holdings_v2`; not exhaustively tested on all 30. | Phase 1 verifies per-table column list + index count + sample row equality as rebuild post-check. |
+| Sequences state | Sequences (`override_id_seq` etc.) are DB-global, not per-table. Dropping + recreating tables does not affect sequence state. | No action. |
+
+### §11.6 Go/no-go recommendation
+
+**GO — Phase 1 approved to execute Strategy C rebuild + ship validator script.**
+
+Rationale:
+- All rebuild mechanics verified (DDL capture round-trips; ATTACH-based reload is fast and well-understood).
+- Only one surprise (S1, `_cache_openfigi` staging-ahead) requires a policy micro-decision — not a scope change.
+- Risk profile is low: pre-rebuild backup covers catastrophic failure; per-table post-checks cover individual drift; pipeline is quiet.
+- Wall clock (8–10 min) is acceptable for a one-time operation.
+
+**Split recommendation:** **keep Phase 1 unified** (rebuild + script in one commit). Surprise count (7) is modest and all surprises are understood. Splitting Phase 1a / 1b would add ceremony without reducing risk; the rebuild is the prerequisite to the script starting at exit 0, so they ship together.
+
+**Pre-conditions for Phase 1 start:**
+1. Serge confirms S1 handling (skip `_cache_openfigi` drop vs. back-merge vs. destroy 484 cache rows).
+2. Serge confirms `*_staging` companions included in rebuild scope (§11.2).
+3. Pre-rebuild backup of `data/13f_staging.duckdb` copied to `data/13f_staging.duckdb.pre_inf39_backup` (Serge runs this Terminal op).
+4. No concurrent staging writers (Serge confirms pipeline quiet).
+5. Phase 1 prompt issued with these decisions encoded.
+
+**Open items for Phase 1 prompt carry-over from Phase 0 §10:**
+- Q1 remediation policy — **resolved** in favor of B (remediate-all), per this §11 work.
+- Q2 script location — still open.
+- Q3 include `entity_current` (L4 VIEW) — still open.
+- Q4 Phase 2 pre-flight wrapper scope — still open.
+- Q5 CI integration — still open.
+- Q6 normalizer aggressiveness — still open.
+
+_End of Phase 0.5 addendum._
+
+---
+
+## §13. Phase 1 implementation summary
+
+_Executed 2026-04-19, branch `block/schema-diff-inf39`. Unified phase per
+Phase 0.5 §11.6 recommendation: rebuild + validator + tests + Phase 2
+wrapper + baseline in one session._
+
+### §13.1 Rebuild execution
+
+Strategy C (per-table capture-and-recreate) executed via
+`scripts/inf39_rebuild_staging.py` against `data/13f_staging.duckdb` with prod
+attached read-only. Per-table CHECKPOINT for interruptibility per §11.5.
+
+**Wall clock: 37.05 seconds** (Phase 0.5 §11.3 estimate: 8–10 minutes). The
+over-estimate came from assuming large-table INSERT-from-ATTACH would be
+bottlenecked on WAL flushes; in practice the columnar copy plus a single
+per-table CHECKPOINT is nearly sequential-scan fast.
+
+Timings breakdown:
+- 28 MIRROR tables (full schema + data reload from prod): 36.0s
+- 2 SCHEMA-ONLY companions (schema rebuilt, no data copy): 0.49s
+- Aggregate rows reloaded into staging: 28,394,565
+
+Tables that ran > 1 second (rows × compression × index count all contribute):
+- `holdings_v2` (12.27M rows, 4 indexes) — 15.57s
+- `fund_holdings_v2` (14.09M rows, 3 indexes) — 12.31s
+- `cusip_classifications` (430,149 rows, 3 indexes) — 0.99s
+
+All 30 tables verdict **OK** (row count, column count, index count all match prod).
+
+**Surprises vs dry-run:** one mid-execution bug found and fixed on the first
+attempt — `duckdb_columns()` / `duckdb_indexes()` return rows for attached
+databases too, inflating staging column counts by 2x whenever prod was
+ATTACHed. Added `WHERE database_name = current_database()` filter to all
+introspection queries in both the rebuild script and the validator. No other
+deviations from the Phase 0.5 dry-run plan.
+
+`_cache_openfigi` S1 decision executed as planned: staging's 16,291 rows
+dropped and re-seeded with prod's 15,807 rows (−484 regenerable OpenFIGI
+cache entries). `entity_identifiers_staging` and `entity_relationships_staging`
+rebuilt schema-only (schema mismatches resolved; 3,503 staging queue rows
+discarded per Phase 1 prompt decision).
+
+**Phase 1c follow-up (2026-04-19):** 3,503 frozen audit-trail rows restored to
+`entity_identifiers_staging` from `data/13f_staging.duckdb.pre_inf39_backup`
+post-rebuild per Serge sign-off for staging/prod data-mirror consistency.
+All rows are `review_status='rejected'` with `reviewed_at IS NULL` (no human
+review lost). Validator re-run: still exit 0, 0 divergences.
+
+Full per-table execution log: `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md`.
+
+### §13.2 Post-rebuild parity — baseline achieved
+
+Re-ran the §3 five-dimension comparison against the rebuilt staging:
+
+| Metric | Phase 0 baseline | Post-rebuild |
+|--------|------------------|--------------|
+| L3 tables compared | 30 | 30 |
+| Tables with drift | 13 | 0 |
+| Total divergence rows | 60 | 0 |
+
+**Verdict: ✓ zero divergences.** All 29 missing-in-staging indexes, 19 column
+default/nullability diffs, 11 PK/NOT NULL constraint diffs, and the 1 missing-
+in-prod index from §3.2 are resolved by the Strategy C rebuild. No residuals
+to document.
+
+### §13.3 Validator implementation
+
+`scripts/pipeline/validate_schema_parity.py` (~550 LOC).
+
+Module structure:
+- `L3_TABLES` constant (30 tables, matches §1 inventory)
+- `Divergence` + `AcceptEntry` dataclasses
+- Introspection layer: `introspect_columns/indexes/constraints/ddl(con, table)`
+- Normalizers: `normalize_ddl_whitespace`, `normalize_pk_index_equivalence`,
+  `dedupe_not_null_constraint`
+- Comparators: one per dimension, return `list[Divergence]`
+- Accept-list: `load_accept_list(path)` YAML parser with field validation;
+  `match_accept(divergence, entries)` exact-match lookup; expiry check
+- Reporters: `format_human` + `format_json` with stable shape
+- Orchestration: `run(...)` → `(exit_code, report_dict)`; `main(argv)` adds CLI
+
+CLI flags per §5.2: `--prod`, `--staging`, `--tables`, `--dimensions`,
+`--accept-list`, `--fail-on-accepted`, `--json`, `--verbose`.
+
+Exit codes per §5.3: 0 parity, 1 unaccepted divergence or expired entry, 2
+invocation error.
+
+Normalizer behavior (conservative, Q6 resolution):
+- DDL whitespace: collapse multi-space, normalize line endings, strip trailing
+  semicolon. Does NOT rewrite punctuation spacing.
+- PK ↔ UNIQUE-index equivalence: pair when column sets match exactly
+  (order-free). Bidirectional: prod-PK/staging-UNIQUE and staging-PK/prod-UNIQUE
+  both collapse.
+- NOT NULL cross-dimension dedupe: strip bare `NOT NULL` rows from constraints
+  (they duplicate `is_nullable=False` in columns and have no column identity).
+- Names compared case-insensitively but preserved as-is in reports.
+
+Accept-list at `config/schema_parity_accept.yaml` ships **empty**. Runtime
+rejects:
+- Entries missing any of `table`/`dimension`/`detail`/`justification`/`reviewer`.
+- Justifications < 30 chars (prevents "tbd" laziness).
+- Unknown dimensions.
+
+Expired entries FAIL regardless of divergence match (forces re-review).
+Stale entries (accept-list references a divergence that no longer exists) WARN
+but pass.
+
+### §13.4 Unit test coverage
+
+`tests/pipeline/test_validate_schema_parity.py` — 50 tests across 13 classes.
+All pass in 0.63s.
+
+| Class | Tests | Focus |
+|-------|-------|-------|
+| `TestDDLWhitespaceNormalizer` | 5 | multi-space, line endings, trailing `;`, empty, whitespace-only |
+| `TestPKIndexEquivalence` | 5 | prod→staging pairing, column-order flex, reverse direction, non-match guards, non-unique guard |
+| `TestNotNullDedupe` | 1 | strips NOT NULL only, keeps PK/CHECK |
+| `TestCompareColumns` | 5 | identity, type mismatch, nullability, missing col, case-insensitive |
+| `TestCompareIndexes` | 3 | identity, missing, SQL whitespace |
+| `TestCompareDDL` | 2 | whitespace-tolerant, real diff |
+| `TestCompareConstraints` | 1 | missing PK |
+| `TestLoadAcceptList` | 7 | missing file, empty list, valid, short justification, missing field, bad dim, malformed YAML |
+| `TestAcceptEntryExpiry` | 5 | no date, future, past, today, bad format |
+| `TestMatchAccept` | 3 | exact, case-insensitive, no match |
+| `TestRunExitCodes` | 8 | parity, unaccepted, all-accepted, --fail-on-accepted, expired, stale, missing DB, bad YAML |
+| `TestJsonOutputShape` | 2 | parity shape, unaccepted populated |
+| `TestCliMain` | 3 | bad dim, bad table, --json parseable |
+
+Test-level bug found: `PyYAML` parses `YYYY-MM-DD` as `datetime.date`, not
+`str`. `AcceptEntry.is_expired()` now handles both inputs.
+
+### §13.5 Phase 2 pre-flight wiring
+
+`Makefile` target `make schema-parity-check` added. Emits the validator's
+default human-mode report against the default prod+staging paths with the
+default accept-list. Exits 0 on parity, non-zero to halt Phase 2.
+
+Block-shape documentation update applied to
+`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.12. Future Rewrite
+blocks must run `make schema-parity-check` before any Phase 2 validation
+workload.
+
+### §13.6 Baseline run output
+
+Human mode:
+
+```
+$ python3 scripts/pipeline/validate_schema_parity.py
+═══ Schema parity report ═══
+  tables scanned  : L3 (30 tables inc. staging companions)
+  divergences     : 0 total (0 accepted, 0 unaccepted)
+  accept-list     : 0 entries (0 stale, 0 expired)
+  fail-on-accepted: False
+
+✓ PARITY — no unaccepted divergences
+$ echo $?
+0
+```
+
+JSON mode:
+
+```json
+{
+  "summary": {
+    "total": 0,
+    "accepted": 0,
+    "unaccepted": 0,
+    "stale_accepts": 0,
+    "expired_accepts": 0,
+    "fail_on_accepted": false,
+    "verdict": "PARITY"
+  },
+  "divergences": [],
+  "unaccepted": [],
+  "accepted": [],
+  "stale_accepts": [],
+  "expired_accepts": []
+}
+```
+
+Baseline state at Phase 1 close: **schema parity is the new default**. Any
+future divergence surfaces as failure (exit 1), forcing remediation or an
+accept-list entry with justification + expiry + reviewer.
+
+---
+
+## §14. Deferred extensions
+
+Three sibling INF## items captured at Phase 1 close, batched for
+`docs/DEFERRED_FOLLOWUPS.md`:
+
+### INF45 — extend schema-parity to L4 derived tables
+
+**Scope:** Add L4 tables (`summary_by_parent`, `summary_by_ticker`,
+`investor_flows`, `ticker_flow_stats`, `managers`, `benchmark_weights`,
+`fund_classes`, `fund_best_index`, `fund_index_scores`, `fund_name_map`,
+`index_proxies`, `peer_groups`, `fund_family_patterns`,
+`beneficial_ownership_current`) and the L4 VIEW `entity_current` to the parity
+comparator. Today L4 is DROP+CTAS regenerated each cycle so drift self-
+corrects; INF45 is triggered by the first concrete incident where an L4 build
+fails on prod but passed on staging.
+
+**Priority:** Low.
+
+### INF46 — extend schema-parity to L0 control-plane tables
+
+**Scope:** Add L0 tables (`ingestion_manifest`, `ingestion_impacts`,
+`pending_entity_resolution`, `data_freshness`, `cusip_retry_queue`,
+`schema_versions`) to the parity comparator. L0 has single-writer-per-table
+discipline (`scripts/pipeline/manifest.py` + migration scripts) and migrations
+stamp `schema_versions`, so drift is rare. Trigger on any control-plane
+migration producing silent staging/prod drift.
+
+**Priority:** Low.
+
+### INF47 — CI wiring for schema-parity gate
+
+**Scope:** Wire `scripts/pipeline/validate_schema_parity.py --json` into the
+existing smoke CI job. Deferred because CI runs against a fixture DB, not
+prod/staging paths — the fixture is rebuilt fresh every run and therefore
+never exhibits drift. INF47 is triggered once CI has access to a realistic
+staging snapshot (or once a CI target learns to regenerate a canonical L3
+fixture and compare).
+
+**Priority:** Low.
+
+---
+
+## §15. Residual concerns and open questions for Serge
+
+None blocking merge. Captured for awareness:
+
+1. **3,503 staging queue rows discarded** on
+   `entity_identifiers_staging` rebuild per explicit Phase 1 prompt
+   instruction. Current staging rebuild drops any pending soft-landing queue
+   contents. The sync → diff → promote workflow will re-seed as needed, but
+   if there were genuinely staging-local (not prod-mirrored) entries awaiting
+   human review, they're gone. The next run of `resolve_pending_series` or
+   equivalent will surface them again from source data.
+
+2. **484 OpenFIGI cache rows discarded** on `_cache_openfigi` mirror from
+   prod (S1 decision). Next OpenFIGI CUSIP run will repopulate naturally;
+   cost is one extra round-trip per CUSIP for those 484 entries.
+
+3. **Rebuild wall clock was 37s, not the estimated 8–10 minutes.** The
+   Phase 0.5 estimate assumed WAL flushes dominated. In practice DuckDB's
+   columnar ATTACH-based INSERT is ~30× faster than estimated. This means
+   future rebuilds at similar scale are ~1 min operations — the 10-minute
+   estimate can be tightened in any follow-up block.
+
+4. **Backup preservation.** `data/13f_staging.duckdb.pre_inf39_backup`
+   (3.7 GB, untracked) is still on disk. Recommend retention through
+   Serge's merge sign-off, then delete to reclaim space. Not committed
+   to git (outside gitignore but too large to track).
+
+5. **Q3 — `entity_current` L4 VIEW** was deferred to INF45 per scope lock,
+   consistent with Phase 0 §10 open question. No action required.
+
+6. **Q4 — Phase 2 pre-flight wrapper** shipped as a Makefile target rather
+   than as a dedicated `scripts/pipeline/phase2_preflight.py` orchestrator.
+   If a future block needs to sequence schema-parity + entity-gate +
+   freshness into one callable, promote the Makefile target into a Python
+   wrapper then.
+
+_End of Phase 1 implementation summary. Block awaits Serge's merge sign-off._
