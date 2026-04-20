@@ -680,6 +680,12 @@ cache entries). `entity_identifiers_staging` and `entity_relationships_staging`
 rebuilt schema-only (schema mismatches resolved; 3,503 staging queue rows
 discarded per Phase 1 prompt decision).
 
+**Phase 1c follow-up (2026-04-19):** 3,503 frozen audit-trail rows restored to
+`entity_identifiers_staging` from `data/13f_staging.duckdb.pre_inf39_backup`
+post-rebuild per Serge sign-off for staging/prod data-mirror consistency.
+All rows are `review_status='rejected'` with `reviewed_at IS NULL` (no human
+review lost). Validator re-run: still exit 0, 0 divergences.
+
 Full per-table execution log: `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md`.
 
 ### §13.2 Post-rebuild parity — baseline achieved
