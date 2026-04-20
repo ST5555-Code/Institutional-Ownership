@@ -18,29 +18,45 @@ pip install -r requirements.txt
 
 ## Build Order
 
-Run scripts in this sequence from the project root:
+The full quarterly refresh is driven by the `Makefile`. Individual steps
+are runnable standalone; the `quarterly-update` target chains them in the
+correct order.
 
 ```bash
-python3 scripts/fetch_adv.py          # ~30 sec  — SEC ADV adviser data
-python3 scripts/fetch_13f.py          # ~5 min   — download 4 quarterly ZIPs (~350 MB)
-python3 scripts/load_13f.py           # ~30 sec  — load into DuckDB
-python3 scripts/build_managers.py     # ~2 min   — manager/parent tables, CIK-CRD linking
-python3 scripts/build_cusip.py        # ~30 min  — CUSIP-to-ticker mapping (OpenFIGI API)
-python3 scripts/fetch_market.py       # ~10 min  — yfinance market data
+make quarterly-update         # Steps 1-9: fetch → build-entities → compute-flows →
+                              # fetch-market → build-summaries → build-classifications →
+                              # backup-db → validate
+DRY_RUN=1 make quarterly-update   # print the plan without executing
 ```
 
-Or run the full pipeline in one command:
+Individual steps (each standalone):
 
 ```bash
-python3 scripts/update.py
+make fetch-13f              # Step 1 — holdings_v2 refresh (scripts/fetch_13f.py)
+make fetch-nport            # Step 2 — fund_holdings_v2 via N-PORT XML (scripts/fetch_nport_v2.py)
+make fetch-dera-nport       # Step 2 alt — fund_holdings_v2 via DERA ZIP bulk
+make build-entities         # Step 3 — entity MDM sync (scripts/build_entities.py)
+make compute-flows          # Step 4 — investor_flows + ticker_flow_stats
+make fetch-market           # Step 5 — market_data + securities
+make build-summaries        # Step 6 — summary_by_parent
+make build-classifications  # Step 7 — manager_type + entity classifications
+make backup-db              # Step 8 — EXPORT DATABASE
+make validate               # Step 9 — validate_entities.py --prod
 ```
 
-This runs all six scripts in order, then runs `auto_resolve.py` to fix ticker gaps automatically.
+Run `make help` for the full target list, including supplementary targets
+(`fetch-13dg`, `fetch-adv`, `fetch-ncen`, `build-managers`, `build-cusip`, …)
+and the `schema-parity-check` pre-flight gate.
+
+`scripts/update.py` is deprecated — retained on disk only for reference
+in open item INF32 (it references retired scripts in `scripts/retired/`
+and is not failing-fast). The Makefile is the single entry point for
+pipeline orchestration.
 
 ## Updating for New Quarters
 
 1. Add the new quarter URL to `QUARTERS` dict in `scripts/fetch_13f.py`
-2. Run `python3 scripts/update.py`
+2. Run `make quarterly-update`
 3. Review any pending ticker overrides: `python3 scripts/approve_overrides.py`
 
 ## Using the Notebook
@@ -109,35 +125,76 @@ To add a new override, see the instructions at the top of `scripts/build_cusip.p
 
 ```
 13f-ownership/
+├── Makefile                   — quarterly-update orchestrator + per-step targets
 ├── scripts/
-│   ├── fetch_adv.py           — SEC ADV adviser data
-│   ├── fetch_13f.py           — Download quarterly 13F ZIPs
-│   ├── load_13f.py            — Load into DuckDB
-│   ├── build_managers.py      — Manager/parent tables
-│   ├── build_cusip.py         — CUSIP-to-ticker mapping
-│   ├── fetch_market.py        — yfinance market data
-│   ├── enrich_tickers.py      — Additional ticker enrichment
-│   ├── auto_resolve.py        — Automatic ticker gap resolution
-│   ├── approve_overrides.py   — Interactive override review CLI
-│   └── update.py              — Master pipeline script
-├── notebooks/
-│   └── research.ipynb         — 15 ownership analysis queries
-├── data/
-│   ├── 13f.duckdb             — Main database (not in Git)
-│   ├── raw/                   — Downloaded ZIPs (not in Git)
-│   ├── extracted/             — Unzipped TSVs (not in Git)
-│   └── reference/
-│       ├── ticker_overrides.csv          — Manual ticker corrections (in Git)
-│       ├── ticker_overrides_pending.csv  — Pending review (in Git)
-│       ├── adv_managers.csv              — Parsed ADV data
-│       └── sec_13f_list.csv              — SEC 13F securities list
-├── outputs/                   — Excel exports from notebook
+│   ├── app.py                 — FastAPI entry point
+│   ├── app_db.py              — shared DB helpers (get_db, has_table, …)
+│   ├── api_common.py          — respond helpers + shared route plumbing
+│   ├── api_config.py          — /api/config/* router
+│   ├── api_register.py        — /api/register, /api/conviction routers
+│   ├── api_fund.py            — /api/fund_portfolio* routers
+│   ├── api_flows.py           — /api/flow_analysis, /api/peer_rotation routers
+│   ├── api_entities.py        — /api/entity_graph, /api/entity_* routers
+│   ├── api_market.py          — /api/market, /api/short_* routers
+│   ├── api_cross.py           — /api/cross_ownership, /api/overlap routers
+│   ├── admin_bp.py            — /api/admin/* router (token-authed)
+│   ├── fetch_13f.py           — Step 1: holdings_v2 (quarterly 13F ZIPs)
+│   ├── fetch_nport_v2.py      — Step 2: fund_holdings_v2 via N-PORT XML
+│   ├── fetch_dera_nport.py    — Step 2 alt: fund_holdings_v2 via DERA ZIP bulk
+│   ├── build_entities.py      — Step 3: entity MDM sync
+│   ├── compute_flows.py       — Step 4: investor_flows + ticker_flow_stats
+│   ├── fetch_market.py        — Step 5: market_data + securities (yfinance + SEC)
+│   ├── build_summaries.py     — Step 6: summary_by_parent rollups
+│   ├── build_classifications.py — Step 7: manager/entity classifications
+│   ├── validate_entities.py   — Step 9: validation gates
+│   ├── fetch_adv.py           — SEC ADV adviser data (supplementary)
+│   ├── fetch_13dg.py + fetch_13dg_v2.py — 13D/G beneficial ownership
+│   ├── fetch_ncen.py          — N-CEN adviser map
+│   ├── build_managers.py      — managers table
+│   ├── build_cusip.py         — CUSIP → ticker mapping (OpenFIGI)
+│   ├── approve_overrides.py   — interactive override review CLI
+│   ├── pipeline/              — pipeline framework (discover, manifest, validate)
+│   │   ├── discover.py
+│   │   ├── manifest.py
+│   │   ├── protocol.py
+│   │   ├── shared.py
+│   │   ├── validate_schema_parity.py
+│   │   └── nport_parsers.py
+│   └── migrations/            — numbered schema migrations (001-008, …)
 ├── web/
-│   ├── datasette_config.yaml  — Datasette configuration
+│   ├── react-app/             — React 19 + TypeScript + Vite frontend (served from dist/)
+│   │   ├── src/               — components, tabs, store, types
+│   │   ├── dist/              — production build (Flask→FastAPI serves this)
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   └── playwright.config.ts
+│   ├── templates/             — admin.html (token-gated) only
+│   ├── datasette_config.yaml  — legacy Datasette dashboard config
 │   └── README_deploy.md       — Render.com deployment guide
+├── notebooks/
+│   └── research.ipynb         — 15 ownership analysis queries (legacy)
+├── data/
+│   ├── 13f.duckdb             — main database (prod, not in Git)
+│   ├── 13f_staging.duckdb     — staging database (not in Git)
+│   ├── 13f_readonly.duckdb    — snapshot for query failover (not in Git)
+│   ├── raw/                   — downloaded ZIPs (not in Git)
+│   ├── nport_raw/             — N-PORT XML files (not in Git)
+│   ├── 13dg_raw/              — 13D/G filings (not in Git)
+│   ├── extracted/             — unzipped TSVs (not in Git)
+│   └── reference/             — curated CSVs (in Git)
+│       ├── ticker_overrides.csv
+│       ├── ticker_overrides_pending.csv
+│       ├── parent_seeds.csv
+│       └── …
+├── docs/                      — architecture, audits, process rules
+├── tests/                     — smoke + fixture tests (pytest)
+├── outputs/                   — Excel exports
 ├── requirements.txt
 └── README.md
 ```
+
+See `scripts/app.py:6-20` for the full router registration manifest.
+
 
 ## SEC API Usage
 

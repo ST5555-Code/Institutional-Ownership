@@ -1,5 +1,16 @@
 # Next Session Prompt — 13F Ownership
 
+> **STATUS: SUPERSEDED — retained for history only (2026-04-20).**
+> Session #11 close and all subsequent sessions have moved well past the
+> React Phase 3/4 decision points and N-PORT fetch cadence referenced
+> below. Do not paste this at the start of a new session. For current
+> session handoff, read `docs/NEXT_SESSION_CONTEXT.md`. Script references
+> below that predate the 2026-04-18 BLOCK-3 retirement of
+> `scripts/fetch_nport.py` → `scripts/retired/` are no longer valid —
+> `scripts/fetch_nport_v2.py` (XML path) and `scripts/fetch_dera_nport.py`
+> (DERA ZIP path) are canonical. The Makefile `fetch-nport` target
+> invokes `fetch_nport_v2.py`.
+
 Paste this at the start of the next Claude Code session.
 
 ---
@@ -44,8 +55,8 @@ If Phase 3 polish is deferred or minimal:
 `fund_holdings_v2` data is stale (last fetch was Oct 2025).
 Pipeline run needed:
 ```bash
-! python3 -u scripts/fetch_nport.py --test   # test first
-! python3 -u scripts/fetch_nport.py           # full run
+! python3 -u scripts/fetch_nport_v2.py --test   # test first (legacy fetch_nport.py retired to scripts/retired/ 2026-04-18)
+! python3 -u scripts/fetch_nport_v2.py           # full run
 ```
 Requires explicit authorization. Do not run without it.
 

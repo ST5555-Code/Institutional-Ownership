@@ -8,9 +8,20 @@
 
 ## Local Testing
 
+Since React Phase 4 cutover (2026-04-13), the FastAPI app in
+`scripts/app.py` serves the React production build from
+`web/react-app/dist/`. Building the React bundle is a prerequisite before
+starting the server — skipping it yields a 404 on `/` and every tab
+route.
+
 ```bash
 cd ~/ClaudeWorkspace/Projects/13f-ownership
 pip install -r requirements.txt
+
+# React production build (required — app.py serves web/react-app/dist/)
+npm --prefix web/react-app install
+npm --prefix web/react-app run build
+
 python3 scripts/app.py --port 8001
 ```
 
@@ -43,7 +54,7 @@ git push -u origin main
    - **Region**: closest to you
    - **Branch**: main
    - **Runtime**: Python
-   - **Build Command**: `pip install -r requirements.txt`
+   - **Build Command**: `pip install -r requirements.txt && npm --prefix web/react-app install && npm --prefix web/react-app run build`
    - **Start Command**: `python scripts/app.py --port $PORT`
    - **Instance Type**: Free
 5. Click **Create Web Service**
@@ -56,7 +67,7 @@ Open the Render URL in your phone browser. The app is responsive.
 
 ## Updating Data
 
-1. Rebuild `data/13f.duckdb` locally with `python3 scripts/update.py`
+1. Rebuild `data/13f.duckdb` locally with `make quarterly-update`
 2. Commit and push the updated database
 3. Render auto-deploys on push
 

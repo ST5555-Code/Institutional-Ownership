@@ -22,6 +22,37 @@ the column is optional: overrides with `identifier_type='series_id'` and
 no CIK-keyed target are valid now. The NOT NULL was a vestige from the
 earliest override schema when every row represented a CIK merge.
 
+---
+INTENTIONAL NULL-TARGET REPLAY-SKIP SEMANTICS (do not re-flag as defect)
+---
+
+The combination of `new_value=NULL` + replay-skip is DESIGNED, not a bug.
+Any future auditor / tool comparing `entity_overrides_persistent` row
+counts to `replay_persistent_overrides()` effect counts will see rows
+with NULL targets silently skipped on replay. That divergence is
+deliberate and bounded by the following invariant:
+
+  - At write time (DM15 L1/L2, INF9d source-side) the override's
+    rollup / relationship effect is applied directly to
+    `entity_rollup_history` / `entity_relationships`. The row in
+    `entity_overrides_persistent` is the audit record — it documents
+    why the write happened, not a replay instruction.
+  - At replay time (`build_entities.py --reset`) the target cannot be
+    resolved without a CIK, so the row is skipped. This is the correct
+    behavior: the pre-rebuild state already reflects the applied effect
+    because the sub-adviser / source entity was re-materialized from
+    the same upstream data that produced it originally (N-CEN, ADV).
+  - Staying on the NULL-target row is therefore a no-op by construction.
+    The override table's role for these rows is purely documentary.
+
+Operationally this appears as "N overrides present, M applied on replay,
+M < N" where the gap exactly matches the NULL-target count. The gap is
+expected. Any monitoring gate that treats N != M as a failure must
+filter `WHERE new_value IS NOT NULL` first.
+
+See ROADMAP 2026-04-17 session #11 (Override IDs 205-221, DM15 L2) and
+`docs/canonical_ddl.md` §17 (Entity MDM) for the audit trail.
+
 Idempotent: probes nullability before acting.
 
 Usage:

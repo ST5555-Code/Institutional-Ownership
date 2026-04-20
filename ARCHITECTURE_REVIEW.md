@@ -48,8 +48,11 @@ Flask + Python  (scripts/app.py ~1,400 lines + scripts/admin_bp.py + scripts/que
 DuckDB  (data/13f.duckdb)
 ```
 
-**React status:** Phase 3 complete (commit `c836813`). Phase 4 cutover pending.
-Two frontends currently live — React at port 5174, vanilla-JS at port 8001.
+**React status:** Phase 4 cutover complete 2026-04-13 (commit `002fab0`).
+Single frontend — the FastAPI app (`scripts/app.py`) serves `web/react-app/dist/`
+on port 8001. Vanilla-JS legacy and `web/react-src/` POC retired the same
+session (38 public routes rewritten to `/api/v1/*`). See `REACT_MIGRATION.md`
+Status section for the full timeline.
 
 **Zustand store shape:**
 ```typescript

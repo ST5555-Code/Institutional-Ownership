@@ -1,6 +1,6 @@
 # Data Classification Methodology
 
-_Last updated: April 9, 2026_
+_Last updated: April 20, 2026 — entity count refreshed to 26,535 (was 20,205 at Apr 9 baseline; +6,330 from DM14b/DM15 sub-adviser MDM buildout + 13D/G filer resolution Apr 17)._
 
 SEC filings do not include investor type or strategy classifications. Every "Type" label in the platform is derived by us from multiple sources.
 
@@ -9,7 +9,7 @@ SEC filings do not include investor type or strategy classifications. Every "Typ
 ### entity_type on holdings_v2 (per-entity, used by all filters)
 
 Resolution order:
-1. `entity_classification_history` (20,205 entities) — if classification != 'unknown', use it
+1. `entity_classification_history` (26,535 entities, per `SELECT COUNT(*) FROM entity_current` 2026-04-20) — if classification != 'unknown', use it
 2. ADV strategy inference via CRD link (3,254 entities) — hedge_fund, private_equity, quantitative override active/mixed/unknown
 3. `manager_type` fallback — parent-level type from parent_seeds
 
@@ -27,7 +27,7 @@ Binary passive/active via name-pattern keywords: "Index", "ETF", "S&P", "Russell
 |--------|----------|------------|----------------|
 | Parent seeds | ~110 parents, ~45% of AUM | High | All types |
 | ADV strategy_inferred | 3,254 entities (38%) | Medium-High | hedge_fund, private_equity, quantitative, passive, active |
-| Entity classification_history | 20,205 entities | Varies (see confidence field) | All types |
+| Entity classification_history | 26,535 entities (2026-04-20) | Varies (see confidence field) | All types |
 | Keyword matching | Fallback for unmatched | Low | wealth_management, hedge_fund, PE |
 | Manual review | ~177 entities >$10B | High | Corrected misclassifications |
 
