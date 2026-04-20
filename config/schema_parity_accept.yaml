@@ -1,0 +1,41 @@
+# Schema parity accept-list
+# Consumed by scripts/pipeline/validate_schema_parity.py.
+#
+# Each entry exempts one prod-vs-staging divergence from FAIL-mode failure.
+# Divergences are matched by (table, dimension, detail) tuple, case-insensitive.
+# The validator refuses entries with a justification shorter than 30 chars.
+#
+# Dimensions: columns | indexes | constraints | ddl
+#
+# Schema:
+#   table:          L3 table name (required)
+#   dimension:      one of: columns, indexes, constraints, ddl (required)
+#   detail:         dimension-specific identifier (required)
+#                     columns      → column name
+#                     indexes      → index name
+#                     constraints  → "{type}:{text}" as surfaced by the validator
+#                     ddl          → "CREATE TABLE"
+#   justification:  prose, ≥30 chars, explains why this drift is tolerable (required)
+#   reviewer:       who accepted; email or GH handle (required)
+#   expiry_date:    optional ISO date (YYYY-MM-DD); FAIL on or after this date
+#                   to force re-review
+#
+# Baseline policy (2026-04-19): empty. Option B "remediate-all" chosen at block
+# close: Phase 1 staging rebuild produced 0 divergences; anything new is real
+# drift and must be remediated or justified here.
+#
+# Example (commented out — the validator rejects entries that look like
+# placeholder text, so an example entry would fail its own check):
+#
+# accepted:
+#   - table: shares_outstanding_history
+#     dimension: indexes
+#     detail: idx_soh_pk
+#     justification: |
+#       Staging expresses uniqueness via UNIQUE(ticker, as_of_date) while prod
+#       uses PRIMARY KEY. Semantically equivalent; PK↔UNIQUE-index normalizer
+#       should collapse this automatically — entry kept as a safety net.
+#     expiry_date: 2026-05-31
+#     reviewer: serge.tismen
+
+accepted: []
