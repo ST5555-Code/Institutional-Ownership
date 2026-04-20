@@ -209,6 +209,73 @@ class TestCompareConstraints:
 
 
 # ---------------------------------------------------------------------------
+# ATTACH filter — regression guard for the duckdb_columns() bug found during
+# Phase 1 rebuild. Without the `database_name = current_database()` filter,
+# introspection queries return rows from every attached database, not just
+# the connected one.
+# ---------------------------------------------------------------------------
+
+
+class TestIntrospectionFilterIsolatesCurrentDatabase:
+    """If the `database_name = current_database()` filter in _filtered_query
+    is removed, these tests regress: introspection queries would double-count
+    columns/indexes/constraints by pulling rows from attached databases too."""
+
+    def _build_two_dbs(self, tmp_path):
+        a = tmp_path / "a.duckdb"
+        b = tmp_path / "b.duckdb"
+        con_a = duckdb.connect(str(a))
+        con_a.execute("CREATE TABLE entities (entity_id BIGINT, entity_type VARCHAR)")
+        con_a.execute("CREATE INDEX idx_a ON entities(entity_type)")
+        con_a.execute("CHECKPOINT")
+        con_a.close()
+        con_b = duckdb.connect(str(b))
+        con_b.execute("CREATE TABLE entities (entity_id BIGINT, entity_type VARCHAR)")
+        con_b.execute("CREATE INDEX idx_b ON entities(entity_type)")
+        con_b.execute("CHECKPOINT")
+        con_b.close()
+        return str(a), str(b)
+
+    def test_columns_introspection_ignores_attached_db(self, tmp_path):
+        a, b = self._build_two_dbs(tmp_path)
+        con = duckdb.connect(a)
+        try:
+            con.execute(f"ATTACH '{b}' AS other (READ_ONLY)")
+            cols = vsp.introspect_columns(con, "entities")
+            # Expect exactly 2 columns (from the connected DB `a`),
+            # NOT 4 (which would indicate rows from the attached `other` DB too).
+            assert len(cols) == 2
+            names = [c["column_name"] for c in cols]
+            assert names == ["entity_id", "entity_type"]
+        finally:
+            con.close()
+
+    def test_indexes_introspection_ignores_attached_db(self, tmp_path):
+        a, b = self._build_two_dbs(tmp_path)
+        con = duckdb.connect(a)
+        try:
+            con.execute(f"ATTACH '{b}' AS other (READ_ONLY)")
+            idxs = vsp.introspect_indexes(con, "entities")
+            # Expect exactly 1 index (idx_a from `a`), not 2 (idx_a + idx_b).
+            assert len(idxs) == 1
+            assert idxs[0]["index_name"] == "idx_a"
+        finally:
+            con.close()
+
+    def test_ddl_introspection_ignores_attached_db(self, tmp_path):
+        a, b = self._build_two_dbs(tmp_path)
+        con = duckdb.connect(a)
+        try:
+            con.execute(f"ATTACH '{b}' AS other (READ_ONLY)")
+            ddl = vsp.introspect_ddl(con, "entities")
+            # Returns a single DDL string, not concatenated or doubled.
+            assert isinstance(ddl, str)
+            assert ddl.upper().startswith("CREATE TABLE")
+        finally:
+            con.close()
+
+
+# ---------------------------------------------------------------------------
 # Accept-list
 # ---------------------------------------------------------------------------
 
