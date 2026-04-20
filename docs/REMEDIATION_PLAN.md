@@ -121,7 +121,7 @@ If these aren't fixed: coverage silently decays, cosmetic deliverables regress t
 | mig-02 | MAJOR-14 fetch_adv.py DROP→CREATE atomic fix | §11.2 | — | SYSTEM_AUDIT §11.3 | OPEN | `scripts/fetch_adv.py:247-249` | obs-01 decouples manifest registration | 3-A | `CREATE OR REPLACE TABLE` single statement. |
 | mig-03 | MAJOR-15 migration 004 staging/rename atomicity pattern | §11.3 | — | SYSTEM_AUDIT §11.3, Pass 2 §5 | OPEN | `scripts/migrations/004_summary_by_parent_rollup_type.py` | None | 3-B | Retrofit; already applied once, but the pattern needs tightening for future migrations. |
 | mig-04 | MAJOR-16 S-02 schema_versions stamp hole | §11.4, Pass 2 §0/§5 | — | SYSTEM_AUDIT §9.3/§11.4 | OPEN | `scripts/migrations/add_last_refreshed_at.py`, `schema_versions` table | None | 3-A | One-time INSERT; rebuild any verify_applied() logic. |
-| mig-05 | BLOCK-4 admin refresh pre-restart rework | §10.3, Pass 2 §4 | — | SYSTEM_AUDIT §10.3 | BLOCKED | `Plans/admin_refresh_system_design.md` (MISSING — see App. D surprises), `scripts/migrations/00X` (new), `scripts/pipeline/protocol.py` | upstream design doc produced or re-sourced | Phase 2 | **Design doc referenced by audit does not exist in this worktree**; program cannot proceed without recovery. |
+| mig-05 | BLOCK-4 admin refresh pre-restart rework | §10.3, Pass 2 §4 | — | `docs/admin_refresh_system_design.md` (recovered `03db9ad`); SYSTEM_AUDIT §10.3 | SUPERSEDED → Phase 2 | `scripts/migrations/010_pipeline_refresh_control_plane.py` (new; slot 010 because int-12 holds 009), `scripts/pipeline/base.py` (new), `scripts/pipeline/cadence.py` (new), `scripts/pipeline/protocol.py` (ABC reconciliation) | Full Phase 2 workstream — see "Phase 2" section above | Phase 2 | **Subsumed into full Phase 2 scope** per prog-01 (2026-04-20). Item retained as cross-reference anchor; actual work scheduled as Phase 2 kickoff (`prog-02` or equivalent). |
 | mig-06 | INF40 L3 surrogate row-ID for rollback | — | INF40 | REWRITE_PCT_OF_SO §14.5/§14.11.4 | OPEN | L3 canonical DDLs (`holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`, others), `scripts/promote_staging.py` | None | 3-C | Broad DDL change; needs migration + backfill. |
 | mig-07 | INF41 read-site inventory discipline (rename sweep) | — | INF41 | REWRITE_PCT_OF_SO §14.11.4 | OPEN | `scripts/queries.py`, `scripts/api_*.py`, `web/react-app/src/**/*.tsx`, `tests/fixtures/responses/*.json` (read-only scripted audit tool) | None | 3-D | Builds a script, not a change; enforces exhaustiveness. |
 | mig-08 | INF42 derived-artifact hygiene | — | INF42 | REWRITE_PCT_OF_SO §14.10 addendum, BLOCK_SCHEMA_DIFF | OPEN | `.gitignore`, `web/react-app/dist/`, `tests/fixtures/13f_fixture.duckdb`, build scripts | None | 3-D | Checksum/hash validation; forced rebuild triggers. |
@@ -249,7 +249,7 @@ Items or pairs flagged here default to **serial** until the ambiguity is resolve
 3. **int-21 (MAJOR-7 unresolved series_id) ↔ sec-04 (validators→prod)** — both touch `scripts/pipeline/shared.py`. Serial.
 4. **obs-02 / obs-04 ↔ mig-02 / mig-01** — fetch_adv.py and promote_13dg.py share file ownership across themes. Serial within those pairs.
 5. **sec-05 (hardcoded-prod builders) ↔ mig-14 (build_managers routing)** — same file, different perspectives. Must be merged into one scope.
-6. **mig-05 (BLOCK-4 admin refresh pre-restart)** — **BLOCKED: upstream design doc `Plans/admin_refresh_system_design.md` referenced by audit does not exist in this branch.** Cannot be scheduled until the design artifact is recovered or re-sourced.
+6. **mig-05 (BLOCK-4 admin refresh pre-restart)** — **UNBLOCKED 2026-04-20 (prog-01).** Design doc recovered at [`docs/admin_refresh_system_design.md`](./admin_refresh_system_design.md) (moved from untracked `Plans/` via commit `03db9ad`). Full Phase 2 scope now captured in the Phase 2 section above. Mig-05 as a Theme 3 item is superseded by the full Phase 2 workstream — treat mig-05's "admin refresh pre-restart rework" as subsumed into Phase 2 kickoff scope. Migration slot renumbered: 008 → 010 (not 009, since int-12 owns 009 for securities.cusip PK).
 7. **ops-18 (rotating_audit_schedule.md)** — **BLOCKED: file referenced by user prompt does not exist in this branch.** May be in a separate repo, an unmerged branch, or still unwritten.
 8. **obs-13 (DIAG-23 Register %FLOAT)** — likely-closed via `ff1ff71` CI-fixture regeneration and `fcf66f2` post-merge-fixes merge, but live verification on served `web/react-app/dist/` bundle required before marking DONE.
 9. **int-15 (INF31 market_data fetch_date discipline)** — convention gap; acceptance criteria fuzzy. Needs scoping session before Phase 1.
@@ -270,15 +270,129 @@ Items or pairs flagged here default to **serial** until the ambiguity is resolve
 
 ---
 
-## Phase 2 — Update Functions (post-foundation)
+## Phase 2 — Update Functions / Admin Refresh System (post-foundation)
 
-The user prompt references an "Update Functions scope" artifact (`docs/UPDATE_FUNCTIONS*.md` / `docs/ADMIN_REFRESH*.md` / `docs/REFRESH_SYSTEM*.md`). **None of these docs exist in this worktree branch** (verified via `find . -iname "*update_function*"` and `find . -iname "*admin_refresh*"` — both empty). The closest current artifact is the audit's BLOCK-4 reference to `Plans/admin_refresh_system_design.md` — also missing. See Appendix D "Surprises".
+**Spec source.** [`docs/admin_refresh_system_design.md`](./admin_refresh_system_design.md) (v3.2, ~992 lines) is the authoritative Phase 2 scope. Moved from untracked `Plans/` into `docs/` by commit `03db9ad` (2026-04-20). Prog-00 flagged this doc as missing — that was a false negative, now corrected.
 
-Placeholder summary until the artifact is recovered:
-- **BLOCK-4** admin refresh pre-restart rework (audit §10.3) — schema reconciliation (fictional columns), enum decision (5-state vs 11-state), Protocol-vs-ABC decision, `parse()` purity decision.
-- 3-5 day focused session, 1 migration (tentatively `009_pipeline_refresh_control_plane.py`), protocol.py refactor.
+**Supporting reference.** [`docs/data_sources.md`](./data_sources.md) (~204 lines) documents the seven data sources feeding the system (13F, N-PORT, 13D, 13G, N-CEN, ADV, market data) — cadence, public-lag, amendment semantics, coverage status, known gaps. Consumed by the Phase 2 Data Source UI tab (design §9). Also a permanent reference for Theme 2 observability work (cadence rules drive `PIPELINE_CADENCE`) and for any session touching a data-source pipeline.
 
-**Recommendation:** treat Phase 2 as formally deferred until Serge confirms doc-artifact location. Program cannot schedule Phase 2 work on a missing spec.
+### Scope summary
+
+Phase 2 delivers a user-triggered data refresh system as a **framework**, not a one-off loader. Three user-facing deliverables plus a backend framework.
+
+**User-facing (React):**
+- **Admin status dashboard tab** (design §8) — per-pipeline cards with last-run, age, stale flag, new-data-available probe, rows added, refresh button, overdue reminders, run history drilldown.
+- **Data Source tab** (design §9) — read-only renderer of `docs/data_sources.md` + runtime-generated cadence timeline SVG from `PIPELINE_CADENCE`.
+- **Diff review & approval surface** (design §2b) — tiered presentation (small <1K rows full list, medium 1K-100K paginated + sample, large 100K+ summary + stratified sample), automatic anomaly detection, async approval with 24-hour staging retention, opt-in per-pipeline auto-approval.
+
+**Backend framework (`scripts/pipeline/`):**
+- **`base.py`** (PENDING) — concrete `SourcePipeline` ABC with `run()` orchestrator driving the 8-step staging flow (fetch → parse → validate → diff → snapshot → promote → verify → cleanup). Current `protocol.py` ships three structural `typing.Protocol`s; design §4 calls for a single ABC — **reconciliation decision required**.
+- **`cadence.py`** (PENDING — file does not exist) — `PIPELINE_CADENCE` dict for 6 pipelines (13F, N-PORT, 13D/G, N-CEN, ADV, market) with `stale_threshold_days`, `next_expected_fn`, `probe_fn`, and `expected_delta` anomaly ranges.
+- **`admin_preferences`** control-plane table (new) — per-user per-pipeline auto-approve configuration with JSON conditions.
+- **9 admin endpoints** (design §8, §11, §2b): `POST /admin/refresh/{pipeline}`, `GET /admin/run/{run_id}`, `GET /admin/status`, `GET /admin/probe/{pipeline}`, `GET /admin/runs/pending`, `GET /admin/runs/{id}/diff`, `POST /admin/runs/{id}/approve`, `POST /admin/runs/{id}/reject`, `POST /admin/rollback/{run_id}`.
+- **`load_13f_v2.py`** — first concrete pipeline on the framework (`append_is_latest` strategy). Current `load_13f.py` is rewritten in place (`8e7d5cb`, `a58c107`) with checkpoint/freshness/dry-run but not yet on base class.
+- **Subsequent migrations**: `fetch_nport_v3.py`, `fetch_13dg_v3.py`, `fetch_market_v2.py`, `fetch_ncen_v2.py`, `fetch_adv_v2.py`.
+- **`queries.py` sweep** — add `WHERE is_latest=TRUE` across all 13F / N-PORT / 13D/G read paths after migration applies.
+
+**Control-plane integration points (L0):**
+- `ingestion_manifest` (DONE — 21,339 rows) — every run writes one row.
+- `ingestion_impacts` (DONE — 29,531 rows) — per-tuple `insert`, `flip_is_latest`, `scd_supersede` actions; backs `/admin/rollback/{run_id}`.
+- `data_freshness` (DONE — 25 rows) — stamped via `SourcePipeline.stamp_freshness()`.
+- `admin_preferences` — NEW, must be created in Phase 2.
+
+### Migration numbering note (contradiction surfaced this session)
+
+Design doc §5 + §12 originally numbered its schema migration as `008`. Slot `008_` is already used by `008_rename_pct_of_float_to_pct_of_so.py` (unrelated). The design doc flags this explicitly and recommends renumbering to `009_`.
+
+**Contradiction with this plan's Appendix D:** slot `009_securities_cusip_pk.py` is already claimed by **int-12 (INF28)**. Phase 2's pipeline-refresh migration must take a different slot — **likely `010_pipeline_refresh_control_plane.py`** assuming int-12 ships first during Batch 1-D.
+
+Resolution at Phase 2 kickoff: confirm int-12 has shipped at slot 009, then assign Phase 2's migration to slot 010. Appendix D is updated to reflect the renumber (see changelog).
+
+### Dependencies on foundation themes
+
+Phase 2 cannot proceed until the following foundation items ship. Each dependency is named with its theme ID and the one-sentence reason it blocks Phase 2.
+
+**Theme 2 (observability) — hard dependencies.**
+- **obs-01** (N-CEN + ADV in `ingestion_manifest`) — Phase 2's admin dashboard queries `ingestion_manifest` for every pipeline. ADV and N-CEN refreshes must be manifest-backed before the UI can surface them.
+- **obs-02** (ADV freshness row + log) — ADV card on the admin dashboard reads `data_freshness` for the "Last run / Age / Status" fields; ADV currently has no freshness row.
+- **obs-03** (market `impact_id` allocation hardening) — Phase 2 amplifies concurrent impact_id inserts (9 new endpoints, per-tuple action logging across all three amendment strategies). The `_next_id` race must be centralized before that load arrives.
+- **obs-06** (13F loader `record_freshness`) — admin dashboard's 13F card reads `data_freshness`; load_13f's current stamp path needs verification.
+- **obs-10** (`quarterly-update` Makefile 13F-load step) — manual smoke path used by admin UI's first refresh; Makefile completeness is a prerequisite.
+
+**Theme 3 (migration discipline) — hard dependencies.**
+- **mig-01** (atomic promotes + extract `_mirror_manifest_and_impacts` helper to `pipeline/manifest.py`) — `SourcePipeline.promote()` delegates to the shared helper; it must exist before the base class can be written.
+- **mig-04** (`schema_versions` stamp hole) — Phase 2's migration 010 relies on `verify_migration_applied()` giving the right answer; the stamp-hole fix is upstream.
+- **mig-09 / mig-10 / mig-11** (schema-parity extension — L4, L0, CI wiring) — Phase 2 adds a new L0 control-plane table (`admin_preferences`) and column-adds three L3 tables. Parity gate must cover both scopes before the migration promotes.
+
+**Theme 4 (security) — hard dependencies.**
+- **sec-01** (admin token → server-side session) — Phase 2 adds 9 new admin endpoints on top of the 15 existing ones. The localStorage-persisted token path is too brittle to expand.
+- **sec-02** (`/run_script` TOCTOU race → `fcntl.flock` or manifest CAS) — Phase 2's "same pipeline cannot run twice simultaneously" invariant (design §11 concurrency) depends on a real lock, not `pgrep + Popen`.
+- **sec-03** (admin endpoint write-surface audit) — inventory of existing admin routes is a prerequisite to mounting 9 more cleanly.
+
+**Theme 1 (data integrity) — soft dependencies.**
+- **int-12** (INF28 securities.cusip formal PK) — blocks Phase 2's migration numbering claim on slot 009 (resolved by Phase 2 taking slot 010, see Migration numbering note above).
+- **int-14** (INF30 NULL-only merge mode) — Phase 2's `direct_write` strategy for market data may benefit from NULL-only semantics; coupled but not a hard blocker.
+
+**Theme 5 (ops) — soft dependencies.**
+- **ops-15** (MAINTENANCE.md §Refetch Pattern) — user-facing documentation of manual refetch coupled with admin UI refresh surface.
+
+### Phase 2 prerequisite status as of 2026-04-20
+
+**DONE:**
+- `ingestion_manifest` / `ingestion_impacts` / `data_freshness` / `pending_entity_resolution` tables live in prod (`731f4a0`, `2892009`, `54bfaad`, `831e5b4`).
+- `scripts/pipeline/manifest.py`, `discover.py`, `registry.py`, `shared.py` (`stamp_freshness` wrapper) — shipped.
+- `scripts/pipeline/protocol.py` — three structural Protocols shipped (awaiting ABC reconciliation decision).
+- `load_13f.py` in-place rewrite — checkpoint + freshness + dry-run + fail-fast (`8e7d5cb`, `14a5152`, `a58c107`).
+- `fetch_nport_v2.py` 4-mode orchestrator + DERA ZIP primary (`44bc98e`, `f02cefa`).
+- `fetch_ncen.py` freshness stamp (`54bfaad`).
+- `enrich_13dg.py` freshness guard (`54bfaad`).
+- `Makefile` — `freshness` / `status` / `quarterly-update` + `check_freshness.py` + `schema-parity-check` (`831e5b4`, `c4e802c`, `4ec0862`).
+- `docs/data_sources.md` moved from `Plans/` to `docs/` (`03db9ad`) — phase-12 prerequisite clear.
+- `FreshnessBadge` on all 11 tabs (`83836ee`, `3526757`).
+
+**IN FLIGHT (tracked as foundation theme items):**
+- obs-01, obs-02, obs-03, obs-06, obs-10 (Theme 2).
+- mig-01, mig-04, mig-09, mig-10, mig-11 (Theme 3).
+- sec-01, sec-02, sec-03 (Theme 4).
+
+**PENDING (Phase 2-native):**
+- `scripts/pipeline/base.py` — concrete SourcePipeline ABC with `run()`.
+- `scripts/pipeline/cadence.py` — file does not exist.
+- Migration 010 — three columns (`accession_number`, `is_latest`, `loaded_at`, `backfill_quality`) on `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2` + backfill with quality stats.
+- `queries.py` sweep — `WHERE is_latest=TRUE` on all 13F / N-PORT / 13D/G read sites.
+- 9 admin endpoints + `admin_preferences` table.
+- `load_13f_v2.py` formal extract to base class.
+- React: Admin status dashboard tab + Data Source tab.
+
+### Major Phase 2 components (at a glance)
+
+| Component | Target path | Status |
+|---|---|---|
+| SourcePipeline ABC + `run()` | `scripts/pipeline/base.py` (new) | PENDING |
+| Cadence config + probe fns | `scripts/pipeline/cadence.py` (new) | PENDING |
+| Admin preferences table | `scripts/migrations/010_pipeline_refresh_control_plane.py` (new) | PENDING (slot assignment post-int-12) |
+| Column-adds + backfill | same migration | PENDING |
+| 9 admin endpoints | `scripts/admin_bp.py` (extend) | PENDING |
+| Data Source tab | `web/react-app/src/tabs/DataSourceTab.tsx` (new) | PENDING |
+| Admin dashboard tab | `web/react-app/src/tabs/AdminRefreshTab.tsx` (new) | PENDING |
+| `load_13f_v2.py` | `scripts/load_13f_v2.py` (new) | PENDING |
+| queries.py `is_latest` sweep | `scripts/queries.py` | PENDING |
+
+### Open design questions (from design §14 + §15)
+
+- **§14 Migration execution order** — sequential (per-table, three promote cycles) vs single atomic transaction. Recommendation in doc: sequential. Re-confirm at Phase 2 kickoff.
+- **§4 Protocol vs ABC decision** — current `protocol.py` has three `typing.Protocol`s (`runtime_checkable`); design §4 calls for a single ABC with `run()` orchestrator. Must reconcile: retrofit existing Protocols to an ABC, or accept divergence. Decision gates the shape of every concrete pipeline refactor.
+- **§15 reviewer items 1-9** (9 targets) — staging-flow edge cases (partial fetch, resume-from-checkpoint, multi-scope), diff tier boundaries (1K / 100K), anomaly rule tightness, 24-hour retention window, SourcePipeline contract sufficiency, holdings_v2 "newest accession wins" heuristic on ~0.5% ambiguous rows, PIPELINE_CADENCE correctness, probe rate-limit under multi-session load, rollback guarantee sufficiency.
+
+### Recommended Phase 2 entry criteria
+
+Treat Phase 2 as **formally deferred** until:
+1. Every foundation-theme hard dependency above ships.
+2. `make smoke` + `validate_entities --prod` + `make schema-parity-check` + `make freshness` all green ("Milestone: Foundation complete" above).
+3. Migration slot collision resolved (int-12 at 009, Phase 2 at 010).
+4. Serge authorizes Phase 2 kickoff session (`prog-02` or equivalent).
+
+Phase 2 itself is 5-session scope minimum: base class + cadence + migration + admin endpoints + React tabs. Reviewer questions §15 will surface more.
 
 ---
 
@@ -310,7 +424,7 @@ Placeholder summary until the artifact is recovered:
 | audit-BLOCK-1 entity backfill | §3.1/§10.1 BLOCK-1 D-01/D-02 | — | "BLOCK-2 apply" commit 5b501fc | 1 | **CLOSED 5b501fc** | Audit's BLOCK-1 = commit's BLOCK-2 due to local numbering drift. |
 | audit-BLOCK-3 legacy-table writes | §3.1/§9.2 BLOCK-3 D-05 S-01 | — | "BLOCK-1" commit 12e172b | 4/2 | **CLOSED 12e172b** | Audit's BLOCK-3 = commit's BLOCK-1. |
 | audit-BLOCK-2 atomic promotes | §4.1 BLOCK-2 C-01 | — | — | 3 | **OPEN** mig-01 | Transaction wrap + helper extraction. |
-| audit-BLOCK-4 admin refresh | §10.3 BLOCK-4 | — | — | 3 | **BLOCKED** mig-05 | Design doc missing. |
+| audit-BLOCK-4 admin refresh | §10.3 BLOCK-4 | — | `docs/admin_refresh_system_design.md` | Phase 2 | **UNBLOCKED** (2026-04-20) → Phase 2 | Design doc recovered `03db9ad`. Subsumed into full Phase 2 workstream. |
 | audit-MAJOR-4 compute_flows atomicity | §4.1 MAJOR-4 C-08 | — | Batch 3 close 87ee955 | — | **LIKELY CLOSED 87ee955** | Violation doc marked CLEARED 7ac96b7; atomicity specifically needs verification. |
 | BLOCK-PCT-OF-SO-PERIOD-ACCURACY | — | INF38 ancestor | REWRITE_PCT_OF_SO_PERIOD_ACCURACY | — | **CLOSED** bee49ff + ea4ae99 + multiple | Migration 008 + Pass B rewrite + live smoke shipped. |
 | BLOCK-SCHEMA-DIFF | — | INF39 | BLOCK_SCHEMA_DIFF_FINDINGS | — | **CLOSED** f22312e | L3 canonical parity live; L4/L0/CI extensions deferred to mig-09/10/11. |
@@ -329,7 +443,7 @@ Placeholder summary until the artifact is recovered:
 | Stage 5 legacy-tables drop | §9.2 | — | data_layers.md §8 | — | **CLOSED** 305739e, 7247689 | 3 legacy tables dropped; writers repointed. |
 | React Phase 4 cut over | — | — | REACT_MIGRATION.md | — | **CLOSED** (2026-04-13) | FastAPI + React build prereq live. |
 | DIAG-Ambiguous (obs-13) | — | INF42 | post-merge | 2 | **AMBIGUOUS** | Live dist verification pending. |
-| mig-05 admin refresh | §10.3 | — | — | 3 | **AMBIGUOUS (BLOCKED)** | Upstream design doc missing. |
+| mig-05 admin refresh | §10.3 | — | `docs/admin_refresh_system_design.md` | Phase 2 | **SUPERSEDED** by Phase 2 | Design doc recovered `03db9ad` (prog-01); item subsumed into full Phase 2 scope. Renumber migration to slot 010 (int-12 holds 009). |
 | ops-18 rotating audit schedule | — | — | — | 5 | **AMBIGUOUS (BLOCKED)** | Referenced file not found. |
 
 ---
@@ -413,7 +527,9 @@ Lookup table for parallel-scheduling decisions. Each row is a source file; colum
 | `scripts/migrations/007_override_new_value_nullable.py` | ops-12 |
 | `scripts/migrations/add_last_refreshed_at.py` | mig-04 |
 | `scripts/migrations/009_securities_cusip_pk.py` (new) | int-12 |
-| `scripts/migrations/009_pipeline_refresh_control_plane.py` (new, Phase 2) | mig-05 |
+| `scripts/migrations/010_pipeline_refresh_control_plane.py` (new, Phase 2) | Phase 2 kickoff (was mig-05 at slot 009 — renumbered post-doc-recovery to avoid int-12 collision) |
+| `scripts/pipeline/base.py` (new, Phase 2) | Phase 2 kickoff |
+| `scripts/pipeline/cadence.py` (new, Phase 2) | Phase 2 kickoff |
 | `scripts/normalize_securities.py` | int-04, int-06 |
 | `scripts/pipeline/cusip_classifier.py` | int-02, int-23 |
 | `scripts/pipeline/manifest.py` | mig-01, obs-03, obs-04 |
@@ -459,3 +575,4 @@ Lookup table for parallel-scheduling decisions. Each row is a source file; colum
 ## Changelog
 
 - **2026-04-20** — Initial consolidation. 47 INF items mapped, 21 INF items retroactively confirmed CLOSED with commit citations. 41 audit items distributed across 5 themes. 5 post-audit items incorporated (INF39-47 + post-merge diagnostic suite + DOC_UPDATE_PROPOSAL + PRECHECK). 2 items BLOCKED pending upstream doc recovery (mig-05, ops-18). Batch 1 parallel-safe seed identified: Themes 2+4+5 subsets. Themes 1 and 3 deferred to Batch 2 to eliminate shared-file risk on `scripts/pipeline/shared.py` and `scripts/promote_*.py`.
+- **2026-04-20 (prog-01)** — Phase 2 placeholder replaced with full scope folded from recovered `docs/admin_refresh_system_design.md` v3.2 (moved from `Plans/` by `03db9ad`). Full dependency graph captured: 5 Theme-2 items, 5 Theme-3 items, 3 Theme-4 items as hard Phase 2 prerequisites, plus 2 Theme-1 and 1 Theme-5 soft deps. mig-05 reclassified from BLOCKED to SUPERSEDED-by-Phase-2. Migration slot collision surfaced: Phase 2 migration renumbered 008 → 010 (not 009; int-12 owns 009 for securities.cusip PK). `docs/data_sources.md` referenced from Phase 2 scope (rendered by Data Source UI tab per design §9). Appendix D updated with three new file entries (`base.py`, `cadence.py`, migration 010). No new foundation-theme items surfaced — all Phase 2 prerequisites were already captured in Themes 1-5. Rescan of 72 repo `.md` files found no additional scope-carrying docs; one minor note: `web/README_deploy.md` may be a stale duplicate of root `README_deploy.md` (ops-05 already tracks root).
