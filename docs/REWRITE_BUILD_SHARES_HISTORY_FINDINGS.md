@@ -353,6 +353,20 @@ cannot wait for the follow-up block) before Phase 1.
 
 ## 3.2.1 — Downstream readers survey
 
+**Follow-up status: DONE 2026-04-19.** The period-accurate
+`pct_of_float` follow-up flagged in §3.2 (Option C deferred to its own
+design pass) was addressed by the **pct-of-so workstream**
+(merged `8925347`, follow-on `12e172b`). Forward-link:
+[`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`](REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md)
+— see that doc's §4 (three-tier denominator design) and §14.10
+(terminology rename `pct_of_float → pct_of_so` + `pct_of_so_source`
+audit column). Migration 008 (`ea4ae99` amended) landed the rename +
+audit column; `enrich_holdings.py` Pass B now runs SOH ASOF with the
+three-tier fallback (`soh_period_accurate` → `market_data_so_latest`
+→ `market_data_float_latest`). True float-adjusted denominator
+(public-float-based, distinct from shares-outstanding) remains deferred
+as **INF38 / BLOCK-FLOAT-HISTORY** per `docs/DEFERRED_FOLLOWUPS.md`.
+
 Amendment 2026-04-19 — read-only grep pass for every consumer of
 `holdings.pct_of_float` and `holdings_v2.pct_of_float`.
 

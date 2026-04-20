@@ -3,7 +3,7 @@
 Single index of open INF## items awaiting a batched doc-update session or
 dedicated fix block. Source of truth for the next doc-update session.
 
-Last refreshed: 2026-04-19 (`block/schema-diff-inf39` Phase 1 close).
+Last refreshed: 2026-04-19 (doc-sync post-INF39 + pct-of-so; branch `doc/sync-post-schema-diff`).
 
 ## Open items
 
@@ -18,12 +18,12 @@ Last refreshed: 2026-04-19 (`block/schema-diff-inf39` Phase 1 close).
 | INF31 | BLOCK-MARKET-DATA-WRITER-CONVENTION — `fetch_date` discipline | `ROADMAP.md` §Open items | Low | Open |
 | INF32 | BLOCK-QUARTERLY-UPDATE-INTEGRITY — missing 13F load step | `ROADMAP.md` §Open items | Medium | Open |
 | INF33 | BLOCK-CI-ACTIONS-NODE20-DEPRECATION | `ROADMAP.md` §Open items | Low | Open |
-| INF34 | `queries.py` `rollup_type` filter missing on `summary_by_parent` / `investor_flows` reads | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 addendum; `ROADMAP.md` §Open items | Low | **CLEARED 2026-04-19** |
+| INF34 | `queries.py` `rollup_type` filter missing on `summary_by_parent` / `investor_flows` reads | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 addendum; `ROADMAP.md` §Open items | Low | **CLEARED 2026-04-19 (`62ad0eb`)** |
 | INF35 | f-string interpolation refinement in `build_summaries.py` | `ROADMAP.md` §Open items; `docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md` | Low | Open |
 | INF36 | NULL `top10_*` placeholders in `summary_by_parent` | `ROADMAP.md` §Open items; `docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md` | Low | Open |
 | INF37 | `backfill_manager_types` residual — 9 entities / 14,368 rows | `ROADMAP.md` §Open items | Low | Open (standing curation) |
 | INF38 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_float` | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 | Low-Medium | Open |
-| INF39 | BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE — pre-flight schema diff | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10; `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` §13 | Medium | **Implementation complete 2026-04-19; pending Serge merge sign-off** |
+| INF39 | BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE — pre-flight schema diff | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10; `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` §13 | Medium | **CLEARED 2026-04-19 (`f22312e` — merge of `block/schema-diff-inf39`)** |
 | INF40 | BLOCK-L3-SURROGATE-ROW-ID — stable surrogate PK for rollback | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.5 / §14.11.4 | Medium | Open |
 | INF41 | BLOCK-READ-SITE-INVENTORY-DISCIPLINE — mechanically exhaustive rename sweep | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.11.4 / §14.11.5 | Medium | Open |
 | INF42 | BLOCK-DERIVED-ARTIFACT-HYGIENE — stale dist/fixture detection | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 addendum | Medium | Open (new 2026-04-19) |
@@ -41,7 +41,7 @@ session must apply:
 
 | Item | Source | Target session |
 |------|--------|---------------|
-| `validate_entities` baseline header correction: 8/1/7 → 8/2/6 | `ROADMAP.md` current-state header; `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 | Next batched doc-update |
+| `validate_entities` baseline header correction: 8/1/7 → 8/2/6 | `ROADMAP.md` current-state header; `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.10 | **APPLIED 2026-04-19** across `ROADMAP.md` + `docs/NEXT_SESSION_CONTEXT.md` in doc-sync session (branch `doc/sync-post-schema-diff`) |
 | Rename historical references `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` | Various docs (findings, NEXT_SESSION_CONTEXT, etc.) | Next batched doc-update |
 | `pct_of_float` terminology retired across project; `pct_of_so` is canonical going forward | `ROADMAP.md`; `docs/canonical_ddl.md` (rename DDL block); `docs/pipeline_inventory.md` (enrich_holdings Pass B) | Next batched doc-update |
 | `docs/data_layers.md` §7: add `pct_of_so_source` as Class B audit column | `docs/data_layers.md` §7 | Next batched doc-update |

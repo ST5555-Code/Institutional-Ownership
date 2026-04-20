@@ -69,12 +69,20 @@ their own migrations.
 ```
 accession_number, cik, manager_name, crd_number, inst_parent_name,
 quarter, report_date, cusip, ticker, issuer_name, security_type,
-market_value_usd, shares, pct_of_portfolio, pct_of_float, manager_type,
+market_value_usd, shares, pct_of_portfolio, pct_of_so, manager_type,
 is_passive, is_activist, discretion, vote_sole, vote_shared, vote_none,
 put_call, market_value_live, security_type_inferred, fund_name,
 classification_source, entity_id, rollup_entity_id, rollup_name,
-entity_type, dm_rollup_entity_id, dm_rollup_name
+entity_type, dm_rollup_entity_id, dm_rollup_name, pct_of_so_source
 ```
+
+_2026-04-19: `pct_of_float` renamed to `pct_of_so` via migration 008
+(`ea4ae99` amended). Added `pct_of_so_source VARCHAR` audit column in
+the same migration — three-tier domain: `soh_period_accurate` (SOH ASOF
+lookup), `market_data_so_latest` (fallback to latest `shares_outstanding`),
+`market_data_float_latest` (last-resort fallback to latest `float_shares`).
+Canonical DDL block above reflects the 35-column post-migration shape.
+Terminology: `pct_of_float` is retired; `pct_of_so` is the canonical name._
 
 **Owner-script INSERT columns (`load_13f.py:222` — `CREATE TABLE holdings AS`):**
 
@@ -82,13 +90,14 @@ entity_type, dm_rollup_entity_id, dm_rollup_name
 (line 222 — `CREATE TABLE holdings AS`). After Stage 5 cleanup (commit
 `305739e`) the target table was renamed to `holdings_v2` and enrichment
 columns (entity_id, rollup_entity_id, manager_type, market_value_live,
-pct_of_float, etc.) were added. The owner script was not updated.
+pct_of_so [was pct_of_float pre-migration 008], pct_of_so_source, etc.)
+were added. The owner script was not updated.
 
 **Column diff:**
 - **In prod, not in owner script:** 13 columns — `entity_id`,
   `rollup_entity_id`, `rollup_name`, `entity_type`, `dm_rollup_entity_id`,
   `dm_rollup_name`, `manager_type`, `is_passive`, `is_activist`,
-  `market_value_live`, `pct_of_float`, `security_type_inferred`,
+  `market_value_live`, `pct_of_so` (was `pct_of_float`), `pct_of_so_source`, `security_type_inferred`,
   `classification_source`.
 - **In owner script, not in prod:** none relevant (legacy CTAS is
   broader but we ignore the dropped table).
@@ -408,3 +417,49 @@ Per the v1.2 pipeline plan:
 |---|--------|------|-------|
 | 001 | `scripts/migrations/001_pipeline_control_plane.py` | 2026-04-13 | adds L0 control plane tables (`ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`), confirms `data_freshness`, creates `ingestion_manifest_current` VIEW. Applied to staging (v1.2 framework session) then prod (Batch 1). |
 | — | (`002_resolve_l3_ddl_drift.py`) | **not created** | **Not needed.** Prod L3 schemas already contain every column the owner scripts reference. The remediation path is script rewrites (tracked in `docs/pipeline_inventory.md`), not schema migration. |
+| 008 | `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` (amended `ea4ae99`) | 2026-04-19 | **pct-of-so workstream.** RENAME `holdings_v2.pct_of_float → pct_of_so`; ADD `pct_of_so_source VARCHAR` audit column. Uses the capture-and-recreate idiom (see below) because the column carries indexes that a DuckDB in-place RENAME cannot preserve. Staging rebuild tracked via `d0e5f45` (INF39 rebuild verifying staging schema parity after the rename). Amended from the original migration 008 draft to bundle the audit column and the three-tier source domain documentation. |
+
+---
+
+## Migration patterns — index-preserving RENAME (capture-and-recreate)
+
+**Problem:** DuckDB's `ALTER TABLE ... RENAME COLUMN` does not preserve
+indexes that reference the renamed column — the index silently drops
+and downstream queries regress on first read. Any RENAME on an
+index-bearing L3 table must therefore snapshot the index set, drop,
+rename, and rebuild.
+
+**Idiom:**
+
+```sql
+-- 1. Snapshot the index DDL for the target table
+SELECT index_name, sql
+FROM duckdb_indexes()
+WHERE table_name = 'holdings_v2';
+
+-- 2. Drop each index (preserve the captured DDL strings)
+DROP INDEX IF EXISTS idx_holdings_v2_foo;
+-- ... repeat for every index ...
+
+-- 3. RENAME the column (or run the column-bearing ALTER)
+ALTER TABLE holdings_v2 RENAME COLUMN pct_of_float TO pct_of_so;
+ALTER TABLE holdings_v2 ADD COLUMN pct_of_so_source VARCHAR;
+
+-- 4. Recreate each index from the captured DDL
+CREATE INDEX idx_holdings_v2_foo ON holdings_v2(...);
+-- ... repeat ...
+```
+
+**When to apply:** any DDL mutation that touches an indexed column on
+an L3 canonical table. Forgetting step 4 is a silent read-path
+regression; forgetting step 1 is unrecoverable without `information_schema`
+archaeology.
+
+**Precedents:** `ea4ae99` (migration 008 amended — `pct_of_float → pct_of_so`
++ `pct_of_so_source`), `d0e5f45` (INF39 staging rebuild — verifies
+index inventory parity post-capture-and-recreate via
+`scripts/pipeline/validate_schema_parity.py`).
+
+**Related:** INF40 (stable L3 surrogate row-ID) would allow a replay-based
+migration mode as an alternative to capture-and-recreate; for now
+capture-and-recreate is the standard. See `docs/DEFERRED_FOLLOWUPS.md`.

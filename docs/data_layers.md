@@ -526,6 +526,21 @@ filing is stamped. The stamp then drifts. Examples:
 `fund_holdings_v2.ticker`, `fund_holdings_v2.entity_id`, and (if ever
 added) `lei`. These are the problem columns.
 
+**Class B — audit-stamp variant.** A handful of Class B columns stamp
+not a current mapping but the *provenance* of an adjacent column. They
+still sit in the drift-risk class because the provenance is only
+meaningful while the adjacent derived value was computed — a
+re-enrichment can change both simultaneously. `holdings_v2.pct_of_so_source`
+is the canonical example: three-tier audit over the `pct_of_so`
+denominator resolution — `soh_period_accurate` (SOH ASOF lookup hit),
+`market_data_so_latest` (fallback to latest `shares_outstanding`), or
+`market_data_float_latest` (last-resort fallback to latest
+`float_shares`). Added 2026-04-19 via migration 008 (`ea4ae99` amended)
+alongside the `pct_of_float → pct_of_so` rename; written by
+`enrich_holdings.py` Pass B. Carrying table: `holdings_v2`. Retirement
+path: follows the `pct_of_so` column itself — if `pct_of_so` ever becomes
+a read-time join, the source stamp comes along.
+
 **Principle.** Class B columns should be joins, not stamps — resolved
 at read time against the current canonical source. Class A columns stay
 denormalized.

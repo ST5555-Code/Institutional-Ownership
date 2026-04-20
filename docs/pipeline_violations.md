@@ -381,9 +381,18 @@ at `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md`:
 - Silent-continue on empty history replaced with explicit log +
   propagated exit status.
 
-Deferred: period-accurate `pct_of_float` via ASOF JOIN in
-`enrich_holdings.py` Pass B tracked separately as
-**BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY** (see ROADMAP).
+Deferred: period-accurate denominator via ASOF JOIN in
+`enrich_holdings.py` Pass B — **CLOSED 2026-04-19** as the pct-of-so
+workstream. Ships as `pct_of_so` (renamed from `pct_of_float` in
+migration 008, `ea4ae99` amended) with three-tier SOH-ASOF fallback
+(`soh_period_accurate` → `market_data_so_latest` → `market_data_float_latest`)
+and `pct_of_so_source` audit column. Commit citations: Phase 1b read-site
+migration + Phase 1c audit-column split + Phase 4b amended migration +
+Phase 4c rename sweep; merge `8925347` + follow-on `12e172b`. See
+`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`. Original
+BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY row also closed in ROADMAP Open Items.
+True float-adjusted denominator (public-float-based, distinct from
+shares-outstanding) tracked separately as **INF38 / BLOCK-FLOAT-HISTORY**.
 
 Original violations retained below for historical reference.
 
