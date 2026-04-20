@@ -1,15 +1,26 @@
 """
-INF12: Admin router for /api/admin/* endpoints (FastAPI).
+sec-01: Admin router for /api/admin/* endpoints (FastAPI).
 
 All routes on this router require ENABLE_ADMIN=1 and ADMIN_TOKEN set in
-env, plus an `X-Admin-Token` header matching ADMIN_TOKEN on every request.
+env. Authentication is cookie-based via `admin_session` — a server-side
+row in `admin_sessions` addressed by a UUID4. The login endpoint
+verifies the env ADMIN_TOKEN with hmac.compare_digest, issues a session
+row, and sets the cookie.
+
+Idle timeout: 30 min. Absolute timeout: 8 h. Cookie attributes:
+HttpOnly, SameSite=Strict, Path=/api/admin, Max-Age=28800s, Secure iff
+the request is over HTTPS.
 
 When ENABLE_ADMIN or ADMIN_TOKEN is unset, every route returns 503
-"Admin disabled". When the header is missing or wrong, returns 403.
-Token comparison uses hmac.compare_digest for timing-safe checking.
+"Admin disabled". When the session cookie is missing, expired, revoked,
+or idle past 30 min, returns 401. When a wrong token is presented to
+/api/admin/login, returns 403.
 
-Name retained as `admin_bp.py` for git history continuity even though the
-exported symbol is now an APIRouter (`admin_router`).
+See docs/findings/sec-01-p0-findings.md for the full design; migration
+009_admin_sessions.py creates the backing table.
+
+Name retained as `admin_bp.py` for git history continuity even though
+the exported symbol is now an APIRouter (`admin_router`).
 """
 from __future__ import annotations
 
@@ -19,14 +30,17 @@ import io as _io
 import logging
 import os
 import re
+import secrets as _secrets
 import subprocess  # nosec B404
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 
 import duckdb
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from config import LATEST_QUARTER, PREV_QUARTER
+from db import PROD_DB
 from queries import clean_for_json, df_to_records
 
 log = logging.getLogger(__name__)
@@ -53,29 +67,227 @@ def init_admin_bp(get_db_fn, has_table_fn):
     _has_table = has_table_fn
 
 
-def require_admin_token(x_admin_token: str = Header(None, alias='X-Admin-Token')) -> None:
-    """INF12: Token-gate dependency for every admin endpoint.
+# Session lifetimes (seconds).
+SESSION_IDLE_TIMEOUT = 1800        # 30 min idle cap
+SESSION_ABSOLUTE_TIMEOUT = 28800   # 8 h absolute cap
+SESSION_COOKIE_NAME = 'admin_session'
+SESSION_COOKIE_PATH = '/api/admin'
+_LOGIN_PATH = '/api/admin/login'
+_UA_MAX_LEN = 512
 
-    503 if ENABLE_ADMIN or ADMIN_TOKEN unset. 403 on bad/missing header.
-    Timing-safe via hmac.compare_digest.
+
+def _env_admin_enabled() -> bool:
+    return (
+        os.environ.get('ENABLE_ADMIN') == '1'
+        and bool(os.environ.get('ADMIN_TOKEN'))
+    )
+
+
+def _client_ip(request: Request) -> str | None:
+    fwd = request.headers.get('x-forwarded-for')
+    if fwd:
+        # First hop; strip whitespace. We do not log or expose this beyond
+        # the audit row in admin_sessions.
+        return fwd.split(',')[0].strip() or None
+    client = request.client
+    return client.host if client else None
+
+
+def _session_db() -> duckdb.DuckDBPyConnection:
+    """Read-write connection for admin_sessions ops (see findings §5/§6)."""
+    return duckdb.connect(PROD_DB, read_only=False)
+
+
+def _sweep_expired(con: duckdb.DuckDBPyConnection) -> None:
+    """Opportunistic cleanup — delete expired rows and long-revoked rows.
+
+    Called at ~1% sample rate from require_admin_session. Kept cheap: the
+    index on expires_at covers the first predicate; the revoked_at filter
+    is a table-scan tail but applies to a narrow set in practice.
     """
-    if os.environ.get('ENABLE_ADMIN') != '1' or not os.environ.get('ADMIN_TOKEN'):
+    con.execute(
+        """
+        DELETE FROM admin_sessions
+         WHERE expires_at < NOW()
+            OR (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL 7 DAY)
+        """
+    )
+
+
+def require_admin_session(request: Request) -> None:
+    """sec-01: Session-cookie dependency for every admin endpoint.
+
+    503 if ENABLE_ADMIN or ADMIN_TOKEN unset.
+    401 on missing / expired / revoked / idle-timeout session cookie.
+
+    The /api/admin/login path is exempt from the session check so that
+    unauthenticated clients can obtain a session. Login still enforces
+    the env gate and performs its own hmac.compare_digest against the
+    presented token.
+    """
+    if not _env_admin_enabled():
         raise HTTPException(status_code=503, detail={'error': 'Admin disabled'})
-    provided = x_admin_token or ''
-    expected = os.environ['ADMIN_TOKEN']
-    if not hmac.compare_digest(provided, expected):
-        raise HTTPException(status_code=403, detail={'error': 'Forbidden'})
+
+    if request.url.path == _LOGIN_PATH:
+        return
+
+    sid = request.cookies.get(SESSION_COOKIE_NAME)
+    if not sid:
+        raise HTTPException(status_code=401, detail={'error': 'No admin session'})
+
+    con = _session_db()
+    try:
+        row = con.execute(
+            """
+            SELECT issued_at, expires_at, last_used_at, revoked_at
+              FROM admin_sessions
+             WHERE session_id = ?
+               AND revoked_at IS NULL
+            """,
+            [sid],
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=401, detail={'error': 'Invalid session'})
+        _issued_at, expires_at, last_used_at, _revoked_at = row
+
+        now = datetime.now()
+        if expires_at < now:
+            raise HTTPException(status_code=401, detail={'error': 'Session expired'})
+        if now - last_used_at > timedelta(seconds=SESSION_IDLE_TIMEOUT):
+            raise HTTPException(status_code=401, detail={'error': 'Session idle'})
+
+        con.execute(
+            "UPDATE admin_sessions SET last_used_at = NOW() WHERE session_id = ?",
+            [sid],
+        )
+
+        # ~1% opportunistic sweep.
+        if _secrets.randbelow(100) == 0:
+            try:
+                _sweep_expired(con)
+            except Exception as e:  # pylint: disable=broad-except
+                log.debug("session sweep: %s", e)
+    finally:
+        con.close()
 
 
 admin_router = APIRouter(
     prefix='/api/admin',
     tags=['admin'],
-    dependencies=[Depends(require_admin_token)],
+    dependencies=[Depends(require_admin_session)],
 )
 
 # Backwards-compat alias: app.py used to import `admin_bp` + `init_admin_bp`.
 # Keep the name exported so old imports don't break mid-migration.
 admin_bp = admin_router
+
+
+# ---------------------------------------------------------------------------
+# sec-01: Session lifecycle — login / logout / logout_all
+# ---------------------------------------------------------------------------
+
+
+def _set_session_cookie(response: Response, session_id: str, *, secure: bool) -> None:
+    """Attach the admin_session cookie — HttpOnly, SameSite=Strict, path-scoped."""
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        max_age=SESSION_ABSOLUTE_TIMEOUT,
+        path=SESSION_COOKIE_PATH,
+        httponly=True,
+        secure=secure,
+        samesite='strict',
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value='',
+        max_age=0,
+        path=SESSION_COOKIE_PATH,
+        httponly=True,
+        secure=False,
+        samesite='strict',
+    )
+
+
+@admin_router.post('/login')
+def api_admin_login(request: Request, response: Response, body: dict = Body(default={})):
+    """Verify ADMIN_TOKEN and issue an admin_session cookie.
+
+    Exempt from require_admin_session (the dep short-circuits on this
+    path). The env gate is still enforced here explicitly.
+    """
+    if not _env_admin_enabled():
+        raise HTTPException(status_code=503, detail={'error': 'Admin disabled'})
+
+    provided = (body or {}).get('token') or ''
+    expected = os.environ['ADMIN_TOKEN']
+    if not hmac.compare_digest(provided, expected):
+        raise HTTPException(status_code=403, detail={'error': 'Forbidden'})
+
+    sid = str(uuid.uuid4())
+    now = datetime.now()
+    expires_at = now + timedelta(seconds=SESSION_ABSOLUTE_TIMEOUT)
+    ua = (request.headers.get('user-agent') or '')[:_UA_MAX_LEN]
+    ip = _client_ip(request)
+
+    con = _session_db()
+    try:
+        con.execute(
+            """
+            INSERT INTO admin_sessions
+              (session_id, issued_at, expires_at, last_used_at, ip, user_agent, revoked_at)
+            VALUES (?, ?, ?, ?, ?, ?, NULL)
+            """,
+            [sid, now, expires_at, now, ip, ua],
+        )
+    finally:
+        con.close()
+
+    _set_session_cookie(response, sid, secure=(request.url.scheme == 'https'))
+    return {'status': 'ok'}
+
+
+@admin_router.post('/logout')
+def api_admin_logout(request: Request, response: Response):
+    """Revoke the caller's session. Idempotent."""
+    sid = request.cookies.get(SESSION_COOKIE_NAME)
+    if sid:
+        con = _session_db()
+        try:
+            con.execute(
+                """
+                UPDATE admin_sessions
+                   SET revoked_at = NOW()
+                 WHERE session_id = ?
+                   AND revoked_at IS NULL
+                """,
+                [sid],
+            )
+        finally:
+            con.close()
+    _clear_session_cookie(response)
+    return {'status': 'ok'}
+
+
+@admin_router.post('/logout_all')
+def api_admin_logout_all(response: Response):
+    """Revoke every active admin session. Clears the caller's cookie."""
+    con = _session_db()
+    try:
+        pre = con.execute(
+            "SELECT COUNT(*) FROM admin_sessions WHERE revoked_at IS NULL"
+        ).fetchone()
+        con.execute(
+            "UPDATE admin_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL"
+        )
+    finally:
+        con.close()
+    _clear_session_cookie(response)
+    count = int(pre[0]) if pre and pre[0] is not None else 0
+    return {'status': 'ok', 'revoked': count}
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +302,6 @@ def api_add_ticker(body: dict = Body(default={})):
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker'})
 
-    from db import PROD_DB  # pylint: disable=import-outside-toplevel
     results = {'ticker': ticker, 'steps': []}
 
     try:
