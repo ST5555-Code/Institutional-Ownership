@@ -367,6 +367,19 @@ purposes (what the audit cares about here) all columns match. Verdict:
 ALIGNED. The constraint-laxness is documented, tracked separately, and
 out of scope for this audit.
 
+**Migration 007 note** (`scripts/migrations/007_override_new_value_nullable.py`):
+dropped NOT NULL from `entity_overrides_persistent.new_value` on 2026-04-17
+to accommodate NULL-target rows (sub-adviser entities with no CIK in
+MDM; INF9d source-side precedent). Rows with `new_value IS NULL` are
+**intentionally skipped by `replay_persistent_overrides()`** during
+`build_entities.py --reset` — the override effect is applied at write
+time against `entity_rollup_history` / `entity_relationships`, so the
+row is purely audit metadata for replay purposes. Monitoring gates that
+compare override-row count to replay-apply count must filter
+`WHERE new_value IS NOT NULL` or they will false-positive on every
+NULL-target row. See the migration 007 docstring for the full
+invariant.
+
 ---
 
 ## 18. `managers` (L4) — ALIGNED (CTAS)

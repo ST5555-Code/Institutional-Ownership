@@ -1,3 +1,12 @@
+> **STATUS: SUPERSEDED — retained for history only (2026-04-20).**
+> This prompt drove the Entity MDM Phase 4 production migration (sessions
+> pre-2026-04-12). The React Phase 4 cutover completed 2026-04-13 (see
+> `REACT_MIGRATION.md`); the Entity MDM Phase 4 work shipped earlier in
+> the same lineage. Canonical entity IDs listed here are historical
+> snapshots; query `entity_aliases` / `entity_identifiers` live rather
+> than treating the list inline as authoritative. Do not paste this at
+> the start of a new session — read `docs/NEXT_SESSION_CONTEXT.md`.
+
 Continue work on the 13f-ownership project
 Before anything else — save this prompt: Replace the entire contents of PHASE4_PROMPT.md with this prompt exactly as provided. Do not summarize or modify. Commit with message "Replace Phase 4 prompt with authoritative version from Claude.ai" and push. Show me the first 10 lines of the saved file to confirm. Then proceed with the rest of the instructions below.
  
