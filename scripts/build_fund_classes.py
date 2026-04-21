@@ -18,7 +18,13 @@ import duckdb
 from lxml import etree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from db import get_db_path, record_freshness, set_staging_mode  # noqa: E402
+from db import (  # noqa: E402
+    get_db_path,
+    is_staging_mode,
+    record_freshness,
+    seed_staging,
+    set_staging_mode,
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
@@ -81,6 +87,51 @@ def parse_xml_for_classes(xml_path):
     }, series_lei, reg_lei
 
 
+def enrich_fund_holdings_v2(con):
+    """ALTER + UPDATE fund_holdings_v2 with LEI data from lei_reference.
+
+    Split out of the builder path so --enrichment-only can invoke it in
+    isolation — same shape as build_managers.enrich_holdings_v2. This
+    mutates a ~9.3M-row prod surface and must never run against staging
+    (see sec-05-p0-findings.md §6 Risk 3: staging schema would diverge
+    from prod). `--staging` callers skip this step; the three-step flow
+    is: build --staging → promote → --enrichment-only against prod.
+    """
+    # ALTER is idempotent — try/except guards the re-run case where the
+    # column already exists.
+    try:
+        con.execute("ALTER TABLE fund_holdings_v2 ADD COLUMN lei VARCHAR")
+        print("  Added lei column to fund_holdings_v2")
+    except Exception:
+        pass
+
+    con.execute("""
+        UPDATE fund_holdings_v2
+        SET lei = lr.lei
+        FROM lei_reference lr
+        WHERE fund_holdings_v2.series_id = lr.series_id
+          AND fund_holdings_v2.lei IS NULL
+    """)
+    updated_lei = con.execute(
+        "SELECT COUNT(*) FROM fund_holdings_v2 WHERE lei IS NOT NULL"
+    ).fetchone()[0]
+    print(f"fund_holdings_v2 with LEI: {updated_lei:,}")
+    return updated_lei
+
+
+def run_enrichment_only():
+    """Post-promote enrichment: update prod fund_holdings_v2.lei from the
+    already-promoted prod lei_reference. Mirrors the build_managers.py
+    --enrichment-only flow."""
+    con = duckdb.connect(get_db_path())
+    try:
+        enrich_fund_holdings_v2(con)
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
+    print("\nDone.")
+
+
 def run():
     con = duckdb.connect(get_db_path())
     create_tables(con)
@@ -138,26 +189,11 @@ def run():
 
     con.execute("CHECKPOINT")
 
-    # Also add LEI to fund_holdings_v2 table if not already present.
-    # Repointed from legacy `fund_holdings` in BLOCK-3 (audit §10 / Pass 2
-    # §2). ALTER is wrapped in try/except for idempotency on re-run.
-    try:
-        con.execute("ALTER TABLE fund_holdings_v2 ADD COLUMN lei VARCHAR")
-        print("  Added lei column to fund_holdings_v2")
-    except Exception:
-        pass
-
-    # Update fund_holdings_v2.lei from lei_reference
-    con.execute("""
-        UPDATE fund_holdings_v2
-        SET lei = lr.lei
-        FROM lei_reference lr
-        WHERE fund_holdings_v2.series_id = lr.series_id
-          AND fund_holdings_v2.lei IS NULL
-    """)
-    updated_lei = con.execute(
-        "SELECT COUNT(*) FROM fund_holdings_v2 WHERE lei IS NOT NULL"
-    ).fetchone()[0]
+    # fund_holdings_v2.lei enrichment runs only against prod. Staging
+    # skips it — the prod-surface UPDATE belongs in --enrichment-only,
+    # invoked after promote_staging.py lands lei_reference in prod.
+    if not is_staging_mode():
+        enrich_fund_holdings_v2(con)
 
     # Summary
     total_classes = con.execute("SELECT COUNT(*) FROM fund_classes").fetchone()[0]
@@ -170,7 +206,6 @@ def run():
     print(f"Fund classes: {total_classes} (new: {classes_added})")
     print(f"Unique series with classes: {unique_series}")
     print(f"LEI references: {total_leis} (new: {leis_added})")
-    print(f"fund_holdings_v2 with LEI: {updated_lei:,}")
 
     # Test: Fidelity Contrafund classes
     fc = con.execute("""
@@ -186,7 +221,11 @@ def run():
 
     try:
         con.execute("CHECKPOINT")
-        record_freshness(con, "fund_classes")
+        # Freshness is stamped only when writing directly to prod. In
+        # --staging the stamp is deferred until promote_staging.py
+        # commits the new rows to prod (sec-05-p0-findings.md §3).
+        if not is_staging_mode():
+            record_freshness(con, "fund_classes")
     except Exception as e:
         print(f"  [warn] record_freshness(fund_classes) failed: {e}", flush=True)
     con.close()
@@ -194,7 +233,9 @@ def run():
 
 
 def _parse_args() -> argparse.Namespace:
-    """CLI parser — `--staging` redirects the write target to the staging DB."""
+    """CLI parser — `--staging` redirects the write target to the staging DB.
+    `--enrichment-only` runs only the fund_holdings_v2.lei ALTER + UPDATE
+    against prod (used after promote_staging.py lands lei_reference)."""
     parser = argparse.ArgumentParser(
         description=("Extract share-class + LEI data from cached N-PORT XMLs "
                      "into fund_classes / lei_reference / "
@@ -202,11 +243,29 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--staging", action="store_true",
                         help="Write to staging DB instead of prod.")
+    parser.add_argument(
+        "--enrichment-only", action="store_true",
+        help=(
+            "Skip the XML parse + fund_classes/lei_reference writes and "
+            "only run the fund_holdings_v2.lei ALTER + UPDATE against "
+            "prod. Used in the three-step flow: build --staging → "
+            "promote_staging.py → --enrichment-only."
+        ),
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     _args = _parse_args()
+    if _args.staging and _args.enrichment_only:
+        raise SystemExit(
+            "ERROR: --staging and --enrichment-only are mutually exclusive. "
+            "The enrichment step mutates prod fund_holdings_v2."
+        )
     if _args.staging:
         set_staging_mode(True)
-    run()
+        seed_staging()
+    if _args.enrichment_only:
+        run_enrichment_only()
+    else:
+        run()

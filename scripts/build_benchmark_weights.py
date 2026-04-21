@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import duckdb  # noqa: E402
-from db import get_db_path, set_staging_mode  # noqa: E402
+from db import get_db_path, seed_staging, set_staging_mode  # noqa: E402
 from config import QUARTERS  # noqa: E402
 
 # Vanguard Total Stock Market Index Fund — broadest US equity coverage
@@ -158,4 +158,5 @@ if __name__ == '__main__':
     _args = _parse_args()
     if _args.staging:
         set_staging_mode(True)
+        seed_staging()
     build()

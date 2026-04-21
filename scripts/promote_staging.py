@@ -66,6 +66,12 @@ PK_COLUMNS = {
     # (see PROMOTE_KIND), so they do not need PK_COLUMNS entries.
     "parent_bridge": ["cik"],
     "cik_crd_direct": ["cik"],
+    # sec-05 Phase 1 (2026-04-21): build_fund_classes +
+    # build_benchmark_weights outputs promoted via pk_diff.
+    # See sec-05-p0-findings.md §3 for the PK rationale.
+    "fund_classes": ["series_id", "class_id"],
+    "lei_reference": ["lei"],
+    "benchmark_weights": ["index_name", "gics_sector", "as_of_date"],
 }
 
 # Per-table validator registration. Each value is one of:
