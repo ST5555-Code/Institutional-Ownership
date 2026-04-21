@@ -107,6 +107,27 @@ def run(db_path, dry_run=False):
             WHERE m.strategy_type IS NULL OR m.strategy_type = 'unknown'
         """).fetchone()[0]
         print(f'Projected managers rows to update: {managers_projected:,}', flush=True)
+
+        # Sample: top 10 entities by row count that would flip
+        sample = con.execute("""
+            SELECT
+                COALESCE(h.inst_parent_name, h.manager_name) AS entity,
+                MIN(h.cik) AS sample_cik,
+                mc.category AS new_type,
+                COUNT(*) AS rows
+            FROM holdings_v2 h
+            JOIN _manager_categories mc
+              ON LOWER(TRIM(COALESCE(h.inst_parent_name, h.manager_name))) = mc.name_clean
+            WHERE h.manager_type IS NULL OR h.manager_type = 'unknown'
+            GROUP BY entity, mc.category
+            ORDER BY rows DESC
+            LIMIT 10
+        """).fetchall()
+        if sample:
+            print('\nSample (top 10 entities that would flip):', flush=True)
+            for entity, cik, new_type, rows in sample:
+                print(f'  cik={cik}  {entity[:50]:50s} → {new_type:20s} ({rows:,} rows)', flush=True)
+
         con.close()
         print('\n[dry-run] no changes applied.', flush=True)
         return
