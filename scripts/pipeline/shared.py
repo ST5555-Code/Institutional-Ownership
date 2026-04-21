@@ -427,34 +427,6 @@ def write_manifest_row(
     return row[0]
 
 
-def write_impact_row(
-    con: Any,
-    *,
-    manifest_id: int,
-    target_table: str,
-    unit_type: str,
-    unit_key_json: str,
-    **kwargs: Any,
-) -> int:
-    """INSERT one row into ingestion_impacts. Returns impact_id."""
-    base = {
-        "manifest_id": manifest_id,
-        "target_table": target_table,
-        "unit_type": unit_type,
-        "unit_key_json": unit_key_json,
-    }
-    base.update(kwargs)
-    cols = ", ".join(base.keys())
-    placeholders = ", ".join(["?"] * len(base))
-    con.execute(
-        f"INSERT INTO ingestion_impacts ({cols}) VALUES ({placeholders}) "
-        f"RETURNING impact_id",
-        list(base.values()),
-    )
-    row = con.fetchone()
-    return row[0]
-
-
 # ---------------------------------------------------------------------------
 # 13D/G Group 2 entity enrichment (bulk)
 # ---------------------------------------------------------------------------
