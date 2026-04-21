@@ -15,15 +15,23 @@ Run: python3 scripts/fetch_ncen.py                  # Full build
 
 import argparse
 import csv
+import json
 import os
 import re
 import time
+import uuid
 from datetime import datetime
 
 import duckdb
 import requests
 from lxml import etree
 from rapidfuzz import fuzz
+
+from pipeline.manifest import (
+    get_or_create_manifest_row,
+    update_manifest_status,
+    write_impact,
+)
 
 # ---------------------------------------------------------------------------
 # INF17b — Brand-token verification gate (same logic as build_managers.py)
@@ -421,6 +429,7 @@ def _entity_tables_exist(con):
 
 
 def run(test_mode=False, staging=False, cik_filter=None):
+    run_id = f"ncen_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     con = duckdb.connect(get_db_path())
     create_tables(con)
 
@@ -458,6 +467,8 @@ def run(test_mode=False, staging=False, cik_filter=None):
     errors = 0
     no_ncen = 0
 
+    skipped_complete = 0
+
     for i, cik in enumerate(fund_ciks):
         if (i + 1) % 50 == 0 or i < 3:
             print(f"  [{i+1}/{len(fund_ciks)}] CIK {cik}... ({total_records} records so far)")
@@ -470,12 +481,46 @@ def run(test_mode=False, staging=False, cik_filter=None):
             no_ncen += 1
             continue
 
+        accession = filing["accession"]
+        cik_num = str(cik).lstrip("0") or "0"
+        source_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{cik_num}/"
+            f"{accession.replace('-', '')}/primary_doc.xml"
+        )
+
+        # Idempotency: skip if this accession has already been fetched.
+        existing = con.execute(
+            "SELECT manifest_id, fetch_status FROM ingestion_manifest WHERE object_key = ?",
+            [accession],
+        ).fetchone()
+        if existing and existing[1] == "complete":
+            skipped_complete += 1
+            continue
+
+        manifest_id = get_or_create_manifest_row(
+            con,
+            source_type="NCEN",
+            object_type="XML",
+            source_url=source_url,
+            accession_number=accession,
+            run_id=run_id,
+            object_key=accession,
+            filing_date=filing["filing_date"],
+            fetch_status="fetching",
+            fetch_started_at=datetime.now(),
+        )
+
         # Download XML
-        xml = download_ncen_xml(cik, filing["accession"], filing["primary_doc"])
+        xml = download_ncen_xml(cik, accession, filing["primary_doc"])
         time.sleep(SEC_DELAY)
 
         if not xml:
             errors += 1
+            update_manifest_status(
+                con, manifest_id, "failed",
+                fetch_completed_at=datetime.now(),
+                error_message="download failed",
+            )
             continue
 
         # Parse
@@ -483,6 +528,23 @@ def run(test_mode=False, staging=False, cik_filter=None):
         if records:
             insert_records(con, records)
             total_records += len(records)
+
+            report_date = records[0]["report_date"]
+            write_impact(
+                con,
+                manifest_id=manifest_id,
+                target_table="ncen_adviser_map",
+                unit_type="registrant_report",
+                unit_key_json=json.dumps(
+                    {"registrant_cik": cik, "report_date": report_date}
+                ),
+                report_date=report_date,
+                rows_staged=len(records),
+                load_status="loaded",
+                promote_status="promoted",
+                rows_promoted=len(records),
+                promoted_at=datetime.now(),
+            )
 
             # Phase 2: sync new ncen rows into entity MDM tables (staging only)
             if do_entity_sync:
@@ -497,13 +559,21 @@ def run(test_mode=False, staging=False, cik_filter=None):
                         role=rec.get("role", ""),
                     )
 
+        update_manifest_status(
+            con, manifest_id, "complete",
+            fetch_completed_at=datetime.now(),
+            http_code=200,
+            source_bytes=len(xml),
+        )
+
         # Checkpoint periodically
         if (i + 1) % 25 == 0:
             con.execute("CHECKPOINT")
 
     con.execute("CHECKPOINT")
     print(f"\nInserted {total_records} adviser-series mappings")
-    print(f"No N-CEN found: {no_ncen}, Errors: {errors}")
+    print(f"No N-CEN found: {no_ncen}, Errors: {errors}, "
+          f"Skipped (already complete): {skipped_complete}")
 
     # Update managers table
     print("\nUpdating managers.adviser_cik...")
