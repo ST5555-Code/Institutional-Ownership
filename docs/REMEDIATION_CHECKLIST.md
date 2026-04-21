@@ -7,8 +7,8 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ### Batch 1-A (parallel-eligible within batch: NO — all items share securities/CUSIP/ticker path)
 - [x] int-01 BLOCK-SEC-AUD-1 RC1: OpenFIGI foreign-exchange ticker filter (build_cusip.py, run_openfigi_retry.py) — PRs #13, #15 (data sweep complete; 216 residual = legitimate foreign-only)
 - [x] int-04 BLOCK-SEC-AUD-4 RC4: issuer_name propagation scope guard (normalize_securities.py) — PRs #18, #22
-- [ ] int-05 BLOCK-TICKER-BACKFILL Phase 1a retroactive Pass C sweep (enrich_holdings.py invocation)
-- [ ] int-10 INF26 OpenFIGI `_update_error()` permanent-pending bug (run_openfigi_retry.py)
+- [x] int-05 BLOCK-TICKER-BACKFILL Phase 1a retroactive Pass C sweep (enrich_holdings.py invocation) — PR #46 (closed as NO-OP; retroactive sweep already executed)
+- [x] int-10 INF26 OpenFIGI `_update_error()` permanent-pending bug (run_openfigi_retry.py) — PRs #42, #44 (code fix shipped; staging sweep pending `--confirm`)
 - [ ] int-23 BLOCK-SEC-AUD-5 universe expansion 132K→430K acceptance (cusip_classifier.py decision)
 
 ### Batch 1-B (parallel-eligible within batch: NO)
@@ -51,7 +51,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 2-B (parallel-eligible within batch: NO — both touch fetch_adv.py / promote_13dg.py)
 - [x] obs-02 MAJOR-12 P-02 ADV freshness + log (fetch_adv.py) — PRs #28, #30
-- [ ] obs-04 MAJOR-8 D-06 13D/G ingestion_impacts grain backfill (pipeline/manifest.py, promote_13dg.py)
+- [x] obs-04 MAJOR-8 D-06 13D/G ingestion_impacts grain backfill (pipeline/manifest.py, promote_13dg.py) — PRs #36, #38 (one-off backfill script shipped; data op pending `--confirm`)
 
 ### Batch 2-C (parallel-eligible within batch: YES — disjoint files)
 - [ ] obs-06 MINOR-3 P-01 13F loader freshness (load_13f.py)
@@ -76,7 +76,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 3-A (parallel-eligible within batch: YES — mig-01 ∥ mig-04 disjoint files)
 - [x] mig-01 BLOCK-2 atomic promotes + extract `_mirror_manifest_and_impacts` helper (promote_nport.py, promote_13dg.py, pipeline/manifest.py) — PRs #31, #33
-- [ ] mig-02 MAJOR-14 fetch_adv.py DROP→CREATE atomic fix (fetch_adv.py)
+- [x] mig-02 MAJOR-14 fetch_adv.py DROP→CREATE atomic fix (fetch_adv.py) — PRs #35, #37 (also closes fetch_adv portion of mig-13)
 - [x] mig-04 MAJOR-16 S-02 schema_versions stamp hole (migrations/add_last_refreshed_at.py) — PRs #26, #29
 
 ### Batch 3-B (parallel-eligible within batch: NO — some share migration files)
@@ -113,12 +113,12 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] sec-04 MAJOR-1 C-02 validators writing to prod (validate_nport_subset.py, pipeline/shared.py) — PRs #24, #27
 
 ### Batch 4-C (parallel-eligible within batch: NO — sec-05 overlaps mig-14; sec-06 touches many scripts)
-- [ ] sec-05 MAJOR-2 C-04 hardcoded-prod builders bypass staging (build_fund_classes.py, build_benchmark_weights.py)
-- [ ] sec-06 MAJOR-3 C-05 5 direct-to-prod writers inventory (resolve_*, backfill_manager_types, enrich_tickers + pipeline_violations.md)
+- [x] sec-05 MAJOR-2 C-04 hardcoded-prod builders bypass staging (build_fund_classes.py, build_benchmark_weights.py) — PRs #43, #45 (build_managers.py confirmed already staged; fund_classes + benchmark_weights --staging path fixed)
+- [x] sec-06 MAJOR-3 C-05 5 direct-to-prod writers inventory (resolve_*, backfill_manager_types, enrich_tickers + pipeline_violations.md) — PRs #47, #48 (3 resolvers retired to scripts/retired/; backfill_manager_types + enrich_tickers hardened)
 
 ### Batch 4-D (parallel-eligible within batch: YES — sec-07 ∥ sec-08 disjoint)
-- [ ] sec-07 MINOR-15 O-02 pin edgartools + pdfplumber (requirements.txt)
-- [ ] sec-08 MINOR-17 O-08 central EDGAR identity config (new config.py, 22+ scripts)
+- [x] sec-07 MINOR-15 O-02 pin edgartools + pdfplumber (requirements.txt) — PR #39
+- [x] sec-08 MINOR-17 O-08 central EDGAR identity config (new config.py, 22+ scripts) — PRs #40, #41 (21 scripts normalized)
 
 ### Tracked elsewhere
 - [x] sec-09 Pass 2 §7.3 fetch_adv.py DROP-before-CREATE — scheduled as **mig-02** (Theme 3)

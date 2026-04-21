@@ -523,3 +523,258 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** Theme 4 security now substantially complete (sec-01/02/03/04 all closed; sec-05/06/07/08 remain). Theme 3 migration formally begun (mig-01 + mig-04 closed; mig-02/03/13/14 and Batches 3-C/D remain). Theme 2 observability mostly closed (obs-01/02/03 done; obs-04/06/07/10 and doc items remain).
 - **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — mig-02-p0 fetch_adv.py staging split (Phase 0)
+
+- **Session name:** mig-02-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — diagnose DROP-before-CREATE window in `fetch_adv.py:247-249` (MAJOR-14); scope staging→promote split as the atomic fix (supersedes naive `CREATE OR REPLACE TABLE`).
+- **Files touched:** `docs/findings/mig-02-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `9b48635` (PR #35 squash-merge)
+- **Merge status:** merged (PR #35)
+- **Follow-ups surfaced:** mig-02-p1 scope locked — route fetch_adv.py through staging DB + promote step; eliminates DROP window entirely. Also closes fetch_adv portion of mig-13.
+- **Parallel-safety validation:** YES — findings-only doc; ran parallel with obs-04-p0.
+
+---
+
+## 2026-04-21 — obs-04-p0 13D/G ingestion_impacts backfill (Phase 0)
+
+- **Session name:** obs-04-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — diagnose 3-row vs 51,905-BO-row grain mismatch in `ingestion_impacts` (MAJOR-8 / D-06); scope one-off backfill script for pre-v2 13D/G history.
+- **Files touched:** `docs/findings/obs-04-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `cb91ef2` (PR #36 squash-merge)
+- **Merge status:** merged (PR #36)
+- **Follow-ups surfaced:** obs-04-p1 scope locked — one-off backfill script gated behind `--confirm`; data op deferred.
+- **Parallel-safety validation:** YES — findings-only; ran parallel with mig-02-p0.
+
+---
+
+## 2026-04-21 — mig-02-p1 fetch_adv.py staging→promote conversion
+
+- **Session name:** mig-02-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** convert `fetch_adv.py` to the staging→promote pattern — fetch writes to staging DB, promote step moves rows to prod under a single atomic swap.
+- **Files touched:** `scripts/fetch_adv.py`, `scripts/promote_staging.py` (promote entry wired)
+- **Result:** DONE
+- **Commits:** `db1fdb8` (PR #37 squash-merge)
+- **Merge status:** merged (PR #37)
+- **Follow-ups surfaced:** mig-02 closed; also closes fetch_adv portion of mig-13 (pipeline-violations REWRITE tail).
+- **Parallel-safety validation:** YES — fetch_adv.py single-owner in this window (obs-02 family already merged per prior sequencing).
+
+---
+
+## 2026-04-21 — obs-04-p1 one-off ingestion_impacts backfill script
+
+- **Session name:** obs-04-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** ship `scripts/oneoff/backfill_13dg_impacts.py` as the retro-mirror tool for pre-v2 13D/G history; script gated behind `--confirm`. Data op deferred.
+- **Files touched:** `scripts/oneoff/backfill_13dg_impacts.py` (new)
+- **Result:** DONE (code only; data op pending `--confirm`)
+- **Commits:** `659f5c4` (PR #38 squash-merge)
+- **Merge status:** merged (PR #38)
+- **Follow-ups surfaced:** backfill data op pending Serge approval + `--confirm` execution window.
+- **Parallel-safety validation:** YES — new-file scope; no parallel worker conflict.
+
+---
+
+## 2026-04-21 — sec-07-p1 pin edgartools + pdfplumber
+
+- **Session name:** sec-07-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** pin `edgartools` and `pdfplumber` in `requirements.txt` (MINOR-15 / O-02). Single session — no Phase 0 required given trivial scope.
+- **Files touched:** `requirements.txt`
+- **Result:** DONE
+- **Commits:** `1f888c3` (PR #39 squash-merge)
+- **Merge status:** merged (PR #39)
+- **Follow-ups surfaced:** none — sec-07 closed.
+- **Parallel-safety validation:** YES — requirements.txt single-owner in Batch 4-D window.
+
+---
+
+## 2026-04-21 — sec-08-p0 central EDGAR identity config (Phase 0)
+
+- **Session name:** sec-08-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — inventory all `User-Agent` + EDGAR identity strings across fetcher scripts (MINOR-17 / O-08); scope central config extraction.
+- **Files touched:** `docs/findings/sec-08-p0-findings.md`
+- **Result:** DONE — 21 scripts targeted (not 22 as originally scoped).
+- **Commits:** `47266ad` (PR #40 squash-merge)
+- **Merge status:** merged (PR #40)
+- **Follow-ups surfaced:** sec-08-p1 scope locked — add `EDGAR_IDENTITY` helper to `scripts/config.py` and normalize 21 call sites.
+- **Parallel-safety validation:** YES — findings-only; ran parallel with sec-07-p1.
+
+---
+
+## 2026-04-21 — sec-08-p1 centralize EDGAR identity
+
+- **Session name:** sec-08-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** add `EDGAR_IDENTITY` helper to `scripts/config.py`; normalize 21 fetcher scripts to consume it.
+- **Files touched:** `scripts/config.py`, 21 fetcher scripts (call-site normalization)
+- **Result:** DONE
+- **Commits:** `fa01c7e` (PR #41 squash-merge)
+- **Merge status:** merged (PR #41)
+- **Follow-ups surfaced:** none — sec-08 closed.
+- **Parallel-safety validation:** PARTIAL — Appendix D predicted ~22 scripts; actual touch count was 21 (one script already used a different UA convention and was out-of-scope). Drift minor; direction consistent with prediction.
+
+---
+
+## 2026-04-21 — merge-wave-4
+
+- **Session name:** merge-wave-4
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** merge coordination — sequential squash-merge of PRs #35, #36, #37, #38, #39, #40, #41 (mig-02 + obs-04 + sec-07 + sec-08 families).
+- **Files touched:** N/A (merge operations only)
+- **Result:** DONE
+- **Commits:** `9b48635`, `cb91ef2`, `db1fdb8`, `659f5c4`, `1f888c3`, `47266ad`, `fa01c7e`
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** none — clean wave; no conflicts; no post-merge regressions.
+- **Parallel-safety validation:** YES — merge ordering respected Appendix D single-owner zones.
+
+---
+
+## 2026-04-21 — int-10-p0 OpenFIGI _update_error() bug (Phase 0)
+
+- **Session name:** int-10-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — diagnose INF26 permanent-pending bug in `run_openfigi_retry.py:_update_error()` (never flips `status='unmappable'` at MAX_ATTEMPTS).
+- **Files touched:** `docs/findings/int-10-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `4072d9e` (PR #42 squash-merge)
+- **Merge status:** merged (PR #42)
+- **Follow-ups surfaced:** int-10-p1 scope locked — flip to `'unmappable'` at MAX_ATTEMPTS + one-off sweep for historical permanent-pending residue (`--confirm`-gated).
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — sec-05-p0 hardcoded-prod builders audit (Phase 0)
+
+- **Session name:** sec-05-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — audit `build_managers.py`, `build_fund_classes.py`, `build_benchmark_weights.py` for hardcoded prod routing (MAJOR-2 / C-04).
+- **Files touched:** `docs/findings/sec-05-p0-findings.md`
+- **Result:** DONE — key finding: `build_managers.py` is already fully staged (plan claim "routing pending" is stale); only `build_fund_classes.py` + `build_benchmark_weights.py` need the `--staging` path fix.
+- **Commits:** `8951117` (PR #43 squash-merge)
+- **Merge status:** merged (PR #43)
+- **Follow-ups surfaced:** sec-05-p1 scope narrowed to two scripts; plan row sec-05 needs the "routing pending" note updated to reflect already-staged reality.
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — int-10-p1 _update_error fix + one-off sweep
+
+- **Session name:** int-10-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** patch `_update_error()` to flip `status='unmappable'` at MAX_ATTEMPTS; ship `scripts/oneoff/int_10_sweep.py` for historical permanent-pending residue (`--confirm`-gated).
+- **Files touched:** `scripts/run_openfigi_retry.py`, `scripts/oneoff/int_10_sweep.py` (new)
+- **Result:** DONE (code only; staging sweep pending `--confirm`)
+- **Commits:** `95f74f2` (PR #44 squash-merge)
+- **Merge status:** merged (PR #44)
+- **Follow-ups surfaced:** staging sweep pending Serge approval + `--confirm` execution.
+- **Parallel-safety validation:** YES — `run_openfigi_retry.py` single-owner in this window.
+
+---
+
+## 2026-04-21 — sec-05-p1 --staging path fix
+
+- **Session name:** sec-05-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** fix `--staging` path for `build_fund_classes.py` + `build_benchmark_weights.py`; eliminates hardcoded prod routing in both.
+- **Files touched:** `scripts/build_fund_classes.py`, `scripts/build_benchmark_weights.py`
+- **Result:** DONE
+- **Commits:** `742d504` (PR #45 squash-merge)
+- **Merge status:** merged (PR #45)
+- **Follow-ups surfaced:** none — sec-05 closed end-to-end (build_managers already staged; fund_classes + benchmark_weights now also staged).
+- **Parallel-safety validation:** YES — two disjoint scripts; no overlap with int-10-p1 or merge-wave-5.
+
+---
+
+## 2026-04-21 — merge-wave-5
+
+- **Session name:** merge-wave-5
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** merge coordination — sequential squash-merge of PRs #42, #43, #44, #45 (int-10 + sec-05 families).
+- **Files touched:** N/A (merge operations only)
+- **Result:** DONE
+- **Commits:** `4072d9e`, `8951117`, `95f74f2`, `742d504`
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** none — clean wave.
+- **Parallel-safety validation:** YES.
+
+---
+
+## 2026-04-21 — int-05-p0 retroactive Pass C sweep (Phase 0, NO-OP)
+
+- **Session name:** int-05-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — investigate BLOCK-TICKER-BACKFILL Phase 1a retroactive Pass C sweep; determine whether any residual work remains.
+- **Files touched:** `docs/findings/int-05-p0-findings.md`
+- **Result:** DONE — **CLOSED AS NO-OP.** Retroactive Pass C sweep was already executed in an earlier session; no residual rows remain. int-05 closes without a p1.
+- **Commits:** `98dc28e` (PR #46 squash-merge)
+- **Merge status:** merged (PR #46)
+- **Follow-ups surfaced:** none — int-05 closed as NO-OP. int-06 (forward-looking hooks) remains open per normal sequencing.
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — sec-06-p0 direct-to-prod writers inventory (Phase 0)
+
+- **Session name:** sec-06-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — inventory 5 direct-to-prod writers (MAJOR-3 / C-05): `resolve_agent_names.py`, `resolve_bo_agents.py`, `resolve_names.py`, `backfill_manager_types.py`, `enrich_tickers.py`. Decide stage-vs-retire per script.
+- **Files touched:** `docs/findings/sec-06-p0-findings.md`
+- **Result:** DONE — 3 scripts confirmed dead (retire); 2 scripts are live writers (harden).
+- **Commits:** `507f30c` (PR #47 squash-merge)
+- **Merge status:** merged (PR #47)
+- **Follow-ups surfaced:** sec-06-p1 scope locked — retire `resolve_agent_names.py` + `resolve_bo_agents.py` + `resolve_names.py` to `scripts/retired/`; harden `backfill_manager_types.py` + `enrich_tickers.py`.
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — sec-06-p1 retire + harden direct-to-prod writers
+
+- **Session name:** sec-06-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** move 3 dead resolver scripts to `scripts/retired/`; harden `backfill_manager_types.py` + `enrich_tickers.py`; update `docs/pipeline_violations.md` with 6 RETIRED + 11 RETROFIT markers.
+- **Files touched:** `scripts/retired/resolve_agent_names.py` (moved), `scripts/retired/resolve_bo_agents.py` (moved), `scripts/retired/resolve_names.py` (moved), `scripts/backfill_manager_types.py`, `scripts/enrich_tickers.py`, `docs/pipeline_violations.md`
+- **Result:** DONE
+- **Commits:** `b716cf4` (PR #48 squash-merge)
+- **Merge status:** merged (PR #48)
+- **Follow-ups surfaced:** none — sec-06 closed. Theme 4 security now fully closed (8/8 items).
+- **Parallel-safety validation:** YES — 5-script touch set matches Appendix D prediction exactly.
+
+---
+
+## 2026-04-21 — merge-wave-6
+
+- **Session name:** merge-wave-6
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** merge coordination — sequential squash-merge of PRs #46, #47, #48 (int-05 NO-OP + sec-06 family). Included stale-worktree cleanup (4 worktrees removed) and local branch deletion for int-05/int-10/sec-05/sec-06.
+- **Files touched:** N/A (merge operations only)
+- **Result:** DONE
+- **Commits:** `98dc28e`, `507f30c`, `b716cf4`
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** Theme 4 fully closed; int-05 closed as NO-OP; conv-03 convergence session triggered.
+- **Parallel-safety validation:** YES.
