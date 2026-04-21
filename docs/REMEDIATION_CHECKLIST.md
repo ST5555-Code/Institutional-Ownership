@@ -46,11 +46,11 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ## Theme 2 — Observability + audit trail
 
 ### Batch 2-A (parallel-eligible within batch: YES — obs-01 ∥ obs-03, disjoint files)
-- [ ] obs-01 MAJOR-9 D-07/P-05 N-CEN + ADV into ingestion_manifest (fetch_ncen.py, fetch_adv.py, migrations/001)
+- [x] obs-01 MAJOR-9 D-07/P-05 N-CEN + ADV into ingestion_manifest (fetch_ncen.py, fetch_adv.py, migrations/001) — PRs #20, #25
 - [x] obs-03 MAJOR-13 P-04 market impact_id allocation hardening (pipeline/manifest.py, fetch_market.py) — PRs #8, #12
 
 ### Batch 2-B (parallel-eligible within batch: NO — both touch fetch_adv.py / promote_13dg.py)
-- [ ] obs-02 MAJOR-12 P-02 ADV freshness + log (fetch_adv.py)
+- [x] obs-02 MAJOR-12 P-02 ADV freshness + log (fetch_adv.py) — PRs #28, #30
 - [ ] obs-04 MAJOR-8 D-06 13D/G ingestion_impacts grain backfill (pipeline/manifest.py, promote_13dg.py)
 
 ### Batch 2-C (parallel-eligible within batch: YES — disjoint files)
@@ -75,9 +75,9 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ## Theme 3 — Migration + schema discipline
 
 ### Batch 3-A (parallel-eligible within batch: YES — mig-01 ∥ mig-04 disjoint files)
-- [ ] mig-01 BLOCK-2 atomic promotes + extract `_mirror_manifest_and_impacts` helper (promote_nport.py, promote_13dg.py, pipeline/manifest.py)
+- [x] mig-01 BLOCK-2 atomic promotes + extract `_mirror_manifest_and_impacts` helper (promote_nport.py, promote_13dg.py, pipeline/manifest.py) — PRs #31, #33
 - [ ] mig-02 MAJOR-14 fetch_adv.py DROP→CREATE atomic fix (fetch_adv.py)
-- [ ] mig-04 MAJOR-16 S-02 schema_versions stamp hole (migrations/add_last_refreshed_at.py)
+- [x] mig-04 MAJOR-16 S-02 schema_versions stamp hole (migrations/add_last_refreshed_at.py) — PRs #26, #29
 
 ### Batch 3-B (parallel-eligible within batch: NO — some share migration files)
 - [ ] mig-03 MAJOR-15 migration 004 staging/rename pattern retrofit (migrations/004)
@@ -110,7 +110,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 4-B (parallel-eligible within batch: NO — sec-04 shares pipeline/shared.py with Theme 1)
 - [x] sec-03 MAJOR-5 C-09 admin endpoint write-surface audit (admin_bp.py) — PRs #16, #17
-- [ ] sec-04 MAJOR-1 C-02 validators writing to prod (validate_nport_subset.py, pipeline/shared.py)
+- [x] sec-04 MAJOR-1 C-02 validators writing to prod (validate_nport_subset.py, pipeline/shared.py) — PRs #24, #27
 
 ### Batch 4-C (parallel-eligible within batch: NO — sec-05 overlaps mig-14; sec-06 touches many scripts)
 - [ ] sec-05 MAJOR-2 C-04 hardcoded-prod builders bypass staging (build_fund_classes.py, build_benchmark_weights.py)
@@ -140,9 +140,9 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] ops-12 Pass 2 §8.2 migration 007 NULL-target doc note — PR #6
 
 ### Batch 5-B (parallel-eligible within batch: YES — disjoint)
-- [ ] ops-06 MINOR-11 DOC-06 write_path_risk_map stale
-- [ ] ops-09 MINOR-14 DOC-12 api_*.py Blueprint split architecture doc (new docs/)
-- [ ] ops-15 DOC_UPDATE_PROPOSAL item 7 — MAINTENANCE.md §Refetch Pattern (MAINTENANCE.md)
+- [x] ops-06 MINOR-11 DOC-06 write_path_risk_map stale — PR #32
+- [x] ops-09 MINOR-14 DOC-12 api_*.py Blueprint split architecture doc (new docs/) — PR #32
+- [x] ops-15 DOC_UPDATE_PROPOSAL item 7 — MAINTENANCE.md §Refetch Pattern (MAINTENANCE.md) — PR #32
 
 ### Batch 5-C (parallel-eligible within batch: NO — shared data_layers.md + ROADMAP.md)
 - [ ] ops-13 DOC_UPDATE_PROPOSAL item 1 — denorm drift doc (data_layers.md §7, ENTITY_ARCHITECTURE.md)
