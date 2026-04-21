@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
 fetch_adv.py — Download SEC bulk ADV data, parse key fields, classify managers,
-               flag activists, and save to DuckDB.
+               flag activists, and stage to data/13f_staging.duckdb.
+
+Writes are staging-only. Promotion to prod adv_managers is handled by
+scripts/promote_adv.py (invoked with the run_id this script prints).
 
 Run: python3 scripts/fetch_adv.py
 """
@@ -30,8 +33,7 @@ from pipeline.manifest import (
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 REF_DIR = os.path.join(DATA_DIR, "reference")
-from db import get_db_path, crash_handler, record_freshness
-DB_PATH = get_db_path()
+from db import STAGING_DB, crash_handler
 
 SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5  # seconds between SEC requests
@@ -253,12 +255,12 @@ def save_to_duckdb(df):
     df_out.to_csv(csv_out, index=False)
     print(f"\n  Saved CSV: {csv_out}")
 
-    # Save to DuckDB
-    con = duckdb.connect(DB_PATH)
-    con.execute("DROP TABLE IF EXISTS adv_managers")
-    con.execute("CREATE TABLE adv_managers AS SELECT * FROM df_out")
+    # Save to staging DuckDB. CREATE OR REPLACE is a single atomic statement —
+    # no kill-window between DROP and CREATE.
+    con = duckdb.connect(STAGING_DB)
+    con.execute("CREATE OR REPLACE TABLE adv_managers AS SELECT * FROM df_out")
     row_count = con.execute("SELECT COUNT(*) FROM adv_managers").fetchone()[0]
-    print(f"  Saved to DuckDB: {DB_PATH}")
+    print(f"  Saved to staging DuckDB: {STAGING_DB}")
     print(f"  Table adv_managers: {row_count:,} rows")
 
     # Quick summary
@@ -274,10 +276,8 @@ def save_to_duckdb(df):
     print(f"\nActivist managers ({len(activist_list)}):")
     print(activist_list.to_string(index=False))
 
-    try:
-        record_freshness(con, "adv_managers", row_count=row_count)
-    except Exception as e:
-        print(f"  [warn] record_freshness(adv_managers) failed: {e}", flush=True)
+    # Freshness is a prod-facing surface — stamped by promote_adv.py after
+    # the atomic swap. Staging CHECKPOINT only.
     con.execute("CHECKPOINT")
     con.close()
     return row_count
@@ -293,7 +293,7 @@ def main():
     object_key = f"ADV_BULK:{zip_filename}"
 
     # Register manifest row before download.
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(STAGING_DB)
     try:
         manifest_id = get_or_create_manifest_row(
             con,
@@ -339,7 +339,7 @@ def main():
         # Step 6: Save
         row_count = save_to_duckdb(df)
     except Exception as exc:
-        con = duckdb.connect(DB_PATH)
+        con = duckdb.connect(STAGING_DB)
         try:
             update_manifest_status(
                 con, manifest_id, "failed",
@@ -351,9 +351,10 @@ def main():
             con.close()
         raise
 
-    # Write impact + finalize manifest (direct-write = promoted at write time).
+    # Write impact + finalize manifest. promote_status='pending' — promote_adv.py
+    # flips it to 'promoted' after the atomic swap into prod.
     today = datetime.now().strftime("%Y-%m-%d")
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(STAGING_DB)
     try:
         # Remove any prior impact row for this manifest so re-runs don't duplicate.
         con.execute(
@@ -369,9 +370,7 @@ def main():
             report_date=today,
             rows_staged=row_count,
             load_status="loaded",
-            promote_status="promoted",
-            rows_promoted=row_count,
-            promoted_at=datetime.now(),
+            promote_status="pending",
         )
         update_manifest_status(
             con, manifest_id, "complete",
@@ -383,7 +382,8 @@ def main():
     finally:
         con.close()
 
-    print("\nDone.")
+    print(f"\nDone. Staged run_id={run_id}")
+    print(f"  Next: python3 scripts/promote_adv.py --run-id {run_id}")
 
 
 if __name__ == "__main__":
