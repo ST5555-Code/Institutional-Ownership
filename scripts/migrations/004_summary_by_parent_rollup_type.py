@@ -30,6 +30,24 @@ import os
 import duckdb
 
 
+VERSION = "004_summary_by_parent_rollup_type"
+NOTES = "summary_by_parent rollup_type column + compound PK"
+
+
+def _already_stamped(con, version: str) -> bool:
+    """True if `schema_versions` has a row for `version`. False if the
+    table is missing (pre-003 DB) or the row is absent."""
+    row = con.execute(
+        "SELECT 1 FROM duckdb_tables() WHERE table_name = 'schema_versions'"
+    ).fetchone()
+    if not row:
+        return False
+    row = con.execute(
+        "SELECT 1 FROM schema_versions WHERE version = ?", [version]
+    ).fetchone()
+    return row is not None
+
+
 def _has_rollup_type(con) -> bool:
     """Probe for the `rollup_type` column on summary_by_parent."""
     cols = con.execute(
@@ -63,8 +81,18 @@ def run_migration(db_path: str) -> None:
             row_count = con.execute(
                 "SELECT COUNT(*) FROM summary_by_parent"
             ).fetchone()[0]
-            print(f"  ALREADY APPLIED ({db_path}): rollup_type present, "
-                  f"{row_count:,} rows")
+            if not _already_stamped(con, VERSION):
+                con.execute(
+                    "INSERT OR IGNORE INTO schema_versions "
+                    "(version, notes) VALUES (?, ?)",
+                    [VERSION, NOTES],
+                )
+                con.execute("CHECKPOINT")
+                print(f"  ALREADY APPLIED ({db_path}): rollup_type present, "
+                      f"{row_count:,} rows — backfilled schema_versions stamp")
+            else:
+                print(f"  ALREADY APPLIED ({db_path}): rollup_type present, "
+                      f"{row_count:,} rows")
             return
 
         ddl_before = con.execute(
@@ -130,6 +158,10 @@ def run_migration(db_path: str) -> None:
             FROM summary_by_parent_old
         """)
         con.execute("DROP TABLE summary_by_parent_old")
+        con.execute(
+            "INSERT OR IGNORE INTO schema_versions (version, notes) VALUES (?, ?)",
+            [VERSION, NOTES],
+        )
         con.execute("CHECKPOINT")
 
         rows_after = con.execute(
