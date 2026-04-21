@@ -358,3 +358,168 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** none — pure doc reconciliation.
 - **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — sec-04-p0 validators writing to prod (Phase 0)
+
+- **Session name:** sec-04-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — audit validator scripts that mutate prod as a side effect of validation (MAJOR-1 / C-02); scope read-only default + separate validate-vs-queue split.
+- **Files touched:** `docs/findings/sec-04-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `88341fb` (work) → `a38f3aa` (PR #24 merge)
+- **Merge status:** merged (PR #24)
+- **Follow-ups surfaced:** sec-04-p1 scope locked — default validators to RO; extract queue_nport_excluded.py as the single write-bearing script.
+- **Parallel-safety validation:** YES — findings-only doc; ran parallel with obs-01-p1.
+
+---
+
+## 2026-04-21 — sec-04-p1 validators RO default + split validate/queue
+
+- **Session name:** sec-04-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** default `validate_nport_subset.py` + `validate_entities.py` to read-only; extract write-side into new `queue_nport_excluded.py`; repoint `fetch_dera_nport.py` + `fetch_nport_v2.py` call sites.
+- **Files touched:** `scripts/validate_nport_subset.py`, `scripts/validate_entities.py`, `scripts/queue_nport_excluded.py` (new), `scripts/fetch_dera_nport.py`, `scripts/fetch_nport_v2.py`
+- **Result:** DONE
+- **Commits:** `af66013` (work) → `aa7f6a8` (PR #27 merge)
+- **Merge status:** merged (PR #27)
+- **Follow-ups surfaced:** none — sec-04 closed.
+- **Parallel-safety validation:** PARTIAL — Appendix D predicted sec-04 zone as `validate_nport_subset.py` + `pipeline/shared.py`; actual scope expanded to include `validate_entities.py` + two fetch_* call-site repoints + new `queue_nport_excluded.py`. `pipeline/shared.py` was NOT touched (the write path was extracted to a new module instead). Drift acceptable — no overlap with int-21 (which owns `pipeline/shared.py` series_id logic); flagged so future RO-default refactors anticipate new-module extraction.
+
+---
+
+## 2026-04-21 — obs-01-p1 N-CEN + ADV manifest registration (Phase 1)
+
+- **Session name:** obs-01-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** register `fetch_ncen.py` + `fetch_adv.py` in `ingestion_manifest` + `ingestion_impacts`; complete MAJOR-9 / D-07/P-05.
+- **Files touched:** `scripts/fetch_adv.py`, `scripts/fetch_ncen.py`
+- **Result:** DONE
+- **Commits:** `a12b4d8` (work) → `64c7d41` (PR #25 merge)
+- **Merge status:** merged (PR #25)
+- **Follow-ups surfaced:** obs-02 (ADV freshness discipline) enters scope with fetch_adv.py now manifest-aware; sequenced next.
+- **Parallel-safety validation:** YES — fetch_adv.py + fetch_ncen.py are Batch 2-A zone; obs-02 was explicitly sequenced after obs-01 to avoid fetch_adv.py write conflict.
+
+---
+
+## 2026-04-21 — obs-02-p0 ADV freshness + log discipline (Phase 0)
+
+- **Session name:** obs-02-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — diagnose missing `record_freshness` call + CHECKPOINT ordering in `fetch_adv.py` (MAJOR-12 / P-02); scope Phase 1 guard + reorder.
+- **Files touched:** `docs/findings/obs-02-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `c8320e1` (work) → `0e7b59f` (PR #28 merge)
+- **Merge status:** merged (PR #28)
+- **Follow-ups surfaced:** obs-02-p1 scope locked — wrap `record_freshness` in try/except and CHECKPOINT after freshness write, not before.
+- **Parallel-safety validation:** YES — findings-only; ran parallel with mig-04-p1.
+
+---
+
+## 2026-04-21 — obs-02-p1 guard record_freshness + CHECKPOINT reorder
+
+- **Session name:** obs-02-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** add freshness-write guard + reorder CHECKPOINT after freshness stamp in `fetch_adv.py`.
+- **Files touched:** `scripts/fetch_adv.py`
+- **Result:** DONE
+- **Commits:** `b86096b` (work) → `b690a1f` (PR #30 merge)
+- **Merge status:** merged (PR #30)
+- **Follow-ups surfaced:** none — obs-02 closed.
+- **Parallel-safety validation:** YES — fetch_adv.py single-owner during obs-02 window; no parallel worker held it (obs-01-p1 merged first per sequencing plan).
+
+---
+
+## 2026-04-21 — mig-04-p0 schema_versions stamp hole (Phase 0)
+
+- **Session name:** mig-04-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — audit which migrations shipped without schema_versions stamps (MAJOR-16 / S-02); scope one-off backfill + verify tool.
+- **Files touched:** `docs/findings/mig-04-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `5997345` (work) → `60ed6a1` (PR #26 merge)
+- **Merge status:** merged (PR #26)
+- **Follow-ups surfaced:** mig-04-p1 scope locked — backfill missing stamps + ship `verify_migration_stamps.py` as permanent CI gate candidate.
+- **Parallel-safety validation:** YES — findings-only; ran parallel with sec-04-p1.
+
+---
+
+## 2026-04-21 — mig-04-p1 schema_versions stamp backfill + verify
+
+- **Session name:** mig-04-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** backfill schema_versions stamps for migrations 004 + add_last_refreshed_at; ship `scripts/oneoff/backfill_schema_versions_stamps.py` + `scripts/verify_migration_stamps.py`.
+- **Files touched:** `scripts/migrations/004_summary_by_parent_rollup_type.py`, `scripts/migrations/add_last_refreshed_at.py`, `scripts/oneoff/backfill_schema_versions_stamps.py` (new), `scripts/verify_migration_stamps.py` (new)
+- **Result:** DONE
+- **Commits:** `152aca7` (work) → `caa1de0` (PR #29 merge)
+- **Merge status:** merged (PR #29)
+- **Follow-ups surfaced:** consider wiring `verify_migration_stamps.py` into smoke CI (candidate for a future mig-11 bundle).
+- **Parallel-safety validation:** YES — migrations touched were owned by mig-04 alone; no overlap with other migration-family work.
+
+---
+
+## 2026-04-21 — mig-01-p0 atomic promotes + manifest mirror (Phase 0)
+
+- **Session name:** mig-01-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — diagnose non-atomic promote sequences in `promote_nport.py` + `promote_13dg.py` (BLOCK-2); design `_mirror_manifest_and_impacts` helper extraction.
+- **Files touched:** `docs/findings/mig-01-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `dd03780` (work) → `fab82b2` (PR #31 merge)
+- **Merge status:** merged (PR #31)
+- **Follow-ups surfaced:** mig-01-p1 scope locked — single BEGIN/COMMIT around manifest + impacts + data inserts; helper lifted to `pipeline/manifest.py`.
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — mig-01-p1 atomic promotes + manifest mirror extraction
+
+- **Session name:** mig-01-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** wrap promote_nport.py + promote_13dg.py in atomic transactions; extract `_mirror_manifest_and_impacts` helper into `pipeline/manifest.py` as the shared call site.
+- **Files touched:** `scripts/pipeline/manifest.py`, `scripts/promote_13dg.py`, `scripts/promote_nport.py`
+- **Result:** DONE
+- **Commits:** `56dcfcb` (work) → `b2765b4` (PR #33 merge)
+- **Merge status:** merged (PR #33)
+- **Follow-ups surfaced:** none — mig-01 (BLOCK-2) closed. Theme-3 migration work formally begun.
+- **Parallel-safety validation:** YES — `pipeline/manifest.py` was touched earlier by obs-03-p1 (id_allocator integration); mig-01-p1 appended new helper without colliding with id_allocator zones. Sequential merge ordering held.
+
+---
+
+## 2026-04-21 — ops-batch-5B doc updates
+
+- **Session name:** ops-batch-5B
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** close ops-06 + ops-09 + ops-15 in one batch — refresh `docs/write_path_risk_map.md`, ship new `docs/api_architecture.md` (Blueprint split), and add §Refetch Pattern to `MAINTENANCE.md`.
+- **Files touched:** `docs/write_path_risk_map.md`, `docs/api_architecture.md` (new), `MAINTENANCE.md`, `docs/findings/ops-batch-5B-findings.md` (new)
+- **Result:** DONE — ops-06, ops-09, ops-15 all closed.
+- **Commits:** `1a47a0e` (work) → `b45893f` (PR #32 merge)
+- **Merge status:** merged (PR #32)
+- **Follow-ups surfaced:** ops-13, ops-14, ops-16 still OPEN (Batches 5-C/D).
+- **Parallel-safety validation:** YES — docs-only; ran parallel with mig-01-p1 with zero file overlap.
+
+---
+
+## 2026-04-21 — conv-02 convergence doc update
+
+- **Session name:** conv-02
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** batch doc update reflecting work completed in PRs #24 through #33 (10 PRs merged since conv-01; 29 PRs total across the program). Flip CHECKLIST items to [x] for sec-04, obs-01, obs-02, mig-01, mig-04, ops-06, ops-09, ops-15. Append one session-log entry per completed session. Update REMEDIATION_PLAN.md changelog.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** Theme 4 security now substantially complete (sec-01/02/03/04 all closed; sec-05/06/07/08 remain). Theme 3 migration formally begun (mig-01 + mig-04 closed; mig-02/03/13/14 and Batches 3-C/D remain). Theme 2 observability mostly closed (obs-01/02/03 done; obs-04/06/07/10 and doc items remain).
+- **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
