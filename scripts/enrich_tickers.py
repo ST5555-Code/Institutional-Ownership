@@ -33,19 +33,13 @@ SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
 
 
 def get_baseline(con):
-    """Get current coverage stats."""
+    """Get current coverage stats on live tables (securities + market_data)."""
     total_cusips = con.execute("SELECT COUNT(*) FROM securities").fetchone()[0]
     with_ticker = con.execute("SELECT COUNT(*) FROM securities WHERE ticker IS NOT NULL").fetchone()[0]
-    total_holdings = con.execute("SELECT COUNT(*) FROM holdings WHERE quarter = '2025Q4'").fetchone()[0]
-    holdings_ticker = con.execute("SELECT COUNT(*) FROM holdings WHERE quarter = '2025Q4' AND ticker IS NOT NULL").fetchone()[0]
-    holdings_live = con.execute("SELECT COUNT(*) FROM holdings WHERE quarter = '2025Q4' AND market_value_live IS NOT NULL").fetchone()[0]
     mkt_tickers = con.execute("SELECT COUNT(*) FROM market_data").fetchone()[0]
     return {
         "total_cusips": total_cusips,
         "cusips_with_ticker": with_ticker,
-        "total_holdings_q4": total_holdings,
-        "holdings_with_ticker": holdings_ticker,
-        "holdings_with_live": holdings_live,
         "market_data_tickers": mkt_tickers,
     }
 
@@ -221,11 +215,11 @@ def enrich_securities(con, df_13f, df_tickers):
     print(f"  Method 2 fuzzy matches: {len(method2_matches):,}")
 
     # ======================================================================
-    # Method 3: Direct name match using holdings issuer_name
+    # Method 3: Direct name match using securities.issuer_name
     # ======================================================================
-    print("\n  Method 3: Direct name match (holdings issuer_name → company_tickers)")
+    print("\n  Method 3: Direct name match (securities.issuer_name → company_tickers)")
 
-    # For CUSIPs still unmatched, try matching the issuer_name from 13F filings
+    # For CUSIPs still unmatched, try matching the issuer_name from securities
     still_unmatched = remaining[
         ~remaining["cusip"].isin(method1_matches) &
         ~remaining["cusip"].isin(method2_matches)
@@ -278,21 +272,6 @@ def update_securities(con, all_matches):
         updated += 1
 
     print(f"  Updated {updated:,} rows in securities")
-
-    # Propagate to holdings
-    print("  Propagating to holdings table...")
-    con.execute("""
-        UPDATE holdings h
-        SET ticker = s.ticker
-        FROM securities s
-        WHERE h.cusip = s.cusip AND s.ticker IS NOT NULL AND h.ticker IS NULL
-    """)
-
-    new_holdings = con.execute(
-        "SELECT COUNT(*) FROM holdings WHERE ticker IS NOT NULL"
-    ).fetchone()[0]
-    print(f"  Holdings with ticker now: {new_holdings:,}")
-
     return updated
 
 
@@ -381,40 +360,12 @@ def fetch_market_for_new_tickers(con, new_tickers):
     return len(records)
 
 
-def update_holdings_live(con):
-    """Update holdings market_value_live and pct_of_float for newly enriched rows."""
-    print("\nUpdating holdings live values...")
-
-    con.execute("""
-        UPDATE holdings h
-        SET market_value_live = h.shares * m.price_live
-        FROM market_data m
-        WHERE h.ticker = m.ticker
-          AND m.price_live IS NOT NULL
-          AND h.market_value_live IS NULL
-    """)
-
-    con.execute("""
-        UPDATE holdings h
-        SET pct_of_float = ROUND(h.shares * 100.0 / m.float_shares, 4)
-        FROM market_data m
-        WHERE h.ticker = m.ticker
-          AND m.float_shares IS NOT NULL
-          AND m.float_shares > 0
-          AND h.pct_of_float IS NULL
-    """)
-
-    live = con.execute("SELECT COUNT(*) FROM holdings WHERE market_value_live IS NOT NULL").fetchone()[0]
-    flt = con.execute("SELECT COUNT(*) FROM holdings WHERE pct_of_float IS NOT NULL").fetchone()[0]
-    total = con.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
-    print(f"  Holdings with live value: {live:,} / {total:,} ({live/total*100:.1f}%)")
-    print(f"  Holdings with float %: {flt:,} / {total:,} ({flt/total*100:.1f}%)")
-
-
-def main():
+def main(dry_run=False):
     print("=" * 60)
     print("ENRICH TICKERS — Improve CUSIP-to-ticker coverage")
     print("=" * 60)
+    if dry_run:
+        print("Mode: DRY RUN — no writes")
 
     con = duckdb.connect(get_db_path())
 
@@ -433,14 +384,27 @@ def main():
     # Cross-reference
     all_matches, new_tickers = enrich_securities(con, df_13f, df_tickers)
 
+    if dry_run:
+        print("\n--- DRY RUN SUMMARY ---")
+        print(f"  Would UPDATE securities.ticker for {len(all_matches):,} CUSIPs")
+        print(f"  Would fetch market_data for up to {len(new_tickers):,} new tickers")
+        sample = list(all_matches.items())[:10]
+        if sample:
+            print("  Sample ticker matches (first 10):")
+            for cusip, ticker in sample:
+                print(f"    {cusip} → {ticker}")
+        con.close()
+        print("\n[dry-run] no changes applied.")
+        return
+
     # Update database
     update_securities(con, all_matches)
 
     # Fetch market data for new tickers
     fetch_market_for_new_tickers(con, new_tickers)
 
-    # Update holdings live values
-    update_holdings_live(con)
+    # Flush writes
+    con.execute("CHECKPOINT")
 
     # Final stats
     print("\n--- AFTER ---")
@@ -452,20 +416,8 @@ def main():
     print("\n--- IMPROVEMENT ---")
     print(f"  CUSIPs with ticker:   {before['cusips_with_ticker']:,} → {after['cusips_with_ticker']:,} "
           f"(+{after['cusips_with_ticker'] - before['cusips_with_ticker']:,})")
-    print(f"  Holdings with ticker: {before['holdings_with_ticker']:,} → {after['holdings_with_ticker']:,} "
-          f"(+{after['holdings_with_ticker'] - before['holdings_with_ticker']:,})")
-    print(f"  Holdings with live $: {before['holdings_with_live']:,} → {after['holdings_with_live']:,} "
-          f"(+{after['holdings_with_live'] - before['holdings_with_live']:,})")
     print(f"  Market data tickers:  {before['market_data_tickers']:,} → {after['market_data_tickers']:,} "
           f"(+{after['market_data_tickers'] - before['market_data_tickers']:,})")
-
-    pct_before = before['holdings_with_ticker'] / before['total_holdings_q4'] * 100
-    pct_after = after['holdings_with_ticker'] / after['total_holdings_q4'] * 100
-    print(f"\n  Q4 ticker coverage: {pct_before:.1f}% → {pct_after:.1f}%")
-
-    pct_live_before = before['holdings_with_live'] / before['total_holdings_q4'] * 100
-    pct_live_after = after['holdings_with_live'] / after['total_holdings_q4'] * 100
-    print(f"  Q4 live value coverage: {pct_live_before:.1f}% → {pct_live_after:.1f}%")
 
     con.close()
     print("\nDone.")
@@ -475,8 +427,10 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Enrich CUSIP-to-ticker coverage")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Project what would change without writing")
     args = parser.parse_args()
     if args.staging:
         set_staging_mode(True)
     from db import crash_handler
-    crash_handler("enrich_tickers")(main)
+    crash_handler("enrich_tickers")(lambda: main(dry_run=args.dry_run))

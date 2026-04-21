@@ -498,6 +498,63 @@ below for historical reference.
 
 ---
 
+## sec-06 (2026-04-21) — 5 direct-to-prod writers inventoried
+
+Phase 0 findings in [docs/findings/sec-06-p0-findings.md](docs/findings/sec-06-p0-findings.md). Three of the five scripts wrote to the `beneficial_ownership` legacy table (dropped Stage 5) — **retired**, not retrofitted. Two scripts target live tables — **hardened** (--dry-run + CHECKPOINT, dead legacy writes removed).
+
+---
+
+## resolve_agent_names.py (RETIRED)
+
+- **Status:** RETIRED — moved to `scripts/retired/resolve_agent_names.py` (sec-06, 2026-04-21).
+- **Reason:** All write operations target `beneficial_ownership` (legacy table dropped Stage 5). Every UPDATE / DROP / CREATE TABLE / CHECKPOINT in the script fires against a table that does not exist in prod — READ-ONLY `information_schema.tables` probe 2026-04-21 confirmed only `beneficial_ownership_current` and `beneficial_ownership_v2` exist.
+- **Tables targeted (all dropped):** `beneficial_ownership`, `beneficial_ownership_current` (the script's `DROP TABLE IF EXISTS` + `CREATE TABLE AS SELECT` rebuild references the dropped source).
+- **Historical reads/writes:** UPDATE `beneficial_ownership` SET `filer_name`, `name_resolved` at `:200-205`; DROP + CREATE `beneficial_ownership_current` at `:212-244`; CHECKPOINT at `:263`.
+- **Future:** If "extract reporting person from filing text" functionality is needed against `beneficial_ownership_v2`, rebuild from scratch against the v2 schema + `entity_id` resolution path.
+
+---
+
+## resolve_bo_agents.py (RETIRED)
+
+- **Status:** RETIRED — moved to `scripts/retired/resolve_bo_agents.py` (sec-06, 2026-04-21).
+- **Reason:** All write operations target `beneficial_ownership` (legacy table dropped Stage 5). Script was the best-behaved of the five by PROCESS_RULES (§1 CHECKPOINT every 500 rows, §2 WHERE-clause restart-safety, §3 EFTS + .hdr.sgml failover, §4 monotonic rate limit, §9 `--apply` dry-run), but every fire path hits a dropped table.
+- **Tables targeted (all dropped):** `beneficial_ownership`, `beneficial_ownership_current`.
+- **Historical reads/writes:** UPDATE `beneficial_ownership` SET `filer_name`, `filer_cik`, `name_resolved` at `:296-300`; DROP + CREATE `beneficial_ownership_current` at `:361-362`; CHECKPOINT at `:306, :323, :380`.
+- **Future:** If agent-name resolution is needed against `beneficial_ownership_v2`, rebuild from scratch — the dual-source EFTS/.hdr.sgml pattern is worth preserving.
+
+---
+
+## resolve_names.py (RETIRED)
+
+- **Status:** RETIRED — moved to `scripts/retired/resolve_names.py` (sec-06, 2026-04-21).
+- **Reason:** All write operations target `beneficial_ownership` (legacy table dropped Stage 5). Script also ran `ALTER TABLE beneficial_ownership ADD COLUMN name_resolved` at `:161` — dead code; the `name_resolved` column already exists on `beneficial_ownership_v2` (READ-ONLY probe 2026-04-21). Pass 1 also reads dropped `holdings` at `:50-56`.
+- **Tables targeted (all dropped):** `beneficial_ownership`, `beneficial_ownership_current`, `holdings`.
+- **Historical reads/writes:** six UPDATEs on `beneficial_ownership` at `:144-149, :165-171, :176-181, :289-295`; ALTER + ADD COLUMN at `:161`; DROP + CREATE `beneficial_ownership_current` at `:189-217`; CHECKPOINT at `:325`.
+- **Future:** If three-pass filer-name resolution is needed against `beneficial_ownership_v2`, rebuild from scratch — Pass 2 (EDGAR submissions API) and Pass 2b (company_tickers.json) logic is worth preserving against the v2 schema.
+
+---
+
+## backfill_manager_types.py (RETROFIT)
+
+- **Status:** HARDENED — `--dry-run` verified + CHECKPOINT verified + entry added (sec-06, 2026-04-21).
+- **Classification:** EXCEPTION — targeted enrichment updater keyed on CSV-curated category mappings, acceptable as direct-to-prod.
+- **Tables written:** `holdings_v2` (UPDATE `manager_type` where NULL or `'unknown'`), `managers` (UPDATE `strategy_type`).
+- **Hardening already in file:** `--dry-run` at `:194-195` previews projected row counts across `holdings_v2` and `managers` without executing any prod UPDATE (temp table `_manager_categories` is session-scoped); CHECKPOINT at `:185` after writes; `record_freshness("holdings_v2")` at `:182`.
+- **Deviations from codebase pattern (tracked, not blocking EXCEPTION):** uses hardcoded prod/staging paths at `:199-204` instead of `db.get_db_path()` / `db.set_staging_mode()`; `--production` polarity (default staging) instead of `--staging`; no `crash_handler` wrap; `try/except/pass` on `managers` UPDATE at `:124, :133-134`. Not a regression — script is safe by default and the CSV mapping is hand-curated.
+
+---
+
+## enrich_tickers.py (RETROFIT)
+
+- **Status:** HARDENED — dead `holdings` (legacy) writes removed, `--dry-run` + CHECKPOINT added (sec-06, 2026-04-21).
+- **Classification:** EXCEPTION — CUSIP→ticker enrichment updater, acceptable as direct-to-prod now that dead-table writes are gone.
+- **Tables written (live):** `securities` (UPDATE `ticker` WHERE `cusip = ?` AND `ticker IS NULL`), `market_data` (INSERT 13 columns, append-only, de-duped via `existing` set).
+- **Dead writes removed (sec-06, 2026-04-21):** UPDATE `holdings` SET `ticker` (propagate from securities); UPDATE `holdings` SET `market_value_live`; UPDATE `holdings` SET `pct_of_float`; SELECT COUNT on `holdings`. `holdings` was dropped Stage 5; `holdings_v2` enrichment lives in `enrich_holdings.py` (Batch 3).
+- **Hardening added:** `--dry-run` projects new-ticker-match count + market_data delta without writing; CHECKPOINT after write operations complete.
+- **Reads that remain:** `securities` (for CUSIPs without ticker), `market_data` (for de-dupe). Both are live.
+
+---
+
 ## Cross-cutting violation patterns
 
 The violation list above clusters into five systemic patterns that the
