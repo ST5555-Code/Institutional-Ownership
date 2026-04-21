@@ -81,7 +81,8 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 # Reference tables that staging needs read access to (copied from production)
 REFERENCE_TABLES = [
     "holdings", "securities", "managers", "market_data", "filings",
-    "fund_holdings", "fund_universe", "adv_managers", "parent_bridge",
+    "fund_holdings", "fund_holdings_v2", "fund_universe", "adv_managers",
+    "parent_bridge",
 ]
 
 # Entity tables — the entire entity MDM layer. The staging workflow
@@ -118,6 +119,11 @@ ENTITY_SEQUENCES = [
 # managers + cik_crd_links via the new "rebuild" promote kind because
 # their natural keys are not empirically unique. See
 # promote_staging.PROMOTE_KIND and REWRITE_BUILD_MANAGERS_FINDINGS.md.
+#
+# Extended 2026-04-21 for the sec-05 Phase 1 staging conversion
+# (build_fund_classes + build_benchmark_weights): fund_classes,
+# lei_reference, benchmark_weights all route through pk_diff. Natural
+# keys are empirically unique — see sec-05-p0-findings.md §3.
 CANONICAL_TABLES = [
     "cusip_classifications",
     "securities",
@@ -125,6 +131,9 @@ CANONICAL_TABLES = [
     "cik_crd_direct",
     "managers",
     "cik_crd_links",
+    "fund_classes",
+    "lei_reference",
+    "benchmark_weights",
 ]
 
 # Union used by promote_staging.py as its argparse allowlist. Grows as more
