@@ -1,10 +1,12 @@
 datasette==0.65.2
 duckdb==1.4.4
+edgartools==4.6.3
 fastapi==0.115.4
 httpx==0.28.1
 jinja2==3.1.6
 openpyxl==3.1.5
 pandas==2.3.3
+pdfplumber==0.11.8
 pydantic==2.12.5
 rapidfuzz==3.13.0
 requests==2.32.5
