@@ -51,6 +51,24 @@ import os
 import duckdb
 
 
+VERSION = "add_last_refreshed_at"
+NOTES = "entity_relationships.last_refreshed_at column + backfill"
+
+
+def _already_stamped(con, version: str) -> bool:
+    """True if `schema_versions` has a row for `version`. False if the
+    table is missing (pre-003 DB) or the row is absent."""
+    row = con.execute(
+        "SELECT 1 FROM duckdb_tables() WHERE table_name = 'schema_versions'"
+    ).fetchone()
+    if not row:
+        return False
+    row = con.execute(
+        "SELECT 1 FROM schema_versions WHERE version = ?", [version]
+    ).fetchone()
+    return row is not None
+
+
 def run_migration(db_path: str, dry_run: bool = False) -> None:
     if not os.path.exists(db_path):
         print(f"  SKIP: {db_path} does not exist")
@@ -65,7 +83,23 @@ def run_migration(db_path: str, dry_run: bool = False) -> None:
         """).fetchall()
 
         if cols_before:
-            print(f"  {db_path}: last_refreshed_at already present — no-op")
+            if not _already_stamped(con, VERSION):
+                if dry_run:
+                    print(f"  {db_path}: last_refreshed_at already present, "
+                          f"schema_versions stamp missing")
+                    print(f"    WILL INSERT schema_versions: {VERSION}")
+                    print("  DRY-RUN — no writes.")
+                else:
+                    con.execute(
+                        "INSERT OR IGNORE INTO schema_versions "
+                        "(version, notes) VALUES (?, ?)",
+                        [VERSION, NOTES],
+                    )
+                    con.execute("CHECKPOINT")
+                    print(f"  {db_path}: last_refreshed_at already present — "
+                          f"backfilled schema_versions stamp")
+            else:
+                print(f"  {db_path}: last_refreshed_at already present — no-op")
             return
 
         n_total = con.execute(
@@ -75,13 +109,17 @@ def run_migration(db_path: str, dry_run: bool = False) -> None:
             "SELECT COUNT(*) FROM entity_relationships "
             "WHERE created_at IS NOT NULL"
         ).fetchone()[0]
+        stamped = _already_stamped(con, VERSION)
         print(f"  {db_path}: dry_run={dry_run}")
         print(f"    rows total              : {n_total:,}")
         print(f"    rows with created_at    : {n_with_created:,}")
         print(f"    rows without created_at : {n_total - n_with_created:,}")
+        print(f"    schema_versions stamped : {stamped}")
         print("  WILL ADD: last_refreshed_at TIMESTAMP")
         print("  WILL BACKFILL: last_refreshed_at = created_at "
               "WHERE created_at IS NOT NULL")
+        if not stamped:
+            print(f"  WILL INSERT schema_versions: {VERSION}")
 
         if dry_run:
             print("  DRY-RUN — no writes.")
@@ -102,6 +140,12 @@ def run_migration(db_path: str, dry_run: bool = False) -> None:
             WHERE last_refreshed_at IS NULL
               AND created_at IS NOT NULL
         """)
+        if not _already_stamped(con, VERSION):
+            con.execute(
+                "INSERT OR IGNORE INTO schema_versions "
+                "(version, notes) VALUES (?, ?)",
+                [VERSION, NOTES],
+            )
         con.execute("CHECKPOINT")
 
         n_backfilled = con.execute(
