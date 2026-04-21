@@ -44,7 +44,9 @@ US_PRICEABLE_EXCHANGES = frozenset({
 # (US composite + Frankfurt/XETRA/OTC secondary listings). See
 # docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md RC1.
 US_PRICEABLE_EXCHCODES = frozenset({
-    'US', 'UN', 'UW', 'UQ', 'UR', 'UA', 'UF', 'UP', 'UV', 'UD', 'UX',
+    'US',                                              # composite
+    'UA', 'UB', 'UC', 'UD', 'UF', 'UM', 'UN',
+    'UP', 'UQ', 'UR', 'UT', 'UV', 'UW', 'UX',
 })
 
 
