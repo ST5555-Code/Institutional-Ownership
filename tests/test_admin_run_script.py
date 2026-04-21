@@ -56,10 +56,21 @@ def client():
 
 @pytest.fixture
 def logged_in(client):
-    resp = client.post("/api/admin/login", json={"token": ADMIN_TOKEN})
-    assert resp.status_code == 200, resp.text
-    yield client
-    client.post("/api/admin/logout")
+    # These tests exercise the /run_script flock — not session auth. The real
+    # auth dependency (require_admin_session) lazily ATTACHes admin.duckdb per
+    # thread; two worker threads racing that ATTACH hit a DuckDB 1.4.4
+    # catalog-visibility race that surfaces here as a CatalogException, turning
+    # this test flaky for reasons unrelated to the lock being tested. Bypass
+    # the dependency with FastAPI's dependency_overrides so the test isolates
+    # the flock behavior it exists to verify.
+    import app as app_module  # noqa: E402
+    import admin_bp  # noqa: E402
+
+    app_module.app.dependency_overrides[admin_bp.require_admin_session] = lambda: None
+    try:
+        yield client
+    finally:
+        app_module.app.dependency_overrides.pop(admin_bp.require_admin_session, None)
 
 
 @pytest.fixture
