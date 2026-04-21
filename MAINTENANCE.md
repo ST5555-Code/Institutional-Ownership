@@ -134,6 +134,45 @@ python3 scripts/<mirror>_to_prod.py
 `fund_holdings_v2.ticker` (+1.45M rows) from staging without
 re-hitting Yahoo; runtime seconds, fully restart-safe.
 
+### Concrete workflow — OpenFIGI / CUSIP refetch
+
+The general pattern above specialises to a five-step loop for CUSIP /
+OpenFIGI refetches (int-01 and successors). The loop is fully
+restart-safe: each step is idempotent and checkpoints to
+`cusip_retry_queue` (re-queue) or `cusip_classifications` (resolution).
+
+```bash
+# 1. Re-queue affected items (no external API calls; metadata only)
+python3 scripts/oneoff/int_01_requeue.py
+
+# 2. Retry against staging (only step that hits OpenFIGI)
+python3 scripts/run_openfigi_retry.py --staging
+
+# 3. Propagate resolved rows through the staging CUSIP tables
+python3 scripts/build_cusip.py --staging --skip-openfigi
+
+# 4. Verify acceptance criteria — read-only SQL checks
+#    Use scripts/validate_classifications.py or ad-hoc duckdb queries
+#    against data/13f_staging.duckdb: row counts, nullability deltas,
+#    priceability gain/loss, and parity against prod for unchanged rows.
+python3 scripts/validate_classifications.py --staging
+
+# 5. Promote staging → prod (authorization required)
+python3 scripts/promote_staging.py --approved --tables cusip_classifications,securities
+```
+
+**Authorization note.** Step 5 is the only step that writes to
+`data/13f.duckdb`. Never run it without explicit approval — the
+staging → prod mirror is destructive on the target rows.
+`promote_staging.py` takes the intra-DB snapshot automatically and
+auto-rolls back on structural validation failure.
+
+**Why this shape.** Steps 1-4 are fully restart-safe and side-effect
+free against prod. Step 2 is the only network round-trip. Steps 3-4
+converge to a deterministic staging state regardless of interruption.
+Step 5 is atomic per table and reversible via
+`rollback_promotion.py --restore`.
+
 ## Rollback Procedures
 
 ```bash
