@@ -6,13 +6,23 @@ fetch_adv.py — Download SEC bulk ADV data, parse key fields, classify managers
 Run: python3 scripts/fetch_adv.py
 """
 
+import io
+import json
 import os
 import time
+import uuid
 import zipfile
-import io
-import requests
-import pandas as pd
+from datetime import datetime
+
 import duckdb
+import pandas as pd
+import requests
+
+from pipeline.manifest import (
+    get_or_create_manifest_row,
+    update_manifest_status,
+    write_impact,
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -224,7 +234,7 @@ def flag_activists(df):
 
 
 def save_to_duckdb(df):
-    """Save adv_managers table to DuckDB."""
+    """Save adv_managers table to DuckDB. Returns row count written."""
     # Select final columns
     final_cols = [
         "crd_number", "sec_file_number", "cik", "firm_name", "legal_name",
@@ -267,6 +277,7 @@ def save_to_duckdb(df):
     con.execute("CHECKPOINT")
     record_freshness(con, "adv_managers", row_count=row_count)
     con.close()
+    return row_count
 
 
 def main():
@@ -274,25 +285,100 @@ def main():
     print("SCRIPT 1 — fetch_adv.py")
     print("=" * 60)
 
-    # Step 1: Download
-    zip_bytes = download_adv_zip()
+    run_id = f"adv_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    zip_filename = os.path.basename(ADV_ZIP_URL)
+    object_key = f"ADV_BULK:{zip_filename}"
 
-    # Step 2: Extract
-    csv_path = extract_csv(zip_bytes)
+    # Register manifest row before download.
+    con = duckdb.connect(DB_PATH)
+    try:
+        manifest_id = get_or_create_manifest_row(
+            con,
+            source_type="ADV",
+            object_type="ZIP",
+            source_url=ADV_ZIP_URL,
+            accession_number=None,
+            run_id=run_id,
+            object_key=object_key,
+            fetch_status="fetching",
+            fetch_started_at=datetime.now(),
+        )
+        # Re-entrant runs: reset status so final update reflects this attempt.
+        update_manifest_status(
+            con, manifest_id, "fetching",
+            run_id=run_id,
+            fetch_started_at=datetime.now(),
+            fetch_completed_at=None,
+            error_message=None,
+        )
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
 
-    # Step 3: Parse
-    df = load_and_parse(csv_path)
+    try:
+        # Step 1: Download
+        zip_bytes = download_adv_zip()
 
-    # Step 4: Classify strategy
-    print("\nClassifying manager strategies...")
-    df["strategy_inferred"] = df.apply(classify_strategy, axis=1)
+        # Step 2: Extract
+        csv_path = extract_csv(zip_bytes)
 
-    # Step 5: Flag activists
-    print("\nFlagging activist managers...")
-    df = flag_activists(df)
+        # Step 3: Parse
+        df = load_and_parse(csv_path)
 
-    # Step 6: Save
-    save_to_duckdb(df)
+        # Step 4: Classify strategy
+        print("\nClassifying manager strategies...")
+        df["strategy_inferred"] = df.apply(classify_strategy, axis=1)
+
+        # Step 5: Flag activists
+        print("\nFlagging activist managers...")
+        df = flag_activists(df)
+
+        # Step 6: Save
+        row_count = save_to_duckdb(df)
+    except Exception as exc:
+        con = duckdb.connect(DB_PATH)
+        try:
+            update_manifest_status(
+                con, manifest_id, "failed",
+                fetch_completed_at=datetime.now(),
+                error_message=str(exc)[:500],
+            )
+            con.execute("CHECKPOINT")
+        finally:
+            con.close()
+        raise
+
+    # Write impact + finalize manifest (direct-write = promoted at write time).
+    today = datetime.now().strftime("%Y-%m-%d")
+    con = duckdb.connect(DB_PATH)
+    try:
+        # Remove any prior impact row for this manifest so re-runs don't duplicate.
+        con.execute(
+            "DELETE FROM ingestion_impacts WHERE manifest_id = ?",
+            [manifest_id],
+        )
+        write_impact(
+            con,
+            manifest_id=manifest_id,
+            target_table="adv_managers",
+            unit_type="bulk_load",
+            unit_key_json=json.dumps({"filename": zip_filename}),
+            report_date=today,
+            rows_staged=row_count,
+            load_status="loaded",
+            promote_status="promoted",
+            rows_promoted=row_count,
+            promoted_at=datetime.now(),
+        )
+        update_manifest_status(
+            con, manifest_id, "complete",
+            fetch_completed_at=datetime.now(),
+            http_code=200,
+            source_bytes=len(zip_bytes),
+        )
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
 
     print("\nDone.")
 
