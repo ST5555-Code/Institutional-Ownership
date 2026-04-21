@@ -5,8 +5,8 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ## Theme 1 — Data integrity foundation
 
 ### Batch 1-A (parallel-eligible within batch: NO — all items share securities/CUSIP/ticker path)
-- [ ] int-01 BLOCK-SEC-AUD-1 RC1: OpenFIGI foreign-exchange ticker filter (build_cusip.py, run_openfigi_retry.py)
-- [ ] int-04 BLOCK-SEC-AUD-4 RC4: issuer_name propagation scope guard (normalize_securities.py)
+- [x] int-01 BLOCK-SEC-AUD-1 RC1: OpenFIGI foreign-exchange ticker filter (build_cusip.py, run_openfigi_retry.py) — PRs #13, #15 (data sweep complete; 216 residual = legitimate foreign-only)
+- [x] int-04 BLOCK-SEC-AUD-4 RC4: issuer_name propagation scope guard (normalize_securities.py) — PRs #18, #22
 - [ ] int-05 BLOCK-TICKER-BACKFILL Phase 1a retroactive Pass C sweep (enrich_holdings.py invocation)
 - [ ] int-10 INF26 OpenFIGI `_update_error()` permanent-pending bug (run_openfigi_retry.py)
 - [ ] int-23 BLOCK-SEC-AUD-5 universe expansion 132K→430K acceptance (cusip_classifier.py decision)
@@ -47,7 +47,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 2-A (parallel-eligible within batch: YES — obs-01 ∥ obs-03, disjoint files)
 - [ ] obs-01 MAJOR-9 D-07/P-05 N-CEN + ADV into ingestion_manifest (fetch_ncen.py, fetch_adv.py, migrations/001)
-- [ ] obs-03 MAJOR-13 P-04 market impact_id allocation hardening (pipeline/manifest.py, fetch_market.py)
+- [x] obs-03 MAJOR-13 P-04 market impact_id allocation hardening (pipeline/manifest.py, fetch_market.py) — PRs #8, #12
 
 ### Batch 2-B (parallel-eligible within batch: NO — both touch fetch_adv.py / promote_13dg.py)
 - [ ] obs-02 MAJOR-12 P-02 ADV freshness + log (fetch_adv.py)
@@ -105,11 +105,11 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ## Theme 4 — Security hardening
 
 ### Batch 4-A (parallel-eligible within batch: NO — both touch admin_bp.py)
-- [ ] sec-01 MAJOR-11 D-11 admin token localStorage → server-side session (admin.html, admin_bp.py)
-- [ ] sec-02 MAJOR-10 C-11 admin `/run_script` TOCTOU race (admin_bp.py)
+- [x] sec-01 MAJOR-11 D-11 admin token localStorage → server-side session (admin.html, admin_bp.py) — PRs #5, #7, #9, #10, #21
+- [x] sec-02 MAJOR-10 C-11 admin `/run_script` TOCTOU race (admin_bp.py) — PRs #11, #14, #19
 
 ### Batch 4-B (parallel-eligible within batch: NO — sec-04 shares pipeline/shared.py with Theme 1)
-- [ ] sec-03 MAJOR-5 C-09 admin endpoint write-surface audit (admin_bp.py)
+- [x] sec-03 MAJOR-5 C-09 admin endpoint write-surface audit (admin_bp.py) — PRs #16, #17
 - [ ] sec-04 MAJOR-1 C-02 validators writing to prod (validate_nport_subset.py, pipeline/shared.py)
 
 ### Batch 4-C (parallel-eligible within batch: NO — sec-05 overlaps mig-14; sec-06 touches many scripts)
@@ -128,16 +128,16 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ## Theme 5 — Operational surface
 
 ### Batch 5-A (parallel-eligible within batch: SELECTIVE — ops-01 ∥ ops-05 ∥ ops-07 ∥ ops-04 disjoint; ops-10 ∥ ops-11 serial on ROADMAP.md)
-- [ ] ops-01 MINOR-6 DOC-01 README retired update.py references (README.md)
-- [ ] ops-02 MINOR-7 DOC-02 README project tree refresh (README.md — serial with ops-01)
-- [ ] ops-03 MINOR-8 DOC-03 PHASE3_PROMPT retired fetch_nport (PHASE3_PROMPT.md)
-- [ ] ops-04 MINOR-9 DOC-04 ARCH_REVIEW vs REACT_MIGRATION Phase 4 contradiction (ARCHITECTURE_REVIEW.md, REACT_MIGRATION.md)
-- [ ] ops-05 MINOR-10 DOC-05 README_deploy React build prereq (README_deploy.md)
-- [ ] ops-07 MINOR-12 DOC-09 CLASSIFICATION_METHODOLOGY entity count (CLASSIFICATION_METHODOLOGY.md)
-- [ ] ops-08 MINOR-13 DOC-10 PHASE1/3/4 prompts housekeeping
-- [ ] ops-10 MINOR-1 R-01 ROADMAP 13DG exclusion count 928 vs 931 (ROADMAP.md)
-- [ ] ops-11 MINOR-2 R-02 ROADMAP NULL-CIK count 4 vs 5 (ROADMAP.md — serial with ops-10)
-- [ ] ops-12 Pass 2 §8.2 migration 007 NULL-target doc note
+- [x] ops-01 MINOR-6 DOC-01 README retired update.py references (README.md) — PR #6
+- [x] ops-02 MINOR-7 DOC-02 README project tree refresh (README.md — serial with ops-01) — PR #6
+- [x] ops-03 MINOR-8 DOC-03 PHASE3_PROMPT retired fetch_nport (PHASE3_PROMPT.md) — PR #6
+- [x] ops-04 MINOR-9 DOC-04 ARCH_REVIEW vs REACT_MIGRATION Phase 4 contradiction (ARCHITECTURE_REVIEW.md, REACT_MIGRATION.md) — PR #6
+- [x] ops-05 MINOR-10 DOC-05 README_deploy React build prereq (README_deploy.md) — PR #6
+- [x] ops-07 MINOR-12 DOC-09 CLASSIFICATION_METHODOLOGY entity count (CLASSIFICATION_METHODOLOGY.md) — PR #6
+- [x] ops-08 MINOR-13 DOC-10 PHASE1/3/4 prompts housekeeping — PR #6
+- [x] ops-10 MINOR-1 R-01 ROADMAP 13DG exclusion count 928 vs 931 (ROADMAP.md) — PR #6
+- [x] ops-11 MINOR-2 R-02 ROADMAP NULL-CIK count 4 vs 5 (ROADMAP.md — serial with ops-10) — PR #6
+- [x] ops-12 Pass 2 §8.2 migration 007 NULL-target doc note — PR #6
 
 ### Batch 5-B (parallel-eligible within batch: YES — disjoint)
 - [ ] ops-06 MINOR-11 DOC-06 write_path_risk_map stale
