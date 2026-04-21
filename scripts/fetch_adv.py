@@ -274,8 +274,11 @@ def save_to_duckdb(df):
     print(f"\nActivist managers ({len(activist_list)}):")
     print(activist_list.to_string(index=False))
 
+    try:
+        record_freshness(con, "adv_managers", row_count=row_count)
+    except Exception as e:
+        print(f"  [warn] record_freshness(adv_managers) failed: {e}", flush=True)
     con.execute("CHECKPOINT")
-    record_freshness(con, "adv_managers", row_count=row_count)
     con.close()
     return row_count
 
