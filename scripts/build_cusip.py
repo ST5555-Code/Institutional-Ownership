@@ -321,7 +321,8 @@ SET ticker                = COALESCE(cc.ticker, s.ticker),
     is_priceable          = cc.is_priceable,
     ticker_expected       = cc.ticker_expected,
     is_active             = cc.is_active,
-    figi                  = COALESCE(cc.figi, s.figi)
+    figi                  = COALESCE(cc.figi, s.figi),
+    issuer_name           = COALESCE(cc.issuer_name, s.issuer_name)
 FROM cusip_classifications cc
 WHERE s.cusip = cc.cusip
 """
