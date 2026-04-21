@@ -44,7 +44,7 @@ import duckdb
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
-from config import LATEST_QUARTER, PREV_QUARTER
+from config import LATEST_QUARTER, PREV_QUARTER, configure_edgar_identity
 from db import PROD_DB
 from queries import clean_for_json, df_to_records
 
@@ -465,7 +465,7 @@ def api_add_ticker(body: dict = Body(default={})):
         # Step 3: Fetch 13D/G filings
         try:
             import edgar  # pylint: disable=import-error,import-outside-toplevel
-            edgar.set_identity("serge.tismen@gmail.com")
+            configure_edgar_identity()
             company = edgar.Company(ticker)
             filing_count = 0
             for form in ['SC 13D', 'SC 13G']:

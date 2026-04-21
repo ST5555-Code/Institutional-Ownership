@@ -31,9 +31,9 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from db import set_staging_mode, get_db_path, set_test_mode, crash_handler, record_freshness
+from config import FINRA_HEADERS
 
 FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
-FINRA_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 MAX_WORKERS = 8
 
 _thread_local = threading.local()

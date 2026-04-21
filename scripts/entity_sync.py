@@ -430,7 +430,7 @@ def sync_from_ncen_row(
 # =============================================================================
 # Phase 3 — SEC company search resolver
 # =============================================================================
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
+from config import SEC_HEADERS
 
 
 def resolve_cik_via_sec(cik: str, session=None) -> dict | None:

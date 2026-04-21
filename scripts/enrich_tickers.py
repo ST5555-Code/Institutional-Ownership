@@ -23,9 +23,9 @@ from rapidfuzz import fuzz, process
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from db import get_db_path, set_staging_mode
+from config import SEC_HEADERS
 REF_DIR = os.path.join(BASE_DIR, "data", "reference")
 
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5
 
 SEC_13F_LIST_URL = "https://www.sec.gov/files/investment/13flist2025q4.txt"

@@ -27,8 +27,7 @@ print = functools.partial(print, flush=True)  # pylint: disable=redefined-builti
 import duckdb
 
 from db import get_db_path, set_staging_mode
-
-SEC_UA = "serge.tismen@gmail.com"
+from config import EDGAR_IDENTITY
 
 
 def clean_text(raw):
@@ -101,7 +100,7 @@ def download_filing(acc, subject_cik, filer_cik):
         try:
             result = subprocess.run(
                 ["curl", "-s", "-f", "-m", "8", "--connect-timeout", "5",
-                 "-H", f"User-Agent: {SEC_UA}", url],
+                 "-H", f"User-Agent: {EDGAR_IDENTITY}", url],
                 capture_output=True, text=True, timeout=12,
                 check=False
             )

@@ -30,7 +30,7 @@ OVERRIDES_PATH = os.path.join(REF_DIR, "ticker_overrides.csv")
 PENDING_PATH = os.path.join(REF_DIR, "ticker_overrides_pending.csv")
 LOG_PATH = os.path.join(REF_DIR, "auto_resolve_log.csv")
 
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
+from config import SEC_HEADERS
 SEC_DELAY = 0.5
 
 AUTO_APPLY_THRESHOLD = 92

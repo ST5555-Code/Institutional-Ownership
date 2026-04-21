@@ -85,8 +85,9 @@ from pipeline.protocol import (  # noqa: E402
 from pipeline.shared import sec_fetch  # noqa: E402
 
 
+from config import SEC_HEADERS, configure_edgar_identity
+
 L1_DIR = os.path.join(BASE_DIR, "data", "nport_raw")
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 PARSER_VERSION = "nport_v2.1"
 
 # Backward-compat alias for any caller that still reads TEST_FUNDS as the
@@ -425,8 +426,8 @@ class NPortXMLPipeline:
         once for the current calendar quarter — NOT once per historical
         quarter — and anti-join the manifest on accession_number.
         """
-        from edgar import set_identity, get_filings  # local import
-        set_identity("13f-research serge.tismen@gmail.com")
+        from edgar import get_filings  # local import
+        configure_edgar_identity()
 
         year, quarter = self.current_quarter
         try:

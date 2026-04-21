@@ -167,9 +167,10 @@ def discover_nport(
     of which path produced it). Returns accession-level targets;
     series-level splitting happens in parse().
     """
-    from edgar import set_identity, Company, get_filings  # local import
+    from edgar import Company, get_filings  # local import
+    from config import configure_edgar_identity
 
-    set_identity("13f-research serge.tismen@gmail.com")
+    configure_edgar_identity()
 
     t = _today(today)
     cutoff = t - timedelta(days=75)
