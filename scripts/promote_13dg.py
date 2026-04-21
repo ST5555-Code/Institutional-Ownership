@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # CHECKPOINT GRANULARITY POLICY
 # promote_13dg.py unit: one run_id (all staged rows for a validated run).
-# This is the commit-or-rollback boundary for a 13D/G scoped run.
+# mig-01 Phase 1 (2026-04-21) — the write sequence is wrapped in one
+# explicit BEGIN TRANSACTION / COMMIT / ROLLBACK boundary. Manifest +
+# impacts mirror, beneficial_ownership_v2 DELETE+INSERT, bulk
+# enrichment, beneficial_ownership_current rebuild, and the impacts
+# UPDATE all roll back together on any failure. A single CHECKPOINT
+# runs after COMMIT (DuckDB rejects CHECKPOINT inside a transaction).
 """promote_13dg.py — staging → prod for SC 13D/G filings.
 
 Runs after validate_13dg.py. Refuses to promote if:
@@ -35,7 +40,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import PROD_DB, STAGING_DB  # noqa: E402
-from pipeline.id_allocator import reserve_ids  # noqa: E402
+from pipeline.manifest import mirror_manifest_and_impacts  # noqa: E402
 from pipeline.shared import (  # noqa: E402
     bulk_enrich_bo_filers,
     rebuild_beneficial_ownership_current,
@@ -201,117 +206,49 @@ def main() -> None:
                 "ingestion_manifest not present in prod — run migration 001 first"
             ) from exc
 
-        # Mirror manifest rows from staging to prod so prod's impacts FK
-        # resolves. For the scoped reference vertical this is a small
-        # insert; long-term the orchestrator handles manifest promotion.
-        manifest_ids = set(rows["manifest_id"].tolist())
-        mf_rows = staging_con.execute(
-            f"SELECT * FROM ingestion_manifest WHERE manifest_id IN "
-            f"({','.join('?' * len(manifest_ids))})",
-            list(manifest_ids),
-        ).fetchdf()
-        if not mf_rows.empty:
-            prod_con.register("mf", mf_rows)
-            # ingestion_manifest has both PRIMARY KEY (manifest_id) and
-            # UNIQUE (object_key), so DuckDB rejects a bare ON CONFLICT
-            # DO UPDATE. Delete by either key first, then insert.
-            m_ids = [int(x) for x in mf_rows["manifest_id"].tolist()]
-            m_keys = mf_rows["object_key"].tolist()
-            prod_con.execute(
-                f"DELETE FROM ingestion_manifest "
-                f"WHERE manifest_id IN ({','.join('?' * len(m_ids))})",
-                m_ids,
+        # mig-01 Phase 1: wrap the whole write sequence in one explicit
+        # transaction. Manifest mirror + BO v2 DELETE+INSERT + bulk
+        # enrichment + BO-current rebuild + impacts UPDATE all roll back
+        # together on any failure. CHECKPOINT cannot run inside a DuckDB
+        # transaction — the single post-COMMIT CHECKPOINT below replaces
+        # the four former intermediate ones.
+        prod_con.execute("BEGIN TRANSACTION")
+        try:
+            # Mirror manifest + impacts from staging to prod so prod's
+            # impacts FK resolves and the _update_impacts below has rows
+            # to hit. Audit-preservation is inside the helper.
+            mirror_manifest_and_impacts(
+                prod_con, staging_con, args.run_id, "13DG",
             )
-            prod_con.execute(
-                f"DELETE FROM ingestion_manifest "
-                f"WHERE object_key IN ({','.join('?' * len(m_keys))})",
-                m_keys,
-            )
-            prod_con.execute(
-                "INSERT INTO ingestion_manifest SELECT * FROM mf"
-            )
-            prod_con.unregister("mf")
 
-        # Mirror the impacts too so promoted_at update below has rows
-        # to hit. Audit-trail preservation (2026-04-17 bugfix): impacts
-        # already `promote_status='promoted'` in prod are preserved —
-        # staging rows would overwrite them with `pending` since staging
-        # never marks impacts promoted, wiping the audit trail on every
-        # re-promote.
-        im_rows = staging_con.execute(
-            f"""
-            SELECT * FROM ingestion_impacts
-            WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})
-            """,
-            list(manifest_ids),
-        ).fetchdf()
-        if not im_rows.empty:
-            prod_con.execute(
-                f"""
-                DELETE FROM ingestion_impacts
-                 WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})
-                   AND promote_status <> 'promoted'
-                """,
-                list(manifest_ids),
-            )
-            # obs-03 Phase 1: allocate prod-side impact_ids via the
-            # central allocator instead of carrying staging PKs across
-            # the mirror. Anti-join runs in pandas so the frame we
-            # INSERT has its impact_id column rewritten to the reserved
-            # range; prod's PK space is never contaminated with a
-            # staging-origin id.
-            kept_rows = prod_con.execute(
-                f"""
-                SELECT manifest_id, unit_type, unit_key_json
-                  FROM ingestion_impacts
-                 WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})
-                """,
-                list(manifest_ids),
-            ).fetchall()
-            existing_keys = {(m, u, k) for m, u, k in kept_rows}
-            if existing_keys:
-                mask = [
-                    (int(m), u, k) not in existing_keys
-                    for m, u, k in zip(
-                        im_rows["manifest_id"],
-                        im_rows["unit_type"],
-                        im_rows["unit_key_json"],
-                    )
-                ]
-                to_insert = im_rows[mask].copy()
-            else:
-                to_insert = im_rows.copy()
-            if not to_insert.empty:
-                new_ids = reserve_ids(
-                    prod_con, "ingestion_impacts", "impact_id",
-                    len(to_insert),
-                )
-                to_insert["impact_id"] = list(new_ids)
-                prod_con.register("im", to_insert)
-                prod_con.execute(
-                    "INSERT INTO ingestion_impacts SELECT * FROM im"
-                )
-                prod_con.unregister("im")
+            print(f"Promoting {len(rows)} staged rows for run_id={args.run_id}")
+            deleted, inserted = _promote(prod_con, rows)
+            print(f"  beneficial_ownership_v2: -{deleted} +{inserted}")
 
-        print(f"Promoting {len(rows)} staged rows for run_id={args.run_id}")
-        deleted, inserted = _promote(prod_con, rows)
-        prod_con.execute("CHECKPOINT")
-        print(f"  beneficial_ownership_v2: -{deleted} +{inserted}")
+            # Group 2 entity enrichment: resolve entity_id + rollup columns
+            # for the filers touched by this run. Scoped — full-refresh lives
+            # in scripts/enrich_13dg.py. Must run before _rebuild_current so
+            # the L4 table inherits enriched values.
+            filer_ciks = set(rows["filer_cik"].dropna().tolist())
+            enriched = bulk_enrich_bo_filers(prod_con, filer_ciks=filer_ciks)
+            print(f"  bo_v2 Group 2 enriched: {enriched:+,} entity_id delta "
+                  f"across {len(filer_ciks)} filer_cik(s)")
 
-        # Group 2 entity enrichment: resolve entity_id + rollup columns
-        # for the filers touched by this run. Scoped — full-refresh lives
-        # in scripts/enrich_13dg.py. Must run before _rebuild_current so
-        # the L4 table inherits enriched values.
-        filer_ciks = set(rows["filer_cik"].dropna().tolist())
-        enriched = bulk_enrich_bo_filers(prod_con, filer_ciks=filer_ciks)
-        prod_con.execute("CHECKPOINT")
-        print(f"  bo_v2 Group 2 enriched: {enriched:+,} entity_id delta "
-              f"across {len(filer_ciks)} filer_cik(s)")
+            cur_rows = _rebuild_current(prod_con)
+            print(f"  beneficial_ownership_current rebuilt: {cur_rows:,} rows")
 
-        cur_rows = _rebuild_current(prod_con)
-        prod_con.execute("CHECKPOINT")
-        print(f"  beneficial_ownership_current rebuilt: {cur_rows:,} rows")
+            promoted = _update_impacts(prod_con, args.run_id)
+            print(f"  ingestion_impacts promoted: {promoted}")
+            prod_con.execute("COMMIT")
+        except Exception:
+            prod_con.execute("ROLLBACK")
+            raise
 
+        # Freshness stamps + CHECKPOINT run outside the transaction.
+        # stamp_freshness is metadata — a crash between COMMIT and the
+        # stamp is recoverable by re-running (the stamp converges).
+        # CHECKPOINT cannot run inside a transaction, so it lives here
+        # exactly once per successful promote.
         stamp_freshness(prod_con, "beneficial_ownership_v2")
         stamp_freshness(prod_con, "beneficial_ownership_current")
         # Logical label (not a real table) — pass explicit row_count
@@ -325,10 +262,7 @@ def main() -> None:
             "beneficial_ownership_v2_enrichment",
             row_count=bo_v2_enriched,
         )
-
-        promoted = _update_impacts(prod_con, args.run_id)
         prod_con.execute("CHECKPOINT")
-        print(f"  ingestion_impacts promoted: {promoted}")
     finally:
         staging_con.close()
         prod_con.close()
