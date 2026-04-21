@@ -36,6 +36,7 @@ import os
 import re
 import secrets as _secrets
 import subprocess  # nosec B404
+import threading
 import uuid
 from datetime import datetime, timedelta
 
@@ -115,6 +116,15 @@ ADMIN_DB = os.path.join(BASE_DIR, 'data', 'admin.duckdb')
 _ADMIN_SCHEMA_NAME = 'adm'
 _ADMIN_BOOTSTRAPPED = False
 
+# sec-01-p1-attach-fix: serialize the per-thread ATTACH in _session_db().
+# DuckDB 1.4.4 has a catalog-visibility race where two connections running
+# ATTACH '...' AS adm concurrently can leave one side with adm present in
+# the catalog but adm.admin_sessions invisible, surfacing downstream as
+# CatalogException on the first SELECT. Holding this lock only while the
+# ATTACH (and one-time bootstrap) runs eliminates the race without
+# serializing subsequent queries. See docs/findings/sec-01-p1-findings.md.
+_ATTACH_LOCK = threading.Lock()
+
 _ADMIN_SESSIONS_DDL = """
 CREATE TABLE IF NOT EXISTS admin_sessions (
     session_id   VARCHAR PRIMARY KEY,
@@ -159,17 +169,21 @@ def _session_db() -> duckdb.DuckDBPyConnection:
     READ_WRITE mode on first use per connection. The fully-qualified name
     `adm.admin_sessions` is used by every caller.
     """
-    _bootstrap_admin_db()
     con = _get_db()
-    try:
-        con.execute(
-            f"ATTACH '{ADMIN_DB}' AS {_ADMIN_SCHEMA_NAME} (READ_WRITE)"
-        )
-    except duckdb.BinderException:
-        # Already attached on this connection — the common path after the
-        # first request on a given thread. DuckDB raises BinderException
-        # ("database X is already attached") which we can safely ignore.
-        pass
+    # Serialize ATTACH across threads — see _ATTACH_LOCK comment above.
+    # Bootstrap is gated by the same lock so two threads on their first
+    # request can't race into duckdb.connect(ADMIN_DB, read_only=False).
+    with _ATTACH_LOCK:
+        _bootstrap_admin_db()
+        try:
+            con.execute(
+                f"ATTACH '{ADMIN_DB}' AS {_ADMIN_SCHEMA_NAME} (READ_WRITE)"
+            )
+        except duckdb.BinderException:
+            # Already attached on this connection — the common path after the
+            # first request on a given thread. DuckDB raises BinderException
+            # ("database X is already attached") which we can safely ignore.
+            pass
     return con
 
 
