@@ -35,6 +35,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import PROD_DB, STAGING_DB  # noqa: E402
+from pipeline.id_allocator import reserve_ids  # noqa: E402
 from pipeline.shared import (  # noqa: E402
     bulk_enrich_bo_filers,
     rebuild_beneficial_ownership_current,
@@ -245,7 +246,6 @@ def main() -> None:
             list(manifest_ids),
         ).fetchdf()
         if not im_rows.empty:
-            prod_con.register("im", im_rows)
             prod_con.execute(
                 f"""
                 DELETE FROM ingestion_impacts
@@ -254,19 +254,44 @@ def main() -> None:
                 """,
                 list(manifest_ids),
             )
-            prod_con.execute(
-                """
-                INSERT INTO ingestion_impacts
-                SELECT im.* FROM im
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM ingestion_impacts p
-                    WHERE p.manifest_id = im.manifest_id
-                      AND p.unit_type   = im.unit_type
-                      AND p.unit_key_json = im.unit_key_json
+            # obs-03 Phase 1: allocate prod-side impact_ids via the
+            # central allocator instead of carrying staging PKs across
+            # the mirror. Anti-join runs in pandas so the frame we
+            # INSERT has its impact_id column rewritten to the reserved
+            # range; prod's PK space is never contaminated with a
+            # staging-origin id.
+            kept_rows = prod_con.execute(
+                f"""
+                SELECT manifest_id, unit_type, unit_key_json
+                  FROM ingestion_impacts
+                 WHERE manifest_id IN ({','.join('?' * len(manifest_ids))})
+                """,
+                list(manifest_ids),
+            ).fetchall()
+            existing_keys = {(m, u, k) for m, u, k in kept_rows}
+            if existing_keys:
+                mask = [
+                    (int(m), u, k) not in existing_keys
+                    for m, u, k in zip(
+                        im_rows["manifest_id"],
+                        im_rows["unit_type"],
+                        im_rows["unit_key_json"],
+                    )
+                ]
+                to_insert = im_rows[mask].copy()
+            else:
+                to_insert = im_rows.copy()
+            if not to_insert.empty:
+                new_ids = reserve_ids(
+                    prod_con, "ingestion_impacts", "impact_id",
+                    len(to_insert),
                 )
-                """
-            )
-            prod_con.unregister("im")
+                to_insert["impact_id"] = list(new_ids)
+                prod_con.register("im", to_insert)
+                prod_con.execute(
+                    "INSERT INTO ingestion_impacts SELECT * FROM im"
+                )
+                prod_con.unregister("im")
 
         print(f"Promoting {len(rows)} staged rows for run_id={args.run_id}")
         deleted, inserted = _promote(prod_con, rows)
