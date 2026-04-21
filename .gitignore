@@ -1,6 +1,10 @@
 # Database and raw data — too large for Git
 data/13f.duckdb
 data/13f.duckdb.wal
+# sec-01-p1 hotfix: admin_sessions lives in its own DB file — bootstrapped
+# on first use by scripts/admin_bp.py. Not tracked in git.
+data/admin.duckdb
+data/admin.duckdb.wal
 data/raw/
 data/extracted/
 data/market/
