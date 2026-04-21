@@ -189,7 +189,13 @@
     // pre-migration entry.
     try { localStorage.removeItem('admin_token'); } catch (e) { /* non-fatal */ }
 
-    async function adminLogin() {
+    // Module-level login lock. The admin page fans out 7+ adminFetch calls on
+    // load; without this, every concurrent 401 would fire its own prompt().
+    // First 401 creates the Promise and shows the prompt; all other 401s await
+    // the same Promise, then retry against the freshly-issued cookie.
+    let _loginPromise = null;
+
+    async function _doLogin() {
         const t = prompt('Admin token — enter ADMIN_TOKEN env value:');
         if (!t) return false;
         const res = await fetch('/api/admin/login', {
@@ -202,6 +208,12 @@
             throw new Error('Admin disabled on server (503) — set ENABLE_ADMIN=1 and ADMIN_TOKEN');
         }
         return res.ok;
+    }
+
+    function adminLogin() {
+        if (_loginPromise) return _loginPromise;
+        _loginPromise = _doLogin().finally(() => { _loginPromise = null; });
+        return _loginPromise;
     }
 
     async function adminFetch(url, opts = {}) {
