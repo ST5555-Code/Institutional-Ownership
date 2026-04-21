@@ -367,12 +367,33 @@ def api_admin_logout_all(response: Response):
 # ---------------------------------------------------------------------------
 
 
+# sec-03-p1 (P0-2): ticker format validation. Upper-case letters, digits,
+# dot, hyphen; 1-10 chars. Covers NYSE/Nasdaq + class-share suffixes
+# (BRK.B, BF-A) while rejecting empty, overlong, or path-traversal input
+# before any external API call.
+TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
+
+
 @admin_router.post('/add_ticker')
 def api_add_ticker(body: dict = Body(default={})):
     """Add a single ticker on-demand: fetch CUSIP, market data, 13D/G filings."""
     ticker = (body.get('ticker') or '').upper().strip()
-    if not ticker:
-        return JSONResponse(status_code=400, content={'error': 'Missing ticker'})
+    if not TICKER_RE.match(ticker):
+        return JSONResponse(status_code=400, content={'error': 'invalid ticker format'})
+
+    # sec-03-p1 (P0-1): flock-based concurrency guard. Single global lock
+    # because the hazard is global — external API quota (OpenFIGI / Yahoo /
+    # SEC / EDGAR) and the PROD_DB single-writer lock. Unlike /run_script
+    # this handler runs entirely in the parent (no child process), so the
+    # parent holds the lock for the full request lifetime and releases it
+    # in finally. See docs/findings/sec-03-p0-findings.md §7.1.
+    lock_path = os.path.join(BASE_DIR, 'data', '.add_ticker.lock')
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(lock_fd)
+        return JSONResponse(status_code=409, content={'error': 'another add_ticker is in flight'})
 
     results = {'ticker': ticker, 'steps': []}
 
@@ -451,6 +472,9 @@ def api_add_ticker(body: dict = Body(default={})):
         results['status'] = 'error'
         results['error'] = str(e)
         return JSONResponse(status_code=500, content=results)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
 
 
 # ---------------------------------------------------------------------------
@@ -942,7 +966,19 @@ def api_admin_entity_override(request: Request, body: bytes = Body(default=b''),
 
     log_path = os.path.join(BASE_DIR, 'logs', 'entity_overrides.log')
     applied, skipped = [], []
-    con = duckdb.connect(staging_path, read_only=False)
+    # sec-03-p1 (P1-1): upgrade DuckDB lock contention from a raw 500
+    # stacktrace to a caller-actionable 409. IOException fires when the
+    # staging file is already held by another writer (a concurrent
+    # /entity_override, merge_staging.py, or unify_positions.py --staging).
+    # BinderException is the same-file different-config variant seen in
+    # sec-01-p1-hotfix. See docs/findings/sec-03-p0-findings.md §7.2.
+    try:
+        con = duckdb.connect(staging_path, read_only=False)
+    except (duckdb.IOException, duckdb.BinderException):
+        return JSONResponse(
+            status_code=409,
+            content={'error': 'staging DB is busy; retry shortly'},
+        )
     try:
         for row_num, row in enumerate(reader, start=2):  # row 1 is header
             try:
