@@ -187,7 +187,7 @@ def _update_no_match(con, cusip: str, reason: str) -> None:
 
 
 def _update_error(con, cusip: str, reason: str) -> None:
-    """Hard HTTP error — bump attempts, leave status='pending'."""
+    """Hard HTTP error — bump attempts; mark unmappable at the attempt limit."""
     con.execute(
         """
         UPDATE cusip_classifications
@@ -205,10 +205,14 @@ def _update_error(con, cusip: str, reason: str) -> None:
         SET attempt_count  = attempt_count + 1,
             last_attempted = NOW(),
             last_error     = ?,
+            status         = CASE
+                WHEN attempt_count + 1 >= ? THEN 'unmappable'
+                ELSE 'pending'
+            END,
             updated_at     = NOW()
         WHERE cusip = ?
         """,
-        [reason, cusip],
+        [reason, MAX_ATTEMPTS, cusip],
     )
 
 
