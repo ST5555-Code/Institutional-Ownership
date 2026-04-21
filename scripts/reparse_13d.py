@@ -29,8 +29,7 @@ print = functools.partial(print, flush=True)  # pylint: disable=redefined-builti
 import duckdb
 
 from db import get_db_path, set_staging_mode
-
-SEC_UA = "serge.tismen@gmail.com"
+from config import EDGAR_IDENTITY
 
 # Rate limiter
 _last_request_time = 0.0
@@ -149,7 +148,7 @@ def download_filing(acc, subject_cik, filer_cik):
         try:
             result = subprocess.run(
                 ["curl", "-s", "-f", "-m", "12", "--connect-timeout", "5",
-                 "-H", f"User-Agent: {SEC_UA}", url],
+                 "-H", f"User-Agent: {EDGAR_IDENTITY}", url],
                 capture_output=True, text=True, timeout=18, check=False,
             )
             if result.returncode == 0 and len(result.stdout) > 200:

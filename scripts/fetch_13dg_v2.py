@@ -66,11 +66,11 @@ from pipeline.protocol import (  # noqa: E402
     DownloadTarget, FetchResult, ParseResult, QCFailure,
 )
 from pipeline.shared import sec_fetch  # noqa: E402
+from config import SEC_HEADERS
 
 
 SCOPED_TICKERS: tuple[str, ...] = ("AR", "OXY", "EQT", "NFLX")
 L1_DIR = os.path.join(BASE_DIR, "data", "13dg_raw")
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 
 # 13D/G windows are narrow — we go back 4 years to be safe against
 # pipeline gaps. Anti-join against manifest will de-duplicate anything

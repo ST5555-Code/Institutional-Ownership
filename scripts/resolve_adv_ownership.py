@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import db  # noqa: E402
 import entity_sync  # noqa: E402
+from config import SEC_HEADERS  # noqa: E402
 
 LOG_DIR = ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -95,7 +96,7 @@ def run_download(targets, limit=None):
     import requests
 
     session = requests.Session()
-    session.headers.update(entity_sync.SEC_HEADERS)
+    session.headers.update(SEC_HEADERS)
 
     work = targets if limit is None else targets[:limit]
     downloaded = 0

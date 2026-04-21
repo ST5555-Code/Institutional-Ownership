@@ -34,6 +34,7 @@ edgar = None
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 from db import get_db_path, set_test_mode, set_staging_mode, is_staging_mode, connect_read, assert_write_safe, crash_handler, record_freshness
+from config import SEC_HEADERS, configure_edgar_identity
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def _init_edgar():
@@ -41,7 +42,7 @@ def _init_edgar():
     global edgar  # pylint: disable=W0603  # module-level cache: lazy import of edgar library
     if edgar is None:
         import edgar as _edgar
-        _edgar.set_identity("serge.tismen@gmail.com")
+        configure_edgar_identity()
         edgar = _edgar
 
 TEST_TICKERS = ["AR", "AM", "DVN", "WBD", "CVX"]
@@ -49,7 +50,6 @@ MAX_WORKERS_PHASE1 = 4
 MAX_WORKERS_PHASE2 = 2  # curl subprocess — no connection pool issues
 _db_lock = threading.Lock()
 _error_log_lock = threading.Lock()
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 MIN_DATE = "2022-01-01"
 FILING_AGENTS = {"Toppan Merrill/FA", "UNKNOWN", "Donnelley Financial Solutions",
                  "ADVISER COMPLIANCE ASSOCIATES LLC"}

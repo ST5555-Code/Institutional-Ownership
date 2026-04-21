@@ -17,10 +17,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
 EXTRACT_DIR = os.path.join(BASE_DIR, "data", "extracted")
 
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5
 
-from config import QUARTER_URLS as QUARTERS
+from config import QUARTER_URLS as QUARTERS, SEC_HEADERS
 from db import crash_handler
 
 

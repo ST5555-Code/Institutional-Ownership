@@ -23,9 +23,9 @@ from datetime import datetime
 import duckdb
 
 from db import get_db_path, set_staging_mode
+from config import EDGAR_IDENTITY
 
 CIK_PATTERN = re.compile(r'^\d{7,10}$')
-SEC_UA = "serge.tismen@gmail.com"
 
 
 def get_unresolved(con):
@@ -85,7 +85,7 @@ def resolve_via_edgar(unresolved_ciks, rate_limit=5):
 
         try:
             result = subprocess.run(
-                ["curl", "-s", "-H", f"User-Agent: {SEC_UA}", url],
+                ["curl", "-s", "-H", f"User-Agent: {EDGAR_IDENTITY}", url],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout.strip():
@@ -121,7 +121,7 @@ def resolve_via_company_tickers(unresolved_ciks):
     """Try SEC company_tickers.json for any CIKs not found via submissions API."""
     print("  Downloading SEC company_tickers.json...")
     result = subprocess.run(
-        ["curl", "-sL", "-H", f"User-Agent: {SEC_UA}",
+        ["curl", "-sL", "-H", f"User-Agent: {EDGAR_IDENTITY}",
          "https://www.sec.gov/files/company_tickers.json"],
         capture_output=True, text=True, timeout=30
     )

@@ -35,8 +35,7 @@ print = functools.partial(print, flush=True)  # pylint: disable=redefined-builti
 import duckdb
 
 from db import get_db_path, set_staging_mode
-
-SEC_UA = "serge.tismen@gmail.com"
+from config import EDGAR_IDENTITY
 
 AGENT_NAMES = [
     "Toppan Merrill/FA",
@@ -82,7 +81,7 @@ def _wait_sec():
 # Source 1: EFTS search-index API
 # ---------------------------------------------------------------------------
 def _fetch_json(url, timeout=10):
-    req = urllib.request.Request(url, headers={"User-Agent": SEC_UA})
+    req = urllib.request.Request(url, headers={"User-Agent": EDGAR_IDENTITY})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
@@ -133,7 +132,7 @@ def resolve_via_header(acc, subject_cik, filer_cik):
         try:
             result = subprocess.run(
                 ["curl", "-s", "-f", "-m", "8", "--connect-timeout", "5",
-                 "-H", f"User-Agent: {SEC_UA}", url],
+                 "-H", f"User-Agent: {EDGAR_IDENTITY}", url],
                 capture_output=True, text=True, timeout=12, check=False,
             )
             if result.returncode == 0 and "<FILED-BY>" in result.stdout:

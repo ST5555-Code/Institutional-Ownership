@@ -60,3 +60,22 @@ SUBADVISER_EXCLUSIONS = {
     'fidelity': ['Geode Capital Management'],
     'fmr': ['Geode Capital Management'],
 }
+
+# --- SEC EDGAR identity (sec-08) --------------------------------------
+#
+# SEC requires a descriptive User-Agent identifying the app + contact email.
+# Rotate the email or app name by editing the constants below — every script
+# imports from here.
+
+EDGAR_CONTACT_EMAIL = "serge.tismen@gmail.com"
+EDGAR_APP_NAME = "13f-research"
+EDGAR_IDENTITY = f"{EDGAR_APP_NAME} {EDGAR_CONTACT_EMAIL}"
+
+SEC_HEADERS = {"User-Agent": EDGAR_IDENTITY}
+FINRA_HEADERS = {"User-Agent": EDGAR_IDENTITY}
+
+
+def configure_edgar_identity() -> None:
+    """Set the process-global edgartools identity. Idempotent."""
+    from edgar import set_identity
+    set_identity(EDGAR_IDENTITY)

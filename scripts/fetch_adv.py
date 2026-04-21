@@ -34,8 +34,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 REF_DIR = os.path.join(DATA_DIR, "reference")
 from db import STAGING_DB, crash_handler
-
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
+from config import SEC_HEADERS
 SEC_DELAY = 0.5  # seconds between SEC requests
 
 ADV_ZIP_URL = (

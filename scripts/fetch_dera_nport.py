@@ -162,8 +162,9 @@ def _ensure_staging_schema(con: duckdb.DuckDBPyConnection) -> None:
 # Constants
 # ---------------------------------------------------------------------------
 
+from config import SEC_HEADERS
+
 DERA_BASE = "https://www.sec.gov/files/dera/data/form-n-port-data-sets"
-USER_AGENT = "13f-research serge.tismen@gmail.com"
 PARSER_VERSION = "dera_nport_v1.0"
 L1_DIR = os.path.join(BASE_DIR, "data", "nport_raw", "dera")
 
@@ -253,7 +254,7 @@ def download_dera_zip(year: int, quarter: int,
     dst = Path(dera_zip_local_path(year, quarter))
     dst.parent.mkdir(parents=True, exist_ok=True)
 
-    headers = {"User-Agent": USER_AGENT}
+    headers = SEC_HEADERS
     head = requests.head(url, headers=headers, timeout=30, allow_redirects=True)
     head.raise_for_status()
     expected_bytes = int(head.headers.get("Content-Length", 0))

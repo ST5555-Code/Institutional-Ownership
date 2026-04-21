@@ -62,9 +62,9 @@ def _brand_tokens_overlap(a, b):
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from db import set_staging_mode, get_db_path, crash_handler, record_freshness
+from config import SEC_HEADERS
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
-SEC_HEADERS = {"User-Agent": "13f-research serge.tismen@gmail.com"}
 SEC_DELAY = 0.5
 NS = {"n": "http://www.sec.gov/edgar/ncen"}
 

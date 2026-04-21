@@ -43,7 +43,8 @@ TICKER_CIK_CSV = os.path.join(BASE_DIR, "data", "reference", "sec_company_ticker
 OVERRIDES_CSV = os.path.join(BASE_DIR, "data", "reference", "shares_overrides.csv")
 CACHE_DIR = os.path.join(BASE_DIR, "data", "cache", "sec_companyfacts")
 
-USER_AGENT = "13f-ownership-research serge.tismen@gmail.com"
+from config import EDGAR_IDENTITY
+
 RATE_LIMIT_SLEEP = 0.11  # ~9 req/sec, under SEC's 10/sec cap
 CACHE_MAX_AGE_DAYS = 90  # SEC files update at filing cadence (quarterly)
 
@@ -54,7 +55,7 @@ class SECSharesClient:
     def __init__(self):
         os.makedirs(CACHE_DIR, exist_ok=True)
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+        self.session.headers.update({"User-Agent": EDGAR_IDENTITY, "Accept": "application/json"})
         self._ticker_to_cik = self._load_ticker_map()
         self._overrides = self._load_overrides()
         self._last_request_ts = 0.0
