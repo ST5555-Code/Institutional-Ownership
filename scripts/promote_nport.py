@@ -2,10 +2,14 @@
 # CHECKPOINT GRANULARITY POLICY
 # promote_nport.py unit: one full run.
 # Batch rewrite (2026-04-17) — the run's tuples are promoted as a single
-# DELETE + INSERT + CHECKPOINT, not per-tuple. Pre-rewrite, per-tuple
-# CHECKPOINT at DERA scale (20K+ tuples) took 2+ hours; batch completes
-# in seconds. Partial promotion is no longer a thing — either the whole
-# run commits or nothing does (prod connection closes on error).
+# DELETE + INSERT, not per-tuple. Pre-rewrite, per-tuple CHECKPOINT at
+# DERA scale (20K+ tuples) took 2+ hours; batch completes in seconds.
+# mig-01 Phase 1 (2026-04-21) — the write sequence is wrapped in one
+# explicit BEGIN TRANSACTION / COMMIT / ROLLBACK boundary. The DELETE
+# of fund_holdings_v2 and its replacement INSERT are now atomic: a
+# mid-sequence crash rolls back cleanly and leaves prod holdings
+# untouched. A single CHECKPOINT runs after COMMIT (DuckDB rejects
+# CHECKPOINT inside a transaction).
 """promote_nport.py — promote staged N-PORT data (staging → prod).
 
 Runs after validate_nport.py marks a run "Promote-ready: YES". Refuses
@@ -49,7 +53,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "scripts"))
 
 from db import PROD_DB, STAGING_DB  # noqa: E402
-from pipeline.id_allocator import reserve_ids  # noqa: E402
+from pipeline.manifest import mirror_manifest_and_impacts  # noqa: E402
 from pipeline.shared import refresh_snapshot, stamp_freshness  # noqa: E402
 
 
@@ -73,98 +77,6 @@ def _assert_promote_ok(report_text: str) -> None:
             "Validation report says NOT promote-ready — aborting. "
             "Resolve BLOCKs (and entity-gate blocks) and re-validate."
         )
-
-
-# ---------------------------------------------------------------------------
-# Manifest / impact mirroring
-# ---------------------------------------------------------------------------
-
-def _mirror_manifest_and_impacts(prod_con, staging_con, run_id: str):
-    """Copy this run's ingestion_manifest + ingestion_impacts rows to prod.
-
-    **Audit-trail preservation (2026-04-17 bugfix):** prod `ingestion_impacts`
-    rows for this run that are already `promote_status='promoted'` are
-    preserved — staging copies would overwrite them with `pending` since
-    staging never marks impacts promoted. Only impacts not yet promoted
-    in prod (or missing entirely) are copied from staging. Manifest rows
-    are replaced wholesale (audit-safe; manifest carries no promote state).
-    """
-    mf_rows = staging_con.execute(
-        "SELECT * FROM ingestion_manifest "
-        "WHERE run_id = ? AND source_type = 'NPORT'",
-        [run_id],
-    ).fetchdf()
-    if mf_rows.empty:
-        return [], []
-    mf_ids = [int(x) for x in mf_rows["manifest_id"].tolist()]
-    mf_keys = mf_rows["object_key"].tolist()
-
-    prod_con.register("mf", mf_rows)
-    prod_con.execute(
-        f"DELETE FROM ingestion_manifest "
-        f"WHERE manifest_id IN ({','.join('?' * len(mf_ids))})",
-        mf_ids,
-    )
-    prod_con.execute(
-        f"DELETE FROM ingestion_manifest "
-        f"WHERE object_key IN ({','.join('?' * len(mf_keys))})",
-        mf_keys,
-    )
-    prod_con.execute("INSERT INTO ingestion_manifest SELECT * FROM mf")
-    prod_con.unregister("mf")
-
-    im_rows = staging_con.execute(
-        f"SELECT * FROM ingestion_impacts "
-        f"WHERE manifest_id IN ({','.join('?' * len(mf_ids))})",
-        mf_ids,
-    ).fetchdf()
-    if not im_rows.empty:
-        # Preserve any existing prod impacts already `promoted` — only
-        # insert impacts that either don't exist in prod or are still
-        # `pending` there. This prevents the re-promote audit wipe.
-        prod_con.execute(
-            f"""
-            DELETE FROM ingestion_impacts
-             WHERE manifest_id IN ({','.join('?' * len(mf_ids))})
-               AND promote_status <> 'promoted'
-            """,
-            mf_ids,
-        )
-        # obs-03 Phase 1: allocate prod-side impact_ids via the central
-        # allocator instead of carrying staging PKs across the mirror.
-        # The anti-join runs in pandas here so the frame we INSERT has
-        # its impact_id column rewritten to the reserved range; prod's
-        # PK space is never contaminated with a staging-origin id.
-        kept_rows = prod_con.execute(
-            f"""
-            SELECT manifest_id, unit_type, unit_key_json
-              FROM ingestion_impacts
-             WHERE manifest_id IN ({','.join('?' * len(mf_ids))})
-            """,
-            mf_ids,
-        ).fetchall()
-        existing_keys = {(m, u, k) for m, u, k in kept_rows}
-        if existing_keys:
-            mask = [
-                (int(m), u, k) not in existing_keys
-                for m, u, k in zip(
-                    im_rows["manifest_id"],
-                    im_rows["unit_type"],
-                    im_rows["unit_key_json"],
-                )
-            ]
-            to_insert = im_rows[mask].copy()
-        else:
-            to_insert = im_rows.copy()
-        if not to_insert.empty:
-            new_ids = reserve_ids(
-                prod_con, "ingestion_impacts", "impact_id", len(to_insert),
-            )
-            to_insert["impact_id"] = list(new_ids)
-            prod_con.register("im", to_insert)
-            prod_con.execute("INSERT INTO ingestion_impacts SELECT * FROM im")
-            prod_con.unregister("im")
-    return mf_ids, im_rows
 
 
 # ---------------------------------------------------------------------------
@@ -277,8 +189,10 @@ def _promote_batch(prod_con, staging_con, manifest_ids,
     """Replace prod rows for every (series_id, report_month) in `tuples`
     with their staged equivalents.
 
-    Executes as a single DELETE + INSERT + CHECKPOINT, not per-tuple —
-    pre-rewrite per-tuple CHECKPOINTs took 2+ hours on DERA-scale runs.
+    Executes as a single DELETE + INSERT, not per-tuple — pre-rewrite
+    per-tuple CHECKPOINTs took 2+ hours on DERA-scale runs. The caller
+    wraps this call in an explicit transaction (mig-01 Phase 1); the
+    single CHECKPOINT runs after COMMIT.
 
     Group 2 entity columns are inserted NULL; `_bulk_enrich_run` fills
     them in one UPDATE after this returns.
@@ -439,77 +353,93 @@ def main() -> None:
                 "ingestion_manifest not present in prod — run migration 001 first"
             ) from exc
 
-        manifest_ids, _impact_rows = _mirror_manifest_and_impacts(
-            prod_con, staging_con, args.run_id,
-        )
-        if not manifest_ids:
-            print(f"No manifest rows for run_id={args.run_id}")
-            return
-
-        tuples = _staged_tuples(staging_con, args.run_id, exclude)
-        print(f"Promoting run_id={args.run_id}  test={args.test}")
-        print(f"  tuples to promote: {len(tuples)}")
-
-        total_deleted, total_inserted = _promote_batch(
-            prod_con, staging_con, manifest_ids, tuples,
-        )
-        series_touched: set[str] = {s for s, _m in tuples}
-        prod_con.execute("CHECKPOINT")
-        print(f"  batch promote: -{total_deleted} +{total_inserted} holdings")
-
-        # Single bulk enrichment pass — fills Group 2 entity columns for
-        # every row inserted above.
-        enriched_series = _bulk_enrich_run(prod_con, series_touched)
-        print(f"  bulk enrichment: {enriched_series} series")
-
-        u = _upsert_universe(
-            prod_con, staging_con, manifest_ids, series_touched,
-        )
-        print(f"  fund_universe upserts: {u}")
-
-        # Batch UPDATE: mark every promoted tuple as `promoted`. The
-        # unit_key_json is a JSON object — build the string with the same
-        # formatting DuckDB produces to ensure IN-match works.
-        if tuples:
-            unit_keys = [
-                json.dumps({"series_id": s, "report_month": m})
-                for s, m in tuples
-            ]
-            prod_con.register(
-                "_tuple_keys",
-                __import__("pandas").DataFrame(
-                    {"unit_key_json": unit_keys}
-                ),
+        # mig-01 Phase 1: wrap the whole write sequence in one explicit
+        # transaction. DELETE+INSERT of fund_holdings_v2 + manifest mirror
+        # + impacts UPDATE all roll back together on any failure.
+        # CHECKPOINT cannot run inside a DuckDB transaction — the single
+        # post-COMMIT CHECKPOINT below replaces the three former
+        # intermediate ones.
+        prod_con.execute("BEGIN TRANSACTION")
+        try:
+            manifest_ids, _impacts_inserted = mirror_manifest_and_impacts(
+                prod_con, staging_con, args.run_id, "NPORT",
             )
-            prod_con.execute(
-                """
-                UPDATE ingestion_impacts
-                   SET promote_status = 'promoted',
-                       rows_promoted  = rows_staged,
-                       promoted_at    = CURRENT_TIMESTAMP
-                 WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
-                                        WHERE run_id = ? AND source_type = 'NPORT')
-                   AND unit_type = 'series_month'
-                   AND unit_key_json IN (SELECT unit_key_json FROM _tuple_keys)
-                """,
-                [args.run_id],
-            )
-            prod_con.unregister("_tuple_keys")
-        else:
-            prod_con.execute(
-                """
-                UPDATE ingestion_impacts
-                   SET promote_status = 'promoted',
-                       rows_promoted  = rows_staged,
-                       promoted_at    = CURRENT_TIMESTAMP
-                 WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
-                                        WHERE run_id = ? AND source_type = 'NPORT')
-                   AND unit_type = 'series_month'
-                """,
-                [args.run_id],
-            )
-        prod_con.execute("CHECKPOINT")
+            if not manifest_ids:
+                prod_con.execute("ROLLBACK")
+                print(f"No manifest rows for run_id={args.run_id}")
+                return
 
+            tuples = _staged_tuples(staging_con, args.run_id, exclude)
+            print(f"Promoting run_id={args.run_id}  test={args.test}")
+            print(f"  tuples to promote: {len(tuples)}")
+
+            total_deleted, total_inserted = _promote_batch(
+                prod_con, staging_con, manifest_ids, tuples,
+            )
+            series_touched: set[str] = {s for s, _m in tuples}
+            print(f"  batch promote: -{total_deleted} +{total_inserted} holdings")
+
+            # Single bulk enrichment pass — fills Group 2 entity columns for
+            # every row inserted above.
+            enriched_series = _bulk_enrich_run(prod_con, series_touched)
+            print(f"  bulk enrichment: {enriched_series} series")
+
+            u = _upsert_universe(
+                prod_con, staging_con, manifest_ids, series_touched,
+            )
+            print(f"  fund_universe upserts: {u}")
+
+            # Batch UPDATE: mark every promoted tuple as `promoted`. The
+            # unit_key_json is a JSON object — build the string with the same
+            # formatting DuckDB produces to ensure IN-match works.
+            if tuples:
+                unit_keys = [
+                    json.dumps({"series_id": s, "report_month": m})
+                    for s, m in tuples
+                ]
+                prod_con.register(
+                    "_tuple_keys",
+                    __import__("pandas").DataFrame(
+                        {"unit_key_json": unit_keys}
+                    ),
+                )
+                prod_con.execute(
+                    """
+                    UPDATE ingestion_impacts
+                       SET promote_status = 'promoted',
+                           rows_promoted  = rows_staged,
+                           promoted_at    = CURRENT_TIMESTAMP
+                     WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
+                                            WHERE run_id = ? AND source_type = 'NPORT')
+                       AND unit_type = 'series_month'
+                       AND unit_key_json IN (SELECT unit_key_json FROM _tuple_keys)
+                    """,
+                    [args.run_id],
+                )
+                prod_con.unregister("_tuple_keys")
+            else:
+                prod_con.execute(
+                    """
+                    UPDATE ingestion_impacts
+                       SET promote_status = 'promoted',
+                           rows_promoted  = rows_staged,
+                           promoted_at    = CURRENT_TIMESTAMP
+                     WHERE manifest_id IN (SELECT manifest_id FROM ingestion_manifest
+                                            WHERE run_id = ? AND source_type = 'NPORT')
+                       AND unit_type = 'series_month'
+                    """,
+                    [args.run_id],
+                )
+            prod_con.execute("COMMIT")
+        except Exception:
+            prod_con.execute("ROLLBACK")
+            raise
+
+        # Freshness stamps + CHECKPOINT run outside the transaction.
+        # stamp_freshness is metadata — a crash between COMMIT and the
+        # stamp is recoverable by re-running (the stamp converges).
+        # CHECKPOINT cannot run inside a transaction, so it lives here
+        # exactly once per successful promote.
         stamp_freshness(prod_con, "fund_holdings_v2")
         stamp_freshness(prod_con, "fund_universe")
         prod_con.execute("CHECKPOINT")

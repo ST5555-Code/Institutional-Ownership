@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from .id_allocator import allocate_id
+from .id_allocator import allocate_id, reserve_ids
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +104,116 @@ def supersede_manifest(
         "WHERE manifest_id = ?",
         [new_manifest_id],
     )
+
+
+# ---------------------------------------------------------------------------
+# Staging → prod mirror
+# ---------------------------------------------------------------------------
+
+def mirror_manifest_and_impacts(
+    prod_con: Any,
+    staging_con: Any,
+    run_id: str,
+    source_type: str,
+) -> tuple[list[int], int]:
+    """Mirror this run's ingestion_manifest + ingestion_impacts rows
+    staging → prod.
+
+    Scoped to (run_id, source_type). Returns
+    ``(manifest_ids, impacts_inserted)``: callers use ``manifest_ids`` to
+    scope subsequent fact-table writes; ``impacts_inserted`` is the count
+    of rows inserted into prod ``ingestion_impacts`` (for logging).
+
+    Audit-preservation (2026-04-17 bugfix): prod impacts already
+    ``promote_status='promoted'`` for this run are preserved — staging
+    rows would overwrite them with ``pending`` since staging never marks
+    impacts promoted, wiping the audit trail on every re-promote. An
+    anti-join on ``(manifest_id, unit_type, unit_key_json)`` leaves those
+    rows untouched.
+
+    obs-03 Phase 1: impact_ids for newly inserted rows are reserved via
+    the central allocator (``reserve_ids``); the staging-origin PK never
+    lands in prod. The allocator's advisory file lock is released as
+    soon as the range is returned — when this helper runs inside an
+    explicit transaction (mig-01 Phase 1), the reserved range is
+    committed together with the INSERT, so rollback releases the
+    reservation cleanly (the next caller re-reads MAX+1).
+
+    Empty manifest rows returns ``([], 0)`` with no writes.
+    """
+    mf_rows = staging_con.execute(
+        "SELECT * FROM ingestion_manifest "
+        "WHERE run_id = ? AND source_type = ?",
+        [run_id, source_type],
+    ).fetchdf()
+    if mf_rows.empty:
+        return [], 0
+    mf_ids = [int(x) for x in mf_rows["manifest_id"].tolist()]
+    mf_keys = mf_rows["object_key"].tolist()
+
+    prod_con.register("mf", mf_rows)
+    # ingestion_manifest has both PRIMARY KEY (manifest_id) and UNIQUE
+    # (object_key), so DuckDB rejects a bare ON CONFLICT DO UPDATE.
+    # Delete by either key first, then insert.
+    prod_con.execute(
+        f"DELETE FROM ingestion_manifest "
+        f"WHERE manifest_id IN ({','.join('?' * len(mf_ids))})",
+        mf_ids,
+    )
+    prod_con.execute(
+        f"DELETE FROM ingestion_manifest "
+        f"WHERE object_key IN ({','.join('?' * len(mf_keys))})",
+        mf_keys,
+    )
+    prod_con.execute("INSERT INTO ingestion_manifest SELECT * FROM mf")
+    prod_con.unregister("mf")
+
+    im_rows = staging_con.execute(
+        f"SELECT * FROM ingestion_impacts "
+        f"WHERE manifest_id IN ({','.join('?' * len(mf_ids))})",
+        mf_ids,
+    ).fetchdf()
+    impacts_inserted = 0
+    if not im_rows.empty:
+        prod_con.execute(
+            f"""
+            DELETE FROM ingestion_impacts
+             WHERE manifest_id IN ({','.join('?' * len(mf_ids))})
+               AND promote_status <> 'promoted'
+            """,
+            mf_ids,
+        )
+        kept_rows = prod_con.execute(
+            f"""
+            SELECT manifest_id, unit_type, unit_key_json
+              FROM ingestion_impacts
+             WHERE manifest_id IN ({','.join('?' * len(mf_ids))})
+            """,
+            mf_ids,
+        ).fetchall()
+        existing_keys = {(m, u, k) for m, u, k in kept_rows}
+        if existing_keys:
+            mask = [
+                (int(m), u, k) not in existing_keys
+                for m, u, k in zip(
+                    im_rows["manifest_id"],
+                    im_rows["unit_type"],
+                    im_rows["unit_key_json"],
+                )
+            ]
+            to_insert = im_rows[mask].copy()
+        else:
+            to_insert = im_rows.copy()
+        if not to_insert.empty:
+            new_ids = reserve_ids(
+                prod_con, "ingestion_impacts", "impact_id", len(to_insert),
+            )
+            to_insert["impact_id"] = list(new_ids)
+            prod_con.register("im", to_insert)
+            prod_con.execute("INSERT INTO ingestion_impacts SELECT * FROM im")
+            prod_con.unregister("im")
+            impacts_inserted = len(to_insert)
+    return mf_ids, impacts_inserted
 
 
 # ---------------------------------------------------------------------------
