@@ -829,9 +829,20 @@ def main():
                         help="run against the staging DB (data/13f_staging.duckdb)")
     target.add_argument("--prod", action="store_true",
                         help="run against the production DB (default)")
-    parser.add_argument("--read-only", action="store_true",
-                        help="open the DB read-only (safe during concurrent writes; "
-                             "all gates are SELECT-only so results are identical)")
+    # Default is read-only. All 16 gates are SELECT-only, so running RO is
+    # safe under concurrent writes and avoids taking a prod write lock from
+    # a "validator". Pass --write/--rw to opt back into read-write (no
+    # current use case — kept as an escape hatch for a future gate that
+    # needs to persist state).
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--read-only", dest="read_only",
+                            action="store_true", default=True,
+                            help="open the DB read-only (default; all gates "
+                                 "are SELECT-only)")
+    mode_group.add_argument("--write", "--rw", dest="read_only",
+                            action="store_false",
+                            help="open the DB read-write (escape hatch; not "
+                                 "needed for any current gate)")
     args = parser.parse_args()
 
     if args.staging:

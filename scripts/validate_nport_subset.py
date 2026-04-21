@@ -11,16 +11,21 @@ runner focuses on the BLOCK-tier checks that actually gate promote, runs
 in under a minute, and writes a `logs/reports/nport_{run_id}.md` with
 `Promote-ready: YES` when all pass.
 
-The excluded series_ids (those failing the entity gate in prod, e.g.
-bond/money-market/index funds that the legacy XML path filtered out) are
-queued in ``pending_entity_resolution`` for later MDM work.
+The validator is **read-only** against prod. The excluded series_ids
+(those failing the entity gate in prod — e.g. bond/money-market/index
+funds that the legacy XML path filtered out) are reported here but
+queued into ``pending_entity_resolution`` by the separate
+``scripts/queue_nport_excluded.py`` script. Split in sec-04-p1 so that
+"validate" stays pure-read.
 
-Usage:
+Usage (two-step: validate, then queue):
     python3 scripts/validate_nport_subset.py \\
         --run-id nport_20260415_060422_352131 \\
         --resolved-file logs/nport_resolved_<run_id>.txt \\
         --excluded-file logs/nport_excluded_<run_id>.txt \\
         --staging
+    python3 scripts/queue_nport_excluded.py \\
+        --excluded-file logs/nport_excluded_<run_id>.txt
 """
 from __future__ import annotations
 
@@ -64,7 +69,9 @@ def main() -> None:
 
     staging_path = STAGING_DB if args.staging else PROD_DB
     stg = duckdb.connect(staging_path, read_only=True)
-    prod = duckdb.connect(PROD_DB)  # write lock — promote will need it too
+    # Validator is read-only. Queueing to pending_entity_resolution is done
+    # by scripts/queue_nport_excluded.py (sec-04-p1).
+    prod = duckdb.connect(PROD_DB, read_only=True)
 
     try:
         # Push resolved + excluded sets into staging for SQL filtering
@@ -179,23 +186,6 @@ def main() -> None:
           AND s.series_id IN (SELECT series_id FROM resolved)
     """, [run_id]).fetchone()
 
-    # Queue excluded series in pending_entity_resolution. ON CONFLICT
-    # (pending_key) DO NOTHING keeps this idempotent across re-runs.
-    if excluded:
-        import pandas as pd
-        exc_df = pd.DataFrame({"series_id": sorted(excluded)})
-        prod.register("excluded_df", exc_df)
-        prod.execute("""
-            INSERT INTO pending_entity_resolution
-                (manifest_id, source_type, identifier_type, identifier_value,
-                 resolution_status, pending_key)
-            SELECT NULL, 'NPORT', 'series_id', e.series_id, 'pending',
-                   'series_id:' || e.series_id
-            FROM excluded_df e
-            ON CONFLICT (pending_key) DO NOTHING
-        """)
-        prod.unregister("excluded_df")
-
     # Verdict
     blocks = []
     if len(dup):
@@ -238,9 +228,11 @@ def main() -> None:
         fh.write(f"- Resolved series missing decision_maker_v1 rollup: "
                  f"**{missing_dm}** / {total} (threshold 0)\n\n")
         fh.write("## Excluded series\n\n")
-        fh.write(f"{len(excluded):,} series queued in "
+        fh.write(f"{len(excluded):,} series eligible for queueing into "
                  f"`pending_entity_resolution` with "
                  f"`source_type='NPORT'`, `identifier_type='series_id'`. "
+                 f"Run `scripts/queue_nport_excluded.py --excluded-file "
+                 f"<path>` to persist; this validator is read-only. "
                  f"Breakdown:\n")
         syn = [s for s in excluded if not s.startswith("S")]
         real = [s for s in excluded if s.startswith("S")]
@@ -257,7 +249,8 @@ def main() -> None:
     print(f"VALIDATION REPORT — N-PORT Run {run_id}")
     print("=" * 60)
     print(f"Resolved:           {len(resolved):,} series")
-    print(f"Excluded (queued):  {len(excluded):,} series")
+    print(f"Excluded (to queue): {len(excluded):,} series (run "
+          f"queue_nport_excluded.py to persist)")
     print(f"Staged rows:        {resolved_rows[0]:,}")
     print(f"BLOCK checks: dup={len(dup)} partial={partials} "
           f"synth_no_entity={synth_no_entity} synth_resolved={synth_resolved} "
@@ -265,7 +258,6 @@ def main() -> None:
     print(f"\nPromote-ready: {'YES' if promote_ok else 'NO'}")
     print(f"Report: {path}")
 
-    prod.execute("CHECKPOINT")
     stg.close()
     prod.close()
     sys.exit(0 if promote_ok else 1)

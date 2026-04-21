@@ -1214,6 +1214,11 @@ def run_quarter(quarter_label: str, dry_run: bool,
     print(f"  staging: {series_written} series, {holdings_written:,} holdings")
     print(f"\nrun_id: {run_id}  (logs/last_dera_run_id.txt)")
     print(f"Next: python3 scripts/validate_nport.py --run-id {run_id} --staging")
+    print("  # For large runs (>~10K series) use the fast subset validator +")
+    print("  # queue step (validator is read-only; queue writes the pending rows):")
+    print(f"  #   python3 scripts/validate_nport_subset.py --run-id {run_id} "
+          "--resolved-file <resolved.txt> --excluded-file <excluded.txt> --staging")
+    print("  #   python3 scripts/queue_nport_excluded.py --excluded-file <excluded.txt>")
     return 0
 
 

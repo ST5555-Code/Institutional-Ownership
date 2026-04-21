@@ -387,6 +387,11 @@ def run_dera_bulk(limit: Optional[int], all_mode: bool, dry_run: bool,
     print("Next:")
     print(f"  python3 scripts/validate_nport.py --changes-only --run-id {run_id} --staging")
     print(f"  python3 scripts/validate_nport.py --run-id {run_id} --staging")
+    print("  # For large runs (>~10K series) use the fast subset validator +")
+    print("  # queue step (validator is read-only; queue writes the pending rows):")
+    print(f"  #   python3 scripts/validate_nport_subset.py --run-id {run_id} "
+          "--resolved-file <resolved.txt> --excluded-file <excluded.txt> --staging")
+    print("  #   python3 scripts/queue_nport_excluded.py --excluded-file <excluded.txt>")
     return 0
 
 
