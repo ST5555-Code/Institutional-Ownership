@@ -28,6 +28,7 @@ the exported symbol is now an APIRouter (`admin_router`).
 from __future__ import annotations
 
 import csv as _csv
+import fcntl
 import hmac
 import io as _io
 import logging
@@ -548,23 +549,44 @@ def api_admin_run_script(body: dict = Body(default={})):
     if script not in allowed:
         return JSONResponse(status_code=400, content={'error': f'Script not allowed: {script}'})
 
+    # sec-02-p1: flock-based concurrency guard. Kernel-level advisory lock on a
+    # per-script sentinel file, acquired non-blocking before spawn. The fd is
+    # passed to the child via `pass_fds`; the kernel keeps the lock alive as
+    # long as any fd pointing at the open file description remains, so the
+    # child holds the lock until it exits (regardless of how it exits — SIGKILL,
+    # OOM, segfault all release it). Parent closes its own fd immediately.
+    # See docs/findings/sec-02-p0-findings.md §4 Option A.
+    lock_path = os.path.join(BASE_DIR, 'data', f'.run_{script}.lock')
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        ps = subprocess.run(['pgrep', '-f', script], capture_output=True, text=True, check=False)  # nosec  # bandit B607 + B603
-        if ps.returncode == 0:
-            return JSONResponse(status_code=409, content={'error': f'{script} is already running'})
-    except Exception as e:  # pylint: disable=broad-except
-        log.debug("run_script pgrep: %s", e)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(lock_fd)
+        return JSONResponse(status_code=409, content={'error': f'{script} is already running'})
 
-    script_path = os.path.join(BASE_DIR, 'scripts', script)
-    if script.endswith('.sh'):
-        cmd = ['bash', script_path] + flags
-    else:
-        cmd = ['python3', '-u', script_path] + flags
+    try:
+        script_path = os.path.join(BASE_DIR, 'scripts', script)
+        if script.endswith('.sh'):
+            cmd = ['bash', script_path] + flags
+        else:
+            cmd = ['python3', '-u', script_path] + flags
 
-    log_name = script.replace('.py', '').replace('.sh', '')
-    log_path = os.path.join(BASE_DIR, 'logs', f'{log_name}_run.log')
-    with open(log_path, 'w', encoding='utf-8') as log_file:
-        proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=BASE_DIR)  # nosec B603
+        log_name = script.replace('.py', '').replace('.sh', '')
+        log_path = os.path.join(BASE_DIR, 'logs', f'{log_name}_run.log')
+        with open(log_path, 'w', encoding='utf-8') as log_file:
+            proc = subprocess.Popen(  # nosec B603
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=BASE_DIR,
+                pass_fds=(lock_fd,),
+                close_fds=True,
+            )
+    finally:
+        # Parent releases its fd unconditionally. On the success path the
+        # child has already inherited a dup and holds the lock; on a Popen
+        # failure the lock must drop so the next request isn't 409-wedged.
+        os.close(lock_fd)
 
     return {
         'status': 'started',
