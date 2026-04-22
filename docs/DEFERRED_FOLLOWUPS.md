@@ -1,18 +1,23 @@
 # Deferred Followups — Tracking Index
 
 Single index of INF## items outside the active work stream. Reconciled 2026-04-22
-after the Remediation Program closed (105 PRs, ~66 items; `docs/REMEDIATION_PLAN.md §Changelog`).
+after conv-12 (Phase 2 admin refresh + Wave 2 pipeline migrations closed; see
+`docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-12)`).
 
-Last refreshed: 2026-04-22 (phase2-prep doc-sync).
+Last refreshed: 2026-04-22 (conv-12 doc-sync).
 
 ## Open items
 
 | ID | Title | Source doc | Priority | Status |
 |----|-------|-----------|----------|--------|
-| INF25 | BLOCK-DENORM-RETIREMENT sequencing (Step 4 — `ticker`/`entity_id`/`rollup_entity_id`/`lei` drops on v2 fact tables) | `ROADMAP.md §Open items`; `docs/data_layers.md §7`; `docs/findings/int-09-p0-findings.md §4` | Architectural | **DEFERRED to Phase 2** — execute after queries.py `is_latest` sweep + read-site audit. Dual-graph resolution decision still open. |
+| INF25 | BLOCK-DENORM-RETIREMENT Step 4 — `ticker` / `entity_id` / `rollup_entity_id` / `lei` drops on v2 fact tables | `ROADMAP.md §Open items`; `docs/data_layers.md §7`; `docs/findings/int-09-p0-findings.md §4` | Architectural | **UNBLOCKED post-Phase-2.** Exit criteria from int-09 Phase 0 now all satisfied (mig-12 done via p2-05, read-site audit tool `scripts/audit_read_sites.py` shipped, join pattern proven, `is_latest` sweep covered 149 sites across `queries.py`). Remaining prerequisite: dual-graph resolution decision for `rollup_entity_id` (two worldviews — EC + DM). Schedulable any time. |
 | INF27 | CUSIP residual-coverage tracking tier | `ROADMAP.md §Open items`; `docs/data_layers.md §11` | Standing | **STANDING curation** — pipeline handles automatically via `build_classifications.py` + `run_openfigi_retry.py`. Revisit trigger: net-increase in `pending` rows across two consecutive runs. |
 | INF37 | `backfill_manager_types` residual — 9 entities / 14,368 rows | `ROADMAP.md §Open items` | Standing | **STANDING curation** — add missing entities to `categorized_institutions_funds_v2.csv` and re-run `backfill_manager_types.py` opportunistically. |
-| INF38 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_float` denominator | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.10`; `ROADMAP.md §Open items` | Low-Medium | **DEFERRED to Phase 2** — needs new float-history data source; execute after first new `SourcePipeline` subclass lands. |
+| INF38 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_float` denominator | `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.10`; `ROADMAP.md §Open items` | Low-Medium | **UNBLOCKED post-Phase-2.** First new `SourcePipeline` subclass has landed (`load_13f_v2.py`). Still needs a new float-history data source before the tier can be implemented in `enrich_holdings.py` Pass B. |
+| P2-FU-01 | Legacy `run_script` allowlist references retired scripts | `scripts/admin_bp.py` (INF12 router, `/run_script` endpoint) | Low | **NEW (conv-12).** After w2-01 … w2-05 retirements the `run_script` allowlist in `admin_bp.py` still names `fetch_nport.py` / `fetch_adv.py` / `fetch_market.py` / `fetch_ncen.py` / `fetch_13dg.py`. Endpoint will 500 if invoked against a retired script; prune after one clean quarterly cycle against the framework so any stale Makefile/scheduler paths surface first. |
+| P2-FU-02 | `scheduler.py` / `update.py` / `benchmark.py` stale-reference audit | `scripts/scheduler.py`, `scripts/update.py`, `scripts/benchmark.py` | Low | **NEW (conv-12).** All three reference now-retired `scripts/fetch_*.py` paths. Repoint to the `scripts/pipeline/load_*.py` subclasses (or to `python3 -m` invocation via the admin CLI) during the same pass as P2-FU-01. |
+| P2-FU-03 | ADV SCD Type 2 conversion | `scripts/pipeline/load_adv.py` (w2-05 chose `direct_write`); `docs/data_layers.md` (`adv_managers` row) | Medium | **NEW (conv-12).** Wave 2 shipped ADV as `direct_write` on `(crd,)` natural key. SCD Type 2 is the natural long-term shape given ADV amendments; deferred because (a) which columns carry history is an open design question and (b) no prod workflow needs point-in-time ADV today. Follow-up when a downstream consumer asks for history. |
+| P2-FU-04 | ADV ownership boundary for `cik_crd_direct` + `lei_reference` | `scripts/pipeline/load_adv.py`; `scripts/build_managers.py` | Low | **NEW (conv-12).** `load_adv.py` deliberately does **not** manage `cik_crd_direct` or `lei_reference`; those stay under `build_managers.py`. Document the seam explicitly (design or `data_layers.md`) or absorb them into the ADV subclass — either is fine, but the current split should not drift into ambiguity. |
 
 ## Closed during Remediation Program (2026-04-22)
 

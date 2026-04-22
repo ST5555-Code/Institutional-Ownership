@@ -1,6 +1,15 @@
 # Pipeline Inventory — DB-Writing Script Audit
 
-_Revised 2026-04-22 (phase2-prep — REMEDIATION PROGRAM COMPLETE). Remediation Program closed (105 PRs #5–#105, ~66 items; `docs/REMEDIATION_PLAN.md §Changelog`). Script-level deltas reflected below in-row:_
+_Revised 2026-04-22 (conv-12 — **PHASE 2 + WAVE 2 COMPLETE**). HEAD `b0baebe`. **All six ingest pipelines now run as `SourcePipeline` subclasses** and register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGISTRY`. Admin dashboard live at `/admin/dashboard`. Wave 2 script-level deltas:_
+
+- _**New subclass modules in `scripts/pipeline/`:** `load_13dg.py` (w2-01, `append_is_latest`), `load_market.py` (w2-02, `direct_write`), `load_nport.py` (w2-03, `append_is_latest`), `load_ncen.py` (w2-04, `scd_type2`), `load_adv.py` (w2-05, `direct_write`). Plus `base.py` (concrete `SourcePipeline` ABC with eight-step flow + atomic promote + explicit column list per p2-10-fix) and `cadence.py` (`PIPELINE_CADENCE` + probe_fns + `expected_delta`)._
+- _**New in `scripts/`:** `load_13f_v2.py` (p2-05 first full subclass exercise, `Load13FPipeline`, `append_is_latest`)._
+- _**Retired to `scripts/retired/` during Wave 2:** `fetch_13dg.py`, `fetch_13dg_v2.py`, `validate_13dg.py`, `promote_13dg.py`, `fetch_market.py`, `fetch_nport.py`, `fetch_nport_v2.py`, `validate_nport.py`, `validate_nport_subset.py`, `promote_nport.py`, `fetch_ncen.py`, `fetch_adv.py`, `promote_adv.py`. All functionality absorbed into the corresponding `load_*.py` subclass; retired copies kept for regression comparison._
+- _**Kept in `scripts/`:** `fetch_dera_nport.py` (DERA ZIP transport helper imported by `pipeline/load_nport.py` on the staging connection); `scripts/pipeline/nport_parsers.py` (shared XML parsing library)._
+- _**Migrations 015–017 applied prod + staging:** 015 amendment-semantics columns (`is_latest`, `loaded_at`, `backfill_quality`) on the three amendable fact tables + `accession_number` on `fund_holdings_v2`; 016 `admin_preferences` control-plane table; 017 `valid_from` / `valid_to` on `ncen_adviser_map` for SCD Type 2._
+- _**Legacy `run_script` allowlist** in `scripts/admin_bp.py` still references retired paths — tracked as a post-Phase-2 follow-up (see `docs/DEFERRED_FOLLOWUPS.md`). `scheduler.py`, `update.py`, `benchmark.py` stale-reference audit also queued._
+
+_Prior revision header (phase2-prep — REMEDIATION PROGRAM COMPLETE). Remediation Program closed (105 PRs #5–#105, ~66 items; `docs/REMEDIATION_PLAN.md §Changelog`). Script-level deltas reflected below in-row:_
 - _`fetch_adv.py` — **STAGING→PROMOTE** split (mig-02, PR #37). Writes to staging; new `promote_adv.py` handles prod atomicity._
 - _`promote_adv.py` — **NEW** (mig-02). Atomic promote for ADV data._
 - _`resolve_agent_names.py` / `resolve_bo_agents.py` / `resolve_names.py` — **RETIRED** to `scripts/retired/` (sec-06, PR #48). Target tables dropped._
@@ -62,17 +71,21 @@ audited for PROCESS_RULES violations.
 | Script | Reads from | Writes to | Legacy refs (file:line) | PROCESS_RULES violations | Action |
 |---|---|---|---|---|---|
 | `fetch_13f.py` | (none) | filesystem only (`data/raw`, `data/extracted`) | none | none (no DB writes) | **OK** |
-| `fetch_nport_v2.py` | EDGAR, DERA ZIPs via `fetch_dera_nport` | `stg_nport_holdings`, `stg_nport_fund_universe`, `ingestion_manifest`, `ingestion_impacts` | — | — | **OK** (SourcePipeline; 4 modes: DERA bulk / `--monthly-topup` XML / `--test` / `--dry-run`) |
+| `scripts/pipeline/load_nport.py` | EDGAR, DERA ZIPs via `fetch_dera_nport` | `stg_nport_holdings`, `stg_nport_fund_universe`, `fund_holdings_v2` (is_latest append), `fund_universe`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (w2-03 `SourcePipeline` subclass `LoadNPortPipeline`, `append_is_latest`; absorbs retired `fetch_nport_v2.py` + `validate_nport*.py` + `promote_nport.py`; scope shapes: `{"quarter":"YYYYQN"}` DERA bulk, `{"monthly_topup":True}` XML topup, `{"month":"YYYY-MM"}`, `{"zip_path":"..."}`, `{"exclude_file":"..."}`) |
+| `scripts/retired/fetch_nport_v2.py` | — | — | — | — | **RETIRED** (w2-03, absorbed by `pipeline/load_nport.py`) |
 | `fetch_dera_nport.py` | SEC DERA ZIPs (`{YYYY}q{N}_nport.zip`) | staging tables (via `fetch_nport_v2`) | — | — | **OK** (transport + parity harness; `--zip` flag for local ZIPs; cross-ZIP amendment dedup live 2026-04-15) |
 | `scripts/retired/fetch_nport.py` (retired) | (not in active pipeline) | N/A — retired | n/a (moved out of `scripts/`) | **RETIRED 2026-04-18 (BLOCK-3 Phase 4)** — helpers (`parse_nport_xml`, `classify_fund`) live at `scripts/pipeline/nport_parsers.py`. File kept functional in `scripts/retired/` for regression comparison against the 2026-04-17 pre-audit backup. | **RETIRED** |
-| `fetch_13dg_v2.py` | EDGAR efts, `listed_filings_13dg`, `beneficial_ownership_v2` | `beneficial_ownership_v2`, `fetched_tickers_13dg`, `listed_filings_13dg`, `ingestion_manifest`, `ingestion_impacts` | — | — | **OK** (SourcePipeline; scoped reference vertical) |
-| `fetch_13dg.py` (legacy) | EDGAR, curl | N/A — pipeline superseded | legacy-table refs | **SUPERSEDED by `fetch_13dg_v2.py`**. Retire after second clean v2 run. | **SUPERSEDED** |
-| `fetch_adv.py` | SEC ADV ZIP (HTTP) | staging tables (via `promote_adv.py`); no direct prod writes | none | — | **OK** (STAGING→PROMOTE split, mig-02 PR #37; prod writes handled by `promote_adv.py`) |
-| `promote_adv.py` | staging, prod | `adv_managers`, `cik_crd_direct`, `lei_reference`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | none | — | **OK** (NEW 2026-04-22, mig-02 PR #37; atomic promote for ADV data) |
-| `fetch_market.py` (v2) | `market_data`, `securities`, `holdings_v2`, `fund_holdings_v2`, `cusip_classifications` | `market_data`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (DirectWritePipeline rewrite, Batch 2A/2B; CUSIP-anchored universe via `securities.canonical_type`) |
+| `scripts/pipeline/load_13dg.py` | EDGAR efts, `listed_filings_13dg`, `beneficial_ownership_v2` | `beneficial_ownership_v2` (is_latest append), `beneficial_ownership_current`, `fetched_tickers_13dg`, `listed_filings_13dg`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (w2-01 `SourcePipeline` subclass `Load13DGPipeline`, `append_is_latest`; absorbs retired `fetch_13dg_v2.py` + `validate_13dg.py` + `promote_13dg.py`; Group 2 entity enrichment via `bulk_enrich_bo_filers` runs at promote time) |
+| `scripts/retired/fetch_13dg_v2.py`, `scripts/retired/fetch_13dg.py`, `scripts/retired/validate_13dg.py`, `scripts/retired/promote_13dg.py` | — | — | — | — | **RETIRED** (w2-01, absorbed by `pipeline/load_13dg.py`) |
+| `scripts/pipeline/load_adv.py` | SEC ADV ZIP (HTTP) | `adv_managers` (direct_write UPSERT on crd), `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | none | — | **OK** (w2-05 `SourcePipeline` subclass `LoadADVPipeline`, `direct_write`; absorbs retired `fetch_adv.py` + `promote_adv.py`; ADV SCD conversion deferred — `adv_managers` carries no `valid_from`/`valid_to` today; `cik_crd_direct` + `lei_reference` stay under `build_managers.py`) |
+| `scripts/retired/fetch_adv.py`, `scripts/retired/promote_adv.py` | — | — | — | — | **RETIRED** (w2-05, absorbed by `pipeline/load_adv.py`) |
+| `scripts/pipeline/load_market.py` | `market_data`, `securities`, `holdings_v2`, `fund_holdings_v2`, `cusip_classifications` | `market_data` (direct_write UPSERT on ticker), `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (w2-02 `SourcePipeline` subclass `LoadMarketPipeline`, `direct_write`; absorbs retired `fetch_market.py`; scope shapes: `{}` → `discover_market` stale universe, `{"tickers":[...]}`, `{"stale_days":N}`; `parse()` ATTACHes prod RO and COALESCEs against it so promote preserves untouched columns) |
+| `scripts/retired/fetch_market.py` | — | — | — | — | **RETIRED** (w2-02, absorbed by `pipeline/load_market.py`) |
 | `fetch_finra_short.py` | `short_interest` | `short_interest` | none | §9 `--test` still writes to prod; otherwise clean (CHECKPOINT per 50k, restart-safe via loaded_dates, 429 backoff) | **RETROFIT** |
-| `fetch_ncen.py` | `fund_universe`, `managers`, entity tables (staging), `ncen_adviser_map` | `ncen_adviser_map`, `managers.adviser_cik`, entity staging tables | none | §6 progress line lacks `flush=True` (relies on `-u`); §9 no `--dry-run`/`--apply`; otherwise clean | **RETROFIT** |
-| `load_13f.py` | TSV files | `raw_submissions`, `raw_infotable`, `raw_coverpage`, `filings`, `filings_deduped`, **`holdings` DROP+CTAS (dropped!)** | `:222-224` `CREATE TABLE holdings`; `:286,:294,:304-305` reads | §1 full DROP+CTAS on every run; §5 silent continue on missing TSV (`:37`); §9 no `--dry-run` | **REWRITE** |
+| `scripts/pipeline/load_ncen.py` | `fund_universe`, `managers`, entity tables (staging), `ncen_adviser_map` | `ncen_adviser_map` (scd_type2 with `valid_from`/`valid_to` per migration 017), `managers.adviser_cik`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (w2-04 `SourcePipeline` subclass `LoadNCENPipeline`, `scd_type2` — first SCD Type 2 subclass; absorbs retired `fetch_ncen.py`; amendment_key `(series_id, adviser_crd, role)`; open-row sentinel `DATE '9999-12-31'`) |
+| `scripts/retired/fetch_ncen.py` | — | — | — | — | **RETIRED** (w2-04, absorbed by `pipeline/load_ncen.py`) |
+| `load_13f.py` (legacy, superseded) | TSV files | N/A — superseded | — | — | **SUPERSEDED by `load_13f_v2.py`** (p2-05 first `SourcePipeline` subclass). Retire in a follow-up once one clean quarterly cycle runs against the framework. |
+| `load_13f_v2.py` | TSV files | `raw_submissions`, `raw_infotable`, `raw_coverpage`, `filings`, `filings_deduped`, `holdings_v2` (is_latest append), `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (p2-05 `SourcePipeline` subclass `Load13FPipeline`, `append_is_latest`; dry-run on Q4 2025 green at +218 net rows) |
 | `refetch_missing_sectors.py` | `/tmp/refetch_tickers.txt`, Yahoo | `market_data.sector/industry` (staging only) | none | — | **OK** (retrofit closed int-15 PR #90: `fetch_date` + `metadata_date` stamped on UPDATE) |
 | `sec_shares_client.py` | SEC XBRL cache + API | filesystem cache only | none | N/A (library) | **OK** |
 | `build_cusip.py` (v2) | `cusip_retry_queue`, `_cache_openfigi`, `securities`, `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2` | `securities` (UPSERT-only), `_cache_openfigi`, `logs/unfetchable_orphans.csv` | — | — | **OK** (UPSERT-only; OpenFIGI v3; asset_category seed; legacy at `scripts/retired/build_cusip_legacy.py`) |
@@ -172,19 +185,9 @@ pipeline framework rewrite and do not participate in the orchestrator.
      the remaining REWRITEs are scoped for future framework work but
      no longer block any analytical workflow.
 
-2. **No `--dry-run` across the SOURCE/DERIVED tier.** Only
-   `merge_staging.py`, `sync_staging.py`, `promote_staging.py`,
-   `migrate_batch_3a.py`, `build_fixture.py`, `resolve_long_tail.py`
-   have proper gates. Every `fetch_*` and `build_*` writes prod by
-   default. The framework `SourcePipeline.promote()` contract mandates
-   explicit opt-in via manifest validation_tier — solving this at the
-   framework level, not per-script.
+2. **`--dry-run` coverage — SOLVED at framework level (Phase 2).** Every `SourcePipeline` subclass gets `--dry-run` for free via the base-class eight-step orchestrator: steps 1–4 run staging writes + validation + diff, step 5+ gated on user approval through `/admin/runs/{id}/approve`. The six migrated pipelines (13F, 13D/G, N-PORT, market, N-CEN, ADV) now have uniform dry-run semantics. Standalone scripts still needing coverage: `merge_staging.py` ✓, `sync_staging.py` ✓, `promote_staging.py` ✓, `migrate_batch_3a.py` ✓, `build_fixture.py` ✓, `resolve_long_tail.py` ✓, `fetch_finra_short.py`, `resolve_adv_ownership.py`.
 
-3. **CHECKPOINT discipline is inconsistent.** Only `fetch_13dg.py`,
-   `fetch_finra_short.py`, `fetch_ncen.py` checkpoint inside the main
-   loop. Most scripts flush at end. `scripts/pipeline/shared.py`'s
-   `sec_fetch` callers must wrap per-object CHECKPOINTs into
-   `load_to_staging()`.
+3. **CHECKPOINT discipline — SOLVED at framework level (Phase 2).** `SourcePipeline.promote()` wraps every mutation in a single BEGIN/COMMIT + explicit CHECKPOINT. Per-batch CHECKPOINT lives inside `_promote_append_is_latest`, `_promote_scd_type2`, `_promote_direct_write`. Remaining per-loop CHECKPOINT cases are on reference / L4 writers (`fetch_finra_short.py`, `build_entities.py` step-level, `build_summaries.py` per-worldview) — all already wired per their retrofit closeouts.
 
 4. **`§3 multi-source failover` is rare.** `fetch_13dg.py` has primary
    (edgar) + curl fallback for the filing body only. `fetch_market.py`

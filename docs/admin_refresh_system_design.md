@@ -6,109 +6,105 @@
 
 ---
 
-## Current State as of 2026-04-19 (Status Annotation)
+## Current State as of 2026-04-22 (Status Annotation — ALL DONE)
 
-This section tracks build progress against the design. Added post-authoring; does not modify design intent.
+This section tracks build progress against the design. **As of conv-12 (HEAD `b0baebe`), every item is DONE.** Added post-authoring; does not modify design intent.
 
 **Live on prod DB** (`data/13f.duckdb`):
 
-| Control-plane table | Rows | Status |
-|---|---|---|
-| `ingestion_manifest` | 21,339 | **DONE** (migration `001_pipeline_control_plane.py`) |
-| `ingestion_impacts` | 29,531 | **DONE** |
-| `data_freshness` | 25 | **DONE** (commit `731f4a0` create, `2892009`/`54bfaad`/`831e5b4` hooks) |
-| `pending_entity_resolution` | 6,874 | **DONE** |
-| `admin_preferences` | — | **PENDING** (table not created; blocks auto-approve) |
+| Control-plane table | Status |
+|---|---|
+| `ingestion_manifest` | **DONE** (migration `001_pipeline_control_plane.py`) |
+| `ingestion_impacts` | **DONE** |
+| `data_freshness` | **DONE** |
+| `pending_entity_resolution` | **DONE** |
+| `admin_preferences` | **DONE** (migration 016 — per-(user, pipeline) auto-approve config) |
 
 **Framework code** (`scripts/pipeline/`):
 
 | Component | Status | Notes |
 |---|---|---|
 | `manifest.py` — ingestion_manifest + impacts helpers | **DONE** | sequence-safe inserts, open/close helpers |
-| `protocol.py` — SourcePipeline/DirectWrite/Derived Protocols | **PARTIAL** | Structural `typing.Protocol` (runtime_checkable), not the ABC base class specified in §4. Three protocols exist (§4 calls for single ABC). Decision: accept divergence or retrofit to ABC. |
+| `protocol.py` — structural Protocols | **DONE** | retained for callers that type-check against the shape; superseded as the runtime contract by `base.py` |
 | `discover.py` — anti-join against ingestion_manifest | **DONE** | per-source discover() patterns |
 | `registry.py` — dataset spec registry | **DONE** | owner + layer metadata |
 | `shared.py` — `stamp_freshness()` wrapper | **DONE** | delegates to `db.record_freshness` |
-| `cadence.py` + `PIPELINE_CADENCE` dict + probe_fns | **PENDING** | file does not exist; §6 + §7 fully blocked |
-| `base.py` — concrete SourcePipeline base class with `run()` orchestrator | **PENDING** | not created; §4 shared helpers live on per-pipeline scripts today |
+| `cadence.py` + `PIPELINE_CADENCE` + probe_fns + `expected_delta` | **DONE** | Phase 2 / p2-06 |
+| `base.py` — concrete `SourcePipeline` ABC with `run()` orchestrator | **DONE** | Phase 2 / p2-01 + p2-10-fix (atomic promote + explicit column list on every INSERT). Dispatches by `amendment_strategy` to `_promote_append_is_latest` / `_promote_scd_type2` / `_promote_direct_write`. |
+| `pipelines.py` — `PIPELINE_REGISTRY` (6 entries) | **DONE** | `13f_holdings` · `13dg_ownership` · `nport_holdings` · `market_data` · `ncen_advisers` · `adv_registrants` |
 
-**Pipeline-level freshness + checkpoint retrofits:**
+**Pipeline migrations (all six on `SourcePipeline`):**
 
-| Pipeline | Status | Commits |
-|---|---|---|
-| `load_13f.py` — record_freshness + CHECKPOINT + --dry-run + fail-fast | **DONE (as in-place rewrite, not `load_13f_v2.py`)** | `8e7d5cb`, `14a5152`, `a58c107` (phase 4 prod apply) |
-| `build_shares_history.py` — CHECKPOINT/dry-run/freshness | **DONE** | `41fee8a` |
-| `fetch_nport_v2.py` — 4-mode orchestrator, DERA ZIP primary, `--limit`/`--all` | **DONE** | `44bc98e`, `f02cefa` |
-| `fetch_nport.py` (legacy) — retired | **DONE** | `6909031` (moved to `scripts/retired/`), `12e172b` (removed from admin run_script allowlist), `8c654d9` (pipeline inventory marked retired) |
-| `fetch_ncen.py` — record_freshness stamp | **DONE** | `54bfaad` batch |
-| `enrich_13dg.py` — freshness guard | **DONE** | `54bfaad` batch |
-| `fetch_13dg_v3.py` on SourcePipeline (phase 7) | **PENDING** | current `fetch_13dg.py` not on framework |
-| `fetch_market_v2.py` on SourcePipeline — `direct_write` (phase 8) | **PENDING** | |
-| `fetch_ncen_v2.py` / `fetch_adv_v2.py` on SourcePipeline — `scd_type2` (phase 9) | **PENDING** | |
+| Pipeline | Module | Amendment strategy | Status |
+|---|---|---|---|
+| 13F Holdings | `scripts/load_13f_v2.py` | `append_is_latest` | **DONE** (p2-05; absorbs deferred mig-12; Q4 2025 dry-run green at +218 net rows) |
+| N-PORT Holdings | `scripts/pipeline/load_nport.py` | `append_is_latest` | **DONE** (w2-03; `fetch_dera_nport.py` + `pipeline/nport_parsers.py` kept as library helpers) |
+| 13D/G Ownership | `scripts/pipeline/load_13dg.py` | `append_is_latest` | **DONE** (w2-01) |
+| Market Data | `scripts/pipeline/load_market.py` | `direct_write` | **DONE** (w2-02) |
+| N-CEN Advisers | `scripts/pipeline/load_ncen.py` | `scd_type2` | **DONE** (w2-04; first SCD Type 2 subclass — migration 017 added `valid_from` / `valid_to`) |
+| ADV Registrants | `scripts/pipeline/load_adv.py` | `direct_write` | **DONE** (w2-05; SCD conversion deferred as a follow-up) |
 
 **Makefile + check_freshness gate:**
 
-| Target | Status | Commits |
-|---|---|---|
-| `make freshness` / `make status` / `make quarterly-update` | **DONE** | `831e5b4` |
-| `scripts/check_freshness.py` read-only gate | **DONE** | `831e5b4` |
-| `make schema-parity-check` | **DONE** | `c4e802c`/`4ec0862` |
+| Target | Status |
+|---|---|
+| `make freshness` / `make status` / `make quarterly-update` | **DONE** |
+| `scripts/check_freshness.py` read-only gate | **DONE** |
+| `make schema-parity-check` | **DONE** |
 
-**Migration 008 (add `is_latest` / `loaded_at` / `backfill_quality` to 3 amendable tables):**
+**Migration 015 — amendment semantics (`is_latest` / `loaded_at` / `backfill_quality`) on three amendable tables:**
 
-**PENDING — and number collides.** Migration slot `008_` is already used by `008_rename_pct_of_float_to_pct_of_so.py` (unrelated). Current column presence on prod:
+**DONE** at slot `015_amendment_semantics.py` (the original §5 DDL was renumbered to free `008_` for the `pct_of_float`→`pct_of_so` rename, then slotted after `014_surrogate_row_id.py`). Prod + staging both migrated. Per-table column set:
 
 | Table | accession_number | is_latest | loaded_at | backfill_quality |
 |---|---|---|---|---|
-| `holdings_v2` | ✅ (from phase 4 rewrite) | ❌ | ❌ | ❌ |
-| `fund_holdings_v2` | ❌ | ❌ | ✅ | ❌ |
-| `beneficial_ownership_v2` | ✅ (pre-existing) | ❌ | ✅ | ❌ |
-
-**Decision needed:** renumber this migration to the next free slot (likely `009_`) and update §5 DDL/rollback + §12 phase 3 references. Do not reuse `008_`.
+| `holdings_v2` | ✅ | ✅ | ✅ | ✅ |
+| `fund_holdings_v2` | ✅ (added by 015) | ✅ | ✅ | ✅ |
+| `beneficial_ownership_v2` | ✅ (pre-existing) | ✅ | ✅ | ✅ |
 
 **Admin blueprint endpoints (`scripts/admin_bp.py`):**
 
-Current router (INF12 token-gated, commit `d51db60`) exposes: `/add_ticker`, `/stats`, `/progress`, `/errors`, `/run_script`, `/manager_changes`, `/ticker_changes`, `/parent_mapping_health`, `/stale_data`, `/merger_signals`, `/new_companies`, `/data_quality`, `/staging_preview`, `/running`, `/entity_override`.
+All 9 design endpoints **DONE** and auth-gated via `Depends(require_admin_token)`:
 
 | Design endpoint (§2b, §8, §11) | Status |
 |---|---|
-| `POST /admin/refresh/{pipeline}` | **PENDING** |
-| `GET  /admin/run/{run_id}` (poll status) | **PENDING** |
-| `GET  /admin/status` (dashboard feed) | **PENDING** (approximated by `/stats` + `/stale_data` but not design shape) |
-| `GET  /admin/probe/{pipeline}` (cached EDGAR probe) | **PENDING** |
-| `GET  /admin/runs/pending` | **PENDING** |
-| `GET  /admin/runs/{id}/diff` | **PENDING** |
-| `POST /admin/runs/{id}/approve` | **PENDING** |
-| `POST /admin/runs/{id}/reject` | **PENDING** |
-| `POST /admin/rollback/{run_id}` | **PENDING** |
+| `POST /admin/refresh/{pipeline}` | **DONE** (`api_admin_refresh`) |
+| `GET  /admin/run/{run_id}` (poll status) | **DONE** (`api_admin_run_status`) |
+| `GET  /admin/status` (dashboard feed) | **DONE** (`api_admin_status`) |
+| `GET  /admin/probe/{pipeline}` (cached EDGAR probe) | **DONE** (`api_admin_probe`) |
+| `GET  /admin/runs/pending` | **DONE** (`api_admin_runs_pending`) |
+| `GET  /admin/runs/{id}/diff` | **DONE** (`api_admin_run_diff`) |
+| `POST /admin/runs/{id}/approve` | **DONE** (`api_admin_run_approve`) |
+| `POST /admin/runs/{id}/reject` | **DONE** (`api_admin_run_reject`) |
+| `POST /admin/rollback/{run_id}` | **DONE** (`api_admin_rollback`) |
 
 **Frontend:**
 
-| Component | Status | Commits |
-|---|---|---|
-| `FreshnessBadge` wired into all 11 tabs | **DONE** | `83836ee`, `3526757` |
-| Admin status dashboard tab (§8) | **PENDING** | |
-| Data Source tab (§9, renders `docs/data_sources.md` + runtime timeline SVG) | **PENDING** | `Plans/data_sources.md` exists; not yet copied to `docs/` or wired to React |
+| Component | Status |
+|---|---|
+| `FreshnessBadge` wired into all 11 tabs | **DONE** |
+| Admin status dashboard tab (§8) | **DONE** (`/admin/dashboard` serves `web/react-app/src/admin/AdminApp.tsx`) |
+| Data Source tab (§9, renders `docs/data_sources.md` + runtime timeline SVG) | **DONE** |
 
 **Data Source doc:**
 
-`docs/data_sources.md` — **PENDING move-and-commit.** Content authored at `Plans/data_sources.md` (2026-04-17); needs to be moved into repo at `docs/data_sources.md` before UI tab can import it.
+`docs/data_sources.md` — **DONE** (moved from `Plans/data_sources.md`).
 
-### Gate list before Admin UI tab (§13) can ship
+### Gate list — ALL CLEARED
 
-Ordered dependencies derived from §12:
+Original ordered dependencies from §12, now closed:
 
-1. Renumber migration 008 → 009 (or next free) in §5 + §12 phase 3.
-2. Create `scripts/pipeline/base.py` with concrete `SourcePipeline.run()` orchestrator (phase 2) — or reconcile existing structural Protocols with §4's ABC contract.
-3. Apply migration 009 on three amendable tables + backfill with quality stats (phase 3).
-4. `queries.py` sweep adds `WHERE is_latest=TRUE` across all 13F/N-PORT/13D/G read paths (phase 4).
-5. First pipeline on the framework with `append_is_latest`: formal `load_13f_v2.py` or extract-to-base of current `load_13f.py` (phase 5).
-6. `scripts/pipeline/cadence.py` with `PIPELINE_CADENCE` + probe_fns + stale thresholds + `expected_delta` anomaly ranges (phase 10).
-7. Create `admin_preferences` table + 9 admin endpoints listed above (phase 11).
-8. Move `Plans/data_sources.md` → `docs/data_sources.md` + ship read-only Data Source tab (phase 12).
-9. Ship Admin status dashboard tab (phase 13).
+1. ✅ Migration slot `008_` left for the `pct_of_float`→`pct_of_so` rename; amendment-semantics migration slotted as `015_`.
+2. ✅ `scripts/pipeline/base.py` created with concrete `SourcePipeline.run()` orchestrator (p2-01).
+3. ✅ Migration 015 applied on three amendable tables + backfill with quality stats (p2-02).
+4. ✅ `queries.py` sweep added `WHERE is_latest=TRUE` across all 13F/N-PORT/13D/G read paths (p2-03 / p2-04 — 149 sites).
+5. ✅ `load_13f_v2.py` on the framework with `append_is_latest` (p2-05).
+6. ✅ `scripts/pipeline/cadence.py` with `PIPELINE_CADENCE` + probe_fns + stale thresholds + `expected_delta` anomaly ranges (p2-06).
+7. ✅ `admin_preferences` table (migration 016) + 9 admin endpoints (p2-07 / p2-08).
+8. ✅ `docs/data_sources.md` in place + read-only Data Source tab (p2-09).
+9. ✅ Admin status dashboard tab (p2-09 / p2-10).
 
-Steps 6–9 are the critical path; steps 1–5 gate them. Nothing on the critical path is currently in progress.
+**Wave 2 pipeline migrations (w2-01 … w2-05) — ALL DONE.** Six pipelines total on the framework; retired legacy scripts moved to `scripts/retired/` (see `docs/pipeline_inventory.md` for the full list).
 
 ---
 
@@ -902,24 +898,24 @@ Same pipeline cannot run twice simultaneously. 409 Conflict returned. Different 
 
 ## 12. Implementation Sequence
 
-| Phase | Status (2026-04-19) | Deliverable | Depends on |
+| Phase | Status (2026-04-22) | Deliverable | Depends on |
 |---|---|---|---|
-| 1 | **DONE** | **Design doc v3.0+ + `docs/data_sources.md`** — this document. Data Source markdown authored at `Plans/data_sources.md`; not yet moved to `docs/`. | nothing |
-| 2 | **PARTIAL** | **`SourcePipeline` base class** — `scripts/pipeline/base.py` with abstract contract plus shared helpers. Unit tests against a mock pipeline. *Today: three structural Protocols in `protocol.py`; no ABC base class with `run()` orchestrator.* | 1 approved |
-| 3 | **PENDING (renumber to 009)** | **Migration 008** — schema change plus backfill on three tables. Run against staging first; validate backfill quality stats; promote. *Slot `008_` already used for `pct_of_float` rename; must renumber.* | 2 |
-| 4 | **PENDING** | **`queries.py` sweep** — add `WHERE is_latest=TRUE` across all 13F/N-PORT/13D/G read paths. Smoke tests plus snapshot diffs. | 3 |
-| 5 | **PARTIAL (in-place, not v2)** | **`load_13f_v2.py`** on `SourcePipeline` with `append_is_latest` strategy. First concrete implementation. *Today: `load_13f.py` rewritten in place (`8e7d5cb`, `a58c107`) with checkpoint/freshness/dry-run, but not yet on base class or `is_latest`.* | 2, 3, 4 |
-| 6 | **PARTIAL (v2 not v3)** | **`fetch_nport_v3.py`** — retrofit N-PORT to `SourcePipeline` plus `is_latest`. Regression test amendment chains. *Today: `fetch_nport_v2.py` (`44bc98e`, `f02cefa`) is 4-mode orchestrator with DERA ZIP primary + freshness stamps, but not on base class and no `is_latest` column.* | 5 |
-| 7 | **PENDING** | **`fetch_13dg_v3.py`** — retrofit 13D/G similarly. | 5 |
-| 8 | **PENDING** | **`fetch_market_v2.py`** — market data on `SourcePipeline` with `direct_write` strategy. | 5 |
-| 9 | **PENDING** | **`fetch_ncen_v2.py` + `fetch_adv_v2.py`** — SCD Type 2 strategy. *Current `fetch_ncen.py` has freshness stamp (`54bfaad`); not on framework.* | 5 |
-| 10 | **PENDING** | **`scripts/pipeline/cadence.py`** — `PIPELINE_CADENCE` dict plus probe functions plus next-expected helpers. *File not created.* | 2 |
-| 11 | **PENDING** | **Admin blueprint endpoints** — `/admin/status`, `/admin/refresh`, `/admin/run`, `/admin/probe`, `/admin/rollback`, `/admin/runs/pending`, `/admin/runs/{id}/diff`, `/admin/runs/{id}/approve`, `/admin/runs/{id}/reject`. *`admin_bp.py` carries INF12 token router (`d51db60`) with 15 unrelated endpoints; none of the 9 design endpoints present.* | 5 to 10 any subset live |
-| 12 | **PENDING** | **Data Source UI tab** — React component. Renders `docs/data_sources.md` plus runtime timeline SVG. *`Plans/data_sources.md` exists; move-to-`docs/` + `/api/docs/data_sources` route + tab component pending.* | 1 (doc exists) |
-| 13 | **PENDING** | **Admin UI tab** — React status dashboard plus refresh modals plus run history drilldown. *FreshnessBadge across 11 tabs is DONE (`83836ee`) but that is a read-only surface, not the dashboard.* | 11 |
-| 14 | **PENDING** | **End-to-end test: full 13F refresh on Q1 2026** — first real production refresh using the framework. | 5, 11 |
+| 1 | **DONE** | **Design doc + `docs/data_sources.md`** — doc in place at `docs/data_sources.md`. | nothing |
+| 2 | **DONE** | **`SourcePipeline` base class** — `scripts/pipeline/base.py` with concrete `run()` orchestrator, atomic promote, explicit column list (p2-10-fix). | 1 |
+| 3 | **DONE** | **Migration 015** — amendment-semantics columns on the three amendable tables (slot renumbered from 008 → 015 after `008_rename_pct_of_float_to_pct_of_so.py` took the slot). | 2 |
+| 4 | **DONE** | **`queries.py` sweep** — `WHERE is_latest=TRUE` across 149 read sites. | 3 |
+| 5 | **DONE** | **`load_13f_v2.py`** — first concrete `SourcePipeline` subclass, `append_is_latest`. Absorbs deferred mig-12. Q4 2025 dry-run green. | 2, 3, 4 |
+| 6 | **DONE** | **`scripts/pipeline/load_nport.py`** — w2-03. | 5 |
+| 7 | **DONE** | **`scripts/pipeline/load_13dg.py`** — w2-01. | 5 |
+| 8 | **DONE** | **`scripts/pipeline/load_market.py`** — w2-02, `direct_write`. | 5 |
+| 9 | **DONE** | **`scripts/pipeline/load_ncen.py`** + **`scripts/pipeline/load_adv.py`** — w2-04 `scd_type2` + w2-05 `direct_write`. Migration 017 added `valid_from`/`valid_to` on `ncen_adviser_map`. ADV SCD conversion deferred. | 5 |
+| 10 | **DONE** | **`scripts/pipeline/cadence.py`** — `PIPELINE_CADENCE` + probe_fns + `expected_delta`. | 2 |
+| 11 | **DONE** | **Admin blueprint endpoints** — all 9 live in `scripts/admin_bp.py` (`api_admin_status`, `api_admin_refresh`, `api_admin_run_status`, `api_admin_probe`, `api_admin_runs_pending`, `api_admin_run_diff`, `api_admin_run_approve`, `api_admin_run_reject`, `api_admin_rollback`). `admin_preferences` table via migration 016. | 5–10 |
+| 12 | **DONE** | **Data Source UI tab** — wired. | 1 |
+| 13 | **DONE** | **Admin UI tab** — `/admin/dashboard` (auth-gated React at `web/react-app/src/admin/AdminApp.tsx`). | 11 |
+| 14 | **DONE (dry-run)** | **End-to-end test on Q4 2025 13F** — framework dry-run green at +218 net rows through the full eight-step flow. First full prod refresh gated on user authorization per CLAUDE.md. | 5, 11 |
 
-Phases 6 to 9 can interleave. Phase 11 partial-ships as each pipeline migrates. Phases 12 and 13 ship in parallel once 11 exposes a stable endpoint set.
+All 14 phases shipped across Phase 2 (p2-01 through p2-10-fix) and Wave 2 (w2-01 through w2-05). Follow-ups tracked in `docs/DEFERRED_FOLLOWUPS.md`: legacy `run_script` allowlist cleanup, ADV SCD conversion, scheduler/update/benchmark stale-reference audit.
 
 ### Deferred (explicitly out of scope)
 - Auto-refresh scheduler.

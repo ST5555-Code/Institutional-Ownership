@@ -1,52 +1,57 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-22 (phase2-prep refresh). Main HEAD: `7c49471` (conv-11 remediation program complete)._
+_Last updated: 2026-04-22 (conv-12 — Phase 2 + Wave 2 complete). Main HEAD: `b0baebe` (w2-05 ADV migrated to SourcePipeline)._
 
-Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + Phase 2 design doc.
+Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + post-Phase-2 backlog.
 
 ---
 
-## Program state — remediation COMPLETE, Phase 2 ready
+## Program state — Phase 2 + Wave 2 COMPLETE
 
-The **Remediation Program** (`docs/REMEDIATION_PLAN.md` + `docs/REMEDIATION_CHECKLIST.md`) closed 2026-04-22. **105 PRs merged (#5–#105), ~66 items closed across 5 themes.** All findings addressed or formally deferred with documented exit criteria.
+The **Remediation Program** closed 2026-04-22 (conv-11, 105 PRs, ~66 items across 5 themes). The **Phase 2 admin refresh system** (p2-01 through p2-10-fix) and the **Wave 2 pipeline migrations** (w2-01 through w2-05) both closed in the same window. All six ingest pipelines now run on the `SourcePipeline` framework; the admin refresh dashboard is live.
 
-| Theme | Scope | Status |
+| Workstream | Scope | Status |
 |---|---|---|
-| Theme 1 — Data integrity foundation | int-01..int-22, OpenFIGI RC1–RC4, denorm retirement, series triage | **CLOSED** (int-09 + int-19 deferred to Phase 2; int-11 + int-18 STANDING) |
-| Theme 2 — Observability + audit trail | ingestion_manifest, freshness, impact_id, log rotation | **CLOSED** (all items) |
-| Theme 3 — Migration + schema discipline | mig-01..mig-14, atomic promotes, parity extensions, row_id | **CLOSED** (mig-12 deferred to Phase 3) |
-| Theme 4 — Security hardening | admin auth, TOCTOU, prod-write validators, pinned deps | **CLOSED** |
-| Theme 5 — Operational surface | README/prompts, MAINTENANCE, ROADMAP hygiene | **CLOSED** (ops-18 BLOCKED pending source recovery) |
+| Remediation Themes 1–5 | int-01..int-23, obs-01..obs-13, mig-01..mig-14, sec-01..sec-08, ops-01..ops-18 | **CLOSED** (int-09 + int-19 deferred; int-11 + int-18 standing; ops-18 blocked) |
+| Phase 2 admin refresh system | p2-01 base class → p2-10-fix atomic promote | **CLOSED** (all 10 phases DONE; p2-10-fix hardened atomic promote + explicit column list in `scripts/pipeline/base.py`) |
+| Wave 2 pipeline migrations | w2-01 13D/G, w2-02 Market, w2-03 N-PORT, w2-04 N-CEN, w2-05 ADV | **CLOSED** (5/5; all on `SourcePipeline`) |
 
-Closure record: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`.
+Closure records: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`; Phase 2 status table in `docs/admin_refresh_system_design.md §Current State`.
 
 ---
 
-## Phase 2 — next work stream
+## Pipeline framework — as-shipped state
 
-**Scope:** User-triggered admin refresh system. Framework-first delivery. See `docs/admin_refresh_system_design.md v3.2`.
+All six pipelines register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGISTRY` and are dispatched by `scripts/admin_bp.py` for refresh / approve / reject / rollback.
 
-### Major components
+| Pipeline name (key) | Subclass | Amendment strategy | Module |
+|---|---|---|---|
+| `13f_holdings` | `Load13FPipeline` | `append_is_latest` | `scripts/load_13f_v2.py` |
+| `13dg_ownership` | `Load13DGPipeline` | `append_is_latest` | `scripts/pipeline/load_13dg.py` |
+| `nport_holdings` | `LoadNPortPipeline` | `append_is_latest` | `scripts/pipeline/load_nport.py` |
+| `market_data` | `LoadMarketPipeline` | `direct_write` | `scripts/pipeline/load_market.py` |
+| `ncen_advisers` | `LoadNCENPipeline` | `scd_type2` | `scripts/pipeline/load_ncen.py` |
+| `adv_registrants` | `LoadADVPipeline` | `direct_write` | `scripts/pipeline/load_adv.py` |
 
-1. **`scripts/pipeline/base.py`** — concrete `SourcePipeline` ABC with `run()` orchestrator (today: `protocol.py` structural Protocols only — retrofit decision required).
-2. **`scripts/pipeline/cadence.py`** — `PIPELINE_CADENCE` dict + probe functions + stale thresholds + `expected_delta` anomaly ranges. Does not exist yet.
-3. **`is_latest` amendment semantics** — new migration (next free slot, likely 015) adds `is_latest`, `loaded_at`, `backfill_quality` to `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`. Not the same as migration 008 (pct_of_so rename).
-4. **`queries.py` sweep** — add `WHERE is_latest=TRUE` across all 13F/N-PORT/13D/G read paths.
-5. **9 admin endpoints** — `/admin/refresh/{pipeline}`, `/admin/run/{run_id}`, `/admin/status`, `/admin/probe/{pipeline}`, `/admin/runs/pending`, `/admin/runs/{id}/diff`, `/admin/runs/{id}/approve`, `/admin/runs/{id}/reject`, `/admin/rollback/{run_id}`. Needs new `admin_preferences` control-plane table.
-6. **Admin status dashboard tab** + **Data Source tab** (move `Plans/data_sources.md` → `docs/data_sources.md` first).
-7. **Six pipeline migrations** to the framework: `fetch_13dg_v3`, `fetch_market_v2`, `fetch_ncen_v2`, `fetch_adv_v2`, `load_13f_v2` (first subclass — absorbs deferred `mig-12`), plus extract-to-base of current `fetch_nport_v2`.
+**Retired to `scripts/retired/`** (Wave 2): `fetch_13dg.py`, `fetch_13dg_v2.py`, `validate_13dg.py`, `promote_13dg.py`, `fetch_market.py`, `fetch_nport.py`, `fetch_nport_v2.py`, `validate_nport.py`, `validate_nport_subset.py`, `promote_nport.py`, `fetch_ncen.py`, `fetch_adv.py`, `promote_adv.py`. Kept in `scripts/` as imported transport / library helpers: `fetch_dera_nport.py` (DERA ZIP transport), `scripts/pipeline/nport_parsers.py` (XML parsing library).
 
-### Dependencies (all cleared)
+**Framework surface.** `scripts/pipeline/base.py` owns the eight-step staging flow (fetch → parse → validate → diff → snapshot → promote → verify → cleanup) with atomic BEGIN/COMMIT wrap on promote, explicit column list on every INSERT (p2-10-fix), and dispatch by `amendment_strategy`. `scripts/pipeline/cadence.py` holds `PIPELINE_CADENCE` + probe functions + `expected_delta` ranges. `scripts/pipeline/manifest.py` owns control-plane writes.
 
-- **Observability:** obs-01, obs-02, obs-03, obs-06, obs-10 DONE (ingestion_manifest coverage, freshness gate, impact_id hardening).
-- **Migrations:** mig-01 (atomic promotes), mig-03 (migration 004 retrofit), mig-04 (fetch_adv DROP→CREATE), mig-09/10/11 (schema-parity L0/L4/CI), mig-13 (build_entities per-step CHECKPOINT) DONE.
-- **Security:** sec-01..sec-04 DONE (token auth, TOCTOU, prod-write elimination, pinned deps).
+**Admin dashboard.** `/admin/dashboard` (auth-gated, React) + 9 endpoints on `scripts/admin_bp.py`: `/admin/status`, `/admin/refresh/{pipeline}`, `/admin/run/{run_id}`, `/admin/probe/{pipeline}`, `/admin/runs/pending`, `/admin/runs/{id}/diff`, `/admin/runs/{id}/approve`, `/admin/runs/{id}/reject`, `/admin/rollback/{run_id}`. Auto-approve per pipeline via `admin_preferences` (migration 016).
 
-### Deferred items Phase 2 will encounter
+**`load_13f_v2.py` dry-run proven on Q4 2025** — +218 net rows, validator green, manifest + impacts written. Full prod refresh not yet executed (gated on user authorization per CLAUDE.md rules).
 
-- **int-09 Step 4** — denorm retirement (`ticker`, `entity_id`, `rollup_entity_id`, `lei` drops on v2 fact tables). Execute **after** queries.py `is_latest` sweep and read-site audit (`scripts/audit_read_sites.py`). Exit criteria: `docs/findings/int-09-p0-findings.md §4`.
-- **int-19 (INF38)** — true float-adjusted `pct_of_float` denominator. Needs new float-history data source. Execute after first new `SourcePipeline` subclass lands.
-- **mig-12** — `load_13f.py` rewrite to `load_13f_v2` on framework. Becomes first full `SourcePipeline` subclass exercise in Phase 2.
+---
+
+## Post-Phase 2 carry-forward (open)
+
+- **int-09 Step 4** — denorm retirement (`ticker`, `entity_id`, `rollup_entity_id`, `lei` drops on v2 fact tables). Now unblocked by `is_latest` sweep + `scripts/audit_read_sites.py`. Exit criteria: `docs/findings/int-09-p0-findings.md §4`.
+- **int-19 (INF38)** — true float-adjusted `pct_of_float` denominator. Needs new float-history data source.
+- **Legacy `run_script` allowlist in `scripts/admin_bp.py`** — references retired scripts (`fetch_nport.py` / `fetch_adv.py` / etc). Prune after one clean quarterly cycle against the framework.
+- **`scheduler.py`, `update.py`, `benchmark.py`** — stale references to retired scripts; audit + prune.
+- **ADV SCD conversion** — w2-05 shipped ADV as `direct_write`. SCD Type 2 on `adv_managers` / `cik_crd_direct` / `lei_reference` deferred (design question: which columns carry history).
+- **`adv_managers` ownership boundary** — ADV pipeline does **not** manage `cik_crd_direct` or `lei_reference`; those stay under `build_managers.py` for now.
+- **mig-12** — **CLOSED (absorbed by p2-05 `load_13f_v2.py`).**
 
 ---
 
@@ -68,7 +73,11 @@ Closure record: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`.
 | `ingestion_manifest` | 21,339+ | covers MARKET / NPORT / 13DG / NCEN / ADV |
 | `ingestion_impacts` | 29,531+ | 51,905 13D/G rows backfilled (obs-04) |
 
-**Migrations applied:** 001–014 on prod + staging.
+**Migrations applied:** 001–017 on prod + staging.
+- 015 — amendment-semantics columns (`is_latest`, `loaded_at`, `backfill_quality`) on `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`; `accession_number` added to `fund_holdings_v2`.
+- 016 — `admin_preferences` control-plane table for per-pipeline auto-approve.
+- 017 — `valid_from` / `valid_to` on `ncen_adviser_map` for SCD Type 2 promote (w2-04).
+
 **SCD open-row sentinel:** `DATE '9999-12-31'`, not NULL.
 **`entity_current`** is the only user-defined VIEW in prod — rebuild after fixture/snapshot restores.
 
@@ -77,18 +86,19 @@ Closure record: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`.
 ## First 5 minutes — read these
 
 1. `~/ClaudeWorkspace/CLAUDE.md` — workspace rules (file routing, tone, naming).
-2. `docs/admin_refresh_system_design.md` — Phase 2 design v3.2. §1 (deliverables), §2a (staging flow), §4 (SourcePipeline), §6 (cadence), §12 (phase sequence).
-3. `docs/REMEDIATION_PLAN.md §Changelog 2026-04-22` — closure record.
-4. `ROADMAP.md §Open items` — remaining carry-forward (int-09, int-19, mig-12, standing curation).
-5. `docs/PROCESS_RULES.md` — rules for large-data scripts.
-6. Auto memory at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`.
+2. `docs/admin_refresh_system_design.md` — admin refresh design v3.2 (§Current State annotations are now all DONE).
+3. `docs/REMEDIATION_PLAN.md §Changelog 2026-04-22` — closure records (conv-11 remediation close + conv-12 Phase 2 + Wave 2 close).
+4. `ROADMAP.md §Open items` — remaining carry-forward (int-09, int-19, standing curation).
+5. `docs/pipeline_inventory.md` — current script map with Wave 2 retirements + SourcePipeline subclasses.
+6. `docs/PROCESS_RULES.md` — rules for large-data scripts.
+7. Auto memory at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`.
 
 ---
 
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main`. Phase 2 work lands on per-item branches.
+- **Branch:** `main`. Post-Phase-2 work lands on per-item branches.
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
   - **FastAPI + uvicorn** — `scripts/app.py` (thin entry) + 9 router modules + `admin_bp.py` (token auth via `Depends`). OpenAPI at `/docs` + `/redoc`.
@@ -123,7 +133,7 @@ Closure record: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`.
 ```bash
 cd ~/ClaudeWorkspace/Projects/13f-ownership
 git status -sb                                         # ## main...origin/main, clean
-git log -1 --oneline                                   # 7c49471 or newer
+git log -1 --oneline                                   # b0baebe or newer
 pytest tests/ -x                                       # green
 make freshness                                         # PASS on 7 critical tables
 make schema-parity-check                               # 0 divergences on L3 canonicals
@@ -218,13 +228,15 @@ python3 scripts/validate_entities.py --prod --read-only  # 8 PASS / 2 FAIL / 6 M
 
 | Question | Source |
 |---|---|
-| Phase 2 design | `docs/admin_refresh_system_design.md` v3.2 |
-| Remediation closure record | `docs/REMEDIATION_PLAN.md §Changelog` + `docs/REMEDIATION_CHECKLIST.md` |
+| Admin refresh system design | `docs/admin_refresh_system_design.md` v3.2 (§Current State annotations all DONE) |
+| Phase 2 + Wave 2 closure records | `docs/REMEDIATION_PLAN.md §Changelog (conv-12)` |
 | Deferred followups | `docs/DEFERRED_FOLLOWUPS.md` |
-| Script inventory + status | `docs/pipeline_inventory.md` |
+| Script inventory + pipeline registry | `docs/pipeline_inventory.md` + `scripts/pipeline/pipelines.py` |
+| SourcePipeline base class | `scripts/pipeline/base.py` (atomic promote, eight-step flow) |
+| Cadence + probes + expected_delta | `scripts/pipeline/cadence.py` |
 | Architecture baseline | `ARCHITECTURE_REVIEW.md` (historical — see status header) |
 | Current prod DDL | `docs/canonical_ddl.md` + `docs/data_layers.md` |
-| Pipeline protocol | `scripts/pipeline/protocol.py` |
 | Entity architecture | `docs/ENTITY_ARCHITECTURE.md` |
+| Pipeline CLI reference | `MAINTENANCE.md §Pipeline refresh` |
 
 Regenerate the top block of this file at session close so future sessions land oriented.
