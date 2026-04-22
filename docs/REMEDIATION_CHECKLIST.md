@@ -54,9 +54,9 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] obs-04 MAJOR-8 D-06 13D/G ingestion_impacts grain backfill (pipeline/manifest.py, promote_13dg.py) — PRs #36, #38 (one-off backfill script shipped; data op pending `--confirm`)
 
 ### Batch 2-C (parallel-eligible within batch: YES — disjoint files)
-- [ ] obs-06 MINOR-3 P-01 13F loader freshness (load_13f.py)
-- [ ] obs-07 MINOR-4 P-07 N-PORT report_month future-leakage gate (promote_nport.py)
-- [ ] obs-10 INF32 quarterly-update Makefile 13F-load step (Makefile)
+- [x] obs-06 MINOR-3 P-01 13F loader freshness (load_13f.py) — closed as already-satisfied; `record_freshness('filings')` + `record_freshness('filings_deduped')` shipped in `8e7d5cb` (`load_13f.py` rewrite) prior to this program window; no PR in conv-04
+- [x] obs-07 MINOR-4 P-07 N-PORT report_month future-leakage gate (promote_nport.py) — PRs #51, #53
+- [x] obs-10 INF32 quarterly-update Makefile 13F-load step (Makefile) — PR #52 (also pruned retired `update.py` refs)
 
 ### Batch 2-D (parallel-eligible within batch: YES — off-code ops + CI disjoint)
 - [ ] obs-08 MINOR-16 O-05 backup-gap investigation (ops)
@@ -81,7 +81,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 3-B (parallel-eligible within batch: NO — some share migration files)
 - [ ] mig-03 MAJOR-15 migration 004 staging/rename pattern retrofit (migrations/004)
-- [ ] mig-13 5 pipeline-violations REWRITE tail (fetch_adv partial, build_fund_classes, build_entities, build_benchmark_weights partial, merge_staging)
+- [ ] mig-13 pipeline-violations REWRITE tail — residual scope: build_entities, merge_staging (fetch_adv closed via mig-02 PR #37; build_fund_classes + build_benchmark_weights closed via sec-05 PR #45)
 - [ ] mig-14 REWRITE_BUILD_MANAGERS INF1 routing + --dry-run + data_freshness (build_managers.py, db.py, promote_staging.py)
 
 ### Batch 3-C (parallel-eligible within batch: YES — mig-06 ∥ mig-09 ∥ mig-10 disjoint)
