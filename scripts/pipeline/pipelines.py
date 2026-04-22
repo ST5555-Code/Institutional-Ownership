@@ -25,8 +25,17 @@ def _load_13f_cls() -> Type[SourcePipeline]:
     return module.Load13FPipeline
 
 
+def _load_market_cls() -> Type[SourcePipeline]:
+    """Lazy-import LoadMarketPipeline. w2-02 migration."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.load_market")
+    return module.LoadMarketPipeline
+
+
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
-    "13f_holdings": _load_13f_cls,  # type: ignore[dict-item]
+    "13f_holdings": _load_13f_cls,    # type: ignore[dict-item]
+    "market_data": _load_market_cls,  # type: ignore[dict-item]
 }
 
 
