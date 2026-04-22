@@ -16,6 +16,7 @@ const TAB_MAP: Record<string, React.LazyExoticComponent<() => React.ReactElement
   'cross-ownership': lazy(() => import('../tabs/CrossOwnershipTab').then(m => ({ default: m.CrossOwnershipTab }))),
   'overlap-analysis': lazy(() => import('../tabs/OverlapAnalysisTab').then(m => ({ default: m.OverlapAnalysisTab }))),
   'short-interest': lazy(() => import('../tabs/ShortInterestTab').then(m => ({ default: m.ShortInterestTab }))),
+  'data-source': lazy(() => import('../tabs/DataSourceTab').then(m => ({ default: m.DataSourceTab }))),
 }
 
 export function AppShell() {

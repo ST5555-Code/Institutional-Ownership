@@ -2,9 +2,11 @@
 
 /api/v1/config/quarters  — quarter list / URLs / report dates (public, no auth)
 /api/v1/freshness        — data_freshness snapshot (ARCH-3A)
+/api/v1/data-sources     — docs/data_sources.md content (p2-08 Data Source tab)
 """
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import os
 
@@ -68,3 +70,24 @@ def api_freshness():
         log.warning("[api_freshness] data_freshness unavailable: %s", e)
         return {'data': []}
     return {'data': df_to_records(df)}
+
+
+@config_router.get('/data-sources')
+def api_data_sources():
+    """Serve docs/data_sources.md as markdown string for the Data Source tab.
+
+    Design doc: admin_refresh_system_design.md §9 + §12 phase 12 (p2-08).
+    File is small (~13KB) — read from disk on each request; no caching.
+    """
+    path = os.path.join(BASE_DIR, 'docs', 'data_sources.md')
+    if not os.path.isfile(path):
+        return JSONResponse(
+            status_code=404,
+            content={'error': 'data_sources.md not found'},
+        )
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    last_modified = _dt.datetime.fromtimestamp(
+        os.path.getmtime(path), tz=_dt.timezone.utc
+    ).isoformat()
+    return {'content': content, 'last_modified': last_modified}
