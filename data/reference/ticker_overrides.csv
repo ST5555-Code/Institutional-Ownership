@@ -1,7 +1,7 @@
 cusip,wrong_ticker,correct_ticker,company_name,note,security_type_override,method,auto_applied
 46090E103,NDQ,QQQ,Invesco QQQ Trust,OpenFIGI returned foreign code,etf,manual,False
 166764100,CHV,CVX,Chevron Corp,Old ticker,equity,manual,False
-617446448,DWD,WM,Waste Management,OpenFIGI foreign code,equity,manual,False
+617446448,DWD,MS,Waste Management,OpenFIGI foreign code,equity,manual,False
 718172109,4I1,PM,Philip Morris International,OpenFIGI foreign code,equity,manual,False
 78463V107,GQ9,GLD,SPDR Gold Trust,OpenFIGI foreign code,etf,manual,False
 172967424,TRVC,C,Citigroup,OpenFIGI foreign code,equity,manual,False
@@ -25,7 +25,7 @@ V7780T103,,RCL,Royal Caribbean Group,Foreign-domiciled CUSIP — no prior ticker
 G7997R103,,STX,Seagate Technology,Foreign-domiciled CUSIP — no prior ticker,equity,manual,False
 042068205,,ARM,Arm Holdings plc,Foreign-domiciled CUSIP — ADR,equity,manual,False
 H42097107,,UBS,UBS Group AG,Foreign-domiciled CUSIP — ADR,equity,manual,False
-G3643J108,,FERG,Ferguson Enterprises,Foreign-domiciled CUSIP,equity,manual,False
+G3643J108,,FLUT,Ferguson Enterprises,Foreign-domiciled CUSIP,equity,manual,False
 G0450A105,,ACGL,Arch Capital Group,Foreign-domiciled CUSIP,equity,manual,False
 457669307,IM8N,INSM,Insmed,OpenFIGI foreign code,equity,manual,False
 00846U101,AG8,A,Agilent Technologies,OpenFIGI foreign code,equity,manual,False
@@ -38,7 +38,7 @@ G0250X107,,AMCR,Amcor plc,Foreign-domiciled CUSIP,equity,manual,False
 97650W108,WF2,WTFC,Wintrust Financial,OpenFIGI foreign code,equity,manual,False
 030420103,AWC,AWK,American Water Works,OpenFIGI foreign code — not Amcor,equity,manual,False
 G0403H108,,AON,Aon plc,Foreign-domiciled CUSIP,equity,manual,False
-N07059210,,,,Schwab Prime Advantage Money Market,money_market,manual,False
+N07059210,,ASML,,Schwab Prime Advantage Money Market,money_market,manual,False
 629377508,NRA,WEC,WEC ENERGY GROUP INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 761152107,RME,RSMDF,"Resmed, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 H01301128,,ALC,"Alcon, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec_json,True
@@ -46,7 +46,7 @@ H01301128,,ALC,"Alcon, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec
 01741R102,ATD,ATI,Ati Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 G7709Q104,,RPRX,Royalty Pharma plc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 74251V102,PG4,PFG,Principal financial group,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
-30161Q104,EX9,OMC,Omnicom group,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
+30161Q104,EX9,EXEL,Omnicom group,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 G50871105,,JAZZ,Jazz Pharmaceuticals plc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 83088M102,AWM,SWKS,"Skyworks Solutions, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 750917106,RMBS*,RMBS,"Rambus, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec_json,True
@@ -64,7 +64,7 @@ G0585R106,,AGO,Assured Guaranty Ltd.,Auto-resolved via sec_json (score 100.0),eq
 74112D101,PBV,PBH,Prestige Consumer Healthcare Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 81180WBL4,STX 3.5 06/01/28,STX,Seagate Technology Holdings PLC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 00751Y106,AWN,AAP,Advance Auto Parts Inc.,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
-647581206,N1UA,U,Unity Software Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
+647581206,N1UA,EDU,Unity Software Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 112463104,B7S,BKD,Brookdale Senior Living Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 55024UAH2,LITE 1.5 12/15/29,LITE,Lumentum Holdings Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 15189TBD8,CNP 4.25 08/15/26,CNP,CenterPoint Energy Inc.,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
@@ -143,7 +143,7 @@ G3855L106,,GHRS,GH Research PLC,Auto-resolved via sec_json (score 100.0),equity,
 902252AB1,TYL 0.25 03/15/26,TYL,Tyler Technologies Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 531229AP7,SIRI 3.75 03/15/28,SIRI,Sirius XM Holdings Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 70614WAD2,PTON 5.5 12/01/29,PTON,Peloton Interactive Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
-400501102,G7A,HWM,Howmet Aerospace Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
+400501102,G7A,OMAB,Howmet Aerospace Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 493732101,ROF,KFRC,"Kforce, Inc.",Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 671044AF2,OSIS 2.25 08/01/29,OSIS,OSI Systems Inc.,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 011642AB1,ALRM 0 01/15/26,ALRM,Alarm.com Holdings Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
@@ -152,7 +152,6 @@ G3855L106,,GHRS,GH Research PLC,Auto-resolved via sec_json (score 100.0),equity,
 89422GAA5,TVTX 2.25 03/01/29,TVTX,Travere Therapeutics Inc.,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 358039AB1,FRPT 3 04/01/28,FRPT,Freshpet Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 62914VAK2,NIO 4.625 10/15/30,NIOIF,NIO Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
-531229AQ5,FWONK 2.25 08/15/27,SIRI,SIRIUS XM HOLDINGS INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 G5494J103,,LIN,Linde plc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 122017AD8,BURL 1.25 12/15/27,BURL,Burlington Stores Inc.,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 686688AB8,ORA 2.5 07/15/27,ORA,ORMAT TECHNOLOGIES INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
@@ -414,7 +413,6 @@ g93a5a101,,VIK,VIKING HOLDINGS LTD,Auto-resolved via sec_json (score 100.0),equi
 673800000,,BCLYF,BARCLAYS PLC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 538034BD0,,LYV,Live Nation Entertainment Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 h01301128,,ALC,Alcon Inc,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
-543912836,,KRO,KRONOS WORLDWIDE INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 19240q201,,COGT,COGENT BIOSCIENCES INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 g037ax101,,AMBA,AMBARELLA INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
 00827b106,,AFRM,AFFIRM HOLDINGS INC,Auto-resolved via sec_json (score 100.0),equity,sec_json,True
