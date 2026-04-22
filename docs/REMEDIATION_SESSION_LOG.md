@@ -1393,3 +1393,363 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) **Theme 3 migration advances to 10/14 CLOSED** (add mig-11 to the existing mig-01/02/03/04/09/10/13/14 list + sec-09 via mig-02); remaining actionable: mig-06, mig-07, mig-08 (+ mig-05/mig-12 Phase 2/3 deferrals). (2) **Theme 1 data integrity advances to 13/23 CLOSED** (add int-22 + int-23); remaining: int-03, int-11..int-17, int-20, int-21 + standing int-18 + Phase 2 int-19. (3) Combined with Theme 2 (13/13) + Theme 4 (8/8) + Theme 5 (17/18, ops-18 BLOCKED) → **only ~14 items across Themes 1 + 3 actionable plus ops-18**. (4) **Candidate `mig-11a` row** (Option C synthetic staging fixture) surfaced in Phase 0 / Phase 1 and should be added to the plan item table adjacent to mig-08 (shares fixture tooling zone) in a follow-up. (5) **`tests/test_admin_*.py` CI gap** — requires a separate `curl_cffi` runtime-dep decision before those tests can run under smoke; tracked for a future smoke-CI hygiene pass. (6) **Pending data ops carried forward:** obs-04 `--confirm` + int-10 staging sweep `--confirm`; status unchanged. (7) Standing gaps: INF42 derived-artifact hygiene CI gate (mig-08) + `entity_current` VIEW schema-parity micro-follow-up (mig-09-p0 §4 Option A).
 - **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
+
+---
+
+## 2026-04-22 — int-16-p1 f-string interpolation cleanup
+
+- **Session name:** int-16-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Close INF35 f-string interpolation cosmetic issue in `build_summaries.py`. Pure cosmetic cleanup — no behavior change.
+- **Files touched:** `scripts/build_summaries.py`
+- **Result:** DONE
+- **Commits:** PR #83 merged as `940d54f`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-16 CLOSED.
+- **Parallel-safety validation:** YES — matches Appendix D prediction (single file edit in `build_summaries.py`).
+
+---
+
+## 2026-04-22 — mig-08-p0 INF42 derived-artifact hygiene (Phase 0)
+
+- **Session name:** mig-08-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping of INF42 derived-artifact hygiene. Identified three-pronged approach: (1) fixture provenance metadata (checksums + generation timestamps) on `tests/fixtures/13f_fixture.duckdb`, (2) CI staleness gate that fails the build when fixture metadata is out of sync with source schema, (3) `.gitignore` hardening to prevent accidental commits of `web/react-app/dist/` and other derived artifacts. Closes the standing gap carried since conv-07 obs-13 close.
+- **Files touched:** `docs/findings/mig-08-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #84 merged as `3d840af`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared. Candidate `mig-11a` (synthetic staging fixture) shares tooling zone with mig-08 — coordinate if both proceed.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — mig-08-p1 fixture provenance + CI staleness gate
+
+- **Session name:** mig-08-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for mig-08. Shipped: fixture provenance metadata (source schema hash + generation timestamp + provenance commit SHA stored alongside fixture); CI staleness gate in `smoke.yml` that compares fixture metadata to current schema hash and fails fast on drift; `.gitignore` hardening adding `web/react-app/dist/` and ancillary derived-artifact paths. Local verification: fresh fixture regeneration round-trips cleanly; intentional schema-hash tweak surfaces the staleness gate as expected.
+- **Files touched:** `.gitignore`, `tests/fixtures/13f_fixture.duckdb` (regenerated with provenance), fixture-metadata file (new), build scripts, `.github/workflows/smoke.yml`
+- **Result:** DONE
+- **Commits:** PR #86 merged as `7b19034`
+- **Merge status:** merged
+- **Follow-ups surfaced:** mig-08 CLOSED. INF42 standing gap (carried since conv-07 obs-13) resolved.
+- **Parallel-safety validation:** YES — files aligned with Appendix D prediction (`.gitignore`, fixture, build scripts, `smoke.yml`).
+
+---
+
+## 2026-04-22 — int-11-p1 CUSIP residual-coverage tracking doc
+
+- **Session name:** int-11-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Close INF27 CUSIP residual-coverage tracking as a doc-only tracking-tier update. Added a dedicated tracking-tier section in `docs/data_layers.md` documenting the 216-row foreign-only residual accepted at int-01 close and the coverage methodology. ROADMAP INF27 row updated to reference the tracking doc.
+- **Files touched:** `docs/data_layers.md`, `ROADMAP.md`
+- **Result:** DONE
+- **Commits:** PR #87 merged as `6ed0b39`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-11 CLOSED.
+- **Parallel-safety validation:** YES — docs-only; no code or DB writes.
+
+---
+
+## 2026-04-22 — int-15-p0 market_data fetch_date discipline (Phase 0)
+
+- **Session name:** int-15-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping of INF31 market_data writer `fetch_date` discipline. Code read confirmed `fetch_market.py` already has the discipline in the INSERT path; the actual gap lives in `refetch_missing_sectors.py` on the UPDATE path, which stamps neither `fetch_date` nor `metadata_date`. Scoped Phase 1 to a 2-line fix on the UPDATE statement.
+- **Files touched:** `docs/findings/int-15-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #88 merged as `8357793`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared to a 2-line patch on `refetch_missing_sectors.py`.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — int-20-p0 orphan-CUSIP driver auto-resolved (Phase 0)
+
+- **Session name:** int-20-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 investigation of MAJOR-6 D-03 orphan-CUSIP secondary driver in `build_summaries.py`. Read-only analysis against prod confirmed the orphan-CUSIP driver has auto-resolved post-int-01/02/04/23 + CUSIP v1.4 — the residual surfaces expected by the original audit have gone to zero. No code change required. Closed as findings-only.
+- **Files touched:** `docs/findings/int-20-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #89 merged as `828d323`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-20 CLOSED (no Phase 1).
+- **Parallel-safety validation:** YES — findings doc + read-only queries.
+
+---
+
+## 2026-04-22 — int-15-p1 stamp fetch_date on sector refetch UPDATE
+
+- **Session name:** int-15-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for INF31. 2-line fix on `scripts/refetch_missing_sectors.py` UPDATE path: stamp `fetch_date` + `metadata_date` so the sentinel-writer convention is honored across both INSERT (already-live in `fetch_market.py`) and UPDATE (now-fixed). Local smoke: `pytest tests/smoke/` green.
+- **Files touched:** `scripts/refetch_missing_sectors.py`
+- **Result:** DONE
+- **Commits:** PR #90 merged as `c3d84b7`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-15 CLOSED.
+- **Parallel-safety validation:** YES — single-file patch; no overlap.
+
+---
+
+## 2026-04-22 — int-03-export ticker_overrides.csv triage export
+
+- **Session name:** int-03-export
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Export the full 568-row `ticker_overrides.csv` inventory for offline review. Added a one-off export script + findings doc enumerating candidate issues for manual triage.
+- **Files touched:** `scripts/oneoff/export_ticker_overrides_triage.py` (new), `docs/findings/int-03-export.md` (new)
+- **Result:** DONE
+- **Commits:** PR #91 merged as `c834373`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Apply phase queued (int-03-apply) pending offline Serge review.
+- **Parallel-safety validation:** YES — export-only; no production writes.
+
+---
+
+## 2026-04-22 — int-12-p0 securities.cusip formal PK (Phase 0)
+
+- **Session name:** int-12-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping of INF28 `securities.cusip` formal PK. Validated zero-duplicate CUSIP state on prod + staging (pre-req for adding the constraint). Migration slot decision: slot 009 is consumed by sec-01 admin session table; slot 010 by obs-03 market ID allocation; next available is slot 011. Scoped Phase 1 to migration 011 + `db.py` VALIDATOR_MAP registration + canonical DDL doc update.
+- **Files touched:** `docs/findings/int-12-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #92 merged as `36ac7ff`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared. Migration slot renumber 009 → 011 documented in Appendix D.
+- **Parallel-safety validation:** YES — findings doc only.
+
+---
+
+## 2026-04-22 — int-21-export unresolved series_id triage export
+
+- **Session name:** int-21-export
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Export the 15.87% unresolved series_id tail for offline review. Triage export surfaces candidate resolve / exclude / new-entity decisions for each unresolved row, keyed by series + CIK.
+- **Files touched:** `scripts/oneoff/export_series_triage.py` (new), `docs/findings/int-21-export.md` (new)
+- **Result:** DONE
+- **Commits:** PR #93 merged as `51a054e`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Dedup worksheet (int-21-dedup) and apply (int-21-apply) queued.
+- **Parallel-safety validation:** YES — export-only.
+
+---
+
+## 2026-04-22 — int-13-p0 OTC grey-market is_otc classifier (Phase 0)
+
+- **Session name:** int-13-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 for INF29 OTC grey-market `is_priceable` refinement. Decision: introduce an explicit `is_otc` column rather than overloading `is_priceable` — keeps price-feasibility semantics cleanly separated from market-venue classification. Scoped Phase 1 to migration 012 + classifier + backfill script.
+- **Files touched:** `docs/findings/int-13-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #94 merged as `11b65ec`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared; backfill `--confirm` scheduled for data-ops batch.
+- **Parallel-safety validation:** YES — findings doc only.
+
+---
+
+## 2026-04-22 — int-12-p1 migration 011 securities.cusip PK
+
+- **Session name:** int-12-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for INF28. Shipped migration 011 adding the formal PK constraint on `securities.cusip`; `db.py` updated to register the constraint in VALIDATOR_MAP; canonical DDL doc refreshed. Applied to prod + staging in data-ops batch.
+- **Files touched:** `scripts/migrations/011_securities_cusip_pk.py` (new), `scripts/db.py`, `docs/canonical_ddl.md`
+- **Result:** DONE
+- **Commits:** PR #95 merged as `0f64667`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-12 CLOSED. Slot renumber 009 → 011 reflected in Appendix D.
+- **Parallel-safety validation:** YES — migration-slot separation held (011 did not collide with any in-flight work).
+
+---
+
+## 2026-04-22 — int-03-apply ticker_overrides triage apply
+
+- **Session name:** int-03-apply
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Apply phase for int-03. Triaged 568-row `ticker_overrides.csv` produced 8 rows needing action: 6 ticker fixes + 2 removals. Applied via a single CSV edit + regression check against staging CUSIP classifier.
+- **Files touched:** `data/reference/ticker_overrides.csv`
+- **Result:** DONE
+- **Commits:** PR #96 merged as `13be997`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-03 CLOSED. Original scope estimate (~20-40 errors) was high; actual triaged set was 8.
+- **Parallel-safety validation:** YES — single CSV edit; no overlap.
+
+---
+
+## 2026-04-22 — int-13-p1 migration 012 + is_otc classifier + backfill
+
+- **Session name:** int-13-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for INF29. Migration 012 adds `is_otc` column to `securities` (and ancillary read surfaces); classifier logic lives in `fetch_market.py` / shared helper; one-off backfill script shipped for retroactive flagging. Prod backfill `--confirm` executed in data-ops batch (1,103 rows flagged).
+- **Files touched:** `scripts/migrations/012_securities_is_otc.py` (new), `scripts/fetch_market.py`, `scripts/oneoff/backfill_is_otc.py` (new), `docs/data_layers.md` §6
+- **Result:** DONE
+- **Commits:** PR #97 merged as `bc47092`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-13 CLOSED.
+- **Parallel-safety validation:** YES — files aligned with Appendix D (`fetch_market.py`, `data_layers.md`); migration slot 012 collision-free.
+
+---
+
+## 2026-04-22 — int-21-dedup new-entity worksheet generation
+
+- **Session name:** int-21-dedup
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Generate the new-entity creation worksheet for int-21 apply. 67 distinct CIKs surfaced from 100 candidate series; worksheet includes proposed entity names, CRD IDs where available, series linkages for post-apply verification.
+- **Files touched:** `scripts/oneoff/generate_new_entity_worksheet.py` (new), `docs/findings/int-21-dedup.md` (new)
+- **Result:** DONE
+- **Commits:** PR #98 merged as `fffb51d`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Apply phase (int-21-apply) cleared.
+- **Parallel-safety validation:** YES — worksheet generation only; no writes.
+
+---
+
+## 2026-04-22 — int-17-p1 drop top10_* columns (migration 013)
+
+- **Session name:** int-17-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for INF36 top10_* NULL placeholders. Drop decision over populate: migration 013 dropped 30 unused `top10_*` columns from `summary_by_parent`. Read-site audit confirmed zero consumers in `api_*.py` / React / queries.py. Applied prod + staging in data-ops batch.
+- **Files touched:** `scripts/migrations/013_drop_top10_columns.py` (new), `summary_by_parent` DDL, `scripts/build_summaries.py` (column-list cleanup)
+- **Result:** DONE
+- **Commits:** PR #99 merged as `b943f95`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-17 CLOSED.
+- **Parallel-safety validation:** YES — migration slot 013 collision-free; read-site audit caught no live consumers.
+
+---
+
+## 2026-04-22 — int-21-apply unified series triage apply (program milestone PR #100)
+
+- **Session name:** int-21-apply
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Apply phase for int-21 unified across resolve / exclude / new-entity paths. Promoted 67 new entities to the entity layer (per int-21-dedup worksheet), resolved 27 existing series, excluded 3, and linked 100 series to entities. 1,399 remaining unresolved accepted as residual tail. Executed via staging workflow (sync → diff → promote). **This is the 100th PR of the remediation program.**
+- **Files touched:** `scripts/oneoff/apply_series_triage.py` (new), staging DB writes, prod DB writes
+- **Result:** DONE
+- **Commits:** PR #100 merged as `c2433ba`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-21 CLOSED. **Program milestone: PR #100 hit.** conv-10 convergence session triggered.
+- **Parallel-safety validation:** YES — single-worker staging→promote flow; no parallel overlap.
+
+---
+
+## 2026-04-22 — merge-wave-14
+
+- **Session name:** merge-wave-14
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Coordination wave covering the start of the conv-10 window: PRs #81 (int-14-p0 findings), #82 (conv-09 doc update), #83 (int-16-p1 f-string cleanup), #84 (mig-08-p0 findings), #85 (int-14 NULL-only merge). All five landed sequentially with zero conflicts; disjoint file zones (findings docs, convergence docs, single-script cosmetic, merge_staging + promote_staging).
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `789a0f8` (#81), `d36f26e` (#82), `940d54f` (#83), `3d840af` (#84), `9c104c2` (#85)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** int-14, int-16 closed; mig-08 Phase 1 cleared.
+- **Parallel-safety validation:** YES — clean wave; no conflicts.
+
+---
+
+## 2026-04-22 — merge-wave-15
+
+- **Session name:** merge-wave-15
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Second coordination wave of conv-10: PRs #86 (mig-08-p1 fixture provenance), #87 (int-11 tracking doc), #88 (int-15-p0 findings), #89 (int-20-p0 findings), #90 (int-15-p1 fetch_date stamps). Disjoint zones (fixture metadata + CI, data_layers.md, findings docs, `refetch_missing_sectors.py`).
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `7b19034` (#86), `6ed0b39` (#87), `8357793` (#88), `828d323` (#89), `c3d84b7` (#90)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** mig-08, int-11, int-15, int-20 all closed.
+- **Parallel-safety validation:** YES — clean wave.
+
+---
+
+## 2026-04-22 — merge-wave-16
+
+- **Session name:** merge-wave-16
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Third coordination wave of conv-10: PRs #91 (int-03-export), #92 (int-12-p0 findings), #93 (int-21-export), #94 (int-13-p0 findings), #95 (int-12-p1 migration 011). Export scripts + findings docs + a new migration file — all disjoint.
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `c834373` (#91), `36ac7ff` (#92), `51a054e` (#93), `11b65ec` (#94), `0f64667` (#95)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** int-12 closed; int-03, int-13, int-21 apply phases cleared.
+- **Parallel-safety validation:** YES — clean wave.
+
+---
+
+## 2026-04-22 — merge-wave-17
+
+- **Session name:** merge-wave-17
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Fourth coordination wave of conv-10: PRs #96 (int-03-apply), #97 (int-13-p1 migration 012 + classifier), #98 (int-21-dedup worksheet), #99 (int-17-p1 migration 013). Disjoint file zones (CSV edit, new migration + classifier, worksheet generator, new migration + DDL cleanup).
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `13be997` (#96), `bc47092` (#97), `fffb51d` (#98), `b943f95` (#99)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** int-03, int-13, int-17 closed; int-21 apply cleared.
+- **Parallel-safety validation:** YES — clean wave.
+
+---
+
+## 2026-04-22 — merge-wave-18
+
+- **Session name:** merge-wave-18
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Final coordination wave of the remediation program. PR #100 (int-21-apply): unified series triage apply — 27 resolve + 3 exclude + 67 new entities + 100 series linked. Program milestone.
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `c2433ba` (#100)
+- **Merge status:** merged to main
+- **Follow-ups surfaced:** int-21 CLOSED. **Program milestone: PR #100.** conv-10 convergence triggered.
+- **Parallel-safety validation:** YES — single-PR wave.
+
+---
+
+## 2026-04-22 — data-ops-batch prod/staging DB writes
+
+- **Session name:** data-ops-batch
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Executed the four carried-forward data ops under `--confirm` after all supporting PRs had merged. (1) **obs-04** `scripts/oneoff/backfill_13dg_impacts.py --confirm` — 51,902 manifest rows + 51,902 impact rows written to prod, closing obs-04 grain backfill. (2) **int-10** staging sweep under `--confirm` — 81 rows swept out of the permanent-pending pool. (3) **int-13** `is_otc` backfill under `--confirm` — 1,103 rows flagged in prod. (4) **Migrations 011, 012, 013** applied to prod + staging. No PRs associated (DB writes only).
+- **Files touched:** n/a (DB writes only; prod + staging DuckDBs)
+- **Result:** DONE
+- **Commits:** n/a
+- **Merge status:** n/a
+- **Follow-ups surfaced:** obs-04 fully closed (data op executed). int-10 fully closed (staging sweep executed). int-13 backfill complete.
+- **Parallel-safety validation:** YES — executed serially under explicit `--confirm` with Serge authorization; no parallel conflict.
+
+---
+
+## 2026-04-22 — conv-10 final convergence doc update
+
+- **Session name:** conv-10
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** **Final convergence session for the remediation program.** Batch doc update reflecting 14 PRs (#87-#100) plus previously-merged PR #83 (int-16-p1) since conv-09, plus the data-ops-batch. Flipped CHECKLIST rows for int-03, int-11, int-12, int-13, int-15, int-16, int-17, int-20, int-21, mig-08 (10 items). Appended SESSION_LOG entries for int-16-p1, mig-08-p0/p1, int-11-p1, int-15-p0/p1, int-20-p0, int-03-export/apply, int-12-p0/p1, int-21-export/dedup/apply, int-13-p0/p1, int-17-p1, merge-wave-14..18, data-ops-batch, conv-10. Updated REMEDIATION_PLAN.md item-table statuses (int-03, int-10 data-op-executed, int-11, int-12, int-13, int-14, int-15, int-16, int-17, int-20, int-21, mig-08, obs-04 data-op-executed). Appended the conv-10 changelog entry covering the program milestone. Program totals at close: 100 PRs merged (#5-#100), ~66 items closed across the checklist, Themes 2 + 4 complete, Theme 1 at 22/23, Theme 3 at 11/14, Theme 5 at 17/18. Remaining actionable: mig-06 (L3 surrogate row-ID), mig-07 (read-site inventory). Everything else standing / deferred / superseded / Phase 3 / blocked.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) **Program close recommendation:** the remediation program has reached its stated "Foundation complete" milestone. mig-06 + mig-07 appropriate to schedule as a lite-audit follow-up rather than keep the foundation program open. (2) Phase 2 kickoff (admin refresh framework) now unblocked on every foundation dependency. (3) Candidate `mig-11a` synthetic staging fixture remains as a carryover enhancement candidate. (4) `tests/test_admin_*.py` CI gap still requires a separate `curl_cffi` runtime-dep decision. (5) int-18 remains standing (no closure expected); int-19 + int-09 Step 4 remain formally Phase 2 deferred. (6) ops-18 remains BLOCKED pending recovery of `rotating_audit_schedule.md`.
+- **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.

@@ -16,23 +16,23 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] int-06 BLOCK-TICKER-BACKFILL Phase 1b forward-looking hooks (build_cusip.py end, normalize_securities.py end) — PR #69 (closed as NO-OP; forward-looking hooks already shipped in prior session, Phase 0 verification confirms)
 
 ### Batch 1-C (parallel-eligible within batch: NO)
-- [ ] int-03 BLOCK-SEC-AUD-3 RC3 ticker_overrides.csv manual triage
+- [x] int-03 BLOCK-SEC-AUD-3 RC3 ticker_overrides.csv manual triage — PRs #91, #96 (triage export 568 rows + apply: 6 ticker fixes, 2 removals)
 - [x] int-07 BLOCK-TICKER-BACKFILL Phase 2 benchmark_weights gate — PR #71 (all 3 gates PASS: coverage + no-regression + tier-stability; Phase 0 findings close item)
 - [ ] int-14 INF30 BLOCK-MERGE-UPSERT-MODE NULL-only merge (merge_staging.py, promote_staging.py)
-- [ ] int-15 INF31 market_data writer fetch_date discipline (fetch_market.py, refetch_missing_sectors.py)
-- [ ] int-21 MAJOR-7 D-04 15.87% unresolved series_id tail (pipeline/shared.py)
+- [x] int-15 INF31 market_data writer fetch_date discipline (fetch_market.py, refetch_missing_sectors.py) — PRs #88, #90 (Phase 0 scoping + 2-line fix: stamp `fetch_date` + `metadata_date` on sector refetch UPDATE)
+- [x] int-21 MAJOR-7 D-04 15.87% unresolved series_id tail (pipeline/shared.py) — PRs #93, #98, #100 (triage export + new-entity worksheet + unified apply: 27 resolve + 3 exclude + 67 new entities; 100 series linked; 1,399 accepted unresolved)
 
 ### Batch 1-D (parallel-eligible within batch: NO)
 - [x] int-08 BLOCK-TICKER-BACKFILL Phase 2b 227-ticker sector refetch (CONDITIONAL) — SKIPPED (no PR; conditional on int-07 gate failure; int-07 PASSED all 3 gates)
 - [x] int-09 INF25 BLOCK-DENORM-RETIREMENT sequencing (DDL + docs) — PRs #73, #75 (Steps 1–3 done; Step 4 formally deferred to Phase 2 with exit criteria; `data_layers.md §7` + `ENTITY_ARCHITECTURE.md` + `ROADMAP.md` INF25 all updated)
-- [ ] int-12 INF28 securities.cusip formal PK + VALIDATOR_MAP
-- [ ] int-17 INF36 top10_* NULL placeholders (summary_by_parent DDL)
-- [ ] int-20 MAJOR-6 D-03 orphan-CUSIP secondary driver (build_summaries.py read-path)
+- [x] int-12 INF28 securities.cusip formal PK + VALIDATOR_MAP — PRs #92, #95 (Phase 0 findings + migration 011 formal PK constraint on `securities.cusip` applied prod + staging)
+- [x] int-17 INF36 top10_* NULL placeholders (summary_by_parent DDL) — PR #99 (migration 013 drops 30 unused top10_* columns from `summary_by_parent`)
+- [x] int-20 MAJOR-6 D-03 orphan-CUSIP secondary driver (build_summaries.py read-path) — PR #89 (Phase 0 findings only: orphan-CUSIP driver auto-resolved by securities coverage repairs; no code change required)
 
 ### Batch 1-E (parallel-eligible within batch: NO — shared docs)
-- [ ] int-11 INF27 CUSIP residual-coverage tracking (doc only)
-- [ ] int-13 INF29 OTC grey-market is_priceable refinement
-- [ ] int-16 INF35 f-string interpolation cosmetic
+- [x] int-11 INF27 CUSIP residual-coverage tracking (doc only) — PR #87 (tracking tier documented in `docs/data_layers.md` + ROADMAP)
+- [x] int-13 INF29 OTC grey-market is_priceable refinement — PRs #94, #97 (Phase 0 classifier findings + migration 012 `is_otc` flag + backfill script; 1,103-row prod backfill executed)
+- [x] int-16 INF35 f-string interpolation cosmetic — PR #83 (f-string interpolation cleanup in `build_summaries.py`)
 - [x] int-22 MINOR-5 C-06 fix_fund_classification no-CHECKPOINT retrofit — PR #76 (CHECKPOINT after executemany UPDATE on `fund_universe`)
 
 ### Standing
@@ -91,7 +91,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 3-D (parallel-eligible within batch: NO — share CI/wiring files)
 - [ ] mig-07 INF41 read-site inventory discipline (new scripted audit tool)
-- [ ] mig-08 INF42 derived-artifact hygiene (.gitignore, fixture + dist rebuild enforcement)
+- [x] mig-08 INF42 derived-artifact hygiene (.gitignore, fixture + dist rebuild enforcement) — PRs #84, #86 (Phase 0 findings + fixture provenance metadata + CI staleness gate + `.gitignore` hardening)
 - [x] mig-11 INF47 schema-parity CI wiring (.github/workflows/smoke.yml) — PR #80 (Option A: widened `pytest` scope to `tests/smoke/ + tests/pipeline/` picking up 885-line validator suite; pinned `pyyaml==6.0.3`)
 
 ### Phase 2 / BLOCKED
