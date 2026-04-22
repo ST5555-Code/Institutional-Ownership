@@ -545,7 +545,14 @@ a read-time join, the source stamp comes along.
 at read time against the current canonical source. Class A columns stay
 denormalized.
 
-**Observed drift.**
+**Observed drift — now bounded by forward hooks.** The two drift
+incidents below were the forcing function for this section. Both are
+historical: the one-time backfills closed the gap and the forward
+hooks (int-06 ticker re-stamp subprocess hooks at the end of
+`build_cusip.py` and `normalize_securities.py`; the entity_id
+refresh path in the staging + `enrich_holdings.py` flow) hold coverage
+steady on every subsequent `securities` / `entity_current` write. No
+active drift incidents since the backfills merged.
 - **BLOCK-2 entity_id backfill.** `fund_holdings_v2.entity_id` coverage
   moved from 40.09% to 84.13% after a one-time backfill pass against
   `entity_current`. The gap wasn't a bug — rows were stamped against
@@ -556,27 +563,69 @@ denormalized.
   was ~59% populated at 2025-06 and had decayed to ~3.7% at 2025-11
   before the backfill. Same mechanism: ticker stamped against
   `securities` at promote; subsequent ticker corrections in
-  `securities` never propagated back.
+  `securities` never propagated back. Post-backfill coverage:
+  3,935,959 → 5,154,223 rows on prod apply (`3299a9f`).
 
 **Planned retirement sequence.** Incremental — do not retire Class B
 columns in one pass. Each step narrows the exposure before the next.
+Steps 1–3 are **done**; Step 4 is **deferred to Phase 2** per int-09
+Phase 0 decision (2026-04-22) — see
+[`docs/findings/int-09-p0-findings.md`](findings/int-09-p0-findings.md).
 
-1. **BLOCK-TICKER-BACKFILL** *(shipped — `3299a9f`)*. One-time full
+1. **BLOCK-TICKER-BACKFILL** *(DONE — `3299a9f`)*. One-time full
    backfill of `fund_holdings_v2.ticker`; forward-looking subprocess
    hooks at the end of `build_cusip.py` and `normalize_securities.py`
    so future `securities` updates trigger a ticker re-stamp. Keeps
    drift bounded, does not remove the column.
-2. **BLOCK-3** *(shipped — `0dc0d5d`)*. Legacy `fetch_nport.py` retired;
+2. **BLOCK-3** *(DONE — `0dc0d5d`)*. Legacy `fetch_nport.py` retired;
    `build_benchmark_weights` + `build_fund_classes` repointed to
    `fund_holdings_v2`. Removes readers that would have been broken by
    a Class B column retirement.
-3. **Batch 3 REWRITE.** Five remaining scripts still reading the
-   denormalized Class B columns as their ground truth. Each one gets
-   repointed to read through a join on `securities` / `entity_current`
-   before the column can be retired.
-4. **BLOCK-DENORM-RETIREMENT.** Drop the stamped Class B columns from
-   v2 fact tables; rely on read-time joins. Tracked in ROADMAP as
-   **INF25**.
+3. **Batch 3 REWRITE queue** *(DONE — closed 2026-04-19)*. All five
+   target scripts shipped and stamped their `pipeline_violations.md`
+   entries clear: `build_shares_history.py` (`d7ba1c2`, prod apply
+   `443e37a`), `build_summaries.py` (`3234c8a`, work already at
+   `87ee955`), `compute_flows.py` (`34710d1`, work already at
+   `87ee955`), `load_13f.py` Rewrite4 (`7e68cf9`, prod apply
+   `a58c107`), `build_managers.py` + `backfill_manager_types.py`
+   Rewrite5 (`223b4d9`, prod apply `7747af2`).
+4. **BLOCK-DENORM-RETIREMENT** *(DEFERRED TO PHASE 2 — int-09
+   2026-04-22)*. Drop the stamped Class B columns from v2 fact
+   tables; rely on read-time joins. Tracked in ROADMAP as **INF25**.
+   Deferred because the read-site footprint in `scripts/queries.py`
+   (405 `ticker` + 69 `entity_id` + 6 `rollup_entity_id` references)
+   is too large to rewrite as a remediation-window task, and
+   `rollup_entity_id` retirement requires a dual-graph resolution
+   decision (`economic_control_v1` vs `decision_maker_v1`) that is
+   itself a Phase 2 design item. Drift is stabilized by the int-06
+   forward hooks, so the urgency case is gone.
+
+   **Exit criteria — Step 4 may execute when all are true:**
+
+   1. **mig-12 complete.** `load_13f_v2` / `promote_13f.py` rewrite
+      shipped and stable; all 13F writers go through the new promote
+      path so no writer emits stamps into columns slated for drop.
+   2. **Read-site audit tool exists** (mig-07 / INF41). Scripted
+      audit that enumerates every read site of a target column across
+      `queries.py`, `api_*.py`, `web/react-app/src/**/*.tsx`, and
+      fixture responses.
+   3. **Read-time join helpers proven.** At least one representative
+      `queries.py` endpoint converted to the join pattern with parity
+      tests against the legacy stamped read.
+   4. **Dual-graph resolution strategy chosen** for `rollup_entity_id`
+      — either (a) explicit graph selector in the API layer,
+      (b) materialized column populated by a view over
+      `entity_current`, or (c) a hybrid. INF25 cannot drop the column
+      without picking one.
+   5. **Drift gate stable for ≥2 consecutive quarters.** Forward
+      hooks hold `ticker` / `entity_id` coverage steady without
+      manual backfills.
+   6. **INF41 rename-sweep discipline applied.** Any column removal
+      goes through the same exhaustiveness tooling slated for
+      renames; no ad-hoc grep-and-delete.
+
+   Full decision record and counter-evidence review in
+   [`docs/findings/int-09-p0-findings.md`](findings/int-09-p0-findings.md).
 
 **Not in scope.** Class A columns stay as stamps. `cusip` and `shares`
 on `holdings_v2` are the filing-time record and do not join anywhere.
