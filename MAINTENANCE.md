@@ -173,6 +173,49 @@ converge to a deterministic staging state regardless of interruption.
 Step 5 is atomic per table and reversible via
 `rollback_promotion.py --restore`.
 
+## Log Rotation
+
+The `logs/` directory accumulates run output, parity reports, and
+staging diffs across every pipeline invocation. Without rotation it
+grows unboundedly — 189 files / 31 MB by April 2026, with some entries
+dating to the start of the project.
+
+**Policy:**
+
+| Age        | Action                         |
+|------------|--------------------------------|
+| 0–7 days   | keep uncompressed              |
+| >7 days    | compress with `gzip`           |
+| >90 days   | delete (compressed or not)     |
+
+The "compress >7d, delete >90d" rule gives roughly three months of
+searchable history in ~10% of the raw disk footprint.
+
+**How to run:**
+
+```bash
+# Preview actions without touching files
+make rotate-logs-dry
+
+# Apply the policy
+make rotate-logs
+```
+
+Both targets shell out to `scripts/rotate_logs.sh`. The script is
+idempotent, restart-safe, and ignores symlinks and non-regular files.
+Zero-byte files are skipped on the compress step (gzip'ing an empty
+file is wasted work).
+
+**Recommended cadence:** weekly, or immediately before any
+`make quarterly-update` run if `du -sh logs/` is above ~50 MB. Not
+wired into `quarterly-update` itself — the pipeline should not silently
+discard diagnostic output mid-run.
+
+**First-time rollout:** run `make rotate-logs-dry` first and review the
+action list. Some logs (e.g. `phase35_resolution_results.csv`,
+`entity_build_conflicts.log`) may be worth archiving manually before
+letting the 90-day delete rule take effect.
+
 ## Rollback Procedures
 
 ```bash
