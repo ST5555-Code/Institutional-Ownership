@@ -98,8 +98,10 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
 
     # Intersect: merge only columns that exist in both DBs. Columns only in
     # staging are silently dropped (warn caller via print). Columns only in
-    # production are preserved (left untouched for replaced rows via UPDATE
-    # semantics; left NULL on newly inserted rows).
+    # production are NULL'd on every replaced row — the PK-keyed path is
+    # DELETE+INSERT, not UPDATE, so a prod-only column loses its value on any
+    # row whose PK is present in staging. Use --mode null-only for column-
+    # scoped monotone enrichment that preserves prod drift on other columns.
     shared_cols = [c for c in staging_cols if c in prod_cols]
     staging_only = [c for c in staging_cols if c not in prod_cols]
     if staging_only:
@@ -158,6 +160,86 @@ def merge_table(prod_con, staging_con, table, pk_cols, dry_run=False):
         return staging_count, 0, 0
 
 
+def merge_table_null_only(prod_con, staging_con, table, pk_cols, columns, dry_run=False):
+    """Column-scoped NULL-only merge. Returns list of per-column stats dicts.
+
+    Monotone semantics: for each (pk, col), writes staging.col into prod.col
+    only when prod.col IS NULL AND staging.col IS NOT NULL. Never overwrites
+    a non-NULL prod value; never reverts a value to NULL. Idempotent — a
+    second run writes zero rows.
+
+    Each stats dict has keys: column, prod_null_rows, would_write,
+    unchanged_prod_nonnull, written (0 in dry-run).
+
+    Validation: pk_cols must be a list (full-replace tables have no row
+    identity); every column in `columns` must exist in both staging and prod.
+    """
+    if not pk_cols:
+        raise ValueError(
+            f"{table}: --mode null-only requires a PK-keyed table "
+            "(TABLE_KEYS[t] is None — full-replace tables have no row identity)"
+        )
+
+    staging_cols = get_columns(staging_con, table)
+    prod_cols = get_columns(prod_con, table)
+    missing_staging = [c for c in columns if c not in staging_cols]
+    missing_prod = [c for c in columns if c not in prod_cols]
+    if missing_staging or missing_prod:
+        details = []
+        if missing_staging:
+            details.append(f"missing in staging: {missing_staging}")
+        if missing_prod:
+            details.append(f"missing in prod: {missing_prod}")
+        raise ValueError(f"{table}: column(s) not present in both DBs — {'; '.join(details)}")
+
+    missing_pk_staging = [c for c in pk_cols if c not in staging_cols]
+    missing_pk_prod = [c for c in pk_cols if c not in prod_cols]
+    if missing_pk_staging or missing_pk_prod:
+        raise ValueError(
+            f"{table}: PK column(s) missing — staging missing {missing_pk_staging}, "
+            f"prod missing {missing_pk_prod}"
+        )
+
+    pk_join = " AND ".join(f'p."{c}" = s."{c}"' for c in pk_cols)
+
+    results = []
+    for col in columns:
+        breakdown_sql = f"""
+            SELECT
+              SUM(CASE WHEN p."{col}" IS NULL                              THEN 1 ELSE 0 END) AS prod_null_rows,
+              SUM(CASE WHEN p."{col}" IS NULL AND s."{col}" IS NOT NULL    THEN 1 ELSE 0 END) AS would_write,
+              SUM(CASE WHEN p."{col}" IS NOT NULL                          THEN 1 ELSE 0 END) AS unchanged_prod_nonnull
+            FROM "{table}" p
+            JOIN staging_db."{table}" s ON {pk_join}
+        """
+        row = prod_con.execute(breakdown_sql).fetchone()
+        prod_null_rows = row[0] or 0
+        would_write = row[1] or 0
+        unchanged_prod_nonnull = row[2] or 0
+
+        written = 0
+        if not dry_run and would_write:
+            prod_con.execute(f"""
+                UPDATE "{table}" AS p
+                SET "{col}" = s."{col}"
+                FROM staging_db."{table}" AS s
+                WHERE {pk_join}
+                  AND p."{col}" IS NULL
+                  AND s."{col}" IS NOT NULL
+            """)
+            written = would_write
+
+        results.append({
+            "column": col,
+            "prod_null_rows": prod_null_rows,
+            "would_write": would_write,
+            "unchanged_prod_nonnull": unchanged_prod_nonnull,
+            "written": written,
+        })
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description="Merge staging DB into production")
     parser.add_argument(
@@ -175,10 +257,37 @@ def main():
     parser.add_argument("--tables", type=str, help="Comma-separated table names to merge")
     parser.add_argument("--dry-run", action="store_true", help="Show what would change without writing")
     parser.add_argument("--drop-staging", action="store_true", help="Delete staging DB after successful merge")
+    parser.add_argument(
+        "--mode",
+        choices=["upsert", "replace", "null-only"],
+        default="upsert",
+        help="Merge mode. 'upsert' (default) and 'replace' preserve existing "
+             "behavior (PK-keyed DELETE+INSERT or DROP+CTAS dispatched by the "
+             "registry). 'null-only' is a column-scoped monotone merge that "
+             "writes staging values into prod only where the prod cell IS NULL; "
+             "requires --columns and PK-keyed tables.",
+    )
+    parser.add_argument(
+        "--columns",
+        type=str,
+        help="Comma-separated column list. Required with --mode null-only; "
+             "rejected with other modes.",
+    )
     args = parser.parse_args()
 
     if not args.all and not args.tables:
         parser.error("Specify --all or --tables")
+
+    if args.mode == "null-only":
+        if not args.columns:
+            parser.error("--mode null-only requires --columns c1,c2,...")
+        if args.all:
+            parser.error("--mode null-only is incompatible with --all; use --tables")
+        if not args.tables:
+            parser.error("--mode null-only requires --tables")
+    else:
+        if args.columns:
+            parser.error("--columns is only valid with --mode null-only")
 
     # INF10 guardrail (2026-04-10): `--all` used to be the default call
     # from run_pipeline.sh, and would silently full-replace every table
@@ -240,19 +349,31 @@ def main():
         prod_con = duckdb.connect(PROD_DB)
         prod_con.execute(f"ATTACH '{STAGING_DB}' AS staging_db (READ_ONLY)")
 
+    null_only_columns = (
+        [c.strip() for c in args.columns.split(",") if c.strip()]
+        if args.mode == "null-only"
+        else []
+    )
+
     # Merge each table
-    print(f"{'Table':40s} {'Added':>8s} {'Replaced':>10s} {'Prev':>8s}")
-    print(f"{'-'*40} {'-'*8} {'-'*10} {'-'*8}")
+    if args.mode == "null-only":
+        print(f"{'Table':30s} {'Column':24s} {'ProdNULL':>10s} {'WouldWrite':>12s} {'PreservedNonNULL':>18s}")
+        print(f"{'-'*30} {'-'*24} {'-'*10} {'-'*12} {'-'*18}")
+    else:
+        print(f"{'Table':40s} {'Added':>8s} {'Replaced':>10s} {'Prev':>8s}")
+        print(f"{'-'*40} {'-'*8} {'-'*10} {'-'*8}")
 
     total_added = 0
     total_replaced = 0
+    total_would_write = 0
+    total_written = 0
     errors: list[tuple[str, str]] = []
 
     for table in tables_to_merge:
         pk_cols = TABLE_KEYS.get(table)
 
         # Ensure target table exists in production
-        if not args.dry_run:
+        if not args.dry_run and args.mode != "null-only":
             prod_exists = count_rows(prod_con, table) >= 0
             if not prod_exists:
                 # Create empty table with same schema
@@ -264,10 +385,22 @@ def main():
                     print(f"    WARNING: pre-create of empty {table} failed ({e}); continuing")
 
         try:
-            added, replaced, prev = merge_table(prod_con, staging_con, table, pk_cols, dry_run=args.dry_run)
-            total_added += added
-            total_replaced += replaced
-            print(f"  {table:38s} {added:>8,} {replaced:>10,} {prev:>8,}")
+            if args.mode == "null-only":
+                stats = merge_table_null_only(
+                    prod_con, staging_con, table, pk_cols, null_only_columns, dry_run=args.dry_run
+                )
+                for s in stats:
+                    total_would_write += s["would_write"]
+                    total_written += s["written"]
+                    print(
+                        f"  {table:28s} {s['column']:24s} {s['prod_null_rows']:>10,} "
+                        f"{s['would_write']:>12,} {s['unchanged_prod_nonnull']:>18,}"
+                    )
+            else:
+                added, replaced, prev = merge_table(prod_con, staging_con, table, pk_cols, dry_run=args.dry_run)
+                total_added += added
+                total_replaced += replaced
+                print(f"  {table:38s} {added:>8,} {replaced:>10,} {prev:>8,}")
         except Exception as e:
             # Collect per-table errors and fail the run non-zero at the end.
             # Dry-run keeps errors as warnings only (preserve inspection contract).
@@ -280,7 +413,13 @@ def main():
     prod_con.close()
     staging_con.close()
 
-    print(f"\n  Total added: {total_added:,}, replaced: {total_replaced:,}")
+    if args.mode == "null-only":
+        if args.dry_run:
+            print(f"\n  Total would_write: {total_would_write:,}")
+        else:
+            print(f"\n  Total written: {total_written:,}")
+    else:
+        print(f"\n  Total added: {total_added:,}, replaced: {total_replaced:,}")
 
     if args.drop_staging and not args.dry_run and not errors:
         os.remove(STAGING_DB)
