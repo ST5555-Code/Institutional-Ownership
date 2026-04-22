@@ -20,12 +20,13 @@ Q :=
 endif
 
 .PHONY: help quarterly-update \
-        fetch-13f fetch-nport fetch-dera-nport \
+        fetch-13f load-13f fetch-nport fetch-dera-nport \
         build-entities compute-flows fetch-market \
         build-summaries build-classifications \
         backup-db validate \
         freshness status \
         fetch-13dg fetch-adv fetch-ncen fetch-finra-short \
+        promote-adv \
         build-managers build-fund-classes build-cusip \
         schema-parity-check
 
@@ -38,7 +39,8 @@ help:
 	@echo "    make freshness            — gate: fail if any critical table is stale"
 	@echo ""
 	@echo "  Individual pipeline steps (runnable standalone):"
-	@echo "    make fetch-13f            — Step 1: holdings_v2 refresh"
+	@echo "    make fetch-13f            — Step 1a: download 13F quarterly ZIPs"
+	@echo "    make load-13f             — Step 1b: load 13F TSVs into holdings_v2 (QUARTER=YYYYQn optional)"
 	@echo "    make fetch-nport          — Step 2: fund_holdings_v2 via XML (legacy)"
 	@echo "    make fetch-dera-nport     — Step 2 alt: fund_holdings_v2 via DERA ZIP"
 	@echo "    make build-entities       — Step 3: entity MDM sync"
@@ -54,7 +56,8 @@ help:
 	@echo ""
 	@echo "  Supplementary:"
 	@echo "    make fetch-13dg           — 13D/G beneficial ownership"
-	@echo "    make fetch-adv            — Form ADV pull"
+	@echo "    make fetch-adv            — Form ADV pull (staging; prints run_id)"
+	@echo "    make promote-adv          — ADV staging → prod (RUN_ID=<adv_run_id> required)"
 	@echo "    make fetch-ncen           — N-CEN adviser map"
 	@echo "    make fetch-finra-short    — FINRA short volume"
 	@echo "    make build-managers       — managers table"
@@ -71,12 +74,21 @@ help:
 quarterly-update:
 	@echo "=== 13F quarterly-update starting ==="
 	$(MAKE) fetch-13f
+	$(MAKE) load-13f
 	$(MAKE) fetch-nport
 	$(MAKE) build-entities
 	$(MAKE) compute-flows
 	$(MAKE) fetch-market
 	$(MAKE) build-summaries
 	$(MAKE) build-classifications
+	@# promote-adv is gated on ADV_RUN_ID because fetch-adv (staging) is
+	@# not itself in quarterly-update — run it separately, capture the
+	@# run_id it prints, then re-invoke: make quarterly-update ADV_RUN_ID=...
+	@if [ -n "$(ADV_RUN_ID)" ]; then \
+		$(MAKE) promote-adv RUN_ID=$(ADV_RUN_ID); \
+	else \
+		echo "--- skip promote-adv (pass ADV_RUN_ID=<run_id> from fetch-adv to include) ---"; \
+	fi
 	$(MAKE) backup-db
 	$(MAKE) validate
 	@echo "=== 13F quarterly-update complete ==="
@@ -85,8 +97,12 @@ quarterly-update:
 # Pipeline steps
 # ---------------------------------------------------------------------------
 fetch-13f:
-	@echo "--- Step 1: fetch_13f (holdings_v2) ---"
+	@echo "--- Step 1a: fetch_13f (download quarterly 13F ZIPs) ---"
 	$(Q) $(PY) $(SCRIPTS)/fetch_13f.py
+
+load-13f:
+	@echo "--- Step 1b: load_13f (TSVs → holdings_v2, filings, filings_deduped, other_managers) ---"
+	$(Q) $(PY) $(SCRIPTS)/load_13f.py $(if $(QUARTER),--quarter $(QUARTER),)
 
 fetch-nport:
 	@echo "--- Step 2: fetch_nport_v2 (fund_holdings_v2, XML path) ---"
@@ -133,6 +149,14 @@ fetch-13dg:
 
 fetch-adv:
 	$(Q) $(PY) $(SCRIPTS)/fetch_adv.py
+
+promote-adv:
+	@echo "--- promote_adv (ADV staging → prod) ---"
+	@if [ -z "$(RUN_ID)" ]; then \
+		echo "ERROR: promote-adv requires RUN_ID=<adv_run_id> (printed by fetch-adv)"; \
+		exit 1; \
+	fi
+	$(Q) $(PY) $(SCRIPTS)/promote_adv.py --run-id $(RUN_ID)
 
 fetch-ncen:
 	$(Q) $(PY) $(SCRIPTS)/fetch_ncen.py
