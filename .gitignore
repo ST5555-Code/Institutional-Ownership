@@ -42,6 +42,8 @@ data/13f_dera_parity.duckdb
 
 # React build output
 web/static/dist/
+# React build artifacts (also covered by web/react-app/.gitignore)
+web/react-app/dist/
 
 # TypeScript incremental build info (regenerated on every tsc)
 **/*.tsbuildinfo

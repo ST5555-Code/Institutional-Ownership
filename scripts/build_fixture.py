@@ -19,6 +19,7 @@ Safety rails:
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -72,6 +73,54 @@ def confirm(args, tickers, flow_qs):
 
 def _sql_list(vals):
     return ",".join(f"'{v}'" for v in vals)
+
+
+def _get_built_from_commit() -> str:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        return out or "unknown"
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown"
+
+
+def _get_schema_version() -> str:
+    """Highest numeric-prefixed migration filename under scripts/migrations/."""
+    mig_dir = Path(__file__).resolve().parent / "migrations"
+    if not mig_dir.is_dir():
+        return "unknown"
+    versions: list[int] = []
+    for p in mig_dir.glob("*.py"):
+        prefix = p.name.split("_", 1)[0]
+        if prefix.isdigit():
+            versions.append(int(prefix))
+    if not versions:
+        return "unknown"
+    return f"{max(versions):03d}"
+
+
+def _write_fixture_metadata(con) -> None:
+    commit = _get_built_from_commit()
+    schema_version = _get_schema_version()
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE _fixture_metadata AS
+        SELECT
+            current_timestamp AS built_at,
+            ?                 AS built_from_commit,
+            ?                 AS schema_version
+        """,
+        [commit, schema_version],
+    )
+    row = con.execute(
+        "SELECT built_at, built_from_commit, schema_version FROM _fixture_metadata"
+    ).fetchone()
+    print(
+        f"[build_fixture] _fixture_metadata: built_at={row[0]} "
+        f"commit={row[1]} schema_version={row[2]}"
+    )
 
 
 def main():
@@ -293,6 +342,7 @@ def main():
 
     con.execute("DETACH prod")
     if not args.dry_run:
+        _write_fixture_metadata(con)
         con.execute("CHECKPOINT")
     con.close()
 
