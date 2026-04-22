@@ -12,7 +12,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [ ] int-23 BLOCK-SEC-AUD-5 universe expansion 132K→430K acceptance (cusip_classifier.py decision)
 
 ### Batch 1-B (parallel-eligible within batch: NO)
-- [ ] int-02 BLOCK-SEC-AUD-2 RC2: MAX(issuer_name_sample) mode aggregator (cusip_classifier.py)
+- [x] int-02 BLOCK-SEC-AUD-2 RC2: MAX(issuer_name_sample) mode aggregator — CODE-COMPLETE in `fc2bbbc` (2026-04-18). Phase 0 (PR #50) confirmed aggregator shipped; 8,178-row re-seed gap accepted under **Option A (no re-seed now)**. Closed 2026-04-21.
 - [ ] int-06 BLOCK-TICKER-BACKFILL Phase 1b forward-looking hooks (build_cusip.py end, normalize_securities.py end)
 
 ### Batch 1-C (parallel-eligible within batch: NO)
