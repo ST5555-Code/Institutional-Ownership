@@ -778,3 +778,18 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** all merged to main
 - **Follow-ups surfaced:** Theme 4 fully closed; int-05 closed as NO-OP; conv-03 convergence session triggered.
 - **Parallel-safety validation:** YES.
+
+---
+
+## 2026-04-21 — int-02-p0 RC2 mode aggregator status + re-seed gap (Phase 0, CLOSE)
+
+- **Session name:** int-02-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — confirm RC2 code status (commit `fc2bbbc`), quantify the MAX→MODE residual gap in prod `cusip_classifications`, and decide on re-seed path.
+- **Files touched:** `docs/findings/int-02-p0-findings.md`, `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/NEXT_SESSION_CONTEXT.md`, `ROADMAP.md`
+- **Result:** DONE — **CLOSED AS CODE-COMPLETE.** `fc2bbbc` (2026-04-18) already shipped the mode+length+alpha aggregator in `cusip_classifier.get_cusip_universe()`; HEAD reflects it. Prod `cusip_classifications` (seeded 2026-04-14, four days before the fix) carries an 8,178-row (6.17%) residual MAX-era gap: 2,600 cosmetic, 248 classic RC2 first-letter-clip rescues, 618 superstring improvements, 771 superstring shortenings, 2,051 distinct-first-word flips (upstream CUSIP contamination, fc2bbbc's "known limitation"), 1,890 other. **Option A (no re-seed now) selected** — organic convergence via future universe expansion (int-23) or routine `--reset` runs is acceptable; the 2,051-row distinct-first-word bucket is a data-quality investigation out of remediation scope. int-02 closes without a p1.
+- **Commits:** PR #50 (pending merge at log-write time)
+- **Merge status:** PR #50 open; both CI checks (pre-commit + smoke) passing; awaiting merge-wave
+- **Follow-ups surfaced:** none blocking. Filed as informational: the 2,051 distinct-first-word CUSIPs warrant a standalone data-quality investigation if and when int-23 universe expansion forces a full re-seed.
+- **Parallel-safety validation:** YES — findings-only; ran solo.

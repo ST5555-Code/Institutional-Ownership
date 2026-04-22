@@ -2,7 +2,7 @@
 
 **Item:** int-02 — replace `MAX(issuer_name_sample)` in `cusip_classifier.get_cusip_universe()` with a frequency-based ("mode") aggregator so upstream clipped-prefix corruption (e.g. `"TLASSIAN CORPORATION"` > `"ATLASSIAN CORPORATION"` under lexicographic MAX) stops winning.
 **Scope:** Phase 0. Read-only investigation. No code or data changes.
-**Recommendation:** **CLOSE CODE WORK AS DONE. Phase 1 reduces to an optional re-seed, not a code change.** The mode+length+alpha aggregator shipped in `fc2bbbc` (2026-04-18). HEAD reflects it. The prod `cusip_classifications` table, however, was seeded on 2026-04-14 — four days *before* the fix — so it still reflects the old MAX() behavior. Quantified gap is below; the decision is whether to re-seed.
+**Recommendation:** **CLOSE INT-02 AS CODE-COMPLETE. NO RE-SEED NOW (Option A selected 2026-04-21).** The mode+length+alpha aggregator shipped in `fc2bbbc` (2026-04-18). HEAD reflects it. The prod `cusip_classifications` table was seeded on 2026-04-14 — four days *before* the fix — so it still reflects the old MAX() behavior. Quantified gap is below; decision is to accept the 6.17% latent MAX-era names rather than run a full re-seed. Future re-seeds (triggered by universe expansion or routine refresh) will converge prod to MODE picks organically.
 
 ---
 
@@ -122,6 +122,17 @@ Code work is complete. `fc2bbbc` is deployed to HEAD and the commit diff matches
 | **C. Full Phase 2 re-seed** | Run `cusip_classifier.py` against the current universe with `--reset` semantics; stage, diff, promote 8,178 row changes. | Medium. Includes the 2,051 "distinct-first-word" flips that need regression review. | ~1 session + review of 2,051-row diff. |
 
 Recommended: **Option B** if a narrow, boring remediation is preferred; **Option C** if the intent is to fully converge prod with the shipped aggregator and accept the review cost.
+
+### 3.2.1 Decision (2026-04-21)
+
+**Option A selected.** No re-seed now. Rationale:
+
+- The 248 signature RC2 cases are cosmetic at the analysis layer — `cusip_classifications.issuer_name` feeds UI labels and manager-level rollups; it does not drive PK joins, flow computation, or valuation.
+- The 2,051 distinct-first-word bucket needs per-row investigation. A targeted Phase 1 without that review would write 618 good fixes but also re-surface the 2,051 contaminated rows as churn.
+- Organic convergence is acceptable: the next universe expansion (int-23) or routine `cusip_classifier.py --reset` run will pick up MODE picks for all rows it rewrites. Rows that are never re-seeded are low-traffic by definition.
+- Blocker for re-seed: the 2,051-row distinct-first-word set is a data-quality investigation in its own right. If and when that investigation runs (filed as a follow-up, not remediation scope), a full Option C re-seed can land alongside it.
+
+int-02 closes here. No int-02-p1 session.
 
 ### 3.3 Phase 0 memory reconciliation
 
