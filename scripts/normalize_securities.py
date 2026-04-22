@@ -41,6 +41,7 @@ SET
     canonical_type_source = cc.canonical_type_source,
     is_equity             = cc.is_equity,
     is_priceable          = cc.is_priceable,
+    is_otc                = cc.is_otc,
     ticker_expected       = cc.ticker_expected,
     is_active             = cc.is_active,
     figi                  = COALESCE(cc.figi, s.figi),
@@ -56,14 +57,14 @@ INSERT_MISSING_SQL = """
 INSERT INTO securities (
     cusip, issuer_name, ticker, security_type, exchange, market_sector,
     canonical_type, canonical_type_source,
-    is_equity, is_priceable, ticker_expected, is_active, figi,
+    is_equity, is_priceable, is_otc, ticker_expected, is_active, figi,
     holdings_count, total_value, is_energy, is_media
 )
 SELECT
     cc.cusip, cc.issuer_name, cc.ticker, cc.raw_type_mode,
     cc.exchange, cc.market_sector,
     cc.canonical_type, cc.canonical_type_source,
-    cc.is_equity, cc.is_priceable, cc.ticker_expected, cc.is_active,
+    cc.is_equity, cc.is_priceable, cc.is_otc, cc.ticker_expected, cc.is_active,
     cc.figi,
     0, 0, FALSE, FALSE
 FROM cusip_classifications cc

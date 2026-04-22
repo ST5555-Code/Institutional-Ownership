@@ -17,6 +17,8 @@ Classification order (see classify_cusip() docstring for detail):
 """
 from __future__ import annotations
 
+import csv
+import os
 import re
 from datetime import date as _date
 from typing import Any, Optional
@@ -202,6 +204,56 @@ _DERIVATIVE_ASSET_CATS = frozenset({
     'DE', 'DIR', 'DCO', 'DCR', 'DO', 'DFE',
     'OPT', 'WAR',
 })
+
+
+# ---------------------------------------------------------------------------
+# OTC grey-market flag — INF29
+# ---------------------------------------------------------------------------
+
+# OpenFIGI exchange codes that mean "OTC / grey market" for US-accessible
+# venues. A row is is_otc=TRUE if securities.exchange falls in this set
+# (Rule B) OR the ticker matches an SEC-reference OTC ticker (Rule A).
+# Rules A and B are disjoint at current population (findings §2) — Rule A
+# catches foreign-ADR F-suffix tickers whose OpenFIGI primary listing is
+# the foreign venue (GR, CN, etc.); Rule B catches domestic OTC preferreds
+# and unlisted notes.
+_OTC_EXCHANGE_CODES = frozenset({'OTC US', 'NOT LISTED'})
+
+# Path to SEC ticker reference. Used by _load_sec_otc_tickers() below.
+_SEC_TICKERS_CSV = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "reference", "sec_company_tickers.csv",
+)
+
+
+def _load_sec_otc_tickers() -> frozenset[str]:
+    """Load the set of uppercase tickers from sec_company_tickers.csv where
+    exchange='OTC'. Returns an empty set if the file is absent (keeps the
+    classifier import-safe in minimal test environments).
+    """
+    if not os.path.exists(_SEC_TICKERS_CSV):
+        return frozenset()
+    out: set[str] = set()
+    with open(_SEC_TICKERS_CSV, newline='') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            exch = (row.get('exchange') or '').strip()
+            tkr = (row.get('ticker') or '').strip()
+            if exch.upper() == 'OTC' and tkr:
+                out.add(tkr.upper())
+    return frozenset(out)
+
+
+_SEC_OTC_TICKERS: frozenset[str] = _load_sec_otc_tickers()
+
+
+def _is_otc(exchange: Optional[str], ticker: Optional[str]) -> bool:
+    """Return True iff the row should be flagged is_otc per Rule A ∪ Rule B."""
+    if exchange and exchange in _OTC_EXCHANGE_CODES:
+        return True
+    if ticker and ticker.upper() in _SEC_OTC_TICKERS:
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -499,6 +551,10 @@ def classify_cusip(row: dict[str, Any]) -> dict[str, Any]:
 
     first_seen_date = row.get('first_seen_date') or _DEFAULT_FIRST_SEEN
 
+    # INF29 — OTC grey-market flag. Independent of is_priceable; downstream
+    # liquid-only queries compose `is_priceable AND NOT is_otc`.
+    is_otc = _is_otc(exchange, row.get('ticker'))
+
     return {
         'cusip': cusip,
         'canonical_type': canonical_type,
@@ -516,6 +572,7 @@ def classify_cusip(row: dict[str, Any]) -> dict[str, Any]:
         'is_equity': bool(is_equity),
         'ticker_expected': bool(ticker_expected),
         'is_priceable': bool(is_priceable),
+        'is_otc': bool(is_otc),
         'is_permanent': bool(is_permanent),
         'is_active': True,
         'classification_source': canonical_type_source or 'inferred',
