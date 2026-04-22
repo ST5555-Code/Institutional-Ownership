@@ -29,7 +29,8 @@ endif
         promote-adv \
         build-managers build-fund-classes build-cusip \
         schema-parity-check \
-        rotate-logs rotate-logs-dry
+        rotate-logs rotate-logs-dry \
+        audit-read-sites
 
 help:
 	@echo "13F pipeline targets:"
@@ -205,3 +206,12 @@ rotate-logs:
 
 rotate-logs-dry:
 	@$(SCRIPTS)/rotate_logs.sh --dry-run
+
+# ---------------------------------------------------------------------------
+# mig-07 Mode 1 — on-demand read-site inventory audit. Scans scripts/ and
+# web/react-app/src/ for SQL and API-field read sites and writes a CSV
+# report to data/reports/read_site_inventory.csv. Run before dropping or
+# renaming a column to find every read site.
+# ---------------------------------------------------------------------------
+audit-read-sites:
+	$(Q) $(PY) $(SCRIPTS)/audit_read_sites.py --csv
