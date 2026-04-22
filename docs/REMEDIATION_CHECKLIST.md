@@ -80,8 +80,8 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] mig-04 MAJOR-16 S-02 schema_versions stamp hole (migrations/add_last_refreshed_at.py) — PRs #26, #29
 
 ### Batch 3-B (parallel-eligible within batch: NO — some share migration files)
-- [ ] mig-03 MAJOR-15 migration 004 staging/rename pattern retrofit (migrations/004)
-- [ ] mig-13 pipeline-violations REWRITE tail — residual scope: build_entities, merge_staging (fetch_adv closed via mig-02 PR #37; build_fund_classes + build_benchmark_weights closed via sec-05 PR #45)
+- [x] mig-03 MAJOR-15 migration 004 staging/rename pattern retrofit (migrations/004) — PRs #60, #62 (retrofit atomic BEGIN/COMMIT + build-new-and-swap shadow pattern + pre-transaction recovery probe)
+- [x] mig-13 pipeline-violations REWRITE tail — residual scope: build_entities, merge_staging (fetch_adv closed via mig-02 PR #37; build_fund_classes + build_benchmark_weights closed via sec-05 PR #45) — PRs #61, #63 (build_entities per-step CHECKPOINTs; merge_staging TABLE_KEYS sourced from registry, collect-and-fail error handling)
 - [ ] mig-14 REWRITE_BUILD_MANAGERS INF1 routing + --dry-run + data_freshness (build_managers.py, db.py, promote_staging.py)
 
 ### Batch 3-C (parallel-eligible within batch: YES — mig-06 ∥ mig-09 ∥ mig-10 disjoint)
