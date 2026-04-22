@@ -8,16 +8,16 @@ primary key. Production DB is only locked during the merge (seconds).
 
 IMPORTANT — prefer --tables over --all. `--all` merges every table
 present in the staging DB, including reference tables seeded by
-`db.seed_staging()` (holdings, managers, fund_holdings, market_data,
-adv_managers, filings, securities, parent_bridge) and any entity
-tables left over from a prior `sync_staging.py` run. For tables not
-in `TABLE_KEYS`, the merge path does a full DROP + CREATE TABLE AS
-SELECT, which would silently revert any concurrent prod writes or
-promote in-progress entity staging edits bypassing the INF1 staging
-workflow. `--all` now requires an explicit `--i-really-mean-all`
-acknowledgement (INF10, 2026-04-10).
+`db.seed_staging()` (holdings_v2, managers, fund_holdings_v2,
+market_data, adv_managers, filings, securities, parent_bridge) and
+any entity tables left over from a prior `sync_staging.py` run. For
+tables not in `TABLE_KEYS`, the merge path does a full DROP + CREATE
+TABLE AS SELECT, which would silently revert any concurrent prod
+writes or promote in-progress entity staging edits bypassing the INF1
+staging workflow. `--all` now requires an explicit
+`--i-really-mean-all` acknowledgement (INF10, 2026-04-10).
 
-Run: python3 scripts/merge_staging.py --tables beneficial_ownership,short_interest
+Run: python3 scripts/merge_staging.py --tables beneficial_ownership_v2,short_interest
      python3 scripts/merge_staging.py --tables X --dry-run
      python3 scripts/merge_staging.py --tables X --drop-staging
      python3 scripts/merge_staging.py --all --i-really-mean-all    # destructive, see above
@@ -25,11 +25,13 @@ Run: python3 scripts/merge_staging.py --tables beneficial_ownership,short_intere
 
 import argparse
 import os
+import sys
 from datetime import datetime
 
 import duckdb
 
 from db import PROD_DB, STAGING_DB
+from pipeline.registry import merge_table_keys
 
 # Table definitions: name → primary key column(s)
 #
@@ -41,37 +43,16 @@ from db import PROD_DB, STAGING_DB
 #
 # Warning: `None` means FULL REPLACEMENT, not "append." Any comment that
 # says otherwise is wrong — see the merge_table() else-branch below.
-TABLE_KEYS = {
-    "beneficial_ownership": ["accession_number"],
-    "beneficial_ownership_current": None,  # rebuilt downstream — full replace
-    "fetched_tickers_13dg": ["ticker"],
-    "listed_filings_13dg": ["accession_number"],
-    "short_interest": ["ticker", "report_date"],
-    "ncen_adviser_map": None,  # rebuilt from N-CEN fetch — full replace
-    "fund_holdings": None,  # rebuilt from N-PORT fetch — full replace
-    "fund_universe": ["series_id"],
-    "fund_classes": ["class_id"],
-    "lei_reference": ["lei"],
-    "peer_groups": None,  # small reference table — replace entirely
-    "market_data": ["ticker"],
-    "shares_outstanding_history": ["ticker", "as_of_date"],
-    "investor_flows": None,  # rebuilt by compute_flows — replace entirely
-    "ticker_flow_stats": None,  # rebuilt — replace entirely
-    "positions": None,  # rebuilt by unify_positions — replace entirely
-    "summary_by_ticker": ["quarter", "ticker"],
-    "summary_by_parent": ["quarter", "inst_parent_name"],
-    "_cache_openfigi": ["cusip"],
-    "_cache_yfinance": ["ticker"],
-    # Batch 3-A (ARCH-3A): N-PORT family pattern lookup. Rebuilt from the
-    # in-code dict via scripts/migrate_batch_3a.py — the staging copy is
-    # authoritative, so full-replace on merge is correct.
-    "fund_family_patterns": None,
-    # Batch 3-A (ARCH-3A): one row per precomputed table, updated by
-    # pipeline scripts after each rebuild. Upsert on `table_name` so that
-    # fresh pipeline writes in prod are preserved when reference-table
-    # merges flow through.
-    "data_freshness": ["table_name"],
-}
+#
+# The registry is the source of truth — see `pipeline.registry.merge_table_keys()`
+# at `scripts/pipeline/registry.py:355`. Only overrides below are the two
+# persistent OpenFIGI / yfinance caches which live outside the registry.
+TABLE_KEYS = merge_table_keys()
+# Persistent lookup caches — not in the dataset registry because they are
+# infrastructure, not datasets. Upsert by primary key so accumulated cache
+# entries survive cross-DB merges.
+TABLE_KEYS["_cache_openfigi"] = ["cusip"]
+TABLE_KEYS["_cache_yfinance"] = ["ticker"]
 
 
 def get_staging_tables(staging_con):
@@ -201,8 +182,8 @@ def main():
 
     # INF10 guardrail (2026-04-10): `--all` used to be the default call
     # from run_pipeline.sh, and would silently full-replace every table
-    # in staging — including reference tables like holdings, managers,
-    # fund_holdings, market_data (tables not in TABLE_KEYS hit the
+    # in staging — including reference tables like holdings_v2, managers,
+    # fund_holdings_v2, market_data (tables not in TABLE_KEYS hit the
     # drop+recreate branch of merge_table()). The pipeline now names
     # tables explicitly; anyone still reaching for --all must opt in
     # explicitly to make the scope visible at the call site.
@@ -265,6 +246,7 @@ def main():
 
     total_added = 0
     total_replaced = 0
+    errors: list[tuple[str, str]] = []
 
     for table in tables_to_merge:
         pk_cols = TABLE_KEYS.get(table)
@@ -287,6 +269,9 @@ def main():
             total_replaced += replaced
             print(f"  {table:38s} {added:>8,} {replaced:>10,} {prev:>8,}")
         except Exception as e:
+            # Collect per-table errors and fail the run non-zero at the end.
+            # Dry-run keeps errors as warnings only (preserve inspection contract).
+            errors.append((table, str(e)))
             print(f"  {table:38s} ERROR: {e}")
 
     if not args.dry_run:
@@ -297,11 +282,20 @@ def main():
 
     print(f"\n  Total added: {total_added:,}, replaced: {total_replaced:,}")
 
-    if args.drop_staging and not args.dry_run:
+    if args.drop_staging and not args.dry_run and not errors:
         os.remove(STAGING_DB)
         print(f"  Staging DB deleted: {STAGING_DB}")
+    elif args.drop_staging and errors:
+        print("  Staging DB retained for investigation (merge had errors).")
 
     print(f"\n{'DRY RUN complete' if args.dry_run else 'Merge complete'}: {datetime.now().strftime('%H:%M:%S')}")
+
+    if errors:
+        print(f"\n  {len(errors)} table(s) failed to merge:")
+        for tbl, msg in errors:
+            print(f"    - {tbl}: {msg}")
+        if not args.dry_run:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

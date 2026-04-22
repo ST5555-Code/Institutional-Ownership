@@ -335,10 +335,15 @@ below for historical reference.
 
 ---
 
-## build_entities.py (RETROFIT)
+## build_entities.py (RETROFIT) — CLEARED 2026-04-21 (mig-13-p1)
 
-- §1 (incremental save): **VIOLATION** — no CHECKPOINT inside any of
-  the 7 build steps. Large INSERT chains flush only at close.
+- §1 (incremental save): **CLEARED** — `CHECKPOINT` now fires in
+  `main()` after every build step (`step2_seed_parents`,
+  `step2_create_manager_entities`, `step2_create_fund_entities`,
+  `step3_populate_identifiers`, `step4_populate_relationships`,
+  `step5_populate_aliases`, `step6_populate_classifications`,
+  `step7_compute_rollups`, plus `replay_persistent_overrides`). Mid-run
+  kill no longer loses a completed step.
 - §9 (dry-run): partial — staging-only via `db.set_staging_mode(True)`
   at `build_entities.py:971`. No explicit `--dry-run` but the
   staging-only gate is the safety rail. Promotion to prod always
@@ -449,18 +454,22 @@ below for historical reference.
 
 ---
 
-## merge_staging.py (RETROFIT)
+## merge_staging.py (RETROFIT) — CLEARED 2026-04-21 (mig-13-p1)
 
-- §5 (error handling): per-table try/except at `merge_staging.py:289`
-  prints error but continues — can mask real failures.
-- Legacy refs: `:45` `"beneficial_ownership": ["accession_number"]`,
-  `:51` `"fund_holdings": None` (both dropped Stage 5). Comments at
-  `:154-160,:204-205,:273` reference legacy names.
-- Otherwise clean: `--dry-run` at `:195`, `--all --i-really-mean-all`
-  gate at `:209`, CHECKPOINT at `:293`.
-- Fix: derive `TABLE_KEYS` from
-  `scripts/pipeline/registry.merge_table_keys()` to keep drift from
-  reappearing.
+- §5 (error handling): **CLEARED** — per-table errors are now collected
+  into an `errors` list; on live runs the script exits non-zero with a
+  failure summary. Dry-run keeps errors as warnings to preserve the
+  inspection contract. `--drop-staging` is suppressed when any table
+  failed so the staging DB is retained for investigation.
+- Legacy refs: **CLEARED** — hand-maintained `TABLE_KEYS` dict replaced
+  by `TABLE_KEYS = merge_table_keys()` import from
+  `scripts/pipeline/registry.py:355`. Stale `beneficial_ownership` and
+  `fund_holdings` entries are gone because neither is in the registry
+  (only `beneficial_ownership_v2` and `fund_holdings_v2` are). Only two
+  explicit overrides remain (`_cache_openfigi`, `_cache_yfinance`) —
+  infrastructure caches that live outside the dataset registry.
+- Otherwise clean: `--dry-run`, `--all --i-really-mean-all` gate, and
+  end-of-merge `CHECKPOINT` retained.
 
 ---
 

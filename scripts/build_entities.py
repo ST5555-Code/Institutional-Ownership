@@ -984,17 +984,26 @@ def main():
             reset_entity_tables(con)
 
         seed_map = step2_seed_parents(con, seeds)
+        con.execute("CHECKPOINT")
         cik_to_entity, manager_rows = step2_create_manager_entities(con, seed_map)
+        con.execute("CHECKPOINT")
         series_to_entity, fund_rows = step2_create_fund_entities(con)
+        con.execute("CHECKPOINT")
 
         step3_populate_identifiers(con, cik_to_entity, series_to_entity, manager_rows)
+        con.execute("CHECKPOINT")
         step4_populate_relationships(con, seed_map, series_to_entity, manager_rows)
+        con.execute("CHECKPOINT")
         step5_populate_aliases(con, seed_map, seeds, manager_rows, fund_rows)
+        con.execute("CHECKPOINT")
         step6_populate_classifications(con, seeds, seed_map, manager_rows, fund_rows)
+        con.execute("CHECKPOINT")
         step7_compute_rollups(con)
+        con.execute("CHECKPOINT")
 
         # Step 8: Replay persistent overrides (survive --reset)
         replay_persistent_overrides(con)
+        con.execute("CHECKPOINT")
 
         # Summary counts
         logger.info("-" * 72)
