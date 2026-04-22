@@ -43,10 +43,19 @@ def _load_market_cls() -> Type[SourcePipeline]:
     return module.LoadMarketPipeline
 
 
+def _load_nport_cls() -> Type[SourcePipeline]:
+    """Lazy-import LoadNPortPipeline. w2-03 migration."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.load_nport")
+    return module.LoadNPortPipeline
+
+
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
     "13f_holdings":   _load_13f_cls,    # type: ignore[dict-item]
     "13dg_ownership": _load_13dg_cls,   # type: ignore[dict-item]
     "market_data":    _load_market_cls,  # type: ignore[dict-item]
+    "nport_holdings": _load_nport_cls,   # type: ignore[dict-item]
 }
 
 

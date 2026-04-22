@@ -14,15 +14,16 @@ Sequence:
   5. build_cusip.py     — Build securities table
   6. fetch_market.py    — Pull yfinance market data
   7. auto_resolve.py    — Auto-resolve ticker gaps
-  8. fetch_nport_v2.py  — Stage N-PORT mutual fund holdings
+  8. pipeline/load_nport.py — Stage N-PORT mutual fund holdings (w2-03)
 
 Retired steps (removed from this script):
-  - fetch_nport.py       → replaced by fetch_nport_v2.py
+  - fetch_nport.py       → replaced by pipeline/load_nport.py (w2-03)
+  - fetch_nport_v2.py    → replaced by pipeline/load_nport.py (w2-03)
   - unify_positions.py   → retired; no longer part of the pipeline
 
-ADV + N-PORT promotion (staging → prod) is not invoked here; run
-`make promote-adv RUN_ID=<id>` (and validate_nport + promote_nport)
-separately after inspecting the staged run.
+ADV + N-PORT promotion (staging → prod) is not invoked here. Use the
+admin refresh UI (or pipeline.approve_and_promote(run_id) in a REPL) to
+promote once a staged run is reviewed.
 """
 
 import os
@@ -70,19 +71,21 @@ def main():
         print("\nPipeline stopped at auto_resolve.py.")
         sys.exit(1)
 
-    # Fetch N-PORT mutual fund holdings (staging). fetch_nport_v2.py is the
-    # DERA-bulk orchestrator — it auto-detects missing quarters, so no
-    # --quarter flag is passed (and none is accepted).
+    # Fetch N-PORT mutual fund holdings. load_nport.py is the w2-03
+    # SourcePipeline subclass — DERA-bulk orchestrator by default, with
+    # auto-discovery of missing quarters. --staging writes to the staging
+    # DB; the admin approval UI promotes.
     print(f"\n{'=' * 60}")
-    print("Running fetch_nport_v2.py --staging...")
+    print("Running pipeline/load_nport.py --staging...")
     print(f"{'=' * 60}")
     result = subprocess.run(
-        [sys.executable, os.path.join(SCRIPTS_DIR, "fetch_nport_v2.py"),
+        [sys.executable,
+         os.path.join(SCRIPTS_DIR, "pipeline", "load_nport.py"),
          "--staging"],
         cwd=BASE_DIR,
     )
     if result.returncode != 0:
-        print(f"\nPipeline stopped at fetch_nport_v2.py (exit {result.returncode}).")
+        print(f"\nPipeline stopped at load_nport.py (exit {result.returncode}).")
         sys.exit(1)
 
     # Notify if pending overrides exist
