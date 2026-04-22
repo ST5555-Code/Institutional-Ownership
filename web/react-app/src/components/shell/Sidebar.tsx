@@ -29,6 +29,9 @@ export function Sidebar() {
         <SidebarItem id="overlap-analysis" label="Overlap Analysis" />
         <SidebarItem id="short-interest" label="Short Interest" />
       </SidebarSection>
+      <SidebarSection title="Reference">
+        <SidebarItem id="data-source" label="Data Source" />
+      </SidebarSection>
     </nav>
   )
 }
