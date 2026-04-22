@@ -183,9 +183,12 @@ def test_status_returns_all_pipelines(logged_in):
     names = {p["name"] for p in body["pipelines"]}
     assert names == set(PIPELINE_CADENCE.keys())
     # Pipelines migrated to SourcePipeline so far:
-    # 13f_holdings (p2-05), 13dg_ownership (w2-01), market_data (w2-02).
+    # 13f_holdings (p2-05), 13dg_ownership (w2-01), market_data (w2-02),
+    # nport_holdings (w2-03).
     registered = {p["name"] for p in body["pipelines"] if p["registered"]}
-    assert registered == {"13f_holdings", "13dg_ownership", "market_data"}
+    assert registered == {
+        "13f_holdings", "13dg_ownership", "market_data", "nport_holdings",
+    }
 
 
 def test_refresh_unknown_pipeline_404(logged_in):
