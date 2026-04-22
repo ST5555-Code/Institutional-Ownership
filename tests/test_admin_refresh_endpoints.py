@@ -182,9 +182,9 @@ def test_status_returns_all_pipelines(logged_in):
     assert "pending_runs" in body
     names = {p["name"] for p in body["pipelines"]}
     assert names == set(PIPELINE_CADENCE.keys())
-    # The only pipeline registered today is 13f_holdings.
+    # Registered today: 13f_holdings (p2-05), market_data (w2-02).
     registered = {p["name"] for p in body["pipelines"] if p["registered"]}
-    assert registered == {"13f_holdings"}
+    assert registered == {"13f_holdings", "market_data"}
 
 
 def test_refresh_unknown_pipeline_404(logged_in):
