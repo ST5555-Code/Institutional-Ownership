@@ -444,46 +444,55 @@ class SourcePipeline(ABC):
         key_cols = list(self.amendment_key)
         rows_flipped = 0
 
-        if key_cols:
-            unique_keys = (
-                rows[key_cols].drop_duplicates().to_dict("records")
-            )
-            for key in unique_keys:
-                where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
-                params = [key[c] for c in key_cols]
-                flipped_rows = prod_con.execute(
-                    f"UPDATE {self.target_table} "  # nosec B608
-                    f"SET is_latest = FALSE "
-                    f"WHERE {where_sql} AND is_latest = TRUE "
-                    f"RETURNING 1",
-                    params,
-                ).fetchall()
-                rows_flipped += len(flipped_rows)
-                self.record_impact(
-                    prod_con, manifest_id=manifest_id, run_id=run_id,
-                    action="flip_is_latest", rowkey=key,
-                )
-
         if "is_latest" in rows.columns:
             rows = rows.copy()
             rows["is_latest"] = True
 
-        prod_con.register("staged_rows", rows)
-        try:
-            prod_con.execute(
-                f"INSERT INTO {self.target_table} "  # nosec B608
-                f"SELECT * FROM staged_rows"
-            )
-        finally:
-            prod_con.unregister("staged_rows")
-        rows_inserted = len(rows)
+        col_list = ", ".join(rows.columns)
 
-        if key_cols:
-            for key in rows[key_cols].drop_duplicates().to_dict("records"):
-                self.record_impact(
-                    prod_con, manifest_id=manifest_id, run_id=run_id,
-                    action="insert", rowkey=key,
+        prod_con.execute("BEGIN TRANSACTION")
+        try:
+            if key_cols:
+                unique_keys = (
+                    rows[key_cols].drop_duplicates().to_dict("records")
                 )
+                for key in unique_keys:
+                    where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
+                    params = [key[c] for c in key_cols]
+                    flipped_rows = prod_con.execute(
+                        f"UPDATE {self.target_table} "  # nosec B608
+                        f"SET is_latest = FALSE "
+                        f"WHERE {where_sql} AND is_latest = TRUE "
+                        f"RETURNING 1",
+                        params,
+                    ).fetchall()
+                    rows_flipped += len(flipped_rows)
+                    self.record_impact(
+                        prod_con, manifest_id=manifest_id, run_id=run_id,
+                        action="flip_is_latest", rowkey=key,
+                    )
+
+            prod_con.register("staged_rows", rows)
+            try:
+                prod_con.execute(
+                    f"INSERT INTO {self.target_table} "  # nosec B608
+                    f"({col_list}) SELECT {col_list} FROM staged_rows"
+                )
+            finally:
+                prod_con.unregister("staged_rows")
+            rows_inserted = len(rows)
+
+            if key_cols:
+                for key in rows[key_cols].drop_duplicates().to_dict("records"):
+                    self.record_impact(
+                        prod_con, manifest_id=manifest_id, run_id=run_id,
+                        action="insert", rowkey=key,
+                    )
+
+            prod_con.execute("COMMIT")
+        except Exception:
+            prod_con.execute("ROLLBACK")
+            raise
 
         return PromoteResult(
             run_id=run_id,
@@ -501,40 +510,48 @@ class SourcePipeline(ABC):
         manifest_id = self._manifest_id_for_run(prod_con, run_id)
         key_cols = list(self.amendment_key)
         rows_flipped = 0
+        col_list = ", ".join(rows.columns)
 
-        if key_cols:
-            for key in rows[key_cols].drop_duplicates().to_dict("records"):
-                where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
-                params = [key[c] for c in key_cols]
-                flipped_rows = prod_con.execute(
-                    f"UPDATE {self.target_table} "  # nosec B608
-                    f"SET valid_to = CURRENT_TIMESTAMP "
-                    f"WHERE {where_sql} AND valid_to = DATE '9999-12-31' "
-                    f"RETURNING 1",
-                    params,
-                ).fetchall()
-                rows_flipped += len(flipped_rows)
-                self.record_impact(
-                    prod_con, manifest_id=manifest_id, run_id=run_id,
-                    action="scd_supersede", rowkey=key,
-                )
-
-        prod_con.register("staged_rows", rows)
+        prod_con.execute("BEGIN TRANSACTION")
         try:
-            prod_con.execute(
-                f"INSERT INTO {self.target_table} "  # nosec B608
-                f"SELECT * FROM staged_rows"
-            )
-        finally:
-            prod_con.unregister("staged_rows")
-        rows_inserted = len(rows)
+            if key_cols:
+                for key in rows[key_cols].drop_duplicates().to_dict("records"):
+                    where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
+                    params = [key[c] for c in key_cols]
+                    flipped_rows = prod_con.execute(
+                        f"UPDATE {self.target_table} "  # nosec B608
+                        f"SET valid_to = CURRENT_TIMESTAMP "
+                        f"WHERE {where_sql} AND valid_to = DATE '9999-12-31' "
+                        f"RETURNING 1",
+                        params,
+                    ).fetchall()
+                    rows_flipped += len(flipped_rows)
+                    self.record_impact(
+                        prod_con, manifest_id=manifest_id, run_id=run_id,
+                        action="scd_supersede", rowkey=key,
+                    )
 
-        if key_cols:
-            for key in rows[key_cols].drop_duplicates().to_dict("records"):
-                self.record_impact(
-                    prod_con, manifest_id=manifest_id, run_id=run_id,
-                    action="insert", rowkey=key,
+            prod_con.register("staged_rows", rows)
+            try:
+                prod_con.execute(
+                    f"INSERT INTO {self.target_table} "  # nosec B608
+                    f"({col_list}) SELECT {col_list} FROM staged_rows"
                 )
+            finally:
+                prod_con.unregister("staged_rows")
+            rows_inserted = len(rows)
+
+            if key_cols:
+                for key in rows[key_cols].drop_duplicates().to_dict("records"):
+                    self.record_impact(
+                        prod_con, manifest_id=manifest_id, run_id=run_id,
+                        action="insert", rowkey=key,
+                    )
+
+            prod_con.execute("COMMIT")
+        except Exception:
+            prod_con.execute("ROLLBACK")
+            raise
 
         return PromoteResult(
             run_id=run_id,
@@ -551,33 +568,41 @@ class SourcePipeline(ABC):
 
         manifest_id = self._manifest_id_for_run(prod_con, run_id)
         key_cols = list(self.amendment_key)
+        col_list = ", ".join(rows.columns)
 
-        if key_cols:
-            where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
-            for row in rows[key_cols].to_dict("records"):
-                params = [row[c] for c in key_cols]
-                prod_con.execute(
-                    f"DELETE FROM {self.target_table} "  # nosec B608
-                    f"WHERE {where_sql}",
-                    params,
-                )
-
-        prod_con.register("staged_rows", rows)
+        prod_con.execute("BEGIN TRANSACTION")
         try:
-            prod_con.execute(
-                f"INSERT INTO {self.target_table} "  # nosec B608
-                f"SELECT * FROM staged_rows"
-            )
-        finally:
-            prod_con.unregister("staged_rows")
-        rows_upserted = len(rows)
+            if key_cols:
+                where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
+                for row in rows[key_cols].to_dict("records"):
+                    params = [row[c] for c in key_cols]
+                    prod_con.execute(
+                        f"DELETE FROM {self.target_table} "  # nosec B608
+                        f"WHERE {where_sql}",
+                        params,
+                    )
 
-        if key_cols:
-            for row in rows[key_cols].drop_duplicates().to_dict("records"):
-                self.record_impact(
-                    prod_con, manifest_id=manifest_id, run_id=run_id,
-                    action="upsert", rowkey=row,
+            prod_con.register("staged_rows", rows)
+            try:
+                prod_con.execute(
+                    f"INSERT INTO {self.target_table} "  # nosec B608
+                    f"({col_list}) SELECT {col_list} FROM staged_rows"
                 )
+            finally:
+                prod_con.unregister("staged_rows")
+            rows_upserted = len(rows)
+
+            if key_cols:
+                for row in rows[key_cols].drop_duplicates().to_dict("records"):
+                    self.record_impact(
+                        prod_con, manifest_id=manifest_id, run_id=run_id,
+                        action="upsert", rowkey=row,
+                    )
+
+            prod_con.execute("COMMIT")
+        except Exception:
+            prod_con.execute("ROLLBACK")
+            raise
 
         return PromoteResult(
             run_id=run_id,
