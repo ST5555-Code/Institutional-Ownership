@@ -84,6 +84,19 @@ SCHEMA_ONLY_TABLES = [
 
 ALL_TABLES = MIRROR_TABLES + SCHEMA_ONLY_TABLES
 
+# Fact tables that carry a surrogate ``row_id`` sequence (mig-06 / INF40).
+# After a MIRROR rebuild via ``INSERT INTO t SELECT * FROM p.t`` the staging
+# rows retain prod's row_id values, but the staging sequence state is
+# untouched — so a subsequent staging-only INSERT would allocate row_id=1
+# and collide with the mirrored rows. The post-rebuild ``setval(...)``
+# clamp below advances the staging sequence past the maximum row_id in
+# the rebuilt table. Harmless if row_id is absent (pre-migration-014).
+ROW_ID_FACT_TABLES = {
+    "holdings_v2",
+    "fund_holdings_v2",
+    "beneficial_ownership_v2",
+}
+
 
 def capture_prod_ddl(prod_con, table: str) -> tuple[str, list[tuple[str, str]]]:
     row = prod_con.execute(
@@ -170,6 +183,21 @@ def rebuild_one(staging_con, prod_con, table: str, copy_data: bool) -> dict:
     if copy_data:
         staging_con.execute(f'INSERT INTO "{table}" SELECT * FROM p."{table}"')
     steps["insert_s"] = round(time.monotonic() - t0, 3)
+
+    t0 = time.monotonic()
+    if copy_data and table in ROW_ID_FACT_TABLES:
+        has_row_id = staging_con.execute(
+            "SELECT 1 FROM duckdb_columns() "
+            "WHERE schema_name='main' AND table_name=? AND column_name='row_id'",
+            [table],
+        ).fetchone() is not None
+        if has_row_id:
+            seq = f"{table}_row_id_seq"
+            staging_con.execute(
+                f"SELECT setval('{seq}', "
+                f'(SELECT COALESCE(MAX(row_id), 0) + 1 FROM "{table}"))'
+            )
+    steps["row_id_clamp_s"] = round(time.monotonic() - t0, 3)
 
     t0 = time.monotonic()
     staging_rows_after = row_count(staging_con, table)
