@@ -1,58 +1,86 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-22 (ops-16 refresh). Main HEAD: `4484137` (conv-07 convergence doc update)._
+_Last updated: 2026-04-22 (phase2-prep refresh). Main HEAD: `7c49471` (conv-11 remediation program complete)._
 
-This file is the startup briefing for a fresh Claude Code session. Read it end-to-end on open, then continue with the live ROADMAP / REMEDIATION docs for current work.
+Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + Phase 2 design doc.
 
 ---
 
-## Program state — remediation in flight
+## Program state — remediation COMPLETE, Phase 2 ready
 
-The **Remediation Program** (`docs/REMEDIATION_PLAN.md` + `docs/REMEDIATION_CHECKLIST.md`) is the active work stream. 67 PRs merged, 46 of ~73 items closed as of 2026-04-21.
-
-### Theme status
+The **Remediation Program** (`docs/REMEDIATION_PLAN.md` + `docs/REMEDIATION_CHECKLIST.md`) closed 2026-04-22. **105 PRs merged (#5–#105), ~66 items closed across 5 themes.** All findings addressed or formally deferred with documented exit criteria.
 
 | Theme | Scope | Status |
 |---|---|---|
-| **Theme 4 — Security hardening** | admin auth, TOCTOU, validators writing to prod, 5 unlisted direct-to-prod writers, pinned deps | **8/8 DONE** |
-| **Theme 2 — Observability + audit trail** | ingestion_manifest coverage, freshness hooks, impact_id hardening, log rotation, docs headline | **13/13 DONE** |
-| **Theme 3 — Migration + schema discipline** | atomic promotes, migration 004 retrofit, fetch_adv DROP→CREATE, schema_versions stamp, pipeline-violations tail | **5/14** |
-| **Theme 1 — Data integrity foundation** | OpenFIGI RC1–RC4, ticker backfill, denorm retirement, INF25–INF31, INF35–INF38 | **6/~20** |
-| **Theme 5 — Operational surface** | README/prompts refresh, write_path_risk_map, MAINTENANCE.md, Blueprint split doc, ROADMAP hygiene | **14/18** |
+| Theme 1 — Data integrity foundation | int-01..int-22, OpenFIGI RC1–RC4, denorm retirement, series triage | **CLOSED** (int-09 + int-19 deferred to Phase 2; int-11 + int-18 STANDING) |
+| Theme 2 — Observability + audit trail | ingestion_manifest, freshness, impact_id, log rotation | **CLOSED** (all items) |
+| Theme 3 — Migration + schema discipline | mig-01..mig-14, atomic promotes, parity extensions, row_id | **CLOSED** (mig-12 deferred to Phase 3) |
+| Theme 4 — Security hardening | admin auth, TOCTOU, prod-write validators, pinned deps | **CLOSED** |
+| Theme 5 — Operational surface | README/prompts, MAINTENANCE, ROADMAP hygiene | **CLOSED** (ops-18 BLOCKED pending source recovery) |
 
-### Open theme progress
-
-**Theme 1 (int)** — closed: int-01, int-02, int-04, int-05, int-10, int-18 (standing). Next up: Batch 1-B (int-06 ticker-backfill forward hooks); Batch 1-C merges (int-03 triage, int-07 benchmark gate, int-14 NULL-only merge, int-15 market_data fetch_date, int-21 series_id tail). int-19 deferred to Phase 2.
-
-**Theme 3 (mig)** — closed: mig-01, mig-02, mig-03, mig-04, mig-13. Next up: mig-14 (REWRITE_BUILD_MANAGERS routing + dry-run), mig-06/mig-09/mig-10 (schema-parity extensions, INF40/45/46), mig-07/mig-08/mig-11 (rename-sweep audit, derived-artifact hygiene, CI wiring). mig-05 (admin refresh) SUPERSEDED → Phase 2. mig-12 (load_13f_v2) Phase 3.
-
-**Theme 5 (ops)** — closed: ops-01 through ops-12, ops-15, ops-17. Remaining: ops-13 (denorm drift doc), ops-14 (INF26-29 ROADMAP rows), ops-16 (this item — DOC-UPDATE-PROPOSAL admin_bp.py revisit flag), ops-18 (BLOCKED — missing rotating_audit_schedule.md).
-
-### Pending data ops (code shipped, `--confirm` required)
-
-- **int-10 INF26 staging sweep** — OpenFIGI permanent-pending flip on the existing retry queue.
-- **obs-04 13D/G ingestion_impacts backfill** — one-off script staged; live run gated behind `--confirm`.
+Closure record: `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-11)`.
 
 ---
 
-## Next priorities
+## Phase 2 — next work stream
 
-1. **Close Theme 3 next-ready items.** Pick mig-14 (REWRITE_BUILD_MANAGERS) or schema-parity extensions (mig-09 / mig-10) — both are bounded and independent.
-2. **Theme 1 Batch 1-C.** int-14 (NULL-only merge mode for `merge_staging.py`) and int-15 (market_data `fetch_date` discipline) are well-scoped.
-3. **Theme 5 remainder.** ops-13, ops-14, and ops-16 are doc-only closures against ROADMAP + data_layers.md. ops-18 stays BLOCKED until the missing `rotating_audit_schedule.md` source is located or formally abandoned.
-4. **Phase 2 kickoff** (trigger-based): admin refresh system full scope (supersedes mig-05). Needs design doc first.
+**Scope:** User-triggered admin refresh system. Framework-first delivery. See `docs/admin_refresh_system_design.md v3.2`.
 
-All entity mutations flow through `sync_staging.py → diff_staging.py → promote_staging.py`. Reference-table mutations use `merge_staging.py --tables <name>`. Never direct-to-prod writes.
+### Major components
+
+1. **`scripts/pipeline/base.py`** — concrete `SourcePipeline` ABC with `run()` orchestrator (today: `protocol.py` structural Protocols only — retrofit decision required).
+2. **`scripts/pipeline/cadence.py`** — `PIPELINE_CADENCE` dict + probe functions + stale thresholds + `expected_delta` anomaly ranges. Does not exist yet.
+3. **`is_latest` amendment semantics** — new migration (next free slot, likely 015) adds `is_latest`, `loaded_at`, `backfill_quality` to `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`. Not the same as migration 008 (pct_of_so rename).
+4. **`queries.py` sweep** — add `WHERE is_latest=TRUE` across all 13F/N-PORT/13D/G read paths.
+5. **9 admin endpoints** — `/admin/refresh/{pipeline}`, `/admin/run/{run_id}`, `/admin/status`, `/admin/probe/{pipeline}`, `/admin/runs/pending`, `/admin/runs/{id}/diff`, `/admin/runs/{id}/approve`, `/admin/runs/{id}/reject`, `/admin/rollback/{run_id}`. Needs new `admin_preferences` control-plane table.
+6. **Admin status dashboard tab** + **Data Source tab** (move `Plans/data_sources.md` → `docs/data_sources.md` first).
+7. **Six pipeline migrations** to the framework: `fetch_13dg_v3`, `fetch_market_v2`, `fetch_ncen_v2`, `fetch_adv_v2`, `load_13f_v2` (first subclass — absorbs deferred `mig-12`), plus extract-to-base of current `fetch_nport_v2`.
+
+### Dependencies (all cleared)
+
+- **Observability:** obs-01, obs-02, obs-03, obs-06, obs-10 DONE (ingestion_manifest coverage, freshness gate, impact_id hardening).
+- **Migrations:** mig-01 (atomic promotes), mig-03 (migration 004 retrofit), mig-04 (fetch_adv DROP→CREATE), mig-09/10/11 (schema-parity L0/L4/CI), mig-13 (build_entities per-step CHECKPOINT) DONE.
+- **Security:** sec-01..sec-04 DONE (token auth, TOCTOU, prod-write elimination, pinned deps).
+
+### Deferred items Phase 2 will encounter
+
+- **int-09 Step 4** — denorm retirement (`ticker`, `entity_id`, `rollup_entity_id`, `lei` drops on v2 fact tables). Execute **after** queries.py `is_latest` sweep and read-site audit (`scripts/audit_read_sites.py`). Exit criteria: `docs/findings/int-09-p0-findings.md §4`.
+- **int-19 (INF38)** — true float-adjusted `pct_of_float` denominator. Needs new float-history data source. Execute after first new `SourcePipeline` subclass lands.
+- **mig-12** — `load_13f.py` rewrite to `load_13f_v2` on framework. Becomes first full `SourcePipeline` subclass exercise in Phase 2.
+
+---
+
+## Database current state (prod, 2026-04-22)
+
+| Table | Rows | Notes |
+|---|---|---|
+| `holdings_v2` | ~12.27M | `row_id BIGINT PK` (migration 014); denorm columns still present pending int-09 |
+| `fund_holdings_v2` | ~14.09M | `row_id BIGINT PK`; `'N/A'` literal for CUSIP-less positions (~832K rows) |
+| `beneficial_ownership_v2` | 51,905 | `row_id BIGINT PK`; `ingestion_impacts` backfilled (obs-04) |
+| `securities` | 430,149 | `cusip PK` (migration 011); `is_otc VARCHAR` (migration 012) |
+| `cusip_classifications` | 132,618 | v1.4, migration 003 |
+| `entities` | ~26,602 | +67 new from int-21 series triage |
+| `entity_identifiers` | ~33K+ | lowercase `identifier_type` ('cik','crd','series_id') |
+| `entity_relationships` | ~18K | `last_refreshed_at TIMESTAMP` live |
+| `entity_overrides_persistent` | 245 | `override_id` sequence + NOT NULL (migration 006) |
+| `summary_by_parent` | 63,916 | EC + DM worldviews (migration 004 PK); `top10_*` columns dropped (migration 013) |
+| `investor_flows` | 17,396,524 | EC + DM |
+| `ingestion_manifest` | 21,339+ | covers MARKET / NPORT / 13DG / NCEN / ADV |
+| `ingestion_impacts` | 29,531+ | 51,905 13D/G rows backfilled (obs-04) |
+
+**Migrations applied:** 001–014 on prod + staging.
+**SCD open-row sentinel:** `DATE '9999-12-31'`, not NULL.
+**`entity_current`** is the only user-defined VIEW in prod — rebuild after fixture/snapshot restores.
 
 ---
 
 ## First 5 minutes — read these
 
 1. `~/ClaudeWorkspace/CLAUDE.md` — workspace rules (file routing, tone, naming).
-2. `docs/REMEDIATION_PLAN.md` — full program state (5 themes, acceptance criteria, items, sequencing).
-3. `docs/REMEDIATION_CHECKLIST.md` — grep-friendly item status.
-4. `docs/PROCESS_RULES.md` — rules for large-data scripts.
-5. `ROADMAP.md` — backlog not covered by the remediation program (DM follow-ups, data-QC carry-forwards, MT-1..MT-6 future-phase).
+2. `docs/admin_refresh_system_design.md` — Phase 2 design v3.2. §1 (deliverables), §2a (staging flow), §4 (SourcePipeline), §6 (cadence), §12 (phase sequence).
+3. `docs/REMEDIATION_PLAN.md §Changelog 2026-04-22` — closure record.
+4. `ROADMAP.md §Open items` — remaining carry-forward (int-09, int-19, mig-12, standing curation).
+5. `docs/PROCESS_RULES.md` — rules for large-data scripts.
 6. Auto memory at `/Users/sergetismen/.claude/projects/-Users-sergetismen-ClaudeWorkspace-Projects-13f-ownership/memory/`.
 
 ---
@@ -60,26 +88,33 @@ All entity mutations flow through `sync_staging.py → diff_staging.py → promo
 ## Project summary
 
 - **Working dir:** `~/ClaudeWorkspace/Projects/13f-ownership`
-- **Branch:** `main`. Remediation PRs merge from per-item branches (e.g. `ops-16-p1`).
+- **Branch:** `main`. Phase 2 work lands on per-item branches.
 - **Repo:** github.com/ST5555-Code/Institutional-Ownership
 - **Stack:**
-  - **FastAPI + uvicorn** — `scripts/app.py` (thin entry ~115 lines) + 9 router modules (`app_db`, `api_common`, `api_config`, `api_register`, `api_fund`, `api_flows`, `api_entities`, `api_market`, `api_cross`) + `admin_bp.py` (token auth via `Depends`). OpenAPI at `/docs` + `/redoc`. Flask retired 2026-04-13.
-  - **Service layer** — `scripts/queries.py` (~5,500 lines) + `scripts/serializers.py` + `scripts/cache.py`.
-  - **DuckDB** — `data/13f.duckdb` (prod), `data/13f_staging.duckdb` (staging), `data/13f_readonly.duckdb` (app snapshot).
-  - **React full-app** — `web/react-app/`, served by FastAPI at :8001 from `web/react-app/dist/`. Dev server on :5174.
-  - **API contract** — public at `/api/v1/*`. 6 endpoints use the Phase 1-B2 envelope. Hand-written `src/types/api.ts` still authoritative; `api-generated.ts` sparse until `schemas.py` expansion lands.
+  - **FastAPI + uvicorn** — `scripts/app.py` (thin entry) + 9 router modules + `admin_bp.py` (token auth via `Depends`). OpenAPI at `/docs` + `/redoc`.
+  - **Service layer** — `scripts/queries.py` (~5,500 lines) + `serializers.py` + `cache.py`.
+  - **DuckDB** — prod `data/13f.duckdb`, staging `data/13f_staging.duckdb`, serving snapshot `data/13f_readonly.duckdb`.
+  - **React** — `web/react-app/` served by FastAPI at :8001 from `dist/`. Dev server :5174.
+  - **API contract** — `/api/v1/*`. 6 endpoints use the Phase 1-B2 envelope. Hand-written `src/types/api.ts` still authoritative.
 
-### Prod state (as of conv-07, 2026-04-21)
+---
 
-- `entities` ~26,535 · `entity_identifiers` ~33K · `entity_relationships` ~18K · `entity_overrides_persistent` 245.
-- `holdings_v2` ~14.09M rows, `entity_id` coverage 84.13%.
-- `fund_holdings_v2` ~9.3M rows, newest `report_date` 2026-02-28.
-- `beneficial_ownership_v2` ~52K rows, enriched ~94.5%.
-- `investor_flows` 17,396,524 · `summary_by_parent` 63,916 (EC + DM worldviews).
-- `cusip_classifications` 132,618 (v1.4 prod, migration 003 applied).
-- `schema_versions` stamps current; `make schema-parity-check` clean on L3 canonicals.
-- `validate_entities --prod` baseline: **8 PASS / 2 FAIL (wellington_sub_advisory + phase3_resolution_rate) / 6 MANUAL**.
-- `make freshness` PASS on all 7 critical tables.
+## Tools and paths
+
+| Tool | Path / Command |
+|---|---|
+| Prod DB | `data/13f.duckdb` |
+| Staging DB | `data/13f_staging.duckdb` |
+| Start app | `./scripts/start_app.sh` → `localhost:8001` |
+| App entry | `scripts/app.py` |
+| Audit tool | `scripts/audit_read_sites.py` (rename-sweep discipline, mig-07) |
+| Schema parity | `scripts/pipeline/validate_schema_parity.py --layer all` / `make schema-parity-check` |
+| Fixture rebuild | `scripts/build_fixture.py` (writes `_fixture_metadata` provenance row) |
+| Freshness gate | `scripts/check_freshness.py` / `make freshness` |
+| Log rotation | `scripts/rotate_logs.sh` / `make rotate-logs` |
+| EDGAR identity | `serge.tismen@gmail.com` (centralized in `scripts/config.py`) |
+| ID issuance | `scripts/pipeline/id_allocator.py` (`manifest_id` / `impact_id`) |
+| Promote mirror | `_mirror_manifest_and_impacts` helper in `promote_nport.py` / `promote_13dg.py` |
 
 ---
 
@@ -87,13 +122,12 @@ All entity mutations flow through `sync_staging.py → diff_staging.py → promo
 
 ```bash
 cd ~/ClaudeWorkspace/Projects/13f-ownership
-git status -sb                                  # expect: ## main...origin/main, clean
-git log -5 --oneline                            # expect: 4484137 or newer
-pgrep -f "scripts/app.py"                       # dev server PID (if running)
-python3 scripts/validate_entities.py --prod --read-only   # 8 PASS / 2 FAIL / 6 MANUAL
-make freshness                                  # PASS on 7 critical tables
-make schema-parity-check                        # 0 divergences on L3 canonicals
-pytest tests/ -x                                # green
+git status -sb                                         # ## main...origin/main, clean
+git log -1 --oneline                                   # 7c49471 or newer
+pytest tests/ -x                                       # green
+make freshness                                         # PASS on 7 critical tables
+make schema-parity-check                               # 0 divergences on L3 canonicals
+python3 scripts/validate_entities.py --prod --read-only  # 8 PASS / 2 FAIL / 6 MANUAL
 ```
 
 ---
@@ -102,19 +136,19 @@ pytest tests/ -x                                # green
 
 - Never start a full pipeline run without explicit user authorization.
 - Never mutate production data to simulate test conditions.
-- Always update `ROADMAP.md` COMPLETED section after closing an item (date + details).
+- Update `ROADMAP.md` COMPLETED section after closing an item (date + details).
+- Update `docs/NEXT_SESSION_CONTEXT.md` at end of every session; commit + push before signing off.
 - Entity changes: `sync_staging.py → diff_staging.py → promote_staging.py`.
 - Reference-table changes: `merge_staging.py --tables <name>`.
-- Read files in full before editing.
-- Confirm destructive actions before running.
-- Use `python3 -u` for background tasks (buffered print swallows output otherwise).
+- Batch entity merges: transfer CIK identifiers BEFORE closing source row (INF4c lesson, ~$166B impact).
+- N-PORT coverage < 50% → classification stays `mixed` regardless of active/passive split.
 - Never trust `managers.manually_verified=True`.
 - Never use `fuzz.token_sort_ratio` alone for firm-name matching — use brand-token overlap (`_brand_tokens_overlap`).
-- CRD values must be normalized via `_normalize_crd()`.
-- Batch entity merges: always transfer CIK identifiers before closing the source row.
-- N-PORT coverage < 50% → keep classification as `mixed` regardless of active/passive split.
-- Sub-adviser vs subsidiary: verify before EC rollup.
+- CRD values normalized via `_normalize_crd()`.
 - Pre-commit hooks must pass. Never `--no-verify`. Fix the underlying issue.
+- `python3 -u` for background tasks (buffered print swallows output otherwise).
+- B608 `# nosec` goes on the closing `"""` line of the SQL string.
+- Worktree recovery: `git pull --ff-only`.
 
 ---
 
@@ -122,83 +156,61 @@ pytest tests/ -x                                # green
 
 ### DB schema + query patterns
 
-**`entity_current` is a VIEW, not a table.** Only user-defined view in prod. Fixture builds or snapshot rebuilds must recreate it after tables land. Definition mirrored in `scripts/build_fixture.py` — keep in sync.
+**`entity_current` is a VIEW.** Only user-defined view in prod. Fixture / snapshot rebuilds must recreate it. Definition mirrored in `scripts/build_fixture.py`.
 
-**`entity_identifiers.identifier_type` is lowercase.** `'cik'`, `'crd'`, `'series_id'`. Uppercase filters silently return zero rows. No `UPPER()` normalization anywhere.
+**`entity_identifiers.identifier_type` is lowercase.** `'cik'`, `'crd'`, `'series_id'`. Uppercase filters return zero rows.
 
-**SCD open-row sentinel is `DATE '9999-12-31'`, not NULL.** Applies to `entity_rollup_history`, `entity_aliases`, `entity_identifiers`, `entity_classification_history`, `entity_relationships`. `valid_to IS NULL` matches zero rows in prod. Use `entity_current` view where possible.
+**SCD open-row sentinel is `DATE '9999-12-31'`, not NULL.** Applies to `entity_rollup_history`, `entity_aliases`, `entity_identifiers`, `entity_classification_history`, `entity_relationships`.
 
-**`holdings_v2` composite key is filing-line grain.** Not `(cik, ticker, quarter)`. True key is `(cik, ticker, quarter, put_call, security_type, discretion)` — separate rows for put vs call options, non-discretionary vs discretionary. Any "total position" aggregation must `SUM(shares), SUM(market_value_usd) GROUP BY (cik, ticker, quarter)`.
+**`holdings_v2` composite key is filing-line grain.** True key: `(cik, ticker, quarter, put_call, security_type, discretion)`. Total-position aggregation requires `SUM(...) GROUP BY (cik, ticker, quarter)`.
 
-**`fund_holdings_v2` stores `'N/A'` literally** for CUSIP-less positions (~832K rows). DERA parity depends on preserving this sentinel — do not normalize to NULL without a coordinated pass.
+**`fund_holdings_v2` stores `'N/A'` literally** for CUSIP-less positions (~832K rows). DERA parity depends on preserving this sentinel.
 
-**`DuckDB NOW() vs CURRENT_TIMESTAMP`** — use `NOW()` inside `ON CONFLICT DO UPDATE SET` with `executemany`. DuckDB binder misreads `CURRENT_TIMESTAMP` as a column name in that context.
+**v2 fact tables have `row_id BIGINT PK`** (migration 014, mig-06). Stable surrogate for rollback replay.
 
-**`DB_PATH_OVERRIDE` env var** swaps DBs for test harnesses (`scripts/app.py:83`). Used by `tests/smoke/conftest.py`. Do not couple further logic to it — narrow override surface only.
+**DuckDB `NOW()` vs `CURRENT_TIMESTAMP`** — use `NOW()` inside `ON CONFLICT DO UPDATE SET` with `executemany`. Binder misreads `CURRENT_TIMESTAMP` as a column name.
 
 ### Entity data plane
 
-**`entity_overrides_persistent` — 245 rows** as of DM15c. 5 action types (reclassify, set_activist, alias_add, merge, suppress_relationship). Resolution via `(identifier_type, identifier_value)` with CRD normalization. `suppress_relationship` uses `entity_id` fallback for PARENT_SEEDS ghosts (not contractually stable across `--reset`).
+**Canonical entity IDs (memorize):** Vanguard 4375 · Morgan Stanley 2920 · Fidelity 10443 · State Street 7984 · Northern Trust 4435 · Wellington 11220 · Dimensional 5026 · Franklin 4805 · PGIM 1589 · First Trust 136.
 
-**INF9d eids 20194 / 20196 / 20201 / 20203** are live PARENT_SEEDS brand shells (Pacific Life Insurance, Stowers Institute, Stonegate Global Financial, International Assets Advisory). Each has aliases + ADV lineage. **Do not delete** despite historic "ghost" framing.
+**Two rollup worldviews:** `economic_control_v1` (EC) · `decision_maker_v1` (DM). `summary_by_parent` PK is `(quarter, rollup_type, rollup_entity_id)`.
 
 **`PARENT_SEEDS` count is 110** in `scripts/build_entities.py:6`. Older planning docs that cite 50 are stale.
 
-**Fragmented-CIK rule.** When merging two entities, INSERT identifiers (esp. CIK) on the survivor BEFORE closing the source row. Closing first breaks `total_aum` gate — see INF4c lesson (~$166B impact).
+**INF9d eids 20194 / 20196 / 20201 / 20203** are live PARENT_SEEDS brand shells with aliases + ADV lineage. **Do not delete.**
 
-**Classification rule.** N-PORT coverage < 50% → keep `mixed` regardless of active/passive split.
+**Fragmented-CIK rule.** INSERT identifiers on the survivor before closing source row on merges.
 
 ### Pipeline + app wiring
 
-**Staging workflow is the law.** `sync_staging.py` CTAS strips column DEFAULTs and indexes — resolver scripts must call `_ensure_staging_indexes()` to restore them. Otherwise `ON CONFLICT DO NOTHING` silently no-ops against invisible NULL-SCD rows.
+**Staging workflow is law.** `sync_staging.py → diff_staging.py → promote_staging.py` for entity changes. `merge_staging.py --tables <name>` for reference tables. No direct-to-prod writes.
 
-**Promote atomicity (Theme 3).** `promote_nport.py` + `promote_13dg.py` now wrap `_mirror_manifest_and_impacts` + DELETE+INSERT in a single transaction (mig-01, PRs #31 #33). The audit-trail wipe bug that inflated caveats historically is fixed — no new reconstruction scaffolding needed.
+**Promote atomicity.** `promote_nport.py` + `promote_13dg.py` wrap `_mirror_manifest_and_impacts` + DELETE+INSERT in a single transaction (mig-01). Audit-trail wipe bug fixed.
 
-**`_RT_AWARE_QUERIES` in `app.py`** — single source of truth for which `query<N>` endpoints accept `rollup_type`. If you change a `query<N>` signature to add/remove `rollup_type`, update the set AND the classification comment block above the routes.
+**Ticker regex is `^[A-Z]{1,6}(\.[A-Z])?$`** (accepts BRK.B). Literal `^[A-Z]{1,6}[.A-Z]?$` was wrong.
 
-**`/api/*` dual-mount** — `_register_v1_aliases()` near the bottom of `app.py` aliases every public `/api/*` route under `/api/v1/*`. `/api/admin/*` excluded (own token validator). `_validate_query_params()` `before_request` fires on both mounts.
+**`get_nport_children_batch()`** replaces per-parent loops — 14× speedup. Do NOT reintroduce singular per-parent loops.
 
-**Ticker regex is `^[A-Z]{1,6}(\.[A-Z])?$`** (accepts BRK.B). The literal spec regex `^[A-Z]{1,6}[.A-Z]?$` was wrong.
+**`get_nport_family_patterns()`** reads `fund_family_patterns` (2 cols: `pattern`, `inst_parent_name`; 83 rows; PK `(inst_parent_name, pattern)`). Memoized at module scope — restart app to pick up table edits.
 
-**`get_nport_children_batch()`** replaces per-parent loops in `query1` (Register) and `portfolio_context` (Conviction). 14× speedup (297ms → 21ms for 25 parents). Do NOT reintroduce singular per-parent loops.
-
-**`get_nport_children_q2` is intentionally NOT batched** — it's an FQ↔LQ delta helper pinned to the first-vs-latest quarter pair. Do not generalize without generalizing the delta semantic.
-
-**`get_nport_family_patterns()`** reads `fund_family_patterns` (2 cols: `pattern`, `inst_parent_name`; 83 rows; PK `(inst_parent_name, pattern)`) and falls back to `_FAMILY_PATTERNS_FALLBACK`. Memoized at module scope — restart the app to pick up table edits. Any planning doc that references a 3-col shape is stale.
-
-**`admin_bp.py:108`** — the OpenFIGI `data[0]` selector is diagnostic-only (no persistent writes back to `securities` / `cusip_classifications`). If a future PR adds write semantics to the admin OpenFIGI path, this becomes the same class of bug as BLOCK-SEC-AUD-1 (RC1) and needs disambiguation. Tracked as ops-16 doc-update item.
-
-**`api-generated.ts` is sparser than `api.ts`** — do not delete `api.ts` until `scripts/schemas.py` is expanded to cover the ~55 response shapes. Mechanical React-tab migration before that is a compile-time type regression. Tracked as ARCH-4C-followup.
+**`api-generated.ts` is sparser than `api.ts`** — do not delete `api.ts` until `scripts/schemas.py` is expanded.
 
 ### Observability
 
-**`record_freshness` + FreshnessBadge.** Pipeline scripts that rebuild a precomputed table must call `db.record_freshness(con, 'table_name')` at end of main (after CHECKPOINT). Helper is no-op on pre-Batch-3A DBs. React `FreshnessBadge` from `common/FreshnessBadge.tsx` shares one `/api/v1/freshness` fetch via module-level cache; `resetFreshnessCache()` forces reload.
+**`record_freshness` + FreshnessBadge.** Pipeline scripts rebuilding a precomputed table call `db.record_freshness(con, 'table_name')` at end of main. React `FreshnessBadge` shares one `/api/v1/freshness` fetch via module-level cache.
 
-**`ingestion_manifest` coverage.** Now covers MARKET, NPORT, 13DG, NCEN, ADV (Theme 2 closed). Any new source needs a row-per-fetch with `object_type` / `object_key`.
+**`ingestion_manifest` coverage.** Covers MARKET, NPORT, 13DG, NCEN, ADV. Any new source needs a row-per-fetch with `object_type` / `object_key`.
 
-**`impact_id` allocation** centralized in `pipeline/manifest.py::_next_id()`. Prod sequences are drifted relative to MAX(id); do not revert to DEFAULT `nextval`.
+**`impact_id` allocation** centralized in `scripts/pipeline/id_allocator.py`. Prod sequences are drifted — do not revert to DEFAULT `nextval`.
 
-### Type badge + formatting
+### Design language + formatting
+
+**Oxford Blue `#002147`** primary color for all surfaces/decks.
 
 **Type badges** use `getTypeStyle()` from `common/typeConfig.ts`. Never inline.
 
-**Formatting rules** — all `%` 2 decimals with trailing zeros; zero → em-dash; highlight yellow `#fef9c3`.
-
----
-
-## User collaboration preferences
-
-- Terse, direct communication. Lead with the answer.
-- Plain professional tone. No preambles, no trailing summaries unless asked.
-- Quick fixes preferred over comprehensive refactors unless explicitly requested.
-- User tests in Safari, occasionally Chrome.
-- Suggest `! <cmd>` for commands the user should run themselves.
-- Flag duplicate ROADMAP items before adding.
-- Don't delete files / data / rows without explicit confirmation.
-- Report scope precisely: "entities affected" ≠ "holdings at risk" ≠ "dollars at risk".
-- Include SEC EDGAR filing links where applicable.
-- Financial models: blue = inputs, black = formulas (IB convention).
-- Cite every data point (filing type + section + date). Flag approximates with `~`.
+**Formatting:** all `%` 2 decimals with trailing zeros; zero → em-dash; highlight yellow `#fef9c3`.
 
 ---
 
@@ -206,13 +218,13 @@ pytest tests/ -x                                # green
 
 | Question | Source |
 |---|---|
-| What's the current open-item queue? | `docs/REMEDIATION_CHECKLIST.md` |
-| Why is an item scoped the way it is? | `docs/REMEDIATION_PLAN.md` (per-item Notes column) |
-| What's the broader backlog outside remediation? | `ROADMAP.md` (§ Open items, § MT-1..MT-6) |
-| What's the decision history? | `docs/findings/*.md` (per-item phase-0 and closeout findings) |
-| What's the audit origin? | `docs/SYSTEM_AUDIT_2026_04_17.md` §12 |
-| What's the pipeline protocol? | `scripts/pipeline/protocol.py` (Source / DirectWrite / Derived) |
-| What's the current prod DDL? | `docs/canonical_ddl.md` + `docs/data_layers.md` |
-| What's the data-layer coverage? | `docs/data_layers.md` §0 headline (last refreshed obs-05, PR #66) |
+| Phase 2 design | `docs/admin_refresh_system_design.md` v3.2 |
+| Remediation closure record | `docs/REMEDIATION_PLAN.md §Changelog` + `docs/REMEDIATION_CHECKLIST.md` |
+| Deferred followups | `docs/DEFERRED_FOLLOWUPS.md` |
+| Script inventory + status | `docs/pipeline_inventory.md` |
+| Architecture baseline | `ARCHITECTURE_REVIEW.md` (historical — see status header) |
+| Current prod DDL | `docs/canonical_ddl.md` + `docs/data_layers.md` |
+| Pipeline protocol | `scripts/pipeline/protocol.py` |
+| Entity architecture | `docs/ENTITY_ARCHITECTURE.md` |
 
-Regenerate the top block of this file at session close so future sessions land oriented. Keep it short — structural gotchas above the fold; session narratives belong in commit messages and findings docs, not here.
+Regenerate the top block of this file at session close so future sessions land oriented.
