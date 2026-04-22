@@ -331,7 +331,17 @@ def _compute_momentum(con, rollup_type: str) -> None:
 
 
 def _compute_ticker_stats(con, rollup_type: str) -> int:
-    """INSERT aggregate flow_intensity + churn per (ticker, period) for a worldview."""
+    """INSERT aggregate flow_intensity + churn per (ticker, period) for a worldview.
+
+    flow_intensity_total = SUM(price_adj_flow) / market_cap, summed over
+    continuing holders only (rows where NOT is_new_entry AND NOT is_exit);
+    `price_adj_flow = net_shares * from_price` isolates share-count change
+    at filing-date price (no price effect). Output is a unitless ratio —
+    net institutional $-flow as a fraction of ticker market cap for the
+    (quarter_from → quarter_to) window. `flow_intensity_active` /
+    `flow_intensity_passive` are the same formula scoped to
+    manager_type != 'passive' / manager_type = 'passive'.
+    """
     con.execute(f"""
         INSERT INTO ticker_flow_stats
         SELECT

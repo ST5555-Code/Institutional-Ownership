@@ -89,7 +89,7 @@ bottom.
 | `filings` | L3 | `fetch_13dg.py` + `load_13f.py` | upsert on accession_number | 43,358 rows; mixed 13F + 13D/G accession metadata |
 | `filings_deduped` | L3 | derived from `filings` | rebuild | 40,140 rows; dedup-on-accession view materialized as table |
 | `holdings_v2` | L3 | `load_13f.py` → `enrich_holdings.py` (Batch 3, **LIVE** since 2026-04-16) | delete_insert on (quarter) | **12,270,984 rows** (2026-04-16); canonical 13F fact table; Group 3 fully enriched (ticker 91.49% / sti 100% / mvl 77.64% / pof 61.83%) |
-| `fund_holdings_v2` | L3 | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` → `enrich_holdings.py --fund-holdings` | delete_insert on (series_id, report_month) | **13,943,029 rows** (2026-04-16 part 2, after ETF Tier A+B re-promote +2.27M rows and Mar 2026 topup +2 rows); 14,060 distinct series; newest `report_date` 2026-02-28 (Mar 2026 not yet on EDGAR); DERA bulk path is primary; `entity_id` coverage 84.13% (post-BLOCK-2 backfill 2026-04-17, +6.21M rows; 1,187 NULL series remain as deferred synthetics); maintained by `scripts/enrich_fund_holdings_v2.py` per audit §10.1 |
+| `fund_holdings_v2` | L3 | `fetch_nport_v2.py` + `fetch_dera_nport.py` → `promote_nport.py` → `enrich_holdings.py --fund-holdings` | delete_insert on (series_id, report_month) | **14,090,397 rows** (verified 2026-04-21 post-BLOCK-2 + CUSIP v1.4); 14,060 distinct series; newest `report_date` 2026-02-28 (Mar 2026 not yet on EDGAR); DERA bulk path is primary; `entity_id` coverage **84.13%** (11,854,576 / 14,090,397 non-NULL; verified 2026-04-21 SQL against prod — stable post-BLOCK-2 backfill 2026-04-17 and CUSIP v1.4 classifications promote 2026-04-15; 1,187 NULL series remain as deferred synthetics, resolution tracked in audit §10.1); maintained by `scripts/enrich_fund_holdings_v2.py` |
 | `beneficial_ownership_v2` | L3 | `fetch_13dg_v2.py` → `promote_13dg.py` → `enrich_13dg.py` (commit `e231633`, **LIVE** 2026-04-16; design: `docs/13DG_ENTITY_LINKAGE.md`) | upsert on accession_number | 51,905 rows; canonical 13D/G fact table. Group 2 entity columns (`entity_id`, `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`, `dm_rollup_name`) enriched at **94.52%** (49,059 rows; was 77.08% pre-session #11). Coverage jump from 2026-04-17 13D/G filer resolution (commit `5efae66`, +1,640 new institution entities + 23 CIK-merges to existing entities; `scripts/resolve_13dg_filers.py` + `data/reference/13dg_filer_research_v2.csv`) |
 | `beneficial_ownership_current` | L4 | `promote_13dg.py` + `scripts/pipeline/shared.rebuild_beneficial_ownership_current` | rebuild | 24,756 rows; latest-per-(filer_cik, subject_ticker) with amendment logic; now carries all 5 entity columns from BO v2 (18,229 rows / 73.64% enriched) |
 | `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,835 rows** (2026-04-16 part 2, +235 from Tier A+B re-promote); now includes bond / index / MM funds via DERA path. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
@@ -779,3 +779,44 @@ policy).
 - ROADMAP → INFRASTRUCTURE → Open items → `INF30` is the
   `merge_staging.py` analogue (NULL-only / column-scoped merge mode)
   for the seed-time reference-table layer.
+
+---
+
+## 10. Flow metrics — `ticker_flow_stats` formulas
+
+`ticker_flow_stats` is an L4-derived table rebuilt by
+`scripts/compute_flows.py` (`_compute_ticker_stats`). It carries
+per-(ticker × period × rollup_type) aggregates derived from
+`investor_flows`.
+
+**`flow_intensity_total`.** Sum of `price_adj_flow` across continuing
+holders only (rows where NOT `is_new_entry` AND NOT `is_exit`), divided
+by the ticker's `market_cap`:
+
+```
+flow_intensity_total
+    = SUM(price_adj_flow) / market_cap
+    where price_adj_flow = net_shares * from_price
+    and rows with is_new_entry OR is_exit are excluded
+```
+
+`price_adj_flow` pins share-count change at filing-date price, so the
+numerator isolates the $-value of share-count change without price
+movement. The result is a unitless ratio — net institutional $-flow
+as a fraction of market cap for the (quarter_from → quarter_to)
+window. Positive = net accumulation by continuing holders; negative
+= net trimming.
+
+**`flow_intensity_active` / `flow_intensity_passive`.** Same formula,
+scoped to `manager_type != 'passive'` and `manager_type = 'passive'`
+respectively. Separates active-manager conviction from index-fund
+mechanical flows.
+
+**`churn_nonpassive` / `churn_active`.** Exits + new entries as a
+fraction of the average of continuing-holder flow — turnover proxy
+scoped to non-passive (resp. active) managers.
+
+**Cross-references.**
+- `scripts/compute_flows.py:_compute_ticker_stats` — canonical SQL.
+- `scripts/compute_flows.py:_insert_period_flows` — upstream
+  `price_adj_flow` / `is_new_entry` / `is_exit` definitions.
