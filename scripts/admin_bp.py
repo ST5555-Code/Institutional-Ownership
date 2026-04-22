@@ -37,6 +37,7 @@ import re
 import secrets as _secrets
 import subprocess  # nosec B404
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -1156,3 +1157,578 @@ def api_admin_entity_override(request: Request, body: bytes = Body(default=b''),
         'skipped_count': len(skipped),
         'log': log_path,
     }
+
+
+# ---------------------------------------------------------------------------
+# p2-07: Pipeline refresh / approve / reject / rollback / status
+#
+# Wires the SourcePipeline framework (scripts/pipeline/base.py) and
+# PIPELINE_CADENCE (scripts/pipeline/cadence.py) into the admin router.
+# Nine endpoints, all gated by the same session auth as the rest of the
+# router. See docs/admin_refresh_system_design.md §2b, §8, §11.
+# ---------------------------------------------------------------------------
+
+
+# Probe cache — in-memory, 15-minute TTL.
+_PROBE_TTL_SECONDS = 900
+_probe_cache: dict[str, dict] = {}
+_probe_cache_lock = threading.Lock()
+
+# Concurrency guard — one run per pipeline at a time. Separate pipelines
+# can run in parallel. Acquired by /admin/refresh before spawning the
+# background thread; released by the thread on exit (success or failure).
+_pipeline_run_locks: dict[str, threading.Lock] = {}
+_pipeline_run_locks_mx = threading.Lock()
+_running_pipelines: dict[str, str] = {}  # pipeline_name -> run_id
+
+
+def _get_cached_probe(pipeline_name: str) -> dict | None:
+    with _probe_cache_lock:
+        entry = _probe_cache.get(pipeline_name)
+        if entry is None:
+            return None
+        if (time.time() - entry.get('_cached_at', 0)) >= _PROBE_TTL_SECONDS:
+            return None
+        # Return a copy without the internal cache key.
+        out = {k: v for k, v in entry.items() if k != '_cached_at'}
+        return out
+
+
+def _set_cached_probe(pipeline_name: str, result: dict) -> None:
+    with _probe_cache_lock:
+        stored = dict(result)
+        stored['_cached_at'] = time.time()
+        _probe_cache[pipeline_name] = stored
+
+
+def _pipeline_lock(name: str) -> threading.Lock:
+    with _pipeline_run_locks_mx:
+        lk = _pipeline_run_locks.get(name)
+        if lk is None:
+            lk = threading.Lock()
+            _pipeline_run_locks[name] = lk
+        return lk
+
+
+def _acquire_pipeline(pipeline_name: str, run_id: str) -> bool:
+    """Non-blocking acquire. Returns True on success, False if already held."""
+    lk = _pipeline_lock(pipeline_name)
+    if not lk.acquire(blocking=False):
+        return False
+    _running_pipelines[pipeline_name] = run_id
+    return True
+
+
+def _release_pipeline(pipeline_name: str) -> None:
+    _running_pipelines.pop(pipeline_name, None)
+    lk = _pipeline_run_locks.get(pipeline_name)
+    if lk is not None and lk.locked():
+        try:
+            lk.release()
+        except RuntimeError:
+            # Already released — best-effort.
+            pass
+
+
+def _read_manifest_row(con: duckdb.DuckDBPyConnection, run_id: str) -> dict | None:
+    row = con.execute(
+        """
+        SELECT manifest_id, source_type, object_key, run_id, fetch_status,
+               fetch_started_at, fetch_completed_at, error_message
+          FROM ingestion_manifest
+         WHERE run_id = ?
+         ORDER BY manifest_id DESC
+         LIMIT 1
+        """,
+        [run_id],
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        'manifest_id': int(row[0]),
+        'source_type': row[1],
+        'object_key': row[2],
+        'run_id': row[3],
+        'status': row[4],
+        'started_at': row[5].isoformat() if row[5] else None,
+        'completed_at': row[6].isoformat() if row[6] else None,
+        'error_message': row[7],
+    }
+
+
+def _parse_object_key_scope(object_key: str) -> dict:
+    """Recover the scope dict from an object_key like '13f_holdings:quarter=2026Q1'."""
+    if not object_key or ':' not in object_key:
+        return {}
+    _prefix, _sep, rest = object_key.partition(':')
+    # Strip any '#timestamp' suffix appended on restart.
+    rest = rest.split('#', 1)[0]
+    scope: dict[str, str] = {}
+    for token in rest.split('_'):
+        if '=' in token:
+            k, _, v = token.partition('=')
+            scope[k] = v
+    return scope
+
+
+def _run_pipeline_background(pipeline_name: str, scope: dict, run_id_slot: dict) -> None:
+    """Entry point for the background pipeline thread. Populates
+    run_id_slot['run_id'] as soon as SourcePipeline.run() returns."""
+    try:
+        # pylint: disable=import-outside-toplevel
+        from pipeline.pipelines import get_pipeline
+        pipeline = get_pipeline(pipeline_name)
+        run_id = pipeline.run(scope)
+        run_id_slot['run_id'] = run_id
+        run_id_slot['status'] = 'pending_approval'
+    except Exception as e:  # pylint: disable=broad-except
+        log.exception("pipeline %s failed: %s", pipeline_name, e)
+        run_id_slot['error'] = str(e)[:500]
+    finally:
+        _release_pipeline(pipeline_name)
+
+
+def _available_pipelines() -> list[str]:
+    # pylint: disable=import-outside-toplevel
+    try:
+        from pipeline.pipelines import available_pipelines
+        return available_pipelines()
+    except Exception as e:  # pylint: disable=broad-except
+        log.debug("available_pipelines: %s", e)
+        return []
+
+
+@admin_router.get('/status')
+def api_admin_status():
+    """Dashboard feed — staleness per pipeline + pending approval queue."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.cadence import PIPELINE_CADENCE, get_all_staleness
+
+    con = _get_db()
+    try:
+        try:
+            staleness = get_all_staleness(con)
+        except Exception as e:  # pylint: disable=broad-except
+            log.debug("get_all_staleness: %s", e)
+            staleness = {}
+
+        registered = set(_available_pipelines())
+        pipelines = []
+        for name, cfg in PIPELINE_CADENCE.items():
+            st = staleness.get(name, {})
+            last_refreshed = st.get('last_refreshed')
+            last_run_row = None
+            try:
+                last_run_row = con.execute(
+                    """
+                    SELECT run_id, fetch_status, fetch_completed_at
+                      FROM ingestion_manifest
+                     WHERE source_type = ?
+                     ORDER BY manifest_id DESC
+                     LIMIT 1
+                    """,
+                    [name],
+                ).fetchone()
+            except Exception as e:  # pylint: disable=broad-except
+                log.debug("last_run lookup %s: %s", name, e)
+
+            last_run = None
+            if last_run_row:
+                last_run = {
+                    'run_id': last_run_row[0],
+                    'status': last_run_row[1],
+                    'completed_at': last_run_row[2].isoformat() if last_run_row[2] else None,
+                }
+
+            pipelines.append({
+                'name': name,
+                'display_name': cfg.get('display_name'),
+                'cadence': cfg.get('cadence'),
+                'target_table': cfg.get('target_table'),
+                'stale_threshold_days': cfg.get('stale_threshold_days'),
+                'staleness_status': st.get('status', 'missing'),
+                'age_days': st.get('age_days'),
+                'last_refreshed': last_refreshed.isoformat() if last_refreshed else None,
+                'registered': name in registered,
+                'currently_running': _running_pipelines.get(name),
+                'last_run': last_run,
+            })
+
+        try:
+            pending_rows = con.execute(
+                """
+                SELECT run_id, source_type, object_key, fetch_completed_at
+                  FROM ingestion_manifest
+                 WHERE fetch_status = 'pending_approval'
+                 ORDER BY manifest_id DESC
+                """
+            ).fetchall()
+        except Exception as e:  # pylint: disable=broad-except
+            log.debug("pending lookup: %s", e)
+            pending_rows = []
+
+        pending_runs = [
+            {
+                'run_id': r[0],
+                'pipeline_name': r[1],
+                'scope': _parse_object_key_scope(r[2]),
+                'pending_since': r[3].isoformat() if r[3] else None,
+            }
+            for r in pending_rows
+        ]
+
+        last_probe_at = None
+        with _probe_cache_lock:
+            if _probe_cache:
+                last_probe_at = max(e['_cached_at'] for e in _probe_cache.values())
+        return {
+            'pipelines': pipelines,
+            'pending_runs': pending_runs,
+            'last_probe_at': (
+                datetime.utcfromtimestamp(last_probe_at).isoformat()
+                if last_probe_at else None
+            ),
+        }
+    finally:
+        con.close()
+
+
+@admin_router.post('/refresh/{pipeline}')
+def api_admin_refresh(pipeline: str, body: dict = Body(default={})):
+    """Trigger a pipeline refresh. Returns immediately with a run_id.
+
+    Body shape is the scope dict that ``SourcePipeline.run()`` expects
+    (e.g. ``{"quarter": "2026Q1"}`` for 13F). A concurrency guard
+    prevents a second run of the same pipeline until the first finishes.
+    """
+    if pipeline not in _available_pipelines():
+        raise HTTPException(
+            status_code=404,
+            detail={'error': f'Unknown pipeline: {pipeline}',
+                    'available': _available_pipelines()},
+        )
+    scope = body or {}
+    if not isinstance(scope, dict):
+        raise HTTPException(status_code=400, detail={'error': 'scope must be a JSON object'})
+
+    pending_run_id = f"pending_{pipeline}_{int(time.time())}"
+    if not _acquire_pipeline(pipeline, pending_run_id):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                'error': f'{pipeline} is already running',
+                'run_id': _running_pipelines.get(pipeline),
+            },
+        )
+
+    run_id_slot: dict[str, str] = {}
+    thread = threading.Thread(
+        target=_run_pipeline_background,
+        args=(pipeline, scope, run_id_slot),
+        name=f"pipeline_{pipeline}",
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        'status': 'started',
+        'pipeline': pipeline,
+        'scope': scope,
+        'run_id_placeholder': pending_run_id,
+    }
+
+
+@admin_router.get('/run/{run_id}')
+def api_admin_run_status(run_id: str):
+    """Poll current status for a pipeline run."""
+    con = _get_db()
+    try:
+        row = _read_manifest_row(con, run_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail={'error': 'run_id not found'})
+        row['scope'] = _parse_object_key_scope(row.get('object_key') or '')
+        # Impact counts when available.
+        try:
+            counts = con.execute(
+                """
+                SELECT unit_type, COUNT(*)
+                  FROM ingestion_impacts
+                 WHERE manifest_id = ?
+                 GROUP BY unit_type
+                """,
+                [row['manifest_id']],
+            ).fetchall()
+            row['impact_counts'] = {u: int(n) for u, n in counts}
+        except Exception as e:  # pylint: disable=broad-except
+            log.debug("impact counts: %s", e)
+            row['impact_counts'] = {}
+        return row
+    finally:
+        con.close()
+
+
+@admin_router.get('/probe/{pipeline}')
+def api_admin_probe(pipeline: str, force: bool = False):
+    """Check EDGAR for filings newer than our latest. 15-minute cache."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.cadence import PIPELINE_CADENCE
+
+    cfg = PIPELINE_CADENCE.get(pipeline)
+    if cfg is None:
+        raise HTTPException(
+            status_code=404,
+            detail={'error': f'Unknown pipeline: {pipeline}',
+                    'available': sorted(PIPELINE_CADENCE.keys())},
+        )
+    probe_fn = cfg.get('probe_fn')
+    if probe_fn is None:
+        return {
+            'pipeline': pipeline,
+            'new_count': None,
+            'latest_accession': None,
+            'probed_at': None,
+            'note': 'no probe function for this pipeline',
+        }
+
+    if not force:
+        cached = _get_cached_probe(pipeline)
+        if cached is not None:
+            cached = dict(cached)
+            cached['pipeline'] = pipeline
+            cached['cached'] = True
+            return cached
+
+    con = _get_db()
+    try:
+        try:
+            result = probe_fn(con)
+        except Exception as e:  # pylint: disable=broad-except
+            log.debug("probe %s: %s", pipeline, e)
+            return JSONResponse(
+                status_code=502,
+                content={'error': f'probe failed: {e}', 'pipeline': pipeline},
+            )
+    finally:
+        con.close()
+
+    # Normalise the probed_at datetime to isoformat for JSON.
+    out = dict(result)
+    probed_at = out.get('probed_at')
+    if isinstance(probed_at, datetime):
+        out['probed_at'] = probed_at.isoformat()
+    _set_cached_probe(pipeline, out)
+    out['pipeline'] = pipeline
+    out['cached'] = False
+    return out
+
+
+@admin_router.get('/runs/pending')
+def api_admin_runs_pending():
+    """List pending_approval runs with a thin diff summary."""
+    con = _get_db()
+    try:
+        rows = con.execute(
+            """
+            SELECT run_id, source_type, object_key, fetch_completed_at,
+                   manifest_id
+              FROM ingestion_manifest
+             WHERE fetch_status = 'pending_approval'
+             ORDER BY manifest_id DESC
+            """
+        ).fetchall()
+        pending = []
+        for r in rows:
+            pending.append({
+                'run_id': r[0],
+                'pipeline_name': r[1],
+                'scope': _parse_object_key_scope(r[2]),
+                'pending_since': r[3].isoformat() if r[3] else None,
+                'manifest_id': int(r[4]),
+            })
+        return {'pending': pending, 'count': len(pending)}
+    finally:
+        con.close()
+
+
+@admin_router.get('/runs/{run_id}/diff')
+def api_admin_run_diff(run_id: str):
+    """Diff summary + anomalies + sample rows for a pending run."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.cadence import PIPELINE_CADENCE, check_expected_delta
+
+    con = _get_db()
+    try:
+        row = _read_manifest_row(con, run_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail={'error': 'run_id not found'})
+    finally:
+        con.close()
+
+    if row['status'] != 'pending_approval':
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'run not in pending_approval (status={row["status"]})'},
+        )
+
+    pipeline_name = row['source_type']
+    cfg = PIPELINE_CADENCE.get(pipeline_name, {})
+    target_table = cfg.get('target_table')
+
+    summary: dict = {
+        'inserts': 0, 'flips': 0, 'anomalies': [],
+        'qc_blocks': 0, 'qc_flags': 0, 'qc_warns': 0,
+    }
+    sample_rows: list = []
+    staged_until = None
+
+    staging_db = os.path.join(BASE_DIR, 'data', '13f_staging.duckdb')
+    if target_table and os.path.exists(staging_db):
+        try:
+            scon = duckdb.connect(staging_db, read_only=True)
+            try:
+                staged_count = scon.execute(
+                    f"SELECT COUNT(*) FROM {target_table}"  # nosec B608
+                ).fetchone()[0]
+                summary['inserts'] = int(staged_count)
+                sample = scon.execute(
+                    f"SELECT * FROM {target_table} LIMIT 50"  # nosec B608
+                ).fetchdf()
+                sample_rows = df_to_records(sample)
+            except (duckdb.CatalogException, duckdb.IOException) as e:
+                log.debug("diff staging read %s: %s", target_table, e)
+            finally:
+                scon.close()
+        except duckdb.IOException as e:
+            log.debug("diff staging open: %s", e)
+
+    try:
+        anomalies = check_expected_delta(pipeline_name, {'row_count': summary['inserts']})
+        summary['anomalies'] = anomalies
+    except Exception as e:  # pylint: disable=broad-except
+        log.debug("expected_delta %s: %s", pipeline_name, e)
+
+    return clean_for_json({
+        'run_id': run_id,
+        'pipeline_name': pipeline_name,
+        'scope': _parse_object_key_scope(row.get('object_key') or ''),
+        'summary': summary,
+        'sample_rows': sample_rows,
+        'staged_until': staged_until,
+    })
+
+
+@admin_router.post('/runs/{run_id}/approve')
+def api_admin_run_approve(run_id: str):
+    """Approve a pending_approval run and promote (steps 5-8)."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.pipelines import get_pipeline
+
+    con = _get_db()
+    try:
+        row = _read_manifest_row(con, run_id)
+    finally:
+        con.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail={'error': 'run_id not found'})
+    if row['status'] != 'pending_approval':
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'run not in pending_approval (status={row["status"]})'},
+        )
+
+    try:
+        pipeline = get_pipeline(row['source_type'])
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail={'error': str(e)}) from e
+
+    try:
+        result = pipeline.approve_and_promote(run_id)
+    except Exception as e:  # pylint: disable=broad-except
+        log.exception("approve_and_promote %s failed: %s", run_id, e)
+        return JSONResponse(
+            status_code=500,
+            content={'error': str(e), 'run_id': run_id},
+        )
+
+    return {
+        'run_id': result.run_id,
+        'status': 'complete',
+        'rows_inserted': result.rows_inserted,
+        'rows_flipped': result.rows_flipped,
+        'rows_upserted': result.rows_upserted,
+        'duration_seconds': result.duration_seconds,
+    }
+
+
+@admin_router.post('/runs/{run_id}/reject')
+def api_admin_run_reject(run_id: str, body: dict = Body(default={})):
+    """Reject a pending_approval run. Staging retained for inspection."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.pipelines import get_pipeline
+
+    con = _get_db()
+    try:
+        row = _read_manifest_row(con, run_id)
+    finally:
+        con.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail={'error': 'run_id not found'})
+    if row['status'] != 'pending_approval':
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'run not in pending_approval (status={row["status"]})'},
+        )
+
+    reason = (body or {}).get('reason', '') if isinstance(body, dict) else ''
+    try:
+        pipeline = get_pipeline(row['source_type'])
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail={'error': str(e)}) from e
+
+    try:
+        pipeline.reject(run_id, reason=reason)
+    except Exception as e:  # pylint: disable=broad-except
+        log.exception("reject %s failed: %s", run_id, e)
+        return JSONResponse(
+            status_code=500,
+            content={'error': str(e), 'run_id': run_id},
+        )
+    return {'run_id': run_id, 'status': 'rejected', 'reason': reason}
+
+
+@admin_router.post('/rollback/{run_id}')
+def api_admin_rollback(run_id: str):
+    """Reverse every impact of a completed run."""
+    # pylint: disable=import-outside-toplevel
+    from pipeline.pipelines import get_pipeline
+
+    con = _get_db()
+    try:
+        row = _read_manifest_row(con, run_id)
+    finally:
+        con.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail={'error': 'run_id not found'})
+    if row['status'] != 'complete':
+        raise HTTPException(
+            status_code=400,
+            detail={'error': f'run not in complete (status={row["status"]})'},
+        )
+
+    try:
+        pipeline = get_pipeline(row['source_type'])
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail={'error': str(e)}) from e
+
+    try:
+        pipeline.rollback(run_id)
+    except Exception as e:  # pylint: disable=broad-except
+        log.exception("rollback %s failed: %s", run_id, e)
+        return JSONResponse(
+            status_code=500,
+            content={'error': str(e), 'run_id': run_id},
+        )
+    return {'run_id': run_id, 'status': 'rolled_back'}
