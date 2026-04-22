@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-Schema parity validator: prod vs staging L3 tables.
+Schema parity validator: prod vs staging L0 / L3 / L4 tables.
 
 Pre-flight gate for Phase 2 staging validation. Detects schema drift across
 columns, indexes, constraints, and table DDL. Exits non-zero on unaccepted
 divergence. Accept-list lets known drift through with justification + expiry.
+
+Layer scope (selected with --layer, default L3 for backward compatibility):
+    l3  — 29 canonical fact / entity-MDM tables (default; pre-flight gate)
+    l4  — 14 derived rebuild outputs (mig-09); entity_current VIEW deferred
+    l0  — 6 control-plane tables (mig-10); admin_sessions lives in its own
+          DB per sec-01-p1-hotfix and is intentionally out of scope
+    all — l0 + l3 + l4
 
 Precedent: pct-of-so Phase 4 prod apply aborted on DependencyException because
 staging had 0 indexes on holdings_v2 while prod had 4 (`docs/REWRITE_PCT_OF_SO_
@@ -82,6 +89,46 @@ L3_TABLES: list[str] = [
     "entity_relationships_staging",
 ]
 
+# ---------------------------------------------------------------------------
+# L4 derived-table inventory (mig-09 — aligned with docs/data_layers.md L4)
+# entity_current VIEW deferred per mig-09-p0-findings §4 Option A; introspect_ddl
+# uses duckdb_tables() which excludes views.
+# ---------------------------------------------------------------------------
+
+L4_TABLES: list[str] = [
+    "beneficial_ownership_current",
+    "summary_by_parent",
+    "summary_by_ticker",
+    "investor_flows",
+    "ticker_flow_stats",
+    "managers",
+    "fund_classes",
+    "fund_family_patterns",
+    "fund_best_index",
+    "fund_index_scores",
+    "fund_name_map",
+    "index_proxies",
+    "benchmark_weights",
+    "peer_groups",
+]
+
+# ---------------------------------------------------------------------------
+# L0 control-plane inventory (mig-10 — aligned with docs/data_layers.md §1 L0)
+# admin_sessions lives in its own DB (data/admin.duckdb, sec-01-p1-hotfix) and
+# is intentionally not part of the prod/staging parity check.
+# ---------------------------------------------------------------------------
+
+L0_TABLES: list[str] = [
+    "ingestion_manifest",
+    "ingestion_impacts",
+    "pending_entity_resolution",
+    "data_freshness",
+    "cusip_retry_queue",
+    "schema_versions",
+]
+
+LAYERS: list[str] = ["l3", "l4", "l0", "all"]
+
 DIMENSIONS: list[str] = ["columns", "indexes", "constraints", "ddl"]
 
 DEFAULT_PROD_DB = "data/13f.duckdb"
@@ -92,6 +139,30 @@ DEFAULT_ACCEPT_LIST = "config/schema_parity_accept.yaml"
 def get_l3_tables() -> list[str]:
     """Return the canonical L3 table list."""
     return list(L3_TABLES)
+
+
+def get_l4_tables() -> list[str]:
+    """Return the canonical L4 table list (excludes entity_current VIEW)."""
+    return list(L4_TABLES)
+
+
+def get_l0_tables() -> list[str]:
+    """Return the canonical L0 control-plane table list."""
+    return list(L0_TABLES)
+
+
+def tables_for_layer(layer: str) -> list[str]:
+    """Return the table list for the requested layer. 'all' = L0 + L3 + L4."""
+    layer = layer.lower()
+    if layer == "l3":
+        return get_l3_tables()
+    if layer == "l4":
+        return get_l4_tables()
+    if layer == "l0":
+        return get_l0_tables()
+    if layer == "all":
+        return get_l0_tables() + get_l3_tables() + get_l4_tables()
+    raise ValueError(f"unknown layer {layer!r}; expected one of {LAYERS}")
 
 
 # ---------------------------------------------------------------------------
@@ -432,11 +503,32 @@ def compare_table(
     dimensions: list[str],
 ) -> list[Divergence]:
     """Run all requested dimensions for one table, with normalizers applied
-    before comparators so cross-dimension equivalences are collapsed."""
+    before comparators so cross-dimension equivalences are collapsed.
+
+    Missing-table guard (mig-09-p0-findings §7.5): if the table is absent from
+    one or both sides, emit a single clean `ddl` divergence with detail
+    'TABLE MISSING' and skip the per-dimension comparators. Without this,
+    introspect_columns returns [] on the missing side and compare_columns
+    floods the report with one divergence per prod column. Tables missing on
+    both sides are silently skipped — they are not present in either DB and
+    have no parity to assess.
+    """
     divs: list[Divergence] = []
 
     prod_cols = introspect_columns(prod_con, table)
     stg_cols = introspect_columns(staging_con, table)
+
+    prod_present = bool(prod_cols)
+    stg_present = bool(stg_cols)
+    if not prod_present and not stg_present:
+        return divs
+    if not prod_present or not stg_present:
+        divs.append(Divergence(
+            table, "ddl", "TABLE MISSING",
+            "present" if prod_present else "missing",
+            "present" if stg_present else "missing",
+        ))
+        return divs
 
     prod_idx = introspect_indexes(prod_con, table)
     stg_idx = introspect_indexes(staging_con, table)
@@ -534,6 +626,20 @@ def match_accept(
 # ---------------------------------------------------------------------------
 
 
+def _layer_header(layer: str, table_count: int) -> str:
+    """Render the 'tables scanned' line so it reflects the active layer."""
+    layer = layer.lower()
+    if layer == "l3":
+        return f"L3 ({table_count} tables inc. staging companions)"
+    if layer == "l4":
+        return f"L4 ({table_count} derived tables)"
+    if layer == "l0":
+        return f"L0 ({table_count} control-plane tables)"
+    if layer == "all":
+        return f"L0+L3+L4 ({table_count} tables)"
+    return f"{layer} ({table_count} tables)"
+
+
 def format_human(
     divergences: list[Divergence],
     accepted: list[tuple[Divergence, AcceptEntry]],
@@ -541,10 +647,14 @@ def format_human(
     expired_accepts: list[AcceptEntry],
     unaccepted: list[Divergence],
     fail_on_accepted: bool,
+    layer: str = "l3",
+    table_count: Optional[int] = None,
 ) -> str:
     lines: list[str] = []
     lines.append("═══ Schema parity report ═══")
-    lines.append(f"  tables scanned  : L3 ({len(L3_TABLES)} tables inc. staging companions)")
+    if table_count is None:
+        table_count = len(L3_TABLES)
+    lines.append(f"  tables scanned  : {_layer_header(layer, table_count)}")
     lines.append(f"  divergences     : {len(divergences)} total "
                  f"({len(accepted)} accepted, {len(unaccepted)} unaccepted)")
     lines.append(f"  accept-list     : {len(accepted) + len(stale_accepts) + len(expired_accepts)} entries "
@@ -600,6 +710,8 @@ def format_json(
     expired_accepts: list[AcceptEntry],
     unaccepted: list[Divergence],
     fail_on_accepted: bool,
+    layer: str = "l3",
+    table_count: Optional[int] = None,
 ) -> dict:
     def div_to_dict(d: Divergence) -> dict:
         return {
@@ -621,6 +733,8 @@ def format_json(
             "stale_accepts": len(stale_accepts),
             "expired_accepts": len(expired_accepts),
             "fail_on_accepted": fail_on_accepted,
+            "layer": layer,
+            "table_count": table_count if table_count is not None else len(L3_TABLES),
             "verdict": "PARITY" if (not unaccepted and not expired_accepts) else "FAIL",
         },
         "divergences": [div_to_dict(d) for d in divergences],
@@ -662,6 +776,7 @@ def run(
     accept_list_path: str,
     fail_on_accepted: bool,
     verbose: bool = False,
+    layer: str = "l3",
 ) -> tuple[int, dict]:
     """Execute the parity check. Returns (exit_code, report_dict).
 
@@ -729,21 +844,32 @@ def run(
         exit_code = 0
 
     report = format_json(
-        all_divergences, accepted_pairs, stale, expired, unaccepted, fail_on_accepted
+        all_divergences, accepted_pairs, stale, expired, unaccepted, fail_on_accepted,
+        layer=layer, table_count=len(tables),
     )
     return exit_code, report
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate schema parity between prod and staging L3 tables"
+        description="Validate schema parity between prod and staging tables (L3 default; L4/L0/all opt-in)"
     )
     parser.add_argument("--prod", default=DEFAULT_PROD_DB, help="Prod DB path")
     parser.add_argument("--staging", default=DEFAULT_STAGING_DB, help="Staging DB path")
     parser.add_argument(
+        "--layer",
+        default="l3",
+        choices=LAYERS,
+        help=(
+            "Which inventory to validate. l3 (default) preserves the original "
+            "29-table behavior; l4 covers derived rebuild outputs (mig-09); "
+            "l0 covers control-plane tables (mig-10); all = l0+l3+l4."
+        ),
+    )
+    parser.add_argument(
         "--tables",
         default=None,
-        help="Comma-separated table subset (default: all L3)",
+        help="Comma-separated table subset (must be in the active --layer inventory)",
     )
     parser.add_argument(
         "--dimensions",
@@ -771,12 +897,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     staging_path = _resolve(args.staging)
     accept_list_path = _resolve(args.accept_list)
 
-    tables = get_l3_tables()
+    layer = args.layer.lower()
+    tables = tables_for_layer(layer)
     if args.tables:
         requested = [t.strip() for t in args.tables.split(",") if t.strip()]
-        unknown = [t for t in requested if t not in L3_TABLES]
+        allowed = set(tables)
+        unknown = [t for t in requested if t not in allowed]
         if unknown:
-            print(f"ERROR: unknown tables: {unknown}", file=sys.stderr)
+            print(
+                f"ERROR: unknown tables for layer={layer}: {unknown}",
+                file=sys.stderr,
+            )
             return 2
         tables = requested
 
@@ -794,6 +925,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         accept_list_path=accept_list_path,
         fail_on_accepted=args.fail_on_accepted,
         verbose=args.verbose,
+        layer=layer,
     )
 
     if args.json:
@@ -814,7 +946,9 @@ def _human_from_report(report: dict) -> str:
     summary = report.get("summary", {})
     lines = []
     lines.append("═══ Schema parity report ═══")
-    lines.append(f"  tables scanned  : L3 ({len(L3_TABLES)} tables inc. staging companions)")
+    layer = summary.get("layer", "l3")
+    table_count = summary.get("table_count", len(L3_TABLES))
+    lines.append(f"  tables scanned  : {_layer_header(layer, table_count)}")
     lines.append(f"  divergences     : {summary.get('total', 0)} total "
                  f"({summary.get('accepted', 0)} accepted, "
                  f"{summary.get('unaccepted', 0)} unaccepted)")
