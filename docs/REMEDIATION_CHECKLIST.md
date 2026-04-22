@@ -64,11 +64,11 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] obs-12 INF33 BLOCK-CI-ACTIONS-NODE20-DEPRECATION (.github/workflows) — PR #57 (Node 20 → Node 24 bump across workflows)
 
 ### Batch 2-E (parallel-eligible within batch: NO — shared data_layers.md)
-- [ ] obs-05 MAJOR-17 DOC-11 data_layers.md coverage headline refresh
-- [ ] obs-11 Pass 2 §6.4 flow_intensity_total formula docstring
+- [x] obs-05 MAJOR-17 DOC-11 data_layers.md coverage headline refresh — PR #66 (headline re-anchored to 14,090,397 rows / 84.13% `entity_id` coverage, BLOCK-2 + CUSIP v1.4 baseline cited)
+- [x] obs-11 Pass 2 §6.4 flow_intensity_total formula docstring — PR #66 (9-line docstring on `_compute_ticker_stats` + new §10 Flow metrics section in data_layers.md)
 
 ### Verify
-- [ ] obs-13 DIAG-23 Register %FLOAT stale dist bundle — verify served bundle post-ff1ff71
+- [x] obs-13 DIAG-23 Register %FLOAT stale dist bundle — verify served bundle post-ff1ff71 — PR #65 (verified PASS; React source + dist bundle both free of `pct_of_float`; ff1ff71 touched CI fixtures only)
 
 ---
 
