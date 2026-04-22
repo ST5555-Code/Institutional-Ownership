@@ -1,6 +1,56 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 21, 2026_
+_Last updated: April 22, 2026 (conv-12 — Phase 2 + Wave 2 close)._
+
+## Pipeline refresh via admin dashboard
+
+Phase 2 + Wave 2 (2026-04-22) put all six ingest pipelines (`13f_holdings`, `13dg_ownership`, `nport_holdings`, `market_data`, `ncen_advisers`, `adv_registrants`) behind a single `SourcePipeline` framework with a user-triggered refresh UI. There are two equivalent entry points.
+
+**Web UI (preferred for interactive reviews).**
+
+1. Navigate to `http://localhost:8001/admin/dashboard`.
+2. Authenticate (INF12 token via the login surface at `/admin/login`).
+3. Click the refresh button on the pipeline's status card. A run starts and transitions through `fetching → parsing → validating → pending_approval`.
+4. On `pending_approval`, the diff dashboard surfaces row-level delta + anomaly flags. Click **Approve and promote** to continue, or **Reject** to abort (staging retained 24h for inspection).
+5. Status card polls `/admin/run/{run_id}` every ~10s until `complete` / `failed` / `rejected`.
+
+Auto-approve can be turned on per-pipeline through the `admin_preferences` table (migration 016). Default is **OFF** on every pipeline; enable only after observing a clean baseline.
+
+**CLI (for scripted or headless runs).**
+
+```bash
+# 13F — quarterly cadence, append_is_latest
+python3 scripts/load_13f_v2.py --quarter 2026Q1 --dry-run
+python3 scripts/load_13f_v2.py --quarter 2026Q1 --auto-approve
+
+# 13D/G — event-driven, append_is_latest
+python3 scripts/pipeline/load_13dg.py --since 2026-04-01 --dry-run
+python3 scripts/pipeline/load_13dg.py --tickers AAPL,NVDA --auto-approve
+
+# N-PORT — monthly-topup XML or DERA ZIP bulk, append_is_latest
+python3 scripts/pipeline/load_nport.py --monthly-topup --dry-run
+python3 scripts/pipeline/load_nport.py --quarter 2026Q1 --zip data/nport_raw/dera/2026q1_nport.zip --auto-approve
+
+# Market data — daily cadence, direct_write
+python3 scripts/pipeline/load_market.py --stale-days 3 --dry-run
+python3 scripts/pipeline/load_market.py --tickers AAPL,MSFT --auto-approve
+
+# N-CEN — annual-rolling, scd_type2
+python3 scripts/pipeline/load_ncen.py --ciks 0000102909 --since 2026-01-01 --dry-run
+python3 scripts/pipeline/load_ncen.py --auto-approve
+
+# ADV — annual, direct_write
+python3 scripts/pipeline/load_adv.py --dry-run
+python3 scripts/pipeline/load_adv.py --zip data/adv/IA_Firm_SEC_Feed_04_22_2026.zip --auto-approve
+```
+
+All CLI flags thread through the `SourcePipeline.run()` orchestrator: `--dry-run` stops after step 4 (diff), `--auto-approve` bypasses the approval gate, and every run writes one `ingestion_manifest` row + N `ingestion_impacts` rows regardless of outcome.
+
+**Stop the app before promote.** DuckDB allows a single writer per file; the framework opens prod in write mode at step 5 (snapshot) and step 6 (promote). If the FastAPI process holds the file open, promote errors with "unable to open file". Standard pattern: `./scripts/start_app.sh stop` → run pipeline → `./scripts/start_app.sh start`.
+
+**Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The legacy "Post-hoc Writer Ordering on `managers`" pattern at the bottom of this doc still applies to `build_managers.py` + `fetch_13dg.py` Phase 3 + `fetch_ncen.py` — but those writers are outside the Phase 2 framework.
+
+---
 
 ## Entity Change Workflow
 
@@ -275,22 +325,19 @@ Authorized on or after **2026-05-09**. See `ROADMAP.md`.
 
 ## Post-hoc Writer Ordering on `managers`
 
-Three scripts mutate the `managers` table in sequence, and later
-writers depend on the earlier writers' schema state:
+**Phase 2 note.** `fetch_13dg.py` and `fetch_ncen.py` are retired — the ingestion halves are now `scripts/pipeline/load_13dg.py` (w2-01) and `scripts/pipeline/load_ncen.py` (w2-04), which run inside the `SourcePipeline` eight-step flow and do not mutate `managers` directly. The `has_13dg` / `adviser_cik` stamping on `managers` is a separate concern from the new ingest pipelines and still runs on the legacy ordering described below, triggered from `build_managers.py`. This section is retained because the `managers` table is an L4 derived artifact owned by `build_managers.py`, not by the framework.
+
+Three writers mutate `managers` in sequence:
 
 1. **`build_managers.py`** — canonical builder. DROP+CTAS rebuild;
    materializes the base schema.
-2. **`fetch_13dg.py`** Phase 3 — runs after `build_managers.py`;
-   `ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN` + `UPDATE` to
-   stamp the 13D/G-filer flag.
-3. **`fetch_ncen.py`** — runs after `build_managers.py`; `ALTER
-   TABLE managers ADD COLUMN adviser_cik VARCHAR` + `UPDATE` from
-   `ncen_adviser_map`.
+2. **13D/G post-hoc stamp** — `ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN` + `UPDATE` to stamp the 13D/G-filer flag. Invoked from `build_managers.py` tail today; historically ran from `fetch_13dg.py` Phase 3.
+3. **N-CEN post-hoc stamp** — `ALTER TABLE managers ADD COLUMN adviser_cik VARCHAR` + `UPDATE` from `ncen_adviser_map`. Invoked from `build_managers.py` tail today; historically ran from `fetch_ncen.py`.
 
 The ordering is currently implicit — enforced only by the Makefile
 `quarterly-update` target and the scheduler that invokes it. There
-is no code-level sentinel that refuses to run `fetch_13dg` or
-`fetch_ncen` if `build_managers` has not run in the current cycle.
+is no code-level sentinel that refuses to run the post-hoc stamps
+if `build_managers` has not run in the current cycle.
 
 **Hazard scenarios.**
 - If `build_managers.py` runs without `fetch_13dg.py` / `fetch_ncen.py`
