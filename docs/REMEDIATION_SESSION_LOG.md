@@ -988,3 +988,93 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) Theme 5 ops now 14/18 closed with ops-17 resolving as already-satisfied via obs-10 (no standalone retire needed). (2) Theme 2 observability now 10/13 closed (obs-05, obs-11, obs-13 remaining — obs-13 verify-only). (3) obs-08 row corrected from "PR #TBD" placeholder to actual "PR #58" citation.
 - **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — mig-03-p0 migration 004 atomicity (Phase 0)
+
+- **Session name:** mig-03-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings for mig-03 (MAJOR-15 `docs/SYSTEM_AUDIT_2026_04_17.md §11.3`). Document current RENAME → CREATE → INSERT → DROP sequence in `scripts/migrations/004_summary_by_parent_rollup_type.py` with exact line numbers; map every kill-point in the sequence to resulting on-disk state (two critical states identified: kill between RENAME and CREATE leaves canonical table missing; kill between CREATE and INSERT leaves it empty with "already applied" probe subsequently declaring success on zero rows); compare to `scripts/migrations/003_cusip_classifications.py:226-239` (only migration already using BEGIN/try/COMMIT/except/ROLLBACK scaffold); propose Phase 1 scope (single-file change).
+- **Files touched:** `docs/findings/mig-03-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #60 merged as `94de1c4`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 locked to single file (`scripts/migrations/004_summary_by_parent_rollup_type.py`); pattern source confirmed as migration 003; no file overlap with ops-12 (migration 007), parallel-safe per REMEDIATION_PLAN.md:230.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-21 — mig-03-p1 migration 004 atomicity retrofit
+
+- **Session name:** mig-03-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Wrap migration 004's RENAME→CREATE→INSERT→DROP sequence in a single BEGIN/COMMIT using build-new-and-swap shadow pattern (`summary_by_parent_new`). Move row-count parity check and `schema_versions` stamp inside the transaction — mismatch now rolls back cleanly, and "applied" is coupled with "stamped". Add pre-transaction recovery probe: if pre-fix crash left canonical table missing with `summary_by_parent_old` present, canonical name is restored via RENAME before the transaction runs.
+- **Files touched:** `scripts/migrations/004_summary_by_parent_rollup_type.py`
+- **Result:** DONE
+- **Commits:** PR #62 merged as `1dfe466`
+- **Merge status:** merged
+- **Follow-ups surfaced:** retrofit only — migration has already applied cleanly on both prod and staging (mig-04-p1 confirmed stamps); Phase 1 protects future fresh-apply paths (CI fixture rebuilds, new environments); next fixture rebuild will exercise the fresh-apply path.
+- **Parallel-safety validation:** YES — single file, no overlap; 97 tests passed; ruff clean.
+
+---
+
+## 2026-04-21 — mig-13-p0 pipeline-violations REWRITE tail scope verification (Phase 0)
+
+- **Session name:** mig-13-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings verifying already-narrowed mig-13 scope at `docs/REMEDIATION_PLAN.md:132`. Confirmed 3 of 5 original scripts **already closed** (`fetch_adv.py` via mig-02 PR #37; `build_fund_classes.py` + `build_benchmark_weights.py` via sec-05 PR #45); 2 scripts **remain open** with trivial residual work: `build_entities.py` (§1 per-step CHECKPOINT — staging-only safety rail already present), `merge_staging.py` (§5 masked errors + stale `TABLE_KEYS` legacy refs — fix derives from `pipeline.registry.merge_table_keys()`, already exists). Recommendation: ship combined Phase 1 in one session.
+- **Files touched:** `docs/findings/mig-13-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #61 merged as `2c779df`
+- **Merge status:** merged
+- **Follow-ups surfaced:** One read-only DuckDB probe confirmed `beneficial_ownership` is dropped and `fund_holdings` coexists with `fund_holdings_v2` in prod; closure commits `db1fdb8` (#37) and `742d504` (#45) verified as ancestors of HEAD `c3590d0`.
+- **Parallel-safety validation:** YES — read-only inspection only; no runtime writes.
+
+---
+
+## 2026-04-21 — mig-13-p1 CHECKPOINT build_entities + clean merge_staging
+
+- **Session name:** mig-13-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Close the two remaining scripts from mig-13 pipeline-violations scope. (1) `scripts/build_entities.py` — add `CHECKPOINT` in `main()` after every step2..step7 call and after `replay_persistent_overrides` (10 new per-step CHECKPOINTs); closes §1 incremental save; no business logic changes. (2) `scripts/merge_staging.py` — replace hand-maintained `TABLE_KEYS` dict with `TABLE_KEYS = merge_table_keys()` from `pipeline.registry`; stale `beneficial_ownership` (dropped Stage 5) and `fund_holdings` (legacy v1 N-PORT) entries removed (registry already uses `_v2` variants); only two overrides remain for persistent caches outside the registry (`_cache_openfigi`, `_cache_yfinance`); convert per-table try/except from silent swallow to collect-and-fail (errors accumulate into a list; live runs exit non-zero with failure summary; dry-run keeps them as warnings); `--drop-staging` suppressed when any table failed so staging is retained for investigation; closes §5 error handling + legacy refs. (3) `docs/pipeline_violations.md` — mark both scripts CLEARED with fix rationale.
+- **Files touched:** `scripts/build_entities.py`, `scripts/merge_staging.py`, `docs/pipeline_violations.md`
+- **Result:** DONE
+- **Commits:** PR #63 merged as `a410c1a`
+- **Merge status:** merged
+- **Follow-ups surfaced:** mig-13 CLOSED — all 5 originally-scoped scripts now resolved (3 closed upstream via mig-02/sec-05/sec-06; 2 closed by this PR). Theme 3 migration now 5/14 CLOSED.
+- **Parallel-safety validation:** YES — two scripts plus doc; scope strictly limited to Phase 1 plan; 97 tests passed; ruff clean.
+
+---
+
+## 2026-04-21 — merge-wave-9
+
+- **Session name:** merge-wave-9
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Coordinated merge of 4 PRs covering mig-03 (Phase 0 + Phase 1) and mig-13 (Phase 0 + Phase 1). Serial merge ordering: PR #60 (mig-03-p0 findings) → PR #61 (mig-13-p0 findings) → PR #62 (mig-03 retrofit) → PR #63 (mig-13 CHECKPOINT + merge_staging). All four landed cleanly with zero conflicts. Parallel-safety held — no file overlap across sessions (Phase 0 findings are new docs; Phase 1 scripts are disjoint).
+- **Files touched:** n/a (coordination session; no code changes)
+- **Result:** DONE
+- **Commits:** merged `94de1c4` (#60), `2c779df` (#61), `1dfe466` (#62), `a410c1a` (#63)
+- **Merge status:** merged
+- **Follow-ups surfaced:** Both Batch 3-B OPEN items now CLOSED (mig-03, mig-13). Only mig-14 remains in 3-B. Theme 3 advances to 5/14 CLOSED. conv-06 convergence session triggered.
+- **Parallel-safety validation:** YES — clean wave; no conflicts; no post-merge regressions.
+
+---
+
+## 2026-04-21 — conv-06 convergence doc update
+
+- **Session name:** conv-06
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** batch doc update reflecting PRs #60 through #63 merged since conv-05 (4 PRs). Flip CHECKLIST items (mig-03, mig-13). Append session-log entries for mig-03-p0, mig-03-p1, mig-13-p0, mig-13-p1, merge-wave-9, conv-06. Update REMEDIATION_PLAN.md item-table statuses (mig-03 OPEN→CLOSED PRs #60/#62; mig-13 OPEN narrowed → CLOSED PRs #61/#63) + append conv-06 changelog entry. Both Theme 3 Batch 3-B items closed; Theme 3 now 5/14 CLOSED.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) Theme 3 migration now 5/14 CLOSED (mig-01, mig-02, mig-03, mig-04, mig-13); mig-14 is the last remaining Batch 3-B item; Batches 3-C/3-D untouched (mig-06/07/08/09/10/11). (2) mig-05/mig-12 remain Phase 2/Phase 3 deferrals. (3) mig-13 scope narrowing across sessions validated: original 5 scripts resolved via 4 different items (mig-02, sec-05, sec-06, mig-13 itself) — good example of cross-theme convergence.
+- **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
