@@ -379,6 +379,136 @@ def test_staging_isolation(pipeline):
     assert _real(pipeline.fetch_db_path) != _real(pipeline._prod_db_path)
 
 
+def test_promote_is_atomic_rollback_on_failure(pipeline):
+    """If record_impact raises after the flip UPDATE commits would be lost
+    unless the promote is wrapped in a transaction. Verifies ROLLBACK
+    restores is_latest on the previously-flipped rows and leaves no new
+    inserted rows behind."""
+    # Seed prod with 5 rows at (cik=1, quarter='2026Q1'), all is_latest=TRUE.
+    con = duckdb.connect(pipeline._prod_db_path)
+    try:
+        for i in range(5):
+            con.execute(
+                "INSERT INTO mock_holdings "
+                "VALUES (1, '2026Q1', 'A_PRIOR', ?, TRUE)",
+                [100 + i],
+            )
+        con.execute(
+            "INSERT INTO ingestion_manifest "
+            "(manifest_id, source_type, object_type, object_key, "
+            " run_id, fetch_status) VALUES "
+            "(1, 'mock_test', 'SCOPE', 'mock_test:q=2026Q1#atomic', "
+            " 'atomic_test', 'approved')"
+        )
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
+
+    # Stage 3 new rows with same amendment_key.
+    staging = duckdb.connect(pipeline._staging_db_path)
+    try:
+        staging.execute(DDL_MOCK_HOLDINGS)
+        for i in range(3):
+            staging.execute(
+                "INSERT INTO mock_holdings "
+                "VALUES (1, '2026Q1', 'A_NEW', ?, TRUE)",
+                [200 + i],
+            )
+        staging.execute("CHECKPOINT")
+    finally:
+        staging.close()
+
+    # Make record_impact fail on the post-INSERT "insert" action.
+    orig = pipeline.record_impact
+
+    def failing(prod_con, **kw):
+        if kw.get("action") == "insert":
+            raise RuntimeError("simulated post-insert failure")
+        return orig(prod_con, **kw)
+
+    pipeline.record_impact = failing
+
+    prod_con = duckdb.connect(pipeline._prod_db_path)
+    try:
+        with pytest.raises(RuntimeError, match="simulated"):
+            pipeline._promote_append_is_latest("atomic_test", prod_con)
+    finally:
+        prod_con.close()
+
+    # After rollback: original 5 rows remain, all is_latest=TRUE.
+    con = duckdb.connect(pipeline._prod_db_path, read_only=True)
+    try:
+        total = con.execute(
+            "SELECT COUNT(*) FROM mock_holdings"
+        ).fetchone()[0]
+        latest = con.execute(
+            "SELECT COUNT(*) FROM mock_holdings WHERE is_latest = TRUE"
+        ).fetchone()[0]
+        impacts = con.execute(
+            "SELECT COUNT(*) FROM ingestion_impacts WHERE manifest_id = 1"
+        ).fetchone()[0]
+    finally:
+        con.close()
+
+    assert total == 5, "INSERT must not have committed (rollback)"
+    assert latest == 5, "flip UPDATE must have rolled back"
+    assert impacts == 0, "impact rows must have rolled back with the promote"
+
+
+def test_promote_excludes_prod_only_columns(tmp_path):
+    """Prod has a row_id column with a sequence DEFAULT that staging
+    lacks. SELECT * would fail with column-count mismatch. An explicit
+    column list driven by the staging schema lets the DEFAULT populate
+    row_id for the new rows."""
+    prod = str(tmp_path / "prod.duckdb")
+    staging = str(tmp_path / "staging.duckdb")
+    backup = tmp_path / "backups"
+    backup.mkdir()
+
+    con = duckdb.connect(prod)
+    try:
+        con.execute(DDL_MANIFEST)
+        con.execute(DDL_IMPACTS)
+        con.execute(DDL_PENDING)
+        con.execute(DDL_FRESHNESS)
+        con.execute("CREATE SEQUENCE mock_row_id_seq START 1")
+        con.execute(
+            """
+            CREATE TABLE mock_holdings (
+                cik              INTEGER,
+                quarter          VARCHAR,
+                accession_number VARCHAR,
+                shares           BIGINT,
+                row_id           BIGINT DEFAULT nextval('mock_row_id_seq'),
+                is_latest        BOOLEAN
+            )
+            """
+        )
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
+
+    p = MockPipeline(
+        prod_db_path=prod,
+        staging_db_path=staging,
+        backup_dir=str(backup),
+    )
+    run_id = p.run({"quarter": "2026Q1"})
+    result = p.approve_and_promote(run_id)
+
+    assert result.rows_inserted == 10
+
+    con = duckdb.connect(prod, read_only=True)
+    try:
+        rows = con.execute(
+            "SELECT row_id, shares FROM mock_holdings ORDER BY row_id"
+        ).fetchall()
+    finally:
+        con.close()
+    assert len(rows) == 10
+    assert all(r[0] is not None for r in rows), "row_id must be populated by DEFAULT"
+
+
 def test_amendment_strategy_dispatch(pipeline, monkeypatch):
     called: list[str] = []
 
