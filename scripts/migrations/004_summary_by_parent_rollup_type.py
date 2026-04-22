@@ -9,12 +9,23 @@ primary key from `(quarter, rollup_entity_id)` to
 Existing rows are stamped `rollup_type='economic_control_v1'` (they were
 populated from the EC rollup in the pre-rewrite pipeline).
 
-DuckDB can't drop/alter PRIMARY KEY via ALTER, so this script:
-  1. Renames existing `summary_by_parent` -> `summary_by_parent_old`.
-  2. Creates new `summary_by_parent` with the expanded PK.
-  3. INSERTs all rows from _old with `rollup_type='economic_control_v1'`.
-  4. DROPs `summary_by_parent_old`.
-  5. CHECKPOINTs.
+DuckDB can't drop/alter PRIMARY KEY via ALTER, so this script uses a
+"build-new, swap" pattern wrapped in a single transaction:
+  1. CREATE `summary_by_parent_new` with the expanded PK.
+  2. INSERT rows from `summary_by_parent` with `rollup_type='economic_control_v1'`.
+  3. Verify row-count parity (source vs. new) — mismatch rolls back.
+  4. DROP `summary_by_parent` and RENAME `_new` into its place.
+  5. Stamp `schema_versions` — all inside the same BEGIN/COMMIT.
+  6. CHECKPOINT after COMMIT.
+
+Atomicity: a crash at any point either leaves the pre-migration state intact
+(pre-COMMIT) or the post-migration state intact (post-COMMIT). The only
+observable states from a reader are the before and after — no "empty" or
+"missing" window.
+
+Pre-transaction recovery: if a prior pre-fix crash left `summary_by_parent`
+missing but `summary_by_parent_old` present, the canonical table is restored
+via RENAME before the transaction runs.
 
 Idempotent: probes for the `rollup_type` column. If present, no-op.
 
@@ -73,6 +84,18 @@ def run_migration(db_path: str) -> None:
 
     con = duckdb.connect(db_path)
     try:
+        # Pre-transaction recovery: a pre-fix kill between RENAME and CREATE
+        # could leave the canonical table missing with `_old` holding the
+        # original rows. Restore the canonical name before proceeding so the
+        # rest of the flow sees a normal "not yet applied" state.
+        if (not _has_table(con, "summary_by_parent")
+                and _has_table(con, "summary_by_parent_old")):
+            print(f"  RECOVER ({db_path}): summary_by_parent missing; "
+                  "restoring from summary_by_parent_old")
+            con.execute(
+                "ALTER TABLE summary_by_parent_old RENAME TO summary_by_parent"
+            )
+
         if not _has_table(con, "summary_by_parent"):
             print(f"  SKIP ({db_path}): summary_by_parent does not exist")
             return
@@ -107,61 +130,91 @@ def run_migration(db_path: str) -> None:
         print(f"    {ddl_before}")
         print(f"    rows: {rows_before:,}")
 
-        # Clean up any lingering _old from a failed prior attempt so this
-        # pass can proceed.
-        con.execute("DROP TABLE IF EXISTS summary_by_parent_old")
+        # Build-new-and-swap wrapped in a single transaction. A crash or error
+        # at any point before COMMIT rolls back cleanly; no observable
+        # intermediate state.
+        con.execute("BEGIN")
+        try:
+            # Belt-and-suspenders: drop any shadow left by a prior failed run
+            # of the new pattern.
+            con.execute("DROP TABLE IF EXISTS summary_by_parent_new")
 
-        con.execute(
-            "ALTER TABLE summary_by_parent RENAME TO summary_by_parent_old"
-        )
-        con.execute("""
-            CREATE TABLE summary_by_parent (
-                quarter VARCHAR,
-                rollup_type VARCHAR,
-                rollup_entity_id BIGINT,
-                inst_parent_name VARCHAR,
-                rollup_name VARCHAR,
-                total_aum DOUBLE,
-                total_nport_aum DOUBLE,
-                nport_coverage_pct DOUBLE,
-                ticker_count INTEGER,
-                total_shares BIGINT,
-                manager_type VARCHAR,
-                is_passive BOOLEAN,
-                top10_tickers VARCHAR,
-                updated_at TIMESTAMP,
-                PRIMARY KEY (quarter, rollup_type, rollup_entity_id)
+            con.execute("""
+                CREATE TABLE summary_by_parent_new (
+                    quarter VARCHAR,
+                    rollup_type VARCHAR,
+                    rollup_entity_id BIGINT,
+                    inst_parent_name VARCHAR,
+                    rollup_name VARCHAR,
+                    total_aum DOUBLE,
+                    total_nport_aum DOUBLE,
+                    nport_coverage_pct DOUBLE,
+                    ticker_count INTEGER,
+                    total_shares BIGINT,
+                    manager_type VARCHAR,
+                    is_passive BOOLEAN,
+                    top10_tickers VARCHAR,
+                    updated_at TIMESTAMP,
+                    PRIMARY KEY (quarter, rollup_type, rollup_entity_id)
+                )
+            """)
+            con.execute("""
+                INSERT INTO summary_by_parent_new (
+                    quarter, rollup_type, rollup_entity_id, inst_parent_name,
+                    rollup_name, total_aum, total_nport_aum, nport_coverage_pct,
+                    ticker_count, total_shares, manager_type, is_passive,
+                    top10_tickers, updated_at
+                )
+                SELECT
+                    quarter,
+                    'economic_control_v1' AS rollup_type,
+                    rollup_entity_id,
+                    inst_parent_name,
+                    rollup_name,
+                    total_aum,
+                    total_nport_aum,
+                    nport_coverage_pct,
+                    ticker_count,
+                    total_shares,
+                    manager_type,
+                    is_passive,
+                    top10_tickers,
+                    updated_at
+                FROM summary_by_parent
+            """)
+
+            # Row-count parity check INSIDE the transaction so a mismatch
+            # rolls back everything.
+            rows_source = con.execute(
+                "SELECT COUNT(*) FROM summary_by_parent"
+            ).fetchone()[0]
+            rows_new = con.execute(
+                "SELECT COUNT(*) FROM summary_by_parent_new"
+            ).fetchone()[0]
+            if rows_source != rows_new:
+                raise RuntimeError(
+                    f"migration 004 row count mismatch: "
+                    f"source={rows_source:,} new={rows_new:,}"
+                )
+
+            # Atomic swap.
+            con.execute("DROP TABLE summary_by_parent")
+            con.execute(
+                "ALTER TABLE summary_by_parent_new RENAME TO summary_by_parent"
             )
-        """)
-        con.execute("""
-            INSERT INTO summary_by_parent (
-                quarter, rollup_type, rollup_entity_id, inst_parent_name,
-                rollup_name, total_aum, total_nport_aum, nport_coverage_pct,
-                ticker_count, total_shares, manager_type, is_passive,
-                top10_tickers, updated_at
+
+            # Stamp inside the transaction so "applied" and "stamped" are
+            # coupled.
+            con.execute(
+                "INSERT OR IGNORE INTO schema_versions "
+                "(version, notes) VALUES (?, ?)",
+                [VERSION, NOTES],
             )
-            SELECT
-                quarter,
-                'economic_control_v1' AS rollup_type,
-                rollup_entity_id,
-                inst_parent_name,
-                rollup_name,
-                total_aum,
-                total_nport_aum,
-                nport_coverage_pct,
-                ticker_count,
-                total_shares,
-                manager_type,
-                is_passive,
-                top10_tickers,
-                updated_at
-            FROM summary_by_parent_old
-        """)
-        con.execute("DROP TABLE summary_by_parent_old")
-        con.execute(
-            "INSERT OR IGNORE INTO schema_versions (version, notes) VALUES (?, ?)",
-            [VERSION, NOTES],
-        )
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+
         con.execute("CHECKPOINT")
 
         rows_after = con.execute(
@@ -174,12 +227,6 @@ def run_migration(db_path: str) -> None:
         print("  AFTER:")
         print(f"    {ddl_after}")
         print(f"    rows: {rows_after:,} (stamped rollup_type='economic_control_v1')")
-
-        if rows_before != rows_after:
-            raise SystemExit(
-                f"  MIGRATION FAILED: row count mismatch "
-                f"({rows_before} before, {rows_after} after)"
-            )
     finally:
         con.close()
 
