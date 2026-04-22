@@ -28,7 +28,8 @@ endif
         fetch-13dg fetch-adv fetch-ncen fetch-finra-short \
         promote-adv \
         build-managers build-fund-classes build-cusip \
-        schema-parity-check
+        schema-parity-check \
+        rotate-logs rotate-logs-dry
 
 help:
 	@echo "13F pipeline targets:"
@@ -53,6 +54,10 @@ help:
 	@echo ""
 	@echo "  Phase 2 pre-flight:"
 	@echo "    make schema-parity-check  — validate staging↔prod L3 schema parity"
+	@echo ""
+	@echo "  Maintenance:"
+	@echo "    make rotate-logs          — compress logs >7d, delete >90d (see MAINTENANCE.md)"
+	@echo "    make rotate-logs-dry      — print rotation actions without executing"
 	@echo ""
 	@echo "  Supplementary:"
 	@echo "    make fetch-13dg           — 13D/G beneficial ownership"
@@ -189,3 +194,14 @@ status:
 schema-parity-check:
 	@echo "--- Schema parity: prod ↔ staging (L3) ---"
 	@$(PY) $(SCRIPTS)/pipeline/validate_schema_parity.py
+
+# ---------------------------------------------------------------------------
+# Maintenance — log rotation (see MAINTENANCE.md → "Log Rotation").
+# Standalone target: run weekly, or before quarterly-update when logs/ is
+# over ~50MB. Policy: compress >7d, delete >90d.
+# ---------------------------------------------------------------------------
+rotate-logs:
+	@$(SCRIPTS)/rotate_logs.sh
+
+rotate-logs-dry:
+	@$(SCRIPTS)/rotate_logs.sh --dry-run
