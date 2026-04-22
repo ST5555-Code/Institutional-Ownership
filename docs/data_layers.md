@@ -869,3 +869,73 @@ scoped to non-passive (resp. active) managers.
 - `scripts/compute_flows.py:_compute_ticker_stats` — canonical SQL.
 - `scripts/compute_flows.py:_insert_period_flows` — upstream
   `price_adj_flow` / `is_new_entry` / `is_exit` definitions.
+
+---
+
+## 11. CUSIP residual-coverage tracking tier
+
+The CUSIP classification universe is closed against any *fixed* snapshot
+of filings but is open-ended in time — every new 13F and N-PORT ingest
+introduces CUSIPs that have never been classified. This section
+documents the standing tracking tier: what is resolved today, what the
+residual gap looks like, and how new CUSIPs flow through the pipeline.
+
+**Current universe.** `cusip_classifications` carries **430,149 CUSIPs**
+on prod as of BLOCK-SECURITIES-DATA-AUDIT Phase 3 close (2026-04-18;
+see `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md`). `securities` mirrors
+the same 430,149 row population via `normalize_securities.py`. The
+§2 table-inventory row for `cusip_classifications` still cites the
+pre-Phase-3 132,618 baseline — this section is the authoritative
+up-to-date figure; the table-inventory row will be refreshed on the
+next doc-sync pass.
+
+**Residual gap — two components.**
+
+1. **~81 malformed CUSIPs — upstream ingest artifacts.** A small
+   residual set of CUSIP-like strings survive the current normalization
+   pass but fail downstream classifier contracts (length/checksum/
+   character-set violations that slipped past the upstream source
+   files). These are upstream data-quality issues, not classifier bugs;
+   they do not respond to OpenFIGI retry. Triaged as `unmappable` in
+   `cusip_retry_queue` or left unresolved in `cusip_classifications`.
+   Population is stable and small; no downstream AUM or entity impact.
+
+2. **Legitimately-new CUSIPs in future ingestion.** Every quarterly
+   13F promote + monthly N-PORT promote introduces CUSIPs that were
+   not present in prior periods (new issues, new listings, new filer
+   holdings). These land in `cusip_retry_queue` at ingest time and
+   flow through the standard classification pipeline on the next
+   `build_classifications.py` + `run_openfigi_retry.py` cycle. This is
+   the steady-state population.
+
+**Mitigation — pipeline handles automatically.**
+`scripts/build_classifications.py` seeds any unclassified CUSIPs from
+`holdings_v2` / `fund_holdings_v2` / `beneficial_ownership_v2` into
+`cusip_retry_queue` with `status='pending'`. `scripts/run_openfigi_retry.py`
+then works the queue, promoting resolved rows into
+`cusip_classifications` + `_cache_openfigi` and flipping hard-unmappable
+rows to `status='unmappable'` (subject to **INF26** `_update_error()`
+hygiene — hard errors today can stick in `pending` instead of flipping;
+small cosmetic fix, does not affect the resolved path). No manual
+intervention is required to close the gap introduced by each new
+ingest cycle.
+
+**Monitoring.** The `cusip_retry_queue` status distribution is the
+single authoritative view of resolution progress. As of 2026-04-15
+prod close: 15,807 `resolved` / 22,118 `unmappable` / balance `pending`
+across 37,925 rows (see §2 table-inventory row for `cusip_retry_queue`).
+A net-increase in `pending` rows across two consecutive pipeline runs
+indicates the retry path is not keeping up with ingest and is the
+trigger condition for revisiting tier cadence.
+
+**Cross-references.**
+- ROADMAP → `INF27` carries the standing-tracking row.
+- ROADMAP → `INF26` — `_update_error()` hygiene fix for permanent-pending
+  rows on hard errors.
+- `docs/BLOCK_TICKER_BACKFILL_FINDINGS.md §10.1` — the 2025-08+
+  `cusip_not_in_securities` step-change that originally surfaced the
+  residual-gap concern.
+- `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md` — Phase 3 close that
+  brought the universe from 132,618 → 430,149.
+- §6 **S1** — `is_priceable` semantics for grey-market rows is a
+  sibling classifier-semantics concern, tracked separately.
