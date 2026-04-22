@@ -25,6 +25,16 @@ def _load_13f_cls() -> Type[SourcePipeline]:
     return module.Load13FPipeline
 
 
+def _load_13dg_cls() -> Type[SourcePipeline]:
+    """Lazy-import Load13DGPipeline. Same rationale as ``_load_13f_cls``
+    — avoids eager import of ``requests`` / EDGAR config when callers
+    only need to enumerate registered pipelines."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.load_13dg")
+    return module.Load13DGPipeline
+
+
 def _load_market_cls() -> Type[SourcePipeline]:
     """Lazy-import LoadMarketPipeline. w2-02 migration."""
     # pylint: disable=import-outside-toplevel
@@ -34,8 +44,9 @@ def _load_market_cls() -> Type[SourcePipeline]:
 
 
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
-    "13f_holdings": _load_13f_cls,    # type: ignore[dict-item]
-    "market_data": _load_market_cls,  # type: ignore[dict-item]
+    "13f_holdings":   _load_13f_cls,    # type: ignore[dict-item]
+    "13dg_ownership": _load_13dg_cls,   # type: ignore[dict-item]
+    "market_data":    _load_market_cls,  # type: ignore[dict-item]
 }
 
 
