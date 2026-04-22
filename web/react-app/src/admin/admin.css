@@ -1,0 +1,245 @@
+/* Dashboard-specific overrides on top of globals.css. */
+
+body {
+  background: #f4f6f9;
+  color: #1e293b;
+  font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+}
+
+.adm-header {
+  background: var(--oxford-blue);
+  color: white;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.adm-header h1 { font-size: 17px; font-weight: 600; margin: 0; }
+.adm-header a, .adm-header button.link {
+  color: var(--glacier-blue);
+  text-decoration: none;
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.adm-header a:hover, .adm-header button.link:hover { text-decoration: underline; }
+
+.adm-container {
+  max-width: 1280px;
+  margin: 24px auto;
+  padding: 0 20px;
+}
+
+.adm-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.adm-card h2 {
+  font-size: 14px;
+  color: var(--oxford-blue);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef1f5;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.adm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.adm-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--oxford-blue);
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.adm-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.adm-table tbody tr:hover { background: #f8fafc; }
+
+.adm-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.adm-badge-fresh { background: #dcfce7; color: #166534; }
+.adm-badge-stale { background: #fef9c3; color: #854d0e; }
+.adm-badge-critical { background: #fee2e2; color: #991b1b; }
+.adm-badge-missing { background: #f1f5f9; color: #64748b; }
+.adm-badge-running { background: #dbeafe; color: #1e40af; }
+
+.adm-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+.adm-dot-fresh { background: #22c55e; }
+.adm-dot-stale { background: #eab308; }
+.adm-dot-critical { background: #ef4444; }
+.adm-dot-missing { background: #94a3b8; }
+
+.adm-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 600;
+  margin: 2px;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.adm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.adm-btn-primary { background: var(--oxford-blue); color: white; }
+.adm-btn-primary:hover:not(:disabled) { background: #001535; }
+.adm-btn-accent { background: var(--glacier-blue); color: white; }
+.adm-btn-accent:hover:not(:disabled) { background: #3a7bc4; }
+.adm-btn-success { background: #16a34a; color: white; }
+.adm-btn-success:hover:not(:disabled) { background: #128a3e; }
+.adm-btn-danger { background: #dc2626; color: white; }
+.adm-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.adm-btn-outline { background: white; border: 1px solid #cbd5e1; color: #334155; }
+.adm-btn-outline:hover:not(:disabled) { background: #f1f5f9; }
+
+.adm-pending-card {
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--glacier-blue);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fafbfd;
+}
+.adm-pending-card h3 {
+  font-size: 14px;
+  color: var(--oxford-blue);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.adm-pending-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+.adm-pending-stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.adm-pending-stats .stat {
+  display: flex;
+  flex-direction: column;
+}
+.adm-pending-stats .v { font-weight: 700; color: var(--oxford-blue); font-size: 15px; }
+.adm-pending-stats .l { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.adm-reminder {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  background: #fffbeb;
+  border-left: 4px solid var(--sandstone);
+  font-size: 13px;
+  color: #78350f;
+}
+
+.adm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.adm-modal {
+  background: white;
+  border-radius: 8px;
+  max-width: 720px;
+  width: calc(100% - 40px);
+  max-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+.adm-modal-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+  color: var(--oxford-blue);
+  font-size: 15px;
+}
+.adm-modal-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.adm-modal-foot {
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.adm-input {
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.adm-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--oxford-blue);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  z-index: 60;
+  max-width: 380px;
+}
+.adm-toast.error { background: #dc2626; }
+
+.adm-muted { color: #64748b; }
+.adm-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+.adm-login-wrap {
+  max-width: 380px;
+  margin: 80px auto;
+  background: white;
+  padding: 28px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  text-align: center;
+}
+.adm-login-wrap h1 { color: var(--oxford-blue); font-size: 18px; margin-bottom: 8px; }
+.adm-login-wrap p { color: #64748b; font-size: 13px; margin-bottom: 18px; }

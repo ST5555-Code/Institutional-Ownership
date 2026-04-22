@@ -92,6 +92,14 @@ def admin_page(request: Request):
     return templates.TemplateResponse('admin.html', {'request': request})
 
 
+@app.get('/admin/dashboard', include_in_schema=False)
+def admin_dashboard():
+    """Serve the p2-09 React admin dashboard (auth-gated client-side)."""
+    return FileResponse(os.path.join(
+        BASE_DIR, 'web', 'react-app', 'dist', 'admin.html'
+    ))
+
+
 if __name__ == '__main__':
     import uvicorn
 
