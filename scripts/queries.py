@@ -3,6 +3,30 @@ queries.py — SQL query functions for the 13F ownership research app.
 
 All database queries are defined here. Route handlers in app.py
 import and call these functions — no raw SQL in app.py.
+
+is_latest filter policy (p2-04, migration 015):
+  Every read from holdings_v2, fund_holdings_v2, or
+  beneficial_ownership_v2 filters on is_latest=TRUE to see only
+  current-state rows (never superseded by an amendment). Placement:
+
+    - FROM / INNER JOIN / bare table  -> WHERE clause.
+    - LEFT / RIGHT / FULL OUTER JOIN  -> ON clause (preserves
+      NULL-semantics for new-entry / exit detection that tests
+      `<alias>.key IS NULL` in WHERE).
+
+  Until amendments start landing (pipeline Phase 4) the filter is a
+  no-op: migration 015 backfilled every existing row to
+  is_latest=TRUE. Exclusions — where a query legitimately needs the
+  full row set including superseded versions — live OUTSIDE this
+  module:
+
+    1. Pipeline promote/rollback scripts (scripts/pipeline/*,
+       scripts/promote_*.py, scripts/enrich_*.py) — need the full
+       row set for INSERT/UPDATE/DELETE bookkeeping.
+    2. Migration scripts (scripts/migrations/*).
+    3. Admin row-count diagnostics on beneficial_ownership_v2 in
+       scripts/admin_bp.py — intentionally count ALL rows for DQ
+       totals / coverage.
 """
 
 import logging
@@ -362,6 +386,7 @@ def get_nport_position(family_patterns, ticker, quarter, con):
                 WHERE EXISTS (SELECT 1 FROM UNNEST([{placeholders}]) t(p) WHERE family_name ILIKE t.p)
                   AND ticker = ? AND quarter = ?
                   {excl_clause}
+                  AND fh.is_latest = TRUE
                 GROUP BY series_id
             )
             SELECT SUM(market_value_usd), SUM(shares), AVG(pct_of_nav), COUNT(*)
@@ -389,7 +414,7 @@ def get_nport_coverage(ticker, quarter, con):
                 SELECT series_id,
                        MAX(market_value_usd) as market_value_usd
                 FROM fund_holdings_v2
-                WHERE ticker = ? AND quarter = ?
+                WHERE ticker = ? AND quarter = ? AND is_latest = TRUE
                 GROUP BY series_id
             )
             SELECT SUM(market_value_usd) as total_value,
@@ -508,6 +533,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
             WHERE fh.ticker = ?
               AND fh.quarter = ?
               {excl_where}
+              AND fh.is_latest = TRUE
             GROUP BY pp.parent_name, fh.fund_name, fh.series_id
             QUALIFY row_number() OVER (
                 PARTITION BY pp.parent_name
@@ -573,6 +599,7 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
               AND fh.ticker = ?
               AND fh.quarter = ?
               {excl_clause}
+              AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id
             ORDER BY value DESC NULLS LAST
             LIMIT {int(limit)}
@@ -620,6 +647,7 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
               AND ticker = ?
               AND quarter IN ('{FQ}', '{LQ}')
               {excl_clause}
+              AND fh.is_latest = TRUE
             GROUP BY fund_name, series_id
             HAVING MAX(CASE WHEN quarter = '{LQ}' THEN shares_or_principal END) IS NOT NULL
                 OR MAX(CASE WHEN quarter = '{FQ}' THEN shares_or_principal END) IS NOT NULL
@@ -664,6 +692,7 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rol
         WHERE h.quarter = '{quarter}'
           AND (h.ticker = ? OR h.cusip = ?)
           AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) = ?
+          AND h.is_latest = TRUE
         GROUP BY h.fund_name, type
         ORDER BY value_live DESC NULLS LAST
         LIMIT {int(limit)}
@@ -701,6 +730,7 @@ def get_nport_children_ncen(inst_parent_name, ticker, quarter, con, limit=5):
             WHERE nam.adviser_name ILIKE ?
               AND fh.ticker = ?
               AND fh.quarter = ?
+              AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id
             ORDER BY value DESC NULLS LAST
             LIMIT ?
@@ -784,6 +814,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 FROM holdings_v2 h
                 WHERE h.quarter = '{quarter}'
                   AND (h.ticker = ? OR h.cusip = ?)
+                  AND h.is_latest = TRUE
             )
             SELECT
                 parent_name,
@@ -815,7 +846,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             ph_aum = ','.join(['?'] * len(parent_names))
             fallback_df = con.execute(f"""
                 SELECT COALESCE({rn}, inst_parent_name) as parent_name, SUM(market_value_usd) / 1e6 as val_mm
-                FROM holdings_v2 WHERE quarter = '{quarter}' AND COALESCE({rn}, inst_parent_name) IN ({ph_aum})
+                FROM holdings_v2 WHERE quarter = '{quarter}' AND COALESCE({rn}, inst_parent_name) IN ({ph_aum}) AND is_latest = TRUE
                 GROUP BY COALESCE({rn}, inst_parent_name)
             """, parent_names).fetchdf()
             for _, r in fallback_df.iterrows():
@@ -857,6 +888,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             WHERE h.quarter = '{quarter}'
               AND (h.ticker = ? OR h.cusip = ?)
               AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
+              AND h.is_latest = TRUE
             GROUP BY parent_name, h.fund_name, type
             ORDER BY parent_name, value_live DESC NULLS LAST
         """, [ticker, cusip] + parent_names).fetchdf()
@@ -956,7 +988,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 SUM(h.shares) as total_shares,
                 SUM(h.pct_of_so) as pct_so
             FROM holdings_v2 h
-            WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?)
+            WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
             GROUP BY parent_name
         """, [ticker, cusip]).fetchdf()
 
@@ -994,7 +1026,7 @@ def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                    SUM(market_value_live) as parent_val
             FROM holdings_v2
-            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?)
+            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
             GROUP BY parent_name
             ORDER BY parent_val DESC NULLS LAST
             LIMIT 25
@@ -1007,7 +1039,7 @@ def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
                        MAX(manager_type) as manager_type,
                        SUM(shares) as q1_shares
                 FROM holdings_v2
-                WHERE quarter = '{FQ}' AND (ticker = ? OR cusip = ?)
+                WHERE quarter = '{FQ}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
                 GROUP BY cik, manager_name, parent_name
             ),
             q4_agg AS (
@@ -1016,7 +1048,7 @@ def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
                        MAX(manager_type) as manager_type,
                        SUM(shares) as q4_shares
                 FROM holdings_v2
-                WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?)
+                WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
                 GROUP BY cik, manager_name, parent_name
             ),
             combined AS (
@@ -1183,7 +1215,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 SELECT fh.fund_name, SUM(fh.market_value_usd) as val
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {af}
+                WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {af} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
                 ORDER BY val DESC NULLS LAST LIMIT 25
             """, [ticker]).fetchdf()
@@ -1199,6 +1231,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 WHERE ticker = ?
                   AND quarter IN ({q_placeholders})
                   AND fund_name IN ({ph_f})
+                  AND is_latest = TRUE
                 GROUP BY fund_name, quarter
             """, [ticker] + fund_names).fetchdf()
 
@@ -1240,7 +1273,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
                    SUM(market_value_live) as parent_val
             FROM holdings_v2
-            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?)
+            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
             GROUP BY parent_name
             ORDER BY parent_val DESC NULLS LAST
             LIMIT 25
@@ -1260,6 +1293,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             WHERE (ticker = ? OR cusip = ?)
               AND quarter IN ({q_placeholders})
               AND COALESCE({rn}, inst_parent_name, manager_name) IN ({ph})
+              AND is_latest = TRUE
             GROUP BY parent_name, quarter
         """, [ticker, cusip] + top_parents).fetchdf()
 
@@ -1293,6 +1327,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                       AND ticker = ?
                       AND quarter IN ({q_placeholders})
                       {excl_clause}
+                      AND fh.is_latest = TRUE
                     GROUP BY fund_name, quarter, series_id
                 """, like_patterns + [ticker] + excl_params).fetchdf()
                 if fund_df.empty:
@@ -1404,6 +1439,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 WHERE h.quarter = '{quarter}'
                   AND (h.ticker = ? OR h.cusip = ?)
                   AND h.entity_type IN ('active', 'hedge_fund', 'activist', 'quantitative')
+                  AND h.is_latest = TRUE
                 GROUP BY h.cik
                 ORDER BY position_value DESC NULLS LAST
                 LIMIT 15
@@ -1419,6 +1455,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                           AND h2.security_type_inferred IN ('equity', 'etf')
                           AND m2.market_cap IS NOT NULL AND m2.market_cap > 0
                           AND m2.market_cap <= {target_mktcap}
+                          AND h2.is_latest = TRUE
                     ) as holdings_below,
                     (
                         SELECT COUNT(*)
@@ -1427,6 +1464,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                         WHERE h2.cik = ca.cik AND h2.quarter = '{quarter}'
                           AND h2.security_type_inferred IN ('equity', 'etf')
                           AND m2.market_cap IS NOT NULL AND m2.market_cap > 0
+                          AND h2.is_latest = TRUE
                     ) as total_with_mktcap
                 FROM cik_agg ca
             )
@@ -1470,7 +1508,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                                    SUM(fh.market_value_usd) as value, AVG(fh.pct_of_nav) as pct_of_nav
                             FROM fund_holdings_v2 fh
                             JOIN fund_universe fu ON fh.series_id = fu.series_id
-                            WHERE fu.family_name ILIKE ? AND fh.ticker = ? AND fh.quarter = '{quarter}'
+                            WHERE fu.family_name ILIKE ? AND fh.ticker = ? AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
                             GROUP BY fh.fund_name
                             ORDER BY value DESC NULLS LAST
                             LIMIT 8
@@ -1518,6 +1556,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 FROM holdings_v2
                 WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
                   AND ticker = ? AND shares > 0
+                  AND is_latest = TRUE
                 GROUP BY quarter ORDER BY quarter
             """, [parent, ticker]).fetchall()
             quarters_held = [r[0] for r in history if r[1] and r[1] > 0]
@@ -1582,8 +1621,10 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                               SELECT DISTINCT manager_name FROM holdings_v2
                               WHERE COALESCE({rn}, inst_parent_name, manager_name) = ?
                                 AND ticker = ? AND quarter = '{quarter}'
+                                AND is_latest = TRUE
                               LIMIT 1
                           )
+                          AND is_latest = TRUE
                         GROUP BY fund_name
                         HAVING SUM(market_value_live) > 0
                         ORDER BY value DESC LIMIT 5
@@ -1682,7 +1723,7 @@ def query4(ticker, quarter=LQ):
                 SUM(market_value_live) as total_value,
                 SUM(pct_of_so) as total_pct_so
             FROM holdings_v2
-            WHERE quarter = '{quarter}' AND ticker = ?
+            WHERE quarter = '{quarter}' AND ticker = ? AND is_latest = TRUE
             GROUP BY category
             ORDER BY total_value DESC NULLS LAST
         """, [ticker]).fetchdf()
@@ -1709,7 +1750,7 @@ def query5(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     SUM(CASE WHEN quarter='{PQ}' THEN shares END) as q3_shares,
                     SUM(CASE WHEN quarter='{quarter}' THEN shares END) as q4_shares
                 FROM holdings_v2
-                WHERE ticker = ?
+                WHERE ticker = ? AND is_latest = TRUE
                 GROUP BY holder, manager_type
             )
             SELECT *,
@@ -1770,7 +1811,7 @@ def query6(ticker, quarter=LQ):  # pylint: disable=W0613  # dispatch protocol: q
                 SELECT filer_name, filing_type, filing_date,
                     pct_owned, shares_owned, intent, purpose_text
                 FROM beneficial_ownership_v2
-                WHERE subject_ticker = ?
+                WHERE subject_ticker = ? AND is_latest = TRUE
                 ORDER BY filing_date DESC
             """, [ticker]).fetchdf()
             sections['history'] = resolve_filer_names_in_records(df_to_records(df_hist))
@@ -1786,7 +1827,7 @@ def query6(ticker, quarter=LQ):  # pylint: disable=W0613  # dispatch protocol: q
                 pct_of_portfolio,
                 pct_of_so
             FROM holdings_v2
-            WHERE ticker = ? AND is_activist = true
+            WHERE ticker = ? AND is_activist = true AND is_latest = TRUE
             ORDER BY manager_name, quarter
         """, [ticker]).fetchdf()
         sections['activist_13f'] = df_to_records(df_legacy)
@@ -1820,6 +1861,7 @@ def query7(ticker, cik=None, fund_name=None, quarter=LQ):
                 SELECT cik, fund_name FROM holdings_v2
                 WHERE ticker = ? AND quarter = '{quarter}'
                   AND entity_type NOT IN ('passive')
+                  AND is_latest = TRUE
                 ORDER BY market_value_live DESC NULLS LAST
                 LIMIT 1
             """, [ticker]).fetchone()
@@ -1843,7 +1885,7 @@ def query7(ticker, cik=None, fund_name=None, quarter=LQ):
             meta_params.append(fund_name)
         mgr_row = con.execute(f"""
             SELECT fund_name, MAX(manager_type) as manager_type
-            FROM holdings_v2 WHERE {meta_where}
+            FROM holdings_v2 WHERE {meta_where} AND is_latest = TRUE
             GROUP BY fund_name LIMIT 1
         """, meta_params).fetchone()
         display_name = mgr_row[0] if mgr_row else cik
@@ -1867,7 +1909,7 @@ def query7(ticker, cik=None, fund_name=None, quarter=LQ):
                 FROM securities WHERE sector IS NOT NULL AND sector != ''
                 GROUP BY cusip
             ) s ON h.cusip = s.cusip
-            WHERE {where}
+            WHERE {where} AND h.is_latest = TRUE
             GROUP BY h.ticker
             ORDER BY market_value_live DESC NULLS LAST
         """, params).fetchdf()
@@ -1907,7 +1949,7 @@ def query8(ticker, quarter=LQ):
             WITH target_holders AS (
                 SELECT DISTINCT cik
                 FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{quarter}'
+                WHERE ticker = ? AND quarter = '{quarter}' AND is_latest = TRUE
             )
             SELECT
                 h.ticker,
@@ -1920,6 +1962,7 @@ def query8(ticker, quarter=LQ):
             WHERE h.quarter = '{quarter}'
               AND h.ticker != ?
               AND h.ticker IS NOT NULL
+              AND h.is_latest = TRUE
             GROUP BY h.ticker, h.issuer_name
             ORDER BY shared_holders DESC
             LIMIT 20
@@ -1942,6 +1985,7 @@ def query9(ticker, quarter=LQ):
                 FROM holdings_v2
                 WHERE ticker = ? AND quarter = '{quarter}'
                 AND entity_type IN ('active', 'hedge_fund')
+                AND is_latest = TRUE
             )
             SELECT
                 s.sector,
@@ -1951,7 +1995,7 @@ def query9(ticker, quarter=LQ):
             FROM holdings_v2 h
             INNER JOIN target_ciks tc ON h.cik = tc.cik
             INNER JOIN securities s ON h.cusip = s.cusip
-            WHERE h.quarter = '{quarter}' AND s.sector IS NOT NULL AND s.sector != ''
+            WHERE h.quarter = '{quarter}' AND s.sector IS NOT NULL AND s.sector != '' AND h.is_latest = TRUE
             GROUP BY s.sector
             ORDER BY sector_value DESC NULLS LAST
         """, [ticker]).fetchdf()
@@ -1971,8 +2015,8 @@ def query10(ticker, quarter=LQ):
                 q4.shares, q4.market_value_live,
                 q4.pct_of_portfolio, q4.pct_of_so
             FROM holdings_v2 q4
-            LEFT JOIN holdings_v2 q3 ON q4.cik = q3.cik AND q3.ticker = ? AND q3.quarter = '{PQ}'
-            WHERE q4.ticker = ? AND q4.quarter = '{quarter}' AND q3.cik IS NULL
+            LEFT JOIN holdings_v2 q3 ON q4.cik = q3.cik AND q3.ticker = ? AND q3.quarter = '{PQ}' AND q3.is_latest = TRUE
+            WHERE q4.ticker = ? AND q4.quarter = '{quarter}' AND q3.cik IS NULL AND q4.is_latest = TRUE
             ORDER BY q4.market_value_live DESC NULLS LAST
             LIMIT 25
         """, [ticker, ticker]).fetchdf()
@@ -1984,8 +2028,8 @@ def query10(ticker, quarter=LQ):
                 q3.market_value_usd as q3_value,
                 q3.pct_of_portfolio as q3_pct
             FROM holdings_v2 q3
-            LEFT JOIN holdings_v2 q4 ON q3.cik = q4.cik AND q4.ticker = ? AND q4.quarter = '{quarter}'
-            WHERE q3.ticker = ? AND q3.quarter = '{PQ}' AND q4.cik IS NULL
+            LEFT JOIN holdings_v2 q4 ON q3.cik = q4.cik AND q4.ticker = ? AND q4.quarter = '{quarter}' AND q4.is_latest = TRUE
+            WHERE q3.ticker = ? AND q3.quarter = '{PQ}' AND q4.cik IS NULL AND q3.is_latest = TRUE
             ORDER BY q3.market_value_usd DESC
             LIMIT 25
         """, [ticker, ticker]).fetchdf()
@@ -2017,7 +2061,7 @@ def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
                     SUM(shares) as total_shares,
                     ROW_NUMBER() OVER (ORDER BY SUM(pct_of_so) DESC) as rn
                 FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{quarter}' AND pct_of_so IS NOT NULL
+                WHERE ticker = ? AND quarter = '{quarter}' AND pct_of_so IS NOT NULL AND is_latest = TRUE
                 GROUP BY holder
             )
             SELECT
@@ -2072,7 +2116,7 @@ def get_sector_flows(active_only=False, level="parent"):
                                SUM(shares_or_principal) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM fund_holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY series_id, ticker, quarter
                     ),
                     flows AS (
@@ -2111,7 +2155,7 @@ def get_sector_flows(active_only=False, level="parent"):
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY cik, manager_type, ticker, quarter
                     ),
                     flows AS (
@@ -2205,7 +2249,7 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
                        SUM(shares) AS shares,
                        SUM(market_value_usd) AS market_value_usd
                 FROM holdings_v2
-                WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                 GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
             ),
             flows AS (
@@ -2309,7 +2353,7 @@ def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="t
                                SUM(shares_or_principal) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM fund_holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY series_id, fund_name, family_name, ticker, quarter
                     ),
                     flows AS (
@@ -2350,7 +2394,7 @@ def get_sector_flow_detail(sector, active_only=False, level="parent", rank_by="t
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
@@ -2454,7 +2498,7 @@ def query14(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 SUM(h.shares) as shares
             FROM holdings_v2 h
             LEFT JOIN managers m ON h.cik = m.cik
-            WHERE h.ticker = ? AND h.quarter = '{quarter}'
+            WHERE h.ticker = ? AND h.quarter = '{quarter}' AND h.is_latest = TRUE
             GROUP BY COALESCE(h.{rn}, h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
             HAVING SUM(h.market_value_live) > 0
             ORDER BY SUM(h.market_value_live) DESC NULLS LAST
@@ -2497,7 +2541,7 @@ def query15(ticker=None, quarter=LQ):  # pylint: disable=W0613  # dispatch proto
                 COUNT(CASE WHEN manager_type IS NOT NULL THEN 1 END) as with_manager_type,
                 COUNT(CASE WHEN market_value_live IS NOT NULL THEN 1 END) as with_live_value,
                 COUNT(CASE WHEN pct_of_so IS NOT NULL THEN 1 END) as with_so_pct
-            FROM holdings_v2 WHERE quarter = '{quarter}'
+            FROM holdings_v2 WHERE quarter = '{quarter}' AND is_latest = TRUE
         """).fetchone()
         total = coverage[0] or 1
         stats['coverage'] = {
@@ -2535,7 +2579,7 @@ def query16(ticker, quarter=LQ):
                 MAX(fu.total_net_assets) / 1e6 as aum_mm
             FROM fund_holdings_v2 fh
             LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-            WHERE fh.ticker = ? AND fh.quarter = '{quarter}'
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.family_name, fh.series_id
             ORDER BY value DESC NULLS LAST
             LIMIT 25
@@ -2577,7 +2621,7 @@ def query16(ticker, quarter=LQ):
                 SUM(fh.shares_or_principal) as total_shares,
                 AVG(fh.pct_of_nav) as pct_of_nav
             FROM fund_holdings_v2 fh
-            WHERE fh.ticker = ? AND fh.quarter = '{quarter}'
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id
         """, [ticker]).fetchdf()
 
@@ -2653,7 +2697,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
                                 THEN fh.market_value_usd ELSE 0 END) as passive_value
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.market_value_usd > 0 {af}
+                WHERE fh.ticker = ? AND fh.market_value_usd > 0 {af} AND fh.is_latest = TRUE
                 GROUP BY fh.quarter ORDER BY fh.quarter
             """, [ticker]).fetchdf()
         else:
@@ -2664,7 +2708,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
                        COUNT(DISTINCT COALESCE({rn}, inst_parent_name, manager_name)) as holder_count,
                        SUM(CASE WHEN entity_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
                        SUM(CASE WHEN entity_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
-                FROM holdings_v2 WHERE ticker = ? GROUP BY quarter ORDER BY quarter
+                FROM holdings_v2 WHERE ticker = ? AND is_latest = TRUE GROUP BY quarter ORDER BY quarter
             """, [ticker]).fetchdf()
 
         rows = df_to_records(df)
@@ -2894,14 +2938,14 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
                 FROM fund_holdings_v2 fh {join_clause}
-                WHERE fh.ticker = ? AND fh.quarter = '{fq}' {active_filter}
+                WHERE fh.ticker = ? AND fh.quarter = '{fq}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
             """, [ticker]).fetchdf()
             q4_df = con.execute(f"""
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
                 FROM fund_holdings_v2 fh {join_clause}
-                WHERE fh.ticker = ? AND fh.quarter = '{lq}' {active_filter}
+                WHERE fh.ticker = ? AND fh.quarter = '{lq}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
             """, [ticker]).fetchdf()
         else:
@@ -2909,12 +2953,12 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
             q1_df = con.execute(f"""
                 SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                        SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings_v2 WHERE ticker = ? AND quarter = '{fq}' GROUP BY investor
+                FROM holdings_v2 WHERE ticker = ? AND quarter = '{fq}' AND is_latest = TRUE GROUP BY investor
             """, [ticker]).fetchdf()
             q4_df = con.execute(f"""
                 SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
                        SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings_v2 WHERE ticker = ? AND quarter = '{lq}' GROUP BY investor
+                FROM holdings_v2 WHERE ticker = ? AND quarter = '{lq}' AND is_latest = TRUE GROUP BY investor
             """, [ticker]).fetchdf()
 
         q1_map = {r['investor']: r for r in df_to_records(q1_df)}
@@ -2938,6 +2982,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_from}'
                       AND entity_type NOT IN ('passive', 'unknown')
+                      AND is_latest = TRUE
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 to_df = con.execute(f"""
@@ -2946,6 +2991,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                     FROM holdings_v2
                     WHERE ticker = ? AND quarter = '{q_to}'
                       AND entity_type NOT IN ('passive', 'unknown')
+                      AND is_latest = TRUE
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 from_map = {r['investor']: float(r['shares'] or 0) for _, r in from_df.iterrows()}
@@ -2998,12 +3044,12 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         from_df = con.execute(f"""
             SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
             FROM fund_holdings_v2 fh {join_clause}
-            WHERE fh.ticker = ? AND fh.quarter = '{quarter_from}' {af} GROUP BY fh.fund_name
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter_from}' {af} AND fh.is_latest = TRUE GROUP BY fh.fund_name
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
             SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
             FROM fund_holdings_v2 fh {join_clause}
-            WHERE fh.ticker = ? AND fh.quarter = '{quarter_to}' {af} GROUP BY fh.fund_name
+            WHERE fh.ticker = ? AND fh.quarter = '{quarter_to}' {af} AND fh.is_latest = TRUE GROUP BY fh.fund_name
         """, [ticker]).fetchdf()
     else:
         from_df = con.execute(f"""
@@ -3011,14 +3057,14 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
                    SUM(pct_of_so) as pct_of_so
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_from}' GROUP BY entity
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_from}' AND is_latest = TRUE GROUP BY entity
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
                    MAX(manager_type) as manager_type,
                    SUM(shares) as shares, SUM(market_value_usd) as value,
                    SUM(pct_of_so) as pct_of_so
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_to}' GROUP BY entity
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_to}' AND is_latest = TRUE GROUP BY entity
         """, [ticker]).fetchdf()
 
     from_map = {r['entity']: r for _, r in from_df.iterrows()}
@@ -3149,12 +3195,12 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
         # Implied prices
         ip = con.execute("""
             SELECT SUM(market_value_usd) / NULLIF(SUM(shares), 0)
-            FROM holdings_v2 WHERE ticker = ? AND quarter = ? AND shares > 0
+            FROM holdings_v2 WHERE ticker = ? AND quarter = ? AND shares > 0 AND is_latest = TRUE
         """, [ticker, quarter_from]).fetchone()
         implied_from = ip[0] if ip and ip[0] else None
         ip2 = con.execute(f"""
             SELECT SUM(market_value_usd) / NULLIF(SUM(shares), 0)
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}' AND shares > 0
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}' AND shares > 0 AND is_latest = TRUE
         """, [ticker]).fetchone()
         implied_to = ip2[0] if ip2 and ip2[0] else None
 
@@ -3270,7 +3316,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                     FROM (
                         SELECT COALESCE({rn}, inst_parent_name, manager_name) as inv, manager_type, quarter,
                                SUM(shares) as shares, SUM(market_value_usd) as market_value_usd
-                        FROM holdings_v2 WHERE ticker = ? AND quarter IN ('{qf}', '{qt}')
+                        FROM holdings_v2 WHERE ticker = ? AND quarter IN ('{qf}', '{qt}') AND is_latest = TRUE
                         GROUP BY inv, manager_type, quarter
                     ) h
                     GROUP BY mtype
@@ -3420,7 +3466,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                        MAX(fu.is_actively_managed) as is_active
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {active_filter}
+                WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
                 ORDER BY val DESC NULLS LAST LIMIT 25
             """, [ticker]).fetchdf()
@@ -3430,7 +3476,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                        SUM(market_value_live) as val,
                        MAX(manager_type) as mtype
                 FROM holdings_v2
-                WHERE (ticker = ? OR cusip = ?) AND quarter = '{quarter}'
+                WHERE (ticker = ? OR cusip = ?) AND quarter = '{quarter}' AND is_latest = TRUE
                 GROUP BY holder ORDER BY val DESC NULLS LAST LIMIT 25
             """, [ticker, cusip]).fetchdf()
 
@@ -3489,6 +3535,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 LEFT JOIN market_data m ON fh.ticker = m.ticker
                 WHERE fh.quarter = '{quarter}' AND fh.fund_name IN ({ph})
                   AND fh.market_value_usd > 0
+                  AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name, fh.ticker, m.sector, m.industry
             """, top_holders).fetchdf()
         else:
@@ -3505,6 +3552,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 WHERE h.quarter = '{quarter}'
                   AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
                   AND h.market_value_live > 0
+                  AND h.is_latest = TRUE
                 GROUP BY holder, h.ticker, m.sector, m.industry
             """, top_holders).fetchdf()
 
@@ -3654,6 +3702,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                     LEFT JOIN market_data m ON fh.ticker = m.ticker
                     WHERE fh.quarter = '{quarter}' AND fh.fund_name IN ({ph_funds})
                       AND fh.market_value_usd > 0
+                      AND fh.is_latest = TRUE
                     GROUP BY fh.fund_name, fh.ticker, m.sector, m.industry
                 """, list(all_child_funds)).fetchdf()
 
@@ -3662,7 +3711,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                     SELECT DISTINCT fh.fund_name, COALESCE(MAX(CAST(fu.is_actively_managed AS INTEGER)), 0) as is_active
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                    WHERE fh.fund_name IN ({ph_funds}) AND fh.quarter = '{quarter}'
+                    WHERE fh.fund_name IN ({ph_funds}) AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
                     GROUP BY fh.fund_name
                 """, list(all_child_funds)).fetchdf()
                 fund_is_active = {r['fund_name']: bool(r['is_active']) for _, r in fund_meta_df.iterrows()}
@@ -3767,7 +3816,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                            SUM(ABS(shares_or_principal)) as short_shares,
                            SUM(ABS(market_value_usd)) as short_value
                     FROM fund_holdings_v2
-                    WHERE ticker = ? AND shares_or_principal < 0
+                    WHERE ticker = ? AND shares_or_principal < 0 AND is_latest = TRUE
                     GROUP BY quarter, fund_name
                 )
                 GROUP BY quarter ORDER BY quarter
@@ -3804,6 +3853,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.ticker = ? AND fh.shares_or_principal < 0
                       AND fh.quarter = '{quarter}'
+                      AND fh.is_latest = TRUE
                 )
                 GROUP BY fund_name
                 ORDER BY short_shares DESC
@@ -3838,7 +3888,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                        MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                WHERE fh.ticker = ? AND fh.shares_or_principal < 0
+                WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name, fh.quarter
                 ORDER BY fh.fund_name, fh.quarter
             """, [ticker]).fetchdf()
@@ -3876,7 +3926,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                 SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent,
                        SUM(shares) as long_shares, SUM(market_value_live) as long_value,
                        MAX(manager_type) as manager_type
-                FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}'
+                FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}' AND is_latest = TRUE
                 GROUP BY parent
             """, [ticker]).fetchdf()
             long_map = {r['parent']: r for _, r in long_df.iterrows()}
@@ -3891,7 +3941,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                            SUM(ABS(shares_or_principal)) as short_shares,
                            SUM(ABS(market_value_usd)) as short_value
                     FROM fund_holdings_v2
-                    WHERE ticker = ? AND shares_or_principal < 0 AND quarter = '{quarter}'
+                    WHERE ticker = ? AND shares_or_principal < 0 AND quarter = '{quarter}' AND is_latest = TRUE
                     GROUP BY family_name, fund_name
                 )
                 GROUP BY family_name
@@ -3954,7 +4004,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                            MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
-                    WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{quarter}'
+                    WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
                     GROUP BY fh.fund_name, fh.family_name, fh.series_id
                 )
                 GROUP BY fund_name
@@ -4025,7 +4075,7 @@ def get_short_long_comparison(ticker, rollup_type='economic_control_v1', quarter
                    SUM(market_value_usd) as long_value,
                    manager_type
             FROM holdings_v2
-            WHERE ticker = ? AND quarter = '{quarter}' AND shares > 0
+            WHERE ticker = ? AND quarter = '{quarter}' AND shares > 0 AND is_latest = TRUE
             GROUP BY manager, manager_type
         """, [ticker]).fetchdf()
 
@@ -4040,6 +4090,7 @@ def get_short_long_comparison(ticker, rollup_type='economic_control_v1', quarter
             LEFT JOIN ncen_adviser_map nam ON fh.series_id = nam.series_id
             WHERE fh.ticker = ? AND fh.shares_or_principal < 0
               AND fh.asset_category IN ('EC', 'EP')
+              AND fh.is_latest = TRUE
             ORDER BY ABS(fh.shares_or_principal) DESC
         """, [ticker]).fetchdf()
 
@@ -4123,14 +4174,14 @@ def _get_summary_impl(ticker, quarter=LQ):
 
         # Company name — use most common issuer_name from filings (avoids CUSIP cross-contamination)
         name_row = con.execute(
-            f"SELECT MODE(issuer_name) FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}'",
+            f"SELECT MODE(issuer_name) FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter}' AND is_latest = TRUE",
             [ticker]
         ).fetchone()
         company_name = name_row[0] if name_row else ticker
 
         # Latest quarter
         q_row = con.execute("""
-            SELECT MAX(quarter) FROM holdings_v2 WHERE ticker = ?
+            SELECT MAX(quarter) FROM holdings_v2 WHERE ticker = ? AND is_latest = TRUE
         """, [ticker]).fetchone()
         latest_quarter = q_row[0] if q_row else 'N/A'
 
@@ -4142,7 +4193,7 @@ def _get_summary_impl(ticker, quarter=LQ):
                 COUNT(DISTINCT cik) as num_holders,
                 SUM(shares) as total_shares
             FROM holdings_v2
-            WHERE ticker = ? AND quarter = '{quarter}'
+            WHERE ticker = ? AND quarter = '{quarter}' AND is_latest = TRUE
         """, [ticker]).fetchone()
 
         # Active vs passive split
@@ -4152,7 +4203,7 @@ def _get_summary_impl(ticker, quarter=LQ):
                 SUM(CASE WHEN entity_type IN ('active','hedge_fund','quantitative','activist')
                     THEN market_value_live ELSE 0 END) as active_value
             FROM holdings_v2
-            WHERE ticker = ? AND quarter = '{quarter}'
+            WHERE ticker = ? AND quarter = '{quarter}' AND is_latest = TRUE
         """, [ticker]).fetchone()
 
         # Full type breakdown for stacked bar
@@ -4160,7 +4211,7 @@ def _get_summary_impl(ticker, quarter=LQ):
             SELECT COALESCE(manager_type, 'unknown') as mtype,
                    SUM(market_value_live) as val
             FROM holdings_v2
-            WHERE ticker = ? AND quarter = '{quarter}' AND market_value_live IS NOT NULL
+            WHERE ticker = ? AND quarter = '{quarter}' AND market_value_live IS NOT NULL AND is_latest = TRUE
             GROUP BY mtype
             ORDER BY val DESC
         """, [ticker]).fetchdf()
@@ -4185,7 +4236,7 @@ def _get_summary_impl(ticker, quarter=LQ):
         nport_date = None
         try:
             nd = con.execute("""
-                SELECT MAX(report_date) FROM fund_holdings_v2 WHERE ticker = ?
+                SELECT MAX(report_date) FROM fund_holdings_v2 WHERE ticker = ? AND is_latest = TRUE
             """, [ticker]).fetchone()
             if nd and nd[0]:
                 nport_date = str(nd[0])[:10]  # YYYY-MM-DD
@@ -4235,7 +4286,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     names_df = con.execute(f"""
         SELECT ticker, MODE(issuer_name) as name
         FROM holdings_v2
-        WHERE ticker IN ({placeholders}) AND quarter = '{quarter}'
+        WHERE ticker IN ({placeholders}) AND quarter = '{quarter}' AND is_latest = TRUE
         GROUP BY ticker
     """, tickers).fetchdf()
     companies = {r['ticker']: r['name'] for _, r in names_df.iterrows()}
@@ -4265,6 +4316,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
             WHERE h.ticker IN ({all_tickers_ph})
               AND h.quarter = '{quarter}'
               {type_filter}
+              AND h.is_latest = TRUE
             GROUP BY investor, h.ticker
         ),
         portfolio_totals AS (
@@ -4272,7 +4324,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
                 COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as investor,
                 SUM(h.market_value_live) as total_portfolio
             FROM holdings_v2 h
-            WHERE h.quarter = '{quarter}'
+            WHERE h.quarter = '{quarter}' AND h.is_latest = TRUE
             GROUP BY investor
         )
         SELECT
@@ -4342,7 +4394,7 @@ def get_market_summary(limit=25, quarter=LQ, rollup_type='economic_control_v1'):
                     COUNT(DISTINCT cik) as num_ciks,
                     MAX(manager_type) as manager_type
                 FROM holdings_v2
-                WHERE quarter = '{quarter}'
+                WHERE quarter = '{quarter}' AND is_latest = TRUE
                 GROUP BY institution
                 ORDER BY total_aum DESC NULLS LAST
                 LIMIT ?
@@ -4482,7 +4534,7 @@ def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='ec
                                SUM(shares_or_principal) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM fund_holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY series_id, fund_name, ticker, quarter
                     ),
                     flows AS (
@@ -4516,7 +4568,7 @@ def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='ec
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
@@ -4764,7 +4816,7 @@ def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent", ro
                                SUM(shares_or_principal) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM fund_holdings_v2
-                        WHERE ticker IN ({ph}) AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IN ({ph}) AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY series_id, fund_name, ticker, quarter
                     ),
                     flows AS (
@@ -4796,7 +4848,7 @@ def get_peer_rotation_detail(ticker, peer, active_only=False, level="parent", ro
                                SUM(shares) AS shares,
                                SUM(market_value_usd) AS market_value_usd
                         FROM holdings_v2
-                        WHERE ticker IN ({ph}) AND quarter IN ('{q_from}', '{q_to}')
+                        WHERE ticker IN ({ph}) AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
                         GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
                     ),
                     flows AS (
@@ -4944,7 +4996,7 @@ def compute_aum_by_cik(cik, quarter, con):
     row = con.execute("""
         SELECT SUM(market_value_usd)
         FROM holdings_v2
-        WHERE cik = ? AND quarter = ?
+        WHERE cik = ? AND quarter = ? AND is_latest = TRUE
     """, [cik, quarter]).fetchone()
     return float(row[0]) if row and row[0] is not None else None
 
@@ -4978,6 +5030,7 @@ def compute_aum_for_subtree(entity_id, quarter, con):
         FROM holdings_v2 h
         WHERE h.cik IN (SELECT cik FROM subtree_ciks)
           AND h.quarter = ?
+          AND h.is_latest = TRUE
     """, [int(entity_id), quarter]).fetchone()
     return float(row[0]) if row and row[0] is not None else None
 
@@ -5023,7 +5076,7 @@ def get_entity_filer_children(entity_id, quarter, con):
                s.display_name,
                s.cik,
                (SELECT SUM(market_value_usd) FROM holdings_v2
-                 WHERE cik = s.cik AND quarter = ?) AS aum
+                 WHERE cik = s.cik AND quarter = ? AND is_latest = TRUE) AS aum
         FROM shallowest s
         ORDER BY aum DESC NULLS LAST, s.display_name
     """, [int(entity_id), quarter]).fetchall()
@@ -5405,6 +5458,7 @@ def get_two_company_overlap(subject, second, quarter, con):
             WHERE h.ticker = ?
               AND h.quarter = ?
               AND h.market_value_live > 0
+              AND h.is_latest = TRUE
             GROUP BY holder
         ),
         sec_holders AS (
@@ -5416,6 +5470,7 @@ def get_two_company_overlap(subject, second, quarter, con):
             WHERE h.ticker = ?
               AND h.quarter = ?
               AND h.market_value_live > 0
+              AND h.is_latest = TRUE
             GROUP BY holder
         )
         SELECT
@@ -5465,6 +5520,7 @@ def get_two_company_overlap(subject, second, quarter, con):
             WHERE fh.ticker = ?
               AND fh.quarter = ?
               AND fh.market_value_usd > 0
+              AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id, fh.family_name
         ),
         sec_funds AS (
@@ -5477,6 +5533,7 @@ def get_two_company_overlap(subject, second, quarter, con):
             WHERE fh.ticker = ?
               AND fh.quarter = ?
               AND fh.market_value_usd > 0
+              AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id
         )
         SELECT
@@ -5525,7 +5582,7 @@ def get_two_company_overlap(subject, second, quarter, con):
     name_rows = con.execute("""
         SELECT ticker, MODE(issuer_name) as name
         FROM holdings_v2
-        WHERE ticker IN (?, ?) AND quarter = ?
+        WHERE ticker IN (?, ?) AND quarter = ? AND is_latest = TRUE
         GROUP BY ticker
     """, [subject, second, quarter]).fetchall()
     name_map = {row[0]: row[1] for row in name_rows}
@@ -5576,6 +5633,7 @@ def get_two_company_subject(subject, quarter, con):
         WHERE h.ticker = ?
           AND h.quarter = ?
           AND h.market_value_live > 0
+          AND h.is_latest = TRUE
         GROUP BY holder
         ORDER BY subj_dollars DESC
         LIMIT 50
@@ -5613,6 +5671,7 @@ def get_two_company_subject(subject, quarter, con):
             WHERE fh.ticker = ?
               AND fh.quarter = ?
               AND fh.market_value_usd > 0
+              AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id, fh.family_name
         )
         SELECT
@@ -5653,7 +5712,7 @@ def get_two_company_subject(subject, quarter, con):
     name_row = con.execute("""
         SELECT MODE(issuer_name) as name
         FROM holdings_v2
-        WHERE ticker = ? AND quarter = ?
+        WHERE ticker = ? AND quarter = ? AND is_latest = TRUE
     """, [subject, quarter]).fetchone()
     subject_name = name_row[0] if name_row else None
 

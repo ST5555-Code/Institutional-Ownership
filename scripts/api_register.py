@@ -67,7 +67,7 @@ def api_tickers(request: Request):
             f"""
             SELECT ticker, MODE(issuer_name) as name
             FROM holdings_v2
-            WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}'
+            WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY ticker
             ORDER BY ticker
             """
@@ -252,7 +252,7 @@ def api_amendments(ticker: str = ''):
                            SELECT accession_number FROM filings WHERE amended = true
                        ) THEN true ELSE false END as is_amended
                 FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{LQ}'
+                WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
             ),
             amended_managers AS (
                 SELECT DISTINCT cik FROM filings
@@ -292,7 +292,7 @@ def api_manager_profile(manager: str = ''):
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
                    pct_of_portfolio, pct_of_so
             FROM holdings_v2
-            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
+            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
             ORDER BY market_value_usd DESC LIMIT 50
             """, [f'%{manager}%']
         ).fetchdf()
@@ -306,6 +306,7 @@ def api_manager_profile(manager: str = ''):
             LEFT JOIN market_data m ON h.ticker = m.ticker
             WHERE h.quarter = '{LQ}' AND COALESCE(h.rollup_name, h.inst_parent_name) ILIKE ?
               AND m.sector IS NOT NULL AND m.sector != ''
+              AND h.is_latest = TRUE
             GROUP BY m.sector
             ORDER BY value DESC LIMIT 10
             """, [f'%{manager}%']
@@ -319,14 +320,14 @@ def api_manager_profile(manager: str = ''):
                    COUNT(DISTINCT cik) as num_ciks,
                    MAX(manager_type) as manager_type
             FROM holdings_v2
-            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ?
+            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
             """, [f'%{manager}%']
         ).fetchone()
 
         qoq = con.execute("""
             SELECT quarter, COUNT(DISTINCT ticker) as positions,
                    SUM(market_value_usd) as total_value
-            FROM holdings_v2 WHERE COALESCE(rollup_name, inst_parent_name) ILIKE ?
+            FROM holdings_v2 WHERE COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
             GROUP BY quarter ORDER BY quarter
         """, [f'%{manager}%']).fetchdf()
 

@@ -152,7 +152,7 @@ def api_crowding(ticker: str = ''):
             SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_so) as pct_so,
                    SUM(market_value_live) as value
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY holder, manager_type
             ORDER BY pct_so DESC NULLS LAST LIMIT 20
             """, [ticker]
@@ -183,7 +183,7 @@ def api_smart_money(ticker: str = ''):
             f"""
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}'
+            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
             """, [ticker]
         ).fetchdf()
@@ -205,6 +205,7 @@ def api_smart_money(ticker: str = ''):
                 FROM fund_holdings_v2
                 WHERE ticker = ? AND shares_or_principal < 0
                   AND asset_category IN ('EC', 'EP')
+                  AND is_latest = TRUE
                 ORDER BY market_value_usd ASC LIMIT 10
             """, [ticker]).fetchdf()
             result['nport_shorts'] = df_to_records(nport_shorts)
@@ -228,7 +229,7 @@ def api_heatmap(request: Request):
                 f""  # nosec B608
                 f"""
                 SELECT ticker, SUM(market_value_usd) as val
-                FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL
+                FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL AND is_latest = TRUE
                 GROUP BY ticker ORDER BY val DESC LIMIT 10
                 """
             ).fetchall()
@@ -242,6 +243,7 @@ def api_heatmap(request: Request):
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
               AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
+              AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_val DESC LIMIT 15
             """, tickers
@@ -263,6 +265,7 @@ def api_heatmap(request: Request):
             WHERE quarter = '{LQ}'
               AND ticker IN ({ticker_ph})
               AND COALESCE(rollup_name, inst_parent_name) IN ({mgr_ph})
+              AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name), ticker
             """, tickers + manager_names
         ).fetchdf()
