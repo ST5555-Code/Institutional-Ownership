@@ -251,7 +251,8 @@ def main():
 
             if sector:
                 con.execute(
-                    "UPDATE market_data SET sector = ?, industry = ? "
+                    "UPDATE market_data SET sector = ?, industry = ?, "
+                    "fetch_date = CURRENT_DATE, metadata_date = CURRENT_DATE "
                     "WHERE ticker = ? AND sector IS NULL",
                     [sector, industry, tk]
                 )
