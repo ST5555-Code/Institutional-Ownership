@@ -511,7 +511,7 @@ def api_admin_stats():
                 log.debug("stats error: %s", e)
                 stats[key] = 0
         try:
-            stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings_v2 WHERE ticker IS NOT NULL").fetchone()[0]
+            stats['tickers'] = con.execute("SELECT COUNT(DISTINCT ticker) FROM holdings_v2 WHERE ticker IS NOT NULL AND is_latest = TRUE").fetchone()[0]
         except Exception as e:  # pylint: disable=broad-except
             log.debug("tickers error: %s", e)
             stats['tickers'] = 0
@@ -645,7 +645,8 @@ def api_admin_manager_changes():
             f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}'
-              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}')
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND is_latest = TRUE)
+              AND is_latest = TRUE
             ORDER BY manager_name LIMIT 50
             """
         ).fetchdf()
@@ -654,7 +655,8 @@ def api_admin_manager_changes():
             f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
-              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}')
+              AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND is_latest = TRUE)
+              AND is_latest = TRUE
             ORDER BY manager_name LIMIT 50
             """
         ).fetchdf()
@@ -678,7 +680,8 @@ def api_admin_ticker_changes():
             f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
-              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL)
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL AND is_latest = TRUE)
+              AND is_latest = TRUE
             GROUP BY ticker ORDER BY ticker LIMIT 100
             """
         ).fetchdf()
@@ -687,7 +690,8 @@ def api_admin_ticker_changes():
             f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
-              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL)
+              AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL AND is_latest = TRUE)
+              AND is_latest = TRUE
             GROUP BY ticker ORDER BY ticker LIMIT 100
             """
         ).fetchdf()
@@ -710,7 +714,7 @@ def api_admin_parent_health():
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
             FROM holdings_v2
-            WHERE quarter = '{LQ}' AND inst_parent_name IS NULL
+            WHERE quarter = '{LQ}' AND inst_parent_name IS NULL AND is_latest = TRUE
             GROUP BY cik, manager_name, manager_type
             ORDER BY total_value DESC NULLS LAST
             LIMIT 20
@@ -721,7 +725,7 @@ def api_admin_parent_health():
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
-            FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
+            FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_value DESC NULLS LAST LIMIT 20
             """
@@ -782,7 +786,8 @@ def api_admin_merger_signals():
             WITH gone AS (
                 SELECT cik, manager_name, SUM(market_value_usd) as prev_value
                 FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
-                  AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}')
+                  AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND is_latest = TRUE)
+                  AND is_latest = TRUE
                 GROUP BY cik, manager_name
                 HAVING SUM(market_value_usd) > 1000000
             )
@@ -813,8 +818,9 @@ def api_admin_new_companies():
             WHERE h.quarter = '{LATEST_QUARTER}' AND h.ticker IS NOT NULL
               AND h.ticker NOT IN (
                   SELECT DISTINCT ticker FROM holdings_v2
-                  WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
+                  WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL AND is_latest = TRUE
               )
+              AND h.is_latest = TRUE
             GROUP BY h.ticker
             HAVING SUM(h.market_value_live) > 10000000
             ORDER BY total_value DESC LIMIT 30
@@ -842,7 +848,7 @@ def api_admin_data_quality():
                     COUNT(ticker) as with_ticker,
                     COUNT(market_value_live) as with_live_value,
                     COUNT(pct_of_so) as with_so_pct
-                FROM holdings_v2 WHERE quarter = '{LQ}'
+                FROM holdings_v2 WHERE quarter = '{LQ}' AND is_latest = TRUE
                 """
             ).fetchone()
             result['holdings'] = {

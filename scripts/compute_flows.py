@@ -166,6 +166,7 @@ def _insert_period_flows(  # pylint: disable=too-many-positional-arguments,too-m
             FROM holdings_v2
             WHERE quarter = '{q_from}'
               AND ticker IS NOT NULL AND ticker != ''
+              AND is_latest = TRUE
             GROUP BY ticker, {rid_col}, {rname_col}
         ),
         q_to AS (
@@ -178,6 +179,7 @@ def _insert_period_flows(  # pylint: disable=too-many-positional-arguments,too-m
             FROM holdings_v2
             WHERE quarter = '{q_to}'
               AND ticker IS NOT NULL AND ticker != ''
+              AND is_latest = TRUE
             GROUP BY ticker, {rid_col}, {rname_col}
         ),
         combined AS (
@@ -259,14 +261,14 @@ def _project_period_flows(
             SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
                    SUM(shares) AS shares, SUM(market_value_usd) AS value
             FROM holdings_v2
-            WHERE quarter = '{q_from}' AND ticker IS NOT NULL AND ticker != ''
+            WHERE quarter = '{q_from}' AND ticker IS NOT NULL AND ticker != '' AND is_latest = TRUE
             GROUP BY ticker, {rid_col}, {rname_col}
         ),
         q_to AS (
             SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
                    SUM(shares) AS shares, SUM(market_value_usd) AS value
             FROM holdings_v2
-            WHERE quarter = '{q_to}' AND ticker IS NOT NULL AND ticker != ''
+            WHERE quarter = '{q_to}' AND ticker IS NOT NULL AND ticker != '' AND is_latest = TRUE
             GROUP BY ticker, {rid_col}, {rname_col}
         )
         SELECT COUNT(*)

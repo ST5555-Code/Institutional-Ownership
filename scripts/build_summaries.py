@@ -154,6 +154,7 @@ def _project_summary_by_ticker(con, quarter: str) -> int:
         FROM holdings_v2
         WHERE quarter = ?
           AND ticker IS NOT NULL AND ticker != ''
+          AND is_latest = TRUE
     """, [quarter]).fetchone()[0]
 
 
@@ -188,6 +189,7 @@ def _build_summary_by_ticker(con, quarter: str) -> int:
         FROM holdings_v2 h
         WHERE h.quarter = ?
           AND h.ticker IS NOT NULL AND h.ticker != ''
+          AND h.is_latest = TRUE
         GROUP BY h.ticker
     """, [quarter, quarter])
     return con.execute(
@@ -205,7 +207,7 @@ def _project_summary_by_parent(con, quarter: str, rid_col: str) -> int:
     return con.execute(f"""
         SELECT COUNT(DISTINCT {rid_col})
         FROM holdings_v2
-        WHERE quarter = ?
+        WHERE quarter = ? AND is_latest = TRUE
     """, [quarter]).fetchone()[0]
 
 
@@ -234,7 +236,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
         WITH latest_per_series AS (
             SELECT series_id, MAX(report_month) AS latest_rm
             FROM fund_holdings_v2
-            WHERE quarter = ?
+            WHERE quarter = ? AND is_latest = TRUE
             GROUP BY series_id
         ),
         nport_per_rollup AS (
@@ -244,7 +246,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             JOIN latest_per_series l
               ON l.series_id = fh.series_id
              AND l.latest_rm = fh.report_month
-            WHERE fh.quarter = ?
+            WHERE fh.quarter = ? AND fh.is_latest = TRUE
             GROUP BY fh.{nport_rid_col}
         ),
         parent_13f AS (
@@ -257,7 +259,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
                 MAX(h.manager_type)     AS manager_type,
                 BOOL_OR(h.is_passive)   AS is_passive
             FROM holdings_v2 h
-            WHERE h.quarter = ?
+            WHERE h.quarter = ? AND h.is_latest = TRUE
             GROUP BY h.{rid_col}
         )
         SELECT

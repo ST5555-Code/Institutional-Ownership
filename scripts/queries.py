@@ -3,6 +3,30 @@ queries.py — SQL query functions for the 13F ownership research app.
 
 All database queries are defined here. Route handlers in app.py
 import and call these functions — no raw SQL in app.py.
+
+is_latest filter policy (p2-04, migration 015):
+  Every read from holdings_v2, fund_holdings_v2, or
+  beneficial_ownership_v2 filters on is_latest=TRUE to see only
+  current-state rows (never superseded by an amendment). Placement:
+
+    - FROM / INNER JOIN / bare table  -> WHERE clause.
+    - LEFT / RIGHT / FULL OUTER JOIN  -> ON clause (preserves
+      NULL-semantics for new-entry / exit detection that tests
+      `<alias>.key IS NULL` in WHERE).
+
+  Until amendments start landing (pipeline Phase 4) the filter is a
+  no-op: migration 015 backfilled every existing row to
+  is_latest=TRUE. Exclusions — where a query legitimately needs the
+  full row set including superseded versions — live OUTSIDE this
+  module:
+
+    1. Pipeline promote/rollback scripts (scripts/pipeline/*,
+       scripts/promote_*.py, scripts/enrich_*.py) — need the full
+       row set for INSERT/UPDATE/DELETE bookkeeping.
+    2. Migration scripts (scripts/migrations/*).
+    3. Admin row-count diagnostics on beneficial_ownership_v2 in
+       scripts/admin_bp.py — intentionally count ALL rows for DQ
+       totals / coverage.
 """
 
 import logging
