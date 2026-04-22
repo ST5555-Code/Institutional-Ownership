@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -676,3 +675,211 @@ class TestCliMain:
         out = capsys.readouterr().out
         data = json.loads(out)
         assert data["summary"]["verdict"] == "PARITY"
+
+
+# ---------------------------------------------------------------------------
+# Layer inventory + --layer CLI flag (mig-09 + mig-10)
+# ---------------------------------------------------------------------------
+
+
+class TestLayerInventories:
+    def test_l4_tables_non_empty(self):
+        assert len(vsp.L4_TABLES) > 0
+        assert vsp.get_l4_tables() == list(vsp.L4_TABLES)
+
+    def test_l0_tables_non_empty(self):
+        assert len(vsp.L0_TABLES) > 0
+        assert vsp.get_l0_tables() == list(vsp.L0_TABLES)
+
+    def test_layer_lists_disjoint(self):
+        l3 = set(vsp.L3_TABLES)
+        l4 = set(vsp.L4_TABLES)
+        l0 = set(vsp.L0_TABLES)
+        assert l3.isdisjoint(l4), f"L3∩L4 must be empty, got {l3 & l4}"
+        assert l3.isdisjoint(l0), f"L3∩L0 must be empty, got {l3 & l0}"
+        assert l4.isdisjoint(l0), f"L4∩L0 must be empty, got {l4 & l0}"
+
+    def test_l4_excludes_entity_current_view(self):
+        # entity_current is a VIEW; introspect_ddl uses duckdb_tables() which
+        # excludes views, so it must not be in the parity inventory until VIEW
+        # introspection lands as a separate item.
+        assert "entity_current" not in vsp.L4_TABLES
+
+    def test_l0_excludes_admin_sessions(self):
+        # admin_sessions lives in data/admin.duckdb (sec-01-p1-hotfix), not in
+        # the prod/staging DBs the parity check connects to.
+        assert "admin_sessions" not in vsp.L0_TABLES
+
+    def test_tables_for_layer_l3(self):
+        assert vsp.tables_for_layer("l3") == list(vsp.L3_TABLES)
+
+    def test_tables_for_layer_l4(self):
+        assert vsp.tables_for_layer("l4") == list(vsp.L4_TABLES)
+
+    def test_tables_for_layer_l0(self):
+        assert vsp.tables_for_layer("l0") == list(vsp.L0_TABLES)
+
+    def test_tables_for_layer_all_combines(self):
+        all_tables = vsp.tables_for_layer("all")
+        assert len(all_tables) == (
+            len(vsp.L0_TABLES) + len(vsp.L3_TABLES) + len(vsp.L4_TABLES)
+        )
+        assert set(all_tables) == (
+            set(vsp.L0_TABLES) | set(vsp.L3_TABLES) | set(vsp.L4_TABLES)
+        )
+
+    def test_tables_for_layer_unknown_raises(self):
+        with pytest.raises(ValueError, match="unknown layer"):
+            vsp.tables_for_layer("l99")
+
+
+class TestLayerCli:
+    def test_default_layer_is_l3(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--tables", "entities",
+            "--json",
+        ])
+        assert rc == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["summary"]["layer"] == "l3"
+
+    def test_layer_l4_accepted(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        # No L4 tables exist in the matched_dbs fixture, so all rows trigger
+        # the missing-on-both-sides skip — clean PARITY result.
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--layer", "l4",
+            "--json",
+        ])
+        assert rc == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["summary"]["layer"] == "l4"
+        assert data["summary"]["table_count"] == len(vsp.L4_TABLES)
+
+    def test_layer_l0_accepted(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--layer", "l0",
+            "--json",
+        ])
+        assert rc == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["summary"]["layer"] == "l0"
+        assert data["summary"]["table_count"] == len(vsp.L0_TABLES)
+
+    def test_layer_all_accepted(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--layer", "all",
+            "--json",
+        ])
+        assert rc == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["summary"]["layer"] == "all"
+        assert data["summary"]["table_count"] == (
+            len(vsp.L0_TABLES) + len(vsp.L3_TABLES) + len(vsp.L4_TABLES)
+        )
+
+    def test_invalid_layer_rejected(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        # argparse exits with SystemExit(2) on invalid --layer choice
+        with pytest.raises(SystemExit) as exc:
+            vsp.main([
+                "--prod", prod, "--staging", staging,
+                "--accept-list", str(accept),
+                "--layer", "l99",
+            ])
+        assert exc.value.code == 2
+
+    def test_unknown_table_under_l4_layer_rejected(self, matched_dbs, tmp_path, capsys):
+        # An L3 table is unknown when --layer=l4 is selected.
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--layer", "l4",
+            "--tables", "entities",  # entities is L3, not L4
+        ])
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "unknown tables for layer=l4" in err
+
+    def test_human_header_reflects_layer(self, matched_dbs, tmp_path, capsys):
+        prod, staging = matched_dbs
+        accept = tmp_path / "accept.yaml"
+        accept.write_text("accepted: []\n")
+        rc = vsp.main([
+            "--prod", prod, "--staging", staging,
+            "--accept-list", str(accept),
+            "--layer", "l4",
+        ])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "L4" in out
+
+
+# ---------------------------------------------------------------------------
+# Missing-table pre-check (mig-09-p0-findings §7.5)
+# ---------------------------------------------------------------------------
+
+
+class TestMissingTableGuard:
+    def test_missing_on_both_sides_emits_no_divergence(self, matched_dbs, tmp_path):
+        # entities exists in both DBs; ask about a table that exists in neither.
+        prod, staging = matched_dbs
+        prod_con = duckdb.connect(prod, read_only=True)
+        stg_con = duckdb.connect(staging, read_only=True)
+        try:
+            divs = vsp.compare_table(prod_con, stg_con, "no_such_table", vsp.DIMENSIONS)
+        finally:
+            prod_con.close()
+            stg_con.close()
+        assert divs == []
+
+    def test_missing_on_one_side_emits_single_clean_divergence(self, tmp_path):
+        # Prod has the table; staging does not. Without the guard, compare_columns
+        # would emit one divergence per prod column.
+        prod = tmp_path / "prod.duckdb"
+        staging = tmp_path / "staging.duckdb"
+        _build_duckdb(str(prod), [
+            "CREATE TABLE summary_by_parent (a INT, b INT, c INT, d INT, e INT);"
+        ])
+        _build_duckdb(str(staging), [
+            "CREATE TABLE other_table (x INT);"
+        ])
+        prod_con = duckdb.connect(str(prod), read_only=True)
+        stg_con = duckdb.connect(str(staging), read_only=True)
+        try:
+            divs = vsp.compare_table(
+                prod_con, stg_con, "summary_by_parent", vsp.DIMENSIONS
+            )
+        finally:
+            prod_con.close()
+            stg_con.close()
+        assert len(divs) == 1
+        d = divs[0]
+        assert d.dimension == "ddl"
+        assert d.detail == "TABLE MISSING"
+        assert d.prod_value == "present"
+        assert d.staging_value == "missing"
