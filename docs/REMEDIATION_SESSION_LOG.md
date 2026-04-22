@@ -1138,3 +1138,168 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) Theme 2 observability **13/13 CLOSED** — full theme complete; no remaining items. Combined with Theme 4 security (8/8 CLOSED), two full themes are now closed. (2) Remaining open work: Theme 1 data integrity (~13 items), Theme 3 migration (~8 items: mig-14 + Batches 3-C/3-D + mig-05/12 deferrals), Theme 5 operational (~4 items: ops-13/14/16/18). (3) **Pending data ops carried forward:** `scripts/oneoff/backfill_13dg_impacts.py --confirm` (obs-04) + int-10 staging sweep `--confirm` — both gated behind Serge approval; status unchanged from conv-06. (4) INF42 derived-artifact hygiene CI gate remains a standing gap (tracked under mig-08). (5) No new follow-ups surfaced from PRs #64-#66 review.
 - **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
+
+---
+
+## 2026-04-22 — mig-14-p0 REWRITE_BUILD_MANAGERS already-satisfied (Phase 0)
+
+- **Session name:** mig-14-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 verification of REWRITE_BUILD_MANAGERS remaining scope (INF1 staging routing + `--dry-run` + `data_freshness`). Read `scripts/build_managers.py`, `scripts/promote_staging.py`, `scripts/db.py` end-to-end at HEAD `4484137`; cross-referenced every original deliverable against live code. Confirmed every claim satisfied: `--staging` + `db.seed_staging()` wired ([build_managers.py:728,784](scripts/build_managers.py:728)); `--dry-run` flag + per-builder projection messages ([:735](scripts/build_managers.py:735) + 4 callsites); 5 `data_freshness` stamps (parent_bridge, cik_crd_links, cik_crd_direct, managers, holdings_v2); `db.CANONICAL_TABLES` covers all 4 outputs ([db.py:130-133](scripts/db.py:130)); `promote_staging.PK_COLUMNS` includes parent_bridge + cik_crd_direct ([promote_staging.py:67-68](scripts/promote_staging.py:67)); new `rebuild` promote kind for managers + cik_crd_links ([promote_staging.py:122-126](scripts/promote_staging.py:122)); full-replace dispatch at [:310-323](scripts/promote_staging.py:310); rebuild-safe restore at [:157-191](scripts/promote_staging.py:157). Closing commits `67e81f3`, `2a71f8a`, `4e64473` verified in `git log`. Independently confirms sec-05-p0 §2/§5 conclusion. Recommendation: close mig-14 as already-satisfied, flip CHECKLIST [x] + PLAN status OPEN→CLOSED at next convergence.
+- **Files touched:** `docs/findings/mig-14-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #68 merged as `0b97247`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Two doc-hygiene items for convergence (CHECKLIST flip + PLAN status update) — handled in conv-08 below.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — int-06-p0 forward-looking hooks already-shipped (Phase 0)
+
+- **Session name:** int-06-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 verification of BLOCK-TICKER-BACKFILL Phase 1b — forward-looking Pass C hooks on `scripts/build_cusip.py` (end) and `scripts/normalize_securities.py` (end). Read both scripts end-to-end at HEAD; confirmed both end-of-run subprocess hooks to `enrich_holdings.py` Pass C were shipped in a prior session (pre-program window). No residual code change required.
+- **Files touched:** `docs/findings/int-06-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #69 merged as `50de780`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Unblocks int-07 gate (Phase 2 benchmark_weights coverage check) — scheduled next.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — ops-16-p1 NEXT_SESSION_CONTEXT refresh
+
+- **Session name:** ops-16-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Close DOC_UPDATE_PROPOSAL item 6 — admin_bp.py:108 revisit flag. Refreshed `docs/NEXT_SESSION_CONTEXT.md` to current program state (PR #5-#67 coverage, Themes 2 + 4 complete, pending data ops enumerated, F1 flag embedded). Placement decision: session-context doc owns the F1 flag (not ROADMAP.md) per convention.
+- **Files touched:** `docs/NEXT_SESSION_CONTEXT.md`
+- **Result:** DONE
+- **Commits:** PR #70 merged as `c7f5605`
+- **Merge status:** merged
+- **Follow-ups surfaced:** ops-16 closed. Theme 5 Batch 5-D resolved.
+- **Parallel-safety validation:** YES — single doc; no code touch; no parallel worker holds this file.
+
+---
+
+## 2026-04-22 — int-07-p0 benchmark_weights gate PASS (Phase 0)
+
+- **Session name:** int-07-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 verification of BLOCK-TICKER-BACKFILL Phase 2 — benchmark_weights three-part gate. Evaluated (1) coverage gate, (2) no-regression gate, (3) tier-stability gate against prod `benchmark_weights` + upstream `securities`/`holdings` state. **All 3 gates PASS.** No Phase 2b escalation required; int-08 can be formally SKIPPED as conditional-and-not-triggered.
+- **Files touched:** `docs/findings/int-07-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #71 merged as `f5a0cd3`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-07 closed (single-phase close). int-08 SKIPPED (condition not met). Batch 1-C advances.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — mig-09-p0 INF45 L4 schema-parity extension (Phase 0)
+
+- **Session name:** mig-09-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping of INF45 L4 schema-parity extension. Enumerated 14 L4 derived tables (post-build aggregates/summaries). Identified `entity_current` VIEW as a deferral (duckdb_tables() excludes views; tracked as micro-follow-up per §4 Option A). Proposed Phase 1 design: `L4_TABLES` constant + `--layer {l3,l4,l0,all}` CLI flag + missing-table pre-check emitting single `ddl` divergence instead of N noisy column rows. Accept-list stays empty per INF39 Option B remediate-all policy.
+- **Files touched:** `docs/findings/mig-09-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #72 merged as `f79d437`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared to ship combined with mig-10 (same constants block edit zone).
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — int-09-p0 INF25 Step 4 defer-to-Phase-2 (Phase 0)
+
+- **Session name:** int-09-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 quantification of BLOCK-DENORM-RETIREMENT Step 4 retirement scope. Steps 1–3 confirmed done: Step 1 (backfill) `3299a9f`; Step 2 (forward hooks) `0dc0d5d`; Step 3 (write-path repoint) `d7ba1c2`/`87ee955`/`7e68cf9`/`223b4d9`. Step 4 (retire denormalized columns on `holdings_v2` + `fund_holdings_v2`) scoped: ~500 `scripts/queries.py` read sites + `rollup_entity_id` dual-graph resolution — too large for a remediation window. Forward hooks (int-06) already bound drift; no urgent correctness gap. Recommendation: **formally defer Step 4 to Phase 2** with explicit exit criteria (mig-12 load_13f_v2 + mig-07 INF41 read-site inventory + join pattern proven + dual-graph decision + drift gate ≥2 quarters + rename-sweep discipline).
+- **Files touched:** `docs/findings/int-09-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #73 merged as `f2dfe2f`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 doc-only bundle cleared to ship with ops-13 + ops-14 (shared doc edit zone).
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — mig-09-10-p1 L4 + L0 schema-parity validator extension
+
+- **Session name:** mig-09-10-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Combined Phase 1 for mig-09 (INF45 L4) and mig-10 (INF46 L0). Shipped `L4_TABLES` (14 derived) + `L0_TABLES` (6 control-plane) alongside existing `L3_TABLES`; added `--layer {l3,l4,l0,all}` CLI flag (default `l3` preserves Phase 2 pre-flight behavior). Threaded active layer + table count through JSON summary (`summary.layer`, `summary.table_count`) and human report header. Added missing-table pre-check in `compare_table`: emits one clean `ddl` divergence (`detail="TABLE MISSING"`) instead of N noisy column divergences when table absent on one side. Deferrals: `entity_current` VIEW (introspect_ddl uses `duckdb_tables()` which excludes views — micro-follow-up per mig-09-p0 §4); `admin_sessions` excluded from L0 (lives in `data/admin.duckdb` per sec-01-p1-hotfix). Baseline accept-list unchanged (INF39 Option B).
+- **Files touched:** `scripts/pipeline/validate_schema_parity.py` (+~150 LoC), `tests/pipeline/test_validate_schema_parity.py` (+~200 LoC)
+- **Result:** DONE
+- **Commits:** PR #74 merged as `8d8bd39`
+- **Merge status:** merged
+- **Follow-ups surfaced:** mig-11 (INF47 CI wiring) unblocked (at least one schema scope extended — both shipped). `entity_current` VIEW micro-follow-up tracked separately. First real `--layer l4 --json` + `--layer l0 --json` runs against local prod/staging DBs deferred to merge-time per findings §8 Q4.
+- **Parallel-safety validation:** YES — validator + tests only; 116 tests pass (26→72 validator suite); ruff clean.
+
+---
+
+## 2026-04-22 — int-09-p1-ops-13-14 DENORM-RETIREMENT Phase 2 deferral formalized
+
+- **Session name:** int-09-p1-ops-13-14
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Combined Phase 1 for int-09 + ops-13 + ops-14 (all three items share `docs/data_layers.md §7` + `ENTITY_ARCHITECTURE.md` + `ROADMAP.md` edit zone — bundled per plan-policy). **int-09 Phase 1** formalizes Phase 0 decision: defer Step 4 of Class B denormalized-column retirement sequence to Phase 2. **ops-13** refreshes `docs/data_layers.md §7` headline (Steps 1–3 marked DONE with commits; "Observed drift" rewritten to bounded-by-forward-hooks framing; post-backfill ticker row counts added; Step 4 DEFERRED TO PHASE 2 with full exit criteria embedded). **ops-14** updates `ROADMAP.md` INF25 row status "Sequenced" → "Deferred to Phase 2 (int-09 2026-04-22)"; notes cite commits for Steps 1–3 + link to `docs/findings/int-09-p0-findings.md §4`. `ENTITY_ARCHITECTURE.md` Known Limitation #6 + Design Decision Log Apr 18 entry each receive a 2026-04-22 addendum with deferral rationale + Phase 2 trigger. Doc-only; no code / schema / writer changes; 116 tests pass (sanity).
+- **Files touched:** `docs/data_layers.md`, `ENTITY_ARCHITECTURE.md`, `ROADMAP.md`
+- **Result:** DONE
+- **Commits:** PR #75 merged as `25a0263`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-09, ops-13, ops-14 all CLOSED simultaneously. Theme 1 Batch 1-D advances; Theme 5 Batch 5-C closes fully. Step 4 exit criteria carried forward to Phase 2 kickoff (prog-02).
+- **Parallel-safety validation:** YES — three docs, single author, serialized per shared-file policy; no parallel worker holds these docs.
+
+---
+
+## 2026-04-22 — merge-wave-11
+
+- **Session name:** merge-wave-11
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** First coordination wave of conv-08 window covering Phase 0 batch: PRs #68 (mig-14-p0), #69 (int-06-p0), #70 (ops-16-p1), #71 (int-07-p0). All four landed sequentially with zero conflicts; all findings-doc or single-doc writes — file-disjoint by construction.
+- **Files touched:** n/a (merge coordination only)
+- **Result:** DONE
+- **Commits:** merged `0b97247` (#68), `50de780` (#69), `c7f5605` (#70), `f5a0cd3` (#71)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** 3 items closed outright (mig-14 already-satisfied, int-06 NO-OP, ops-16, int-07); int-08 unblocked for SKIP decision.
+- **Parallel-safety validation:** YES — Phase 0 findings-only + single-doc ops-16 refresh; no parallel worker contention.
+
+---
+
+## 2026-04-22 — merge-wave-12
+
+- **Session name:** merge-wave-12
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Second coordination wave of conv-08 window covering the Phase 1 batch + remaining Phase 0: PRs #72 (mig-09-p0 findings), #73 (int-09-p0 findings), #74 (mig-09-10-p1 validator extension), #75 (int-09-p1 + ops-13 + ops-14 doc bundle). All four landed sequentially with zero conflicts; schema-parity validator and doc bundle occupy disjoint file zones so serialization was conservative but not strictly required.
+- **Files touched:** n/a (merge coordination only)
+- **Result:** DONE
+- **Commits:** merged `f79d437` (#72), `f2dfe2f` (#73), `8d8bd39` (#74), `25a0263` (#75)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** 5 items closed (mig-09, mig-10, int-09, ops-13, ops-14); conv-08 convergence session triggered.
+- **Parallel-safety validation:** YES — clean wave; no conflicts; no post-merge regressions.
+
+---
+
+## 2026-04-22 — conv-08 convergence doc update
+
+- **Session name:** conv-08
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Batch doc update reflecting 8 PRs merged since conv-07 (PRs #68-#75). Flip CHECKLIST rows for int-06, int-07, int-08 (SKIPPED), int-09, mig-09, mig-10, mig-14, ops-13, ops-14, ops-16 with PR citations. Append SESSION_LOG entries for mig-14-p0, int-06-p0, ops-16-p1, int-07-p0, mig-09-p0, int-09-p0, mig-09-10-p1, int-09-p1-ops-13-14, merge-wave-11, merge-wave-12, conv-08. Update REMEDIATION_PLAN.md item-table statuses (int-06 READY→CLOSED PR #69; int-07 READY→CLOSED PR #71; int-08 CONDITIONAL→SKIPPED; int-09 OPEN→CLOSED PRs #73/#75; mig-09 OPEN→CLOSED PRs #72/#74; mig-10 OPEN→CLOSED PR #74; mig-14 OPEN→CLOSED PR #68; ops-13 OPEN→CLOSED PR #75; ops-14 OPEN→CLOSED PR #75; ops-16 OPEN→CLOSED PR #70) and append conv-08 changelog entry. Program total: 75 PRs merged (#5-#75), 53 items closed, ~17 remaining.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) **Theme 5 operational advances to 17/18 CLOSED — only ops-18 BLOCKED remaining** (rotating_audit_schedule.md file not found). (2) **Theme 3 migration advances to 9/14 CLOSED** (mig-01, mig-02, mig-03, mig-04, mig-09, mig-10, mig-13, mig-14 + sec-09 via mig-02); remaining: mig-06, mig-07, mig-08, mig-11 (Batches 3-C/3-D) + mig-05/mig-12 Phase 2/3 deferrals. (3) **Theme 1 data integrity advances to 11/23 CLOSED** (add int-06 NO-OP, int-07, int-08 SKIPPED, int-09 Phase-2-deferred to earlier list of int-01/02/04/05/10); remaining: int-03, int-11..int-17, int-20..int-23 + standing int-18 + Phase 2 int-19. (4) Combined with Theme 2 (13/13) + Theme 4 (8/8) → **Themes 2 + 4 complete; Theme 5 effectively complete modulo ops-18 BLOCKED**. (5) **Pending data ops carried forward:** `scripts/oneoff/backfill_13dg_impacts.py --confirm` (obs-04) + int-10 staging sweep `--confirm` — both gated behind Serge approval; status unchanged from conv-07. (6) INF42 derived-artifact hygiene CI gate remains a standing gap (mig-08). (7) Int-09 Phase 2 exit criteria (mig-12 + mig-07 + join pattern + dual-graph + drift gate + rename-sweep) now anchored in `data_layers.md §7` for Phase 2 kickoff reference.
+- **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.

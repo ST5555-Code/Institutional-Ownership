@@ -13,18 +13,18 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 
 ### Batch 1-B (parallel-eligible within batch: NO)
 - [x] int-02 BLOCK-SEC-AUD-2 RC2: MAX(issuer_name_sample) mode aggregator — CODE-COMPLETE in `fc2bbbc` (2026-04-18). Phase 0 (PR #50) confirmed aggregator shipped; 8,178-row re-seed gap accepted under **Option A (no re-seed now)**. Closed 2026-04-21.
-- [ ] int-06 BLOCK-TICKER-BACKFILL Phase 1b forward-looking hooks (build_cusip.py end, normalize_securities.py end)
+- [x] int-06 BLOCK-TICKER-BACKFILL Phase 1b forward-looking hooks (build_cusip.py end, normalize_securities.py end) — PR #69 (closed as NO-OP; forward-looking hooks already shipped in prior session, Phase 0 verification confirms)
 
 ### Batch 1-C (parallel-eligible within batch: NO)
 - [ ] int-03 BLOCK-SEC-AUD-3 RC3 ticker_overrides.csv manual triage
-- [ ] int-07 BLOCK-TICKER-BACKFILL Phase 2 benchmark_weights gate
+- [x] int-07 BLOCK-TICKER-BACKFILL Phase 2 benchmark_weights gate — PR #71 (all 3 gates PASS: coverage + no-regression + tier-stability; Phase 0 findings close item)
 - [ ] int-14 INF30 BLOCK-MERGE-UPSERT-MODE NULL-only merge (merge_staging.py, promote_staging.py)
 - [ ] int-15 INF31 market_data writer fetch_date discipline (fetch_market.py, refetch_missing_sectors.py)
 - [ ] int-21 MAJOR-7 D-04 15.87% unresolved series_id tail (pipeline/shared.py)
 
 ### Batch 1-D (parallel-eligible within batch: NO)
-- [ ] int-08 BLOCK-TICKER-BACKFILL Phase 2b 227-ticker sector refetch (CONDITIONAL)
-- [ ] int-09 INF25 BLOCK-DENORM-RETIREMENT sequencing (DDL + docs)
+- [x] int-08 BLOCK-TICKER-BACKFILL Phase 2b 227-ticker sector refetch (CONDITIONAL) — SKIPPED (no PR; conditional on int-07 gate failure; int-07 PASSED all 3 gates)
+- [x] int-09 INF25 BLOCK-DENORM-RETIREMENT sequencing (DDL + docs) — PRs #73, #75 (Steps 1–3 done; Step 4 formally deferred to Phase 2 with exit criteria; `data_layers.md §7` + `ENTITY_ARCHITECTURE.md` + `ROADMAP.md` INF25 all updated)
 - [ ] int-12 INF28 securities.cusip formal PK + VALIDATOR_MAP
 - [ ] int-17 INF36 top10_* NULL placeholders (summary_by_parent DDL)
 - [ ] int-20 MAJOR-6 D-03 orphan-CUSIP secondary driver (build_summaries.py read-path)
@@ -82,12 +82,12 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ### Batch 3-B (parallel-eligible within batch: NO — some share migration files)
 - [x] mig-03 MAJOR-15 migration 004 staging/rename pattern retrofit (migrations/004) — PRs #60, #62 (retrofit atomic BEGIN/COMMIT + build-new-and-swap shadow pattern + pre-transaction recovery probe)
 - [x] mig-13 pipeline-violations REWRITE tail — residual scope: build_entities, merge_staging (fetch_adv closed via mig-02 PR #37; build_fund_classes + build_benchmark_weights closed via sec-05 PR #45) — PRs #61, #63 (build_entities per-step CHECKPOINTs; merge_staging TABLE_KEYS sourced from registry, collect-and-fail error handling)
-- [ ] mig-14 REWRITE_BUILD_MANAGERS INF1 routing + --dry-run + data_freshness (build_managers.py, db.py, promote_staging.py)
+- [x] mig-14 REWRITE_BUILD_MANAGERS INF1 routing + --dry-run + data_freshness (build_managers.py, db.py, promote_staging.py) — PR #68 (closed as already-satisfied; `--staging` + `--dry-run` + freshness stamps + `CANONICAL_TABLES` + `PK_COLUMNS` + new `rebuild` promote kind all live at HEAD per commits `67e81f3`/`2a71f8a`/`4e64473`)
 
 ### Batch 3-C (parallel-eligible within batch: YES — mig-06 ∥ mig-09 ∥ mig-10 disjoint)
 - [ ] mig-06 INF40 L3 surrogate row-ID for rollback
-- [ ] mig-09 INF45 schema-parity L4 extension (validate_schema_parity.py, accept.yaml)
-- [ ] mig-10 INF46 schema-parity L0 extension (validate_schema_parity.py, accept.yaml)
+- [x] mig-09 INF45 schema-parity L4 extension (validate_schema_parity.py, accept.yaml) — PRs #72, #74 (L4_TABLES inventory + `--layer {l3,l4,l0,all}` CLI flag + missing-table pre-check; 116 tests pass, validator suite 26→72 tests)
+- [x] mig-10 INF46 schema-parity L0 extension (validate_schema_parity.py, accept.yaml) — PR #74 (L0_TABLES inventory shipped in combined mig-09+10 PR; `admin_sessions` excluded per sec-01-p1-hotfix)
 
 ### Batch 3-D (parallel-eligible within batch: NO — share CI/wiring files)
 - [ ] mig-07 INF41 read-site inventory discipline (new scripted audit tool)
@@ -145,11 +145,11 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] ops-15 DOC_UPDATE_PROPOSAL item 7 — MAINTENANCE.md §Refetch Pattern (MAINTENANCE.md) — PR #32
 
 ### Batch 5-C (parallel-eligible within batch: NO — shared data_layers.md + ROADMAP.md)
-- [ ] ops-13 DOC_UPDATE_PROPOSAL item 1 — denorm drift doc (data_layers.md §7, ENTITY_ARCHITECTURE.md)
-- [ ] ops-14 DOC_UPDATE_PROPOSAL items 2-5 INF26-29 ROADMAP rows + notes
+- [x] ops-13 DOC_UPDATE_PROPOSAL item 1 — denorm drift doc (data_layers.md §7, ENTITY_ARCHITECTURE.md) — PR #75 (data_layers.md §7 headline refresh; Steps 1–3 marked DONE with commits; Step 4 DEFERRED TO PHASE 2 with full exit criteria; bundled with int-09 + ops-14)
+- [x] ops-14 DOC_UPDATE_PROPOSAL items 2-5 INF26-29 ROADMAP rows + notes — PR #75 (ROADMAP INF25 row updated with deferral decision + cross-ref to `docs/findings/int-09-p0-findings.md`)
 
 ### Batch 5-D
-- [ ] ops-16 DOC_UPDATE_PROPOSAL item 6 — admin_bp.py:108 revisit flag (placement decision first)
+- [x] ops-16 DOC_UPDATE_PROPOSAL item 6 — admin_bp.py:108 revisit flag (placement decision first) — PR #70 (refreshed `docs/NEXT_SESSION_CONTEXT.md` to current program state; F1 flag placed in session-context doc)
 
 ### Phase 2 / BLOCKED
 - [x] ops-17 PRECHECK tertiary — retire or repair scripts/update.py — PR #55 (closed as already-satisfied by obs-10; zero Makefile references remain; no standalone retire needed)
