@@ -4,9 +4,8 @@ p2-07. Consumed by scripts/admin_bp.py to dispatch refresh / approve /
 reject / rollback calls to the correct pipeline implementation.
 
 Only pipelines that have migrated to the ``SourcePipeline`` framework
-are registered here. The remaining five (NPORT, 13D/G, N-CEN, ADV,
-market_data) register as they migrate in the wave-2 sessions — see
-docs/admin_refresh_system_design.md §12.
+are registered here. The remaining one (N-CEN) registers as it migrates
+in the wave-2 sessions — see docs/admin_refresh_system_design.md §12.
 """
 from __future__ import annotations
 
@@ -51,11 +50,20 @@ def _load_nport_cls() -> Type[SourcePipeline]:
     return module.LoadNPortPipeline
 
 
+def _load_adv_cls() -> Type[SourcePipeline]:
+    """Lazy-import LoadADVPipeline. w2-05 migration."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.load_adv")
+    return module.LoadADVPipeline
+
+
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
-    "13f_holdings":   _load_13f_cls,    # type: ignore[dict-item]
-    "13dg_ownership": _load_13dg_cls,   # type: ignore[dict-item]
-    "market_data":    _load_market_cls,  # type: ignore[dict-item]
-    "nport_holdings": _load_nport_cls,   # type: ignore[dict-item]
+    "13f_holdings":    _load_13f_cls,     # type: ignore[dict-item]
+    "13dg_ownership":  _load_13dg_cls,    # type: ignore[dict-item]
+    "market_data":     _load_market_cls,  # type: ignore[dict-item]
+    "nport_holdings":  _load_nport_cls,   # type: ignore[dict-item]
+    "adv_registrants": _load_adv_cls,     # type: ignore[dict-item]
 }
 
 

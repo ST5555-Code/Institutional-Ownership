@@ -15,7 +15,7 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 STAGES = [
-    ("fetch_adv.py", "Download SEC ADV data"),
+    ("pipeline/load_adv.py --staging", "Download SEC ADV data (w2-05)"),
     ("fetch_13f.py", "Download 13F quarterly ZIPs"),
     ("load_13f.py", "Load TSVs into DuckDB"),
     ("build_managers.py", "Build manager/parent tables"),
