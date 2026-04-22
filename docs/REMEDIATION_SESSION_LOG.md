@@ -898,3 +898,93 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) item-table Status column in REMEDIATION_PLAN.md for sec-01/02/03/04, obs-01/02/03, mig-01/mig-04, ops-01..ops-12, ops-06/09/15 was still showing OPEN despite being closed in conv-01/conv-02 — backfilled during this session. (2) `scripts/update.py` retirement (ops-17) now has zero Makefile references; standalone retire remains Phase 2 scope. (3) mig-13 residual scope narrowed to build_entities + merge_staging only.
 - **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — ops-17-p1 update.py retired-script verify/close
+
+- **Session name:** ops-17-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** verify `scripts/update.py` has zero live references (Makefile pruned by obs-10 PR #52) and close ops-17 as already-satisfied. No standalone retire needed; no code change required.
+- **Files touched:** N/A (verification + doc close only)
+- **Result:** DONE — **closed as already-satisfied.** Self-update doc close via PR #55.
+- **Commits:** `a06729e` (PR #55 squash-merge)
+- **Merge status:** merged (PR #55)
+- **Follow-ups surfaced:** none — ops-17 closed.
+- **Parallel-safety validation:** YES — verification-only, no file conflicts.
+
+---
+
+## 2026-04-21 — obs-09-p1 log-rotation script + Makefile target
+
+- **Session name:** obs-09-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** ship log-rotation script + Makefile target to address 182-file `logs/` backlog (MINOR-18 / O-10).
+- **Files touched:** `scripts/rotate_logs.py` (new), `Makefile`
+- **Result:** DONE
+- **Commits:** `784007a` (PR #56 squash-merge)
+- **Merge status:** merged (PR #56)
+- **Follow-ups surfaced:** none — obs-09 closed.
+- **Parallel-safety validation:** YES — new script + Makefile single-owner in this window.
+
+---
+
+## 2026-04-21 — obs-12-p1 GitHub Actions Node 22+ compatibility
+
+- **Session name:** obs-12-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** verify/upgrade GitHub Actions to Node 22+ (shipped as Node 24) to clear BLOCK-CI-ACTIONS-NODE20-DEPRECATION (INF33).
+- **Files touched:** `.github/workflows/*.yml`
+- **Result:** DONE
+- **Commits:** `44408ba` (PR #57 squash-merge)
+- **Merge status:** merged (PR #57)
+- **Follow-ups surfaced:** none — obs-12 closed.
+- **Parallel-safety validation:** YES — workflow files single-owner in this window.
+
+---
+
+## 2026-04-21 — obs-08-p1 backup-gap investigation + docs + Makefile
+
+- **Session name:** obs-08-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** close MINOR-16 / O-05 backup-gap investigation; document backup state (no infra gap), fix MAINTENANCE.md wording (manual vs `quarterly-update`) + retention note, wire `backup-db` Makefile target. Findings captured in `docs/findings/obs-08-p1-findings.md`.
+- **Files touched:** `MAINTENANCE.md`, `Makefile`, `docs/findings/obs-08-p1-findings.md`
+- **Result:** DONE
+- **Commits:** `c3590d0` (PR #58 squash-merge)
+- **Merge status:** merged (PR #58)
+- **Follow-ups surfaced:** none — obs-08 closed. PR #58 self-updated the CHECKLIST [x] marker; plan-table status still referenced "PR #TBD" and was corrected in conv-05.
+- **Parallel-safety validation:** YES — MAINTENANCE.md + Makefile + findings doc single-owner in this window.
+
+---
+
+## 2026-04-21 — merge-wave-8
+
+- **Session name:** merge-wave-8
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** merge coordination — sequential squash-merge of PRs #55, #56, #57, #58 (ops-17 close + obs-09 + obs-12 + obs-08).
+- **Files touched:** N/A (merge operations only)
+- **Result:** DONE
+- **Commits:** `a06729e`, `784007a`, `44408ba`, `c3590d0`
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** none — clean wave; no conflicts; no post-merge regressions. conv-05 convergence session triggered.
+- **Parallel-safety validation:** YES — merge ordering respected Appendix D single-owner zones.
+
+---
+
+## 2026-04-21 — conv-05 convergence doc update
+
+- **Session name:** conv-05
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** batch doc update reflecting PRs #55 through #58 merged since conv-04 (4 PRs). Flip CHECKLIST items (obs-09, obs-12, ops-17; correct obs-08 row; obs-08 already self-flipped by PR #58). Append session-log entries for obs-08-p1, obs-09-p1, obs-12-p1, ops-17-p1, merge-wave-8, conv-05. Update REMEDIATION_PLAN.md item-table statuses (obs-08 PR #TBD→#58; obs-09, obs-12, ops-17 OPEN→CLOSED) + append conv-05 changelog entry.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) Theme 5 ops now 14/18 closed with ops-17 resolving as already-satisfied via obs-10 (no standalone retire needed). (2) Theme 2 observability now 10/13 closed (obs-05, obs-11, obs-13 remaining — obs-13 verify-only). (3) obs-08 row corrected from "PR #TBD" placeholder to actual "PR #58" citation.
+- **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
