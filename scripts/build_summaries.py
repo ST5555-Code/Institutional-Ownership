@@ -119,7 +119,6 @@ def _ensure_tables(con) -> None:
             passive_value DOUBLE,
             active_pct DOUBLE,
             pct_of_so DOUBLE,
-            top10_holders VARCHAR,
             updated_at TIMESTAMP,
             PRIMARY KEY (quarter, ticker)
         )
@@ -138,7 +137,6 @@ def _ensure_tables(con) -> None:
             total_shares BIGINT,
             manager_type VARCHAR,
             is_passive BOOLEAN,
-            top10_tickers VARCHAR,
             updated_at TIMESTAMP,
             PRIMARY KEY (quarter, rollup_type, rollup_entity_id)
         )
@@ -186,7 +184,6 @@ def _build_summary_by_ticker(con, quarter: str) -> int:
                      1)
                  END AS active_pct,
             SUM(h.pct_of_so) AS pct_of_so,
-            NULL AS top10_holders,
             CURRENT_TIMESTAMP AS updated_at
         FROM holdings_v2 h
         WHERE h.quarter = ?
@@ -232,7 +229,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             inst_parent_name, rollup_name,
             total_aum, total_nport_aum, nport_coverage_pct,
             ticker_count, total_shares, manager_type, is_passive,
-            top10_tickers, updated_at
+            updated_at
         )
         WITH latest_per_series AS (
             SELECT series_id, MAX(report_month) AS latest_rm
@@ -280,7 +277,6 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             p.total_shares,
             p.manager_type,
             p.is_passive,
-            NULL AS top10_tickers,
             CURRENT_TIMESTAMP AS updated_at
         FROM parent_13f p
         LEFT JOIN nport_per_rollup np ON np.rid = p.rid
