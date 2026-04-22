@@ -65,7 +65,7 @@ their own migrations.
 
 ## 1. `holdings_v2` — OWNER_BEHIND
 
-**Prod DDL (33 columns):**
+**Prod DDL (34 columns):**
 ```
 accession_number, cik, manager_name, crd_number, inst_parent_name,
 quarter, report_date, cusip, ticker, issuer_name, security_type,
@@ -73,7 +73,9 @@ market_value_usd, shares, pct_of_portfolio, pct_of_so, manager_type,
 is_passive, is_activist, discretion, vote_sole, vote_shared, vote_none,
 put_call, market_value_live, security_type_inferred, fund_name,
 classification_source, entity_id, rollup_entity_id, rollup_name,
-entity_type, dm_rollup_entity_id, dm_rollup_name, pct_of_so_source
+entity_type, dm_rollup_entity_id, dm_rollup_name, pct_of_so_source,
+row_id BIGINT DEFAULT nextval('holdings_v2_row_id_seq')
+-- UNIQUE INDEX idx_holdings_v2_row_id ON holdings_v2(row_id)
 ```
 
 _2026-04-19: `pct_of_float` renamed to `pct_of_so` via migration 008
@@ -116,14 +118,16 @@ columns set by a separate `enrich_holdings.py` pass).
 
 ## 2. `fund_holdings_v2` — OWNER_BEHIND
 
-**Prod DDL (25 columns):**
+**Prod DDL (26 columns):**
 ```
 fund_cik, fund_name, family_name, series_id, quarter, report_month,
 report_date, cusip, isin, issuer_name, ticker, asset_category,
 shares_or_principal, market_value_usd, pct_of_nav, fair_value_level,
 is_restricted, payoff_profile, loaded_at, fund_strategy, best_index,
 entity_id, rollup_entity_id, dm_entity_id, dm_rollup_entity_id,
-dm_rollup_name
+dm_rollup_name,
+row_id BIGINT DEFAULT nextval('fund_holdings_v2_row_id_seq')
+-- UNIQUE INDEX idx_fund_holdings_v2_row_id ON fund_holdings_v2(row_id)
 ```
 
 **Owner-script DDL (`fetch_nport.py:377`):**
@@ -162,13 +166,15 @@ pattern.
 
 ## 3. `beneficial_ownership_v2` — OWNER_BEHIND
 
-**Prod DDL (21 columns):**
+**Prod DDL (22 columns):**
 ```
 accession_number, filer_cik, filer_name, subject_cusip, subject_ticker,
 subject_name, filing_type, filing_date, report_date, pct_owned,
 shares_owned, aggregate_value, intent, is_amendment, prior_accession,
 purpose_text, group_members, manager_cik, loaded_at, name_resolved,
-entity_id
+entity_id,
+row_id BIGINT DEFAULT nextval('beneficial_ownership_v2_row_id_seq')
+-- UNIQUE INDEX idx_beneficial_ownership_v2_row_id ON beneficial_ownership_v2(row_id)
 ```
 
 **Owner-script DDL (`fetch_13dg.py:230`):**
@@ -431,6 +437,7 @@ Per the v1.2 pipeline plan:
 | 001 | `scripts/migrations/001_pipeline_control_plane.py` | 2026-04-13 | adds L0 control plane tables (`ingestion_manifest`, `ingestion_impacts`, `pending_entity_resolution`), confirms `data_freshness`, creates `ingestion_manifest_current` VIEW. Applied to staging (v1.2 framework session) then prod (Batch 1). |
 | — | (`002_resolve_l3_ddl_drift.py`) | **not created** | **Not needed.** Prod L3 schemas already contain every column the owner scripts reference. The remediation path is script rewrites (tracked in `docs/pipeline_inventory.md`), not schema migration. |
 | 008 | `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` (amended `ea4ae99`) | 2026-04-19 | **pct-of-so workstream.** RENAME `holdings_v2.pct_of_float → pct_of_so`; ADD `pct_of_so_source VARCHAR` audit column. Uses the capture-and-recreate idiom (see below) because the column carries indexes that a DuckDB in-place RENAME cannot preserve. Staging rebuild tracked via `d0e5f45` (INF39 rebuild verifying staging schema parity after the rename). Amended from the original migration 008 draft to bundle the audit column and the three-tier source domain documentation. |
+| 014 | `scripts/migrations/014_surrogate_row_id.py` | 2026-04-22 | **mig-06 / INF40.** ADD `row_id BIGINT DEFAULT nextval('<table>_row_id_seq')` + UNIQUE INDEX `idx_<table>_row_id` on each of `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`. Enables point-in-time rollback snapshots via a stable surrogate key (DuckDB `rowid` is not stable across full-table UPDATE + CHECKPOINT). Zero owner-script change — both active writers use explicit column lists that omit `row_id`, so the DEFAULT fires on every INSERT. `scripts/inf39_rebuild_staging.py` runs a post-rebuild `setval` clamp to advance the staging sequence past the mirrored max row_id. |
 
 ---
 
