@@ -88,6 +88,7 @@ def run(db_path):
         "UPDATE fund_universe SET is_actively_managed = ? WHERE series_id = ?",
         updates
     )
+    con.execute("CHECKPOINT")
 
     # Verify
     after = con.execute("""
