@@ -18,7 +18,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ### Batch 1-C (parallel-eligible within batch: NO)
 - [x] int-03 BLOCK-SEC-AUD-3 RC3 ticker_overrides.csv manual triage — PRs #91, #96 (triage export 568 rows + apply: 6 ticker fixes, 2 removals)
 - [x] int-07 BLOCK-TICKER-BACKFILL Phase 2 benchmark_weights gate — PR #71 (all 3 gates PASS: coverage + no-regression + tier-stability; Phase 0 findings close item)
-- [ ] int-14 INF30 BLOCK-MERGE-UPSERT-MODE NULL-only merge (merge_staging.py, promote_staging.py)
+- [x] int-14 INF30 BLOCK-MERGE-UPSERT-MODE NULL-only merge (merge_staging.py, promote_staging.py) — PRs #81, #85 (Phase 0 scoping + NULL-only merge mode shipped)
 - [x] int-15 INF31 market_data writer fetch_date discipline (fetch_market.py, refetch_missing_sectors.py) — PRs #88, #90 (Phase 0 scoping + 2-line fix: stamp `fetch_date` + `metadata_date` on sector refetch UPDATE)
 - [x] int-21 MAJOR-7 D-04 15.87% unresolved series_id tail (pipeline/shared.py) — PRs #93, #98, #100 (triage export + new-entity worksheet + unified apply: 27 resolve + 3 exclude + 67 new entities; 100 series linked; 1,399 accepted unresolved)
 
@@ -85,12 +85,12 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] mig-14 REWRITE_BUILD_MANAGERS INF1 routing + --dry-run + data_freshness (build_managers.py, db.py, promote_staging.py) — PR #68 (closed as already-satisfied; `--staging` + `--dry-run` + freshness stamps + `CANONICAL_TABLES` + `PK_COLUMNS` + new `rebuild` promote kind all live at HEAD per commits `67e81f3`/`2a71f8a`/`4e64473`)
 
 ### Batch 3-C (parallel-eligible within batch: YES — mig-06 ∥ mig-09 ∥ mig-10 disjoint)
-- [ ] mig-06 INF40 L3 surrogate row-ID for rollback
+- [x] mig-06 INF40 L3 surrogate row-ID for rollback — PRs #103, #104 (Phase 0 findings + migration 014 adds surrogate `row_id` BIGINT PK on all 3 v2 fact tables; applied prod + staging)
 - [x] mig-09 INF45 schema-parity L4 extension (validate_schema_parity.py, accept.yaml) — PRs #72, #74 (L4_TABLES inventory + `--layer {l3,l4,l0,all}` CLI flag + missing-table pre-check; 116 tests pass, validator suite 26→72 tests)
 - [x] mig-10 INF46 schema-parity L0 extension (validate_schema_parity.py, accept.yaml) — PR #74 (L0_TABLES inventory shipped in combined mig-09+10 PR; `admin_sessions` excluded per sec-01-p1-hotfix)
 
 ### Batch 3-D (parallel-eligible within batch: NO — share CI/wiring files)
-- [ ] mig-07 INF41 read-site inventory discipline (new scripted audit tool)
+- [x] mig-07 INF41 read-site inventory discipline (new scripted audit tool) — PR #101 (Mode 1 on-demand terminal read-site audit tool shipped)
 - [x] mig-08 INF42 derived-artifact hygiene (.gitignore, fixture + dist rebuild enforcement) — PRs #84, #86 (Phase 0 findings + fixture provenance metadata + CI staleness gate + `.gitignore` hardening)
 - [x] mig-11 INF47 schema-parity CI wiring (.github/workflows/smoke.yml) — PR #80 (Option A: widened `pytest` scope to `tests/smoke/ + tests/pipeline/` picking up 885-line validator suite; pinned `pyyaml==6.0.3`)
 

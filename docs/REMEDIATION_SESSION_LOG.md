@@ -1753,3 +1753,93 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) **Program close recommendation:** the remediation program has reached its stated "Foundation complete" milestone. mig-06 + mig-07 appropriate to schedule as a lite-audit follow-up rather than keep the foundation program open. (2) Phase 2 kickoff (admin refresh framework) now unblocked on every foundation dependency. (3) Candidate `mig-11a` synthetic staging fixture remains as a carryover enhancement candidate. (4) `tests/test_admin_*.py` CI gap still requires a separate `curl_cffi` runtime-dep decision. (5) int-18 remains standing (no closure expected); int-19 + int-09 Step 4 remain formally Phase 2 deferred. (6) ops-18 remains BLOCKED pending recovery of `rotating_audit_schedule.md`.
 - **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
+
+---
+
+## 2026-04-22 — mig-07-p1 read-site inventory audit tool (Mode 1)
+
+- **Session name:** mig-07-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** INF41 read-site inventory discipline. Shipped Mode 1 (on-demand terminal) scripted audit tool that scans `scripts/queries.py`, `scripts/api_*.py`, `web/react-app/src/**/*.tsx`, and `tests/fixtures/responses/*.json` for references to columns not present in canonical DDL. Read-only; enforces exhaustiveness as columns rename/retire.
+- **Files touched:** `scripts/audit_read_sites.py` (new)
+- **Result:** DONE
+- **Commits:** merged `482d3f1` (#101)
+- **Merge status:** merged to main
+- **Follow-ups surfaced:** Modes 2 (CI gate) + 3 (pre-commit hook) remain as future enhancement candidates; not blocking.
+- **Parallel-safety validation:** YES — new script, disjoint from all in-flight work.
+
+---
+
+## 2026-04-22 — mig-06-p0 INF40 L3 surrogate row-ID (Phase 0)
+
+- **Session name:** mig-06-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping for INF40 L3 surrogate row-ID for rollback. Verified current state of v2 fact tables (`holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`) — no stable row identity for rollback diffs. Proposed approach: add `row_id BIGINT PRIMARY KEY` backfilled monotonically at migration time; rollback tooling can then target exact rows without composite-key arithmetic.
+- **Files touched:** `docs/findings/mig-06-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** merged `b9f3a2a` (#103)
+- **Merge status:** merged to main
+- **Follow-ups surfaced:** mig-06-p1 scheduled to ship migration 014 + backfill + prod/staging apply.
+- **Parallel-safety validation:** YES — findings doc only.
+
+---
+
+## 2026-04-22 — mig-06-p1 migration 014 surrogate row_id on v2 fact tables
+
+- **Session name:** mig-06-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** INF40 Phase 1 implementation. Shipped migration 014 adding surrogate `row_id BIGINT PRIMARY KEY` to all 3 v2 fact tables (`holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2`). Backfill via monotonic sequence at migration time. Closes INF40 standing gap; unlocks rollback tooling for future promotes.
+- **Files touched:** `scripts/migrations/014_v2_fact_row_id.py` (new), `docs/canonical_ddl.md`
+- **Result:** DONE
+- **Commits:** merged `60d4c30` (#104)
+- **Merge status:** merged to main
+- **Follow-ups surfaced:** migration 014 apply to prod + staging scheduled as data-ops-batch-2.
+- **Parallel-safety validation:** YES — new migration file; DDL change to canonical tables but no concurrent writer in flight.
+
+---
+
+## 2026-04-22 — merge-wave-19
+
+- **Session name:** merge-wave-19
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Final coordination wave of the remediation program. Landed PRs #101 (mig-07-p1 read-site audit tool), #102 (conv-10 final convergence), #103 (mig-06-p0 Phase 0 findings), #104 (mig-06-p1 migration 014). All sequential merges with zero conflicts.
+- **Files touched:** n/a (coordination only)
+- **Result:** DONE
+- **Commits:** merged `482d3f1` (#101), `55d74a3` (#102), `b9f3a2a` (#103), `60d4c30` (#104)
+- **Merge status:** merged to main
+- **Follow-ups surfaced:** Closes mig-06 + mig-07 — the last two actionable items. Program now has zero actionable remediation work remaining.
+- **Parallel-safety validation:** YES — all four PRs landed sequentially; no conflicts.
+
+---
+
+## 2026-04-22 — data-ops-batch-2 migration 014 prod + staging apply
+
+- **Session name:** data-ops-batch-2
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Applied migration 014 (surrogate `row_id` BIGINT PK on all 3 v2 fact tables) to both prod and staging DuckDBs. No PR associated (DB writes only). Closes mig-06 end-to-end — code shipped via PR #104, data op executed here.
+- **Files touched:** n/a (DB writes only; prod + staging DuckDBs)
+- **Result:** DONE
+- **Commits:** n/a
+- **Merge status:** n/a
+- **Follow-ups surfaced:** mig-06 fully closed (code + data op). Migrations 011-014 complete across prod + staging.
+- **Parallel-safety validation:** YES — executed serially under explicit authorization; no parallel conflict.
+
+---
+
+## 2026-04-22 — conv-11 REMEDIATION PROGRAM COMPLETE
+
+- **Session name:** conv-11
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** **Final convergence session declaring the remediation program COMPLETE.** Flipped CHECKLIST rows for mig-06 (PRs #103, #104), mig-07 (PR #101), and stale int-14 (PR #85 was already merged but CHECKLIST row was still unflipped from conv-10). Appended SESSION_LOG entries for mig-07-p1, mig-06-p0, mig-06-p1, merge-wave-19, data-ops-batch-2, and conv-11 itself. Updated REMEDIATION_PLAN.md item-table statuses for mig-06 (OPEN→CLOSED PRs #103/#104) and mig-07 (OPEN→CLOSED PR #101). Appended final program-complete changelog entry. Program totals at close: **104 PRs merged (#5-#104), ~66 items closed across the checklist, all 5 themes at terminal state.** Theme 4 Security 8/8. Theme 2 Observability 13/13. Theme 5 Ops 17/18 (ops-18 BLOCKED). Theme 3 Migration 11/14 (mig-05 SUPERSEDED, mig-12 Phase 3, mig-11a deferred). Theme 1 Integrity 16/~20 (int-18 STANDING, int-19/int-09-Step4 Phase 2). **Zero actionable remediation items remain.** Phase 2 kickoff (admin refresh framework) now fully unblocked on every foundation dependency.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) **PROGRAM COMPLETE.** No actionable remediation items remain. (2) Phase 2 kickoff ready — design doc `docs/admin_refresh_system_design.md`. (3) Standing / deferred / blocked items carry forward for tracking but are out of scope for this program: int-18 (STANDING), int-19 + int-09 Step 4 (DEFERRED Phase 2), mig-05 (SUPERSEDED by Phase 2), mig-12 (Phase 3 load_13f_v2 rewrite), mig-11a (synthetic staging fixture enhancement candidate), ops-18 (BLOCKED pending `rotating_audit_schedule.md` recovery).
+- **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
