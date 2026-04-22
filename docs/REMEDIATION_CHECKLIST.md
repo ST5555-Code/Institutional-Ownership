@@ -9,7 +9,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] int-04 BLOCK-SEC-AUD-4 RC4: issuer_name propagation scope guard (normalize_securities.py) — PRs #18, #22
 - [x] int-05 BLOCK-TICKER-BACKFILL Phase 1a retroactive Pass C sweep (enrich_holdings.py invocation) — PR #46 (closed as NO-OP; retroactive sweep already executed)
 - [x] int-10 INF26 OpenFIGI `_update_error()` permanent-pending bug (run_openfigi_retry.py) — PRs #42, #44 (code fix shipped; staging sweep pending `--confirm`)
-- [ ] int-23 BLOCK-SEC-AUD-5 universe expansion 132K→430K acceptance (cusip_classifier.py decision)
+- [x] int-23 BLOCK-SEC-AUD-5 universe expansion 132K→430K acceptance (cusip_classifier.py decision) — PR #77 (closed as already-done; 430K universe live since CUSIP v1.4 prod promotion `8a41c48` 2026-04-15)
 
 ### Batch 1-B (parallel-eligible within batch: NO)
 - [x] int-02 BLOCK-SEC-AUD-2 RC2: MAX(issuer_name_sample) mode aggregator — CODE-COMPLETE in `fc2bbbc` (2026-04-18). Phase 0 (PR #50) confirmed aggregator shipped; 8,178-row re-seed gap accepted under **Option A (no re-seed now)**. Closed 2026-04-21.
@@ -33,7 +33,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [ ] int-11 INF27 CUSIP residual-coverage tracking (doc only)
 - [ ] int-13 INF29 OTC grey-market is_priceable refinement
 - [ ] int-16 INF35 f-string interpolation cosmetic
-- [ ] int-22 MINOR-5 C-06 fix_fund_classification no-CHECKPOINT retrofit
+- [x] int-22 MINOR-5 C-06 fix_fund_classification no-CHECKPOINT retrofit — PR #76 (CHECKPOINT after executemany UPDATE on `fund_universe`)
 
 ### Standing
 - [ ] int-18 INF37 backfill_manager_types residual 9 entities (no closure expected)
@@ -92,7 +92,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 ### Batch 3-D (parallel-eligible within batch: NO — share CI/wiring files)
 - [ ] mig-07 INF41 read-site inventory discipline (new scripted audit tool)
 - [ ] mig-08 INF42 derived-artifact hygiene (.gitignore, fixture + dist rebuild enforcement)
-- [ ] mig-11 INF47 schema-parity CI wiring (.github/workflows/smoke.yml)
+- [x] mig-11 INF47 schema-parity CI wiring (.github/workflows/smoke.yml) — PR #80 (Option A: widened `pytest` scope to `tests/smoke/ + tests/pipeline/` picking up 885-line validator suite; pinned `pyyaml==6.0.3`)
 
 ### Phase 2 / BLOCKED
 - [ ] mig-05 BLOCK-4 admin refresh pre-restart rework (BLOCKED — upstream design doc missing)

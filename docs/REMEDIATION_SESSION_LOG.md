@@ -1299,7 +1299,97 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Scope:** Batch doc update reflecting 8 PRs merged since conv-07 (PRs #68-#75). Flip CHECKLIST rows for int-06, int-07, int-08 (SKIPPED), int-09, mig-09, mig-10, mig-14, ops-13, ops-14, ops-16 with PR citations. Append SESSION_LOG entries for mig-14-p0, int-06-p0, ops-16-p1, int-07-p0, mig-09-p0, int-09-p0, mig-09-10-p1, int-09-p1-ops-13-14, merge-wave-11, merge-wave-12, conv-08. Update REMEDIATION_PLAN.md item-table statuses (int-06 READY→CLOSED PR #69; int-07 READY→CLOSED PR #71; int-08 CONDITIONAL→SKIPPED; int-09 OPEN→CLOSED PRs #73/#75; mig-09 OPEN→CLOSED PRs #72/#74; mig-10 OPEN→CLOSED PR #74; mig-14 OPEN→CLOSED PR #68; ops-13 OPEN→CLOSED PR #75; ops-14 OPEN→CLOSED PR #75; ops-16 OPEN→CLOSED PR #70) and append conv-08 changelog entry. Program total: 75 PRs merged (#5-#75), 53 items closed, ~17 remaining.
 - **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
 - **Result:** DONE
+- **Commits:** PR #79 merged as `607b9d7`
+- **Merge status:** merged
+- **Follow-ups surfaced:** (1) **Theme 5 operational advances to 17/18 CLOSED — only ops-18 BLOCKED remaining** (rotating_audit_schedule.md file not found). (2) **Theme 3 migration advances to 9/14 CLOSED** (mig-01, mig-02, mig-03, mig-04, mig-09, mig-10, mig-13, mig-14 + sec-09 via mig-02); remaining: mig-06, mig-07, mig-08, mig-11 (Batches 3-C/3-D) + mig-05/mig-12 Phase 2/3 deferrals. (3) **Theme 1 data integrity advances to 11/23 CLOSED** (add int-06 NO-OP, int-07, int-08 SKIPPED, int-09 Phase-2-deferred to earlier list of int-01/02/04/05/10); remaining: int-03, int-11..int-17, int-20..int-23 + standing int-18 + Phase 2 int-19. (4) Combined with Theme 2 (13/13) + Theme 4 (8/8) → **Themes 2 + 4 complete; Theme 5 effectively complete modulo ops-18 BLOCKED**. (5) **Pending data ops carried forward:** `scripts/oneoff/backfill_13dg_impacts.py --confirm` (obs-04) + int-10 staging sweep `--confirm` — both gated behind Serge approval; status unchanged from conv-07. (6) INF42 derived-artifact hygiene CI gate remains a standing gap (mig-08). (7) Int-09 Phase 2 exit criteria (mig-12 + mig-07 + join pattern + dual-graph + drift gate + rename-sweep) now anchored in `data_layers.md §7` for Phase 2 kickoff reference.
+- **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
+
+---
+
+## 2026-04-22 — int-22-p1 fix_fund_classification CHECKPOINT retrofit
+
+- **Session name:** int-22-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Close MINOR-5 C-06 `fix_fund_classification.py` no-CHECKPOINT retrofit. Inserted `con.execute("CHECKPOINT")` immediately after the `executemany` UPDATE on `fund_universe` so the write is durably flushed before the verification queries run. Single-line code change + ruff clean + `pytest tests/ -x` = 116 passed.
+- **Files touched:** `scripts/fix_fund_classification.py`
+- **Result:** DONE
+- **Commits:** PR #76 merged as `b98472b`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-22 CLOSED. Batch 1-E Theme 1 retrofit list shrinks by one.
+- **Parallel-safety validation:** YES — single script edit; no parallel worker touches `fix_fund_classification.py`.
+
+---
+
+## 2026-04-22 — int-23-p0 universe expansion already-done (Phase 0)
+
+- **Session name:** int-23-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 investigation of BLOCK-SEC-AUD-5 universe expansion 132K→430K. Read-only queries against prod + staging DuckDBs and a code read of `scripts/pipeline/cusip_classifier.py` show the expansion is **already implemented**: prod `cusip_classifications` = prod `securities` = 430,149 rows (staging matches); three-source UNION (`securities` + `fund_holdings_v2` + `beneficial_ownership_v2`) = 430,149 distinct CUSIPs = classifier output (full coverage); `get_cusip_universe()` has no gating, cap, or flag — every re-seed naturally pulls the full surface. The audit's "execute at Phase 3 re-seed" action was satisfied by the CUSIP v1.4 prod promotion (commit `8a41c48`, 2026-04-15). No code change, no migration, no SSE required.
+- **Files touched:** `docs/findings/int-23-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #77 merged as `568b6dd`
+- **Merge status:** merged
+- **Follow-ups surfaced:** int-23 CLOSED (already-done, no Phase 1). Batch 1-A Theme 1 shrinks to int-01..int-05, int-10 closed (int-23 resolves).
+- **Parallel-safety validation:** YES — findings doc + read-only queries; no runtime writes.
+
+---
+
+## 2026-04-22 — mig-11-p0 INF47 schema-parity CI wiring (Phase 0)
+
+- **Session name:** mig-11-p0
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 0 scoping of INF47 schema-parity CI wiring. Mapped gap: fixture covers 21/49 tables (43%) across L0+L3+L4 and has no staging counterpart, so cross-DB parity is unreachable from CI today exactly as `BLOCK_SCHEMA_DIFF_FINDINGS.md §10 Q5 / §14` foresaw. **Key finding:** 885 lines of pure-logic unit tests at `tests/pipeline/test_validate_schema_parity.py` already exist but are **not** run in CI (`smoke.yml` step 5 runs `pytest tests/smoke/` only) — single largest gap. Validator handles self-parity correctly (same file on both sides → 0 divergences, no `--self-check` flag needed). `pyyaml` is required by the validator but is not currently installed in `smoke.yml`. Proposed three options: A (widen pytest scope + add `pyyaml` — recommended, highest signal-to-cost), B (self-parity CLI liveness — optional), C (synthetic staging fixture — defer to candidate `mig-11a`, shares mig-08 fixture tooling). Four open questions for sign-off before Phase 1 (§10).
+- **Files touched:** `docs/findings/mig-11-p0-findings.md` (new)
+- **Result:** DONE
+- **Commits:** PR #78 merged as `72780f4`
+- **Merge status:** merged
+- **Follow-ups surfaced:** Phase 1 cleared to ship Option A only; Options B + C deferred. Candidate `mig-11a` new row surfaced for Option C (synthetic staging fixture — share mig-08 fixture tooling). `tests/test_admin_*.py` CI-exclusion requires a separate dep-footprint decision before it can be pulled into smoke.
+- **Parallel-safety validation:** YES — findings doc only; no runtime writes.
+
+---
+
+## 2026-04-22 — mig-11-p1 widen CI pytest scope + pyyaml pin
+
+- **Session name:** mig-11-p1
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Phase 1 remediation for mig-11 (INF47 schema-parity CI wiring), **Option A only** per Phase 0 findings. `smoke.yml`: widened `pytest tests/smoke/` to `pytest tests/smoke/ tests/pipeline/`, picking up the 885-line validator unit suite in `tests/pipeline/test_validate_schema_parity.py` plus 4 sibling pipeline test files previously uncovered by CI (109 tests total). `smoke.yml`: added `pyyaml==6.0.3` to the runtime-deps install step — required by `scripts/pipeline/validate_schema_parity.py::load_accept_list` (previously a hidden transitive dep via pre-commit, not installed by the smoke job). `requirements.txt`: pinned `pyyaml==6.0.3` in alphabetical order. **Scope note:** `tests/test_admin_*.py` excluded — imports `yahoo_client` which requires `curl_cffi`, not in CI runtime deps. Option B (self-parity CLI smoke) and Option C (synthetic-staging fixture) intentionally deferred per Phase 0 findings §6. Local verification: `pytest tests/smoke/ tests/pipeline/ -q` → 109 passed in 1.87s; `yaml.safe_load(open('.github/workflows/smoke.yml'))` valid.
+- **Files touched:** `.github/workflows/smoke.yml`, `requirements.txt`
+- **Result:** DONE
+- **Commits:** PR #80 merged as `4ced172`
+- **Merge status:** merged
+- **Follow-ups surfaced:** mig-11 CLOSED. Theme 3 migration advances to 10/14 CLOSED. Candidate `mig-11a` row (Option C synthetic staging fixture) surfaced for the plan but not yet added. `tests/test_admin_*.py` CI inclusion requires a separate `curl_cffi` dep decision.
+- **Parallel-safety validation:** YES — CI workflow + requirements pin; no production code or data writes.
+
+---
+
+## 2026-04-22 — merge-wave-13
+
+- **Session name:** merge-wave-13
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Coordination wave covering the conv-09 window: PRs #76 (int-22-p1 CHECKPOINT retrofit), #77 (int-23-p0 already-done findings), #78 (mig-11-p0 findings), #79 (conv-08 doc update), #80 (mig-11-p1 CI pytest widening). All five landed sequentially with zero conflicts; file zones were disjoint by construction (a single script, three findings docs, the three convergence docs, and the `smoke.yml` + `requirements.txt` pair).
+- **Files touched:** n/a (merge coordination only)
+- **Result:** DONE
+- **Commits:** merged `b98472b` (#76), `568b6dd` (#77), `72780f4` (#78), `607b9d7` (#79), `4ced172` (#80)
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** 3 items closed (int-22, int-23, mig-11); conv-09 convergence session triggered.
+- **Parallel-safety validation:** YES — clean wave; no conflicts; no post-merge regressions.
+
+---
+
+## 2026-04-22 — conv-09 convergence doc update
+
+- **Session name:** conv-09
+- **Start:** 2026-04-22
+- **End:** 2026-04-22
+- **Scope:** Batch doc update reflecting 5 PRs merged since conv-08 (PRs #76-#80). Flipped CHECKLIST rows for int-22, int-23, mig-11 with PR citations. Appended SESSION_LOG entries for int-22-p1, int-23-p0, mig-11-p0, mig-11-p1, merge-wave-13, conv-09, and backfilled the conv-08 entry with its now-known commit (`607b9d7`) + merged status. Updated REMEDIATION_PLAN.md item-table statuses (int-22 OPEN→CLOSED PR #76; int-23 OPEN→CLOSED PR #77 already-done; mig-11 OPEN→CLOSED PRs #78/#80) and appended the conv-09 changelog entry. Program total: 80 PRs merged (#5-#80), 56 items closed across the checklist, ~14 remaining.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
 - **Commits:** (filled at commit step)
 - **Merge status:** pending Serge review
-- **Follow-ups surfaced:** (1) **Theme 5 operational advances to 17/18 CLOSED — only ops-18 BLOCKED remaining** (rotating_audit_schedule.md file not found). (2) **Theme 3 migration advances to 9/14 CLOSED** (mig-01, mig-02, mig-03, mig-04, mig-09, mig-10, mig-13, mig-14 + sec-09 via mig-02); remaining: mig-06, mig-07, mig-08, mig-11 (Batches 3-C/3-D) + mig-05/mig-12 Phase 2/3 deferrals. (3) **Theme 1 data integrity advances to 11/23 CLOSED** (add int-06 NO-OP, int-07, int-08 SKIPPED, int-09 Phase-2-deferred to earlier list of int-01/02/04/05/10); remaining: int-03, int-11..int-17, int-20..int-23 + standing int-18 + Phase 2 int-19. (4) Combined with Theme 2 (13/13) + Theme 4 (8/8) → **Themes 2 + 4 complete; Theme 5 effectively complete modulo ops-18 BLOCKED**. (5) **Pending data ops carried forward:** `scripts/oneoff/backfill_13dg_impacts.py --confirm` (obs-04) + int-10 staging sweep `--confirm` — both gated behind Serge approval; status unchanged from conv-07. (6) INF42 derived-artifact hygiene CI gate remains a standing gap (mig-08). (7) Int-09 Phase 2 exit criteria (mig-12 + mig-07 + join pattern + dual-graph + drift gate + rename-sweep) now anchored in `data_layers.md §7` for Phase 2 kickoff reference.
+- **Follow-ups surfaced:** (1) **Theme 3 migration advances to 10/14 CLOSED** (add mig-11 to the existing mig-01/02/03/04/09/10/13/14 list + sec-09 via mig-02); remaining actionable: mig-06, mig-07, mig-08 (+ mig-05/mig-12 Phase 2/3 deferrals). (2) **Theme 1 data integrity advances to 13/23 CLOSED** (add int-22 + int-23); remaining: int-03, int-11..int-17, int-20, int-21 + standing int-18 + Phase 2 int-19. (3) Combined with Theme 2 (13/13) + Theme 4 (8/8) + Theme 5 (17/18, ops-18 BLOCKED) → **only ~14 items across Themes 1 + 3 actionable plus ops-18**. (4) **Candidate `mig-11a` row** (Option C synthetic staging fixture) surfaced in Phase 0 / Phase 1 and should be added to the plan item table adjacent to mig-08 (shares fixture tooling zone) in a follow-up. (5) **`tests/test_admin_*.py` CI gap** — requires a separate `curl_cffi` runtime-dep decision before those tests can run under smoke; tracked for a future smoke-CI hygiene pass. (6) **Pending data ops carried forward:** obs-04 `--confirm` + int-10 staging sweep `--confirm`; status unchanged. (7) Standing gaps: INF42 derived-artifact hygiene CI gate (mig-08) + `entity_current` VIEW schema-parity micro-follow-up (mig-09-p0 §4 Option A).
 - **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
