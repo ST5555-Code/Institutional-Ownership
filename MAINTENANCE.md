@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 10, 2026_
+_Last updated: April 21, 2026_
 
 ## Entity Change Workflow
 
@@ -55,9 +55,17 @@ cat logs/entity_validation_report.json | python3 -m json.tool | grep -A3 manual_
 
 ## Backup Protocol
 
-`backup_db.py` runs **manually**, never on a schedule. Every invocation
-prompts for confirmation before doing anything — pass `--no-confirm` to
-bypass for scripted / automated use.
+`backup_db.py` runs on two paths:
+
+1. **Scheduled, as step 8 of `make quarterly-update`** — the
+   `backup-db` Makefile target invokes
+   `python3 scripts/backup_db.py --no-confirm` automatically during every
+   quarterly refresh. The full pipeline does not commit a backup on its
+   own cron; it runs when an analyst kicks `quarterly-update`.
+2. **Ad-hoc, before risky sessions** — analysts run `backup_db.py`
+   manually around work that falls outside `quarterly-update`. Manual
+   invocations prompt for confirmation before doing anything; pass
+   `--no-confirm` to bypass for scripted use.
 
 ```bash
 # Take a backup (interactive prompt)
@@ -73,7 +81,7 @@ python3 scripts/backup_db.py --list
 python3 scripts/backup_db.py --staging
 ```
 
-**When to back up:**
+**When to back up (outside `quarterly-update`):**
 
 - Before any DM13 / DM14 / DM15 audit pass
 - Before Stage 5 cleanup (on or after 2026-05-09)
@@ -85,6 +93,19 @@ takes an automatic intra-DB snapshot of every entity table before applying
 changes, and auto-rolls back on structural validation failure. Full
 backups are reserved for known-risky sessions where the snapshot
 mechanism alone isn't enough insurance.
+
+**Retention.** `data/backups/` is gitignored and accumulates ~2.6 G per
+full snapshot. Keep every backup in the **current quarter** and the
+**current month** in full. Older backups may be pruned manually by the
+analyst once the quarterly refresh they guard is fully promoted and a
+replacement `quarterly-update` has produced a new baseline. There is no
+automated retention script today — flag disk pressure explicitly if
+`data/backups/` passes 50 G.
+
+Observed cadence (as of 2026-04-21): 12 snapshots covering
+2026-04-10 → 2026-04-19; ~31 G on disk. Apparent size variation across
+snapshots tracks schema evolution (table adds/drops) rather than partial
+backups — see [docs/findings/obs-08-p1-findings.md](docs/findings/obs-08-p1-findings.md).
 
 ## Refetch Pattern for Prod Apply
 

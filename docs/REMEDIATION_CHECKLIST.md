@@ -59,7 +59,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] obs-10 INF32 quarterly-update Makefile 13F-load step (Makefile) — PR #52 (also pruned retired `update.py` refs)
 
 ### Batch 2-D (parallel-eligible within batch: YES — off-code ops + CI disjoint)
-- [ ] obs-08 MINOR-16 O-05 backup-gap investigation (ops)
+- [x] obs-08 MINOR-16 O-05 backup-gap investigation (ops) — explained, no infra gap; MAINTENANCE.md wording fix + retention note; see `docs/findings/obs-08-p1-findings.md`
 - [ ] obs-09 MINOR-18 O-10 log-rotation policy (ops + scripts)
 - [ ] obs-12 INF33 BLOCK-CI-ACTIONS-NODE20-DEPRECATION (.github/workflows)
 
