@@ -184,10 +184,11 @@ def test_status_returns_all_pipelines(logged_in):
     assert names == set(PIPELINE_CADENCE.keys())
     # Pipelines migrated to SourcePipeline so far:
     # 13f_holdings (p2-05), 13dg_ownership (w2-01), market_data (w2-02),
-    # nport_holdings (w2-03).
+    # nport_holdings (w2-03), ncen_advisers (w2-04).
     registered = {p["name"] for p in body["pipelines"] if p["registered"]}
     assert registered == {
         "13f_holdings", "13dg_ownership", "market_data", "nport_holdings",
+        "ncen_advisers",
     }
 
 
