@@ -210,6 +210,16 @@ def main():
     # a smoke endpoint. If a future smoke test needs flows, add a scoped
     # create() here filtered to a single ticker + quarter.
 
+    # ── 4. Force is_latest=TRUE on amendable fact tables ───────────────────
+    # Prod rows may be is_latest=FALSE when a later amendment supersedes
+    # them, but those amendments get filtered out by the ticker+quarter scope
+    # here. The fixture does not model amendment history — every row that
+    # survives the filter should be treated as current. Without this,
+    # queries.py is_latest=TRUE filters drop every fixture row.
+    if not args.dry_run:
+        for _tbl in ("holdings_v2", "fund_holdings_v2"):
+            con.execute(f"UPDATE {_tbl} SET is_latest = TRUE WHERE is_latest IS NOT TRUE")
+
     # ── 5. Entity closure (seed + rollup_history walk to fixed point) ──────
     # Seed eids come from the holdings/fund_holdings we just filtered.
     if args.dry_run:
