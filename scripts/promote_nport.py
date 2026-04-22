@@ -79,6 +79,44 @@ def _assert_promote_ok(report_text: str) -> None:
         )
 
 
+def _assert_no_future_report_month(staging_con, run_id: str) -> None:
+    """Abort if any staged row for this run has report_month > current month.
+
+    N-PORT-P reports period-end holdings at monthly grain. A report_month
+    strictly greater than the current calendar month cannot be a legitimate
+    period-end filing — it is either a typo in the filing, a date-parse bug
+    in the fetcher, or corruption. Aborting the promote preserves the
+    invariant that fund_holdings_v2.report_month <= today's calendar month.
+
+    report_month is stored as VARCHAR 'YYYY-MM' (fixed-width, monotonic
+    lexicographic sort), so a string compare against
+    strftime(CURRENT_DATE, '%Y-%m') is correct.
+    """
+    offenders = staging_con.execute(
+        """
+        SELECT s.series_id, s.report_month, COUNT(*) AS rows
+          FROM stg_nport_holdings s
+          JOIN ingestion_manifest m ON s.manifest_id = m.manifest_id
+         WHERE m.run_id = ?
+           AND s.report_month > strftime(CURRENT_DATE, '%Y-%m')
+         GROUP BY 1, 2
+         ORDER BY 2 DESC, 1
+         LIMIT 20
+        """,
+        [run_id],
+    ).fetchall()
+    if offenders:
+        lines = [f"  {sid}  {rm}  ({n:,} rows)" for sid, rm, n in offenders]
+        raise SystemExit(
+            "obs-07 gate FAIL — staged report_month in the future:\n"
+            + "\n".join(lines)
+            + f"\n\nRun {run_id} has staged rows with report_month > "
+            + "current calendar month. Investigate filings for typos "
+            + "(common: YYYY swapped 2025→2052, 2026→2062) before promoting."
+        )
+    print("  report_month gate: PASS")
+
+
 # ---------------------------------------------------------------------------
 # Group 2 entity enrichment (bulk)
 # ---------------------------------------------------------------------------
@@ -346,6 +384,11 @@ def main() -> None:
     staging_con = duckdb.connect(STAGING_DB, read_only=True)
     prod_con = duckdb.connect(PROD_DB)
     try:
+        # obs-07 pre-flight: reject the run if any staged row carries a
+        # report_month strictly greater than the current calendar month.
+        # Runs before BEGIN TRANSACTION — no rollback needed (no writes yet).
+        _assert_no_future_report_month(staging_con, args.run_id)
+
         try:
             prod_con.execute("SELECT 1 FROM ingestion_manifest LIMIT 1")
         except duckdb.CatalogException as exc:
