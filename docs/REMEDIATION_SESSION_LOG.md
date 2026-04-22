@@ -1078,3 +1078,63 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Merge status:** pending Serge review
 - **Follow-ups surfaced:** (1) Theme 3 migration now 5/14 CLOSED (mig-01, mig-02, mig-03, mig-04, mig-13); mig-14 is the last remaining Batch 3-B item; Batches 3-C/3-D untouched (mig-06/07/08/09/10/11). (2) mig-05/mig-12 remain Phase 2/Phase 3 deferrals. (3) mig-13 scope narrowing across sessions validated: original 5 scripts resolved via 4 different items (mig-02, sec-05, sec-06, mig-13 itself) — good example of cross-theme convergence.
 - **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — obs-batch-2E data_layers.md headline + flow_intensity docstring
+
+- **Session name:** obs-batch-2E
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Close the last two content items in Theme 2 Batch 2-E. obs-05 refreshed `docs/data_layers.md:92` `fund_holdings_v2` headline to 14,090,397 rows / 84.13% `entity_id` coverage (prod-verified 2026-04-21 via read-only SQL snapshot) and cited BLOCK-2 (2026-04-17) + CUSIP v1.4 (2026-04-15) as the stability baseline. obs-11 added a 9-line formula docstring to `scripts/compute_flows.py::_compute_ticker_stats` explaining `flow_intensity_total = SUM(price_adj_flow) / market_cap` over continuing holders, plus a new `§10 Flow metrics` section in `docs/data_layers.md` documenting `flow_intensity_{total,active,passive}` and the churn variants with cross-references to `compute_flows.py`. Doc-only + docstring-only; no behavior change, no schema change.
+- **Files touched:** `scripts/compute_flows.py` (docstring only), `docs/data_layers.md` (headline + new §10)
+- **Result:** DONE
+- **Commits:** merged `76e8da3` (PR #66)
+- **Merge status:** merged
+- **Follow-ups surfaced:** Theme 2 Batch 2-E fully closed. Combined with obs-13 verification (PR #65) this closes the final 3 open items in Theme 2 → **Theme 2 observability 13/13 CLOSED**. No new items surfaced.
+- **Parallel-safety validation:** YES — Batch 2-E was predicted serial (shared `docs/data_layers.md`); shipping obs-05 + obs-11 as a single PR respected the serial dependency by co-editing the file under one author. No drift from Phase 0 prediction.
+
+---
+
+## 2026-04-21 — obs-13-verify Register %FLOAT dist bundle verification
+
+- **Session name:** obs-13-verify
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Verification-only pass for obs-13 DIAG-23 Register %FLOAT stale dist bundle. Confirmed that (a) React source under `web/react-app/src/` (`RegisterTab.tsx`, `api.ts`) uses `pct_so` exclusively with no `pct_of_float` remnants; (b) the main-worktree dist bundle under `web/react-app/dist/` (rebuilt 2026-04-19 15:26 EDT, after `f956096` source migration) contains zero `pct_of_float` references; (c) `ff1ff71` modified CI fixtures only and did not touch React source, so a post-ff1ff71 dist rebuild is not required; (d) `web/react-app/dist/` is gitignored, so there is no stale-bundle-in-repo condition to clear. Full evidence (grep results, file timestamps, commit trail) written to `docs/findings/obs-13-verify-findings.md`. No code changes, no DB writes, no migration.
+- **Files touched:** `docs/findings/obs-13-verify-findings.md` (new)
+- **Result:** DONE
+- **Commits:** merged `0edb9b8` (PR #65)
+- **Merge status:** merged
+- **Follow-ups surfaced:** INF42 (derived-artifact hygiene — no CI check forces fixture/dist rebuilds when schema migrations land) remains a standing gap and is tracked separately under Theme 3 Batch 3-D (mig-08). Not a blocker for obs-13 closure.
+- **Parallel-safety validation:** YES — verification-only session, single findings doc, no file conflicts possible.
+
+---
+
+## 2026-04-21 — merge-wave-10
+
+- **Session name:** merge-wave-10
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Retroactive bookkeeping entry covering merges of PRs #64 (conv-06 doc update), #65 (obs-13 verification), #66 (obs-05 + obs-11). No dedicated coordination session was run for this window — conv-06 was merged as part of closing out the prior convergence, and PRs #65/#66 landed sequentially as individual worker PRs without requiring a wave-level merge coordinator. All three PRs landed cleanly with zero conflicts; CI green; no post-merge regressions.
+- **Files touched:** n/a (coordination bookkeeping only; no code changes)
+- **Result:** DONE
+- **Commits:** merged `cccc604` (#64), `0edb9b8` (#65), `76e8da3` (#66)
+- **Merge status:** merged
+- **Follow-ups surfaced:** With PRs #65 + #66 landed, Theme 2 observability completes at **13/13 CLOSED** (program milestone). Program total advances to **66 PRs merged, 46 items closed**. conv-07 convergence session triggered.
+- **Parallel-safety validation:** YES — no parallel worker activity during this window; no conflicts observed.
+
+---
+
+## 2026-04-21 — conv-07 convergence doc update
+
+- **Session name:** conv-07
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Batch doc update reflecting 3 PRs merged since conv-06 (PRs #64, #65, #66) plus retroactive closure confirmations for obs-06, int-05, int-10. Flip CHECKLIST rows for obs-05, obs-11, obs-13 to `[x]` with PR citations. Append SESSION_LOG entries for obs-batch-2E, obs-13-verify, merge-wave-10, conv-07. Update REMEDIATION_PLAN.md item-table statuses (obs-05 OPEN→CLOSED PR #66; obs-11 OPEN→CLOSED PR #66; obs-13 LIKELY-CLOSED→CLOSED PR #65) and append conv-07 changelog entry. **Theme 2 observability closes at 13/13 — program milestone.** Theme 4 security stays at 8/8 CLOSED (sustained). Program total: 66 PRs merged (#5-#66), 46 items closed, ~24 remaining across Themes 1, 3, 5.
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) Theme 2 observability **13/13 CLOSED** — full theme complete; no remaining items. Combined with Theme 4 security (8/8 CLOSED), two full themes are now closed. (2) Remaining open work: Theme 1 data integrity (~13 items), Theme 3 migration (~8 items: mig-14 + Batches 3-C/3-D + mig-05/12 deferrals), Theme 5 operational (~4 items: ops-13/14/16/18). (3) **Pending data ops carried forward:** `scripts/oneoff/backfill_13dg_impacts.py --confirm` (obs-04) + int-10 staging sweep `--confirm` — both gated behind Serge approval; status unchanged from conv-06. (4) INF42 derived-artifact hygiene CI gate remains a standing gap (tracked under mig-08). (5) No new follow-ups surfaced from PRs #64-#66 review.
+- **Parallel-safety validation:** YES — docs-only session; no parallel worker holds these three files.
