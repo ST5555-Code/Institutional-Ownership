@@ -151,21 +151,21 @@ def _ensure_tables(con) -> None:
 
 def _project_summary_by_ticker(con, quarter: str) -> int:
     """Dry-run projection: count distinct tickers in scope for a quarter."""
-    return con.execute(f"""
+    return con.execute("""
         SELECT COUNT(DISTINCT ticker)
         FROM holdings_v2
-        WHERE quarter = '{quarter}'
+        WHERE quarter = ?
           AND ticker IS NOT NULL AND ticker != ''
-    """).fetchone()[0]
+    """, [quarter]).fetchone()[0]
 
 
 def _build_summary_by_ticker(con, quarter: str) -> int:
     """DELETE+INSERT one quarter of summary_by_ticker. Returns row count."""
     con.execute("DELETE FROM summary_by_ticker WHERE quarter = ?", [quarter])
-    con.execute(f"""
+    con.execute("""
         INSERT INTO summary_by_ticker
         SELECT
-            '{quarter}' AS quarter,
+            ? AS quarter,
             h.ticker,
             MODE(h.issuer_name) AS company_name,
             SUM(COALESCE(h.market_value_live, h.market_value_usd)) AS total_value,
@@ -189,10 +189,10 @@ def _build_summary_by_ticker(con, quarter: str) -> int:
             NULL AS top10_holders,
             CURRENT_TIMESTAMP AS updated_at
         FROM holdings_v2 h
-        WHERE h.quarter = '{quarter}'
+        WHERE h.quarter = ?
           AND h.ticker IS NOT NULL AND h.ticker != ''
         GROUP BY h.ticker
-    """)
+    """, [quarter, quarter])
     return con.execute(
         "SELECT COUNT(*) FROM summary_by_ticker WHERE quarter = ?",
         [quarter],
@@ -208,8 +208,8 @@ def _project_summary_by_parent(con, quarter: str, rid_col: str) -> int:
     return con.execute(f"""
         SELECT COUNT(DISTINCT {rid_col})
         FROM holdings_v2
-        WHERE quarter = '{quarter}'
-    """).fetchone()[0]
+        WHERE quarter = ?
+    """, [quarter]).fetchone()[0]
 
 
 def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,too-many-arguments
@@ -237,7 +237,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
         WITH latest_per_series AS (
             SELECT series_id, MAX(report_month) AS latest_rm
             FROM fund_holdings_v2
-            WHERE quarter = '{quarter}'
+            WHERE quarter = ?
             GROUP BY series_id
         ),
         nport_per_rollup AS (
@@ -247,7 +247,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             JOIN latest_per_series l
               ON l.series_id = fh.series_id
              AND l.latest_rm = fh.report_month
-            WHERE fh.quarter = '{quarter}'
+            WHERE fh.quarter = ?
             GROUP BY fh.{nport_rid_col}
         ),
         parent_13f AS (
@@ -260,12 +260,12 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
                 MAX(h.manager_type)     AS manager_type,
                 BOOL_OR(h.is_passive)   AS is_passive
             FROM holdings_v2 h
-            WHERE h.quarter = '{quarter}'
+            WHERE h.quarter = ?
             GROUP BY h.{rid_col}
         )
         SELECT
-            '{quarter}' AS quarter,
-            '{rollup_type}' AS rollup_type,
+            ? AS quarter,
+            ? AS rollup_type,
             p.rid AS rollup_entity_id,
             p.rname AS inst_parent_name,
             p.rname AS rollup_name,
@@ -284,7 +284,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             CURRENT_TIMESTAMP AS updated_at
         FROM parent_13f p
         LEFT JOIN nport_per_rollup np ON np.rid = p.rid
-    """)
+    """, [quarter, quarter, quarter, quarter, rollup_type])
     return con.execute(
         "SELECT COUNT(*) FROM summary_by_parent "
         "WHERE quarter = ? AND rollup_type = ?",
