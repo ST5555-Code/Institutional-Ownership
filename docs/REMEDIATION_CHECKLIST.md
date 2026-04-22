@@ -59,9 +59,9 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] obs-10 INF32 quarterly-update Makefile 13F-load step (Makefile) — PR #52 (also pruned retired `update.py` refs)
 
 ### Batch 2-D (parallel-eligible within batch: YES — off-code ops + CI disjoint)
-- [x] obs-08 MINOR-16 O-05 backup-gap investigation (ops) — explained, no infra gap; MAINTENANCE.md wording fix + retention note; see `docs/findings/obs-08-p1-findings.md`
-- [ ] obs-09 MINOR-18 O-10 log-rotation policy (ops + scripts)
-- [ ] obs-12 INF33 BLOCK-CI-ACTIONS-NODE20-DEPRECATION (.github/workflows)
+- [x] obs-08 MINOR-16 O-05 backup-gap investigation (ops) — PR #58 (explained, no infra gap; MAINTENANCE.md wording fix + retention note + `backup-db` Makefile target wired; see `docs/findings/obs-08-p1-findings.md`)
+- [x] obs-09 MINOR-18 O-10 log-rotation policy (ops + scripts) — PR #56 (log-rotation script + Makefile target shipped)
+- [x] obs-12 INF33 BLOCK-CI-ACTIONS-NODE20-DEPRECATION (.github/workflows) — PR #57 (Node 20 → Node 24 bump across workflows)
 
 ### Batch 2-E (parallel-eligible within batch: NO — shared data_layers.md)
 - [ ] obs-05 MAJOR-17 DOC-11 data_layers.md coverage headline refresh
@@ -152,5 +152,5 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [ ] ops-16 DOC_UPDATE_PROPOSAL item 6 — admin_bp.py:108 revisit flag (placement decision first)
 
 ### Phase 2 / BLOCKED
-- [ ] ops-17 PRECHECK tertiary — retire or repair scripts/update.py (Phase 2)
+- [x] ops-17 PRECHECK tertiary — retire or repair scripts/update.py — PR #55 (closed as already-satisfied by obs-10; zero Makefile references remain; no standalone retire needed)
 - [ ] ops-18 Restore missing rotating_audit_schedule.md (BLOCKED — doc not found)
