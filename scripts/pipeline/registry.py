@@ -145,7 +145,7 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         downstream=("fund_holdings_v2",),
     ),
     "adv_managers": DatasetSpec(
-        layer=3, owner="scripts/fetch_adv.py",
+        layer=3, owner="scripts/pipeline/load_adv.py",
         promote_strategy="rebuild",
         downstream=("entities", "cik_crd_direct", "managers"),
     ),

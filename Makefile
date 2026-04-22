@@ -154,15 +154,11 @@ fetch-13dg:
 	$(Q) $(PY) $(SCRIPTS)/fetch_13dg.py
 
 fetch-adv:
-	$(Q) $(PY) $(SCRIPTS)/fetch_adv.py
+	$(Q) $(PY) $(SCRIPTS)/pipeline/load_adv.py --staging
 
 promote-adv:
-	@echo "--- promote_adv (ADV staging → prod) ---"
-	@if [ -z "$(RUN_ID)" ]; then \
-		echo "ERROR: promote-adv requires RUN_ID=<adv_run_id> (printed by fetch-adv)"; \
-		exit 1; \
-	fi
-	$(Q) $(PY) $(SCRIPTS)/promote_adv.py --run-id $(RUN_ID)
+	@echo "--- load_adv auto-approve (ADV staging → prod) ---"
+	$(Q) $(PY) $(SCRIPTS)/pipeline/load_adv.py --auto-approve
 
 fetch-ncen:
 	$(Q) $(PY) $(SCRIPTS)/fetch_ncen.py

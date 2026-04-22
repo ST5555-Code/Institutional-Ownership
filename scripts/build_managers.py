@@ -9,7 +9,7 @@ Run: python3 scripts/build_managers.py                  # full run, prod
      python3 scripts/build_managers.py --staging        # full run, staging DB
      python3 scripts/build_managers.py --dry-run        # no writes, print projections
      python3 scripts/build_managers.py --enrichment-only # only UPDATE holdings_v2
-     (Requires fetch_adv.py and load_13f.py to have run first)
+     (Requires pipeline/load_adv.py and load_13f.py to have run first)
 """
 
 import os
@@ -226,7 +226,7 @@ PARENT_SEEDS = [
 # ---------------------------------------------------------------------------
 _REQUIRED_INPUTS = [
     ("filings_deduped", "load_13f.py"),
-    ("adv_managers", "fetch_adv.py"),
+    ("adv_managers", "pipeline/load_adv.py"),
 ]
 
 
