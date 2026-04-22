@@ -63,6 +63,16 @@ import db  # noqa: E402
 SOURCE_TAG = "int-21_series_triage"
 DEFAULT_TRIAGE = os.path.expanduser("~/Downloads/unresolved_series_triage_resolved.csv")
 DEFAULT_WORKSHEET = os.path.expanduser("~/Downloads/new_entity_worksheet_filled.csv")
+
+# Pinned rollup_target → entity_id overrides. Applied verbatim before any
+# resolver tier so AUM-tiebreak substring matches can't drift onto the wrong
+# entity (funds, sub-advisers, holding cos vs. operating advisers).
+ROLLUP_OVERRIDES: dict[str, int] = {
+    "State Street Global Advisors": 7984,  # STATE STREET CORP
+    "Federated Hermes":             4635,  # FEDERATED HERMES, INC. (public parent)
+    "AMG":                            27,  # Affiliated Managers Group
+    "Brookfield":                   3714,  # Brookfield Asset Management Private Institutional Capital Adviser US, LLC
+}
 DEFAULT_MANIFEST = os.path.join(
     BASE_DIR, "logs", "int21_new_entity_manifest.csv",
 )
@@ -301,6 +311,9 @@ def _plan_new_entities(
         rollup_resolution = ""
         if rollup_is_self:
             rollup_resolution = "SELF"
+        elif rollup_raw in ROLLUP_OVERRIDES:
+            rollup_eid = ROLLUP_OVERRIDES[rollup_raw]
+            rollup_resolution = f"OVERRIDE → eid={rollup_eid}"
         else:
             eid, reason = resolve_entity_by_name(con, rollup_raw)
             if eid is None:
