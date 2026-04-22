@@ -789,7 +789,112 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Scope:** Phase 0 findings — confirm RC2 code status (commit `fc2bbbc`), quantify the MAX→MODE residual gap in prod `cusip_classifications`, and decide on re-seed path.
 - **Files touched:** `docs/findings/int-02-p0-findings.md`, `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/NEXT_SESSION_CONTEXT.md`, `ROADMAP.md`
 - **Result:** DONE — **CLOSED AS CODE-COMPLETE.** `fc2bbbc` (2026-04-18) already shipped the mode+length+alpha aggregator in `cusip_classifier.get_cusip_universe()`; HEAD reflects it. Prod `cusip_classifications` (seeded 2026-04-14, four days before the fix) carries an 8,178-row (6.17%) residual MAX-era gap: 2,600 cosmetic, 248 classic RC2 first-letter-clip rescues, 618 superstring improvements, 771 superstring shortenings, 2,051 distinct-first-word flips (upstream CUSIP contamination, fc2bbbc's "known limitation"), 1,890 other. **Option A (no re-seed now) selected** — organic convergence via future universe expansion (int-23) or routine `--reset` runs is acceptable; the 2,051-row distinct-first-word bucket is a data-quality investigation out of remediation scope. int-02 closes without a p1.
-- **Commits:** PR #50 (pending merge at log-write time)
-- **Merge status:** PR #50 open; both CI checks (pre-commit + smoke) passing; awaiting merge-wave
+- **Commits:** `90456da` (work) → `269fec5` (PR #50 squash-merge)
+- **Merge status:** merged (PR #50)
 - **Follow-ups surfaced:** none blocking. Filed as informational: the 2,051 distinct-first-word CUSIPs warrant a standalone data-quality investigation if and when int-23 universe expansion forces a full re-seed.
 - **Parallel-safety validation:** YES — findings-only; ran solo.
+
+---
+
+## 2026-04-21 — conv-03 convergence doc update
+
+- **Session name:** conv-03
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** batch doc update reflecting work completed in PRs #35 through #48 (14 PRs merged since conv-02). Flip CHECKLIST items for mig-02, obs-04, sec-05, sec-06, sec-07, sec-08, int-05, int-10. Append session-log entries for all worker sessions + merge-wave-4/5/6. Update REMEDIATION_PLAN.md item-table statuses + changelog entry. Theme 4 security milestone marked (8/8 closed).
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** `60eda6e` (work) → `21c6dc2` (PR #49 squash-merge)
+- **Merge status:** merged (PR #49)
+- **Follow-ups surfaced:** remaining obs-06/07/10 + int-02 closeouts queued for next convergence (conv-04).
+- **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
+
+---
+
+## 2026-04-21 — obs-07-p0 N-PORT report_month future-leakage gate (Phase 0)
+
+- **Session name:** obs-07-p0
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** Phase 0 findings — scope a preventive gate in `promote_nport.py` that rejects rows whose `report_month` is in the future (MINOR-4 / P-07). Confirm existing data is clean; no historical residual detected.
+- **Files touched:** `docs/findings/obs-07-p0-findings.md`
+- **Result:** DONE
+- **Commits:** `cfd3515` (PR #51 squash-merge)
+- **Merge status:** merged (PR #51)
+- **Follow-ups surfaced:** obs-07-p1 scope locked — guard in promote_nport.py; emit one row per rejection with filing_id + raw report_month.
+- **Parallel-safety validation:** YES — findings-only.
+
+---
+
+## 2026-04-21 — obs-10-p1 Makefile quarterly-update 13F + ADV wiring
+
+- **Session name:** obs-10-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** wire `load-13f` + `promote-adv` targets into the `quarterly-update` Makefile recipe (INF32); prune retired `scripts/update.py` references from same recipe.
+- **Files touched:** `Makefile`
+- **Result:** DONE
+- **Commits:** `b5c04aa` (PR #52 squash-merge)
+- **Merge status:** merged (PR #52)
+- **Follow-ups surfaced:** none — obs-10 closed. `scripts/update.py` retirement (ops-17) still Phase 2 scope; references now fully pruned from Makefile.
+- **Parallel-safety validation:** YES — Makefile single-owner in this window.
+
+---
+
+## 2026-04-21 — obs-07-p1 report_month future-leakage gate
+
+- **Session name:** obs-07-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** add `report_month` future-leakage gate to `promote_nport.py` — reject rows whose `report_month` > current month; per-row logging on rejection; completes MINOR-4 / P-07.
+- **Files touched:** `scripts/promote_nport.py`
+- **Result:** DONE
+- **Commits:** `387b9c2` (PR #53 squash-merge)
+- **Merge status:** merged (PR #53)
+- **Follow-ups surfaced:** none — obs-07 closed.
+- **Parallel-safety validation:** YES — `promote_nport.py` single-owner during obs-07 window (mig-01 already merged per prior sequencing).
+
+---
+
+## 2026-04-21 — obs-06-p1 13F loader freshness (NO-OP)
+
+- **Session name:** obs-06-p1
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** confirm MINOR-3 / P-01 13F loader freshness is already satisfied — `record_freshness(con, 'filings')` + `record_freshness(con, 'filings_deduped')` shipped in `load_13f.py` via `8e7d5cb` prior to this program window.
+- **Files touched:** N/A (no code change)
+- **Result:** DONE — **closed as already-satisfied / NO-OP.** No PR needed; verification only.
+- **Commits:** none (no-op close)
+- **Merge status:** N/A
+- **Follow-ups surfaced:** none — obs-06 closed.
+- **Parallel-safety validation:** N/A — no file touched.
+
+---
+
+## 2026-04-21 — merge-wave-7
+
+- **Session name:** merge-wave-7
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** merge coordination — sequential squash-merge of PRs #49, #50, #51, #52, #53 (conv-03 doc sync + int-02 close + obs-07 family + obs-10).
+- **Files touched:** N/A (merge operations only)
+- **Result:** DONE
+- **Commits:** `21c6dc2`, `269fec5`, `cfd3515`, `b5c04aa`, `387b9c2`
+- **Merge status:** all merged to main
+- **Follow-ups surfaced:** none — clean wave; no conflicts; no post-merge regressions. conv-04 convergence session triggered.
+- **Parallel-safety validation:** YES — merge ordering respected Appendix D single-owner zones.
+
+---
+
+## 2026-04-21 — conv-04 convergence doc update
+
+- **Session name:** conv-04
+- **Start:** 2026-04-21
+- **End:** 2026-04-21
+- **Scope:** batch doc update reflecting PRs #49 through #53 merged since conv-03 (5 PRs; program-wide total 53 PRs). Flip remaining CHECKLIST items (obs-06 no-op, obs-07, obs-10). Append session-log entries for obs-07-p0/p1, obs-10-p1, obs-06-p1, merge-wave-7, conv-03, conv-04. Update REMEDIATION_PLAN.md item-table statuses (backfill of stale OPEN markers from conv-01/conv-02 window) + append conv-04 changelog entry. Narrow mig-13 residual scope note (fetch_adv closed via mig-02; build_fund_classes + build_benchmark_weights closed via sec-05).
+- **Files touched:** `docs/REMEDIATION_CHECKLIST.md`, `docs/REMEDIATION_SESSION_LOG.md`, `docs/REMEDIATION_PLAN.md`
+- **Result:** DONE
+- **Commits:** (filled at commit step)
+- **Merge status:** pending Serge review
+- **Follow-ups surfaced:** (1) item-table Status column in REMEDIATION_PLAN.md for sec-01/02/03/04, obs-01/02/03, mig-01/mig-04, ops-01..ops-12, ops-06/09/15 was still showing OPEN despite being closed in conv-01/conv-02 — backfilled during this session. (2) `scripts/update.py` retirement (ops-17) now has zero Makefile references; standalone retire remains Phase 2 scope. (3) mig-13 residual scope narrowed to build_entities + merge_staging only.
+- **Parallel-safety validation:** YES — docs-only; no parallel worker holds these three files.
