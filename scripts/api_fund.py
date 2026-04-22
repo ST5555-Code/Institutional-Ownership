@@ -108,6 +108,7 @@ def api_fund_portfolio_managers(ticker: str = ''):
             FROM holdings_v2
             WHERE ticker = ? AND quarter = '{LQ}'
               AND entity_type NOT IN ('passive')
+              AND is_latest = TRUE
             GROUP BY cik, fund_name
             ORDER BY position_value DESC NULLS LAST
             LIMIT 50
@@ -139,7 +140,7 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
             f""  # nosec B608
             f"""
             SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
-            FROM fund_holdings_v2 WHERE {where}
+            FROM fund_holdings_v2 WHERE {where} AND is_latest = TRUE
             GROUP BY fund_name, series_id, lei, family_name
             LIMIT 1
             """, [param]
@@ -159,7 +160,7 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
                 COUNT(DISTINCT ticker) as unique_holdings,
                 COUNT(DISTINCT quarter) as quarters_held
             FROM fund_holdings_v2
-            WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0
+            WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0 AND is_latest = TRUE
             """, [param]
         ).fetchone()
 
@@ -173,6 +174,7 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
             WHERE {sector_where}
               AND fh.quarter = '{LQ}'
               AND s.sector IS NOT NULL AND s.sector != ''
+              AND fh.is_latest = TRUE
             GROUP BY s.sector
             ORDER BY sector_value DESC
             LIMIT 10
@@ -184,7 +186,7 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
             f"""
             SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
             FROM fund_holdings_v2
-            WHERE {where} AND quarter = '{LQ}'
+            WHERE {where} AND quarter = '{LQ}' AND is_latest = TRUE
             ORDER BY market_value_usd DESC NULLS LAST
             LIMIT 10
             """, [param]
@@ -233,6 +235,7 @@ def api_nport_shorts(ticker: str = ''):
             WHERE fh.shares_or_principal < 0
               AND fh.asset_category IN ('EC', 'EP')
               {where}
+              AND fh.is_latest = TRUE
             ORDER BY fh.market_value_usd ASC
             LIMIT 200
             """, params
