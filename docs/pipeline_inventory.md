@@ -15,7 +15,7 @@ _Prior revision header (phase2-prep — REMEDIATION PROGRAM COMPLETE). Remediati
 - _`resolve_agent_names.py` / `resolve_bo_agents.py` / `resolve_names.py` — **RETIRED** to `scripts/retired/` (sec-06, PR #48). Target tables dropped._
 - _`backfill_manager_types.py` — **HARDENED** (sec-06, PR #48): `--dry-run` + CHECKPOINT discipline._
 - _`enrich_tickers.py` — **HARDENED** (sec-06, PR #48): dead holdings writes removed; `--dry-run` + CHECKPOINT._
-- _`build_fund_classes.py` — **RETROFIT CLOSED** (sec-05, PR #45): `--staging` fixed, `seed_staging`, `--enrichment-only`._
+- _`build_fund_classes.py` — **REWRITE CLOSED** (batch-3-tail, 2026-04-23): retrofit bar reached — `--dry-run` + explicit `parse_error` / `lei_error` counters (§5 silent-pass killed) + CHECKPOINT every 2,000 XMLs (§1). Prior sec-05 retrofit (`--staging`, `seed_staging`, `--enrichment-only`) retained._
 - _`build_benchmark_weights.py` — **RETROFIT CLOSED** (sec-05, PR #45): `--staging` fixed + `seed_staging`._
 - _`build_entities.py` — **RETROFIT CLOSED** (mig-13, PR #63): 9 per-step CHECKPOINTs added._
 - _`merge_staging.py` — **RETROFIT CLOSED** (mig-13 PR #63 + int-14 PR #85): `TABLE_KEYS` sourced from `scripts/pipeline/registry.merge_table_keys()`; NULL-only merge mode shipped; error handling fixed._
@@ -108,7 +108,7 @@ audited for PROCESS_RULES violations.
 | `build_managers.py` | `filings_deduped`, `adv_managers`, `cik_crd_*`, `managers` | `parent_bridge`, `cik_crd_links`, `cik_crd_direct`, `managers` (all DROP+CTAS), **`holdings` ALTER+UPDATE (dropped!)** | `:513-532` ALTER+UPDATE `holdings`; `:534` COUNT `holdings` | §1 no CHECKPOINT; §5 `try/except pass` at `:515-521` hides schema failures; §9 hardcoded prod path at `:22`, no `--staging` | **REWRITE** |
 | `build_summaries.py` (v2) | `holdings_v2`, `fund_holdings_v2` | `summary_by_ticker`, `summary_by_parent`, `data_freshness` | — | — | **OK** (rewritten 2026-04-16, commit `87ee955`; rollup_type doubled INSERT for `summary_by_parent`; `total_value` uses `COALESCE(market_value_live, market_value_usd)` for graceful pre/post-enrich behavior; N-PORT side scoped to latest report_month per series_id; `--staging --dry-run --rebuild`; per-quarter × per-worldview CHECKPOINT) |
 | `enrich_holdings.py` | `holdings_v2`, `fund_holdings_v2`, `cusip_classifications`, `securities`, `market_data`, `shares_outstanding_history` | `holdings_v2.{ticker, security_type_inferred, market_value_live, pct_of_so, pct_of_so_source}`, `fund_holdings_v2.ticker`, `data_freshness('holdings_v2_enrichment')` | — | — | **OK** (new 2026-04-16, commit `559058d`; pct-of-so workstream shipped 2026-04-19, merge `8925347` + follow-on `12e172b`; cusip-keyed lookup `UPDATE...FROM`; Pass A NULL cleanup + Pass B main enrichment + Pass C fund_holdings_v2 ticker; `--staging --dry-run --quarter --fund-holdings`; per-pass CHECKPOINT. **Pass B SOH ASOF three-tier denominator**: computes `pct_of_so` via period-accurate ASOF lookup on `shares_outstanding_history` keyed by `(ticker, as_of_date ≤ report_date)`; three-tier fallback hierarchy resolves per row — (1) `soh_period_accurate` when the SOH ASOF match is present, (2) `market_data_so_latest` when SOH has no row ≤ `report_date` (fallback to latest `market_data.shares_outstanding`), (3) `market_data_float_latest` when `shares_outstanding` is NULL (last-resort fallback to latest `market_data.float_shares`). Audit stamp: `pct_of_so_source` column populated per row with the resolved tier. Migration 008 (`ea4ae99` amended) renamed `pct_of_float → pct_of_so` and added `pct_of_so_source VARCHAR` in the same transaction using the capture-and-recreate idiom; see `docs/canonical_ddl.md § Migration patterns — index-preserving RENAME`.) |
-| `build_fund_classes.py` | local N-PORT XML cache, `fund_classes`, `fund_holdings_v2` | `fund_classes`, `lei_reference`, `fund_holdings_v2.lei` (ALTER+UPDATE) | — | — | **OK** (retrofit closed sec-05 PR #45: `--staging` fixed + `seed_staging` + `--enrichment-only`) |
+| `build_fund_classes.py` | local N-PORT XML cache, `fund_classes`, `fund_holdings_v2` | `fund_classes`, `lei_reference`, `fund_holdings_v2.lei` (ALTER+UPDATE) | — | — | **OK** (REWRITE closed 2026-04-23, `build-fund-classes-rewrite`: `--dry-run` + read-only conn; `parse_error` / `lei_error` counters with >1% WARN gate; `_get_existing_classes` scoped to `CatalogException` only; `enrich_fund_holdings_v2` probes `information_schema` instead of try/except/ALTER; CHECKPOINT every 2,000 XMLs. Prior sec-05 PR #45 retrofit preserved.) |
 | `build_entities.py` | `managers`, `adv_managers`, `fund_universe`, `ncen_adviser_map`, etc. | entity MDM tables (staging only) | none | — | **OK** (retrofit closed mig-13 PR #63: 9 per-step CHECKPOINTs added) |
 | `build_benchmark_weights.py` | `fund_holdings_v2`, `market_data` | `benchmark_weights` | — | — | **OK** (retrofit closed sec-05 PR #45: `--staging` fixed + `seed_staging`) |
 | `build_shares_history.py` | `market_data`, **`holdings` (dropped!)**, SEC XBRL cache | `shares_outstanding_history`, **`holdings.pct_of_float` UPDATE (dropped!)** | `:161-164,:201-203` reads; `:177-184,:190-199` UPDATE `holdings` | §1 CHECKPOINT at end only; §9 no `--dry-run` | **REWRITE** |
@@ -199,9 +199,10 @@ pipeline framework rewrite and do not participate in the orchestrator.
    `SourcePipeline.fetch()` retrofit should supply multi-source by
    default.
 
-5. **Hardcoded prod DB paths:** `build_managers.py:22`,
-   `build_fund_classes.py:19`. Must be migrated to `db.get_db_path()`
-   in the framework rewrite so `--staging` works uniformly.
+5. **Hardcoded prod DB paths:** `build_managers.py:22` (CLEARED
+   Rewrite5 `223b4d9`), `build_fund_classes.py:19` (CLEARED sec-05
+   PR #45 — uses `db.get_db_path()`). Framework rewrites now
+   standardize on `db.get_db_path()` so `--staging` works uniformly.
 
 6. **`db.REFERENCE_TABLES` is stale:** lists `holdings` and
    `fund_holdings` (dropped Stage 5). `seed_staging()` would fail on
