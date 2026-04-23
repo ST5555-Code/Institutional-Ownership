@@ -1,6 +1,13 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-22 (conv-12 — Phase 2 + Wave 2 complete). Main HEAD: `b0baebe` (w2-05 ADV migrated to SourcePipeline)._
+_Last updated: 2026-04-22 (post int-22 close — prod `is_latest` rollback executed + verified). Main HEAD: `2f3fed5` (PR #110 — int-22 rollback wrapper + staging proof)._
+
+**int-22 closed this session** (`int-22-prod-execute-and-verify`). Option C rollback of run_id `13f_holdings_quarter=2025Q4_20260422_200854` (manifest_id=78902) executed on prod. Post-state matches staging rehearsal to the row (3,205,650 total / 483,080 legitimate tickerless TRUE / 0 FALSE / manifest `rolled_back`). `/api/v1/tickers` returns 12,598 tickers; `/api/v1/query1?ticker=AAPL` and `?ticker=MSFT` both 200. Readonly snapshot refreshed from corrected prod (`data/13f_readonly.duckdb` 5.5GB, 333 tables). Loader idempotency gap tracked separately as **int-23** (open).
+
+**Next items:**
+- **Cluster 2** — INF37 (`backfill_manager_types` residual 9 entities / 14,368 rows) + int-21 SELF-fallback curation (standing).
+- **Serge visual walkthrough on PR #107** (ui-audit-01).
+- **Peer rotation precompute** — address `get_peer_rotation()` slowness.
 
 Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + post-Phase-2 backlog.
 
