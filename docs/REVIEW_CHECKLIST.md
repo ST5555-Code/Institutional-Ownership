@@ -53,6 +53,62 @@ confirms the exemption reason is legitimate and tracked.
 
 ---
 
+## Ticket Number Discipline
+
+**Scope.** Any PR that opens a new tracker item or closes an old one under
+any of the project's numbered prefixes: `INF`, `DM`, `BL`, `mig-`, `int-`,
+`obs-`, `sec-`, `ops-`, `w2-`, `p2-`, `conv-`, `D`, `S`.
+
+**Hard rule — numbers are retired forever.** Ticket numbers are
+monotonically increasing. Once a number has been assigned to an item (open
+OR closed), that number is retired permanently. A new item MUST pick the
+next available number for its prefix, never an old one — even if the prior
+holder was closed, reverted, rescoped, or never shipped.
+
+**Why.** We had an INF40 collision on 2026-04-23: one closed item
+(`BLOCK-L3-SURROGATE-ROW-ID`, 2026-04-22) and one new item (entity-CTAS
+rewrite, 2026-04-23) both landed under "INF40". The second had to be
+disambiguated in prose ("INF40 (entity-CTAS)") — still ambiguous in every
+grep, commit message, and cross-reference. Retiring numbers costs nothing;
+reusing them costs ambiguity forever.
+
+**Qualifier suffixes for decompositions.** When splitting an existing item
+into sub-parts, append a lowercase letter (`INF40a`, `INF40b`, `DM15d`,
+`mig-04b`). The base number still refers to the parent item; the suffixes
+are new children that inherit its context. Precedent: DM15b, DM15c, DM15d,
+DM15e; INF9a through INF9e.
+
+**Picking the next number.** Before opening a new item, grep for the
+prefix in `ROADMAP.md`, `docs/DEFERRED_FOLLOWUPS.md`, `docs/findings/`,
+`docs/REMEDIATION_*.md`, and `docs/closed/`. Use max(existing) + 1. Gaps in
+the sequence are NOT free to reuse — they usually represent an assigned
+number that was closed without a ROADMAP entry (e.g. absorbed into another
+item).
+
+**Reviewer check.** Before approving a PR that introduces a new ticket
+number, reviewer runs:
+
+```
+python3 scripts/audit_ticket_numbers.py
+```
+
+The script prints the current max per prefix and flags candidate reuse
+across tracker docs. A PR that introduces a number already present in the
+script output without explicit suffix disambiguation is rejected on review.
+
+**Script semantics.** The auditor is a diagnostic tool, not ground truth.
+It intentionally over-reports — phase splits (p0/p1), workflow stages
+(export/apply), and cross-references commonly show up as "candidates" and
+are resolved by inspection. True reuse looks like the INF40 case: two
+distinct item titles, both treated as a "definition" (heading or bold
+table row), in two unrelated tracker sections.
+
+**References.**
+- Audit script: `scripts/audit_ticket_numbers.py`
+- Known collision precedent: INF40 (2026-04-23 session close)
+
+---
+
 ## Tracker consistency
 
 **Scope.** Any PR that changes the status of a tracked item (closes
