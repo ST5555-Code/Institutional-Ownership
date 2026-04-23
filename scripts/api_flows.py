@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from api_common import (
@@ -21,7 +21,10 @@ from api_common import (
     envelope_success,
     get_rollup_type,
     validate_query_params_dep,
+    validate_ticker_current,
+    validate_ticker_historical,
 )
+from app_db import get_db
 from queries import (
     clean_for_json,
     cohort_analysis,
@@ -58,6 +61,14 @@ def api_flow_analysis(request: Request):
             'missing_param', 'Missing ticker parameter',
             request, schema=FlowAnalysisEnvelope, status=400,
         )
+    con = get_db()
+    try:
+        validate_ticker_historical(con, ticker)
+        if peers:
+            for p in [t.strip() for t in peers.split(',') if t.strip()]:
+                validate_ticker_historical(con, p)
+    finally:
+        con.close()
     try:
         result = flow_analysis(ticker, period=period, peers=peers, level=level,
                                active_only=ao, rollup_type=rt)
@@ -80,6 +91,11 @@ def api_ownership_trend_summary(request: Request):
             'missing_param', 'Missing ticker parameter',
             request, schema=OwnershipTrendEnvelope, status=400,
         )
+    con = get_db()
+    try:
+        validate_ticker_historical(con, ticker)
+    finally:
+        con.close()
     try:
         result = ownership_trend_summary(ticker, level=level, active_only=ao, rollup_type=rt)
         return envelope_success(clean_for_json(result), request, schema=OwnershipTrendEnvelope)
@@ -99,6 +115,11 @@ def api_cohort_analysis(request: Request):
     rt = get_rollup_type(request)
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_historical(con, ticker)
+    finally:
+        con.close()
     try:
         result = cohort_analysis(ticker, from_quarter=from_q, level=level,
                                  active_only=active_only, rollup_type=rt)
@@ -115,6 +136,11 @@ def api_holder_momentum(request: Request):
     rt = get_rollup_type(request)
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_historical(con, ticker)
+    finally:
+        con.close()
     try:
         result = holder_momentum(ticker, level=level, active_only=ao, rollup_type=rt)
         return clean_for_json(result)
@@ -130,11 +156,18 @@ def api_peer_rotation(request: Request):
         ticker = (request.query_params.get('ticker') or '').upper().strip()
         if not ticker:
             return JSONResponse(status_code=400, content={'error': 'Missing ticker param'})
+        con = get_db()
+        try:
+            validate_ticker_historical(con, ticker)
+        finally:
+            con.close()
         active_only = request.query_params.get('active_only', '0') == '1'
         level = (request.query_params.get('level') or 'parent').strip()
         rt = get_rollup_type(request)
         result = get_peer_rotation(ticker, active_only=active_only, level=level, rollup_type=rt)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("peer_rotation error: %s", e)
         return JSONResponse(status_code=500, content={'error': str(e)})
@@ -149,12 +182,20 @@ def api_peer_rotation_detail(request: Request):
         peer = (request.query_params.get('peer') or '').upper().strip()
         if not ticker or not peer:
             return JSONResponse(status_code=400, content={'error': 'Missing ticker or peer param'})
+        con = get_db()
+        try:
+            validate_ticker_historical(con, ticker)
+            validate_ticker_historical(con, peer)
+        finally:
+            con.close()
         active_only = request.query_params.get('active_only', '0') == '1'
         level = (request.query_params.get('level') or 'parent').strip()
         rt = get_rollup_type(request)
         result = get_peer_rotation_detail(
             ticker, peer, active_only=active_only, level=level, rollup_type=rt)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("peer_rotation_detail error: %s", e)
         return JSONResponse(status_code=500, content={'error': str(e)})
@@ -171,6 +212,11 @@ def api_portfolio_context(request: Request):
             'missing_param', 'Missing ticker parameter',
             request, schema=ConvictionEnvelope, status=400,
         )
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
     try:
         rt = get_rollup_type(request)
         result = portfolio_context(ticker, level=level, active_only=ao, rollup_type=rt)

@@ -12,10 +12,15 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from api_common import get_rollup_type, validate_query_params_dep
+from api_common import (
+    get_rollup_type,
+    validate_query_params_dep,
+    validate_ticker_current,
+    validate_ticker_historical,
+)
 from app_db import get_db, has_table
 import queries
 from queries import _cross_ownership_query, clean_for_json, df_to_records
@@ -47,6 +52,8 @@ def api_cross_ownership(request: Request):
     except Exception as e:
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
+        for t in tickers:
+            validate_ticker_current(con, t)
         return _cross_ownership_query(con, tickers, anchor=anchor,
                                       active_only=active_only, limit=limit,
                                       rollup_type=rt)
@@ -69,6 +76,8 @@ def api_cross_ownership_top(request: Request):
     except Exception as e:
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
+        for t in tickers:
+            validate_ticker_current(con, t)
         return _cross_ownership_query(con, tickers, anchor=None,
                                       active_only=active_only, limit=limit,
                                       rollup_type=rt)
@@ -92,8 +101,12 @@ def api_two_company_overlap(request: Request):
     except Exception as e:
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
+        validate_ticker_historical(con, subject)
+        validate_ticker_historical(con, second)
         result = queries.get_two_company_overlap(subject, second, quarter, con)
         return clean_for_json(result)
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("two_company_overlap error: %s", e, exc_info=True)
         return JSONResponse(status_code=500, content={'error': str(e)})
@@ -117,8 +130,11 @@ def api_two_company_subject(request: Request):
     except Exception as e:
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
+        validate_ticker_historical(con, subject)
         result = queries.get_two_company_subject(subject, quarter, con)
         return clean_for_json(result)
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("two_company_subject error: %s", e, exc_info=True)
         return JSONResponse(status_code=500, content={'error': str(e)})

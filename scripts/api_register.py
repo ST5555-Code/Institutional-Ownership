@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api_common import (
@@ -27,6 +27,8 @@ from api_common import (
     envelope_success,
     get_rollup_type,
     validate_query_params_dep,
+    validate_ticker_current,
+    validate_ticker_historical,
 )
 from app_db import get_db
 from export import build_excel, build_excel_multisheet
@@ -48,6 +50,19 @@ QUERY_NAMES = {
     9: 'Sector Rotation', 10: 'New Positions', 11: 'Exits',
     14: 'AUM vs Position', 15: 'DB Statistics',
 }
+
+# BL-7 ticker validation dispatch:
+#   HISTORICAL_QUERIES — queries that intentionally span multiple quarters
+#     (FQ→LQ, PQ→LQ, quarter heatmaps). A ticker valid historically but
+#     absent from LQ must still pass.
+#   q7   — fund-portfolio lookup keyed on cik/fund_name; skip ticker
+#          validation (existing 404 on empty positions already handles bad
+#          inputs).
+#   q15  — global DB stats; no ticker required.
+#   All others default to current validator. If ?quarter= is explicitly
+#   passed AND != LQ, the current-family queries override to historical.
+_HISTORICAL_QUERIES = frozenset({2, 5, 9, 10, 11})
+_SKIP_TICKER_VALIDATION = frozenset({7, 15})
 
 
 # SMOKE TEST: /api/v1/tickers is the autocomplete root — a silent 500 here
@@ -82,6 +97,11 @@ def api_summary(ticker: str = ''):
     ticker = (ticker or '').upper().strip()
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_historical(con, ticker)
+    finally:
+        con.close()
     result = get_summary(ticker)
     if not result:
         return JSONResponse(
@@ -102,11 +122,23 @@ def _execute_query(qnum: int, request: Request):
         return None, {'code': 'invalid_query', 'message': f'Invalid query number: {qnum}'}, 400
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     cik = (request.query_params.get('cik') or '').strip()
-    quarter = request.query_params.get('quarter', LQ)
+    quarter_raw = request.query_params.get('quarter')
+    quarter = quarter_raw if quarter_raw else LQ
     rt = get_rollup_type(request)
 
     if qnum not in (15,) and not ticker:
         return None, {'code': 'missing_param', 'message': 'Missing ticker parameter'}, 400
+
+    # BL-7: validate ticker against DB universe before dispatching to query fn.
+    if ticker and qnum not in _SKIP_TICKER_VALIDATION:
+        con = get_db()
+        try:
+            if qnum in _HISTORICAL_QUERIES or (quarter_raw and quarter_raw != LQ):
+                validate_ticker_historical(con, ticker)
+            else:
+                validate_ticker_current(con, ticker)
+        finally:
+            con.close()
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
@@ -163,11 +195,23 @@ def api_export(qnum: int, request: Request):
         return JSONResponse(status_code=400, content={'error': f'Invalid query number: {qnum}'})
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     cik = (request.query_params.get('cik') or '').strip()
-    quarter = request.query_params.get('quarter', LQ)
+    quarter_raw = request.query_params.get('quarter')
+    quarter = quarter_raw if quarter_raw else LQ
     rt = get_rollup_type(request)
 
     if qnum not in (15,) and not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+
+    # BL-7: mirror _execute_query validation dispatch.
+    if ticker and qnum not in _SKIP_TICKER_VALIDATION:
+        con = get_db()
+        try:
+            if qnum in _HISTORICAL_QUERIES or (quarter_raw and quarter_raw != LQ):
+                validate_ticker_historical(con, ticker)
+            else:
+                validate_ticker_current(con, ticker)
+        finally:
+            con.close()
 
     try:
         fn = QUERY_FUNCTIONS[qnum]
@@ -242,6 +286,7 @@ def api_amendments(ticker: str = ''):
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
+        validate_ticker_current(con, ticker)
         amendments = con.execute(
             f""  # nosec B608
             f"""
@@ -271,6 +316,8 @@ def api_amendments(ticker: str = ''):
             'ticker': ticker,
             'amendments': df_to_records(amendments),
         })
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("amendments error: %s", e)
         return JSONResponse(status_code=500, content={'error': str(e)})
