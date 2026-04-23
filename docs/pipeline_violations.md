@@ -321,17 +321,48 @@ below for historical reference.
 
 ---
 
-## build_fund_classes.py (REWRITE)
+## build_fund_classes.py (REWRITE) — CLEARED 2026-04-23 (retrofit bar)
 
-- §1 (incremental save): weak — CHECKPOINT every 5000 XMLs at
-  `build_fund_classes.py:104`, final at `:135`. Adequate but sparse
-  for the N-PORT XML volume.
-- §5 (error handling): silent — `pass` at `:53` and `:133` hide parse
-  failures.
-- §9 (dry-run): **VIOLATION** — no flag; `DB_PATH` hardcoded to prod at
-  `build_fund_classes.py:19`. No `--staging` plumbing.
-- Legacy refs: `build_fund_classes.py:139` ALTER `fund_holdings`;
-  `:146-151` UPDATE; `:152` COUNT.
+**CLEARED 2026-04-23** — Retrofit landed on branch
+`build-fund-classes-rewrite` alongside the Batch 3 bar
+(`compute_flows` / `build_summaries` / `build_shares_history`).
+Legacy-ref + `DB_PATH` + `--staging` items had already been cleared
+in earlier sessions (sec-05 PR #45 for `--staging` / `seed_staging` /
+`--enrichment-only`; BLOCK-3 `0dc0d5d` repointed `fund_holdings` →
+`fund_holdings_v2`); this PR closes the remaining §1 / §5 / §9 gaps:
+
+- §1 (incremental save): **CLEARED** — CHECKPOINT cadence tightened
+  to every 2,000 XMLs (prev. 5,000) via `CHECKPOINT_EVERY` constant,
+  final flush preserved before enrichment + before close. Matches
+  the `fetch_nport_v2.py` per-2,000-rows bar.
+- §5 (error handling): **CLEARED** — three silent `pass` blocks
+  replaced:
+  (a) `parse_xml_for_classes()` catches only `etree.XMLSyntaxError` /
+      `OSError` and prints a `[parse_error]` line with the filename +
+      exception; a per-run counter is surfaced in the SUMMARY and
+      drives a `>1%` WARN gate.
+  (b) `_get_existing_classes()` catches only
+      `duckdb.CatalogException` (table-missing first-run case); any
+      other DuckDB error propagates.
+  (c) `enrich_fund_holdings_v2()` no longer speculatively ALTERs
+      inside a try/except — probes `information_schema.columns`
+      first; idempotent by detection, not by swallowing errors.
+  (d) LEI `INSERT OR REPLACE` wraps only `duckdb.Error` and
+      increments a `lei_errors` counter reported in SUMMARY.
+- §9 (dry-run): **CLEARED** — `--dry-run` flag added; opens a
+  read-only DuckDB connection, parses the full XML cache, counts
+  candidate inserts against an in-memory `existing` set, and
+  projects the enrichment UPDATE via COUNT-join. Zero DB mutations
+  in dry-run. Skips `record_freshness` and all CHECKPOINT calls.
+- Legacy refs: **CLEARED prior session** (BLOCK-3 `0dc0d5d`) — script
+  targets `fund_holdings_v2` only; `rg "fund_holdings(?!_v2)"` on
+  `scripts/build_fund_classes.py` returns 0 matches.
+
+Test: `python3 scripts/build_fund_classes.py --dry-run` against prod
+— 53,131 XMLs scanned, 1 parse error surfaced (previously silent),
+31,067 candidate classes + 13,154 candidate LEIs projected,
+11,855,837-row enrichment projection, zero writes. `pytest tests/`
+282/282 PASS, `pytest tests/smoke/` 8/8 PASS.
 
 ---
 
