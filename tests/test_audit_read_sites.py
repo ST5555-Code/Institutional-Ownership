@@ -1,4 +1,4 @@
-"""Unit tests for scripts/audit_read_sites.py (mig-07 Mode 1)."""
+"""Unit tests for scripts/hygiene/audit_read_sites.py (mig-07 Mode 1)."""
 from __future__ import annotations
 
 import csv
@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "scripts" / "hygiene"))
 
 import audit_read_sites as ars  # noqa: E402
 

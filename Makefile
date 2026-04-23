@@ -210,4 +210,4 @@ rotate-logs-dry:
 # renaming a column to find every read site.
 # ---------------------------------------------------------------------------
 audit-read-sites:
-	$(Q) $(PY) $(SCRIPTS)/audit_read_sites.py --csv
+	$(Q) $(PY) $(SCRIPTS)/hygiene/audit_read_sites.py --csv

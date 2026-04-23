@@ -318,7 +318,7 @@ def main(argv: list[str]) -> int:
     )
     args = ap.parse_args(argv)
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     defs = scan(root)
 
     by_prefix: dict[str, set[int]] = defaultdict(set)

@@ -292,7 +292,7 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         rebuild_from=("fund_universe",),
     ),
     "fund_family_patterns": DatasetSpec(
-        layer=4, owner="scripts/migrate_batch_3a.py",
+        layer=4, owner="manual seed",
         promote_strategy="upsert",
         promote_key=("pattern",),
         notes="seeded once, manually edited thereafter",
