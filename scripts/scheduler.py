@@ -23,8 +23,8 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 DEFAULT_SCHEDULE = [
     {
         "name": "13D/G Update",
-        "script": "fetch_13dg.py",
-        "flags": ["--staging", "--update"],
+        "script": "pipeline/load_13dg.py",
+        "flags": ["--staging"],
         "interval_hours": 720,  # monthly (30 days)
         "enabled": False,
     },
@@ -37,8 +37,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "name": "Market Data Refresh",
-        "script": "fetch_market.py",
-        "flags": ["--staging"],
+        "script": "pipeline/load_market.py",
+        "flags": [],
         "interval_hours": 24,  # daily
         "enabled": False,
     },
@@ -98,7 +98,7 @@ def run_task(task):
     else:
         cmd = ["python3", "-u", script_path] + flags
 
-    log_name = script.replace('.py', '').replace('.sh', '')
+    log_name = os.path.basename(script).replace('.py', '').replace('.sh', '')
     log_path = os.path.join(LOG_DIR, f"sched_{log_name}.log")
 
     print(f"  [{datetime.now().strftime('%H:%M')}] Running {task['name']}...", flush=True)

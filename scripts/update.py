@@ -12,7 +12,7 @@ Sequence:
   3. load_13f.py            — Load 13F TSVs into DuckDB
   4. build_managers.py      — Build manager/parent tables
   5. build_cusip.py         — Build securities table
-  6. fetch_market.py        — Pull yfinance market data
+  6. pipeline/load_market.py — Pull yfinance market data
   7. auto_resolve.py        — Auto-resolve ticker gaps
   8. pipeline/load_nport.py — Stage N-PORT mutual fund holdings (w2-03)
 
@@ -74,7 +74,7 @@ def main():
         "load_13f.py",
         "build_managers.py",
         "build_cusip.py",
-        "fetch_market.py",
+        "pipeline/load_market.py",
     ]
 
     for script in steps:
