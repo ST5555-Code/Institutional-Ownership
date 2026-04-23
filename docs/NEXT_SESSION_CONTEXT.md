@@ -1,6 +1,6 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-23 (post entity-curation-w1 — INF37 cleared + int-21 SELF-fallback reviewed + 43e de-scoped). Main HEAD at branch point: `e1b11e1`. entity-curation-w1 branch pending PR._
+_Last updated: 2026-04-23 (post inf9f-agincourt — INF9 residual fully resolved via Path B). Main HEAD at branch point: `6c14c35`. inf9f-agincourt branch pending PR._
 
 **entity-curation-w1 closed this session.** Batch-closed two of three standing curation items:
 - **INF37 CLEARED** — 9 entities / 14,368 `holdings_v2` rows flipped from NULL/unknown to correct `manager_type` (8 `wealth_management` + 1 `active`). Zero residuals. CSV edit + prod backfill. See `docs/findings/entity-curation-w1-log.md`.
@@ -15,7 +15,9 @@ Prod state: `validate_entities.py` baseline 8 PASS / 1 FAIL / 7 MANUAL preserved
 - **Taxonomy refactor follow-on** (43e re-scope) — bucket membership for `family_office` + `multi_strategy` + `SWF` in `build_summaries.py:173,181` and `queries.py:1724`; plus React typeConfig color mapping.
 - **Serge visual walkthrough on PR #107** (ui-audit-01).
 - **Peer rotation precompute** — address `get_peer_rotation()` slowness.
-- **INF9 closed 2026-04-23** (`inf9-persist`, PR #120, snapshot `20260423_080406`). 11 DM12 `merge`/`decision_maker_v1` overrides (HC Capital Trust 6 + CRI 5, IDs 246–256) promoted to prod; `entity_overrides_persistent` 245 → 256; validate baseline preserved (8 PASS / 1 FAIL wellington / 7 MANUAL). New ROADMAP follow-ups: **INF9f** (merge-target identifier_type schema gap; 1 residual row S000029852 → Agincourt eid 19021, CRD-only target) and **INF40** (`sync_staging.py` CTAS strips UNIQUE/PK constraints — blocks `build_entities.py --reset` on staging). Findings doc: `docs/findings/inf9-closure.md`.
+- **INF9 closed 2026-04-23** (`inf9-persist`, PR #120, snapshot `20260423_080406`). 11 DM12 `merge`/`decision_maker_v1` overrides (HC Capital Trust 6 + CRI 5, IDs 246–256) promoted to prod; `entity_overrides_persistent` 245 → 256; validate baseline preserved (8 PASS / 1 FAIL wellington / 7 MANUAL). Findings doc: `docs/findings/inf9-closure.md`.
+- **INF9f closed 2026-04-23** (`inf9f-agincourt`, snapshot `20260423_084622`). Path B: assigned real CIK `0001845254` to Agincourt Capital Management, LLC (eid 19021) from `adv_managers` — EDGAR-verified, active 13F-HR filer. 12th DM12 merge override (S000029852 → `0001845254`) staged + promoted as override_id 257. Prod counts: `entity_identifiers` 35,511 → 35,512; `entity_overrides_persistent` 256 → 257. Validate baseline preserved (8 PASS / 1 FAIL wellington / 7 MANUAL). INF9 residual fully resolved.
+- **INF40 still open** — `sync_staging.py` CTAS strips UNIQUE/PK constraints — blocks `build_entities.py --reset` on staging. See ROADMAP.
 
 Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + post-Phase-2 backlog.
 
