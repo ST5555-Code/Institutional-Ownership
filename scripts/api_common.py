@@ -70,6 +70,53 @@ def get_rollup_type(request: Request) -> str:
     return rt
 
 
+# ── Ticker universe validation (BL-7) ──────────────────────────────────────
+# Shape validation (TICKER_RE) catches "foo", "aapl!", etc. These validators
+# catch the next class of error: syntactically-valid but unknown tickers
+# (typos, de-listed symbols). Call from route bodies AFTER any existing
+# missing-param check and BEFORE any DB read. Ticker must already be
+# upper-cased and stripped.
+#
+# validate_ticker_current   — LQ + is_latest=TRUE view (what /api/v1/tickers
+#                             autocomplete exposes). Use for current-state
+#                             routes.
+# validate_ticker_historical — summary_by_ticker EXISTS (any quarter). Use
+#                              for routes that legitimately span history
+#                              (exits, rotation, cohort, trend).
+
+def validate_ticker_current(con, ticker: str) -> None:
+    """Raise 404 if ticker has no current (LQ, is_latest=TRUE) holdings."""
+    row = con.execute(
+        f"SELECT 1 FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' "  # nosec B608
+        f"AND is_latest = TRUE LIMIT 1",
+        [ticker],
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Ticker '{ticker}' not found in current holdings. "
+                f"Check typing or see /api/v1/tickers for the valid list."
+            ),
+        )
+
+
+def validate_ticker_historical(con, ticker: str) -> None:
+    """Raise 404 if ticker has no historical data in any quarter."""
+    row = con.execute(
+        "SELECT 1 FROM summary_by_ticker WHERE ticker = ? LIMIT 1",
+        [ticker],
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Ticker '{ticker}' has no historical data. "
+                f"Check typing or see /api/v1/tickers."
+            ),
+        )
+
+
 # ── Input guards (ARCH-1A) — FastAPI dependency ────────────────────────────
 # Applied via APIRouter(dependencies=[Depends(validate_query_params_dep)]).
 # Raises HTTPException(400, ...) on invalid input. /api/admin/* routers

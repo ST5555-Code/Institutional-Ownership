@@ -15,10 +15,15 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from api_common import LQ, get_rollup_type, validate_query_params_dep
+from api_common import (
+    LQ,
+    get_rollup_type,
+    validate_query_params_dep,
+    validate_ticker_current,
+)
 from app_db import get_db, has_table
 from queries import clean_for_json, df_to_records, short_interest_analysis
 
@@ -91,6 +96,11 @@ def api_short_analysis(request: Request):
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
     try:
         rt = get_rollup_type(request)
         return short_interest_analysis(ticker, rollup_type=rt)
@@ -104,6 +114,11 @@ def api_short_long(request: Request):
     ticker = (request.query_params.get('ticker') or '').upper().strip()
     if not ticker:
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
     try:
         from queries import get_short_long_comparison
         rt = get_rollup_type(request)
@@ -121,6 +136,7 @@ def api_short_volume(ticker: str = ''):
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
+        validate_ticker_current(con, ticker)
         if not has_table('short_interest'):
             return JSONResponse(
                 status_code=404,
@@ -146,6 +162,7 @@ def api_crowding(ticker: str = ''):
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
+        validate_ticker_current(con, ticker)
         holders = con.execute(
             f""  # nosec B608
             f"""
@@ -178,6 +195,7 @@ def api_smart_money(ticker: str = ''):
         return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
     con = get_db()
     try:
+        validate_ticker_current(con, ticker)
         longs = con.execute(
             f""  # nosec B608
             f"""
@@ -224,6 +242,10 @@ def api_heatmap(request: Request):
         tickers = [ticker] if ticker else []
         if peers:
             tickers += [t.strip() for t in peers.split(',') if t.strip()]
+        # BL-7: validate every ticker actually provided by the client (not the
+        # top-10 auto-backfill case where `tickers` stays empty).
+        for t in tickers:
+            validate_ticker_current(con, t)
         if not tickers:
             top = con.execute(
                 f""  # nosec B608
@@ -275,6 +297,8 @@ def api_heatmap(request: Request):
             'managers': manager_names,
             'cells': df_to_records(cells),
         })
+    except HTTPException:
+        raise
     except Exception as e:
         log.error("heatmap error: %s", e)
         return JSONResponse(status_code=500, content={'error': str(e)})

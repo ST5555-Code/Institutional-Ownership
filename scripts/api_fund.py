@@ -11,7 +11,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from api_common import LQ, validate_query_params_dep
+from api_common import (
+    LQ,
+    validate_query_params_dep,
+    validate_ticker_current,
+    validate_ticker_historical,
+)
 from app_db import get_db
 from queries import clean_for_json, df_to_records
 
@@ -96,6 +101,7 @@ def api_fund_portfolio_managers(ticker: str = ''):
     except Exception as e:
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
+        validate_ticker_current(con, ticker)
         df = con.execute(
             f""  # nosec B608
             f"""
@@ -217,6 +223,8 @@ def api_nport_shorts(ticker: str = ''):
     ticker = (ticker or '').upper().strip()
     con = get_db()
     try:
+        if ticker:
+            validate_ticker_historical(con, ticker)
         where = "AND fh.ticker = ?" if ticker else ""
         params = [ticker] if ticker else []
         df = con.execute(
