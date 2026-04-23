@@ -53,6 +53,31 @@ Each session's commits must include the session name in the first line for trace
 
 This lets `git log --grep="int-01"` surface every commit associated with that item.
 
+## Closing tracked items
+
+When a session closes a tracked item (from `ROADMAP.md § Open items`
+or equivalent), do **not** append the closure row to
+`ROADMAP.md § Closed items (log)`. That table is frozen as of
+2026-04-23. Parallel sessions that both appended to its tail
+conflicted mechanically on every collision.
+
+Instead, the session writes a per-session file:
+
+```
+docs/closures/YYYY-MM-DD-<session-name>.md
+```
+
+containing one Markdown table row per closed item, in the same
+four-column shape as the archived log. Multiple closures from one
+session stack as multiple rows in the same file. Full format spec
+and rationale: `docs/closures/README.md`.
+
+Because each session writes its own file, two parallel sessions
+never touch the same file and git merge has no grounds to flag a
+conflict. A flat view is generated on demand by
+`python3 scripts/concat_closed_log.py` → `docs/closed-items-log.md`
+(git-ignored).
+
 ## Post-merge cleanup
 
 `gh pr merge --squash --delete-branch` deletes the remote branch but cannot delete the local branch when a worktree still holds it, so the local copy and its worktree both leak. After merging a PR to `main`, run:
