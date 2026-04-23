@@ -48,7 +48,7 @@ All CLI flags thread through the `SourcePipeline.run()` orchestrator: `--dry-run
 
 **Stop the app before promote.** DuckDB allows a single writer per file; the framework opens prod in write mode at step 5 (snapshot) and step 6 (promote). If the FastAPI process holds the file open, promote errors with "unable to open file". Standard pattern: `./scripts/start_app.sh stop` → run pipeline → `./scripts/start_app.sh start`.
 
-**Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The legacy "Post-hoc Writer Ordering on `managers`" pattern at the bottom of this doc still applies to `build_managers.py` + `fetch_13dg.py` Phase 3 + `fetch_ncen.py` — but those writers are outside the Phase 2 framework.
+**Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The `adviser_cik` stamping on `managers` now runs inside `scripts/pipeline/load_ncen.py._update_managers_adviser_cik` during promote — the legacy post-hoc writer-ordering hazard (fetch_13dg Phase 3 + fetch_ncen running after build_managers) is gone with those scripts' retirement in Wave 2.
 
 ---
 
@@ -309,62 +309,28 @@ DuckDB EXPORT DATABASE directories.
 
 All items below must go through the staging workflow:
 
-- **Securian / Sterling fix** — `entity_relationships` 12171 + 12172 + dependent rollups + `holdings_v2` / `fund_holdings_v2` re-stamps
-- **HC Capital Trust** — 5 sub-adviser routings (Parametric, Mellon, City of London, Wellington, RhumbLine, Agincourt)
-- **CRI / Christian Brothers** — 4 missing series routings (Wellington, Loomis Sayles, Teachers Advisors, Parametric)
 - **DM13** — ADV_SCHEDULE_A relationship quality audit (~410 suspicious relationships)
 - **DM14** — DM8 extension for unlabeled intra-firm sub-advisers (~300-500 series)
 - **DM15** — External sub-adviser coverage pass (~$549.7B AUM affected)
 - **L5 parents 201-720 audit** (batches of 100)
 - **L4 classification audit** (13 categories)
 
-## Stage 5 Cleanup
+## Completed Audit Work
 
-Drop original holdings / fund_holdings / beneficial_ownership tables.
-Authorized on or after **2026-05-09**. See `ROADMAP.md`.
+- **Securian / Sterling** — **Closed 2026-04-10 (DM12, `ada58ac`)**.
+- **HC Capital Trust (7 sub-adviser routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Note: original MAINTENANCE count of 5 was understated; actual scope 7.
+- **CRI / Christian Brothers (5 missing series routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Note: original MAINTENANCE count of 4 was understated; actual scope 5.
 
-## Post-hoc Writer Ordering on `managers`
+## Stage 5 Cleanup — CLOSED 2026-04-13
 
-**Phase 2 note.** `fetch_13dg.py` and `fetch_ncen.py` are retired — the ingestion halves are now `scripts/pipeline/load_13dg.py` (w2-01) and `scripts/pipeline/load_ncen.py` (w2-04), which run inside the `SourcePipeline` eight-step flow and do not mutate `managers` directly. The `has_13dg` / `adviser_cik` stamping on `managers` is a separate concern from the new ingest pipelines and still runs on the legacy ordering described below, triggered from `build_managers.py`. This section is retained because the `managers` table is an L4 derived artifact owned by `build_managers.py`, not by the framework.
+Legacy `holdings` / `fund_holdings` / `beneficial_ownership` tables dropped from prod and staging. EXPORT DATABASE backup taken before mutation. Four INF9d eids verified as live PARENT_SEEDS brand shells and preserved. All writers repointed to v2 successors. Commits: `305739e` (primary drop), `7247689` (write-path follow-up).
 
-Three writers mutate `managers` in sequence:
+## Post-hoc Writer Ordering on `managers` — CLOSED (Wave 2 retirement)
 
-1. **`build_managers.py`** — canonical builder. DROP+CTAS rebuild;
-   materializes the base schema.
-2. **13D/G post-hoc stamp** — `ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN` + `UPDATE` to stamp the 13D/G-filer flag. Invoked from `build_managers.py` tail today; historically ran from `fetch_13dg.py` Phase 3.
-3. **N-CEN post-hoc stamp** — `ALTER TABLE managers ADD COLUMN adviser_cik VARCHAR` + `UPDATE` from `ncen_adviser_map`. Invoked from `build_managers.py` tail today; historically ran from `fetch_ncen.py`.
+The post-hoc writer-ordering hazard documented in prior revisions (three writers — `build_managers.py`, `fetch_13dg.py` Phase 3 `has_13dg` stamp, `fetch_ncen.py` `adviser_cik` stamp — running in implicit Makefile-enforced sequence) no longer applies:
 
-The ordering is currently implicit — enforced only by the Makefile
-`quarterly-update` target and the scheduler that invokes it. There
-is no code-level sentinel that refuses to run the post-hoc stamps
-if `build_managers` has not run in the current cycle.
+- `fetch_13dg.py` retired to `scripts/retired/` (Wave 2 w2-01). `has_13dg` post-hoc stamp on `managers` was not ported; the live `Load13DGPipeline` writes only `beneficial_ownership_v2` + `beneficial_ownership_current`.
+- `fetch_ncen.py` retired to `scripts/retired/` (Wave 2 w2-04). The `adviser_cik` stamp on `managers` is now owned by `scripts/pipeline/load_ncen.py._update_managers_adviser_cik` and fires atomically inside the subclass's `approve_and_promote()`.
+- `build_managers.py` no longer carries the `has_13dg` / `adviser_cik` ALTER+UPDATE tail; those columns are not populated from the canonical builder.
 
-**Hazard scenarios.**
-- If `build_managers.py` runs without `fetch_13dg.py` / `fetch_ncen.py`
-  afterward, `managers` ends the cycle with the base schema only —
-  `has_13dg` and `adviser_cik` are missing. Downstream readers that
-  expect either column will error.
-- If `fetch_13dg.py` or `fetch_ncen.py` runs before `build_managers.py`
-  in a cycle, the ALTER+UPDATE writes against the *previous cycle's*
-  `managers` table (`build_managers` uses DROP+CTAS, so every cycle
-  starts fresh). The writes succeed but are immediately overwritten
-  on the next `build_managers.py` invocation.
-
-**Current discipline.** Makefile + scheduler sequencing. Adequate for
-the quarterly cadence; the hazard window is narrow because the chain
-is automated end-to-end.
-
-**Follow-on candidates (not scheduled).**
-- (x) Sentinel check at top of `fetch_13dg.py` Phase 3 and
-  `fetch_ncen.py`: read `data_freshness('managers')` and fail if the
-  stamp is older than the current cycle's `build_managers.py` run.
-  Makes the ordering contract explicit at the code layer. Small fix,
-  straightforward.
-- (y) Document and rely on ops discipline (status quo). Accept the
-  hazard as bounded to manual out-of-sequence invocations.
-
-If writer ordering is ever bundled into broader convention-hardening
-work, fold into `INF31` (BLOCK-MARKET-DATA-WRITER-CONVENTION), which
-covers the analogous issue for `market_data` writers.
-
-This section captures the state, not a change.
+Sequencing for the remaining `managers` writer (`build_managers.py` DROP+CTAS) is handled by the Makefile `quarterly-update` target. The "Follow-on candidate (x) sentinel check in fetch_13dg.py / fetch_ncen.py" proposal is retired — it targeted scripts that no longer exist in the ingest path.
