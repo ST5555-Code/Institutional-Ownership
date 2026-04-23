@@ -118,16 +118,31 @@ future infra work as INF40 (suggestion: have `sync_staging.py` rebuild
 target tables via DDL from `entity_schema.sql` rather than CTAS, or
 have `validate_schema_parity.py` (INF39) gate on constraint parity too).
 
-## Phase 4 — promote (BLOCKED — see PR body)
+## Phase 4 — promote (DONE)
 
-`scripts/promote_staging.py --approved` cannot run while
-`scripts/app.py` (Flask, port 8001, PID 64487 at session time) holds an
-open read connection on `data/13f.duckdb`. DuckDB's read connection
-takes a shared lock that conflicts with the exclusive write lock
-required for promote. The 11 staged rows are safe in
-`data/13f_staging.duckdb` and can be promoted later with no further
-work — re-run `python3 scripts/promote_staging.py --approved` after
-stopping the app.
+Initial promote attempt was blocked by `scripts/app.py` (Flask, port
+8001, PID 64487) holding a shared read lock on `data/13f.duckdb`. After
+the app was stopped, `scripts/promote_staging.py --approved` ran cleanly:
+
+- Snapshot id: **`20260423_080406`** (245-row baseline preserved across
+  all 9 entity tables; rollback path available).
+- `entity_overrides_persistent`: **deleted=0, modified=0, added=11**.
+  All other entity tables: 0 changes.
+- Embedded `validate_entities.py --prod` after promote:
+  **8 PASS / 1 FAIL (wellington baseline) / 7 MANUAL** — no regression.
+- Direct `validate_entities.py --prod` re-run: same result.
+
+Prod state confirmed: **256 rows** in `entity_overrides_persistent`,
+all 11 `claude-inf9-persist` rows present at IDs 246–256 with the
+expected `(series_id, target_cik)` pairs and
+`rollup_type='decision_maker_v1'`.
+
+## Phase 5 — done
+
+ROADMAP: INF9 moved from §Open items to §Closed items (log) with
+snapshot id + summary. INF9f + INF40 added as new follow-ups.
+NEXT_SESSION_CONTEXT: closure note + `entity_overrides_persistent`
+count refreshed to 256.
 
 ## Out of scope
 
