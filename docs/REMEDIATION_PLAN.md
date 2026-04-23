@@ -574,6 +574,7 @@ Lookup table for parallel-scheduling decisions. Each row is a source file; colum
 
 ## Changelog
 
+- **2026-04-23 (tier4-review-gate)** — Codified the Tier 4 join-pattern review rule in a new top-level checklist at `docs/REVIEW_CHECKLIST.md`. Hybrid enforcement per [tier-4-join-pattern-proposal.md §7](proposals/tier-4-join-pattern-proposal.md) is now the standing pre-merge gate: hard rule for net-new `scripts/queries.py` functions reading from `holdings_v2` / `fund_holdings_v2` (must go through `scripts/queries_helpers.py`); soft rule for modifications to existing stamp-column functions (bundle into the int-09 Step 4 sweep, now unblocked per `DEFERRED_FOLLOWUPS.md` INF25). Worldview-correctness note included — `entity_current` hardcodes EC, so DM paths must use `rollup_join`. Exemption marker convention: `# tier4-exempt: <reason>` on the line above the `def`. Docs-only session; no code paths changed; `scripts/queries_helpers.py` untouched.
 - **2026-04-22 (p2fu-cleanup-01)** —
   - **P2-FU-02** closed — scheduler/update/benchmark stale-reference audit. Retired `fetch_*.py` paths repointed to `SourcePipeline` subclasses.
   - **P2-FU-04** closed — ADV ownership boundary for `cik_crd_direct` + `lei_reference` documented in `data_layers.md` + `admin_refresh_system_design.md`.
