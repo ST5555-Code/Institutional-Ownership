@@ -46,6 +46,15 @@ PREFIXES: list[str] = [
 # Cap the ticket number to avoid collisions with CIKs / series IDs / PK values.
 MAX_TICKET_NUMBER = 999
 
+# Historical dual-closure tickets: already-annotated reuse retained per policy.
+# Candidate-reuse detection skips these outright.
+DUAL_CLOSURE_EXCEPTIONS = {"INF40"}
+
+# Matches the dual-closure annotation sentinel, e.g. `[INF40 #1 of 2 ...]`.
+ANNOTATION_RE = re.compile(
+    r"\[(?:INF|DM|BL|mig-|int-|obs-|sec-|ops-|w2-|p2-|conv-)\d+[a-z]?\s+#\d+\s+of\s+\d+\b"
+)
+
 # Directories we never scan.
 SKIP_DIRS = {
     ".git",
@@ -72,6 +81,7 @@ class Definition:
     ticket: str
     kind: str  # "heading" | "table-row" | "bullet" | "line"
     title: str
+    annotated: bool = False  # True if line carries `[TICKET #M of K]` sentinel
 
 
 TICKET_ALT = "|".join(re.escape(p) for p in PREFIXES)
@@ -256,6 +266,7 @@ def scan(root: Path) -> dict[str, list[Definition]]:
                     continue
                 seen_on_line.add(ticket)
                 title = extract_title(kind, line, ticket)
+                annotated = bool(ANNOTATION_RE.search(line))
                 defs[ticket].append(
                     Definition(
                         file=rel,
@@ -263,6 +274,7 @@ def scan(root: Path) -> dict[str, list[Definition]]:
                         ticket=ticket,
                         kind=kind,
                         title=title,
+                        annotated=annotated,
                     )
                 )
     return defs
@@ -339,7 +351,10 @@ def main(argv: list[str]) -> int:
     print("--- Candidate number reuse (≥2 distinct titles) ---")
     any_reuse = False
     for ticket in sorted(defs):
-        groups = group_distinct(defs[ticket])
+        if ticket in DUAL_CLOSURE_EXCEPTIONS:
+            continue
+        unannotated = [d for d in defs[ticket] if not d.annotated]
+        groups = group_distinct(unannotated)
         if len(groups) < 2:
             continue
         # Require at least two groups to each have a strong definition (heading

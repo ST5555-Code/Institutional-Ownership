@@ -86,7 +86,6 @@ Tracker docs:
 
 - `ROADMAP.md`
 - `docs/REMEDIATION_PLAN.md`
-- `docs/REMEDIATION_CHECKLIST.md`
 - `docs/DEFERRED_FOLLOWUPS.md`
 - `docs/NEXT_SESSION_CONTEXT.md`
 

@@ -1,5 +1,7 @@
 # Remediation Program — Master Plan
 
+> Remediation Program COMPLETE 2026-04-22 (conv-11). Historical checklist retired to `archive/docs/REMEDIATION_CHECKLIST.md` on 2026-04-23. Sprint-view no longer useful post-program. Forward work → `ROADMAP.md`.
+
 _Generated: 2026-04-20. Last updated: 2026-04-22 (conv-12 — Phase 2 + Wave 2 doc refresh on top of conv-11 PROGRAM COMPLETE)._
 
 ## Program overview
