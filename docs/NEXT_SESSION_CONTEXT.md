@@ -1,11 +1,18 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-22 (post int-22 close — prod `is_latest` rollback executed + verified). Main HEAD: `2f3fed5` (PR #110 — int-22 rollback wrapper + staging proof)._
+_Last updated: 2026-04-23 (post entity-curation-w1 — INF37 cleared + int-21 SELF-fallback reviewed + 43e de-scoped). Main HEAD at branch point: `e1b11e1`. entity-curation-w1 branch pending PR._
 
-**int-22 closed this session** (`int-22-prod-execute-and-verify`). Option C rollback of run_id `13f_holdings_quarter=2025Q4_20260422_200854` (manifest_id=78902) executed on prod. Post-state matches staging rehearsal to the row (3,205,650 total / 483,080 legitimate tickerless TRUE / 0 FALSE / manifest `rolled_back`). `/api/v1/tickers` returns 12,598 tickers; `/api/v1/query1?ticker=AAPL` and `?ticker=MSFT` both 200. Readonly snapshot refreshed from corrected prod (`data/13f_readonly.duckdb` 5.5GB, 333 tables). Loader idempotency gap tracked separately as **int-23** (open).
+**entity-curation-w1 closed this session.** Batch-closed two of three standing curation items:
+- **INF37 CLEARED** — 9 entities / 14,368 `holdings_v2` rows flipped from NULL/unknown to correct `manager_type` (8 `wealth_management` + 1 `active`). Zero residuals. CSV edit + prod backfill. See `docs/findings/entity-curation-w1-log.md`.
+- **int-21 SELF-fallback CLOSED** — all 12 entities (plan said 11, actual 12) reviewed and confirmed SELF-rooted. All are inert MDM entries: 0 holdings as manager, 0 child rollups, 0 relationships, 0 N-CEN adviser matches. No writes; defer individual parent reassignment to on-demand triage if/when holdings data lands.
+- **43e de-scoped** — downstream enum surface (`scripts/build_summaries.py:173,181` + `scripts/queries.py:1724` closed-list `manager_type IN (…)` checks) makes adding `family_office` a taxonomy refactor, not a one-line add. Re-filed in ROADMAP for a dedicated follow-on that also resolves pre-existing `multi_strategy` / `SWF` bucket-membership ambiguity.
+
+Prod state: `validate_entities.py` baseline 8 PASS / 1 FAIL / 7 MANUAL preserved; `summary_by_ticker` 47,642 → 47,732 (+90 from newly classified entities); `summary_by_parent` 63,916 unchanged.
+
+**Prior session (preserved):** int-22 closed (`int-22-prod-execute-and-verify`). Option C rollback of run_id `13f_holdings_quarter=2025Q4_20260422_200854` executed on prod. Post-state matches staging rehearsal to the row. Loader idempotency gap tracked separately as **int-23** (closed since by PR #119).
 
 **Next items:**
-- **Cluster 2** — INF37 (`backfill_manager_types` residual 9 entities / 14,368 rows) + int-21 SELF-fallback curation (standing).
+- **Taxonomy refactor follow-on** (43e re-scope) — bucket membership for `family_office` + `multi_strategy` + `SWF` in `build_summaries.py:173,181` and `queries.py:1724`; plus React typeConfig color mapping.
 - **Serge visual walkthrough on PR #107** (ui-audit-01).
 - **Peer rotation precompute** — address `get_peer_rotation()` slowness.
 
