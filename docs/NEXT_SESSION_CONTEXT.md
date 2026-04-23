@@ -8,6 +8,7 @@ _Last updated: 2026-04-22 (post int-22 close — prod `is_latest` rollback execu
 - **Cluster 2** — INF37 (`backfill_manager_types` residual 9 entities / 14,368 rows) + int-21 SELF-fallback curation (standing).
 - **Serge visual walkthrough on PR #107** (ui-audit-01).
 - **Peer rotation precompute** — address `get_peer_rotation()` slowness.
+- **`inf9-persist` branch — pending prod promote.** 11 DM12 `merge`/`decision_maker_v1` overrides (HC Capital Trust 6 + CRI 5, IDs 246–256) staged in `data/13f_staging.duckdb`; `promote_staging.py --approved` was blocked at session close by the running `scripts/app.py` holding a read lock on `data/13f.duckdb`. Stop the app, run `python3 scripts/promote_staging.py --approved` then `python3 scripts/validate_entities.py --prod`, expect baseline preserved. After promote, mark INF9 CLOSED in `ROADMAP.md`. New ROADMAP rows: **INF9f** (merge-target identifier_type schema gap, 1 residual row Agincourt-CRD-only) and **INF40** (`sync_staging.py` CTAS strips UNIQUE/PK constraints — blocks `build_entities.py --reset` on staging). Findings doc: `docs/findings/inf9-closure.md`.
 
 Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + post-Phase-2 backlog.
 
@@ -74,7 +75,7 @@ All six pipelines register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGI
 | `entities` | ~26,602 | +67 new from int-21 series triage |
 | `entity_identifiers` | ~33K+ | lowercase `identifier_type` ('cik','crd','series_id') |
 | `entity_relationships` | ~18K | `last_refreshed_at TIMESTAMP` live |
-| `entity_overrides_persistent` | 245 | `override_id` sequence + NOT NULL (migration 006) |
+| `entity_overrides_persistent` | 245 (256 staged — `inf9-persist` PR pending promote) | `override_id` sequence + NOT NULL (migration 006) |
 | `summary_by_parent` | 63,916 | EC + DM worldviews (migration 004 PK); `top10_*` columns dropped (migration 013) |
 | `investor_flows` | 17,396,524 | EC + DM |
 | `ingestion_manifest` | 21,339+ | covers MARKET / NPORT / 13DG / NCEN / ADV |
