@@ -34,7 +34,7 @@ This database aggregates institutional ownership and fund holdings data from pub
 - Q3 (Sep 30) → November 14
 - Q4 (Dec 31) → February 14
 
-**Amendments.** 13F-HR/A filings correct or restate a prior 13F-HR. Common in the first 90 days after the original. `holdings_v2` carries `accession_number` today (populated by `load_13f.py` post-rewrite, commit `a58c107`); the full amendment-history semantics (`is_latest` flag + per-amendment row retention) land with migration 009 per the Admin Refresh design doc §5 — currently pending.
+**Amendments.** 13F-HR/A filings correct or restate a prior 13F-HR. Common in the first 90 days after the original. `holdings_v2` carries `accession_number` (populated by `load_13f.py` post-rewrite, commit `a58c107`); the full amendment-history semantics (`is_latest` flag + `loaded_at` + `backfill_quality` + per-amendment row retention) shipped with **migration 015** per the Admin Refresh design doc §5. (Slot note: the design doc originally scheduled this work as "migration 009"; the slot was renumbered 008 → 015 as migrations 008–014 absorbed other Phase 2 work — 008 `pct_of_float` → `pct_of_so` rename, 011 `securities` CUSIP PK, 012 `is_otc`, 013 drop top10 columns, 014 `row_id` surrogate PK.)
 
 **Our coverage (as of 2026-04-19).** Quarters 2025Q1 through 2025Q4 fully loaded. 12,270,984 rows in `holdings_v2` across approximately 12,000 filer CIKs. `data_freshness[holdings_v2].last_computed_at` = 2026-04-19. Q1 2026 loads on or after May 16, 2026.
 
@@ -60,7 +60,7 @@ This database aggregates institutional ownership and fund holdings data from pub
 - September filings → public around November 30
 - December filings → public around February 28
 
-**Amendments.** N-PORT/A filings are common. Current system treats latest accession as authoritative via `delete_insert(series_id, report_month)`. Retrofit to `is_latest` flag is scheduled with migration 009 (design §5) — currently pending; `fund_holdings_v2` carries `loaded_at` today but not yet `accession_number` or `is_latest`.
+**Amendments.** N-PORT/A filings are common. Current system treats latest accession as authoritative via `delete_insert(series_id, report_month)`. Retrofit to `is_latest` flag shipped with **migration 015** (design §5); `fund_holdings_v2` now carries `accession_number`, `is_latest`, `loaded_at`, and `backfill_quality`.
 
 **Our coverage.** ~14 million rows across ~14,000 fund series. Newest report_date February 2026 (March 2026 not yet available per the 60-day lag rule). DERA bulk quarterly ZIPs are the primary ingest path (`fetch_nport_v2.py`, commit `44bc98e`); per-accession XML used for monthly top-up.
 
@@ -80,7 +80,7 @@ This database aggregates institutional ownership and fund holdings data from pub
 
 **Amendments.** 13D/A filings required "promptly" (interpreted as within 10 days) upon any material change — additional purchases/sales of 1% or more, change in intent, or change in agreements.
 
-**Our coverage.** ~52,000 filings across the coverage universe. `beneficial_ownership_v2` is the canonical table (carries `accession_number` + `loaded_at` today; `is_latest` retrofit pending with migration 009); 94.5% enriched with entity MDM rollups as of April 2026.
+**Our coverage.** ~52,000 filings across the coverage universe. `beneficial_ownership_v2` is the canonical table (carries `accession_number` + `loaded_at` + `is_latest` + `backfill_quality` per **migration 015**); 94.5% enriched with entity MDM rollups as of April 2026.
 
 **Key use case.** Activist campaigns, hostile bidder disclosures, control-group formations.
 
@@ -138,7 +138,7 @@ This database aggregates institutional ownership and fund holdings data from pub
 
 **Our coverage.** `adv_managers` table with CIK↔CRD mapping and LEI reference. Phase 3.5 ADV ownership resolver processes 3,585 CRDs with Schedule A/B parsing.
 
-**Rewrite pending.** Current `fetch_adv.py` uses full DROP+CTAS and lacks dry-run gate. Rewrite to SourcePipeline pattern is tracked.
+**Ingest path.** ADV ingestion now runs through `LoadADVPipeline` (Wave 2 w2-05, `direct_write` on `(crd,)` natural key). Retired `fetch_adv.py` archived in `scripts/retired/`. SCD Type 2 conversion deferred as P2-FU-03.
 
 ---
 
@@ -201,4 +201,4 @@ Market data: refreshed daily, always current.
 
 ---
 
-*Last updated: 2026-04-19 (status annotation pass; original content 2026-04-17). This document currently lives at `Plans/data_sources.md`; per design §9 + §12 phase 12, it will move to `docs/data_sources.md` when the Data Source UI tab ships. That move is currently pending.*
+*Last updated: 2026-04-19 (status annotation pass; original content 2026-04-17).*

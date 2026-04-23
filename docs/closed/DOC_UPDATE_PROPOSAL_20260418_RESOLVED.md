@@ -1,4 +1,18 @@
-# Doc Update Proposal — 2026-04-18
+# Doc Update Proposal — 2026-04-18 — **RESOLVED**
+
+**Closure summary (doc-hygiene-w1, 2026-04-23).** All seven Phase 0 items applied and verified landed on `main` prior to this closeout. Status per item:
+
+1. **Denormalized v2 columns — stamps not joins.** Applied. New section at `docs/data_layers.md §7 — Denormalized enrichment columns — drift risk and planned retirement`. Cross-references landed in `ENTITY_ARCHITECTURE.md` (Known Limitations + Design Decision Log) and `ROADMAP.md` INF25 (BLOCK-DENORM-RETIREMENT, subsequently deferred to Phase 2 per int-09 2026-04-22).
+2. **BLOCK-OPENFIGI-RETRY-HYGIENE.** Applied. `ROADMAP.md` INF26, **Done 2026-04-22 (int-10)** — `scripts/run_openfigi_retry.py:185-208` `_update_error()` now flips `status='unmappable'` at `attempt_count >= MAX_ATTEMPTS`.
+3. **BLOCK-CUSIP-COVERAGE (reduced scope).** Applied. `ROADMAP.md` INF27 in STANDING / data-quality tier; tracking tier documented in `docs/data_layers.md §11` (int-11-p1, 2026-04-22).
+4. **BLOCK-SCHEMA-CONSTRAINT-HYGIENE.** Applied. `ROADMAP.md` INF28, **Done 2026-04-22 (int-12, PR #95)** — migration 011 `securities_cusip_pk.py`; `VALIDATOR_MAP` placeholder resolved.
+5. **BLOCK-PRICEABILITY-REFINEMENT.** Applied. `docs/data_layers.md §6` picks up `S1` entry; `ROADMAP.md` INF29, **Done 2026-04-22 (int-13, PR #97)** — migration 012 `securities_is_otc.py` added `is_otc` classifier.
+6. **`admin_bp.py:108` revisit flag.** Applied. Moved to `docs/NEXT_SESSION_CONTEXT.md` (option (b) in Phase 0 flag F1) rather than consuming an INF row.
+7. **Phase 4 refetch pattern.** Applied. New H2 `## Refetch Pattern for Prod Apply` landed in `MAINTENANCE.md` (line 160).
+
+File moved from `docs/DOC_UPDATE_PROPOSAL_20260418.md` to `docs/closed/` and renamed with `_RESOLVED` suffix during doc-hygiene-w1. Phase 0 proposal content preserved below for commit archaeology.
+
+---
 
 _Phase 0 output: structural review of the four canonical docs and
 proposed insertion points for seven deferred items from
