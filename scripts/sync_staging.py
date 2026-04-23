@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -58,29 +59,70 @@ def _row_count(con, qualified: str) -> int:
         return -1
 
 
-def _reset_sequences(con) -> dict:
-    """Set each entity sequence to MAX(id)+1 of its target table.
+# Column-default pattern inside a prod DDL emitted by duckdb_tables().sql:
+#   `override_id BIGINT DEFAULT(nextval('override_id_seq')) NOT NULL,`
+# Capture group 1 = column name, group 2 = sequence name. Used to prime
+# staging sequences to MAX(col)+1 from prod BEFORE recreating the table,
+# because once the table exists its DEFAULT clause creates a dependency
+# that blocks DROP / CREATE OR REPLACE on the referenced sequence.
+_SEQ_DEFAULT_RE = re.compile(
+    r"\b([A-Za-z_][A-Za-z0-9_]*)\s+[A-Za-z_][A-Za-z0-9_]*"
+    r"\s+DEFAULT\(nextval\('([A-Za-z_][A-Za-z0-9_]*)'\)\)"
+)
 
-    DuckDB does not implement ALTER SEQUENCE ... RESTART WITH N, so we
-    DROP and CREATE the sequence at the desired starting value. This is
-    safe in staging because CTAS-created tables do not carry the
-    `DEFAULT nextval(...)` clauses from the original schema; the
-    sequences are only used by application code that calls nextval()
-    explicitly.
+
+def _prod_table_ddl(con, table: str) -> str | None:
+    """Return the DDL DuckDB records for `table` in the attached prod DB.
+
+    None if the table is not present in prod. The returned statement is a
+    bare `CREATE TABLE name(...)` — unqualified, so executing it against
+    the staging connection creates the table in staging's default schema.
     """
-    out = {}
-    for seq, table, col in db.ENTITY_SEQUENCES:
-        try:
+    row = con.execute(
+        "SELECT sql FROM duckdb_tables() "
+        "WHERE database_name = 'prod' AND table_name = ?",
+        [table],
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _plan_sequence_starts(con, ddls: dict[str, str]) -> dict[str, int]:
+    """Compute MAX(col)+1 from prod for every sequence about to be used.
+
+    Two sources of (sequence, table, column) tuples:
+      1. DEFAULT(nextval('x')) clauses inside each rebuilt table's prod DDL.
+      2. db.ENTITY_SEQUENCES for tables being rebuilt — catches sequences
+         app code uses without a DEFAULT (e.g. identifier_staging_id_seq
+         lives in the DDL of entity_relationships_staging but is also
+         populated by build_entities.py for entity_identifiers_staging).
+    For each sequence, take the MAX across all referenced (table, col)
+    pairs so the new start value is safe no matter which table is
+    inserted into next.
+    """
+    plan: dict[str, int] = {}
+
+    def bump(seq: str, candidate: int) -> None:
+        if seq not in plan or candidate > plan[seq]:
+            plan[seq] = candidate
+
+    for table, ddl in ddls.items():
+        if ddl is None:
+            continue
+        for col, seq in _SEQ_DEFAULT_RE.findall(ddl):
             row = con.execute(
-                f"SELECT COALESCE(MAX({col}), 0) + 1 FROM {table}"
+                f"SELECT COALESCE(MAX({col}), 0) + 1 FROM prod.{table}"
             ).fetchone()
-            next_val = int(row[0]) if row and row[0] is not None else 1
-            con.execute(f"DROP SEQUENCE IF EXISTS {seq}")
-            con.execute(f"CREATE SEQUENCE {seq} START WITH {next_val}")
-            out[seq] = next_val
-        except Exception as e:
-            out[seq] = f"ERROR: {e}"
-    return out
+            bump(seq, int(row[0]) if row and row[0] is not None else 1)
+
+    for seq, tgt_table, col in db.ENTITY_SEQUENCES:
+        if tgt_table not in ddls:
+            continue
+        row = con.execute(
+            f"SELECT COALESCE(MAX({col}), 0) + 1 FROM prod.{tgt_table}"
+        ).fetchone()
+        bump(seq, int(row[0]) if row and row[0] is not None else 1)
+
+    return plan
 
 
 def sync(tables: list[str], dry_run: bool) -> dict:
@@ -98,11 +140,13 @@ def sync(tables: list[str], dry_run: bool) -> dict:
     #   - Prod has a legacy degraded schema (constraint-free entities table)
     #     so re-running CREATE TABLE statements would fail FK validation
     #     against the constraint-free parent.
-    #   - Staging will be CTAS'd from prod below, inheriting prod's degraded
-    #     schema, so the same FK-validation failure would block any
-    #     subsequent _ensure_staging_schema call after the first sync run.
-    # Staging gets its tables purely via CREATE TABLE AS SELECT from prod —
-    # see the CTAS block below.
+    #   - Staging inherits prod's exact schema via the per-table DDL copy
+    #     below, so applying entity_schema.sql on top would clash with
+    #     whatever constraints prod does or does not have.
+    # Staging gets each entity table by fetching prod's recorded DDL from
+    # duckdb_tables(), executing it on staging, then INSERT-SELECTing rows
+    # from prod. This preserves DEFAULT clauses and NOT NULL constraints
+    # that CTAS silently drops (INF40, 2026-04-23).
     stg = duckdb.connect(db.STAGING_DB)
     stg.execute(f"ATTACH '{db.PROD_DB}' AS prod (READ_ONLY)")
 
@@ -128,14 +172,6 @@ def sync(tables: list[str], dry_run: bool) -> dict:
 
         report = {"tables": {}, "started_at": datetime.now().isoformat(timespec="seconds")}
 
-        # Strategy: DROP + recreate. DuckDB has a quirk where DELETE on a
-        # parent table inside a transaction does not see in-transaction
-        # child-table deletes when checking FK constraints, so the more
-        # natural "DELETE children, DELETE parent, INSERT all" pattern
-        # fails on the parent DELETE. DROP TABLE bypasses FK enforcement
-        # entirely. We then re-apply entity_schema.sql to recreate every
-        # entity table with constraints intact, and INSERT from prod.
-
         if dry_run:
             for table in tables:
                 prod_n = _row_count(stg, f"prod.{table}")
@@ -147,34 +183,49 @@ def sync(tables: list[str], dry_run: bool) -> dict:
                 }
                 _log(f"  [DRY-RUN] {table}: prod={prod_n} staging={stg_n}")
         else:
-            # CTAS strategy: drop staging entity tables and re-create them
-            # via CREATE TABLE AS SELECT from prod. This makes staging's
-            # schema structurally identical to prod's (including degraded
-            # constraints), which is the only way to do a lossless mirror
-            # given that prod has data violations of the canonical schema:
-            #   1. NULLs in NOT-NULL columns (entity_identifiers.confidence)
-            #   2. Foreign-key inconsistencies that DuckDB only catches on
-            #      parent-table DELETE inside a transaction
-            # CTAS sidesteps both: the staging table inherits prod's column
-            # types but no constraints, so the INSERT cannot fail. Constraint
-            # enforcement is sacrificed in staging in favor of a faithful
-            # mirror — staging is for editing, prod's schema migration is
-            # tracked separately.
+            # DDL-first strategy (INF40, 2026-04-23): for each entity
+            # table, fetch prod's recorded DDL via duckdb_tables().sql,
+            # apply it to staging, then INSERT rows. The previous CTAS
+            # path (`CREATE TABLE x AS SELECT * FROM prod.x`) silently
+            # stripped DEFAULT clauses and NOT NULL constraints — see
+            # e.g. entity_overrides_persistent.override_id which has
+            # `DEFAULT(nextval('override_id_seq')) NOT NULL` on prod but
+            # landed as a bare `BIGINT` on staging. That mismatch blocked
+            # `build_entities.py --reset` idempotency validation because
+            # application code relies on the DEFAULT to assign IDs.
+            #
+            # INF11 fix (2026-04-10, carried forward): drop only the
+            # tables we are about to rebuild, so partial syncs preserve
+            # in-progress edits on other entity tables.
+            # Fetch all prod DDLs up front so we can compute the
+            # sequence plan before touching staging tables.
+            ddls = {t: _prod_table_ddl(stg, t) for t in tables}
+
             stg.execute("DROP VIEW IF EXISTS entity_current")
-            # INF11 fix (2026-04-10): previously this loop iterated
-            # `db.ENTITY_TABLES` unconditionally — every entity table in
-            # staging was dropped before rebuilding only the requested
-            # subset, silently wiping any in-progress edits on tables the
-            # operator did not intend to refresh. Drop only the tables
-            # that are about to be re-CTAS'd. FK drop-order is irrelevant
-            # here because CTAS-created staging tables have no foreign key
-            # constraints (see the strategy comment above).
             for table in reversed(tables):
                 stg.execute(f"DROP TABLE IF EXISTS {table}")
 
+            # Prime sequences BEFORE recreating tables: once a table
+            # exists with a DEFAULT(nextval('x')) clause, DuckDB refuses
+            # to DROP or CREATE OR REPLACE the referenced sequence. At
+            # this point all rebuilt tables are dropped, so any sequence
+            # whose only dependents were in `tables` is free.
+            seq_plan = _plan_sequence_starts(stg, ddls)
+            for seq, next_val in seq_plan.items():
+                stg.execute(f"CREATE OR REPLACE SEQUENCE {seq} START {next_val}")
+                _log(f"  sequence {seq} primed to {next_val}")
+            report["sequences"] = dict(seq_plan)
+
             for table in tables:
+                ddl = ddls.get(table)
+                if ddl is None:
+                    # Shouldn't reach here — tables missing from prod
+                    # were filtered out above.
+                    _log(f"  ! {table}: missing DDL in prod, skipping")
+                    continue
+                stg.execute(ddl)
                 stg.execute(
-                    f"CREATE TABLE {table} AS SELECT * FROM prod.{table}"
+                    f"INSERT INTO {table} SELECT * FROM prod.{table}"
                 )
                 prod_n = _row_count(stg, f"prod.{table}")
                 stg_n = _row_count(stg, table)
@@ -186,36 +237,13 @@ def sync(tables: list[str], dry_run: bool) -> dict:
                 marker = "✓" if stg_n == prod_n else "✗"
                 _log(f"  {marker} {table}: copied {stg_n} rows (prod={prod_n})")
 
-            # Recreate empty skipped tables (e.g. entity_overrides_persistent)
-            # individually. Cannot re-run the full entity_schema.sql because
-            # its FK CREATE statements would fail against the constraint-free
-            # CTAS-created entities table.
-            if "entity_overrides_persistent" in (db.ENTITY_TABLES) and \
-               "entity_overrides_persistent" not in tables:
-                stg.execute("""
-                    CREATE TABLE IF NOT EXISTS entity_overrides_persistent (
-                        override_id    BIGINT,
-                        entity_cik     VARCHAR,
-                        action         VARCHAR NOT NULL,
-                        field          VARCHAR,
-                        old_value      VARCHAR,
-                        new_value      VARCHAR NOT NULL,
-                        reason         VARCHAR,
-                        analyst        VARCHAR,
-                        still_valid    BOOLEAN NOT NULL DEFAULT TRUE,
-                        applied_at     TIMESTAMP DEFAULT NOW(),
-                        created_at     TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-                _log("  + entity_overrides_persistent: created empty in staging")
-
-        # Reset sequences after successful copy
-        if not dry_run:
-            seq_report = _reset_sequences(stg)
-            report["sequences"] = seq_report
-            for seq, val in seq_report.items():
-                _log(f"  sequence {seq} restart with {val}")
-
+        # Sequences were primed inline per-table above — once the DDL
+        # creates a DEFAULT(nextval('x')) dependency on a sequence, the
+        # sequence cannot be dropped, so the old post-copy DROP+CREATE
+        # approach no longer works. Sequences without a DEFAULT reference
+        # in any rebuilt table (e.g. a sequence whose table lives outside
+        # ENTITY_TABLES) are left untouched — the partial-sync contract
+        # says only rebuilt tables should see side effects.
         report["finished_at"] = datetime.now().isoformat(timespec="seconds")
         return report
 
