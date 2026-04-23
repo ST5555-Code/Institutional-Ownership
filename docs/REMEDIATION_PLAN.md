@@ -400,7 +400,6 @@ Phase 2 itself is 5-session scope minimum: base class + cadence + migration + ad
 
 - **load_13f_v2 rewrite** (mig-12): Full rewrite of `load_13f.py` into `fetch_13f.py` + `promote_13f.py`, applying Batch 3 retrofit bar (CHECKPOINT, data_freshness, --dry-run, --staging, PROCESS_RULES §1-§9 compliance). See `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md`.
 - **INF38 BLOCK-FLOAT-HISTORY** (int-19): True period-accurate `pct_of_float` from 10-K Item 5 + Schedule 13D/G + Forms 3/4/5 insider holdings. Additional tier above `pct_of_so`.
-- **Phantom `other_managers` table decision** (REWRITE_LOAD_13F §6.4): add write path, reassign ownership, or retire.
 - **INF40 L3 surrogate row-ID** (mig-06) if deferred from foundation.
 - **BL-3 transaction-based safety** for T2-tier scripts per `docs/write_path_risk_map.md`.
 - **React Phase 4C+** OpenAPI-typed client (8 endpoints pending from `PHASE4_STATE.md`).
@@ -488,6 +487,7 @@ Items confirmed CLOSED via commit SHA or doc-sync confirmation as of 2026-04-20:
 | compute_flows violations cleared | `7ac96b7` | 2026-04-19 | doc close. |
 | build_summaries violations cleared | `c51ed65` | 2026-04-19 | doc close. |
 | Batch 3 REWRITE queue doc-close | `499e120` | 2026-04-19 | build_shares_history, load_13f, build_managers. |
+| Phantom `other_managers` table decision (REWRITE_LOAD_13F §6.4) | `14a5152`, `a58c107` | 2026-04-19 | Option A (add writer) — OTHERMANAGER2 loader; 15,405 rows live; `docs/findings/phantom-other-managers-decision.md`. |
 | Stage 5 legacy-table drop | `305739e`, `7247689` | 2026-04-13 / 2026-04-17 | 3 tables dropped; writers repointed. |
 | build_managers holdings → holdings_v2 + Phase 4 prod apply | `1719320`, `7747af2` | 2026-04-19 | |
 | backfill_manager_types holdings → holdings_v2 | `7b8a2b7` | 2026-04-19 | |
