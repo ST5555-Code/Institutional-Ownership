@@ -552,9 +552,13 @@ criteria are the per-script violation lists in `docs/pipeline_violations.md`.
 ## INFRASTRUCTURE — Performance & Reliability
 
 Structure: open work appears in `### Open items` below. Historical
-closed rows live in `### Closed items (log)` further down. New
-follow-ups land in `### Open items` and move to the log when they
-close.
+closed rows (pre-2026-04-23) live in `### Closed items (log)`
+further down, frozen as an archive. New follow-ups land in
+`### Open items` and, on closure, move to a per-session file under
+`docs/closures/YYYY-MM-DD-<session-name>.md` rather than being
+appended to the archived log. See `docs/closures/README.md` for
+rationale and file format. Run `python3 scripts/concat_closed_log.py`
+to regenerate `docs/closed-items-log.md` for a flat view.
 
 **Allocation policy.** INF## IDs are allocated sequentially. The gap
 at **INF19 / INF20 / INF21** is preserved intentionally — IDs jumped
@@ -584,6 +588,11 @@ Next free ID at allocation time is `max(in use) + 1`; verify via
 | 56 | Decision maker and voting rollup worldviews | Not started | DM1-DM7 — see `## DECISION MAKER & VOTING ROLLUP WORLDVIEWS` section below. Addresses sub-adviser policy issue surfaced in L5 audit (item 43i). |
 
 ### Closed items (log)
+
+**Frozen archive** — rows below capture closures through
+2026-04-23. New closures land in
+`docs/closures/YYYY-MM-DD-<session-name>.md` per
+`docs/closures/README.md`. Do not append here.
 
 | # | Item | Priority | Notes |
 |---|------|----------|-------|
