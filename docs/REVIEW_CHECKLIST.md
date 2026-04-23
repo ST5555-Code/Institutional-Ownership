@@ -106,3 +106,34 @@ table row), in two unrelated tracker sections.
 **References.**
 - Audit script: `scripts/audit_ticket_numbers.py`
 - Known collision precedent: INF40 (2026-04-23 session close)
+
+---
+
+## Tracker consistency
+
+**Scope.** Any PR that changes the status of a tracked item (closes
+it, reopens it, marks it deferred/standing/superseded, re-scopes it).
+
+**Hard rule.** For any PR that closes or changes status on an item,
+verify the same item is updated in **every tracker doc that
+references it** — not just the one the author happened to edit.
+Tracker docs: `ROADMAP.md`, `docs/REMEDIATION_PLAN.md`,
+`docs/REMEDIATION_CHECKLIST.md`, `docs/DEFERRED_FOLLOWUPS.md`,
+`docs/NEXT_SESSION_CONTEXT.md`.
+
+**Check.** Run `python3 scripts/audit_tracker_staleness.py` against
+the branch head. The script prints any ID whose status disagrees
+across docs and exits non-zero on drift. If the branch leaves drift
+in place, the PR should either resolve it or document why the drift
+is intentional (partial closure, scope exemption).
+
+**Rationale.** Closing a tracker doc lags the real fix by one
+session when different trackers drift independently. The cost of
+catching drift at review time is a grep; the cost of missing it is
+a full investigation session for whoever opens the item next.
+
+**References.**
+- Rule wording: `docs/SESSION_GUIDELINES.md § Cross-tracker update rule`.
+- Audit script: `scripts/audit_tracker_staleness.py`.
+- Precedent incident: `phantom-other-managers-decision` (PR #125) —
+  a 4-day staleness that cost a full session to reconstruct.
