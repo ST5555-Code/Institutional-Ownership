@@ -6,5 +6,6 @@
 #
 # Then run `13f` from any terminal to boot the server and open the UI.
 
-cd ~/ClaudeWorkspace/Projects/13f-ownership
+cd "$(dirname "$0")" || exit 1
+cd "$(git rev-parse --show-toplevel)" || exit 1
 python3 scripts/app.py --port 8001
