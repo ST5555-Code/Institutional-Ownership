@@ -305,8 +305,9 @@ audit (`docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md`) confirmed:
 - DDL drift: **absent**. `CREATE TABLE IF NOT EXISTS` at `:110–145`
   matches prod column-for-column for both tables; PK on
   `summary_by_parent` is `(quarter, rollup_type, rollup_entity_id)`
-  per migration 004 shipped in the same commit. `canonical_ddl.md`
-  §4 and §5 already marked both tables ALIGNED.
+  per migration 004 shipped in the same commit. `docs/data_layers.md`
+  Appendix A entries already mark both tables ALIGNED (formerly
+  `canonical_ddl.md` §4 and §5).
 - Downstream readers surveyed: 14 files, 90 hits, no breakage.
 
 No Phase 1–4 rewrite work required. Original violations retained
@@ -315,7 +316,7 @@ below for historical reference.
 - §9 (dry-run): **VIOLATION** — no `--dry-run`. `--staging` at `:130`
   and `--rebuild` at `:129` exist.
 - Legacy refs: `build_summaries.py:73` `FROM holdings h`; `:118`
-  `FROM holdings h`. DDL drift documented in `docs/canonical_ddl.md`
+  `FROM holdings h`. DDL drift documented in `docs/data_layers.md` Appendix A
   (prod has `rollup_entity_id`, `rollup_name`, `total_nport_aum`,
   `nport_coverage_pct`; script has none of these and wrong PK).
 

@@ -18,7 +18,7 @@ This document is the single source of truth for how every table in the
 prod DB is classified across the four-layer model. Each owning script
 must stay within its assigned layer. A promote script for a table whose
 DDL drifts from its owner-script INSERT is blocked until the drift is
-resolved (see `docs/canonical_ddl.md`).
+resolved (see Appendix A below).
 
 ---
 
@@ -482,7 +482,7 @@ swap; (c) rely on owner-script DDL with `CREATE TABLE IF NOT EXISTS`
 plus column-diff additions in migrations.
 
 **Why unresolved:** Need one real schema change to validate the chosen
-approach. The `summary_by_parent` DDL drift (see `docs/canonical_ddl.md`)
+approach. The `summary_by_parent` DDL drift (see Appendix A below)
 is the obvious first candidate — the right fix is a migration script
 that adds `rollup_entity_id`, `total_nport_aum`, `nport_coverage_pct`
 columns to `build_summaries.py`'s `CREATE TABLE IF NOT EXISTS`, then a
@@ -772,7 +772,7 @@ orphaned. The only observable symptom is data-coverage regression,
 typically caught by a smoke test or a manual audit, often weeks later.
 
 **Mitigation going forward.** When retiring a table, audit all writers
-named in `scripts/pipeline/registry.py` / `docs/canonical_ddl.md`, not
+named in `scripts/pipeline/registry.py` / Appendix A below, not
 just downstream readers. The `pipeline_violations.md` doc already lists
 `Legacy refs:` for each script — a table-retirement audit should treat
 those lines as a kill-list: every `Legacy refs:` entry against the
@@ -961,3 +961,1666 @@ trigger condition for revisiting tier cadence.
   brought the universe from 132,618 → 430,149.
 - §6 **S1** — `is_priceable` semantics for grey-market rows is a
   sibling classifier-semantics concern, tracked separately.
+
+---
+
+## Appendix A: Canonical DDL
+
+This appendix was folded in from `docs/canonical_ddl.md` on 2026-04-23. DDL regenerated from prod `information_schema` at time of fold. Table enumeration from `DATASET_REGISTRY` (`scripts/pipeline/registry.py`) cross-checked against `information_schema.tables` in `data/13f.duckdb`. For updates, re-run the Phase C1 queries against live prod.
+
+### Reconciliation summary
+
+- **REGISTRY ∩ prod:** 51 tables/views (primary scope)
+- **REGISTRY only:** 1 (positions)
+- **prod only:** 8 (_cache_openfigi, admin_preferences, admin_sessions, cusip_classifications, cusip_retry_queue, fund_holdings, ingestion_manifest_current, schema_versions)
+
+Total: 60 tables/views (+ snapshot tables excluded). REGISTRY contains 52 entries; prod contains 59 base-tables + views (excluding `*_snapshot_*`).
+
+### `adv_managers`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 16,606 (as of 2026-04-23)
+- **Columns:** 18
+
+**DDL:**
+
+```sql
+CREATE TABLE adv_managers (
+    "crd_number" VARCHAR,
+    "sec_file_number" VARCHAR,
+    "cik" VARCHAR,
+    "firm_name" VARCHAR,
+    "legal_name" VARCHAR,
+    "city" VARCHAR,
+    "state" VARCHAR,
+    "address" VARCHAR,
+    "adv_5f_raum" DOUBLE,
+    "adv_5f_raum_discrtnry" DOUBLE,
+    "adv_5f_raum_non_discrtnry" DOUBLE,
+    "adv_5f_num_accts" BIGINT,
+    "pct_discretionary" DOUBLE,
+    "strategy_inferred" VARCHAR,
+    "is_activist" BOOLEAN,
+    "has_hedge_funds" VARCHAR,
+    "has_pe_funds" VARCHAR,
+    "has_vc_funds" VARCHAR
+);
+```
+
+### `benchmark_weights`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 55 (as of 2026-04-23)
+- **Columns:** 6
+- **Primary key:** `(index_name, gics_sector, as_of_date)`
+
+**DDL:**
+
+```sql
+CREATE TABLE benchmark_weights (
+    "index_name" VARCHAR NOT NULL,
+    "gics_sector" VARCHAR NOT NULL,
+    "gics_code" VARCHAR,
+    "weight_pct" DOUBLE,
+    "as_of_date" DATE NOT NULL,
+    "source" VARCHAR,
+    PRIMARY KEY ("index_name", "gics_sector", "as_of_date")
+);
+```
+
+### `beneficial_ownership_current`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 24,756 (as of 2026-04-23)
+- **Columns:** 21
+
+**DDL:**
+
+```sql
+CREATE TABLE beneficial_ownership_current (
+    "filer_cik" VARCHAR,
+    "filer_name" VARCHAR,
+    "subject_ticker" VARCHAR,
+    "subject_cusip" VARCHAR,
+    "latest_filing_type" VARCHAR,
+    "latest_filing_date" DATE,
+    "pct_owned" DOUBLE,
+    "shares_owned" BIGINT,
+    "intent" VARCHAR,
+    "crossing_date" DATE,
+    "days_since_filing" INTEGER,
+    "is_current" BOOLEAN,
+    "accession_number" VARCHAR,
+    "crossed_5pct" BOOLEAN,
+    "prior_intent" VARCHAR,
+    "amendment_count" BIGINT,
+    "entity_id" BIGINT,
+    "rollup_entity_id" BIGINT,
+    "rollup_name" VARCHAR,
+    "dm_rollup_entity_id" BIGINT,
+    "dm_rollup_name" VARCHAR
+);
+```
+
+### `beneficial_ownership_v2`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 51,905 (as of 2026-04-23)
+- **Columns:** 28
+
+**DDL:**
+
+```sql
+CREATE TABLE beneficial_ownership_v2 (
+    "accession_number" VARCHAR,
+    "filer_cik" VARCHAR,
+    "filer_name" VARCHAR,
+    "subject_cusip" VARCHAR,
+    "subject_ticker" VARCHAR,
+    "subject_name" VARCHAR,
+    "filing_type" VARCHAR,
+    "filing_date" DATE,
+    "report_date" DATE,
+    "pct_owned" DOUBLE,
+    "shares_owned" BIGINT,
+    "aggregate_value" DOUBLE,
+    "intent" VARCHAR,
+    "is_amendment" BOOLEAN,
+    "prior_accession" VARCHAR,
+    "purpose_text" VARCHAR,
+    "group_members" VARCHAR,
+    "manager_cik" VARCHAR,
+    "loaded_at" TIMESTAMP,
+    "name_resolved" BOOLEAN,
+    "entity_id" BIGINT,
+    "rollup_entity_id" BIGINT,
+    "rollup_name" VARCHAR,
+    "dm_rollup_entity_id" BIGINT,
+    "dm_rollup_name" VARCHAR,
+    "row_id" BIGINT DEFAULT nextval('beneficial_ownership_v2_row_id_seq'),
+    "is_latest" BOOLEAN DEFAULT CAST('t' AS BOOLEAN),
+    "backfill_quality" VARCHAR
+);
+```
+
+### `cik_crd_direct`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 4,059 (as of 2026-04-23)
+- **Columns:** 3
+
+**DDL:**
+
+```sql
+CREATE TABLE cik_crd_direct (
+    "cik" VARCHAR,
+    "crd_number" VARCHAR,
+    "match_type" VARCHAR
+);
+```
+
+### `cik_crd_links`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 353 (as of 2026-04-23)
+- **Columns:** 5
+
+**DDL:**
+
+```sql
+CREATE TABLE cik_crd_links (
+    "cik" VARCHAR,
+    "crd_number" VARCHAR,
+    "filing_name" VARCHAR,
+    "adv_name" VARCHAR,
+    "match_score" DOUBLE
+);
+```
+
+### `data_freshness`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 26 (as of 2026-04-23)
+- **Columns:** 3
+- **Primary key:** `(table_name)`
+
+**DDL:**
+
+```sql
+CREATE TABLE data_freshness (
+    "table_name" VARCHAR NOT NULL,
+    "last_computed_at" TIMESTAMP,
+    "row_count" BIGINT,
+    PRIMARY KEY ("table_name")
+);
+```
+
+### `entities`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 26,602 (as of 2026-04-23)
+- **Columns:** 6
+
+**DDL:**
+
+```sql
+CREATE TABLE entities (
+    "entity_id" BIGINT,
+    "entity_type" VARCHAR,
+    "canonical_name" VARCHAR,
+    "created_source" VARCHAR,
+    "is_inferred" BOOLEAN,
+    "created_at" TIMESTAMP
+);
+```
+
+### `entity_aliases`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 26,941 (as of 2026-04-23)
+- **Columns:** 10
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_aliases (
+    "entity_id" BIGINT,
+    "alias_name" VARCHAR,
+    "alias_type" VARCHAR,
+    "is_preferred" BOOLEAN,
+    "preferred_key" BIGINT,
+    "source_table" VARCHAR,
+    "is_inferred" BOOLEAN,
+    "valid_from" DATE,
+    "valid_to" DATE,
+    "created_at" TIMESTAMP
+);
+```
+
+### `entity_classification_history`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 26,662 (as of 2026-04-23)
+- **Columns:** 9
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_classification_history (
+    "entity_id" BIGINT,
+    "classification" VARCHAR,
+    "is_activist" BOOLEAN,
+    "confidence" VARCHAR,
+    "source" VARCHAR,
+    "is_inferred" BOOLEAN,
+    "valid_from" DATE,
+    "valid_to" DATE,
+    "created_at" TIMESTAMP
+);
+```
+
+### `entity_current`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** VIEW
+- **Row count:** 26,602 (as of 2026-04-23)
+- **Columns:** 9
+
+**View definition:**
+
+```sql
+CREATE VIEW entity_current AS SELECT e.entity_id, e.entity_type, e.created_at, COALESCE(ea.alias_name, e.canonical_name) AS display_name, ech.classification, ech.is_activist, ech.confidence AS classification_confidence, er.rollup_entity_id, er.rollup_type FROM entities AS e LEFT JOIN (SELECT entity_id, alias_name FROM entity_aliases WHERE ((is_preferred = CAST('t' AS BOOLEAN)) AND (valid_to = CAST('9999-12-31' AS DATE)))) AS ea ON ((e.entity_id = ea.entity_id)) LEFT JOIN entity_classification_history AS ech ON (((e.entity_id = ech.entity_id) AND (ech.valid_to = CAST('9999-12-31' AS DATE)))) LEFT JOIN entity_rollup_history AS er ON (((e.entity_id = er.entity_id) AND (er.rollup_type = 'economic_control_v1') AND (er.valid_to = CAST('9999-12-31' AS DATE))));
+```
+
+### `entity_identifiers`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 35,512 (as of 2026-04-23)
+- **Columns:** 9
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_identifiers (
+    "entity_id" BIGINT,
+    "identifier_type" VARCHAR,
+    "identifier_value" VARCHAR,
+    "confidence" VARCHAR,
+    "source" VARCHAR,
+    "is_inferred" BOOLEAN,
+    "valid_from" DATE,
+    "valid_to" DATE,
+    "created_at" TIMESTAMP
+);
+```
+
+### `entity_identifiers_staging`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 3,503 (as of 2026-04-23)
+- **Columns:** 13
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_identifiers_staging (
+    "staging_id" BIGINT,
+    "entity_id" BIGINT,
+    "identifier_type" VARCHAR,
+    "identifier_value" VARCHAR,
+    "confidence" VARCHAR,
+    "source" VARCHAR,
+    "conflict_reason" VARCHAR,
+    "existing_entity_id" BIGINT,
+    "review_status" VARCHAR,
+    "reviewed_by" VARCHAR,
+    "reviewed_at" TIMESTAMP,
+    "notes" VARCHAR,
+    "created_at" TIMESTAMP
+);
+```
+
+### `entity_overrides_persistent`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 257 (as of 2026-04-23)
+- **Columns:** 15
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_overrides_persistent (
+    "override_id" BIGINT DEFAULT nextval('override_id_seq') NOT NULL,
+    "entity_cik" VARCHAR,
+    "action" VARCHAR NOT NULL,
+    "field" VARCHAR,
+    "old_value" VARCHAR,
+    "new_value" VARCHAR,
+    "reason" VARCHAR,
+    "analyst" VARCHAR,
+    "still_valid" BOOLEAN DEFAULT CAST('t' AS BOOLEAN) NOT NULL,
+    "applied_at" TIMESTAMP DEFAULT now(),
+    "created_at" TIMESTAMP DEFAULT now(),
+    "identifier_type" VARCHAR DEFAULT 'cik',
+    "identifier_value" VARCHAR,
+    "rollup_type" VARCHAR DEFAULT 'economic_control_v1',
+    "relationship_context" VARCHAR
+);
+```
+
+### `entity_relationships`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 18,365 (as of 2026-04-23)
+- **Columns:** 14
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_relationships (
+    "relationship_id" BIGINT,
+    "parent_entity_id" BIGINT,
+    "child_entity_id" BIGINT,
+    "relationship_type" VARCHAR,
+    "control_type" VARCHAR,
+    "is_primary" BOOLEAN,
+    "primary_parent_key" BIGINT,
+    "confidence" VARCHAR,
+    "source" VARCHAR,
+    "is_inferred" BOOLEAN,
+    "valid_from" DATE,
+    "valid_to" DATE,
+    "created_at" TIMESTAMP,
+    "last_refreshed_at" TIMESTAMP
+);
+```
+
+### `entity_relationships_staging`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 0 (as of 2026-04-23)
+- **Columns:** 14
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_relationships_staging (
+    "id" BIGINT DEFAULT nextval('identifier_staging_id_seq'),
+    "child_entity_id" BIGINT NOT NULL,
+    "parent_entity_id" BIGINT,
+    "owner_name" VARCHAR NOT NULL,
+    "relationship_type" VARCHAR,
+    "ownership_pct" FLOAT,
+    "source" VARCHAR,
+    "confidence" VARCHAR,
+    "conflict_reason" VARCHAR,
+    "review_status" VARCHAR DEFAULT 'pending',
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "reviewer" VARCHAR,
+    "reviewed_at" TIMESTAMP,
+    "resolution" VARCHAR
+);
+```
+
+### `entity_rollup_history`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 59,938 (as of 2026-04-23)
+- **Columns:** 11
+
+**DDL:**
+
+```sql
+CREATE TABLE entity_rollup_history (
+    "entity_id" BIGINT,
+    "rollup_entity_id" BIGINT,
+    "rollup_type" VARCHAR,
+    "rule_applied" VARCHAR,
+    "confidence" VARCHAR,
+    "valid_from" DATE,
+    "valid_to" DATE,
+    "computed_at" TIMESTAMP,
+    "source" VARCHAR,
+    "routing_confidence" VARCHAR DEFAULT 'high',
+    "review_due_date" DATE
+);
+```
+
+### `fetched_tickers_13dg`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 6,075 (as of 2026-04-23)
+- **Columns:** 2
+- **Primary key:** `(ticker)`
+
+**DDL:**
+
+```sql
+CREATE TABLE fetched_tickers_13dg (
+    "ticker" VARCHAR NOT NULL,
+    "fetched_at" TIMESTAMP,
+    PRIMARY KEY ("ticker")
+);
+```
+
+### `filings`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 43,358 (as of 2026-04-23)
+- **Columns:** 9
+
+**DDL:**
+
+```sql
+CREATE TABLE filings (
+    "accession_number" VARCHAR,
+    "cik" VARCHAR,
+    "manager_name" VARCHAR,
+    "crd_number" VARCHAR,
+    "quarter" VARCHAR,
+    "report_date" VARCHAR,
+    "filing_type" VARCHAR,
+    "amended" BOOLEAN,
+    "filed_date" VARCHAR
+);
+```
+
+### `filings_deduped`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 40,140 (as of 2026-04-23)
+- **Columns:** 9
+
+**DDL:**
+
+```sql
+CREATE TABLE filings_deduped (
+    "accession_number" VARCHAR,
+    "cik" VARCHAR,
+    "manager_name" VARCHAR,
+    "crd_number" VARCHAR,
+    "quarter" VARCHAR,
+    "report_date" VARCHAR,
+    "filing_type" VARCHAR,
+    "amended" BOOLEAN,
+    "filed_date" VARCHAR
+);
+```
+
+### `fund_best_index`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 6,151 (as of 2026-04-23)
+- **Columns:** 8
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_best_index (
+    "series_id" VARCHAR,
+    "fund_name" VARCHAR,
+    "best_index" VARCHAR,
+    "best_coverage" DOUBLE,
+    "best_weight" DOUBLE,
+    "best_score" DOUBLE,
+    "total_tickers" BIGINT,
+    "fund_aum_m" DOUBLE
+);
+```
+
+### `fund_classes`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 31,056 (as of 2026-04-23)
+- **Columns:** 7
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_classes (
+    "series_id" VARCHAR,
+    "class_id" VARCHAR,
+    "fund_cik" VARCHAR,
+    "fund_name" VARCHAR,
+    "report_date" DATE,
+    "quarter" VARCHAR,
+    "loaded_at" TIMESTAMP
+);
+```
+
+### `fund_classification`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 5,717 (as of 2026-04-23)
+- **Columns:** 12
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_classification (
+    "series_id" VARCHAR,
+    "fund_name" VARCHAR,
+    "total_tickers" BIGINT,
+    "sp500_coverage_pct" DOUBLE,
+    "sp500_weight_pct" DOUBLE,
+    "sp500_matches" BIGINT,
+    "fund_aum_m" DOUBLE,
+    "sp500_strategy" VARCHAR,
+    "classification_method" VARCHAR,
+    "best_index" VARCHAR,
+    "best_index_coverage" DOUBLE,
+    "best_index_weight" DOUBLE
+);
+```
+
+### `fund_family_patterns`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 83 (as of 2026-04-23)
+- **Columns:** 2
+- **Primary key:** `(inst_parent_name, pattern)`
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_family_patterns (
+    "pattern" VARCHAR NOT NULL,
+    "inst_parent_name" VARCHAR NOT NULL,
+    PRIMARY KEY ("inst_parent_name", "pattern")
+);
+```
+
+### `fund_holdings_v2`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 14,090,397 (as of 2026-04-23)
+- **Columns:** 30
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_holdings_v2 (
+    "fund_cik" VARCHAR,
+    "fund_name" VARCHAR,
+    "family_name" VARCHAR,
+    "series_id" VARCHAR,
+    "quarter" VARCHAR,
+    "report_month" VARCHAR,
+    "report_date" DATE,
+    "cusip" VARCHAR,
+    "isin" VARCHAR,
+    "issuer_name" VARCHAR,
+    "ticker" VARCHAR,
+    "asset_category" VARCHAR,
+    "shares_or_principal" DOUBLE,
+    "market_value_usd" DOUBLE,
+    "pct_of_nav" DOUBLE,
+    "fair_value_level" VARCHAR,
+    "is_restricted" BOOLEAN,
+    "payoff_profile" VARCHAR,
+    "loaded_at" TIMESTAMP,
+    "fund_strategy" VARCHAR,
+    "best_index" VARCHAR,
+    "entity_id" BIGINT,
+    "rollup_entity_id" BIGINT,
+    "dm_entity_id" BIGINT,
+    "dm_rollup_entity_id" BIGINT,
+    "dm_rollup_name" VARCHAR,
+    "row_id" BIGINT DEFAULT nextval('fund_holdings_v2_row_id_seq'),
+    "accession_number" VARCHAR,
+    "is_latest" BOOLEAN DEFAULT CAST('t' AS BOOLEAN),
+    "backfill_quality" VARCHAR
+);
+```
+
+### `fund_index_scores`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 80,271 (as of 2026-04-23)
+- **Columns:** 8
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_index_scores (
+    "series_id" VARCHAR,
+    "fund_name" VARCHAR,
+    "index_name" VARCHAR,
+    "total_tickers" BIGINT,
+    "coverage_pct" DOUBLE,
+    "weight_pct" DOUBLE,
+    "idx_matches" BIGINT,
+    "fund_aum_m" DOUBLE
+);
+```
+
+### `fund_name_map`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 6,229,495 (as of 2026-04-23)
+- **Columns:** 5
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_name_map (
+    "accession_number" VARCHAR,
+    "cusip" VARCHAR,
+    "shares" BIGINT,
+    "discretion" VARCHAR,
+    "fund_name" VARCHAR
+);
+```
+
+### `fund_universe`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 12,870 (as of 2026-04-23)
+- **Columns:** 16
+- **Primary key:** `(series_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_universe (
+    "fund_cik" VARCHAR,
+    "fund_name" VARCHAR,
+    "series_id" VARCHAR NOT NULL,
+    "family_name" VARCHAR,
+    "total_net_assets" DOUBLE,
+    "fund_category" VARCHAR,
+    "is_actively_managed" BOOLEAN,
+    "total_holdings_count" INTEGER,
+    "equity_pct" DOUBLE,
+    "top10_concentration" DOUBLE,
+    "last_updated" TIMESTAMP,
+    "fund_strategy" VARCHAR,
+    "best_index" VARCHAR,
+    "strategy_narrative" VARCHAR,
+    "strategy_source" VARCHAR,
+    "strategy_fetched_at" TIMESTAMP,
+    PRIMARY KEY ("series_id")
+);
+```
+
+### `holdings_v2`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 12,270,984 (as of 2026-04-23)
+- **Columns:** 38
+
+**DDL:**
+
+```sql
+CREATE TABLE holdings_v2 (
+    "accession_number" VARCHAR,
+    "cik" VARCHAR,
+    "manager_name" VARCHAR,
+    "crd_number" VARCHAR,
+    "inst_parent_name" VARCHAR,
+    "quarter" VARCHAR,
+    "report_date" VARCHAR,
+    "cusip" VARCHAR,
+    "ticker" VARCHAR,
+    "issuer_name" VARCHAR,
+    "security_type" VARCHAR,
+    "market_value_usd" BIGINT,
+    "shares" BIGINT,
+    "pct_of_portfolio" DOUBLE,
+    "pct_of_so" DOUBLE,
+    "manager_type" VARCHAR,
+    "is_passive" BOOLEAN,
+    "is_activist" BOOLEAN,
+    "discretion" VARCHAR,
+    "vote_sole" BIGINT,
+    "vote_shared" BIGINT,
+    "vote_none" BIGINT,
+    "put_call" VARCHAR,
+    "market_value_live" DOUBLE,
+    "security_type_inferred" VARCHAR,
+    "fund_name" VARCHAR,
+    "classification_source" VARCHAR,
+    "entity_id" BIGINT,
+    "rollup_entity_id" BIGINT,
+    "rollup_name" VARCHAR,
+    "entity_type" VARCHAR,
+    "dm_rollup_entity_id" BIGINT,
+    "dm_rollup_name" VARCHAR,
+    "pct_of_so_source" VARCHAR,
+    "row_id" BIGINT DEFAULT nextval('holdings_v2_row_id_seq'),
+    "is_latest" BOOLEAN DEFAULT CAST('t' AS BOOLEAN),
+    "loaded_at" TIMESTAMP DEFAULT now(),
+    "backfill_quality" VARCHAR
+);
+```
+
+### `index_proxies`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 13,641 (as of 2026-04-23)
+- **Columns:** 3
+
+**DDL:**
+
+```sql
+CREATE TABLE index_proxies (
+    "index_name" VARCHAR,
+    "ticker" VARCHAR,
+    "weight" DOUBLE
+);
+```
+
+### `ingestion_impacts`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 98,706 (as of 2026-04-23)
+- **Columns:** 17
+- **Primary key:** `(impact_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE ingestion_impacts (
+    "impact_id" BIGINT NOT NULL,
+    "manifest_id" BIGINT NOT NULL,
+    "target_table" VARCHAR NOT NULL,
+    "unit_type" VARCHAR NOT NULL,
+    "unit_key_json" VARCHAR NOT NULL,
+    "report_date" DATE,
+    "rows_staged" INTEGER DEFAULT 0 NOT NULL,
+    "rows_promoted" INTEGER DEFAULT 0 NOT NULL,
+    "load_status" VARCHAR DEFAULT 'pending' NOT NULL,
+    "validation_tier" VARCHAR,
+    "validation_report" VARCHAR,
+    "promote_status" VARCHAR DEFAULT 'pending' NOT NULL,
+    "promote_duration_ms" BIGINT,
+    "validate_duration_ms" BIGINT,
+    "promoted_at" TIMESTAMP,
+    "error_message" VARCHAR,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("impact_id")
+);
+```
+
+### `ingestion_manifest`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 73,244 (as of 2026-04-23)
+- **Columns:** 26
+- **Primary key:** `(manifest_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE ingestion_manifest (
+    "manifest_id" BIGINT NOT NULL,
+    "source_type" VARCHAR NOT NULL,
+    "object_type" VARCHAR NOT NULL,
+    "object_key" VARCHAR NOT NULL,
+    "source_url" VARCHAR,
+    "accession_number" VARCHAR,
+    "report_period" DATE,
+    "filing_date" DATE,
+    "accepted_at" TIMESTAMP,
+    "run_id" VARCHAR NOT NULL,
+    "discovered_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "fetch_started_at" TIMESTAMP,
+    "fetch_completed_at" TIMESTAMP,
+    "fetch_status" VARCHAR DEFAULT 'pending' NOT NULL,
+    "http_code" INTEGER,
+    "source_bytes" BIGINT,
+    "source_checksum" VARCHAR,
+    "local_path" VARCHAR,
+    "retry_count" INTEGER DEFAULT 0 NOT NULL,
+    "error_message" VARCHAR,
+    "parser_version" VARCHAR,
+    "schema_version" VARCHAR,
+    "is_amendment" BOOLEAN DEFAULT CAST('f' AS BOOLEAN) NOT NULL,
+    "prior_accession" VARCHAR,
+    "superseded_by_manifest_id" BIGINT,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("manifest_id")
+);
+```
+
+### `investor_flows`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 17,396,524 (as of 2026-04-23)
+- **Columns:** 25
+
+**DDL:**
+
+```sql
+CREATE TABLE investor_flows (
+    "ticker" VARCHAR,
+    "period" VARCHAR,
+    "quarter_from" VARCHAR,
+    "quarter_to" VARCHAR,
+    "rollup_type" VARCHAR,
+    "rollup_entity_id" BIGINT,
+    "rollup_name" VARCHAR,
+    "inst_parent_name" VARCHAR,
+    "manager_type" VARCHAR,
+    "from_shares" DOUBLE,
+    "to_shares" DOUBLE,
+    "net_shares" DOUBLE,
+    "pct_change" DOUBLE,
+    "from_value" DOUBLE,
+    "to_value" DOUBLE,
+    "from_price" DOUBLE,
+    "price_adj_flow" DOUBLE,
+    "raw_flow" DOUBLE,
+    "price_effect" DOUBLE,
+    "is_new_entry" BOOLEAN,
+    "is_exit" BOOLEAN,
+    "flow_4q" DOUBLE,
+    "flow_2q" DOUBLE,
+    "momentum_ratio" DOUBLE,
+    "momentum_signal" VARCHAR
+);
+```
+
+### `lei_reference`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 13,143 (as of 2026-04-23)
+- **Columns:** 6
+- **Primary key:** `(lei)`
+
+**DDL:**
+
+```sql
+CREATE TABLE lei_reference (
+    "lei" VARCHAR NOT NULL,
+    "entity_name" VARCHAR,
+    "entity_type" VARCHAR,
+    "series_id" VARCHAR,
+    "fund_cik" VARCHAR,
+    "updated_at" TIMESTAMP,
+    PRIMARY KEY ("lei")
+);
+```
+
+### `listed_filings_13dg`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 60,247 (as of 2026-04-23)
+- **Columns:** 8
+- **Primary key:** `(accession_number)`
+
+**DDL:**
+
+```sql
+CREATE TABLE listed_filings_13dg (
+    "accession_number" VARCHAR NOT NULL,
+    "ticker" VARCHAR,
+    "form" VARCHAR,
+    "filing_date" VARCHAR,
+    "filer_cik" VARCHAR,
+    "subject_name" VARCHAR,
+    "subject_cik" VARCHAR,
+    "listed_at" TIMESTAMP,
+    PRIMARY KEY ("accession_number")
+);
+```
+
+### `managers`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 11,135 (as of 2026-04-23)
+- **Columns:** 15
+
+**DDL:**
+
+```sql
+CREATE TABLE managers (
+    "cik" VARCHAR,
+    "manager_name" VARCHAR,
+    "crd_number" VARCHAR,
+    "parent_name" VARCHAR,
+    "strategy_type" VARCHAR,
+    "is_activist" BOOLEAN,
+    "is_passive" BOOLEAN,
+    "aum_total" DOUBLE,
+    "aum_discretionary" DOUBLE,
+    "pct_discretionary" DOUBLE,
+    "adv_city" VARCHAR,
+    "adv_state" VARCHAR,
+    "manually_verified" BOOLEAN,
+    "num_filings" BIGINT,
+    "total_positions" BIGINT
+);
+```
+
+### `market_data`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 10,064 (as of 2026-04-23)
+- **Columns:** 26
+
+**DDL:**
+
+```sql
+CREATE TABLE market_data (
+    "ticker" VARCHAR,
+    "price_live" DOUBLE,
+    "market_cap" DOUBLE,
+    "float_shares" DOUBLE,
+    "shares_outstanding" DOUBLE,
+    "fifty_two_week_high" DOUBLE,
+    "fifty_two_week_low" DOUBLE,
+    "avg_volume_30d" DOUBLE,
+    "sector" VARCHAR,
+    "industry" VARCHAR,
+    "exchange" VARCHAR,
+    "fetch_date" VARCHAR,
+    "price_2025Q1" INTEGER,
+    "price_2025Q2" INTEGER,
+    "price_2025Q3" INTEGER,
+    "price_2025Q4" INTEGER,
+    "unfetchable" BOOLEAN,
+    "unfetchable_reason" VARCHAR,
+    "metadata_date" VARCHAR,
+    "sec_date" VARCHAR,
+    "public_float_usd" DOUBLE,
+    "shares_as_of" VARCHAR,
+    "shares_form" VARCHAR,
+    "shares_filed" VARCHAR,
+    "shares_source_tag" VARCHAR,
+    "cik" VARCHAR
+);
+```
+
+### `ncen_adviser_map`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 11,209 (as of 2026-04-23)
+- **Columns:** 14
+
+**DDL:**
+
+```sql
+CREATE TABLE ncen_adviser_map (
+    "registrant_cik" VARCHAR,
+    "registrant_name" VARCHAR,
+    "adviser_name" VARCHAR,
+    "adviser_sec_file" VARCHAR,
+    "adviser_crd" VARCHAR,
+    "adviser_lei" VARCHAR,
+    "role" VARCHAR,
+    "series_id" VARCHAR,
+    "series_name" VARCHAR,
+    "report_date" DATE,
+    "filing_date" DATE,
+    "loaded_at" TIMESTAMP,
+    "valid_from" TIMESTAMP,
+    "valid_to" DATE DEFAULT CAST('9999-12-31' AS DATE)
+);
+```
+
+### `other_managers`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 15,405 (as of 2026-04-23)
+- **Columns:** 8
+
+**DDL:**
+
+```sql
+CREATE TABLE other_managers (
+    "accession_number" VARCHAR,
+    "sequence_number" VARCHAR,
+    "other_cik" VARCHAR,
+    "form13f_file_number" VARCHAR,
+    "crd_number" VARCHAR,
+    "sec_file_number" VARCHAR,
+    "name" VARCHAR,
+    "quarter" VARCHAR
+);
+```
+
+### `parent_bridge`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 11,135 (as of 2026-04-23)
+- **Columns:** 7
+
+**DDL:**
+
+```sql
+CREATE TABLE parent_bridge (
+    "cik" VARCHAR,
+    "manager_name" VARCHAR,
+    "crd_number" VARCHAR,
+    "parent_name" VARCHAR,
+    "strategy_type" VARCHAR,
+    "is_activist" BOOLEAN,
+    "manually_verified" BOOLEAN
+);
+```
+
+### `peer_groups`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 27 (as of 2026-04-23)
+- **Columns:** 8
+
+**DDL:**
+
+```sql
+CREATE TABLE peer_groups (
+    "group_id" VARCHAR,
+    "group_name" VARCHAR,
+    "ticker" VARCHAR,
+    "company_name" VARCHAR,
+    "is_primary" BOOLEAN,
+    "added_date" DATE,
+    "added_by" VARCHAR,
+    "notes" VARCHAR
+);
+```
+
+### `pending_entity_resolution`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 6,874 (as of 2026-04-23)
+- **Columns:** 13
+- **Primary key:** `(resolution_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE pending_entity_resolution (
+    "resolution_id" BIGINT DEFAULT nextval('resolution_id_seq') NOT NULL,
+    "manifest_id" BIGINT,
+    "source_type" VARCHAR NOT NULL,
+    "identifier_type" VARCHAR NOT NULL,
+    "identifier_value" VARCHAR NOT NULL,
+    "context_json" VARCHAR,
+    "resolution_status" VARCHAR DEFAULT 'pending' NOT NULL,
+    "pending_key" VARCHAR,
+    "resolved_entity_id" BIGINT,
+    "resolved_by" VARCHAR,
+    "resolved_at" TIMESTAMP,
+    "resolution_notes" VARCHAR,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("resolution_id")
+);
+```
+
+### `raw_coverpage`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 43,358 (as of 2026-04-23)
+- **Columns:** 10
+
+**DDL:**
+
+```sql
+CREATE TABLE raw_coverpage (
+    "accession_number" VARCHAR,
+    "report_calendar" VARCHAR,
+    "is_amendment" VARCHAR,
+    "amendment_no" VARCHAR,
+    "filing_manager_name" VARCHAR,
+    "filing_manager_city" VARCHAR,
+    "filing_manager_state" VARCHAR,
+    "crd_number" VARCHAR,
+    "sec_file_number" VARCHAR,
+    "quarter" VARCHAR
+);
+```
+
+### `raw_infotable`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 13,540,608 (as of 2026-04-23)
+- **Columns:** 15
+
+**DDL:**
+
+```sql
+CREATE TABLE raw_infotable (
+    "accession_number" VARCHAR,
+    "issuer_name" VARCHAR,
+    "title_of_class" VARCHAR,
+    "cusip" VARCHAR,
+    "figi" VARCHAR,
+    "value" BIGINT,
+    "shares" BIGINT,
+    "shares_type" VARCHAR,
+    "put_call" VARCHAR,
+    "discretion" VARCHAR,
+    "other_manager" VARCHAR,
+    "vote_sole" BIGINT,
+    "vote_shared" BIGINT,
+    "vote_none" BIGINT,
+    "quarter" VARCHAR
+);
+```
+
+### `raw_submissions`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 43,358 (as of 2026-04-23)
+- **Columns:** 6
+
+**DDL:**
+
+```sql
+CREATE TABLE raw_submissions (
+    "accession_number" VARCHAR,
+    "filing_date" VARCHAR,
+    "submission_type" VARCHAR,
+    "cik" VARCHAR,
+    "period_of_report" VARCHAR,
+    "quarter" VARCHAR
+);
+```
+
+### `securities`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 430,149 (as of 2026-04-23)
+- **Columns:** 22
+- **Primary key:** `(cusip)`
+
+**DDL:**
+
+```sql
+CREATE TABLE securities (
+    "cusip" VARCHAR NOT NULL,
+    "issuer_name" VARCHAR,
+    "ticker" VARCHAR,
+    "security_type" VARCHAR,
+    "exchange" VARCHAR,
+    "market_sector" VARCHAR,
+    "sector" VARCHAR,
+    "industry" VARCHAR,
+    "sic_code" INTEGER,
+    "is_energy" BOOLEAN,
+    "is_media" BOOLEAN,
+    "holdings_count" BIGINT,
+    "total_value" DOUBLE,
+    "security_type_inferred" VARCHAR,
+    "canonical_type" VARCHAR,
+    "canonical_type_source" VARCHAR,
+    "is_equity" BOOLEAN,
+    "is_priceable" BOOLEAN,
+    "ticker_expected" BOOLEAN,
+    "is_active" BOOLEAN DEFAULT CAST('t' AS BOOLEAN),
+    "figi" VARCHAR,
+    "is_otc" BOOLEAN DEFAULT CAST('f' AS BOOLEAN),
+    PRIMARY KEY ("cusip")
+);
+```
+
+### `shares_outstanding_history`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 338,053 (as of 2026-04-23)
+- **Columns:** 7
+- **Primary key:** `(ticker, as_of_date)`
+
+**DDL:**
+
+```sql
+CREATE TABLE shares_outstanding_history (
+    "ticker" VARCHAR NOT NULL,
+    "cik" VARCHAR,
+    "as_of_date" DATE NOT NULL,
+    "shares" BIGINT NOT NULL,
+    "form" VARCHAR,
+    "filed_date" DATE,
+    "source_tag" VARCHAR,
+    PRIMARY KEY ("ticker", "as_of_date")
+);
+```
+
+### `short_interest`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 328,595 (as of 2026-04-23)
+- **Columns:** 8
+- **Primary key:** `(ticker, report_date)`
+
+**DDL:**
+
+```sql
+CREATE TABLE short_interest (
+    "ticker" VARCHAR NOT NULL,
+    "short_volume" BIGINT,
+    "short_exempt_volume" BIGINT,
+    "total_volume" BIGINT,
+    "report_date" DATE NOT NULL,
+    "report_month" VARCHAR,
+    "short_pct" DOUBLE,
+    "loaded_at" TIMESTAMP,
+    PRIMARY KEY ("ticker", "report_date")
+);
+```
+
+### `summary_by_parent`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 63,916 (as of 2026-04-23)
+- **Columns:** 13
+- **Primary key:** `(quarter, rollup_type, rollup_entity_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE summary_by_parent (
+    "quarter" VARCHAR NOT NULL,
+    "rollup_type" VARCHAR NOT NULL,
+    "rollup_entity_id" BIGINT NOT NULL,
+    "inst_parent_name" VARCHAR,
+    "rollup_name" VARCHAR,
+    "total_aum" DOUBLE,
+    "total_nport_aum" DOUBLE,
+    "nport_coverage_pct" DOUBLE,
+    "ticker_count" INTEGER,
+    "total_shares" BIGINT,
+    "manager_type" VARCHAR,
+    "is_passive" BOOLEAN,
+    "updated_at" TIMESTAMP,
+    PRIMARY KEY ("quarter", "rollup_type", "rollup_entity_id")
+);
+```
+
+### `summary_by_ticker`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 47,732 (as of 2026-04-23)
+- **Columns:** 11
+- **Primary key:** `(quarter, ticker)`
+
+**DDL:**
+
+```sql
+CREATE TABLE summary_by_ticker (
+    "quarter" VARCHAR NOT NULL,
+    "ticker" VARCHAR NOT NULL,
+    "company_name" VARCHAR,
+    "total_value" DOUBLE,
+    "total_shares" BIGINT,
+    "holder_count" INTEGER,
+    "active_value" DOUBLE,
+    "passive_value" DOUBLE,
+    "active_pct" DOUBLE,
+    "pct_of_float" DOUBLE,
+    "updated_at" TIMESTAMP,
+    PRIMARY KEY ("quarter", "ticker")
+);
+```
+
+### `ticker_flow_stats`
+
+- **Source bucket:** REGISTRY ∩ prod
+- **Object type:** BASE TABLE
+- **Row count:** 80,322 (as of 2026-04-23)
+- **Columns:** 10
+
+**DDL:**
+
+```sql
+CREATE TABLE ticker_flow_stats (
+    "ticker" VARCHAR,
+    "quarter_from" VARCHAR,
+    "quarter_to" VARCHAR,
+    "rollup_type" VARCHAR,
+    "flow_intensity_total" DOUBLE,
+    "flow_intensity_active" DOUBLE,
+    "flow_intensity_passive" DOUBLE,
+    "churn_nonpassive" DOUBLE,
+    "churn_active" DOUBLE,
+    "computed_at" TIMESTAMP
+);
+```
+
+---
+
+### Registry-only tables
+
+### `positions`
+
+- **Source bucket:** REGISTRY only — retire candidate — DATASET_REGISTRY notes "Decision D2 — delete. No app reads confirmed. Retire pending sweep." Owner: scripts/unify_positions.py (RETIRE).
+- **Object type:** MISSING
+- **Columns:** 0
+
+**DDL:** _not yet created in prod_
+- **Registry owner:** `scripts/unify_positions.py (RETIRE)`
+- **Registry notes:** Decision D2 — delete. No app reads confirmed. Retire pending sweep.
+
+---
+
+### Prod-only tables (registry gaps)
+
+### `_cache_openfigi`
+
+- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 cache (migration 003); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 15,807 (as of 2026-04-23)
+- **Columns:** 7
+- **Primary key:** `(cusip)`
+
+**DDL:**
+
+```sql
+CREATE TABLE _cache_openfigi (
+    "cusip" VARCHAR NOT NULL,
+    "figi" VARCHAR,
+    "ticker" VARCHAR,
+    "exchange" VARCHAR,
+    "security_type" VARCHAR,
+    "market_sector" VARCHAR,
+    "cached_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("cusip")
+);
+```
+
+### `admin_preferences`
+
+- **Source bucket:** prod only — registry gap — admin app table (migration 016, p2-07); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 0 (as of 2026-04-23)
+- **Columns:** 4
+- **Primary key:** `(user_id, pipeline_name)`
+
+**DDL:**
+
+```sql
+CREATE TABLE admin_preferences (
+    "user_id" VARCHAR NOT NULL,
+    "pipeline_name" VARCHAR NOT NULL,
+    "auto_approve_enabled" BOOLEAN DEFAULT CAST('f' AS BOOLEAN),
+    "auto_approve_conditions" JSON,
+    PRIMARY KEY ("user_id", "pipeline_name")
+);
+```
+
+### `admin_sessions`
+
+- **Source bucket:** prod only — registry gap — admin app table (migration 009, sec-01); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 9 (as of 2026-04-23)
+- **Columns:** 7
+- **Primary key:** `(session_id)`
+
+**DDL:**
+
+```sql
+CREATE TABLE admin_sessions (
+    "session_id" VARCHAR NOT NULL,
+    "issued_at" TIMESTAMP NOT NULL,
+    "expires_at" TIMESTAMP NOT NULL,
+    "last_used_at" TIMESTAMP NOT NULL,
+    "ip" VARCHAR,
+    "user_agent" VARCHAR,
+    "revoked_at" TIMESTAMP,
+    PRIMARY KEY ("session_id")
+);
+```
+
+### `cusip_classifications`
+
+- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 classification layer (migration 003); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 430,149 (as of 2026-04-23)
+- **Columns:** 33
+- **Primary key:** `(cusip)`
+
+**DDL:**
+
+```sql
+CREATE TABLE cusip_classifications (
+    "cusip" VARCHAR NOT NULL,
+    "canonical_type" VARCHAR NOT NULL,
+    "canonical_type_source" VARCHAR NOT NULL,
+    "raw_type_mode" VARCHAR,
+    "raw_type_count" INTEGER,
+    "security_type_inferred" VARCHAR,
+    "asset_category_seed" VARCHAR,
+    "market_sector" VARCHAR,
+    "issuer_name" VARCHAR,
+    "ticker" VARCHAR,
+    "figi" VARCHAR,
+    "exchange" VARCHAR,
+    "country_code" VARCHAR,
+    "is_equity" BOOLEAN DEFAULT CAST('f' AS BOOLEAN) NOT NULL,
+    "ticker_expected" BOOLEAN DEFAULT CAST('f' AS BOOLEAN) NOT NULL,
+    "is_priceable" BOOLEAN DEFAULT CAST('f' AS BOOLEAN) NOT NULL,
+    "is_permanent" BOOLEAN DEFAULT CAST('f' AS BOOLEAN) NOT NULL,
+    "is_active" BOOLEAN DEFAULT CAST('t' AS BOOLEAN) NOT NULL,
+    "classification_source" VARCHAR NOT NULL,
+    "ticker_source" VARCHAR,
+    "confidence" VARCHAR NOT NULL,
+    "openfigi_attempts" INTEGER DEFAULT 0 NOT NULL,
+    "last_openfigi_attempt" TIMESTAMP,
+    "openfigi_status" VARCHAR,
+    "last_priceable_check" TIMESTAMP,
+    "first_seen_date" DATE NOT NULL,
+    "last_confirmed_date" DATE,
+    "inactive_since" DATE,
+    "inactive_reason" VARCHAR,
+    "notes" VARCHAR,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "is_otc" BOOLEAN DEFAULT CAST('f' AS BOOLEAN),
+    PRIMARY KEY ("cusip")
+);
+```
+
+### `cusip_retry_queue`
+
+- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 OpenFIGI retry queue (migration 003); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 37,929 (as of 2026-04-23)
+- **Columns:** 13
+- **Primary key:** `(cusip)`
+
+**DDL:**
+
+```sql
+CREATE TABLE cusip_retry_queue (
+    "cusip" VARCHAR NOT NULL,
+    "issuer_name" VARCHAR,
+    "canonical_type" VARCHAR,
+    "attempt_count" INTEGER DEFAULT 0 NOT NULL,
+    "first_attempted" TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "last_attempted" TIMESTAMP,
+    "last_error" VARCHAR,
+    "status" VARCHAR DEFAULT 'pending' NOT NULL,
+    "resolved_ticker" VARCHAR,
+    "resolved_figi" VARCHAR,
+    "notes" VARCHAR,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("cusip")
+);
+```
+
+### `fund_holdings`
+
+- **Source bucket:** prod only — registry gap — legacy table flagged for retire (canonical_ddl.md §2 says "dropped 2026-04-13 Stage 5" but 22,030 rows still in prod); surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 22,030 (as of 2026-04-23)
+- **Columns:** 19
+
+**DDL:**
+
+```sql
+CREATE TABLE fund_holdings (
+    "fund_cik" VARCHAR,
+    "fund_name" VARCHAR,
+    "family_name" VARCHAR,
+    "series_id" VARCHAR,
+    "quarter" VARCHAR,
+    "report_month" VARCHAR,
+    "report_date" DATE,
+    "cusip" VARCHAR,
+    "isin" VARCHAR,
+    "issuer_name" VARCHAR,
+    "ticker" VARCHAR,
+    "asset_category" VARCHAR,
+    "shares_or_principal" DOUBLE,
+    "market_value_usd" DOUBLE,
+    "pct_of_nav" DOUBLE,
+    "fair_value_level" VARCHAR,
+    "is_restricted" BOOLEAN,
+    "payoff_profile" VARCHAR,
+    "loaded_at" TIMESTAMP
+);
+```
+
+### `ingestion_manifest_current`
+
+- **Source bucket:** prod only — registry gap — VIEW created in migration 001; surface for later resolution.
+- **Object type:** VIEW
+- **Row count:** 73,244 (as of 2026-04-23)
+- **Columns:** 26
+
+**View definition:**
+
+```sql
+CREATE VIEW ingestion_manifest_current AS SELECT m.* FROM ingestion_manifest AS m WHERE (m.superseded_by_manifest_id IS NULL);
+```
+
+### `schema_versions`
+
+- **Source bucket:** prod only — registry gap — migration metadata table; surface for later resolution.
+- **Object type:** BASE TABLE
+- **Row count:** 18 (as of 2026-04-23)
+- **Columns:** 3
+- **Primary key:** `(version)`
+
+**DDL:**
+
+```sql
+CREATE TABLE schema_versions (
+    "version" VARCHAR NOT NULL,
+    "applied_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "notes" VARCHAR,
+    PRIMARY KEY ("version")
+);
+```
+
+---
+
+## Appendix A.2: Migration History
+
+Migration metadata is maintained in `schema_versions` in prod and `scripts/migrations/<version>.py` on disk. The 18 rows in `schema_versions` correspond 1:1 to the 18 files in `scripts/migrations/` — no gaps or unrecorded files at fold time.
+
+| Version | Applied at (UTC) | File | Description |
+|---------|------------------|------|-------------|
+| `001_pipeline_control_plane` | 2026-04-21 08:50:33 | `scripts/migrations/001_pipeline_control_plane.py` | L0 pipeline control plane (backfill) |
+| `002_fund_universe_strategy` | 2026-04-21 08:50:33 | `scripts/migrations/002_fund_universe_strategy.py` | fund_universe strategy narrative columns (backfill) |
+| `003_cusip_classifications` | 2026-04-15 09:17:46 | `scripts/migrations/003_cusip_classifications.py` | CUSIP & ticker classification layer |
+| `004_summary_by_parent_rollup_type` | 2026-04-21 08:50:33 | `scripts/migrations/004_summary_by_parent_rollup_type.py` | summary_by_parent rollup_type column + compound PK (backfill) |
+| `005_beneficial_ownership_entity_rollups` | 2026-04-16 07:56:14 | `scripts/migrations/005_beneficial_ownership_entity_rollups.py` | 13D/G entity rollup columns on beneficial_ownership_v2 |
+| `006_override_id_sequence` | 2026-04-17 05:00:39 | `scripts/migrations/006_override_id_sequence.py` | override_id sequence + DEFAULT nextval + NOT NULL constraint |
+| `007_override_new_value_nullable` | 2026-04-17 05:55:16 | `scripts/migrations/007_override_new_value_nullable.py` | drop NOT NULL on entity_overrides_persistent.new_value |
+| `008_rename_pct_of_float_to_pct_of_so` | 2026-04-19 13:17:12 | `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | holdings_v2 pct_of_float → pct_of_so rename + pct_of_so_source audit column |
+| `009_admin_sessions` | 2026-04-20 12:39:01 | `scripts/migrations/009_admin_sessions.py` | admin_sessions table (sec-01 Phase 1 server-side session storage) |
+| `010_drop_nextval_defaults` | 2026-04-21 04:58:38 | `scripts/migrations/010_drop_nextval_defaults.py` | drop DEFAULT nextval on ingestion_impacts.impact_id and ingestion_manifest.manifest_id (obs-03 Phase 1) |
+| `011_securities_cusip_pk` | 2026-04-22 08:52:47 | `scripts/migrations/011_securities_cusip_pk.py` | add PRIMARY KEY (cusip) to securities (INF28 / int-12 Phase 1) |
+| `012_securities_is_otc` | 2026-04-22 08:52:59 | `scripts/migrations/012_securities_is_otc.py` | add is_otc BOOLEAN DEFAULT FALSE to securities + cusip_classifications (INF29) |
+| `013_drop_top10_columns` | 2026-04-22 08:55:40 | `scripts/migrations/013_drop_top10_columns.py` | drop unused top10_* placeholder columns from summary_by_parent and summary_by_ticker (int-17 / INF36) |
+| `014_surrogate_row_id` | 2026-04-22 09:44:34 | `scripts/migrations/014_surrogate_row_id.py` | add row_id BIGINT DEFAULT nextval on holdings_v2, fund_holdings_v2, beneficial_ownership_v2 (mig-06 / INF40) |
+| `015_amendment_semantics` | 2026-04-22 11:46:54 | `scripts/migrations/015_amendment_semantics.py` | is_latest + loaded_at + backfill_quality on holdings_v2, fund_holdings_v2, beneficial_ownership_v2 (p2-02) |
+| `016_admin_preferences` | 2026-04-22 14:44:06 | `scripts/migrations/016_admin_preferences.py` | admin_preferences table for per-pipeline auto-approve (p2-07) |
+| `017_ncen_scd_columns` | 2026-04-22 17:27:17 | `scripts/migrations/017_ncen_scd_columns.py` | valid_from + valid_to on ncen_adviser_map for SCD Type 2 promote (w2-04) |
+| `add_last_refreshed_at` | 2026-04-21 08:50:33 | `scripts/migrations/add_last_refreshed_at.py` | entity_relationships.last_refreshed_at column + backfill (backfill) |
+
+**File ↔ version mapping:** all 18 `schema_versions` rows have a corresponding file under `scripts/migrations/` with the same prefix. The non-numbered `add_last_refreshed_at` row corresponds to `scripts/migrations/add_last_refreshed_at.py` (originally drafted in commit `831e5b4`, applied during a later backfill).
+
+### Verdict semantics (preserved from canonical_ddl.md)
+
+The retired drift report used three verdicts to compare prod DDL against owner-script INSERT/UPDATE column lists:
+
+- `ALIGNED` — prod DDL and owner-script column list match. No action needed.
+- `OWNER_BEHIND` — prod DDL is complete; the **owner script** lags (writes to a dropped table and/or its CREATE DDL is missing columns prod has). Fixable only by rewriting the owner script — not by schema migration on prod.
+- `BROKEN` — formerly used as a catch-all; replaced by `OWNER_BEHIND` after the 2026-04-13 Batch 1 reclassification.
+
+At fold time the only outstanding `OWNER_BEHIND` table was `holdings_v2` (`load_13f.py` still materialized the pre-Stage-5 `holdings` table); the v2 cutover scheduled in phase-b2-5 (`ad4b8f7`, 2026-04-23) swapped scheduled execution to `load_13f_v2.py`, closing the loop.
+
+### Migration patterns — index-preserving RENAME (capture-and-recreate)
+
+**Problem:** DuckDB's `ALTER TABLE ... RENAME COLUMN` does not preserve indexes that reference the renamed column — the index silently drops and downstream queries regress on first read. Any RENAME on an index-bearing L3 table must therefore snapshot the index set, drop, rename, and rebuild.
+
+**Idiom:**
+
+```sql
+-- 1. Snapshot the index DDL for the target table
+SELECT index_name, sql
+FROM duckdb_indexes()
+WHERE table_name = 'holdings_v2';
+
+-- 2. Drop each index (preserve the captured DDL strings)
+DROP INDEX IF EXISTS idx_holdings_v2_foo;
+-- ... repeat for every index ...
+
+-- 3. RENAME the column (or run the column-bearing ALTER)
+ALTER TABLE holdings_v2 RENAME COLUMN pct_of_float TO pct_of_so;
+ALTER TABLE holdings_v2 ADD COLUMN pct_of_so_source VARCHAR;
+
+-- 4. Recreate each index from the captured DDL
+CREATE INDEX idx_holdings_v2_foo ON holdings_v2(...);
+-- ... repeat ...
+```
+
+**When to apply:** any DDL mutation that touches an indexed column on an L3 canonical table. Forgetting step 4 is a silent read-path regression; forgetting step 1 is unrecoverable without `information_schema` archaeology.
+
+**Precedents:** `ea4ae99` (migration 008 amended — `pct_of_float → pct_of_so` + `pct_of_so_source`); `d0e5f45` (INF39 staging rebuild — verifies index inventory parity post-capture-and-recreate via `scripts/pipeline/validate_schema_parity.py`).
+
+**Related:** INF40 (stable L3 surrogate row-ID, shipped in migration 014) enables a replay-based migration mode as an alternative to capture-and-recreate; for now capture-and-recreate remains the standard. See `docs/DEFERRED_FOLLOWUPS.md`.
