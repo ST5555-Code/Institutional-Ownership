@@ -23,7 +23,7 @@ When a worker script needs a DB, the natural workaround is to `cd ~/ClaudeWorksp
 ### Mitigation — run the bootstrap script
 
 ```
-./scripts/bootstrap_worktree.sh
+./scripts/hygiene/bootstrap_worktree.sh
 ```
 
 Idempotent. In the primary worktree it no-ops. In a secondary worktree it creates symlinks:
@@ -71,7 +71,7 @@ For a session that runs in a secondary worktree:
 
 1. `pwd` — confirm you are under `.claude/worktrees/<name>/`, not `~/ClaudeWorkspace/Projects/13f-ownership/`.
 2. `git branch --show-current` — confirm the feature branch.
-3. `./scripts/bootstrap_worktree.sh` — install DB symlinks.
+3. `./scripts/hygiene/bootstrap_worktree.sh` — install DB symlinks.
 4. Run work from the worktree. Never `cd` to the primary path.
 5. `git status` at end of session — confirm expected files are staged; cross-check `git -C ~/ClaudeWorkspace/Projects/13f-ownership status` shows no stray changes.
 
@@ -108,7 +108,7 @@ rediscovering what already shipped.
 **How to apply:**
 
 1. When preparing a PR that closes an item, run
-   `python3 scripts/audit_tracker_staleness.py` against your branch.
+   `python3 scripts/hygiene/audit_tracker_staleness.py` against your branch.
    The script prints any ID whose status disagrees across docs and
    exits non-zero if drift exists.
 2. If the audit flags your item, update every tracker it names
@@ -124,6 +124,20 @@ rediscovering what already shipped.
 tracker (a typo fix, a link repair, a header refresh) does not need
 to update the others. The rule kicks in when the PR changes the
 **status** of an item, not when it changes prose around the item.
+
+---
+
+## 4. Scripts directory taxonomy
+
+The `scripts/` tree is partitioned by lifecycle. Place new scripts in the directory matching their intended use:
+
+- **`scripts/`** — active pipelines + core utilities (run regularly by Makefile, scheduler, or operators).
+- **`scripts/pipeline/`** — `SourcePipeline` framework (registry, sync/diff/promote, base classes).
+- **`scripts/hygiene/`** — audit + cleanup tools (e.g. `audit_ticket_numbers.py`, `audit_tracker_staleness.py`, `audit_read_sites.py`, `bootstrap_worktree.sh`, `cleanup_merged_worktree.sh`, `concat_closed_log.py`). Run on demand by reviewers / session start.
+- **`scripts/oneoff/`** — historical apply / bootstrap / seed scripts (audit trail; **do not re-run**). Examples: `dm14_layer1_apply.py`, `inf23_apply.py`, `migrate_batch_3a.py`.
+- **`scripts/retired/`** — superseded by current code paths; **do not call**. Kept only for archaeology.
+
+**Rule of thumb:** if a script is one-shot (data fix, schema migration apply, bootstrap seed), land it in `scripts/oneoff/` from the start. If it's a recurring on-demand tool (audit, cleanup), land it in `scripts/hygiene/`. Reserve top-level `scripts/` for things that get called by Makefile / scheduler / update.py / admin_bp.py.
 
 ---
 

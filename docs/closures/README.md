@@ -51,7 +51,7 @@ one file. One row per line — do not insert blank lines between rows.
 When a single flat view is needed (grep, scrolling, audit), run:
 
 ```
-python3 scripts/concat_closed_log.py
+python3 scripts/hygiene/concat_closed_log.py
 ```
 
 Output: `docs/closed-items-log.md` (git-ignored; regenerate on

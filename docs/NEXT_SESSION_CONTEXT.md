@@ -64,7 +64,7 @@ All six pipelines register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGI
 
 ## Post-Phase 2 carry-forward (open)
 
-- **int-09 Step 4** — denorm retirement (`ticker`, `entity_id`, `rollup_entity_id`, `lei` drops on v2 fact tables). Now unblocked by `is_latest` sweep + `scripts/audit_read_sites.py`. Exit criteria: `docs/findings/int-09-p0-findings.md §4`.
+- **int-09 Step 4** — denorm retirement (`ticker`, `entity_id`, `rollup_entity_id`, `lei` drops on v2 fact tables). Now unblocked by `is_latest` sweep + `scripts/hygiene/audit_read_sites.py`. Exit criteria: `docs/findings/int-09-p0-findings.md §4`.
 - **int-19 (INF38)** — true float-adjusted `pct_of_float` denominator. Needs new float-history data source.
 - **Legacy `run_script` allowlist in `scripts/admin_bp.py`** — references retired scripts (`fetch_nport.py` / `fetch_adv.py` / etc). Prune after one clean quarterly cycle against the framework.
 - **`scheduler.py`, `update.py`, `benchmark.py`** — stale references to retired scripts; audit + prune.
@@ -136,7 +136,7 @@ All six pipelines register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGI
 | Staging DB | `data/13f_staging.duckdb` |
 | Start app | `./scripts/start_app.sh` → `localhost:8001` |
 | App entry | `scripts/app.py` |
-| Audit tool | `scripts/audit_read_sites.py` (rename-sweep discipline, mig-07) |
+| Audit tool | `scripts/hygiene/audit_read_sites.py` (rename-sweep discipline, mig-07) |
 | Schema parity | `scripts/pipeline/validate_schema_parity.py --layer all` / `make schema-parity-check` |
 | Fixture rebuild | `scripts/build_fixture.py` (writes `_fixture_metadata` provenance row) |
 | Freshness gate | `scripts/check_freshness.py` / `make freshness` |

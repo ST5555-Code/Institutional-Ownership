@@ -75,7 +75,7 @@ and rationale: `docs/closures/README.md`.
 Because each session writes its own file, two parallel sessions
 never touch the same file and git merge has no grounds to flag a
 conflict. A flat view is generated on demand by
-`python3 scripts/concat_closed_log.py` → `docs/closed-items-log.md`
+`python3 scripts/hygiene/concat_closed_log.py` → `docs/closed-items-log.md`
 (git-ignored).
 
 ## Post-merge cleanup
@@ -83,9 +83,9 @@ conflict. A flat view is generated on demand by
 `gh pr merge --squash --delete-branch` deletes the remote branch but cannot delete the local branch when a worktree still holds it, so the local copy and its worktree both leak. After merging a PR to `main`, run:
 
 ```
-./scripts/cleanup_merged_worktree.sh <pr-number>
+./scripts/hygiene/cleanup_merged_worktree.sh <pr-number>
 # or
-./scripts/cleanup_merged_worktree.sh <branch-name>
+./scripts/hygiene/cleanup_merged_worktree.sh <branch-name>
 ```
 
 The script resolves the PR to its head branch, removes the worktree (`git worktree remove --force`), and deletes the local branch (`git branch -D`). It refuses to touch `main` or `master`, and it is a no-op if either the worktree or branch is already gone.
@@ -93,7 +93,7 @@ The script resolves the PR to its head branch, removes the worktree (`git worktr
 Optional one-shot alias:
 
 ```
-git config alias.merge-and-clean '!f() { gh pr merge "$1" --squash --delete-branch && git checkout main && git pull --ff-only && ./scripts/cleanup_merged_worktree.sh "$1"; }; f'
+git config alias.merge-and-clean '!f() { gh pr merge "$1" --squash --delete-branch && git checkout main && git pull --ff-only && ./scripts/hygiene/cleanup_merged_worktree.sh "$1"; }; f'
 # then: git merge-and-clean 127
 ```
 

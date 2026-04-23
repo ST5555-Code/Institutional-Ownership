@@ -89,7 +89,7 @@ item).
 number, reviewer runs:
 
 ```
-python3 scripts/audit_ticket_numbers.py
+python3 scripts/hygiene/audit_ticket_numbers.py
 ```
 
 The script prints the current max per prefix and flags candidate reuse
@@ -104,10 +104,10 @@ distinct item titles, both treated as a "definition" (heading or bold
 table row), in two unrelated tracker sections.
 
 **Prior dual-closure items (INF40):**
-INF40 has two annotated closures using pattern `[INF<N> #M of K]`. Do NOT file new INF40. Next available number is current monotonic increment. Run `scripts/hygiene/audit_ticket_numbers.py` if unsure. (Script relocates to scripts/hygiene/ in Phase B2.)
+INF40 has two annotated closures using pattern `[INF<N> #M of K]`. Do NOT file new INF40. Next available number is current monotonic increment. Run `scripts/hygiene/audit_ticket_numbers.py` if unsure.
 
 **References.**
-- Audit script: `scripts/audit_ticket_numbers.py`
+- Audit script: `scripts/hygiene/audit_ticket_numbers.py`
 - Known collision precedent: INF40 (2026-04-23 session close)
 
 ---
@@ -124,7 +124,7 @@ Tracker docs: `ROADMAP.md`, `docs/REMEDIATION_PLAN.md`,
 `docs/REMEDIATION_CHECKLIST.md`, `docs/DEFERRED_FOLLOWUPS.md`,
 `docs/NEXT_SESSION_CONTEXT.md`.
 
-**Check.** Run `python3 scripts/audit_tracker_staleness.py` against
+**Check.** Run `python3 scripts/hygiene/audit_tracker_staleness.py` against
 the branch head. The script prints any ID whose status disagrees
 across docs and exits non-zero on drift. If the branch leaves drift
 in place, the PR should either resolve it or document why the drift
@@ -137,6 +137,6 @@ a full investigation session for whoever opens the item next.
 
 **References.**
 - Rule wording: `docs/SESSION_GUIDELINES.md § Cross-tracker update rule`.
-- Audit script: `scripts/audit_tracker_staleness.py`.
+- Audit script: `scripts/hygiene/audit_tracker_staleness.py`.
 - Precedent incident: `phantom-other-managers-decision` (PR #125) —
   a 4-day staleness that cost a full session to reconstruct.
