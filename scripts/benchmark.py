@@ -17,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGES = [
     ("pipeline/load_adv.py --staging", "Download SEC ADV data (w2-05)"),
     ("fetch_13f.py", "Download 13F quarterly ZIPs"),
-    ("load_13f.py", "Load TSVs into DuckDB"),
+    ("load_13f_v2.py --quarter 2025Q4 --auto-approve", "Load TSVs into DuckDB (SourcePipeline)"),
     ("build_managers.py", "Build manager/parent tables"),
     ("build_cusip.py", "Build securities table (OpenFIGI + yfinance)"),
     ("pipeline/load_market.py", "Pull yfinance market data"),

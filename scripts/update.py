@@ -9,7 +9,7 @@ Run: python3 scripts/update.py
 Sequence:
   1. pipeline/load_adv.py   — Stage SEC ADV data (w2-05; staging DB)
   2. fetch_13f.py           — Download 13F quarterly ZIPs
-  3. load_13f.py            — Load 13F TSVs into DuckDB
+  3. load_13f_v2.py         — Load 13F TSVs into DuckDB (SourcePipeline; --quarter required)
   4. build_managers.py      — Build manager/parent tables
   5. build_cusip.py         — Build securities table
   6. pipeline/load_market.py — Pull yfinance market data
@@ -69,15 +69,33 @@ def main():
         print(f"\nPipeline stopped at load_adv.py (exit {result.returncode}).")
         sys.exit(1)
 
-    steps = [
-        "fetch_13f.py",
-        "load_13f.py",
-        "build_managers.py",
-        "build_cusip.py",
-        "pipeline/load_market.py",
-    ]
+    if not run_script("fetch_13f.py"):
+        print("\nPipeline stopped at fetch_13f.py.")
+        sys.exit(1)
 
-    for script in steps:
+    # load_13f_v2 is a SourcePipeline subclass — dispatch directly so
+    # --quarter and --auto-approve thread through. QUARTER is required
+    # post-V2-cutover (no full-reload mode).
+    quarter = os.environ.get("QUARTER")
+    if not quarter:
+        print("\nERROR: QUARTER env var required. "
+              "Usage: QUARTER=2025Q4 python3 scripts/update.py")
+        sys.exit(1)
+    print(f"\n{'=' * 60}")
+    print(f"Running load_13f_v2.py --quarter {quarter} --auto-approve...")
+    print(f"{'=' * 60}")
+    result = subprocess.run(
+        [sys.executable,
+         os.path.join(SCRIPTS_DIR, "load_13f_v2.py"),
+         "--quarter", quarter,
+         "--auto-approve"],
+        cwd=BASE_DIR,
+    )
+    if result.returncode != 0:
+        print(f"\nPipeline stopped at load_13f_v2.py (exit {result.returncode}).")
+        sys.exit(1)
+
+    for script in ["build_managers.py", "build_cusip.py", "pipeline/load_market.py"]:
         if not run_script(script):
             print(f"\nPipeline stopped at {script}.")
             sys.exit(1)

@@ -60,6 +60,14 @@ All six pipelines register in `scripts/pipeline/pipelines.py` → `PIPELINE_REGI
 
 **`load_13f_v2.py` dry-run proven on Q4 2025** — +218 net rows, validator green, manifest + impacts written. Full prod refresh not yet executed (gated on user authorization per CLAUDE.md rules).
 
+**[2026-04-23] V2 cutover complete (phase-b2-5).** Scheduled cycle paths now run `load_13f_v2.py`:
+- `Makefile` → `make load-13f` and `make quarterly-update` invoke `load_13f_v2.py --quarter $(QUARTER) --auto-approve`. `QUARTER=` is now required at both targets.
+- `scripts/update.py` and `scripts/benchmark.py` updated to dispatch V2.
+- `scripts/build_managers.py` upstream input attributed to V2.
+- `scripts/pipeline/registry.py` — `filings`, `filings_deduped`, `other_managers` owners flipped V1→V2. `raw_*` L1 owners deferred to phase B3 (V1 still writes `raw_submissions`/`raw_infotable`/`raw_coverpage`).
+- `scripts/load_13f.py` retained as break-glass fallback until phase B3 (2-cycle gate, ~Aug 2026 / Q1+Q2 2026 cycles).
+- Watch the Q1 2026 cycle (~May 16) for any novel filing patterns V1 handled silently that V2 doesn't.
+
 ---
 
 ## Post-Phase 2 carry-forward (open)

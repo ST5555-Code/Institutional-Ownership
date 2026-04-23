@@ -711,12 +711,10 @@ def main() -> None:
 
             db.record_freshness(con, "holdings_v2_enrichment",
                                 row_count=after_h["ticker"])
-            # Also stamp the L3 table itself. `holdings_v2` currently has
-            # no active INSERT-side writer (legacy load_13f.py targets the
-            # dropped `holdings` table; a v2 loader is not yet built).
-            # Enrichment is the only script that touches the full table
-            # regularly, so `enrich_holdings.py` owns the freshness stamp
-            # until a dedicated 13F loader lands.
+            # Also stamp the L3 table itself. load_13f_v2.py writes
+            # holdings_v2 quarter-by-quarter; enrichment is the only
+            # script that touches the full table after promote, so it
+            # owns the table-wide freshness stamp.
             holdings_total = con.execute(
                 "SELECT COUNT(*) FROM holdings_v2"
             ).fetchone()[0]

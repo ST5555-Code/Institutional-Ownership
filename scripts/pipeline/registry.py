@@ -110,12 +110,12 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         downstream=("beneficial_ownership_current",),
     ),
     "filings": DatasetSpec(
-        layer=3, owner="scripts/load_13f.py",
+        layer=3, owner="scripts/load_13f_v2.py",
         promote_strategy="rebuild",
         downstream=("filings_deduped", "managers"),
     ),
     "filings_deduped": DatasetSpec(
-        layer=3, owner="scripts/load_13f.py",
+        layer=3, owner="scripts/load_13f_v2.py",
         promote_strategy="rebuild",
         rebuild_from=("filings",),
     ),
@@ -172,7 +172,7 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         promote_strategy="rebuild",
     ),
     "other_managers": DatasetSpec(
-        layer=3, owner="scripts/load_13f.py",
+        layer=3, owner="scripts/load_13f_v2.py",
         promote_strategy="rebuild",
     ),
     "parent_bridge": DatasetSpec(
