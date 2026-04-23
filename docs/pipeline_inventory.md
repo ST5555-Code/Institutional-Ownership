@@ -86,8 +86,8 @@ audited for PROCESS_RULES violations.
 | `fetch_finra_short.py` | `short_interest` | `short_interest` | none | §9 `--test` still writes to prod; otherwise clean (CHECKPOINT per 50k, restart-safe via loaded_dates, 429 backoff) | **RETROFIT** |
 | `scripts/pipeline/load_ncen.py` | `fund_universe`, `managers`, entity tables (staging), `ncen_adviser_map` | `ncen_adviser_map` (scd_type2 with `valid_from`/`valid_to` per migration 017), `managers.adviser_cik`, `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (w2-04 `SourcePipeline` subclass `LoadNCENPipeline`, `scd_type2` — first SCD Type 2 subclass; absorbs retired `fetch_ncen.py`; amendment_key `(series_id, adviser_crd, role)`; open-row sentinel `DATE '9999-12-31'`) |
 | `scripts/retired/fetch_ncen.py` | — | — | — | — | **RETIRED** (w2-04, absorbed by `pipeline/load_ncen.py`) |
-| `load_13f.py` (legacy, superseded) | TSV files | N/A — superseded | — | — | **SUPERSEDED by `load_13f_v2.py`** (p2-05 first `SourcePipeline` subclass). Retire in a follow-up once one clean quarterly cycle runs against the framework. |
-| `load_13f_v2.py` | TSV files | `raw_submissions`, `raw_infotable`, `raw_coverpage`, `filings`, `filings_deduped`, `holdings_v2` (is_latest append), `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK** (p2-05 `SourcePipeline` subclass `Load13FPipeline`, `append_is_latest`; dry-run on Q4 2025 green at +218 net rows) |
+| `load_13f.py` (legacy, break-glass) | TSV files | N/A — out of scheduled paths | — | — | **OUT OF SCHEDULED PATHS** (V2 cutover phase-b2-5, 2026-04-23). Retained on disk as break-glass fallback until phase B3 (2-cycle gate, ~Aug 2026). Still owns `raw_submissions`/`raw_infotable`/`raw_coverpage` writes per `scripts/pipeline/registry.py:69,74,79` — V2 does not write raw_*. |
+| `load_13f_v2.py` | TSV files | `filings`, `filings_deduped`, `other_managers`, `holdings_v2` (is_latest append), `ingestion_manifest`, `ingestion_impacts`, `data_freshness` | — | — | **OK — primary 13F loader** (p2-05 `SourcePipeline` subclass `Load13FPipeline`, `append_is_latest`; cut over phase-b2-5, 2026-04-23). Does NOT write `raw_*` (V1 still owns those until B3). |
 | `refetch_missing_sectors.py` | `/tmp/refetch_tickers.txt`, Yahoo | `market_data.sector/industry` (staging only) | none | — | **OK** (retrofit closed int-15 PR #90: `fetch_date` + `metadata_date` stamped on UPDATE) |
 | `sec_shares_client.py` | SEC XBRL cache + API | filesystem cache only | none | N/A (library) | **OK** |
 | `build_cusip.py` (v2) | `cusip_retry_queue`, `_cache_openfigi`, `securities`, `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2` | `securities` (UPSERT-only), `_cache_openfigi`, `logs/unfetchable_orphans.csv` | — | — | **OK** (UPSERT-only; OpenFIGI v3; asset_category seed; legacy at `scripts/retired/build_cusip_legacy.py`) |
@@ -180,8 +180,7 @@ pipeline framework rewrite and do not participate in the orchestrator.
      Group 2 enrichment for `beneficial_ownership_v2` +
      `beneficial_ownership_current`. Scoped enrichment also wired into
      `promote_13dg.py`. ✓
-   - Still REWRITE: `load_13f.py` (`holdings` DROP+CTAS — replacing
-     with `load_13f_v2.py` post-Batch-3), `build_managers.py`,
+   - Still REWRITE: `build_managers.py`,
      `build_fund_classes.py`, `build_shares_history.py`,
      `build_benchmark_weights.py`. The Batch 3 trio is now closed;
      the remaining REWRITEs are scoped for future framework work but

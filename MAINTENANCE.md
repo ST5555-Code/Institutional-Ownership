@@ -46,6 +46,16 @@ python3 scripts/pipeline/load_adv.py --zip data/adv/IA_Firm_SEC_Feed_04_22_2026.
 
 All CLI flags thread through the `SourcePipeline.run()` orchestrator: `--dry-run` stops after step 4 (diff), `--auto-approve` bypasses the approval gate, and every run writes one `ingestion_manifest` row + N `ingestion_impacts` rows regardless of outcome.
 
+**Full reload (13F).** `load_13f_v2.py` requires `--quarter` per invocation; there is no full-reload mode. To reload historical quarters, loop:
+
+```bash
+for q in 2025Q1 2025Q2 2025Q3 2025Q4; do
+  make load-13f QUARTER=$q
+done
+```
+
+This replaces the legacy `python3 scripts/load_13f.py` (no-arg) full-reload pattern that was retired at the V2 cutover (phase-b2-5, 2026-04-23). The legacy `scripts/load_13f.py` remains on disk as a break-glass fallback until phase B3 (2-cycle gate, ~Aug 2026).
+
 **Stop the app before promote.** DuckDB allows a single writer per file; the framework opens prod in write mode at step 5 (snapshot) and step 6 (promote). If the FastAPI process holds the file open, promote errors with "unable to open file". Standard pattern: `./scripts/start_app.sh stop` → run pipeline → `./scripts/start_app.sh start`.
 
 **Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The `adviser_cik` stamping on `managers` now runs inside `scripts/pipeline/load_ncen.py._update_managers_adviser_cik` during promote — the legacy post-hoc writer-ordering hazard (fetch_13dg Phase 3 + fetch_ncen running after build_managers) is gone with those scripts' retirement in Wave 2.

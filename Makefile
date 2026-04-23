@@ -36,13 +36,13 @@ help:
 	@echo "13F pipeline targets:"
 	@echo ""
 	@echo "  Primary:"
-	@echo "    make quarterly-update     — run the full 9-step quarterly sequence"
+	@echo "    make quarterly-update     — run the full 9-step quarterly sequence (QUARTER=YYYYQn required)"
 	@echo "    make status               — print last-run timestamps from data_freshness"
 	@echo "    make freshness            — gate: fail if any critical table is stale"
 	@echo ""
 	@echo "  Individual pipeline steps (runnable standalone):"
 	@echo "    make fetch-13f            — Step 1a: download 13F quarterly ZIPs"
-	@echo "    make load-13f             — Step 1b: load 13F TSVs into holdings_v2 (QUARTER=YYYYQn optional)"
+	@echo "    make load-13f             — Step 1b: load 13F TSVs into holdings_v2 (QUARTER=YYYYQn required)"
 	@echo "    make fetch-nport          — Step 2: fund_holdings_v2 via XML (legacy)"
 	@echo "    make fetch-dera-nport     — Step 2 alt: fund_holdings_v2 via DERA ZIP"
 	@echo "    make build-entities       — Step 3: entity MDM sync"
@@ -78,9 +78,12 @@ help:
 # Sequential execution: make stops on the first failing step.
 # ---------------------------------------------------------------------------
 quarterly-update:
+ifndef QUARTER
+	$(error QUARTER is required. Usage: make quarterly-update QUARTER=2025Q4)
+endif
 	@echo "=== 13F quarterly-update starting ==="
 	$(MAKE) fetch-13f
-	$(MAKE) load-13f
+	$(MAKE) load-13f QUARTER=$(QUARTER)
 	$(MAKE) fetch-nport
 	$(MAKE) build-entities
 	$(MAKE) compute-flows
@@ -107,8 +110,11 @@ fetch-13f:
 	$(Q) $(PY) $(SCRIPTS)/fetch_13f.py
 
 load-13f:
-	@echo "--- Step 1b: load_13f (TSVs → holdings_v2, filings, filings_deduped, other_managers) ---"
-	$(Q) $(PY) $(SCRIPTS)/load_13f.py $(if $(QUARTER),--quarter $(QUARTER),)
+ifndef QUARTER
+	$(error QUARTER is required. Usage: make load-13f QUARTER=2025Q4)
+endif
+	@echo "--- Step 1b: load_13f_v2 (TSVs → holdings_v2, filings, filings_deduped, other_managers) ---"
+	$(Q) $(PY) $(SCRIPTS)/load_13f_v2.py --quarter $(QUARTER) --auto-approve
 
 fetch-nport:
 	@echo "--- Step 2: fetch_nport_v2 (fund_holdings_v2, XML path) ---"
