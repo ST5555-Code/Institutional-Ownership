@@ -44,6 +44,8 @@ This section tracks build progress against the design. **As of conv-12 (HEAD `b0
 | N-CEN Advisers | `scripts/pipeline/load_ncen.py` | `scd_type2` | **DONE** (w2-04; first SCD Type 2 subclass — migration 017 added `valid_from` / `valid_to`) |
 | ADV Registrants | `scripts/pipeline/load_adv.py` | `direct_write` | **DONE** (w2-05; SCD conversion deferred as a follow-up) |
 
+_Ownership boundary: see `data_layers.md` §ADV managers — P2-FU-04._
+
 **Makefile + check_freshness gate:**
 
 | Target | Status |

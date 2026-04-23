@@ -574,6 +574,9 @@ Lookup table for parallel-scheduling decisions. Each row is a source file; colum
 
 ## Changelog
 
+- **2026-04-22 (p2fu-cleanup-01)** —
+  - **P2-FU-02** closed — scheduler/update/benchmark stale-reference audit. Retired `fetch_*.py` paths repointed to `SourcePipeline` subclasses.
+  - **P2-FU-04** closed — ADV ownership boundary for `cik_crd_direct` + `lei_reference` documented in `data_layers.md` + `admin_refresh_system_design.md`.
 - **2026-04-22 (conv-12)** — **Phase 2 + Wave 2 complete.** Admin refresh system shipped (p2-01 through p2-10-fix): concrete `SourcePipeline` ABC in `scripts/pipeline/base.py` with eight-step staging flow, atomic promote, explicit column list (p2-10-fix); `scripts/pipeline/cadence.py` with `PIPELINE_CADENCE` + probe_fns + `expected_delta`; migrations 015 (amendment-semantics columns on three amendable fact tables), 016 (`admin_preferences`), 017 (`ncen_adviser_map` SCD columns); `queries.py` sweep added `WHERE is_latest=TRUE` to 149 read sites; 9 admin endpoints on `scripts/admin_bp.py`; `/admin/dashboard` + Data Source tab live. All five Wave 2 pipeline migrations shipped: w2-01 13D/G, w2-02 market, w2-03 N-PORT, w2-04 N-CEN (first `scd_type2`), w2-05 ADV. Registry in `scripts/pipeline/pipelines.py` carries six entries. `mig-12` **CLOSED — absorbed by p2-05** `load_13f_v2.py` (first full `SourcePipeline` subclass exercise; Q4 2025 dry-run +218 net rows). Retired to `scripts/retired/`: `fetch_13dg*.py`, `validate_13dg.py`, `promote_13dg.py`, `fetch_market.py`, `fetch_nport*.py`, `validate_nport*.py`, `promote_nport.py`, `fetch_ncen.py`, `fetch_adv.py`, `promote_adv.py`. Follow-ups: legacy `run_script` allowlist cleanup in `admin_bp.py`, ADV SCD conversion, scheduler/update/benchmark stale-reference audit, int-09 Step 4 denorm retirement (now unblocked).
 - **2026-04-22 (conv-11)** — **REMEDIATION PROGRAM COMPLETE.**
 
