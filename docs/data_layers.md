@@ -152,6 +152,10 @@ bottom.
 
 **Unclassified — none.** Every prod table is assigned a layer.
 
+### ADV managers
+
+> **Ownership boundary (P2-FU-04).** `scripts/pipeline/load_adv.py` (`LoadADVPipeline`) owns `adv_managers` only — writes via `direct_write` on `(crd,)` natural key. It does **not** manage `cik_crd_direct` or `lei_reference`. Those two reference tables stay under `scripts/build_managers.py`. Rationale: `cik_crd_direct` and `lei_reference` are identity-resolution artifacts built from multiple sources (ADV is one input among several), and their lifecycle is driven by the entity build pipeline rather than the ADV fetch cadence. Revisit if a downstream consumer needs ADV-cadence freshness on either table.
+
 ---
 
 ## 3. Column ownership — `holdings_v2`
