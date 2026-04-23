@@ -60,6 +60,8 @@ Eight scripts got `record_freshness(con, target_table)` hooks at end-of-run in c
 
 Gate tooling: `scripts/check_freshness.py` (exit-1 on stale/missing rows; prod read-only; `--status-only` for info). Wired into `make freshness` in `Makefile`.
 
+**Post-Wave-2 update (2026-04-22, conv-12).** `fetch_ncen.py` (and `fetch_13dg.py`, `fetch_adv.py`, `fetch_market.py`, `fetch_nport.py`) retired to `scripts/retired/`. Freshness stamping on their respective target tables is now owned by the `SourcePipeline` subclasses in `scripts/pipeline/` — `load_ncen.py` owns `ncen_adviser_map` stamping (via scd_type2 promote path); `load_13dg.py` owns `beneficial_ownership_v2` + `beneficial_ownership_current`; `load_adv.py` owns `adv_managers`; `load_market.py` owns `market_data`; `load_nport.py` owns `fund_holdings_v2` + `fund_universe`. The retired scripts are kept at `scripts/retired/` as frozen reference copies and are **not** imported as library helpers — `load_ncen.py` reimplements the EDGAR fetch/parse helpers inline (see `scripts/pipeline/load_ncen.py:163` and `:232`). The `RETROFIT` cross-cutting flag previously carried on `fetch_ncen.py` (cited in the session #11 narrative above) is cleared by retirement.
+
 ---
 
 

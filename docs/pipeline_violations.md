@@ -119,7 +119,7 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 ---
 
-## fetch_adv.py (REWRITE)
+## fetch_adv.py (REWRITE) — SUPERSEDED by `scripts/pipeline/load_adv.py` (Wave 2 w2-05, 2026-04-22). Retained for historical reference only.
 
 - §1 (incremental save): **VIOLATION** — whole CSV loaded into pandas
   at `fetch_adv.py:110`, processed in memory, `DROP TABLE; CREATE TABLE
@@ -164,7 +164,7 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 ---
 
-## fetch_ncen.py (RETROFIT)
+## fetch_ncen.py (RETROFIT) — SUPERSEDED by `scripts/pipeline/load_ncen.py` (Wave 2 w2-04, 2026-04-22). Retained for historical reference only.
 
 - §6 (progress): 50-filing progress at `fetch_ncen.py:435` lacks
   explicit `flush=True` — relies on `python3 -u` at call sites.
