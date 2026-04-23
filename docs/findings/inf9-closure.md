@@ -57,11 +57,18 @@ covering Section 1b (HC Capital Trust 6 series) + Section 1c (CRI 5 series).
 | S000073785 | 20136 | Parametric Portfolio Associates LLC | 0000932859 | yes |
 | S000073786 | 17348 | Teachers Advisors LLC (eid 9904) | 0000939222 | yes |
 
-### Residual (1 row, non-persistable under current schema)
+### Residual (1 row, non-persistable under current schema) — **RESOLVED 2026-04-23 (`inf9f-agincourt`)**
 
 | Series | Eid | Intended target | Reason |
 |--------|-----|-----------------|--------|
 | S000029852 | 19020 | Agincourt Capital Management, LLC (eid 19021) | Agincourt has only `crd='000112096'` in `entity_identifiers` — no CIK. The `merge` action in `replay_persistent_overrides()` resolves the **target** by CIK only (line 825-829 of `scripts/build_entities.py`), so this override would skip on replay. Same shape as INF9d's "merge target identifier_type" gap, but on the target side instead of source side. Out of scope for this session (modifying scripts is excluded). Track as **INF9f** for future schema extension. |
+
+**INF9f closure (2026-04-23, `inf9f-agincourt`, snapshot `20260423_084622`).** Chose **Path B (assign real CIK)** after EDGAR verification. Agincourt Capital Management, LLC has an active 13F-HR filer CIK `0001845254` — it was simply never enriched into `entity_identifiers`. CIK is present in our own `adv_managers` table (CRD `112096` → CIK `1845254`). No schema change required. Two staging edits:
+
+1. `entity_identifiers` INSERT: `(entity_id=19021, identifier_type='cik', identifier_value='0001845254', confidence='exact', source='adv_managers', is_inferred=FALSE, valid_from=2000-01-01, valid_to=9999-12-31)`.
+2. `entity_overrides_persistent` INSERT (override_id 257): `(action='merge', identifier_type='series_id', identifier_value='S000029852', new_value='0001845254', rollup_type='decision_maker_v1', analyst='claude-inf9f-agincourt')`.
+
+Prod counts: `entity_identifiers` 35,511 → 35,512; `entity_overrides_persistent` 256 → 257. `validate_entities.py --prod`: 8 PASS / 1 FAIL wellington / 7 MANUAL — baseline preserved. INF9 residual fully resolved.
 
 ## Replay risk for live rows
 
