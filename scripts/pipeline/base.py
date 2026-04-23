@@ -137,6 +137,69 @@ class InvalidStateTransitionError(ValueError):
     its current status per ``_VALID_TRANSITIONS``."""
 
 
+class DowngradeRefusalError(Exception):
+    """Raised by ``_promote_append_is_latest`` when flipping ``is_latest``
+    would downgrade coverage on a sensitive column.
+
+    Guards the int-22 failure class (2026-04-22): the 13F loader re-ran
+    against an already-loaded quarter without ticker enrichment, inserted
+    tickerless rows as ``is_latest=TRUE``, and displaced 3.2M ticker-
+    populated rows to ``is_latest=FALSE``. Design: ``docs/findings/int-23-design.md``.
+
+    Attributes:
+      target_table — table that would have been corrupted.
+      refusals     — list of (key_dict, column_name, displaced_nonnull_count)
+                     tuples, one per offending (key, column). Capped at 100
+                     entries; see ``total_refused_keys`` for the true total.
+      total_refused_keys — count of offending (key, column) pairs before
+                           truncation.
+    """
+
+    _SAMPLE_CAP = 100
+
+    def __init__(
+        self,
+        target_table: str,
+        refusals: list[tuple[dict, str, int]],
+    ) -> None:
+        self.target_table = target_table
+        self.total_refused_keys = len(refusals)
+        self.refusals = refusals[: self._SAMPLE_CAP]
+        column_breakdown: dict[str, int] = {}
+        for _, col, _ in refusals:
+            column_breakdown[col] = column_breakdown.get(col, 0) + 1
+        self.column_breakdown = column_breakdown
+        super().__init__(
+            f"Downgrade refused on {target_table}: "
+            f"{self.total_refused_keys} (key, column) pairs would flip to NULL. "
+            f"Column breakdown: {column_breakdown}. "
+            f"First sample: {self.refusals[:3]}"
+        )
+
+    def to_manifest_payload(self) -> str:
+        """Return a JSON payload suitable for ``ingestion_manifest.error_message``.
+
+        Serializes up to ``_SAMPLE_CAP`` refused (key, column) entries plus
+        the true total count and per-column breakdown. Keeps the payload
+        bounded regardless of how many keys were refused.
+        """
+        payload = {
+            "kind": "downgrade_refusal",
+            "target_table": self.target_table,
+            "refused_keys": [
+                {
+                    "key": key,
+                    "column": col,
+                    "displaced_nonnull": count,
+                }
+                for key, col, count in self.refusals
+            ],
+            "total_refused_keys": self.total_refused_keys,
+            "column_breakdown": self.column_breakdown,
+        }
+        return json.dumps(payload, sort_keys=True, default=str)
+
+
 def _assert_valid_transition(current: str, target: str) -> None:
     allowed = _VALID_TRANSITIONS.get(current, set())
     if target not in allowed:
@@ -161,6 +224,18 @@ class SourcePipeline(ABC):
     amendment_key: tuple[str, ...] = ()
 
     _VALID_STRATEGIES = ("append_is_latest", "scd_type2", "direct_write")
+
+    # Columns the ``append_is_latest`` promote step must not silently
+    # downgrade from non-NULL to NULL when flipping ``is_latest``. See
+    # ``docs/findings/int-23-design.md`` §4.1 for the full rationale.
+    # Columns absent from the target table are skipped by the check so
+    # int-09 Step 4 column retirements (see
+    # ``docs/proposals/tier-4-join-pattern-proposal.md``) dissolve gracefully.
+    _DOWNGRADE_SENSITIVE_COLUMNS: tuple[str, ...] = (
+        "ticker",
+        "entity_id",
+        "rollup_entity_id",
+    )
 
     # ---- construction --------------------------------------------------
 
@@ -352,7 +427,28 @@ class SourcePipeline(ABC):
         prod_con = duckdb.connect(self._prod_db_path)
         try:
             self._transition(prod_con, manifest_id, "approved", "promoting")
-            result = self.promote(run_id, prod_con)
+            try:
+                result = self.promote(run_id, prod_con)
+            except DowngradeRefusalError as e:
+                # int-23: surface the structured refusal payload on the
+                # manifest so operators can see the offending (key, column)
+                # set without grep'ing logs. ``promote()`` already rolled
+                # back its transaction, so prod_con is writable. Mark
+                # failed directly — bypass the state machine since
+                # promoting→failed is a terminal error path.
+                update_manifest_status(
+                    prod_con, manifest_id, "failed",
+                    error_message=e.to_manifest_payload()[:500],
+                )
+                prod_con.execute("CHECKPOINT")
+                raise
+            except Exception as e:
+                update_manifest_status(
+                    prod_con, manifest_id, "failed",
+                    error_message=str(e)[:500],
+                )
+                prod_con.execute("CHECKPOINT")
+                raise
             self._transition(
                 prod_con, manifest_id, "promoting", "verifying",
             )
@@ -433,6 +529,81 @@ class SourcePipeline(ABC):
         finally:
             con.close()
 
+    def _target_table_columns(self, prod_con: Any) -> set[str]:
+        """Return the set of column names defined on ``self.target_table``.
+
+        Used by the downgrade-refusal check so columns absent from the
+        target (e.g. retired by int-09 Step 4) are skipped silently rather
+        than raising.
+        """
+        try:
+            rows = prod_con.execute(
+                f"PRAGMA table_info({self.target_table})"  # nosec B608
+            ).fetchall()
+        except Exception:
+            return set()
+        # PRAGMA table_info returns (cid, name, type, notnull, dflt_value, pk)
+        return {r[1] for r in rows}
+
+    def _check_no_downgrade_refusal(
+        self, prod_con: Any, rows: Any, key_cols: list[str],
+    ) -> None:
+        """Raise ``DowngradeRefusalError`` if promoting ``rows`` would flip
+        ``is_latest`` on any (key, sensitive-column) pair where prod has
+        non-NULL data but every staged row carries NULL.
+
+        Runs a single existence guard (PRAGMA table_info) followed by one
+        indexed point query per (offending-key, sensitive-column). Keys
+        that already carry a non-NULL value in the staged population are
+        never queried — an all-NULL staged population is a prerequisite.
+
+        Complexity bound per §4.2 of ``docs/findings/int-23-design.md``:
+        ``O(sensitive_cols × offending_keys)``. For the int-22 scenario
+        that was 1 column × 8,636 keys against ``holdings_v2`` — seconds
+        on an indexed (cik, quarter) PK.
+        """
+        if rows.empty or not key_cols:
+            return
+        target_cols = self._target_table_columns(prod_con)
+        if not target_cols:
+            return
+        sensitive_cols = [
+            c for c in self._DOWNGRADE_SENSITIVE_COLUMNS
+            if c in target_cols and c in rows.columns
+        ]
+        if not sensitive_cols:
+            return
+
+        refusals: list[tuple[dict, str, int]] = []
+        for col in sensitive_cols:
+            # Keys whose staged rows are all-NULL on this column. Anything
+            # with at least one non-NULL staged value cannot downgrade by
+            # definition.
+            grouped = rows.groupby(key_cols, dropna=False)[col].apply(
+                lambda s: s.notna().sum() == 0
+            )
+            null_only_keys = [k for k, is_null in grouped.items() if is_null]
+            for key_tuple in null_only_keys:
+                if not isinstance(key_tuple, tuple):
+                    key_tuple = (key_tuple,)
+                key_dict = dict(zip(key_cols, key_tuple))
+                where_sql = " AND ".join(f"{c} = ?" for c in key_cols)
+                params = list(key_tuple)
+                displaced_nonnull = prod_con.execute(
+                    f"SELECT COUNT(*) FROM {self.target_table} "  # nosec B608
+                    f"WHERE {where_sql} AND is_latest = TRUE "
+                    f"AND {col} IS NOT NULL",
+                    params,
+                ).fetchone()[0]
+                if displaced_nonnull > 0:
+                    refusals.append((key_dict, col, int(displaced_nonnull)))
+
+        if refusals:
+            raise DowngradeRefusalError(
+                target_table=self.target_table,
+                refusals=refusals,
+            )
+
     def _promote_append_is_latest(
         self, run_id: str, prod_con: Any,
     ) -> PromoteResult:
@@ -452,6 +623,13 @@ class SourcePipeline(ABC):
 
         prod_con.execute("BEGIN TRANSACTION")
         try:
+            # int-23 guard: refuse to flip is_latest if doing so would
+            # downgrade a sensitive column from non-NULL to NULL. See
+            # docs/findings/int-23-design.md. Pure SELECTs inside the
+            # open transaction are consistent; on refusal the ROLLBACK
+            # below unwinds cleanly before any UPDATE runs.
+            self._check_no_downgrade_refusal(prod_con, rows, key_cols)
+
             if key_cols:
                 unique_keys = (
                     rows[key_cols].drop_duplicates().to_dict("records")
