@@ -928,9 +928,15 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
             # Merge: N-PORT funds first, then 13F entities not covered by N-PORT
             merged = list(nport_kids)
-            nport_names = {c['institution'].lower() for c in nport_kids}
+            # Null-safe handling: skip rows where institution is NULL rather than crash.
+            # Added post-int-22 as defensive hygiene. Surfaces upstream NULL-institution
+            # bugs via silent filtering rather than HTTP 500. If NULL rows appear at scale,
+            # investigate upstream data plane (loader promote, enrichment pipeline) before
+            # removing this guard.
+            nport_names = {(c['institution'] or '').lower() for c in nport_kids if c.get('institution')}
             for c in f13_kids:
-                if c['institution'].lower() not in nport_names and c.get('subadviser_note'):
+                inst = (c.get('institution') or '').lower()
+                if inst and inst not in nport_names and c.get('subadviser_note'):
                     merged.append(c)
 
             # Only show N-PORT children as expandable. No N-PORT = flat row.
