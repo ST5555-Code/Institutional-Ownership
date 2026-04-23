@@ -103,6 +103,9 @@ are resolved by inspection. True reuse looks like the INF40 case: two
 distinct item titles, both treated as a "definition" (heading or bold
 table row), in two unrelated tracker sections.
 
+**Prior dual-closure items (INF40):**
+INF40 has two annotated closures using pattern `[INF<N> #M of K]`. Do NOT file new INF40. Next available number is current monotonic increment. Run `scripts/hygiene/audit_ticket_numbers.py` if unsure. (Script relocates to scripts/hygiene/ in Phase B2.)
+
 **References.**
 - Audit script: `scripts/audit_ticket_numbers.py`
 - Known collision precedent: INF40 (2026-04-23 session close)

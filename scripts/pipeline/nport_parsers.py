@@ -20,7 +20,7 @@ Plus the module-global filter-flag they respect:
                            for parity with the pre-extraction call sites.
 
 Extracted from ``scripts/fetch_nport.py`` as part of BLOCK-3 per
-``docs/SYSTEM_AUDIT_2026_04_17.md`` §10 and ``docs/SYSTEM_PASS2_2026_04_17.md``
+``archive/docs/SYSTEM_AUDIT_2026_04_17.md`` §10 and ``archive/docs/SYSTEM_PASS2_2026_04_17.md``
 §2. Behaviour preserved bit-for-bit versus the original file so the
 pre-audit backup at ``data/backups/13f_backup_20260417_172152`` remains
 a valid regression baseline.

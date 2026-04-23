@@ -2,7 +2,7 @@
 """enrich_fund_holdings_v2.py — BLOCK-2 full-scope entity_id backfill for
 `fund_holdings_v2`.
 
-Context (docs/SYSTEM_AUDIT_2026_04_17.md §10.1, docs/SYSTEM_PASS2_2026_04_17.md §1):
+Context (archive/docs/SYSTEM_AUDIT_2026_04_17.md §10.1, archive/docs/SYSTEM_PASS2_2026_04_17.md §1):
 
   `_bulk_enrich_run` in `promote_nport.py:153-218` is run-scoped — it only
   enriches rows whose `series_id` was part of the current promote's

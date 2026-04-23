@@ -36,7 +36,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] int-22 MINOR-5 C-06 fix_fund_classification no-CHECKPOINT retrofit — PR #76 (CHECKPOINT after executemany UPDATE on `fund_universe`)
 
 ### Standing
-- [ ] int-18 INF37 backfill_manager_types residual 9 entities (no closure expected)
+- [x] int-18 INF37 backfill_manager_types residual 9 entities (no closure expected) — CLEARED 2026-04-23 (entity-curation-w1)
 
 ### Phase 2
 - [ ] int-19 INF38 BLOCK-FLOAT-HISTORY true pct_of_float (deferred)
@@ -95,10 +95,10 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] mig-11 INF47 schema-parity CI wiring (.github/workflows/smoke.yml) — PR #80 (Option A: widened `pytest` scope to `tests/smoke/ + tests/pipeline/` picking up 885-line validator suite; pinned `pyyaml==6.0.3`)
 
 ### Phase 2 / BLOCKED
-- [ ] mig-05 BLOCK-4 admin refresh pre-restart rework (BLOCKED — upstream design doc missing)
+- [x] mig-05 BLOCK-4 admin refresh pre-restart rework (BLOCKED — upstream design doc missing) — SUPERSEDED by Phase 2 (prog-01)
 
 ### Phase 3
-- [ ] mig-12 load_13f_v2 rewrite (fetch_13f.py + promote_13f.py + build_managers reader)
+- [x] mig-12 load_13f_v2 rewrite (fetch_13f.py + promote_13f.py + build_managers reader) — absorbed by p2-05 load_13f_v2.py
 
 ---
 

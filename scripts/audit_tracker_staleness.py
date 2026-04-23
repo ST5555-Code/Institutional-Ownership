@@ -2,8 +2,8 @@
 """Audit tracker docs for cross-doc status drift.
 
 The repo keeps several long-lived tracker docs (ROADMAP.md,
-docs/REMEDIATION_PLAN.md, docs/REMEDIATION_CHECKLIST.md,
-docs/DEFERRED_FOLLOWUPS.md, docs/NEXT_SESSION_CONTEXT.md). Items (INF##,
+docs/REMEDIATION_PLAN.md, docs/DEFERRED_FOLLOWUPS.md,
+docs/NEXT_SESSION_CONTEXT.md). Items (INF##,
 int-##, mig-##, obs-##, sec-##, ops-##, P2-FU-##) get mentioned in
 several of these docs at once. When a session closes an item but only
 updates one tracker, the other trackers lie.
@@ -37,7 +37,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TRACKER_DOCS: tuple[Path, ...] = (
     REPO_ROOT / "ROADMAP.md",
     REPO_ROOT / "docs" / "REMEDIATION_PLAN.md",
-    REPO_ROOT / "docs" / "REMEDIATION_CHECKLIST.md",
     REPO_ROOT / "docs" / "DEFERRED_FOLLOWUPS.md",
     REPO_ROOT / "docs" / "NEXT_SESSION_CONTEXT.md",
 )
