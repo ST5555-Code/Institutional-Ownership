@@ -17,6 +17,7 @@
 | Operational | 2 — `MAINTENANCE.md`, `docs/PROCESS_RULES.md` + `docs/SESSION_GUIDELINES.md` |
 | Code TODO/FIXME/XXX/HACK | 5 hits across `scripts/` + `web/react-app/` (archive/snapshot excluded) |
 | UI-specific | 0 README/TODO files under `web/react-app/`; 1 in-component TODO |
+| UI audit (unmerged branch) | 1 — `docs/ui-audit-01-triage.md` (599 lines) on branch `ui-audit-01` / [PR #107](https://github.com/ST5555-Code/Institutional-Ownership/pull/107) OPEN. Added after initial Phase 2 enumeration missed it — see [Meta-findings](#meta-findings). |
 
 ---
 
@@ -41,22 +42,22 @@
 
 ## Executive summary
 
-- **Total distinct items catalogued**: 76 (deduplicated; matches the [Appendix](#appendix--flat-item-list) row count)
-- **Total raw hits before dedup**: ~142 across all Phase 2 sources (ROADMAP ~36, REMEDIATION_PLAN + plans ~22, findings/closures ~31, code/ops-doc TODOs ~6, architecture/operational docs ~47). Dedup rate ~46% — heavy cross-tracker overlap, consistent with INF / DM / P2-FU items appearing in 3–4 sources each.
+- **Total distinct items catalogued**: 86 (deduplicated; matches the [Appendix](#appendix--flat-item-list) row count after ui-audit-01 re-scope)
+- **Total raw hits before dedup**: ~158 across all Phase 2 sources (ROADMAP ~36, REMEDIATION_PLAN + plans ~22, findings/closures ~31, code/ops-doc TODOs ~6, architecture/operational docs ~47, ui-audit-01 triage file ~16). Dedup rate ~46% — heavy cross-tracker overlap, consistent with INF / DM / P2-FU items appearing in 3–4 sources each.
 
 ### By category
 
-| Category | Count |
-|---|---:|
-| ARCHITECTURE | 18 |
-| DATA_QUALITY | 19 |
-| DOCS | 11 |
-| OPS | 8 |
-| UI | 8 |
-| INFRA | 6 |
-| PIPELINE | 5 |
-| SECURITY | 1 |
-| **Total** | **76** |
+| Category | Count | Δ from v1 |
+|---|---:|---:|
+| DATA_QUALITY | 20 | +1 (ui-audit bug-1) |
+| ARCHITECTURE | 19 | +1 (ui-audit dead-endpoints) |
+| UI | 11 | +3 (ui-audit React-1/React-2/walkthrough) |
+| DOCS | 11 | — |
+| PIPELINE | 10 | +5 (ui-audit bug-2 + 3 precompute rows + 1 open-q) |
+| OPS | 8 | — |
+| INFRA | 6 | — |
+| SECURITY | 1 | — |
+| **Total** | **86** | **+10** |
 
 (Two items span two categories; counted once under primary.)
 
@@ -74,8 +75,8 @@
 
 ### Highlighted gaps (surface-only; see Meta-findings for detail)
 
-- **DATA_QUALITY is the largest single category** (19 items). 8 items have sat > 60 days. DM13 ADV audit (~390 suspicious rows), L4 classification audit (13 categories), L5 parents 201–720 batches, and the 1,187 DERA NULL series all carry forward without an active session slot.
-- **UI is under-tracked**. Only 8 items across all sources — and 2 are documented in design docs (`admin_refresh_system_design.md` v2 scope) rather than any primary tracker. Zero `README.md` / `TODO.md` / `CHANGELOG.md` under `web/react-app/`. Only 1 in-component TODO.
+- **DATA_QUALITY is the largest single category** (20 items). 8 items have sat > 60 days. DM13 ADV audit (~390 suspicious rows), L4 classification audit (13 categories), L5 parents 201–720 batches, and the 1,187 DERA NULL series all carry forward without an active session slot.
+- **UI is better-catalogued than initially reported — but on an unmerged branch, not in any primary tracker on `main`.** Initial Phase 2 sweep of `docs/findings/` missed `docs/ui-audit-01-triage.md` (lives at `docs/`, not `docs/findings/`, and only on branch `ui-audit-01` / [PR #107](https://github.com/ST5555-Code/Institutional-Ownership/pull/107)). That file carries 11 UI-category items + 8 precompute targets + 24 per-tab "Bugs (visual)" / "Completeness gaps" placeholder rows left BLANK pending Serge's walkthrough. None of those 11+ items are replicated into ROADMAP.md / DEFERRED_FOLLOWUPS.md / NEXT_SESSION_CONTEXT.md. NEXT_SESSION_CONTEXT.md:41 merely references "PR #107 ui-audit walkthrough — separate track, still open" without scope. Direct UI-facing tracker presence remains low: `web/react-app/` still has no `README.md` / `TODO.md` / `CHANGELOG.md`, and `web/react-app/src/` has only 1 in-component TODO.
 - **Drift between `docs/REMEDIATION_PLAN.md` body and its own Changelog**. The body (`:291`, `:375`, `:377`, `:380`, `:427`, `:457`, `:458`, `:459`) still flags mig-01, INF40, INF41, INF42, mig-06/07/08/09/10/11, and 5 Phase-2-native scaffold items as OPEN / PENDING; `:577,584,585` Changelog (conv-11 + conv-12) closed all of them. The body was never updated.
 - **DM14 + DM15 Layer 1** show as PARKED in `docs/data_layers.md §11` and `MAINTENANCE.md §Open audits` but ROADMAP records them as DONE (2026-04-15 to 2026-04-17).
 - **INF37 entity curation** shows as `STANDING` in ROADMAP and `DEFERRED_FOLLOWUPS`, but `docs/findings/entity-curation-w1-log.md` reports it CLEARED 2026-04-23 with zero residuals.
@@ -93,6 +94,11 @@
 | — | Cross-process rate limiter (currently in-process `threading.Lock`) | OPEN | UNSCOPED | `scripts/pipeline/shared.py:9,39` (code TODO) | — | Triggers when orchestrator moves to parallel subprocess dispatch. |
 | int-23 Q7.1 | Hard-coded vs per-pipeline sensitive columns for `_promote_append_is_latest` downgrade refusal | OPEN-QUESTION | UNSCOPED | `docs/findings/int-23-design.md:263–265` | 1 day | Design file post-dates int-23 impl; see [Drift](#cross-tracker-drift). |
 | int-23 Q7.2 | Fail-whole-run vs per-key partial on downgrade refusal | OPEN-QUESTION | UNSCOPED | `docs/findings/int-23-design.md:265–267` | 1 day | Same caveat as Q7.1. |
+| ui-audit-01 bug-2 | `query1()` NoneType crash at `queries.py:933` — Register + Entity Graph "ticker holders" panel 500 | OPEN BLOCKER | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #2 @ branch `ui-audit-01` | 2 days | One-line null guard `c['institution'].lower() for c in nport_kids if c.get('institution')`. Routed to int-09 Step 4 bundle per triage §Work item routing. |
+| ui-audit-01 perf-P0 | `peer_rotation_by_ticker` + `peer_rotation_detail_by_pair` precomputed tables (cures 11.4s cold/warm) | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P0 | 2 days | New `compute_peer_rotation.py` + `SourcePipeline` subclass. 2–3 day effort; highest single-path cost in the audit. |
+| ui-audit-01 perf-P1 | `sector_flows_rollup` + `sector_flow_movers_by_quarter_sector` + `cohort_by_ticker_from` precomputed tables | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P1 | 2 days | Sector Rotation + Ownership Trend tabs. Combined ~3 day effort per triage. |
+| ui-audit-01 perf-P2 | `flow_analysis_by_ticker_period` + `market_summary_top25` + `holder_momentum_by_ticker` precomputed tables | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P2 | 2 days | Flow Analysis + Entity Graph + Ownership Trend. Combined ~2 day effort. |
+| ui-audit-01 open-q | `short_interest_analysis()` precompute vs keep live (~130 ms warm) — traffic-dependent decision | OPEN-QUESTION | UNSCOPED | `docs/ui-audit-01-triage.md` §Short Interest precompute | 2 days | Serge confirmation needed. |
 
 ---
 
@@ -119,6 +125,7 @@
 | 56 | Decision-maker & voting rollup worldviews (DM1–DM7 series completion) | NOT-STARTED | UNSCOPED | `ROADMAP.md:586,612` | ≥30 days | UI toggle for `rollup_type` on 6+ tabs; phased: N-CEN (Phase 1), ADV (3.5b), N-PORT (3.5c). Spans DATA_QUALITY + UI. |
 | — | DERA fund_universe NULL-series synthetics — 1,187 rows | PARKED | UNSCOPED | `docs/data_layers.md:92` | ≥60 days | Resolution tracked in audit §10.1. |
 | — | Rule A / Rule B OTC classification tracking note | PARTIAL | UNSCOPED | `docs/data_layers.md:96` §6 S1 | ≥30 days | Substantive closure via int-13 / migration 012; tracking note in body never struck. |
+| ui-audit-01 bug-1 | `is_latest=TRUE` inversion on prod DB `data/13f.duckdb` for `quarter='2025Q4'` — every `is_latest=TRUE` row has `ticker IS NULL`; every ticker-bearing row is `is_latest=FALSE` | OPEN at 2026-04-22; verify vs post-dated int-22 rollback | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #1 @ branch `ui-audit-01` | 2 days | Breaks `/api/v1/tickers`, `/api/v1/fund_portfolio_managers`, `/api/v1/portfolio_context`, most 2025Q4-filtering queries. Fix: backfill or migration on prod DB. Int-22 rollback (2026-04-22) may have addressed; confirm before action. |
 
 ---
 
@@ -134,9 +141,11 @@
 | — | Rollback UI button (admin tab v2) | PARKED | UNSCOPED | `docs/admin_refresh_system_design.md:922` | ~30 days | Rollback endpoint already exists; UI button ships in v2 of the admin tab. |
 | — | `DataSourceTab.tsx` cadence timeline SVG (p2-06 TODO) | OPEN | UNSCOPED | `web/react-app/src/components/tabs/DataSourceTab.tsx:99` | — | In-component TODO; wire timeline from `PIPELINE_CADENCE` constant. |
 | — | Type-badge `family_office` color addition | OPEN | GATED | `docs/NEXT_SESSION_CONTEXT.md:40`; `common/typeConfig.ts` | 1 day | Part of 43e taxonomy refactor; React leg. |
+| ui-audit-01 React-1 | Consolidate `/api/v1/tickers` into single shared hook (TickerInput, CrossOwnershipTab, OverlapAnalysisTab) | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing @ branch `ui-audit-01` / PR #107 | 2 days | P3 priority; <0.5d effort per triage. Fetched 3× per session today. |
+| ui-audit-01 React-2 | Collapse duplicate `/api/v1/entity_search` call in EntityGraphTab.tsx (L125 + L230) | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing | 2 days | P3 priority; request-scoped memo. |
+| ui-audit-01 walkthrough | 24 per-tab "Bugs (visual)" + "Completeness gaps" placeholder rows (12 tabs × 2) | OPEN | GATED | `docs/ui-audit-01-triage.md` §per-tab sections (BLANK) | 2 days | Gate: Serge walks the live app and fills each row (PR #107 test-plan item 1). |
 
-Also noted:
-- **PR #107 ui-audit walkthrough** — "separate track, still open" per `docs/NEXT_SESSION_CONTEXT.md:41`. No source doc in this branch describes scope.
+Cross-reference — **PR #107 ui-audit walkthrough** per `docs/NEXT_SESSION_CONTEXT.md:41`: the triage file at `docs/ui-audit-01-triage.md` on branch `ui-audit-01` feeds the three `ui-audit-01 …` rows above plus additional non-UI items (see PIPELINE, DATA_QUALITY, ARCHITECTURE). None of the triage items are filed in any primary tracker on `main`.
 
 ---
 
@@ -176,6 +185,7 @@ Also noted:
 | §14 Q2 | Admin diff-presentation tier boundaries (1K, 100K) | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:980` | ≥30 days | Reviewer question pending. |
 | §14 Q7 | `PIPELINE_CADENCE` correctness vs SEC rules | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:987` | ≥30 days | Reviewer question pending. |
 | §14 Q8 | Probe rate-limit safety vs PROCESS_RULES §4 | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:988` | ≥30 days | Reviewer question pending. |
+| ui-audit-01 dead-endpoints | 15 routes defined in routers but not called from any tab (candidates for triage: delete vs modal-only keep) | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #5 @ branch `ui-audit-01` | 2 days | Triage out of scope for the audit itself; explicit follow-up ask. Routes: `/api/v1/config/quarters`, `/api/v1/amendments`, `/api/v1/manager_profile`, `/api/v1/fund_rollup_context`, `/api/v1/fund_behavioral_profile`, `/api/v1/nport_shorts`, `/api/v1/entity_resolve`, `/api/v1/sector_flow_detail`, `/api/v1/short_long`, `/api/v1/short_volume`, `/api/v1/crowding`, `/api/v1/smart_money`, `/api/v1/heatmap`, `/api/v1/peer_groups/{group_id}`, `/api/v1/export/query{qnum}`. |
 
 ---
 
@@ -235,8 +245,9 @@ Items that surface in 2+ sources (with file:line citations for both) and disagre
 | 7 | V2 loader cycle-entry point | `docs/NEXT_SESSION_CONTEXT.md:10,82,83`: "V2 cutover complete" / Makefile invokes V2 | `docs/findings/refinement-validation-2026-04-23.md:25–125` V-Q1 PARTIAL: "Makefile:110–111 still invokes V1" | Findings file pre-dates PR #141 V2 cutover (2026-04-23); drift is temporal — finding was never annotated post-merge. |
 | 8 | 43e family-office classification | `ROADMAP.md:608,666` lists as open follow-on for taxonomy refactor | `docs/findings/entity-curation-w1-log.md:13,158,181`: "DE-SCOPED … Item C remains open in ROADMAP §Open items, re-filed as a dedicated taxonomy refactor follow-on" | Intent agrees; state label differs (OPEN follow-on vs DE-SCOPED). |
 | 9 | DM13 row count | `docs/findings/dm-open-surface-2026-04-22.md:149`: ~390 remaining (after BlueCove cluster closed) | `MAINTENANCE.md:393`: "~410 suspicious relationships" | MAINTENANCE.md cites pre-BlueCove number. |
+| 10 | ui-audit-01 triage items unfiled on `main` | `docs/ui-audit-01-triage.md` (branch `ui-audit-01`, commit `8a50a51`): 3 blockers, 8 precompute targets, 2 React-only items, 15 dead endpoints, 1 open question, 24 blank per-tab rows | `docs/NEXT_SESSION_CONTEXT.md:41` on `main`: single-line mention "PR #107 ui-audit walkthrough — separate track, still open" without scope; ROADMAP.md / DEFERRED_FOLLOWUPS.md carry no rows for any triage item | Comprehensive audit exists but is invisible from `main` tracker scans. A reader not aware of PR #107 would not discover the scope. |
 
-**Drift count: 9.**
+**Drift count: 10.**
 
 _Removed from prior 11-entry list: (a) int-21 SELF-fallback — no second-source citation; not actual drift. (b) Phase 0-B2 smoke CI (ARCHITECTURE_REVIEW.md G10) — second source was auto-memory, which is not a Phase 2 enumerated source; out of scope for this cross-tracker check._
 
@@ -319,7 +330,7 @@ UI item count (8) is conspicuously low given:
 
 1. **`docs/REMEDIATION_PLAN.md` body is the largest single source of drift.** The document's own Changelog closes ~15 items that the body still describes as OPEN / PENDING. A doc-hygiene pass would either archive the body prose or annotate each closed section in-line.
 
-2. **UI is under-tracked.** 8 items total, 3 outside any primary tracker. User-memory flags (Entity Graph LR rendering, expand trigger) have no written counterpart. This category has been deprioritized for months; the catalog confirms the symptom (few items) but cannot distinguish "no work pending" from "work pending but not written down". The latter seems likelier given the volume of React surface and the single in-component TODO.
+2. **UI is better-catalogued than the first pass of this memo showed — but the catalog lives on an unmerged branch.** Initial Phase 2 swept `docs/findings/` and `docs/closures/` on `main`, which missed `docs/ui-audit-01-triage.md` (file lives at `docs/`, only on branch `ui-audit-01` / PR #107 OPEN, dated 2026-04-22). That 599-line triage captures 12 tabs, 26 endpoints, 21 `queries.py` functions + 4 inline-SQL blocks; surfaces 3 blockers (`is_latest=TRUE` inversion, `query1()` NoneType crash, `get_peer_rotation()` 11.4 s) + an 8-row prioritised precompute build plan + 2 React-only consolidations + 15 dead-endpoint candidates + 1 open traffic-dependent decision. **None of those items are filed in any primary tracker on `main`.** `NEXT_SESSION_CONTEXT.md:41` merely references "PR #107 ui-audit walkthrough — separate track, still open". 24 per-tab "Bugs (visual)" / "Completeness gaps" placeholder rows remain BLANK awaiting Serge's live-app walkthrough. Net: UI work pending is **well-documented on one branch and invisible from `main`**; the earlier "UI under-tracked" claim was right in spirit (nothing on `main` tracks it) but wrong in letter (rich documentation exists, just parked). Meta-lesson for Phase 2 of future backlog sweeps: enumerate open PR branches alongside `main` sources.
 
 3. **DATA_QUALITY carry-forward is concentrated in the DM family.** 7 of 19 DATA_QUALITY items are DM-prefixed. DM13 / DM14c / DM15d / DM15e all surface on `dm-open-surface-2026-04-22.md`; DM2 / DM3 / DM6 are gated on pipeline work (D12 / D13 / N-1A parser). Without those pipeline items scheduled, the DM tail will continue to age.
 
@@ -421,7 +432,17 @@ One row per distinct item, sorted by category then by ID or title. `age` column 
 | 74 | — | Prometheus metrics | OPS | PARKED | UNSCOPED | `docs/admin_refresh_system_design.md:922` | ≥30d |
 | 75 | — | Multi-user roles on admin | OPS | PARKED (out-of-scope) | UNSCOPED | `docs/admin_refresh_system_design.md:922` | ≥30d |
 | 76 | 43b | `scripts/app.py` hardening (B110, B603/B607, B104) | SECURITY | OPEN | UNSCOPED | `ROADMAP.md:584,610` | ≥30d |
+| 77 | ui-audit-01 bug-1 | `is_latest=TRUE` inversion on prod DB for 2025Q4 | DATA_QUALITY | OPEN (verify vs int-22 post-date) | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #1 (branch `ui-audit-01`) | 2d |
+| 78 | ui-audit-01 bug-2 | `query1()` NoneType crash at `queries.py:933` | PIPELINE | OPEN BLOCKER | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #2 | 2d |
+| 79 | ui-audit-01 perf-P0 | `peer_rotation_by_ticker` + `peer_rotation_detail_by_pair` precomputed tables | PIPELINE | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P0 | 2d |
+| 80 | ui-audit-01 perf-P1 | `sector_flows_rollup` + `sector_flow_movers` + `cohort_by_ticker_from` precomputed tables | PIPELINE | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P1 | 2d |
+| 81 | ui-audit-01 perf-P2 | `flow_analysis_by_ticker_period` + `market_summary_top25` + `holder_momentum_by_ticker` precomputed tables | PIPELINE | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Precompute build plan P2 | 2d |
+| 82 | ui-audit-01 open-q | `short_interest_analysis()` precompute-vs-live decision | PIPELINE | OPEN-QUESTION | UNSCOPED | `docs/ui-audit-01-triage.md` §Short Interest | 2d |
+| 83 | ui-audit-01 React-1 | Consolidate `/api/v1/tickers` into shared hook | UI | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing | 2d |
+| 84 | ui-audit-01 React-2 | Collapse duplicate `/api/v1/entity_search` in EntityGraphTab | UI | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing | 2d |
+| 85 | ui-audit-01 walkthrough | 24 blank per-tab "Bugs (visual)" + "Completeness gaps" rows | UI | OPEN | GATED | `docs/ui-audit-01-triage.md` §per-tab sections | 2d |
+| 86 | ui-audit-01 dead-endpoints | 15 router-defined but tab-uncalled routes — triage (delete vs keep) | ARCHITECTURE | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #5 | 2d |
 
 ---
 
-_End of memo. No edits to any tracker, script, or DB occurred in this session. 11 drift items surfaced (§Cross-tracker drift) — reconciliation out of scope._
+_End of memo. No edits to any tracker, script, or DB occurred in this session. 10 drift items surfaced (§Cross-tracker drift) — reconciliation out of scope. Memo revised 2026-04-24 to incorporate the `ui-audit-01` branch triage file (missed in initial Phase 2 sweep; now catalogued)._
