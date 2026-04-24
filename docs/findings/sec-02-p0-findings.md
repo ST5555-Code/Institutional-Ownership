@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-20 — branch `remediation/sec-02-p0` off main HEAD `4724a1b` (after `7004bbc` + docs commit)._
 
-_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-02`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-A. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11.1 C-11; `docs/CODEX_REVIEW_2026_04_17.md` §§1 row 5 and 3c; Pass-2 cross-check row 5._
+_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-02`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-A. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11.1 C-11; `docs/findings/2026-04-17-codex-review.md` §§1 row 5 and 3c; Pass-2 cross-check row 5._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. Deliverables: this document + Phase 1 fix recommendation.
 

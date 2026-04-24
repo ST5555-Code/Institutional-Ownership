@@ -4,7 +4,7 @@ _Session: `phantom-other-managers-decision` (2026-04-23). Branch: `phantom-other
 
 ## TL;DR
 
-**The phantom is already gone.** The decision called for by `REWRITE_LOAD_13F_FINDINGS.md §6.4` was effectively taken during the same rewrite block: **Option A — add writer to `load_13f.py`** — was committed at `14a5152` (2026-04-19), validated in Phase 2 (`dd1d382`), and applied to prod in Phase 4 (`a58c107`). At HEAD `f3c7183` the writer is present, active, and producing the observed 15,405 rows. The `registry.py:174` claim naming `load_13f.py` as owner is now **true**, not phantom.
+**The phantom is already gone.** The decision called for by `2026-04-19-rewrite-load-13f.md §6.4` was effectively taken during the same rewrite block: **Option A — add writer to `load_13f.py`** — was committed at `14a5152` (2026-04-19), validated in Phase 2 (`dd1d382`), and applied to prod in Phase 4 (`a58c107`). At HEAD `f3c7183` the writer is present, active, and producing the observed 15,405 rows. The `registry.py:174` claim naming `load_13f.py` as owner is now **true**, not phantom.
 
 This doc records the decision retroactively, cites the evidence, and cleans up the one stale tracker entry (`REMEDIATION_PLAN.md:403`) that still treats the question as open. No new code changes are required in this session.
 
@@ -57,7 +57,7 @@ Sample rows (`LIMIT 10`, prod):
 
 Same schema. Same row count: **15,405**. Sample `LIMIT 10` is byte-for-byte identical to prod. Staging mirrors prod because `scripts/load_13f.py` honors `--staging` and the Phase 4 prod apply also back-populated staging from the same TSV source.
 
-### Row-count parity vs source TSV (from `REWRITE_LOAD_13F_FINDINGS.md §9.4`)
+### Row-count parity vs source TSV (from `2026-04-19-rewrite-load-13f.md §9.4`)
 
 | Quarter | `other_managers` rows | `OTHERMANAGER2.tsv` rows | Match |
 |---|---:|---:|---|
@@ -102,7 +102,7 @@ Both writers load the same 8-column shape (`accession_number, sequence_number, o
 
 ### Docs that name the table (reference-only)
 
-`docs/REWRITE_LOAD_13F_FINDINGS.md`, `docs/REMEDIATION_PLAN.md`, `docs/pipeline_violations.md`, `docs/data_layers.md`, `docs/canonical_ddl.md`, `docs/findings/mig-09-p0-findings.md`, `docs/SCHEMA_DIFF_PHASE_0_5_REBUILD_DRY_RUN.sql`, `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md`, `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md`, `docs/reports/rewrite_load_13f_phase2_20260419_071500.md`, `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md`, `Makefile`. All reference-only.
+`docs/findings/2026-04-19-rewrite-load-13f.md`, `docs/REMEDIATION_PLAN.md`, `docs/pipeline_violations.md`, `docs/data_layers.md`, `docs/canonical_ddl.md`, `docs/findings/mig-09-p0-findings.md`, `docs/SCHEMA_DIFF_PHASE_0_5_REBUILD_DRY_RUN.sql`, `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md`, `docs/findings/2026-04-19-block-schema-diff.md`, `archive/docs/reports/rewrite_load_13f_phase2_20260419_071500.md`, `docs/findings/2026-04-19-precheck-load-13f-liveness.md`, `Makefile`. All reference-only.
 
 ### Retired scripts / migrations / SQL
 
@@ -127,7 +127,7 @@ Hunt performed with the same grep across `scripts/`, `tests/`, `web/` plus the d
 
 ## Phase 4 — Cross-reference with REWRITE_LOAD_13F §6.4 + §9
 
-`docs/REWRITE_LOAD_13F_FINDINGS.md` covered this territory exhaustively:
+`docs/findings/2026-04-19-rewrite-load-13f.md` covered this territory exhaustively:
 
 - **§0 (Phase 0 executive summary, finding 3)** flagged the phantom-owner drift: registry (`registry.py:174`) and canonical DDL claimed `load_13f.py` owned the table, but the script had no INSERT/CREATE.
 - **§6.4** posed the decision: (A) add write path, (B) reassign ownership, or (C) retire.
@@ -180,7 +180,7 @@ One stale entry:
 
 - `docs/REMEDIATION_PLAN.md:403` still reads "Phantom `other_managers` table decision (REWRITE_LOAD_13F §6.4): add write path, reassign ownership, or retire." This bullet should be removed or moved to a "completed" section. Implemented in this PR.
 
-Optionally link this decision doc from `REWRITE_LOAD_13F_FINDINGS.md §6.4` so a future reader pulling on that thread lands here directly. Not strictly required — the §9 addendum already closes the loop — so held for the follow-on session to batch with any other REWRITE cross-refs.
+Optionally link this decision doc from `2026-04-19-rewrite-load-13f.md §6.4` so a future reader pulling on that thread lands here directly. Not strictly required — the §9 addendum already closes the loop — so held for the follow-on session to batch with any other REWRITE cross-refs.
 
 ---
 
@@ -189,7 +189,7 @@ Optionally link this decision doc from `REWRITE_LOAD_13F_FINDINGS.md §6.4` so a
 Pick up in a separate session if needed:
 
 - **Docs cleanup (tracker hygiene).** Remove or re-file `REMEDIATION_PLAN.md:403`. Covered in this PR; listed here for completeness.
-- **Cross-link (optional, low-priority).** Add a one-line pointer from `REWRITE_LOAD_13F_FINDINGS.md §6.4` / §9.9 to `docs/findings/phantom-other-managers-decision.md`.
+- **Cross-link (optional, low-priority).** Add a one-line pointer from `2026-04-19-rewrite-load-13f.md §6.4` / §9.9 to `docs/findings/phantom-other-managers-decision.md`.
 - **`mig-12` carry-forward (tracked elsewhere).** The `load_13f_v2` rewrite (REMEDIATION_PLAN.md:401) will become the long-term owner of `other_managers` when it retires `load_13f.py`. The v2 writer is already written and tested (`tests/pipeline/test_load_13f_v2.py`). No incremental work needed here; verify `other_managers` is covered in the `mig-12` cutover checklist when that session runs.
 - **Schema hardening (deferred, optional).** Table has no PK, no index, no provenance column. If a reader ever materializes that filters by `(accession_number, sequence_number)` hot, revisit. Until a reader shows up, leave it as-is.
 

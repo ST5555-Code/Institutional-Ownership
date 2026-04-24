@@ -8,7 +8,7 @@ Purpose. Phase 4 of the build_managers.py REWRITE switches the
 holdings_v2 enrichment UPDATE to `COALESCE(m.strategy_type, h.manager_type)`
 to preserve 4,163 CIKs / ~5.33M rows of hand-curated values from
 backfill_manager_types.py + categorized_institutions_funds_v2.csv
-(see docs/reports/rewrite_build_managers_phase2_20260419_082630.md §Risk 1).
+(see archive/docs/reports/rewrite_build_managers_phase2_20260419_082630.md §Risk 1).
 
 Before COALESCE lands in prod, capture the current state as an
 immutable reference so operators can audit what was preserved and

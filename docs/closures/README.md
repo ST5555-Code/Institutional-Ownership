@@ -4,7 +4,7 @@ New closures land here, one file per session. The historical
 `ROADMAP.md § Closed items (log)` table is frozen as of 2026-04-23
 and preserved in place as the pre-cutover archive.
 
-Note: this directory is distinct from `docs/closed/`, which holds
+Note: this directory is distinct from `archive/docs/closed/`, which holds
 resolved proposal-style documents (a different convention that
 predates the per-session closure log).
 

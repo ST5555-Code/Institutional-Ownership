@@ -32,10 +32,10 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
   - `docs/REMEDIATION_CHECKLIST.md` (new)
   - `docs/REMEDIATION_SESSION_LOG.md` (new)
   - `docs/SESSION_NAMING.md` (new)
-  - `docs/prompts/int-01-p0.md` (new)
-  - `docs/prompts/obs-03-p0.md` (new)
-  - `docs/prompts/sec-01-p0.md` (new)
-  - `docs/prompts/ops-batch-5A-p0.md` (new)
+  - `archive/docs/prompts/int-01-p0.md` (new)
+  - `archive/docs/prompts/obs-03-p0.md` (new)
+  - `archive/docs/prompts/sec-01-p0.md` (new)
+  - `archive/docs/prompts/ops-batch-5A-p0.md` (new)
 - **Result:** DONE
 - **Commits:** (filled by commit step)
 - **Merge status:** pending Serge review
@@ -68,10 +68,10 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
   - **Migration slot collision resolved:** Phase 2 migration renumbered from slot 008 (per design doc) → 010. Slot 009 is owned by int-12 (INF28 securities.cusip formal PK). Design doc itself recommends renumbering from 008; this plan's Appendix D drove the choice of 010 over 009.
   - **Protocol → ABC reconciliation decision** is Phase 2-native (not a foundation item). Captured as Phase 2 open design question. `scripts/pipeline/protocol.py` ships three structural `typing.Protocol`s today; design §4 calls for a single ABC with `run()` orchestrator. Deferred to Phase 2 kickoff.
   - **No new foundation-theme items added.** All Phase 2 dependencies already captured in existing theme items — validated by tracing each design-doc "gate list" entry to an existing checklist row. Conservative bias applied: did not invent new theme items for issues that map to existing ones.
-  - **`web/README_deploy.md` potential duplicate** of root `README_deploy.md` — surfaced during rescan. ops-05 tracks root `README_deploy.md`. Flag for ops-05 session to decide whether `web/README_deploy.md` is a stale copy to retire or a distinct doc.
+  - **`web/README_deploy.md` potential duplicate** of root `docs/deployment.md` — surfaced during rescan. ops-05 tracks root `docs/deployment.md`. Flag for ops-05 session to decide whether `web/README_deploy.md` is a stale copy to retire or a distinct doc.
   - **mig-05 semantics change** — previously "BLOCK-4 admin refresh pre-restart rework" as a Theme 3 item; now reclassified as SUPERSEDED by the full Phase 2 workstream. Retained as cross-reference anchor in Appendix A.
   - **Appendix D added three file rows**: `scripts/migrations/010_pipeline_refresh_control_plane.py`, `scripts/pipeline/base.py`, `scripts/pipeline/cadence.py` — all attributed to Phase 2 kickoff, no foundation conflicts.
-  - **Rescan of 72 repo `.md` files** found no additional scope-carrying docs. Historical / closed / report artifacts dominate the uncovered set (e.g., `docs/ci_fixture_design.md` Phase 0-B1 close-out, `docs/endpoint_classification.md` Phase 4 freeze, `docs/plans/20260412_architecture_review_revision.md` closed revision pass).
+  - **Rescan of 72 repo `.md` files** found no additional scope-carrying docs. Historical / closed / report artifacts dominate the uncovered set (e.g., `docs/ci_fixture_design.md` Phase 0-B1 close-out, `docs/endpoint_classification.md` Phase 4 freeze, `archive/docs/plans/20260412_architecture_review_revision.md` closed revision pass).
 - **Parallel-safety validation:** YES — this session's file touch list (`docs/REMEDIATION_PLAN.md`, `docs/REMEDIATION_SESSION_LOG.md`) is within the plan-family scope expected for `prog` sessions (per SESSION_NAMING.md convention). No other worker owns these files during this window. No drift from Phase 0 prediction (prog-01 was anticipated as a doc-authorship-only session).
 
 ---
@@ -337,7 +337,7 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Start:** 2026-04-20
 - **End:** 2026-04-20
 - **Scope:** close ops-01 through ops-12 in a single batch — doc hygiene sweep across README, PHASE prompts, ARCH_REVIEW, README_deploy, CLASSIFICATION_METHODOLOGY, ROADMAP, and a docs-only migration 007 footnote.
-- **Files touched:** `README.md`, `README_deploy.md`, `ARCHITECTURE_REVIEW.md`, `PHASE3_PROMPT.md`, `PHASE4_PROMPT.md`, `ROADMAP.md`, `docs/CLASSIFICATION_METHODOLOGY.md`, `docs/canonical_ddl.md`, `scripts/migrations/007_override_new_value_nullable.py`, `docs/findings/ops-batch-5A-p0-findings.md` (new)
+- **Files touched:** `README.md`, `docs/deployment.md`, `ARCHITECTURE_REVIEW.md`, `PHASE3_PROMPT.md`, `PHASE4_PROMPT.md`, `ROADMAP.md`, `docs/CLASSIFICATION_METHODOLOGY.md`, `docs/canonical_ddl.md`, `scripts/migrations/007_override_new_value_nullable.py`, `docs/findings/ops-batch-5A-p0-findings.md` (new)
 - **Result:** DONE — ops-01, ops-02, ops-03, ops-04, ops-05, ops-07, ops-08, ops-10, ops-11, ops-12 all closed.
 - **Commits:** `0bfa7fd` (work) → `4721372` (PR #6 merge)
 - **Merge status:** merged (PR #6)
@@ -1341,7 +1341,7 @@ The **Parallel-safety validation** field is a critical feedback loop. Every work
 - **Session name:** mig-11-p0
 - **Start:** 2026-04-22
 - **End:** 2026-04-22
-- **Scope:** Phase 0 scoping of INF47 schema-parity CI wiring. Mapped gap: fixture covers 21/49 tables (43%) across L0+L3+L4 and has no staging counterpart, so cross-DB parity is unreachable from CI today exactly as `BLOCK_SCHEMA_DIFF_FINDINGS.md §10 Q5 / §14` foresaw. **Key finding:** 885 lines of pure-logic unit tests at `tests/pipeline/test_validate_schema_parity.py` already exist but are **not** run in CI (`smoke.yml` step 5 runs `pytest tests/smoke/` only) — single largest gap. Validator handles self-parity correctly (same file on both sides → 0 divergences, no `--self-check` flag needed). `pyyaml` is required by the validator but is not currently installed in `smoke.yml`. Proposed three options: A (widen pytest scope + add `pyyaml` — recommended, highest signal-to-cost), B (self-parity CLI liveness — optional), C (synthetic staging fixture — defer to candidate `mig-11a`, shares mig-08 fixture tooling). Four open questions for sign-off before Phase 1 (§10).
+- **Scope:** Phase 0 scoping of INF47 schema-parity CI wiring. Mapped gap: fixture covers 21/49 tables (43%) across L0+L3+L4 and has no staging counterpart, so cross-DB parity is unreachable from CI today exactly as `2026-04-19-block-schema-diff.md §10 Q5 / §14` foresaw. **Key finding:** 885 lines of pure-logic unit tests at `tests/pipeline/test_validate_schema_parity.py` already exist but are **not** run in CI (`smoke.yml` step 5 runs `pytest tests/smoke/` only) — single largest gap. Validator handles self-parity correctly (same file on both sides → 0 divergences, no `--self-check` flag needed). `pyyaml` is required by the validator but is not currently installed in `smoke.yml`. Proposed three options: A (widen pytest scope + add `pyyaml` — recommended, highest signal-to-cost), B (self-parity CLI liveness — optional), C (synthetic staging fixture — defer to candidate `mig-11a`, shares mig-08 fixture tooling). Four open questions for sign-off before Phase 1 (§10).
 - **Files touched:** `docs/findings/mig-11-p0-findings.md` (new)
 - **Result:** DONE
 - **Commits:** PR #78 merged as `72780f4`

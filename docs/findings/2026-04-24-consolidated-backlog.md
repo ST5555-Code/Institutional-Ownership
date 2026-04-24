@@ -10,7 +10,7 @@
 | Source category | Files scanned |
 |---|---|
 | Primary trackers | 4 — `ROADMAP.md`, `docs/REMEDIATION_PLAN.md`, `docs/DEFERRED_FOLLOWUPS.md`, `docs/NEXT_SESSION_CONTEXT.md` |
-| Plans | 2 — `docs/plans/2026-04-23-phase-b-c-execution-plan.md`, `docs/plans/20260412_architecture_review_revision.md` |
+| Plans | 2 — `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md`, `archive/docs/plans/20260412_architecture_review_revision.md` |
 | Findings | 55 (incl. 1 index README) |
 | Closures | 1 (README only) |
 | Architecture | 5 — `ARCHITECTURE_REVIEW.md`, `ENTITY_ARCHITECTURE.md`, `docs/admin_refresh_system_design.md`, `docs/data_layers.md` (body), `docs/pipeline_inventory.md` |
@@ -88,7 +88,7 @@
 
 | ID | Title | State | Timing | Source | Age | Notes |
 |---|---|---|---|---|---|---|
-| P2-FU-01 | Prune legacy `run_script` allowlist in `scripts/admin_bp.py` | OPEN | GATED | `docs/DEFERRED_FOLLOWUPS.md:17`; `ROADMAP.md:587`; `docs/plans/2026-04-23-phase-b-c-execution-plan.md §9` | ~2 days (conv-12) | Gate: 1 clean quarterly cycle on V2 framework to surface stale Makefile/scheduler paths first. |
+| P2-FU-01 | Prune legacy `run_script` allowlist in `scripts/admin_bp.py` | OPEN | GATED | `docs/DEFERRED_FOLLOWUPS.md:17`; `ROADMAP.md:587`; `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md §9` | ~2 days (conv-12) | Gate: 1 clean quarterly cycle on V2 framework to surface stale Makefile/scheduler paths first. |
 | P2-FU-03 | ADV SCD Type 2 conversion (currently `direct_write`) | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:18`; `ROADMAP.md:588`; `docs/plans/…-phase-b-c…md §9` | ~2 days | Design question: which columns carry history. No downstream consumer asking yet. |
 | — | V-Q3 co-land cleanups for B3 denorm drops: `scripts/db.py` REFERENCE_TABLES + `scripts/pipeline/registry.py` L1 entries + `notebooks/research.ipynb` dead-branch probe | OPEN | GATED | `docs/findings/refinement-validation-2026-04-23.md:146–237` | 1 day | Co-lands with B3 (~Aug 2026). |
 | — | Cross-process rate limiter (currently in-process `threading.Lock`) | OPEN | UNSCOPED | `scripts/pipeline/shared.py:9,39` (code TODO) | — | Triggers when orchestrator moves to parallel subprocess dispatch. |
@@ -174,11 +174,11 @@ Cross-reference — **PR #107 ui-audit walkthrough** per `docs/NEXT_SESSION_CONT
 | G1 | Untyped API contract (no OpenAPI-driven types; hand-written `api.ts`) | OPEN | UNSCOPED | `ARCHITECTURE_REVIEW.md:113–132` | ≥40 days | Called out as highest-value gap before tool is shared. Cross-ref ARCH-4C-followup. |
 | G2 | No standardised error contract across endpoints | OPEN | UNSCOPED | `ARCHITECTURE_REVIEW.md:133` | ≥40 days | React tabs lack consistent error boundary. |
 | G6 | `scripts/app.py` monolith (~1,400 lines, 50+ routes) | PARTIAL | UNSCOPED | `ARCHITECTURE_REVIEW.md:153` | ≥40 days | Blueprint split Batch 4-A complete per ARCHITECTURE_REVIEW annotation. |
-| G7 | `scripts/queries.py` monolith (~5,500 lines) | PARTIAL | UNSCOPED | `ARCHITECTURE_REVIEW.md:158`; `docs/plans/20260412_architecture_review_revision.md §A2` | ≥40 days | Batch 4-B split underway; per-domain split deferred to "Phase 6". |
+| G7 | `scripts/queries.py` monolith (~5,500 lines) | PARTIAL | UNSCOPED | `ARCHITECTURE_REVIEW.md:158`; `archive/docs/plans/20260412_architecture_review_revision.md §A2` | ≥40 days | Batch 4-B split underway; per-domain split deferred to "Phase 6". |
 | BL-2 | Pipeline dependency enforcement — Makefile / DAG to prevent out-of-order runs | OPEN | UNSCOPED | `ROADMAP.md:802` | ~30 days | |
 | BL-3 | Write-path consistency (non-entity) — extend staging/validation to flow recompute + market-data upsert | OPEN | UNSCOPED | `ROADMAP.md:803` | ~30 days | |
 | BL-4 | Three snapshot roles (serving / rollback / archive) documented | OPEN | UNSCOPED | `ROADMAP.md:804` | ~30 days | |
-| BL-7 | DB-universe ticker validation at route layer | OPEN | UNSCOPED | `ARCHITECTURE_REVIEW.md:715`; `docs/plans/20260412_architecture_review_revision.md §C3b` | ≥30 days | Deferred from 1-A to avoid DB coupling at route layer. |
+| BL-7 | DB-universe ticker validation at route layer | OPEN | UNSCOPED | `ARCHITECTURE_REVIEW.md:715`; `archive/docs/plans/20260412_architecture_review_revision.md §C3b` | ≥30 days | Deferred from 1-A to avoid DB coupling at route layer. |
 | — | `portfolio_context` precompute — re-trigger when latency regresses | PARKED | UNSCOPED | `ARCHITECTURE_REVIEW.md:467–476` | ~12 days | Current 730ms acceptable. |
 | INF28 | `securities.cusip` VALIDATOR_MAP registration | OPEN | UNSCOPED | `docs/data_layers.md:96,136` | ≥30 days | PK constraint empirical-only; formal VALIDATOR_MAP row pending. |
 | P2-FU-04 | ADV ownership boundary documentation cross-ref | OPEN (annotation) | UNSCOPED | `docs/data_layers.md:47` | ~2 days | `DEFERRED_FOLLOWUPS.md` marks P2-FU-04 CLOSED 2026-04-22; cross-ref note in body never struck. See [Drift](#cross-tracker-drift). |
@@ -196,7 +196,7 @@ Cross-reference — **PR #107 ui-audit walkthrough** per `docs/NEXT_SESSION_CONT
 | maintenance-audit-design | Re-author `rotating_audit_schedule.md` from 6-surface scope + May–October cadence | OPEN | UNSCOPED | `docs/NEXT_SESSION_CONTEXT.md:38`; `docs/findings/2026-04-23-ops-18-investigation.md`; `ROADMAP.md:579` | 1 day | Was ops-18; PARTIAL outcome per C2. |
 | — | `docs/TESTING_STRATEGY.md` | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:197` | ≥40 days | Pointer exists; doc never created. |
 | — | `docs/OBSERVABILITY_PLAN.md` | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:199` | ≥40 days | Pointer exists; doc never created. |
-| — | `docs/SCHEMA_MIGRATIONS.md` | TODO | UNSCOPED | `docs/plans/20260412_architecture_review_revision.md` R2 | ~12 days | Pointer introduced by the revision plan; doc never created. |
+| — | `docs/SCHEMA_MIGRATIONS.md` | TODO | UNSCOPED | `archive/docs/plans/20260412_architecture_review_revision.md` R2 | ~12 days | Pointer introduced by the revision plan; doc never created. |
 | — | Rename `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` across findings docs | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:56` | ~30 days | "Next batched doc-update". |
 | — | `pct_of_float` → `pct_of_so` terminology retirement project-wide | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:57` | ~30 days | "Next batched doc-update". |
 | — | `docs/data_layers.md §7`: add `pct_of_so_source` as Class B audit column | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:58` | ~30 days | "Next batched doc-update". |
@@ -240,7 +240,7 @@ Items that surface in 2+ sources (with file:line citations for both) and disagre
 | 2 | INF37 `backfill_manager_types` residual | `docs/DEFERRED_FOLLOWUPS.md:15`: STANDING; `ROADMAP.md:604`: standing curation | `docs/findings/entity-curation-w1-log.md:11,16,23`: "APPLIED to prod. … 14,368 → 0 (zero residuals)" | Findings reports closure 2026-04-23; primary trackers still say STANDING. |
 | 3 | int-23 design questions | `docs/findings/int-23-design.md:263–267` Q7.1 / Q7.2 OPEN | `docs/DEFERRED_FOLLOWUPS.md:20`: int-23 CLOSED 2026-04-23 (int-23-impl Option (a)) | Impl presumably resolves Q7.1/Q7.2 but design file was never annotated. |
 | 4 | DM14 / DM15 Layer 1 status | `ROADMAP.md:114` (DM15 Layer 1 in `entity_rollup_history` row count); auto-memory records DM14 Layer 1 / DM15 Layer 1 DONE 2026-04-15–17 | `MAINTENANCE.md:394,395`: both listed under "Open audits"; `docs/data_layers.md:393,394`: same two items listed as PARKED | Follow-on rows exist but phrasing leaves DONE / OPEN coexisting. |
-| 5 | ops-18 rotating audit label | `ROADMAP.md:579`: "ops-18 … PARTIAL" | `docs/NEXT_SESSION_CONTEXT.md:38`: relabelled `maintenance-audit-design`; `docs/plans/2026-04-23-phase-b-c-execution-plan.md:36,46,874,876,896`: "Phase C2 investigation" | Three labels for one item. |
+| 5 | ops-18 rotating audit label | `ROADMAP.md:579`: "ops-18 … PARTIAL" | `docs/NEXT_SESSION_CONTEXT.md:38`: relabelled `maintenance-audit-design`; `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md:36,46,874,876,896`: "Phase C2 investigation" | Three labels for one item. |
 | 6 | P2-FU-04 ADV ownership boundary | `docs/DEFERRED_FOLLOWUPS.md:44`: CLOSED 2026-04-22 (p2fu-04) | `docs/data_layers.md:47`: "see … P2-FU-04" cross-ref note without status | Body note not updated to reflect closure. |
 | 7 | V2 loader cycle-entry point | `docs/NEXT_SESSION_CONTEXT.md:10,82,83`: "V2 cutover complete" / Makefile invokes V2 | `docs/findings/refinement-validation-2026-04-23.md:25–125` V-Q1 PARTIAL: "Makefile:110–111 still invokes V1" | Findings file pre-dates PR #141 V2 cutover (2026-04-23); drift is temporal — finding was never annotated post-merge. |
 | 8 | 43e family-office classification | `ROADMAP.md:608,666` lists as open follow-on for taxonomy refactor | `docs/findings/entity-curation-w1-log.md:13,158,181`: "DE-SCOPED … Item C remains open in ROADMAP §Open items, re-filed as a dedicated taxonomy refactor follow-on" | Intent agrees; state label differs (OPEN follow-on vs DE-SCOPED). |
@@ -415,7 +415,7 @@ One row per distinct item, sorted by category then by ID or title. `age` column 
 | 57 | maintenance-audit-design | Re-author `rotating_audit_schedule.md` | DOCS | OPEN | UNSCOPED | `docs/NEXT_SESSION_CONTEXT.md:38`; `ROADMAP.md:579` | 1d |
 | 58 | — | `docs/TESTING_STRATEGY.md` | DOCS | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:197` | ≥40d |
 | 59 | — | `docs/OBSERVABILITY_PLAN.md` | DOCS | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:199` | ≥40d |
-| 60 | — | `docs/SCHEMA_MIGRATIONS.md` | DOCS | TODO | UNSCOPED | `docs/plans/20260412_architecture_review_revision.md` R2 | ~12d |
+| 60 | — | `docs/SCHEMA_MIGRATIONS.md` | DOCS | TODO | UNSCOPED | `archive/docs/plans/20260412_architecture_review_revision.md` R2 | ~12d |
 | 61 | — | Rename `block/pct-of-float…` → `block/pct-of-so…` across findings docs | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:56` | ~30d |
 | 62 | — | `pct_of_float` → `pct_of_so` terminology retirement | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:57` | ~30d |
 | 63 | — | `docs/data_layers.md §7` — add `pct_of_so_source` audit column | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:58` | ~30d |

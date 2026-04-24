@@ -54,7 +54,7 @@ DuckDB  (data/13f.duckdb)
 **React status:** Phase 4 cutover complete 2026-04-13 (commit `002fab0`).
 Single frontend — the FastAPI app (`scripts/app.py`) serves `web/react-app/dist/`
 on port 8001. Vanilla-JS legacy and `web/react-src/` POC retired the same
-session (38 public routes rewritten to `/api/v1/*`). See `REACT_MIGRATION.md`
+session (38 public routes rewritten to `/api/v1/*`). See `archive/docs/REACT_MIGRATION.md`
 Status section for the full timeline.
 
 **Zustand store shape:**
@@ -648,7 +648,7 @@ _Production-grade serving. Gated on Phase 4 React cutover confirmed stable._
 _Do not start until React Phase 4 cutover is running without regression for one full week._
 
 The original plan referenced "frontend Phase 6 complete" as the gate. Phase 6
-is not defined in REACT_MIGRATION.md — the migration defines Phases 1–4 only.
+is not defined in archive/docs/REACT_MIGRATION.md — the migration defines Phases 1–4 only.
 Gate restated as: **React Phase 4 cutover confirmed stable.**
 
 | Priority | Component | Action | Trigger |

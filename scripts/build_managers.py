@@ -316,7 +316,7 @@ def build_parent_bridge(con, dry_run=False):
     # manager_name, crd_number FROM filings_deduped` which fans out when
     # a CIK has multiple (name, crd) variants across quarters. Keep the
     # first occurrence so cik stays empirically unique and the pk_diff
-    # promote path is sound (see REWRITE_BUILD_MANAGERS_FINDINGS.md §2.3
+    # promote path is sound (see 2026-04-19-rewrite-build-managers.md §2.3
     # — this was the 870-dupe pattern surfaced in Phase 2 validation).
     df_bridge_full = df_bridge_full.drop_duplicates(subset=["cik"], keep="first")
 
@@ -625,7 +625,7 @@ def build_managers_table(con, dry_run=False):
 def enrich_holdings_v2(con, dry_run=False):
     """Update holdings_v2 with manager metadata. Repointed from the
     dropped legacy `holdings` table per the REWRITE findings — see
-    docs/REWRITE_BUILD_MANAGERS_FINDINGS.md §4. holdings_v2 already has
+    docs/findings/2026-04-19-rewrite-build-managers.md §4. holdings_v2 already has
     inst_parent_name/manager_type/is_passive/is_activist with the
     correct types (VARCHAR/VARCHAR/BOOLEAN/BOOLEAN), so the historical
     ALTER-to-fix-types block is retired.
@@ -761,7 +761,7 @@ def main():
     # enrich_holdings.py. The no-flag path is preserved for
     # backward compatibility with existing scheduler / Makefile / cron
     # invocations; new operators should prefer the three-step
-    # --staging flow documented in REWRITE_BUILD_MANAGERS_FINDINGS.md.
+    # --staging flow documented in 2026-04-19-rewrite-build-managers.md.
     args = _parse_args()
 
     if args.test:

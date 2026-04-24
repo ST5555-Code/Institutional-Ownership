@@ -10,7 +10,7 @@ sec-03-p0._
 `scripts/app.py` — the FastAPI application. Phase 4+ Batch 4-C swapped
 the original Flask Blueprint layout for FastAPI `APIRouter`s; the
 pre-FastAPI Flask entry was deleted once this module proved stable
-(see `docs/REACT_MIGRATION.md` and ROADMAP).
+(see `archive/docs/REACT_MIGRATION.md` and ROADMAP).
 
 Layout summary:
 
@@ -140,7 +140,7 @@ startup banner and the server import see the same resolved path.
 - Admin write-surface audit: `docs/findings/sec-03-p0-findings.md` §2.
 - Concurrency guards: `docs/findings/sec-02-p1-findings.md`,
   `docs/findings/sec-03-p1-findings.md`.
-- Flask → FastAPI migration history: `docs/REACT_MIGRATION.md`,
+- Flask → FastAPI migration history: `archive/docs/REACT_MIGRATION.md`,
   ROADMAP Batch 4-C entries.
 
 ## Follow-on

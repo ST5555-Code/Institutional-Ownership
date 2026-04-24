@@ -95,7 +95,7 @@ Start the research app:
 
 Open http://localhost:8001. The app provides a browser-based interface with all 15
 ownership queries, ticker autocomplete, sortable tables, copy-to-clipboard, and
-Excel export. See `web/README_deploy.md` for Render.com deployment.
+Excel export. See `docs/deployment.md` for Render.com deployment.
 
 **One-command startup alias.** Add to `~/.zshrc` for boot-and-open from any terminal:
 
@@ -170,7 +170,7 @@ To add a new override, see the instructions at the top of `scripts/build_cusip.p
 │   │   └── playwright.config.ts
 │   ├── templates/             — admin.html (token-gated) only
 │   ├── datasette_config.yaml  — legacy Datasette dashboard config
-│   └── README_deploy.md       — Render.com deployment guide
+│   └── README_deploy.md       — Render.com deployment guide (stale; see top-level `docs/deployment.md`)
 ├── notebooks/
 │   └── research.ipynb         — 15 ownership analysis queries (legacy)
 ├── data/

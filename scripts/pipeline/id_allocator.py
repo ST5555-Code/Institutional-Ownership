@@ -1,6 +1,6 @@
 """Centralized PK allocator for ingestion_manifest / ingestion_impacts.
 
-obs-03 Phase 1 (docs/findings/obs-03-p0-findings.md §5, docs/prompts/obs-03-p1.md).
+obs-03 Phase 1 (docs/findings/obs-03-p0-findings.md §5, archive/docs/prompts/obs-03-p1.md).
 Single source of truth for allocating integer primary keys on the two
 pipeline control-plane tables. Replaces the inline `_next_id` in
 `manifest.py` and the deleted bypass in `shared.py`.

@@ -5,7 +5,7 @@ _Branch: `rewrite-load-13f`, off main `34710d1`. Phase 0 is read-only._
 ## Scope
 
 Full REWRITE audit of `scripts/load_13f.py` following Precheck2's LIVE
-classification (`docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md`, commit
+classification (`docs/findings/2026-04-19-precheck-load-13f-liveness.md`, commit
 `cdf2cae`).
 
 **Broad audit** — not just the legacy `holdings` write retirement. All
@@ -395,7 +395,7 @@ Non-commit references in the working tree:
 | `docs/data_layers.md` | 105 | documentation claim (from `3816577`) |
 | `docs/canonical_ddl.md` | 40, 326 | documentation claim (from `3816577`) |
 | `notebooks/research.ipynb` | 21 | non-writer — listed in a static `DESCRIBE` enumeration of available tables |
-| `docs/REWRITE_LOAD_13F_FINDINGS.md` | multiple | this finding |
+| `docs/findings/2026-04-19-rewrite-load-13f.md` | multiple | this finding |
 | `scripts/load_13f.py` | 71 | `OTHERMANAGER` scalar column on `INFOTABLE.tsv`, unrelated to the `other_managers` table |
 
 ### 9.2 Retired scripts

@@ -180,7 +180,7 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 
 **CLEARED 2026-04-19** — Full rewrite landed at commit `7e68cf9`, Phase 4
 prod apply at `a58c107`. Rewrite4 Findings at
-`docs/REWRITE_LOAD_13F_FINDINGS.md`:
+`docs/findings/2026-04-19-rewrite-load-13f.md`:
 
 - Dead `holdings` DROP+CTAS at `:222-284` retired — script no longer
   writes the legacy table. `holdings_v2` is the canonical fact table
@@ -243,7 +243,7 @@ Original violations retained below for historical reference.
 **CLEARED 2026-04-19** — Full rewrite + `backfill_manager_types.py`
 repoint landed at merge commit `223b4d9`, Phase 4 prod apply at
 `7747af2`. Rewrite5 Findings at
-`docs/REWRITE_BUILD_MANAGERS_FINDINGS.md`:
+`docs/findings/2026-04-19-rewrite-build-managers.md`:
 
 - `holdings` ALTER+UPDATE at `:513-532` retired — manager enrichment
   now writes `holdings_v2` (repoint commit `1719320`) and
@@ -290,7 +290,7 @@ Original violations retained below for historical reference.
 **CLEARED 2026-04-19** — Work landed at commit `87ee955` on
 2026-04-16 ("feat: Batch 3 close — compute_flows + build_summaries
 rewrites + migration 004"), an ancestor of HEAD `d7ba1c2`. Phase 0
-audit (`docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md`) confirmed:
+audit (`docs/findings/2026-04-19-rewrite-build-summaries.md`) confirmed:
 
 - Legacy `holdings` reads retired — script now reads `holdings_v2`
   and `fund_holdings_v2` throughout (0 refs to legacy `holdings`).
@@ -404,7 +404,7 @@ Test: `python3 scripts/build_fund_classes.py --dry-run` against prod
 
 **CLEARED 2026-04-19** — Full rewrite + PROCESS_RULES retrofits landed
 at commit `d7ba1c2`, Phase 4 prod apply at `443e37a`. Rewrite1 Findings
-at `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md`:
+at `docs/findings/2026-04-19-rewrite-build-shares-history.md`:
 
 - Legacy `holdings` reads at `:161-164,:201-203` and
   `holdings.pct_of_float` UPDATEs at `:177-184,:190-199` retired —
@@ -426,7 +426,7 @@ migration 008, `ea4ae99` amended) with three-tier SOH-ASOF fallback
 and `pct_of_so_source` audit column. Commit citations: Phase 1b read-site
 migration + Phase 1c audit-column split + Phase 4b amended migration +
 Phase 4c rename sweep; merge `8925347` + follow-on `12e172b`. See
-`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`. Original
+`docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`. Original
 BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY row also closed in ROADMAP Open Items.
 True float-adjusted denominator (public-float-based, distinct from
 shares-outstanding) tracked separately as **INF38 / BLOCK-FLOAT-HISTORY**.

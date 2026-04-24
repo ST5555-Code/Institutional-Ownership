@@ -64,4 +64,4 @@ decision rather than a recovery problem.
 - `archive/docs/SYSTEM_AUDIT_2026_04_17.md:409` — 6-surface enumeration.
 - `docs/REMEDIATION_PLAN.md:413` — cadence + October 2026 wide-audit marker.
 - [PR #143 `phase-c2-tracker-consolidate`](https://github.com/ST5555-Code/Institutional-Ownership/pull/143) — original investigation write-up in PR body (merge `e7db8d0`).
-- `docs/plans/2026-04-23-phase-b-c-execution-plan.md §6.2` — investigation framing.
+- `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md §6.2` — investigation framing.

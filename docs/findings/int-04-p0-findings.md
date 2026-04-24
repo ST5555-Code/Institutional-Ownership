@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-21 — branch `remediation/int-04-p0` off main HEAD `8a7afb2`._
 
-_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) Theme 1 row `int-04`; [docs/REMEDIATION_CHECKLIST.md](../REMEDIATION_CHECKLIST.md) Batch 1-A. Upstream finding: [docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) §5 (RC4 — "Scope guard — issuer_name propagation to `securities`")._
+_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) Theme 1 row `int-04`; [docs/REMEDIATION_CHECKLIST.md](../REMEDIATION_CHECKLIST.md) Batch 1-A. Upstream finding: [docs/findings/2026-04-18-block-securities-data-audit.md](../2026-04-18-block-securities-data-audit.md) §5 (RC4 — "Scope guard — issuer_name propagation to `securities`")._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. Deliverables: this document + Phase 1 scope.
 
@@ -158,7 +158,7 @@ Not yet attempted (Phase 0 is read-only). Reasoning: RC2 (`fc2bbbc`) already re-
 | int-01 (RC1 whitelist) | Merged `2066682` | Re-queue script (`scripts/requeue_foreign_exchange_cusips.py` per int-01-p1) will touch ~500 rows across `cusip_classifications` + `securities`. That refresh path already writes `issuer_name` via the INSERT branch; no int-04 dependency. |
 | int-02 (RC2 aggregator) | Shipped `fc2bbbc` | Changes `cc.issuer_name` values. Without int-04 Phase 1, every RC2 run risks re-opening drift on any rows whose mode winner changed. Zero divergence today implies a post-RC2 normalize run has propagated; int-04 Phase 1 hardens this. |
 | int-05 (Pass C sweep) | Pending | Depends on int-04. Pass C in `enrich_holdings.py` consumes `securities.ticker` / `securities.issuer_name` to backfill `fund_holdings_v2`. If s.issuer_name is stale, Pass C will stamp stale values onto 10M+ holdings rows. Blocker relationship confirmed. |
-| int-06 (forward hooks) | Pending | Plan per `docs/BLOCK_TICKER_BACKFILL_FINDINGS.md` §6 is to auto-trigger a cc → s port at the end of the main pipeline. int-06 can choose either `build_cusip.py` or `normalize_securities.py` as the target. **Recommendation:** int-04 Phase 1 should patch `build_cusip.py` directly so int-06 can cleanly wire in whichever is most ergonomic without inheriting the scope-guard bug. |
+| int-06 (forward hooks) | Pending | Plan per `docs/findings/2026-04-18-block-ticker-backfill.md` §6 is to auto-trigger a cc → s port at the end of the main pipeline. int-06 can choose either `build_cusip.py` or `normalize_securities.py` as the target. **Recommendation:** int-04 Phase 1 should patch `build_cusip.py` directly so int-06 can cleanly wire in whichever is most ergonomic without inheriting the scope-guard bug. |
 
 The `enrich_holdings.py` subprocess hook at [scripts/build_cusip.py:441-449](../../scripts/build_cusip.py:441) and [scripts/normalize_securities.py:143-154](../../scripts/normalize_securities.py:143) already fire `enrich_holdings.py --fund-holdings` post-port. Pass C consumes whatever `securities.*` looks like at that moment, so an issuer_name miss in the build_cusip path would cascade into `fund_holdings_v2.issuer_name` too (int-05 scope). Another reason to patch build_cusip.
 
@@ -239,4 +239,4 @@ Approve Phase 1 as a one-line patch to `scripts/build_cusip.py:313-327` + a new 
 
 **Estimated Phase 1 effort:** 30 minutes code, 30 minutes test, 30 minutes staging verification (with authorization).
 
-**Next prompt:** `docs/prompts/int-04-p1.md` — Phase 1 implementation prompt for RC4 scope-guard patch + regression test.
+**Next prompt:** `archive/docs/prompts/int-04-p1.md` — Phase 1 implementation prompt for RC4 scope-guard patch + regression test.

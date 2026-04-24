@@ -163,7 +163,7 @@ DELETE and the INSERT loses rows that were committed to staging.
 
 - **mig-01-p0** (merged, commit `dd03780`) — Phase 0 findings +
   mirror-helper scaffolding.
-- **mig-01-p1** (open, prompt `60c8713` docs/prompts/mig-01-p1.md) —
+- **mig-01-p1** (open, prompt `60c8713` archive/docs/prompts/mig-01-p1.md) —
   atomic wrap + extract `_mirror_manifest_and_impacts` helper into
   `pipeline/manifest.py`. Critical Batch 3-A item; landing this closes
   the last structural window on the source-pipeline promote path.

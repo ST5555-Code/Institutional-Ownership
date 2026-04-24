@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-21 — branch `remediation/sec-03-p0` off main HEAD `c8cee2f`._
 
-_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-03`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-B. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11 MAJOR-5 (C-09); `docs/CODEX_REVIEW_2026_04_17.md` §§1 row 6. Upstream: sec-02-p0 §2 preliminary inventory._
+_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-03`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-B. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11 MAJOR-5 (C-09); `docs/findings/2026-04-17-codex-review.md` §§1 row 6. Upstream: sec-02-p0 §2 preliminary inventory._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. Deliverables: this document + Phase 1 fix recommendation.
 

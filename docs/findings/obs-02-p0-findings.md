@@ -1,7 +1,7 @@
 # obs-02-p0 — Phase 0 findings: ADV freshness + log discipline
 
 **Branch:** `remediation/obs-02-p0` off main HEAD (`9712a0e`).
-**Audit refs:** [SYSTEM_AUDIT §P-02](../SYSTEM_AUDIT_2026_04_17.md), [SYSTEM_ATLAS §3 P-02](../SYSTEM_ATLAS_2026_04_17.md), [CODEX_REVIEW P-02](../CODEX_REVIEW_2026_04_17.md), [REMEDIATION_PLAN obs-02](../REMEDIATION_PLAN.md), [REMEDIATION_CHECKLIST Batch 2-B](../REMEDIATION_CHECKLIST.md).
+**Audit refs:** [SYSTEM_AUDIT §P-02](../SYSTEM_AUDIT_2026_04_17.md), [SYSTEM_ATLAS §3 P-02](../SYSTEM_ATLAS_2026_04_17.md), [CODEX_REVIEW P-02](2026-04-17-codex-review.md), [REMEDIATION_PLAN obs-02](../REMEDIATION_PLAN.md), [REMEDIATION_CHECKLIST Batch 2-B](../REMEDIATION_CHECKLIST.md).
 **Investigation only — no code, no DB writes.**
 
 ## TL;DR

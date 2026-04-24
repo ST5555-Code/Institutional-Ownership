@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-22 — branch `mig-09-p0` off main HEAD `c7f5605`._
 
-_Tracker: `docs/REMEDIATION_PLAN.md` Theme 3 row `mig-09` (Batch 3-C). Sibling of `mig-10` (L0 control-plane, disjoint `accept.yaml` sections; parallel-eligible). Source design: `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` §9 / §14 (INF45 deferred extension)._
+_Tracker: `docs/REMEDIATION_PLAN.md` Theme 3 row `mig-09` (Batch 3-C). Sibling of `mig-10` (L0 control-plane, disjoint `accept.yaml` sections; parallel-eligible). Source design: `docs/findings/2026-04-19-block-schema-diff.md` §9 / §14 (INF45 deferred extension)._
 
 Phase 0 is investigation only. No code changes, no DB writes. READ-ONLY inspection of the validator, accept-list, and data-layer inventory.
 

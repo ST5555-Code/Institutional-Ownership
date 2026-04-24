@@ -2,7 +2,7 @@
 
 **Session:** `plan-review-2026-04-23` · **Mode:** Read-only critique. No plan edits — that is a separate session per the plan's §12 adoption flow.
 
-**Plan under review:** [`docs/plans/2026-04-23-phase-b-c-execution-plan.md`](../plans/2026-04-23-phase-b-c-execution-plan.md), DRAFT v2.
+**Plan under review:** [`archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md`](../plans/2026-04-23-phase-b-c-execution-plan.md), DRAFT v2.
 
 **Inputs cross-checked:**
 - [`docs/findings/comprehensive-audit-2026-04-23.md`](./comprehensive-audit-2026-04-23.md) (Phase A baseline; not yet on main).

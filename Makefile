@@ -192,7 +192,7 @@ status:
 
 # ---------------------------------------------------------------------------
 # Phase 2 pre-flight: schema parity between prod and staging L3 tables.
-# Exit non-zero halts Phase 2. See docs/BLOCK_SCHEMA_DIFF_FINDINGS.md §6.
+# Exit non-zero halts Phase 2. See docs/findings/2026-04-19-block-schema-diff.md §6.
 # ---------------------------------------------------------------------------
 schema-parity-check:
 	@echo "--- Schema parity: prod ↔ staging (L3) ---"

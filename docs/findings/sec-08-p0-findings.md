@@ -81,7 +81,7 @@ Under `scripts/retired/`, do **not** modify — kept for historical reference:
 
 ### §2.4 Non-code mentions (out of scope)
 
-- `docs/SYSTEM_ATLAS_2026_04_17.md`, `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md`, `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md`, `docs/findings/obs-02-p0-findings.md`, `README.md`, `config/schema_parity_accept.yaml`, `tests/pipeline/test_validate_schema_parity.py:304` — all documentation or reviewer-name references, not EDGAR UA usage.
+- `docs/SYSTEM_ATLAS_2026_04_17.md`, `docs/findings/2026-04-19-rewrite-build-shares-history.md`, `docs/findings/2026-04-19-block-schema-diff.md`, `docs/findings/obs-02-p0-findings.md`, `README.md`, `config/schema_parity_accept.yaml`, `tests/pipeline/test_validate_schema_parity.py:304` — all documentation or reviewer-name references, not EDGAR UA usage.
 
 ---
 

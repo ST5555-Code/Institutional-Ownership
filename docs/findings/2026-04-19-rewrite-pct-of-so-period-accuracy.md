@@ -111,7 +111,7 @@ value was pulled, not *when* that value was the accurate figure as of.
 ### 1.5 Sole writer
 
 Pass B is the only live writer of `holdings_v2.pct_of_float`.
-Confirmed via `REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md §3.2.1` and
+Confirmed via `2026-04-19-rewrite-build-shares-history.md §3.2.1` and
 re-verified in §3 below. Pass A (`enrich_holdings.py:141-164`) NULLs
 `pct_of_float` for unclassified cusips; Pass B repopulates it.
 
@@ -1067,7 +1067,7 @@ Commit `f956096` migrated every live read surface. Reconciliation:
 | estimate source | count | actual |
 |---|---:|---|
 | Phase 0 §3.6 "Total live across surfaces" | ~28 | **matched for backend SQL sites**; underestimated React + CSV labels |
-| Peer findings doc (`REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md` §3.2.1) "~30 live" | ~30 | same — both estimates counted backend-SQL consumers, not frontend-render consumers |
+| Peer findings doc (`2026-04-19-rewrite-build-shares-history.md` §3.2.1) "~30 live" | ~30 | same — both estimates counted backend-SQL consumers, not frontend-render consumers |
 
 **Delta explanation**: Phase 0's inventory counted `queries.py`
 SELECT sites and API endpoints (the *read surfaces that the backend
@@ -1100,7 +1100,7 @@ is larger because React consumers multiply.
 | `scripts/enrich_holdings.py` | module docstring has one backward-reference note `(renamed from pct_of_float in 008)` — intentional |
 | `notebooks/research.ipynb` | stale since Stage 5 dropped `holdings` table |
 | `web/datasette_config.yaml` | canned queries on dropped `holdings` table (already broken) |
-| `ROADMAP.md`, `NEXT_SESSION_CONTEXT.md`, `docs/*.md`, `docs/reports/*.md` | deferred to batched doc-update session per prompt constraints |
+| `ROADMAP.md`, `NEXT_SESSION_CONTEXT.md`, `docs/*.md`, `archive/docs/reports/*.md` | deferred to batched doc-update session per prompt constraints |
 
 ### 11.6 N-PORT compute-path rewrite — RESOLVED in Phase 1c
 
@@ -1167,11 +1167,11 @@ update session)." The following docs reference `pct_of_float` /
 | `docs/pipeline_inventory.md` | update enrichment writers list |
 | `docs/pipeline_violations.md` | update §5 / §9 references if any name the old column |
 | `docs/NEXT_SESSION_CONTEXT.md` | session wrap with commit list + block completion note |
-| `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md` | §3.2.1 amendment — the "elevate follow-up block" section is now complete; mark done with forward link |
-| `docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md` | historical report; leave in place |
-| `docs/CI_SMOKE_FAILURE_DIAGNOSIS_20260419.md` | single `pct_float` reference in snapshot-vs-actual narrative; rename to `pct_so` |
-| `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` / `REWRITE_BUILD_SUMMARIES_FINDINGS.md` | passing references only — rename in batched pass |
-| `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md` | single reference — rename in batched pass |
+| `docs/findings/2026-04-19-rewrite-build-shares-history.md` | §3.2.1 amendment — the "elevate follow-up block" section is now complete; mark done with forward link |
+| `archive/docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md` | historical report; leave in place |
+| `docs/findings/2026-04-19-ci-smoke-failure-diagnosis.md` | single `pct_float` reference in snapshot-vs-actual narrative; rename to `pct_so` |
+| `docs/findings/2026-04-19-rewrite-build-managers.md` / `2026-04-19-rewrite-build-summaries.md` | passing references only — rename in batched pass |
+| `docs/findings/2026-04-19-precheck-load-13f-liveness.md` | single reference — rename in batched pass |
 
 ### Additional cleanup items flagged during Phase 1b/1c
 
@@ -1825,10 +1825,10 @@ for next batched session)
   while context is fresh.
 - Flag INF38 as lower-priority but tracked.
 
-**docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md**
+**docs/findings/2026-04-19-rewrite-build-shares-history.md**
 - §3.2.1: mark the "elevate follow-up block" as DONE. Forward-link
   to this findings doc
-  (`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`).
+  (`docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`).
 
 **Decisions to document (already resolved but worth recording)**
 - §11.6 mixed-semantics resolution (N-PORT SOH ASOF) — **closed in
@@ -1879,7 +1879,7 @@ commit ea4ae99) as the reusable idiom for any L3 migration touching
 columns on an index-bearing table.
 Priority: medium (process hardening).
 Precedent: pct-of-so Phase 4 DependencyException (see
-REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.0).
+2026-04-19-rewrite-pct-of-so-period-accuracy.md §14.0).
 ```
 
 ### §14.10 addendum — INF42 + INF34 (added 2026-04-19, branch `fix/post-merge-regressions`)
@@ -1966,7 +1966,7 @@ Two known classes:
     only by hand via scripts/build_fixture.py)
 Priority: medium. Sibling to INF39/INF40/INF41.
 Precedent: pct-of-so post-merge regressions 2026-04-19 — see
-REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.10 addendum.
+2026-04-19-rewrite-pct-of-so-period-accuracy.md §14.10 addendum.
 ```
 
 ### §14.11 Phase 4b exit

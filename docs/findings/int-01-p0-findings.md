@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-21 — branch `remediation/int-01-p0` off main HEAD `cf508a8`._
 
-_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) Theme 1 row `int-01` (status "OPEN (Phase 0 done)" at prog-00); [docs/REMEDIATION_CHECKLIST.md](../REMEDIATION_CHECKLIST.md) Batch 1-A. Upstream finding: [docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) §4.1 (RC1)._
+_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) Theme 1 row `int-01` (status "OPEN (Phase 0 done)" at prog-00); [docs/REMEDIATION_CHECKLIST.md](../REMEDIATION_CHECKLIST.md) Batch 1-A. Upstream finding: [docs/findings/2026-04-18-block-securities-data-audit.md](../2026-04-18-block-securities-data-audit.md) §4.1 (RC1)._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. Deliverables: this document + Phase 1 scope.
 
@@ -58,7 +58,7 @@ Grep across `scripts/` surfaces three other `data[0]` occurrences:
 
 | File:line | Site | In scope? |
 |---|---|---|
-| [scripts/admin_bp.py:389-390](../../scripts/admin_bp.py:389) | Admin debug: `data[0]['data'][0].get('figi')` on a ticker→CUSIP probe | **No** — diagnostic UI, no persistent writes. Flagged by [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §7 addendum](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) and is not listed in this prompt's file allowlist. |
+| [scripts/admin_bp.py:389-390](../../scripts/admin_bp.py:389) | Admin debug: `data[0]['data'][0].get('figi')` on a ticker→CUSIP probe | **No** — diagnostic UI, no persistent writes. Flagged by [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §7 addendum](../2026-04-18-block-securities-data-audit.md) and is not listed in this prompt's file allowlist. |
 | [scripts/retired/build_cusip_legacy.py:152](../../scripts/retired/build_cusip_legacy.py:152) | Retired legacy builder | **No** — under `retired/`; superseded by `build_cusip.py`. |
 | [scripts/api_register.py:210-213](../../scripts/api_register.py:210), [scripts/export.py:35](../../scripts/export.py:35), [scripts/resolve_adv_ownership.py:723](../../scripts/resolve_adv_ownership.py:723) | Unrelated (API payload shape checks, Excel header derivation, CSV writer) | **No** — not OpenFIGI paths. |
 
@@ -68,7 +68,7 @@ Conclusion: both RC1 persistent call sites are patched; no third live persistent
 
 ## §2. Live row-count impact
 
-Methodology mirrors [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §1 Q1](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md): equity-like = `canonical_type IN ('COM','ETF','PFD','ADR')`; foreign-shape regex `^[A-Z]{2,4}[0-9][A-Z0-9]*$`; foreign-exchange list `GR,GF,GM,FF,GA,EU,EO,GY,GS`. Read-only queries against `data/13f.duckdb` on 2026-04-21.
+Methodology mirrors [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §1 Q1](../2026-04-18-block-securities-data-audit.md): equity-like = `canonical_type IN ('COM','ETF','PFD','ADR')`; foreign-shape regex `^[A-Z]{2,4}[0-9][A-Z0-9]*$`; foreign-exchange list `GR,GF,GM,FF,GA,EU,EO,GY,GS`. Read-only queries against `data/13f.duckdb` on 2026-04-21.
 
 ### §2.1 Baselines
 
@@ -77,7 +77,7 @@ Methodology mirrors [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §1 Q1](../BLOCK_SECUR
 | `securities` | **430,149** | 21,142 | 429,717 | 16,291 |
 | `cusip_classifications` | **430,149** | 16,852 | 429,717 | 16,285 |
 
-Universe expanded from 132,618 → 430,149 per [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §7 addendum](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) (accepted 2026-04-18). `securities` and `cc` row counts are now aligned at 430,149 after the CUSIP v1.4 prod promotion ([`8a41c48`](../../commit/8a41c48)).
+Universe expanded from 132,618 → 430,149 per [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §7 addendum](../2026-04-18-block-securities-data-audit.md) (accepted 2026-04-18). `securities` and `cc` row counts are now aligned at 430,149 after the CUSIP v1.4 prod promotion ([`8a41c48`](../../commit/8a41c48)).
 
 ### §2.2 Foreign-exchange tickers on equity CUSIPs (current)
 
@@ -155,7 +155,7 @@ Exchange breakdown of the 216: `GR`=94, `EO`=83, `EU`=22, `GF`=13, `GM`=2, `GS`=
 
 ## §3. Whitelist audit — four US exchCodes are missing
 
-The proposed whitelist in [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §4.1](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) was 11 codes: `US, UN, UW, UQ, UR, UA, UF, UP, UV, UD, UX`. Shipped verbatim in [scripts/pipeline/cusip_classifier.py:46-48](../../scripts/pipeline/cusip_classifier.py:46).
+The proposed whitelist in [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §4.1](../2026-04-18-block-securities-data-audit.md) was 11 codes: `US, UN, UW, UQ, UR, UA, UF, UP, UV, UD, UX`. Shipped verbatim in [scripts/pipeline/cusip_classifier.py:46-48](../../scripts/pipeline/cusip_classifier.py:46).
 
 Scanning `_cache_openfigi` for any 2-char `U?` exchCode not in the whitelist surfaces four additional codes that have appeared in live OpenFIGI responses:
 
@@ -265,7 +265,7 @@ Plus a pure-foreign CUSIP regression: `data = [{'exchCode':'GR',...}]` → falls
 
 Run against staging:
 
-- `cc` equity-like foreign-exchange count drops from 216 → **< 50** (target matches the `<50` threshold articulated in [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §5](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) for ADR + legitimate-foreign-only residual).
+- `cc` equity-like foreign-exchange count drops from 216 → **< 50** (target matches the `<50` threshold articulated in [BLOCK_SECURITIES_DATA_AUDIT_FINDINGS §5](../2026-04-18-block-securities-data-audit.md) for ADR + legitimate-foreign-only residual).
 - `securities` equity-like foreign-exchange count drops from 276 → **< 50** (by propagation).
 - `s ↔ cc` ticker divergence on the affected set: 0 (confirmed today; must stay 0 post-sweep).
 - Zero new `openfigi_status='error'` rows attributable to the re-queue.

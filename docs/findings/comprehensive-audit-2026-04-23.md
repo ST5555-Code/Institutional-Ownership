@@ -36,34 +36,34 @@
 | `PHASE3_PROMPT.md` | 92 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | prompt | Next Session Prompt — 13F Ownership | 8 |
 | `PHASE4_PROMPT.md` | 332 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | prompt | > **STATUS: SUPERSEDED — retained for history only (2026-04-20).** | 6 |
 | `PHASE4_STATE.md` | 134 | 2026-04-10 | 950ec7e Add staging workflow framework: sync, diff, promot | prompt | Phase 4 State — Facts Only | 3 |
-| `REACT_MIGRATION.md` | 151 | 2026-04-13 | 71269cb feat: retire vanilla-JS frontend — web/react-src/, | unknown | React Migration Plan | 14 |
+| `archive/docs/REACT_MIGRATION.md` | 151 | 2026-04-13 | 71269cb feat: retire vanilla-JS frontend — web/react-src/, | unknown | React Migration Plan | 14 |
 | `README.md` | 201 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | tracker | 13-F Institutional Ownership Database | 13 |
-| `README_deploy.md` | 81 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | tracker | Deploying 13F Ownership Research to Render.com | 13 |
+| `docs/deployment.md` | 81 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | tracker | Deploying 13F Ownership Research to Render.com | 13 |
 | `ROADMAP.md` | 1166 | 2026-04-23 | aab73d2 hygiene-ticket-numbering: codify retire-forever ru | plan | 13F Institutional Ownership Database — Roadmap | 33 |
 | `data/reference/PRE_PHASE4_STATUS.md` | 106 | 2026-04-09 | ee5e7cb Pre-Phase 4 complete: Items 2-9 done, all validati | prompt | Pre-Phase 4 Item Status | 1 |
 | `data/reference/ROLLUP_COVERAGE_REPORT.md` | 148 | 2026-04-08 | 9d34d34 Update ROADMAP + ROLLUP_COVERAGE_REPORT with final | unknown | Entity Rollup Coverage Report | 0 |
-| `docs/13DG_ENTITY_LINKAGE.md` | 183 | 2026-04-16 | f40ffa2 docs: 13D/G entity linkage — new 13DG_ENTITY_LINKA | unknown | 13D/G Entity Linkage | 4 |
-| `docs/BLOCK_MARKET_DATA_WRITER_AUDIT_FINDINGS.md` | 166 | 2026-04-19 | eb9cf2d docs(audit): market_data writer audit — phase 0 fi | findings | BLOCK-MARKET-DATA-WRITER-AUDIT — Phase 0 Findings | 3 |
-| `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` | 905 | 2026-04-19 | 4ec0862 schema-diff Phase 1c: restore entity_identifiers_s | findings | BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE (INF39) — Phase 0 Findings | 9 |
-| `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md` | 467 | 2026-04-18 | f583524 docs(block-securities-data-audit): addendum — 430K | findings | BLOCK-SECURITIES-DATA-AUDIT — Phase 0 Findings | 11 |
-| `docs/BLOCK_TICKER_BACKFILL_FINDINGS.md` | 358 | 2026-04-18 | 168927e docs(block-ticker-backfill): addendum — cusip step | findings | BLOCK-TICKER-BACKFILL — Findings & Fix Plan | 7 |
-| `docs/CI_SMOKE_FAILURE_DIAGNOSIS_20260419.md` | 124 | 2026-04-19 | 74df368 docs(ci): smoke workflow failure diagnosis — snaps | unknown | CI smoke workflow failure — diagnosis (2026-04-19) | 1 |
+| `docs/findings/2026-04-16-13dg-entity-linkage.md` | 183 | 2026-04-16 | f40ffa2 docs: 13D/G entity linkage — new 13DG_ENTITY_LINKA | unknown | 13D/G Entity Linkage | 4 |
+| `docs/findings/2026-04-19-block-market-data-writer-audit.md` | 166 | 2026-04-19 | eb9cf2d docs(audit): market_data writer audit — phase 0 fi | findings | BLOCK-MARKET-DATA-WRITER-AUDIT — Phase 0 Findings | 3 |
+| `docs/findings/2026-04-19-block-schema-diff.md` | 905 | 2026-04-19 | 4ec0862 schema-diff Phase 1c: restore entity_identifiers_s | findings | BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE (INF39) — Phase 0 Findings | 9 |
+| `docs/findings/2026-04-18-block-securities-data-audit.md` | 467 | 2026-04-18 | f583524 docs(block-securities-data-audit): addendum — 430K | findings | BLOCK-SECURITIES-DATA-AUDIT — Phase 0 Findings | 11 |
+| `docs/findings/2026-04-18-block-ticker-backfill.md` | 358 | 2026-04-18 | 168927e docs(block-ticker-backfill): addendum — cusip step | findings | BLOCK-TICKER-BACKFILL — Findings & Fix Plan | 7 |
+| `docs/findings/2026-04-19-ci-smoke-failure-diagnosis.md` | 124 | 2026-04-19 | 74df368 docs(ci): smoke workflow failure diagnosis — snaps | unknown | CI smoke workflow failure — diagnosis (2026-04-19) | 1 |
 | `docs/CLASSIFICATION_METHODOLOGY.md` | 59 | 2026-04-20 | 0bfa7fd remediation/ops-batch-5A-p0: doc hygiene sweep | unknown | Data Classification Methodology | 9 |
-| `docs/CODEX_REVIEW_2026_04_17.md` | 201 | 2026-04-17 | 838a1b3 docs: system audit 2026-04-17 — atlas + codex revi | unknown | Codex Review — 2026-04-17 | 9 |
+| `docs/findings/2026-04-17-codex-review.md` | 201 | 2026-04-17 | 838a1b3 docs: system audit 2026-04-17 — atlas + codex revi | unknown | Codex Review — 2026-04-17 | 9 |
 | `docs/DEFERRED_FOLLOWUPS.md` | 82 | 2026-04-23 | 12af4be int-23-impl: downgrade-refusal invariant on _promo | unknown | Deferred Followups — Tracking Index | 13 |
 | `docs/NEXT_SESSION_CONTEXT.md` | 261 | 2026-04-23 | f3c7183 inf40-fix: preserve constraints in sync_staging.py | session-guide | 13F Ownership — Next Session Context | 17 |
 | `docs/POST_MERGE_REGRESSIONS_DIAGNOSTIC.md` | 250 | 2026-04-19 | 08f9a32 diag/post-merge-regressions: three-issue diagnosti | unknown | Post-merge regressions — diagnostic findings | 0 |
-| `docs/PRECHECK_LOAD_13F_LIVENESS_20260419.md` | 140 | 2026-04-19 | cdf2cae docs(precheck): load_13f.py liveness audit — LIVE | unknown | Precheck2 — `load_13f.py` liveness audit | 4 |
+| `docs/findings/2026-04-19-precheck-load-13f-liveness.md` | 140 | 2026-04-19 | cdf2cae docs(precheck): load_13f.py liveness audit — LIVE | unknown | Precheck2 — `load_13f.py` liveness audit | 4 |
 | `docs/PROCESS_RULES.md` | 124 | 2026-04-09 | ee5e7cb Pre-Phase 4 complete: Items 2-9 done, all validati | tracker | Process Rules — Large-Data Scripts | 13 |
 | `docs/REMEDIATION_CHECKLIST.md` | 156 | 2026-04-22 | 7c49471 conv-11: REMEDIATION PROGRAM COMPLETE — 104 PRs, ~ | tracker | Remediation Program — Checklist | 50 |
 | `docs/REMEDIATION_PLAN.md` | 614 | 2026-04-23 | fec20d4 hygiene-file-leak-fix: mitigate file-leak-to-main  | plan | Remediation Program — Master Plan | 69 |
 | `docs/REMEDIATION_SESSION_LOG.md` | 1845 | 2026-04-22 | 7c49471 conv-11: REMEDIATION PROGRAM COMPLETE — 104 PRs, ~ | session-guide | Remediation Program — Session Log | 1 |
 | `docs/REVIEW_CHECKLIST.md` | 139 | 2026-04-23 | aab73d2 hygiene-ticket-numbering: codify retire-forever ru | tracker | PR Review Checklist | 4 |
-| `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` | 541 | 2026-04-19 | bf7bfe6 docs(rewrite): build_managers — phase 0 findings a | findings | REWRITE build_managers.py — Phase 0 Findings | 6 |
-| `docs/REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md` | 636 | 2026-04-19 | 42f5d6e doc-sync: REWRITE_BUILD_SHARES_HISTORY_FINDINGS.md | findings | REWRITE build_shares_history.py — Phase 0 Findings | 3 |
-| `docs/REWRITE_BUILD_SUMMARIES_FINDINGS.md` | 330 | 2026-04-19 | 6a88816 docs(rewrite): build_summaries — phase 0 findings  | findings | REWRITE build_summaries.py — Phase 0 Findings | 2 |
-| `docs/REWRITE_LOAD_13F_FINDINGS.md` | 554 | 2026-04-19 | 0a7ae35 docs(rewrite): load_13f phase 0 addendum — other_m | findings | REWRITE load_13f.py — Phase 0 Findings | 4 |
-| `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` | 2210 | 2026-04-19 | dc2e670 schema-diff Phase 1: Phase 2 pre-flight wrapper +  | findings | BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY — Phase 0 Findings | 6 |
+| `docs/findings/2026-04-19-rewrite-build-managers.md` | 541 | 2026-04-19 | bf7bfe6 docs(rewrite): build_managers — phase 0 findings a | findings | REWRITE build_managers.py — Phase 0 Findings | 6 |
+| `docs/findings/2026-04-19-rewrite-build-shares-history.md` | 636 | 2026-04-19 | 42f5d6e doc-sync: 2026-04-19-rewrite-build-shares-history.md | findings | REWRITE build_shares_history.py — Phase 0 Findings | 3 |
+| `docs/findings/2026-04-19-rewrite-build-summaries.md` | 330 | 2026-04-19 | 6a88816 docs(rewrite): build_summaries — phase 0 findings  | findings | REWRITE build_summaries.py — Phase 0 Findings | 2 |
+| `docs/findings/2026-04-19-rewrite-load-13f.md` | 554 | 2026-04-19 | 0a7ae35 docs(rewrite): load_13f phase 0 addendum — other_m | findings | REWRITE load_13f.py — Phase 0 Findings | 4 |
+| `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` | 2210 | 2026-04-19 | dc2e670 schema-diff Phase 1: Phase 2 pre-flight wrapper +  | findings | BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY — Phase 0 Findings | 6 |
 | `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md` | 444 | 2026-04-19 | 4aea6d1 schema-diff Phase 1: post-rebuild verification — b | prompt | INF39 Phase 1 — Staging Rebuild Execution Log | 3 |
 | `docs/SESSION_GUIDELINES.md` | 135 | 2026-04-23 | 28d588f hygiene-tracker-sync: codify cross-tracker update  | session-guide | Session Guidelines — Worktree Hygiene | 2 |
 | `docs/SESSION_NAMING.md` | 99 | 2026-04-23 | de5b3fd hygiene-roadmap-conflict-fix: per-session closure  | session-guide | Session Naming Convention | 3 |
@@ -74,7 +74,7 @@
 | `docs/api_architecture.md` | 150 | 2026-04-21 | 1a47a0e remediation/ops-batch-5B: write_path_risk_map + ap | architecture | API Architecture | 6 |
 | `docs/canonical_ddl.md` | 485 | 2026-04-22 | 60d4c30 mig-06: migration 014 — surrogate row_id on v2 fac | unknown | Canonical DDL Audit — L3 Drift Report | 20 |
 | `docs/ci_fixture_design.md` | 210 | 2026-04-13 | 7f62b7d docs: Phase 0-B1 — CI fixture DB design decision | unknown | CI Fixture DB Design (Phase 0-B1) | 6 |
-| `docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md` | 551 | 2026-04-23 | c2e6efd doc-hygiene-w1: clear 10 stale sections across 5 d | closure | Doc Update Proposal — 2026-04-18 — **RESOLVED** | 0 |
+| `archive/docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md` | 551 | 2026-04-23 | c2e6efd doc-hygiene-w1: clear 10 stale sections across 5 d | closure | Doc Update Proposal — 2026-04-18 — **RESOLVED** | 0 |
 | `docs/closures/README.md` | 65 | 2026-04-23 | de5b3fd hygiene-roadmap-conflict-fix: per-session closure  | closure | Per-session closure entries | 14 |
 | `docs/data_layers.md` | 963 | 2026-04-22 | 4d9ee08 p2fu-04: document ADV ownership boundary + close P | unknown | Data Layers — Table Classification | 27 |
 | `docs/data_sources.md` | 204 | 2026-04-23 | c2e6efd doc-hygiene-w1: clear 10 stale sections across 5 d | unknown | Data Sources | 7 |
@@ -128,44 +128,44 @@
 | `docs/findings/sec-08-p0-findings.md` | 256 | 2026-04-21 | 47266ad sec-08-p0: central EDGAR identity config — Phase 0 | findings | sec-08-p0 — Phase 0 findings: central EDGAR identity config | 1 |
 | `docs/pipeline_inventory.md` | 234 | 2026-04-23 | 94e3350 build-fund-classes-rewrite: retrofit §1/§5/§9 + fu | unknown | Pipeline Inventory — DB-Writing Script Audit | 17 |
 | `docs/pipeline_violations.md` | 625 | 2026-04-23 | 94e3350 build-fund-classes-rewrite: retrofit §1/§5/§9 + fu | unknown | Pipeline Violations — Per-Script PROCESS_RULES Detail | 21 |
-| `docs/plans/20260412_architecture_review_revision.md` | 262 | 2026-04-12 | 657c885 docs: ARCHITECTURE_REVIEW.md — revision pass after | architecture | ARCHITECTURE_REVIEW.md — revision pass | 1 |
-| `docs/prompts/int-01-p0.md` | 64 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | int-01-p0 — Phase 0 investigation: RC1 OpenFIGI foreign-exchange ticker filter | 1 |
-| `docs/prompts/int-01-p1.md` | 171 | 2026-04-21 | f0d5a8c docs(int-01): add Phase 1 implementation prompt fo | unknown | int-01-p1 — Phase 1 implementation: RC1 whitelist patch + residual CUSIP re-queu | 0 |
-| `docs/prompts/int-04-p0.md` | 70 | 2026-04-21 | 8a7afb2 docs(int-04): add Phase 0 investigation prompt for | unknown | int-04-p0 — Phase 0 investigation: RC4 issuer_name propagation scope guard | 0 |
-| `docs/prompts/int-04-p1.md` | 57 | 2026-04-21 | 271d63e docs(int-04): add Phase 1 implementation prompt fo | unknown | int-04-p1 — Phase 1 implementation: RC4 issuer_name propagation in build_cusip.p | 1 |
-| `docs/prompts/mig-01-p0.md` | 69 | 2026-04-21 | 9878a3a docs(mig-01): add Phase 0 investigation prompt for | unknown | mig-01-p0 — Phase 0 investigation: atomic promotes + manifest mirror helper | 0 |
-| `docs/prompts/mig-01-p1.md` | 96 | 2026-04-21 | 60c8713 docs(mig-01): add Phase 1 implementation prompt fo | unknown | mig-01-p1 — Phase 1 implementation: atomic promotes + manifest mirror extraction | 1 |
-| `docs/prompts/mig-04-p0.md` | 62 | 2026-04-21 | 79aba16 docs(mig-04): add Phase 0 investigation prompt for | unknown | mig-04-p0 — Phase 0 investigation: schema_versions stamp hole | 1 |
-| `docs/prompts/mig-04-p1.md` | 78 | 2026-04-21 | dc14194 docs(mig-04): add Phase 1 implementation prompt fo | unknown | mig-04-p1 — Phase 1 implementation: schema_versions stamp backfill | 0 |
-| `docs/prompts/obs-01-p0.md` | 79 | 2026-04-21 | 9812ef5 docs(obs-01): add Phase 0 investigation prompt for | unknown | obs-01-p0 — Phase 0 investigation: N-CEN + ADV manifest registration | 0 |
-| `docs/prompts/obs-01-p1.md` | 99 | 2026-04-21 | 1b2e7ac docs(obs-01): add Phase 1 implementation prompt fo | unknown | obs-01-p1 — Phase 1 implementation: N-CEN + ADV manifest registration | 1 |
-| `docs/prompts/obs-02-p0.md` | 54 | 2026-04-21 | 9712a0e docs(obs-02): add Phase 0 investigation prompt for | unknown | obs-02-p0 — Phase 0 investigation: ADV freshness + log discipline | 0 |
-| `docs/prompts/obs-02-p1.md` | 52 | 2026-04-21 | 8de6085 docs(obs-02): add Phase 1 implementation prompt fo | unknown | obs-02-p1 — Phase 1 implementation: ADV freshness + code smell fixes | 0 |
-| `docs/prompts/obs-03-p0.md` | 60 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | obs-03-p0 — Phase 0 investigation: market `impact_id` allocation hardening | 1 |
-| `docs/prompts/obs-03-p1.md` | 152 | 2026-04-20 | 7004bbc docs(obs-03): add Phase 1 implementation prompt wi | unknown | obs-03-p1 — Phase 1 implementation: centralized impact_id allocator | 2 |
-| `docs/prompts/ops-batch-5A-p0.md` | 90 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | ops-batch-5A-p0 — Phase 0 investigation: doc-hygiene sweep (Batch 5-A subset) | 1 |
-| `docs/prompts/ops-batch-5B.md` | 72 | 2026-04-21 | 2893f21 docs(ops): add Batch 5-B prompt for doc updates | unknown | ops-batch-5B — Batch 5-B doc updates: write_path_risk_map + api_architecture + M | 1 |
-| `docs/prompts/sec-01-p0.md` | 63 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | sec-01-p0 — Phase 0 investigation: admin token localStorage → server-side sessio | 2 |
-| `docs/prompts/sec-01-p1.md` | 152 | 2026-04-20 | 4dd676b docs(sec-01): add Phase 1 implementation prompt wi | unknown | sec-01-p1 — Phase 1 implementation: admin token localStorage → server-side sessi | 0 |
-| `docs/prompts/sec-02-p0.md` | 75 | 2026-04-20 | 4724a1b docs(sec-02): add Phase 0 investigation prompt for | unknown | sec-02-p0 — Phase 0 investigation: admin `/run_script` TOCTOU race | 0 |
-| `docs/prompts/sec-02-p1.md` | 127 | 2026-04-21 | 020c517 docs(sec-02): add Phase 1 implementation prompt fo | unknown | sec-02-p1 — Phase 1 implementation: admin `/run_script` TOCTOU race fix | 0 |
-| `docs/prompts/sec-03-p0.md` | 75 | 2026-04-21 | c8cee2f docs(sec-03): add Phase 0 investigation prompt for | unknown | sec-03-p0 — Phase 0 investigation: admin endpoint write-surface audit | 0 |
-| `docs/prompts/sec-03-p1.md` | 107 | 2026-04-21 | 13dd111 docs(sec-03): add Phase 1 implementation prompt fo | unknown | sec-03-p1 — Phase 1 implementation: /add_ticker guard + /entity_override IOExcep | 0 |
-| `docs/prompts/sec-04-p0.md` | 72 | 2026-04-21 | d0fba1c docs(sec-04): add Phase 0 investigation prompt for | unknown | sec-04-p0 — Phase 0 investigation: validators writing to prod | 0 |
-| `docs/prompts/sec-04-p1.md` | 69 | 2026-04-21 | f6447ee docs(sec-04): add Phase 1 implementation prompt fo | unknown | sec-04-p1 — Phase 1 implementation: validator read-only fixes | 0 |
-| `docs/proposals/tier-4-join-pattern-proposal.md` | 413 | 2026-04-23 | e1b11e1 tier-4-join-pattern-proposal: design doc for int-0 | proposal | Tier 4 Join Pattern Proposal | 6 |
-| `docs/reports/block3_phase2_rerun_20260418_193735.md` | 183 | 2026-04-18 | a643b65 chore(block-3): phase 2 rerun against post-Audit + | report | BLOCK-3 Phase 2 Rerun — Report | 1 |
-| `docs/reports/block3_phase4_prod_apply_20260418_201319.md` | 120 | 2026-04-18 | 2405df1 chore(block-3): phase 4 prod apply — enrich_holdin | report | BLOCK-3 Phase 4 Prod Apply — Report | 1 |
-| `docs/reports/block_sector_coverage_closeout_20260419_052804.md` | 277 | 2026-04-19 | ccd9274 docs(block-sector-coverage): closeout + upsert-mod | report | BLOCK-SECTOR-COVERAGE-BACKGROUND — closeout | 3 |
-| `docs/reports/block_securities_audit_phase2_20260418_105033.md` | 344 | 2026-04-18 | 82dadb7 chore(block-securities-data-audit): phase 2 re-see | report | BLOCK-SECURITIES-DATA-AUDIT — Phase 2 Re-Seed Report | 1 |
-| `docs/reports/block_securities_audit_phase2b_20260418_155554.md` | 299 | 2026-04-18 | 8742c0c chore(block-securities-data-audit): phase 2b Path  | report | BLOCK-SECURITIES-DATA-AUDIT — Phase 2b Path A + Drain Report | 1 |
-| `docs/reports/block_ticker_backfill_closeout_20260418_205753.md` | 141 | 2026-04-18 | 0bb56d3 docs(block-ticker-backfill): closeout report — hoo | report | BLOCK-TICKER-BACKFILL — Close-out Report | 1 |
-| `docs/reports/rewrite_build_managers_phase2_20260419_082630.md` | 459 | 2026-04-19 | b50868a docs(rewrite): build_managers Risk 1 pre-Phase-4 i | report | REWRITE build_managers.py — Phase 2 staging validation | 1 |
-| `docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md` | 214 | 2026-04-19 | db7de66 chore(rewrite): build_shares_history phase 2 stagi | report | REWRITE build_shares_history.py — Phase 2 Staging Validation Report | 1 |
-| `docs/reports/rewrite_load_13f_phase2_20260419_071500.md` | 185 | 2026-04-19 | dd1d382 chore(rewrite): load_13f phase 2 staging validatio | report | REWRITE load_13f.py — Phase 2 staging validation | 1 |
-| `docs/superpowers/plans/2026-04-01-flask-web-app.md` | 148 | 2026-04-01 | 35cbe01 Flask web app UI fixes - company name, autocomplet | unknown | Flask Web Application — Implementation Plan | 0 |
-| `docs/superpowers/specs/2026-04-06-peer-rotation-plan.md` | 244 | 2026-04-13 | baaf443 docs: add superpowers design specs (peer-rotation  | plan | Peer Rotation Tab — Implementation Plan | 0 |
-| `docs/superpowers/specs/2026-04-06-sector-rotation-redesign.md` | 220 | 2026-04-13 | baaf443 docs: add superpowers design specs (peer-rotation  | unknown | Sector Rotation Tab — Redesign Spec | 0 |
+| `archive/docs/plans/20260412_architecture_review_revision.md` | 262 | 2026-04-12 | 657c885 docs: ARCHITECTURE_REVIEW.md — revision pass after | architecture | ARCHITECTURE_REVIEW.md — revision pass | 1 |
+| `archive/docs/prompts/int-01-p0.md` | 64 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | int-01-p0 — Phase 0 investigation: RC1 OpenFIGI foreign-exchange ticker filter | 1 |
+| `archive/docs/prompts/int-01-p1.md` | 171 | 2026-04-21 | f0d5a8c docs(int-01): add Phase 1 implementation prompt fo | unknown | int-01-p1 — Phase 1 implementation: RC1 whitelist patch + residual CUSIP re-queu | 0 |
+| `archive/docs/prompts/int-04-p0.md` | 70 | 2026-04-21 | 8a7afb2 docs(int-04): add Phase 0 investigation prompt for | unknown | int-04-p0 — Phase 0 investigation: RC4 issuer_name propagation scope guard | 0 |
+| `archive/docs/prompts/int-04-p1.md` | 57 | 2026-04-21 | 271d63e docs(int-04): add Phase 1 implementation prompt fo | unknown | int-04-p1 — Phase 1 implementation: RC4 issuer_name propagation in build_cusip.p | 1 |
+| `archive/docs/prompts/mig-01-p0.md` | 69 | 2026-04-21 | 9878a3a docs(mig-01): add Phase 0 investigation prompt for | unknown | mig-01-p0 — Phase 0 investigation: atomic promotes + manifest mirror helper | 0 |
+| `archive/docs/prompts/mig-01-p1.md` | 96 | 2026-04-21 | 60c8713 docs(mig-01): add Phase 1 implementation prompt fo | unknown | mig-01-p1 — Phase 1 implementation: atomic promotes + manifest mirror extraction | 1 |
+| `archive/docs/prompts/mig-04-p0.md` | 62 | 2026-04-21 | 79aba16 docs(mig-04): add Phase 0 investigation prompt for | unknown | mig-04-p0 — Phase 0 investigation: schema_versions stamp hole | 1 |
+| `archive/docs/prompts/mig-04-p1.md` | 78 | 2026-04-21 | dc14194 docs(mig-04): add Phase 1 implementation prompt fo | unknown | mig-04-p1 — Phase 1 implementation: schema_versions stamp backfill | 0 |
+| `archive/docs/prompts/obs-01-p0.md` | 79 | 2026-04-21 | 9812ef5 docs(obs-01): add Phase 0 investigation prompt for | unknown | obs-01-p0 — Phase 0 investigation: N-CEN + ADV manifest registration | 0 |
+| `archive/docs/prompts/obs-01-p1.md` | 99 | 2026-04-21 | 1b2e7ac docs(obs-01): add Phase 1 implementation prompt fo | unknown | obs-01-p1 — Phase 1 implementation: N-CEN + ADV manifest registration | 1 |
+| `archive/docs/prompts/obs-02-p0.md` | 54 | 2026-04-21 | 9712a0e docs(obs-02): add Phase 0 investigation prompt for | unknown | obs-02-p0 — Phase 0 investigation: ADV freshness + log discipline | 0 |
+| `archive/docs/prompts/obs-02-p1.md` | 52 | 2026-04-21 | 8de6085 docs(obs-02): add Phase 1 implementation prompt fo | unknown | obs-02-p1 — Phase 1 implementation: ADV freshness + code smell fixes | 0 |
+| `archive/docs/prompts/obs-03-p0.md` | 60 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | obs-03-p0 — Phase 0 investigation: market `impact_id` allocation hardening | 1 |
+| `archive/docs/prompts/obs-03-p1.md` | 152 | 2026-04-20 | 7004bbc docs(obs-03): add Phase 1 implementation prompt wi | unknown | obs-03-p1 — Phase 1 implementation: centralized impact_id allocator | 2 |
+| `archive/docs/prompts/ops-batch-5A-p0.md` | 90 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | ops-batch-5A-p0 — Phase 0 investigation: doc-hygiene sweep (Batch 5-A subset) | 1 |
+| `archive/docs/prompts/ops-batch-5B.md` | 72 | 2026-04-21 | 2893f21 docs(ops): add Batch 5-B prompt for doc updates | unknown | ops-batch-5B — Batch 5-B doc updates: write_path_risk_map + api_architecture + M | 1 |
+| `archive/docs/prompts/sec-01-p0.md` | 63 | 2026-04-20 | 1da7527 prog-00: remediation program consolidation — maste | unknown | sec-01-p0 — Phase 0 investigation: admin token localStorage → server-side sessio | 2 |
+| `archive/docs/prompts/sec-01-p1.md` | 152 | 2026-04-20 | 4dd676b docs(sec-01): add Phase 1 implementation prompt wi | unknown | sec-01-p1 — Phase 1 implementation: admin token localStorage → server-side sessi | 0 |
+| `archive/docs/prompts/sec-02-p0.md` | 75 | 2026-04-20 | 4724a1b docs(sec-02): add Phase 0 investigation prompt for | unknown | sec-02-p0 — Phase 0 investigation: admin `/run_script` TOCTOU race | 0 |
+| `archive/docs/prompts/sec-02-p1.md` | 127 | 2026-04-21 | 020c517 docs(sec-02): add Phase 1 implementation prompt fo | unknown | sec-02-p1 — Phase 1 implementation: admin `/run_script` TOCTOU race fix | 0 |
+| `archive/docs/prompts/sec-03-p0.md` | 75 | 2026-04-21 | c8cee2f docs(sec-03): add Phase 0 investigation prompt for | unknown | sec-03-p0 — Phase 0 investigation: admin endpoint write-surface audit | 0 |
+| `archive/docs/prompts/sec-03-p1.md` | 107 | 2026-04-21 | 13dd111 docs(sec-03): add Phase 1 implementation prompt fo | unknown | sec-03-p1 — Phase 1 implementation: /add_ticker guard + /entity_override IOExcep | 0 |
+| `archive/docs/prompts/sec-04-p0.md` | 72 | 2026-04-21 | d0fba1c docs(sec-04): add Phase 0 investigation prompt for | unknown | sec-04-p0 — Phase 0 investigation: validators writing to prod | 0 |
+| `archive/docs/prompts/sec-04-p1.md` | 69 | 2026-04-21 | f6447ee docs(sec-04): add Phase 1 implementation prompt fo | unknown | sec-04-p1 — Phase 1 implementation: validator read-only fixes | 0 |
+| `archive/docs/proposals/tier-4-join-pattern-proposal.md` | 413 | 2026-04-23 | e1b11e1 tier-4-join-pattern-proposal: design doc for int-0 | proposal | Tier 4 Join Pattern Proposal | 6 |
+| `archive/docs/reports/block3_phase2_rerun_20260418_193735.md` | 183 | 2026-04-18 | a643b65 chore(block-3): phase 2 rerun against post-Audit + | report | BLOCK-3 Phase 2 Rerun — Report | 1 |
+| `archive/docs/reports/block3_phase4_prod_apply_20260418_201319.md` | 120 | 2026-04-18 | 2405df1 chore(block-3): phase 4 prod apply — enrich_holdin | report | BLOCK-3 Phase 4 Prod Apply — Report | 1 |
+| `archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md` | 277 | 2026-04-19 | ccd9274 docs(block-sector-coverage): closeout + upsert-mod | report | BLOCK-SECTOR-COVERAGE-BACKGROUND — closeout | 3 |
+| `archive/docs/reports/block_securities_audit_phase2_20260418_105033.md` | 344 | 2026-04-18 | 82dadb7 chore(block-securities-data-audit): phase 2 re-see | report | BLOCK-SECURITIES-DATA-AUDIT — Phase 2 Re-Seed Report | 1 |
+| `archive/docs/reports/block_securities_audit_phase2b_20260418_155554.md` | 299 | 2026-04-18 | 8742c0c chore(block-securities-data-audit): phase 2b Path  | report | BLOCK-SECURITIES-DATA-AUDIT — Phase 2b Path A + Drain Report | 1 |
+| `archive/docs/reports/block_ticker_backfill_closeout_20260418_205753.md` | 141 | 2026-04-18 | 0bb56d3 docs(block-ticker-backfill): closeout report — hoo | report | BLOCK-TICKER-BACKFILL — Close-out Report | 1 |
+| `archive/docs/reports/rewrite_build_managers_phase2_20260419_082630.md` | 459 | 2026-04-19 | b50868a docs(rewrite): build_managers Risk 1 pre-Phase-4 i | report | REWRITE build_managers.py — Phase 2 staging validation | 1 |
+| `archive/docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md` | 214 | 2026-04-19 | db7de66 chore(rewrite): build_shares_history phase 2 stagi | report | REWRITE build_shares_history.py — Phase 2 Staging Validation Report | 1 |
+| `archive/docs/reports/rewrite_load_13f_phase2_20260419_071500.md` | 185 | 2026-04-19 | dd1d382 chore(rewrite): load_13f phase 2 staging validatio | report | REWRITE load_13f.py — Phase 2 staging validation | 1 |
+| `archive/docs/superpowers/plans/2026-04-01-flask-web-app.md` | 148 | 2026-04-01 | 35cbe01 Flask web app UI fixes - company name, autocomplet | unknown | Flask Web Application — Implementation Plan | 0 |
+| `archive/docs/superpowers/specs/2026-04-06-peer-rotation-plan.md` | 244 | 2026-04-13 | baaf443 docs: add superpowers design specs (peer-rotation  | plan | Peer Rotation Tab — Implementation Plan | 0 |
+| `archive/docs/superpowers/specs/2026-04-06-sector-rotation-redesign.md` | 220 | 2026-04-13 | baaf443 docs: add superpowers design specs (peer-rotation  | unknown | Sector Rotation Tab — Redesign Spec | 0 |
 | `docs/write_path_risk_map.md` | 236 | 2026-04-21 | 1a47a0e remediation/ops-batch-5B: write_path_risk_map + ap | unknown | Write-Path Risk Map | 11 |
 | `web/README_deploy.md` | 119 | 2026-04-01 | 4105689 N-PORT pipeline built and tested, queries 1-3 prod | tracker | Deploying 13-F Ownership Research to Render.com | 13 |
 
@@ -645,7 +645,7 @@ Recommend raising `DM3`/`DM6` duplicate-title case with Serge; the INF40 re-issu
 _Cross-cutting notes:_
 - Today is 2026-04-23. No finding or report is older than 5 days — **zero "stale >30 days" candidates**.
 - `docs/closures/README.md` is a scaffold documenting the per-session closure convention (Pattern B landed 2026-04-23 in PR #129 `de5b3fd`); the directory currently contains no per-session entries, so there is no closure-vs-finding redundancy to report.
-- `docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md` is a formal retroactive resolution of the Phase 0 doc-update proposal; status `closed-and-tracker-updated` (verified via §4).
+- `archive/docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md` is a formal retroactive resolution of the Phase 0 doc-update proposal; status `closed-and-tracker-updated` (verified via §4).
 
 ---
 
@@ -702,17 +702,17 @@ Legend: `C+T` = closed-and-tracker-updated · `C−T` = closed-no-tracker-update
 | docs/findings/sec-05-p0-findings.md | 2026-04-21 | sec-05 / C-04 | Phase 0: hardcoded-prod builders bypass staging (build_fund_classes, build_benchmark_weights) | C+T | ✓ (CHECKLIST:116 `[x]`) |
 | docs/findings/sec-06-p0-findings.md | 2026-04-21 | sec-06 / C-05 | Phase 0: 5 direct-to-prod writers inventory (resolve_*, backfill_*) | C+T | ✓ (CHECKLIST:117 `[x]`) |
 | docs/findings/sec-08-p0-findings.md | 2026-04-21 | sec-08 / O-08 | Phase 0: central EDGAR identity config across 19 scripts | C+T | ✓ (CHECKLIST:121 `[x]`) |
-| docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md | 2026-04-23 | doc-update proposal (7 items) | Retroactive resolution log for BLOCK-SECURITIES/BLOCK-TICKER/BLOCK-3 doc updates | C+T | ✓ (all 7 sub-items tracked in ROADMAP INF25–INF29 + MAINTENANCE.md) |
+| archive/docs/closed/DOC_UPDATE_PROPOSAL_20260418_RESOLVED.md | 2026-04-23 | doc-update proposal (7 items) | Retroactive resolution log for BLOCK-SECURITIES/BLOCK-TICKER/BLOCK-3 doc updates | C+T | ✓ (all 7 sub-items tracked in ROADMAP INF25–INF29 + MAINTENANCE.md) |
 | docs/closures/README.md | 2026-04-23 | Pattern B scaffold | Convention doc for per-session closure files (Pattern B, PR #129) | I (scaffold) | N/A — scaffold |
-| docs/reports/block3_phase2_rerun_20260418_193735.md | 2026-04-18 | BLOCK-3 Phase 2 rerun | Staging rerun post-is_priceable; all 3 gates PASS | C+T | ✓ (BLOCK-3 closed, prod applied 2026-04-18) |
-| docs/reports/block3_phase4_prod_apply_20260418_201319.md | 2026-04-18 | BLOCK-3 Phase 4 prod | Prod apply report; all gates PASS on prod | C+T | ✓ |
-| docs/reports/block_sector_coverage_closeout_20260419_052804.md | 2026-04-19 | block_sector_coverage | Closeout: 3,287-ticker sweep; flags upsert-mode gap (→ INF30/int-14) + silent writer (→ INF31/int-15) | C+T | ✓ (findings escalated to int-14 + int-15, both closed) |
-| docs/reports/block_securities_audit_phase2_20260418_105033.md | 2026-04-18 | BLOCK-SECURITIES-AUDIT Phase 2 | Gate-mixed: RC2 works but raw counts fail → drives Phase 2b | C+T | ✓ (superseded by Phase 2b + int-01..int-04 closures) |
-| docs/reports/block_securities_audit_phase2b_20260418_155554.md | 2026-04-18 | BLOCK-SECURITIES-AUDIT Phase 2b | Path A + drain: gates still mixed; 216 residual accepted | C+T | ✓ |
-| docs/reports/block_ticker_backfill_closeout_20260418_205753.md | 2026-04-18 | BLOCK-TICKER-BACKFILL | Closeout: forward-looking hooks shipped; retroactive backfill absorbed into BLOCK-3 | C+T | ✓ |
-| docs/reports/rewrite_build_managers_phase2_20260419_082630.md | 2026-04-19 | build_managers rewrite | Phase 2 staging validation; Risk 1 = 59.9% manager_type coverage → downstream INF37 | C+T | ✓ (Risk 1 → INF37, now closed by entity-curation-w1 2026-04-23) |
-| docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md | 2026-04-19 | build_shares_history rewrite | Phase 2 staging validation; gates PASS | C+T | ✓ |
-| docs/reports/rewrite_load_13f_phase2_20260419_071500.md | 2026-04-19 | load_13f rewrite | Phase 2 staging validation; gates PASS; OTHERMANAGER2 loader materializes other_managers | C+T | ✓ (phantom-other-managers-decision 2026-04-23 confirms) |
+| archive/docs/reports/block3_phase2_rerun_20260418_193735.md | 2026-04-18 | BLOCK-3 Phase 2 rerun | Staging rerun post-is_priceable; all 3 gates PASS | C+T | ✓ (BLOCK-3 closed, prod applied 2026-04-18) |
+| archive/docs/reports/block3_phase4_prod_apply_20260418_201319.md | 2026-04-18 | BLOCK-3 Phase 4 prod | Prod apply report; all gates PASS on prod | C+T | ✓ |
+| archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md | 2026-04-19 | block_sector_coverage | Closeout: 3,287-ticker sweep; flags upsert-mode gap (→ INF30/int-14) + silent writer (→ INF31/int-15) | C+T | ✓ (findings escalated to int-14 + int-15, both closed) |
+| archive/docs/reports/block_securities_audit_phase2_20260418_105033.md | 2026-04-18 | BLOCK-SECURITIES-AUDIT Phase 2 | Gate-mixed: RC2 works but raw counts fail → drives Phase 2b | C+T | ✓ (superseded by Phase 2b + int-01..int-04 closures) |
+| archive/docs/reports/block_securities_audit_phase2b_20260418_155554.md | 2026-04-18 | BLOCK-SECURITIES-AUDIT Phase 2b | Path A + drain: gates still mixed; 216 residual accepted | C+T | ✓ |
+| archive/docs/reports/block_ticker_backfill_closeout_20260418_205753.md | 2026-04-18 | BLOCK-TICKER-BACKFILL | Closeout: forward-looking hooks shipped; retroactive backfill absorbed into BLOCK-3 | C+T | ✓ |
+| archive/docs/reports/rewrite_build_managers_phase2_20260419_082630.md | 2026-04-19 | build_managers rewrite | Phase 2 staging validation; Risk 1 = 59.9% manager_type coverage → downstream INF37 | C+T | ✓ (Risk 1 → INF37, now closed by entity-curation-w1 2026-04-23) |
+| archive/docs/reports/rewrite_build_shares_history_phase2_20260419_054947.md | 2026-04-19 | build_shares_history rewrite | Phase 2 staging validation; gates PASS | C+T | ✓ |
+| archive/docs/reports/rewrite_load_13f_phase2_20260419_071500.md | 2026-04-19 | load_13f rewrite | Phase 2 staging validation; gates PASS; OTHERMANAGER2 loader materializes other_managers | C+T | ✓ (phantom-other-managers-decision 2026-04-23 confirms) |
 
 ---
 
@@ -1074,7 +1074,7 @@ Each question surfaces a judgement call the audit cannot answer mechanically. Nu
 
 **Context.** §7.a found these as the only zero-inbound-ref docs outside the 60-day window. `ROLLUP_COVERAGE_REPORT.md` is a pre-Phase-4 status snapshot; `POST_MERGE_REGRESSIONS_DIAGNOSTIC.md` is a resolved-issue diagnostic.
 
-**Recommendation.** Move to `docs/closed/` or an archive/ subtree in Phase C.
+**Recommendation.** Move to `archive/docs/closed/` or an archive/ subtree in Phase C.
 # §9 Summary Counts
 
 All figures are as-of HEAD `aab73d2` on branch `comprehensive-audit`, audit date 2026-04-23.

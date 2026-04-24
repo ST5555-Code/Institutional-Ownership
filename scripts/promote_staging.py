@@ -113,7 +113,7 @@ VALIDATOR_MAP = {
 # SELECT * FROM staging. Use when PK-diff is semantically wrong. Added for
 # build_managers.py outputs whose natural keys are not empirically unique
 # (managers.cik has ~7.3% duplication from LEFT JOIN fan-out; cik_crd_links
-# has 3 duplicate CIKs). See REWRITE_BUILD_MANAGERS_FINDINGS.md §2.4.
+# has 3 duplicate CIKs). See 2026-04-19-rewrite-build-managers.md §2.4.
 #
 # The rebuild path inherits staging's schema. Any post-hoc columns added
 # by later pipeline stages (fetch_13dg `has_13dg`, fetch_ncen `adviser_cik`

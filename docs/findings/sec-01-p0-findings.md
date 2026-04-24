@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-20 — branch `remediation/sec-01-p0` off main HEAD `46c2a25`._
 
-_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-01`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-A. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11.1 D-11; `docs/SYSTEM_PASS2_2026_04_17.md` §7.4; `docs/CODEX_REVIEW_2026_04_17.md` §§3f/7.4._
+_Tracker: `docs/REMEDIATION_PLAN.md` Theme 4 row `sec-01`; `docs/REMEDIATION_CHECKLIST.md` Batch 4-A. Audit refs: `docs/SYSTEM_AUDIT_2026_04_17.md` §11.1 D-11; `docs/SYSTEM_PASS2_2026_04_17.md` §7.4; `docs/findings/2026-04-17-codex-review.md` §§3f/7.4._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. Deliverables: this document + Phase 1 plan + open questions.
 
@@ -47,7 +47,7 @@ None present.
 
 ### §1.4 Existing session infrastructure
 
-None. `grep -rn "admin_sessions|user_sessions|session_id"` returns only hits in `docs/prompts/sec-01-p0.md` itself. The migration directory contains nothing session-shaped:
+None. `grep -rn "admin_sessions|user_sessions|session_id"` returns only hits in `archive/docs/prompts/sec-01-p0.md` itself. The migration directory contains nothing session-shaped:
 
 - `scripts/migrations/001_pipeline_control_plane.py` ... `008_rename_pct_of_float_to_pct_of_so.py`
 - `scripts/migrations/add_last_refreshed_at.py`
@@ -187,7 +187,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_
 
 Design rationale per column:
 
-- **`session_id VARCHAR PRIMARY KEY`** — UUID4 stringified. Python `uuid.uuid4()` gives ~122 bits of entropy; storing as string avoids DuckDB `UUID` type drift across staging/prod (see `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md`). Not sequential, not guessable.
+- **`session_id VARCHAR PRIMARY KEY`** — UUID4 stringified. Python `uuid.uuid4()` gives ~122 bits of entropy; storing as string avoids DuckDB `UUID` type drift across staging/prod (see `docs/findings/2026-04-19-block-schema-diff.md`). Not sequential, not guessable.
 - **`issued_at` + `expires_at`**. Absolute cap of 8h to limit damage from a stolen cookie. Separate from `last_used_at` so idle-timeout and absolute-timeout are both enforceable.
 - **`last_used_at`** — updated on every authenticated request; 30-minute idle timeout means rows with `now - last_used_at > 30 min` are rejected even if `expires_at` is in the future.
 - **`ip`, `user_agent`** — recorded for audit, **not** pinned. Mobile networks and NAT change IPs legitimately; strict pinning causes churn.
@@ -202,7 +202,7 @@ Design rationale per column:
 - `CREATE INDEX IF NOT EXISTS` for `expires_at`.
 - No seeding.
 - Forward-only (no `down()`); if rollback is ever needed, the table can be dropped manually — it is pure session state and safe to recreate.
-- Applied to **both** `13f.duckdb` (prod) and `13f_staging.duckdb` (staging) for parity per `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` conventions.
+- Applied to **both** `13f.duckdb` (prod) and `13f_staging.duckdb` (staging) for parity per `docs/findings/2026-04-19-block-schema-diff.md` conventions.
 
 ### §6.3 Cookie attributes
 
