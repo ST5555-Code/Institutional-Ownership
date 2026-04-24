@@ -1,6 +1,20 @@
 # 13F Ownership — Next Session Context
 
-_Last updated: 2026-04-24 (post `fetch-finra-short-dry-run` — V5 gap closed). `scripts/fetch_finra_short.py` now has a mutually-exclusive `--dry-run` / `--apply` group; default preserved as apply (with stderr deprecation warning) so the Makefile target kept working while it was updated in-PR to pass `--apply`. 6 subprocess-level regression tests in `tests/pipeline/test_fetch_finra_short.py` exercise every mode including mutex rejection and INSERT-OR-IGNORE idempotency. FINRA CDN is stubbed via a new `FINRA_BASE_URL_OVERRIDE` env var — tests bind it to a local `http.server` returning 404 for all paths. Full suite 224/224 green. See MAINTENANCE.md → "Pipeline CLI contracts" for operator guidance._
+_Last updated: 2026-04-24 (post `doc-sync` — tracker reconciliation across the 10-PR wave #139–#148). HEAD on main: `143772d`._
+
+_This session was doc-only hygiene: bumped `ROADMAP.md § Current backlog` verified-date to 2026-04-24; added a **Plan status as of 2026-04-24** block + per-section **SHIPPED** tags in `docs/plans/2026-04-23-phase-b-c-execution-plan.md §2/§3/§4/§5/§6/§8.1–§8.4`; added `docs/findings/README.md` index; filed `docs/findings/2026-04-23-ops-18-investigation.md` (PARTIAL outcome placeholder backfilled from the C2 PR body). No scripts / no DB / no phase-body rewrites._
+
+_Shipped between 2026-04-23 and 2026-04-24 (10 PRs, trackers already reflect the outcomes):_
+- _#139 phase-b1-doc-hygiene (`84362d3`) — REMEDIATION_CHECKLIST archived, INF40 dual-closure annotations, 8 legacy docs archived._
+- _#140 phase-b2-script-reorg (`c16e498`) — `scripts/hygiene/` directory live; `audit_*.py` relocated._
+- _#141 phase-b2-5-v2-cutover (`ad4b8f7`) — scheduled paths run `load_13f_v2.py`; V1 break-glass until B3._
+- _#142 phase-c1-ddl-fold (`ff647d7`) — canonical DDL folded into `docs/data_layers.md` Appendix A._
+- _#143 phase-c2-tracker-consolidate (`e7db8d0`) — source-of-truth rules in `SESSION_GUIDELINES §5`; ops-18 PARTIAL outcome._
+- _#144 registry-gap-sweep (`778fe62`) — **PARTIAL** 2 of 4 tables registered; new backlog items `multi-db-datasetspec`, `admin_preferences`._
+- _#145 audit-ticket-numbers-refinement-v10 (`ca258b7`) — table-row lead-cell restriction; grouped-row false positive closed._
+- _#146 fetch-finra-short-dry-run (`dd9b388`) — `--dry-run` / `--apply` mutex on `scripts/fetch_finra_short.py`; follow-up `finra-default-flip` target 2026-07-23._
+- _#147 snapshot-discovery (`74e8f21`) — 292 snapshots inventoried / classified; findings at `docs/findings/2026-04-24-snapshot-inventory.md`._
+- _#148 snapshot-policy (`143772d`) — migration 018 `snapshot_registry`, 14-day default retention + V2-cutover carve-outs, `scripts/hygiene/snapshot_retention.py` live; follow-up `snapshot-retention-cadence` for recurring `--apply` wiring._
 
 _Prior update: 2026-04-23 (post `inf40-fix` — `sync_staging.py` DDL-first rewrite, CTAS constraint-strip gap closed). Main HEAD at branch point: `6c14c35`. `inf40-fix` branch pending PR._
 
@@ -15,13 +29,16 @@ Prod state: `validate_entities.py` baseline 8 PASS / 1 FAIL / 7 MANUAL preserved
 
 **Prior session (preserved):** int-22 closed (`int-22-prod-execute-and-verify`). Option C rollback of run_id `13f_holdings_quarter=2025Q4_20260422_200854` executed on prod. Post-state matches staging rehearsal to the row. Loader idempotency gap tracked separately as **int-23** (closed since by PR #119).
 
-**Next items:**
-- **Taxonomy refactor follow-on** (43e re-scope) — bucket membership for `family_office` + `multi_strategy` + `SWF` in `build_summaries.py:173,181` and `queries.py:1724`; plus React typeConfig color mapping.
-- **Serge visual walkthrough on PR #107** (ui-audit-01).
-- **Peer rotation precompute** — address `get_peer_rotation()` slowness.
-- **INF9 closed 2026-04-23** (`inf9-persist`, PR #120, snapshot `20260423_080406`). 11 DM12 `merge`/`decision_maker_v1` overrides (HC Capital Trust 6 + CRI 5, IDs 246–256) promoted to prod; `entity_overrides_persistent` 245 → 256; validate baseline preserved (8 PASS / 1 FAIL wellington / 7 MANUAL). Findings doc: `docs/findings/inf9-closure.md`.
-- **INF9f closed 2026-04-23** (`inf9f-agincourt`, snapshot `20260423_084622`). Path B: assigned real CIK `0001845254` to Agincourt Capital Management, LLC (eid 19021) from `adv_managers` — EDGAR-verified, active 13F-HR filer. 12th DM12 merge override (S000029852 → `0001845254`) staged + promoted as override_id 257. Prod counts: `entity_identifiers` 35,511 → 35,512; `entity_overrides_persistent` 256 → 257. Validate baseline preserved (8 PASS / 1 FAIL wellington / 7 MANUAL). INF9 residual fully resolved.
-- **INF40 (entity-CTAS) closed 2026-04-23** (`inf40-fix`) — sync_staging constraint-strip gap fixed. `build_entities.py --reset` on staging now hits a **separate** `ON CONFLICT` inference blocker (prod entity tables lack PK/UNIQUE); file a new ticket if the full `--reset` replay path needs to be unblocked.
+**Next items (as of 2026-04-24 post-`doc-sync`):**
+- **B3 gate** — awaiting 2 clean 13F cycles on V2 (Q1 2026 ~May 15, Q2 2026 ~Aug 14). Plan §7 stays frozen until then. No code action this window.
+- **snapshot-retention-cadence** — wire `scripts/hygiene/snapshot_retention.py --apply` onto a recurring surface (cron / Makefile / scheduler). Pick the surface that matches the active ops model when next touched. `--dry-run` safe as a nightly CI probe today.
+- **finra-default-flip** — target 2026-07-23. Delete the deprecation-warning path in `scripts/fetch_finra_short.py` and make `--dry-run` / `--apply` mutex required. Callers already pass `--apply` explicitly.
+- **multi-db-datasetspec** — prerequisite for registering `admin_sessions` + `admin_preferences` in `data/admin.duckdb`. Requires a `db_file` field on `DatasetSpec` + `unclassified_tables()` caller updates.
+- **admin_preferences** — 0-row stub from migration 016; register or retire when the admin feature set is next revisited. Blocked on `multi-db-datasetspec` if kept in `data/admin.duckdb`.
+- **maintenance-audit-design** — re-author `rotating_audit_schedule.md` from the 6-surface scope + May–October cadence recovered by C2 ops-18 investigation (`docs/findings/2026-04-23-ops-18-investigation.md`).
+- **Standing carry-forward** — int-09 Step 4 / INF25 (architectural, Q2 2026 gate), INF38 / int-19 float-history data source, INF27 CUSIP residual-coverage (auto-handled), INF2 monthly maintenance, INF16 Soros AUM recompute. Full list in `ROADMAP.md § Current backlog`.
+- **Taxonomy refactor follow-on** (43e re-scope, from entity-curation-w1) — bucket membership for `family_office` + `multi_strategy` + `SWF` in `build_summaries.py:173,181` and `queries.py:1724`; plus React typeConfig color mapping.
+- **PR #107 ui-audit walkthrough** — separate track, still open.
 
 Startup briefing for a fresh Claude Code session. Read end-to-end, then continue with ROADMAP + post-Phase-2 backlog.
 

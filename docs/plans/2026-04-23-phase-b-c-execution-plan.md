@@ -24,6 +24,29 @@
 
 ---
 
+## Plan status as of 2026-04-24
+
+Added 2026-04-24 by `doc-sync` session. Phase bodies below are preserved as historical record; per-section **SHIPPED** tags cite the landing PR + merge commit inline. Do not rewrite the phase prose — add new execution notes under the relevant section if follow-up work spawns.
+
+**Phases shipped:**
+- **B1** (§2) — phase-b1-doc-hygiene, [PR #139](https://github.com/ST5555-Code/Institutional-Ownership/pull/139), merge `84362d3`.
+- **B2** (§3) — phase-b2-script-reorg, [PR #140](https://github.com/ST5555-Code/Institutional-Ownership/pull/140), merge `c16e498`.
+- **B2.5** (§5) — phase-b2-5-v2-cutover, [PR #141](https://github.com/ST5555-Code/Institutional-Ownership/pull/141), merge `ad4b8f7`. Scheduled cycle paths now run `load_13f_v2.py`; V1 retained as break-glass until B3.
+- **C1** (§4) — phase-c1-ddl-fold, [PR #142](https://github.com/ST5555-Code/Institutional-Ownership/pull/142), merge `ff647d7`. Canonical DDL folded into `docs/data_layers.md` Appendix A; pre-fold archived at `archive/docs/canonical_ddl.md`.
+- **C2** (§6) — phase-c2-tracker-consolidate, [PR #143](https://github.com/ST5555-Code/Institutional-Ownership/pull/143), merge `e7db8d0`. Source-of-truth rules in `docs/SESSION_GUIDELINES.md §5`; ops-18 outcome = **PARTIAL** (see §6.2 + `docs/findings/2026-04-23-ops-18-investigation.md`).
+
+**§8 one-offs:**
+- **§8.1** fetch-finra-short-dry-run — SHIPPED, [PR #146](https://github.com/ST5555-Code/Institutional-Ownership/pull/146), merge `dd9b388`. Follow-up `finra-default-flip` (target 2026-07-23) tracked in `ROADMAP.md § Current backlog`.
+- **§8.2** audit-ticket-numbers-refinement-v10 — SHIPPED, [PR #145](https://github.com/ST5555-Code/Institutional-Ownership/pull/145), merge `ca258b7`. `line_kind()` / table-row lead-cell restriction; grouped-row false positive closed.
+- **§8.3** snapshot-retention-policy — SHIPPED across two sessions: inventory + classification in [PR #147](https://github.com/ST5555-Code/Institutional-Ownership/pull/147) `snapshot-discovery` (merge `74e8f21`), policy + `snapshot_registry` sidecar + 14-day retention in [PR #148](https://github.com/ST5555-Code/Institutional-Ownership/pull/148) `snapshot-policy` (merge `143772d`). Follow-up `snapshot-retention-cadence` (wire `scripts/hygiene/snapshot_retention.py --apply` onto a recurring surface) tracked in `ROADMAP.md § Current backlog`.
+- **§8.4** registry-gap-sweep — SHIPPED **PARTIAL (2 of 4 registered)**, [PR #144](https://github.com/ST5555-Code/Institutional-Ownership/pull/144), merge `778fe62`. Registered `_cache_openfigi` + `cusip_retry_queue`; `admin_sessions` deferred to `multi-db-datasetspec`, `cusip_classifications` deferred, `admin_preferences` tracked as new backlog row. Execution rationale in §8.4 below + `ROADMAP.md § Current backlog`.
+
+**Still-live:**
+- **B3** (§7) — awaiting 2-cycle operational gate (Q1 + Q2 2026 cycles on V2). No code changes yet.
+- Parked: `maintenance-audit-design` — rotating-audit scope was superseded by a broader design discussion during C2 ops-18 triage. Re-author from the recovered 6-surface scope + May–October cadence preserved in `docs/findings/2026-04-23-ops-18-investigation.md`.
+
+---
+
 ## §0 — Purpose and boundaries
 
 The comprehensive audit plus pre-Phase-B verification plus refinement validation plus plan reviews produced a set of actions, Serge decisions, and a validated execution sequence. This document translates them into discrete batches with gating, rollback, and per-batch Code session drafts.
@@ -107,6 +130,8 @@ Small one-offs: dispatched opportunistically during any batch's idle time.
 ---
 
 ## §2 — Phase B1: Tracker hygiene + doc archival
+
+**Status: SHIPPED** — [PR #139](https://github.com/ST5555-Code/Institutional-Ownership/pull/139), merge `84362d3` (2026-04-23).
 
 **Session name:** `phase-b1-doc-hygiene`.
 **Estimated duration:** 30-60 min Code time.
@@ -271,6 +296,8 @@ Out of scope: anything beyond the 3 flips + ROADMAP INF40 + REVIEW_CHECKLIST not
 
 ## §3 — Phase B2: Script filesystem reorg
 
+**Status: SHIPPED** — [PR #140](https://github.com/ST5555-Code/Institutional-Ownership/pull/140), merge `c16e498` (2026-04-23).
+
 **Session name:** `phase-b2-script-reorg`.
 **Estimated duration:** 60-120 min.
 **Risk level:** Medium.
@@ -411,6 +438,8 @@ DO NOT use --no-verify. DO NOT force push.
 ---
 
 ## §4 — Phase C1: Canonical DDL fold
+
+**Status: SHIPPED** — [PR #142](https://github.com/ST5555-Code/Institutional-Ownership/pull/142), merge `ff647d7` (2026-04-23). Canonical DDL folded into `docs/data_layers.md` Appendix A; pre-fold archived at `archive/docs/canonical_ddl.md`.
 
 **Session name:** `phase-c1-ddl-fold`.
 **Estimated duration:** 60-120 min.
@@ -595,6 +624,8 @@ DO NOT use --no-verify. DO NOT force push.
 ---
 
 ## §5 — Phase B2.5: V2 cutover
+
+**Status: SHIPPED** — [PR #141](https://github.com/ST5555-Code/Institutional-Ownership/pull/141), merge `ad4b8f7` (2026-04-23). Scheduled cycle paths now run `load_13f_v2.py`; V1 retained as break-glass fallback until Phase B3 (post-2-cycle gate).
 
 **Session name:** `phase-b2-5-v2-cutover`.
 **Estimated duration:** 90-150 min (includes real fixture smoke per plan-review-v3 M4).
@@ -842,6 +873,8 @@ DO NOT use --no-verify. DO NOT force push.
 
 ## §6 — Phase C2: Tracker consolidation + ops-18 investigation
 
+**Status: SHIPPED** — [PR #143](https://github.com/ST5555-Code/Institutional-Ownership/pull/143), merge `e7db8d0` (2026-04-23). Source-of-truth rules shipped in `docs/SESSION_GUIDELINES.md §5`. ops-18 outcome = **PARTIAL** (6-surface scope + May–October cadence recovered; per-month assignment missing — see §6.2 + `docs/findings/2026-04-23-ops-18-investigation.md`).
+
 **Session name:** `phase-c2-tracker-consolidate`.
 **Estimated duration:** 90-150 min.
 **Risk level:** Low-medium.
@@ -1009,9 +1042,13 @@ Deferred — drafted when gate approaches (Aug 2026). Current draft structural o
 
 ### §8.1 `fetch-finra-short-dry-run`
 
+**Status: SHIPPED** — [PR #146](https://github.com/ST5555-Code/Institutional-Ownership/pull/146), merge `dd9b388` (2026-04-24). Follow-up `finra-default-flip` (target 2026-07-23: delete deprecation-warning path, make the mutex group required) tracked in `ROADMAP.md § Current backlog`.
+
 Add `--dry-run` / `--apply` to `scripts/fetch_finra_short.py`. V5 gap. Very low risk.
 
 ### §8.2 `audit-ticket-numbers-refinement-v10`
+
+**Status: SHIPPED** — [PR #145](https://github.com/ST5555-Code/Institutional-Ownership/pull/145), merge `ca258b7` (2026-04-24). `line_kind()` / table-row restriction to lead-cell tickets; grouped-row false positive (`| DM2 / DM3 / DM6 |`) closed.
 
 Refine `scripts/hygiene/audit_ticket_numbers.py` grouped-row handling for V10's `| DM2 / DM3 / DM6 |` false positive. Fix in `line_kind()` or `extract_table_title()` — detect multi-ticket lead cells.
 
@@ -1021,9 +1058,13 @@ Very low risk.
 
 ### §8.3 `snapshot-retention-policy`
 
+**Status: SHIPPED across two sessions** — inventory + classification in [PR #147](https://github.com/ST5555-Code/Institutional-Ownership/pull/147) `snapshot-discovery` (merge `74e8f21`, 2026-04-24), policy + `snapshot_registry` sidecar + 14-day default retention + carve-outs in [PR #148](https://github.com/ST5555-Code/Institutional-Ownership/pull/148) `snapshot-policy` (merge `143772d`, 2026-04-24). 292 snapshots backfilled (290 `default_14d` + 2 V2-cutover `carve_out`); `scripts/hygiene/snapshot_retention.py` live under `--dry-run` default. Follow-up `snapshot-retention-cadence` (wire `--apply` onto a recurring surface) tracked in `ROADMAP.md § Current backlog`. Closure note: `docs/findings/2026-04-24-snapshot-inventory.md §8`.
+
 Define retention for 292 snapshots across 15 tables (V8). Requires Serge policy decision.
 
 ### §8.4 `registry-gap-sweep`
+
+**Status: SHIPPED PARTIAL (2 of 4 registered)** — [PR #144](https://github.com/ST5555-Code/Institutional-Ownership/pull/144), merge `778fe62` (2026-04-24). Registered `_cache_openfigi` (L3 upsert) + `cusip_retry_queue` (L0 direct_write). `admin_sessions` deferred to the new `multi-db-datasetspec` backlog item (lives in `data/admin.duckdb`). `cusip_classifications` deferred (out-of-scope in executing session despite C1 annotation). `admin_preferences` filed as a separate backlog row (0-row stub; register-or-retire when the admin feature set is next revisited). See execution notes below + `ROADMAP.md § Current backlog`.
 
 Add DATASET_REGISTRY entries for 4 active tables surfaced by C1 registry-gap triage:
 

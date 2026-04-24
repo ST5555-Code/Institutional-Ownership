@@ -568,9 +568,9 @@ available for reuse; future confusion is avoided by leaving the gap.
 Next free ID at allocation time is `max(in use) + 1`; verify via
 `grep -oE 'INF[0-9]+' ROADMAP.md | sort -u` before claiming.
 
-### Current backlog (verified 2026-04-23)
+### Current backlog (verified 2026-04-24)
 
-Canonical open-items index synced against `docs/plans/2026-04-23-phase-b-c-execution-plan.md §9` at phase-c2 close. Detailed rows live in `### Open items` below; this subsection is the single-source list for backlog grooming and session planning. Update on every close.
+Canonical open-items index synced against `docs/plans/2026-04-23-phase-b-c-execution-plan.md §9` at phase-c2 close; re-verified 2026-04-24 (`doc-sync`) after the five §8 one-offs (PRs #144–#148). Detailed rows live in `### Open items` below; this subsection is the single-source list for backlog grooming and session planning. Update on every close.
 
 | # | Item | Source | Status |
 |---|------|--------|--------|
