@@ -173,6 +173,26 @@ def extract_bullet_title(line: str, ticket: str) -> str:
     return line.strip()[:140]
 
 
+def lead_cell_tickets(line: str) -> set[str]:
+    """Tickets declared in the first non-empty pipe-delimited cell of a row.
+
+    A table row's lead cell is the authoritative declaration site. Tickets
+    mentioned in downstream cells are cross-references, not declarations.
+    Handles multi-ticket lead cells like ``| **DM2 / DM3 / DM6** | ...``.
+    """
+    lead = ""
+    for cell in line.split("|"):
+        if cell.strip():
+            lead = cell
+            break
+    tickets: set[str] = set()
+    for m in TICKET_RE.finditer(lead):
+        t = normalize_ticket(m.group("prefix"), m.group("num"), m.group("suffix"))
+        if t:
+            tickets.add(t)
+    return tickets
+
+
 def extract_title(kind: str, line: str, ticket: str) -> str:
     if kind == "heading":
         title = extract_heading_title(line, ticket)
@@ -258,11 +278,19 @@ def scan(root: Path) -> dict[str, list[Definition]]:
             if kind is None:
                 continue
             seen_on_line: set[str] = set()
+            # On table rows, only the lead cell declares tickets; later cells
+            # hold cross-references. Without this filter, rows like
+            # `| **DM15e** | ... | DM6 or DM3 | ...` spuriously attribute
+            # DM6/DM3 as defined. Also correctly handles multi-ticket lead
+            # cells like `| **DM2 / DM3 / DM6** | ...`.
+            lead_tickets = lead_cell_tickets(line) if kind == "table-row" else None
             for m in TICKET_RE.finditer(line):
                 ticket = normalize_ticket(
                     m.group("prefix"), m.group("num"), m.group("suffix")
                 )
                 if ticket is None or ticket in seen_on_line:
+                    continue
+                if lead_tickets is not None and ticket not in lead_tickets:
                     continue
                 seen_on_line.add(ticket)
                 title = extract_title(kind, line, ticket)
