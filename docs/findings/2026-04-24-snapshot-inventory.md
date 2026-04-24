@@ -88,6 +88,33 @@ Creators × intents, cell counts:
 
 **Implication:** No snapshot is referenced by name anywhere in code. Operational dependency is entirely on the naming pattern + the newest snapshot per base table (as the rollback anchor for the most recent promotion).
 
+### 4.1 Validation against dynamic-naming patterns (2026-04-24)
+
+The 0 / 0 / 0 / 292 classification was validated against dynamic name-construction patterns, not just literal snapshot names:
+
+```
+grep -rn '"_snapshot_"\|f"{[^}]*}_snapshot_\|_snapshot_{[^}]*}"\|"snapshot"' scripts/ web/ tests/
+grep -rn 'snapshot_table\|snapshot_name\|create_snapshot\|make_snapshot\|SNAPSHOT' scripts/ web/ tests/
+grep -rn "rollback_promotion\|promote_staging\|_snapshot_suffix\|latest_snapshot" scripts/ web/
+```
+
+**Dynamic constructors found — all already accounted for:**
+
+- `scripts/promote_staging.py:143-144` — `_snapshot_name(table, sid)` helper returning `f"{table}_snapshot_{sid}"`. Consumed by the snapshot/rollback/restore methods at lines 150/165/178 with `sid` supplied from the `--rollback SNAPSHOT_ID` CLI argument or from the snapshot-creation path. Pattern-based, operator-supplied — not a hard-coded specific-name reference.
+- `scripts/promote_staging.py:238,241` — parses `snapshot_id` out of discovered table names when `--list-snapshots` is invoked. Listing, not name-based reading.
+- `scripts/rollback_promotion.py:39,44-46` — calls `promote_staging.list_snapshots()` and `promote_staging.rollback(args.restore, list(db.ENTITY_TABLES))`. `args.restore` is a CLI-supplied snapshot_id; not a hard-coded name.
+- `scripts/pipeline/registry.py:418` — `ignore_patterns = ("_snapshot_",)` — this *excludes* snapshot tables from DATASET_REGISTRY governance. Pattern-exclusion, not a consumer.
+- `scripts/retired/snapshot_manager_type_legacy.py:31,41-42` — the retired ad-hoc script that originally created `holdings_v2_manager_type_legacy_snapshot_20260419`. Creator, not reader. Script is in `scripts/retired/`.
+
+**Namespace-collision false positives (checked and dismissed):**
+
+- `scripts/config.py:31 QUARTER_SNAPSHOT_DATES` + `scripts/api_config.py:30,35` — 13F quarter-end calendar dates, unrelated to DB snapshot tables.
+- `scripts/app_db.py:31 DB_SNAPSHOT_PATH` — file path of `13f_readonly.duckdb` (a snapshot *of the whole DB file* served to the Flask app). Different concept; not a reference to any `%_snapshot_%` table.
+- `tests/smoke/test_smoke_endpoints.py:24,73 SNAPSHOT_DIR` — JSON response-fixture directory for HTTP smoke tests (Jest-style response snapshots). Unrelated to DB snapshots.
+- `scripts/rollback_promotion.py:30` + `scripts/promote_staging.py:747` — CLI `metavar="SNAPSHOT_ID"` help strings. Not references.
+
+**Result: no dynamic consumer references any specific `%_snapshot_%` table by name.** The 0 LIVE / 0 TEST / 0 DOC / 292 NO REFERENCE classification holds. Operational coupling is 100% pattern-based via the rollback/promote tool pair, which discovers snapshots at runtime from `information_schema.tables LIKE '%_snapshot_%'` and acts on whichever `snapshot_id` the operator supplies.
+
 ## 5. Timing flags
 
 ### 5.1 `raw_*` snapshots (B3 drop coordination)
