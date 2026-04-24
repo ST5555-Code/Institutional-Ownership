@@ -180,7 +180,7 @@ IGNORE`) plus the `data_freshness` row for `short_interest`.
 |------|-----------|
 | `--apply` | Execute writes. Matches prior default behaviour exactly. |
 | `--dry-run` | Fetch runs; DDL, inserts, `CHECKPOINT`, and `record_freshness` are all skipped. Prints `[DRY-RUN]` lines naming each intended write. |
-| neither flag | Prints a stderr deprecation warning, then applies. Preserved for backward compatibility with any manual operator muscle memory — a future version may require an explicit flag. |
+| neither flag | Prints a stderr deprecation warning, then applies. Preserved for backward compatibility with any manual operator muscle memory. **Scheduled for removal on 2026-07-23** — tracked as `finra-default-flip` in ROADMAP Current backlog. |
 | `--dry-run --apply` | Rejected by argparse (mutex group). |
 
 The Makefile target `make fetch-finra-short` now passes `--apply`

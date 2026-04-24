@@ -281,7 +281,8 @@ if __name__ == "__main__":
         description="Fetch FINRA short sale volume data. "
                     "Pass --apply to execute writes or --dry-run to report planned writes only. "
                     "If neither is passed, --apply is assumed (deprecation warning emitted) — "
-                    "a future version may require an explicit mode flag.")
+                    "this fallback is scheduled for removal on 2026-07-23 "
+                    "(ROADMAP: finra-default-flip).")
     parser.add_argument("--days", type=int, default=30, help="Number of trading days to fetch")
     parser.add_argument("--update", action="store_true", help="Only fetch since last loaded date")
     parser.add_argument("--test", action="store_true", help="Test mode (5 days)")
@@ -296,7 +297,8 @@ if __name__ == "__main__":
     should_apply = not args.dry_run  # --dry-run wins; --apply or neither → apply
     if not args.apply and not args.dry_run:
         print("[deprecation] fetch_finra_short.py: no mode flag passed — defaulting to --apply. "
-              "Pass --apply (or --dry-run) explicitly; a future version may require it.",
+              "Pass --apply (or --dry-run) explicitly. "
+              "This behavior will be removed on 2026-07-23 (ROADMAP: finra-default-flip).",
               file=sys.stderr, flush=True)
 
     if hasattr(args, 'staging') and args.staging:
