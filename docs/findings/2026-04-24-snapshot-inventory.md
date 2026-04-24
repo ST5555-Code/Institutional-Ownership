@@ -486,3 +486,7 @@ All 292 snapshots, sorted by base table then timestamp. Columns: name, base tabl
 | `managers_snapshot_20260419_091455` | `managers` | 2026-04-19 09:14:55 | 5 | 12,005 | SESSION (promote_staging.py) | ROLLBACK | NONE |
 | `parent_bridge_snapshot_20260419_091455` | `parent_bridge` | 2026-04-19 09:14:55 | 5 | 11,135 | SESSION (promote_staging.py) | ROLLBACK | NONE |
 | `securities_snapshot_20260418_172203` | `securities` | 2026-04-18 17:22:03 | 6 | 132,618 | SESSION (promote_staging.py) | ROLLBACK | NONE |
+
+## 8. Closure note — snapshot-policy session (2026-04-24)
+
+Policy applied 2026-04-24 in session **snapshot-policy** (migration `018_snapshot_registry` + `scripts/hygiene/backfill_snapshot_registry.py` + `scripts/hygiene/snapshot_retention.py`). The sidecar `snapshot_registry` table records per-snapshot creator / purpose / expiration / approver. 292 snapshots backfilled: 290 under `default_14d` with `expiration = created_at + 14 days`, 2 `holdings_v2_*` under `carve_out` through 2026-05-31 (V2 cutover insurance, approved by Serge). **0 snapshots deleted on apply** — every default_14d row remained within its 14-day window as of 2026-04-24 (oldest cohort expires 2026-04-25). The enforcement script is live under `--dry-run` default / `--apply` opt-in; cadence wiring is tracked as `snapshot-retention-cadence` in `ROADMAP.md § Current backlog`. Creation-site tagging is in place: `scripts/promote_staging.py::_take_snapshot` now writes a registry row on every snapshot it mints.

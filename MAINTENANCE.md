@@ -341,6 +341,51 @@ Promotion snapshots are intra-DB tables (`{table}_snapshot_{timestamp}`)
 auto-created by `promote_staging.py`. Backups are full self-contained
 DuckDB EXPORT DATABASE directories.
 
+## Snapshot retention
+
+Every `%_snapshot_%` table has a governance row in `snapshot_registry`
+(created by migration `018_snapshot_registry`). The registry records
+the base table, creator, purpose, expiration, and approver so
+retention can be enforced without parsing table names.
+
+**Policy**
+
+- **Default retention:** 14 days from `created_at`. Every snapshot
+  minted by `scripts/promote_staging.py` writes a registry row with
+  `applied_policy='default_14d'` and `expiration = created_at + 14
+  days`.
+- **Carve-outs:** declared at creation (or via manual UPDATE against
+  the registry) with `applied_policy='carve_out'`, an explicit
+  `expiration` date, and a named `approver`. Carve-outs are retained
+  until their expiration passes.
+- **Untagged snapshots:** if a `%_snapshot_%` table appears in the DB
+  without a registry row, the enforcement script reports it as
+  `UNREGISTERED` and **never auto-deletes** it. An operator must
+  register it (or drop it manually) to bring it under policy.
+
+**Enforcement — `scripts/hygiene/snapshot_retention.py`**
+
+```bash
+# Report only — no writes, no DDL. Default mode.
+python3 scripts/hygiene/snapshot_retention.py --dry-run
+
+# Execute: DROP TABLE + DELETE from snapshot_registry where expiration <= today().
+# Also prunes registry rows whose snapshot table has gone missing.
+python3 scripts/hygiene/snapshot_retention.py --apply
+```
+
+Exit codes: `0` clean run, `2` DB missing, `3` `snapshot_registry`
+missing (run migration 018 first).
+
+**Cadence.** Recommended weekly run against production. The default
+`--dry-run` mode is safe to wire into CI or a nightly cron; operator
+review is only needed before `--apply`.
+
+**Restoring a carve-out after deletion.** Once `--apply` has dropped a
+snapshot, it is unrecoverable short of a DuckDB EXPORT DATABASE
+restore. Mark carve-outs in the registry **before** the expiration
+date passes.
+
 ## Pending Audit Work
 
 All items below must go through the staging workflow:
