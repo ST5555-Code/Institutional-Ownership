@@ -568,6 +568,26 @@ available for reuse; future confusion is avoided by leaving the gap.
 Next free ID at allocation time is `max(in use) + 1`; verify via
 `grep -oE 'INF[0-9]+' ROADMAP.md | sort -u` before claiming.
 
+### Current backlog (verified 2026-04-23)
+
+Canonical open-items index synced against `docs/plans/2026-04-23-phase-b-c-execution-plan.md §9` at phase-c2 close. Detailed rows live in `### Open items` below; this subsection is the single-source list for backlog grooming and session planning. Update on every close.
+
+| # | Item | Source | Status |
+|---|------|--------|--------|
+| int-09 Step 4 / INF25 | BLOCK-DENORM-RETIREMENT — retire denorm v2 enrichment columns (`ticker`, `entity_id`, `rollup_entity_id`, `lei`) | `### Open items` INF25; plan §9 | Deferred to Phase 2 (exit criteria in `docs/findings/int-09-p0-findings.md §4`) |
+| INF38 / int-19 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_float` denominator | `### Open items` INF38; plan §9 | Open (Phase 2) |
+| ops-18 | `rotating_audit_schedule.md` re-author | plan §9; `docs/REMEDIATION_PLAN.md` L210/L413; `archive/docs/SYSTEM_AUDIT_2026_04_17.md §12.4` | **PARTIAL** (concept + 6 surface targets + May–October cadence recovered from `archive/docs/SYSTEM_AUDIT_2026_04_17.md:409` and `docs/REMEDIATION_PLAN.md:413`; per-month assignment never authored — re-author from recovered scope) |
+| INF27 | CUSIP residual-coverage tracking | `### Open items` INF27; plan §9 | Standing / data quality |
+| INF2 | Monthly maintenance checklist | `### Open items` INF2; plan §9 | Recurring |
+| INF16 | Recompute `managers.aum_total` for two Soros CIKs | `### Open items` INF16; plan §9 | Low |
+| 43g | Drop redundant type columns (`is_actively_managed`, `manager_type`) — migrate queries | `### Open items` 43g; plan §9 | Medium |
+| 43b | `app.py` remaining hardening | `### Open items` 43b; plan §9 | Low |
+| 48 | Phase 3.5 deferred items (D2/D4/D5/D10/D11/D12/D13) | `### Open items` 48; plan §9 | Partially done |
+| 56 | Decision maker / voting rollup worldviews (DM1-DM7) | `### Open items` 56; plan §9 | Not started |
+| P2-FU-01 | `run_script` allowlist prune in `admin_bp.py` | plan §9 | Open |
+| P2-FU-03 | ADV SCD Type 2 conversion | plan §9 | Open |
+| registry-gap-sweep | Add 4 active tables to DATASET_REGISTRY (`_cache_openfigi`, `admin_sessions`, `cusip_classifications`, `cusip_retry_queue`) | plan §8.4 (added phase-c2) | Open — dedicated session after C2; not gating B3 |
+
 ### Open items
 
 | # | Item | Priority | Notes |

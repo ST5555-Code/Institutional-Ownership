@@ -262,7 +262,7 @@ python3 scripts/validate_entities.py --prod --read-only  # 8 PASS / 2 FAIL / 6 M
 | SourcePipeline base class | `scripts/pipeline/base.py` (atomic promote, eight-step flow) |
 | Cadence + probes + expected_delta | `scripts/pipeline/cadence.py` |
 | Architecture baseline | `ARCHITECTURE_REVIEW.md` (historical — see status header) |
-| Current prod DDL | `docs/canonical_ddl.md` + `docs/data_layers.md` |
+| Current prod DDL | `docs/data_layers.md` Appendix A (canonical DDL folded 2026-04-23, phase-c1 PR #142; pre-fold copy archived at `archive/docs/canonical_ddl.md`) |
 | Entity architecture | `docs/ENTITY_ARCHITECTURE.md` |
 | Pipeline CLI reference | `MAINTENANCE.md §Pipeline refresh` |
 

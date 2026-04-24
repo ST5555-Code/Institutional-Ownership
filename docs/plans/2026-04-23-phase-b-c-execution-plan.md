@@ -1023,6 +1023,21 @@ Very low risk.
 
 Define retention for 292 snapshots across 15 tables (V8). Requires Serge policy decision.
 
+### §8.4 `registry-gap-sweep`
+
+Add DATASET_REGISTRY entries for 4 active tables surfaced by C1 registry-gap triage:
+
+- `_cache_openfigi` (CUSIP v1.4 OpenFIGI cache; writers: `build_cusip.py`, `run_openfigi_retry.py`; readers: `build_cusip.py` and one-offs)
+- `admin_sessions` (admin app session store; writers/readers: `admin_bp.py`)
+- `cusip_classifications` (CUSIP/ticker classification pipeline output; readers include `enrich_holdings.py`)
+- `cusip_retry_queue` (OpenFIGI retry pipeline queue state)
+
+Each entry requires a small design call: layer tag (L0/L1/L2), lifecycle classification (cache vs pipeline output vs queue vs app state), owner, downstream, notes. Scope-boundary question for REGISTRY is in play — app-state tables like `admin_sessions` may or may not belong.
+
+Session scope: design decision per table, then add `DatasetSpec` entries in one PR. Not gating B3. Dispatched as a dedicated session after C2.
+
+Low-medium risk. ~45-60 min.
+
 ---
 
 ## §9 — Still-open real backlog

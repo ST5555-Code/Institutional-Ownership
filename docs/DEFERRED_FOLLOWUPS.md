@@ -54,7 +54,7 @@ Items too small to warrant their own INF## but tracked for future doc-update ses
 |------|--------|--------|
 | `validate_entities` baseline header correction: 8/1/7 → 8/2/6 | `ROADMAP.md` current-state header; `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md §14.10` | **APPLIED 2026-04-19** |
 | Rename historical refs `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` | Various findings docs | Next batched doc-update |
-| `pct_of_float` → `pct_of_so` terminology retirement across project | `ROADMAP.md`; `docs/canonical_ddl.md`; `docs/pipeline_inventory.md` | Next batched doc-update |
+| `pct_of_float` → `pct_of_so` terminology retirement across project | `ROADMAP.md`; `docs/data_layers.md` Appendix A; `docs/pipeline_inventory.md` | Next batched doc-update |
 | `docs/data_layers.md §7`: add `pct_of_so_source` as Class B audit column | `docs/data_layers.md §7` | Next batched doc-update |
 | `docs/pipeline_violations.md`: close `pct_of_float` violation entries with Phase 1b/1c/4b commit citations | `docs/pipeline_violations.md` | Next batched doc-update |
 
