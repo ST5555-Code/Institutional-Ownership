@@ -141,6 +141,22 @@ The `scripts/` tree is partitioned by lifecycle. Place new scripts in the direct
 
 ---
 
+## 5. Tracker source-of-truth
+
+Each kind of tracking content has one canonical home. When two homes could plausibly hold the same content, default to the one named below — and link from the others rather than duplicating prose. Drift between trackers is the recurring cost the cross-tracker update rule (§3) was written to absorb; pinning a single source-of-truth per content type keeps that audit cheap.
+
+- **Forward work (multi-session)** → `ROADMAP.md` `### Current backlog` + `docs/DEFERRED_FOLLOWUPS.md`. Items that span sessions or whose owner/priority is still being decided. `### Current backlog` is the curated index; `DEFERRED_FOLLOWUPS.md` carries the long-tail follow-ups not yet large enough to earn an INF##.
+- **Single-session handoff** → `docs/NEXT_SESSION_CONTEXT.md`. Volatile, refreshed at session close. Anything that won't matter two sessions from now belongs here, not in `ROADMAP.md`.
+- **Remediation narrative** → `docs/REMEDIATION_PLAN.md`. The frozen ledger of how the 2026-04-20 → 2026-04-22 remediation program was scoped and closed. Append-only changelog at the bottom. Do not rewrite historical rows; carry corrections forward as new entries.
+- **Per-session findings** → `docs/findings/<session-name>-<phase>.md`. Phase 0 investigations, audit reports, decision-quality writeups. One file per finding; never paste full findings into trackers.
+- **Per-session closures** → `docs/closures/YYYY-MM-DD-<session-name>.md` (Pattern B). Replaces the legacy "append to ROADMAP closed-items log" pattern. Run `python3 scripts/concat_closed_log.py` to regenerate `docs/closed-items-log.md` for a flat view. See `docs/closures/README.md`.
+- **Frozen closure log** → `ROADMAP.md` `### Closed items (log)`. Archived through 2026-04-23. Read-only; new closures land in `docs/closures/` per above.
+- **Small one-offs** → `docs/plans/2026-04-23-phase-b-c-execution-plan.md §8`, referenced from `ROADMAP.md` `### Current backlog` when an item warrants a backlog row.
+
+**Rule:** closing an item requires updating every tracker that references it (per §3). Run `python3 scripts/hygiene/audit_tracker_staleness.py` if in doubt about which trackers carry the item.
+
+---
+
 ## Related
 
 - `docs/SESSION_NAMING.md` — session / branch naming convention.
