@@ -2348,7 +2348,7 @@ CREATE TABLE ticker_flow_stats (
 
 ### `_cache_openfigi`
 
-- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 cache (migration 003); surface for later resolution.
+- **Source bucket:** prod only — Active writer outside REGISTRY — `scripts/build_cusip.py` + `scripts/run_openfigi_retry.py`. Registration pending (see ROADMAP / DEFERRED_FOLLOWUPS after C2).
 - **Object type:** BASE TABLE
 - **Row count:** 15,807 (as of 2026-04-23)
 - **Columns:** 7
@@ -2371,7 +2371,7 @@ CREATE TABLE _cache_openfigi (
 
 ### `admin_preferences`
 
-- **Source bucket:** prod only — registry gap — admin app table (migration 016, p2-07); surface for later resolution.
+- **Source bucket:** prod only — Admin app table — created by migration 016, 0 rows, no writer/reader found in `scripts/` `web/` `tests/`. Likely stub for unfinished feature; confirm before registering.
 - **Object type:** BASE TABLE
 - **Row count:** 0 (as of 2026-04-23)
 - **Columns:** 4
@@ -2391,7 +2391,7 @@ CREATE TABLE admin_preferences (
 
 ### `admin_sessions`
 
-- **Source bucket:** prod only — registry gap — admin app table (migration 009, sec-01); surface for later resolution.
+- **Source bucket:** prod only — Active writer outside REGISTRY — admin app session store (`scripts/admin_bp.py`). Registration pending.
 - **Object type:** BASE TABLE
 - **Row count:** 9 (as of 2026-04-23)
 - **Columns:** 7
@@ -2414,7 +2414,7 @@ CREATE TABLE admin_sessions (
 
 ### `cusip_classifications`
 
-- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 classification layer (migration 003); surface for later resolution.
+- **Source bucket:** prod only — Active writer outside REGISTRY — CUSIP/ticker classification pipeline. Read by `enrich_holdings`. Registration pending.
 - **Object type:** BASE TABLE
 - **Row count:** 430,149 (as of 2026-04-23)
 - **Columns:** 33
@@ -2463,7 +2463,7 @@ CREATE TABLE cusip_classifications (
 
 ### `cusip_retry_queue`
 
-- **Source bucket:** prod only — registry gap — pre-existing CUSIP v1.4 OpenFIGI retry queue (migration 003); surface for later resolution.
+- **Source bucket:** prod only — Active writer outside REGISTRY — OpenFIGI retry pipeline. Registration pending.
 - **Object type:** BASE TABLE
 - **Row count:** 37,929 (as of 2026-04-23)
 - **Columns:** 13
@@ -2492,7 +2492,7 @@ CREATE TABLE cusip_retry_queue (
 
 ### `fund_holdings`
 
-- **Source bucket:** prod only — registry gap — legacy table flagged for retire (canonical_ddl.md §2 says "dropped 2026-04-13 Stage 5" but 22,030 rows still in prod); surface for later resolution.
+- **Source bucket:** prod only — Legacy Stage 5 table. Only retired writers/readers remain (`scripts/retired/`). Retire candidate — B3 2-cycle gate scope.
 - **Object type:** BASE TABLE
 - **Row count:** 22,030 (as of 2026-04-23)
 - **Columns:** 19
@@ -2525,7 +2525,7 @@ CREATE TABLE fund_holdings (
 
 ### `ingestion_manifest_current`
 
-- **Source bucket:** prod only — registry gap — VIEW created in migration 001; surface for later resolution.
+- **Source bucket:** prod only — DB-native view over `ingestion_manifest` (created by migration 001). Views intentionally excluded from REGISTRY.
 - **Object type:** VIEW
 - **Row count:** 73,244 (as of 2026-04-23)
 - **Columns:** 26
@@ -2538,7 +2538,7 @@ CREATE VIEW ingestion_manifest_current AS SELECT m.* FROM ingestion_manifest AS 
 
 ### `schema_versions`
 
-- **Source bucket:** prod only — registry gap — migration metadata table; surface for later resolution.
+- **Source bucket:** prod only — DB-native migration metadata. Written by every migration. Intentionally excluded from REGISTRY.
 - **Object type:** BASE TABLE
 - **Row count:** 18 (as of 2026-04-23)
 - **Columns:** 3
