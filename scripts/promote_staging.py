@@ -144,12 +144,50 @@ def _snapshot_name(table: str, sid: str) -> str:
     return f"{table}_snapshot_{sid}"
 
 
+def _register_snapshot(con, snap: str, base_table: str) -> None:
+    """Record the snapshot in ``snapshot_registry`` under the default
+    14-day retention policy. Graceful no-op if the registry table does
+    not exist — allows promote_staging.py to run against a staging DB
+    that has not yet applied migration 018 (the enforcement script is
+    always run against production where 018 is a precondition).
+
+    Creation metadata is fixed: every promote_staging snapshot is a
+    pre-promote rollback artifact. The enforcement script (see
+    ``scripts/hygiene/snapshot_retention.py``) drops rows where
+    ``expiration <= today()``; carve-outs and custom purposes must be
+    edited directly in the registry after the fact.
+    """
+    has_registry = con.execute(
+        "SELECT 1 FROM duckdb_tables() WHERE table_name = 'snapshot_registry'"
+    ).fetchone()
+    if not has_registry:
+        return
+    # INSERT OR IGNORE because a rerun with the same snapshot_id will
+    # DROP + recreate the snapshot table but keep the registry row —
+    # the original created_at + expiration still describe the data.
+    con.execute(
+        """
+        INSERT OR IGNORE INTO snapshot_registry (
+            snapshot_table_name, base_table, created_at, created_by,
+            purpose, expiration, approver, applied_policy, notes
+        ) VALUES (
+            ?, ?, NOW(), 'scripts/promote_staging.py',
+            'Pre-promote rollback snapshot',
+            CAST(NOW() AS DATE) + INTERVAL 14 DAY,
+            NULL, 'default_14d', NULL
+        )
+        """,
+        [snap, base_table],
+    )
+
+
 def _take_snapshot(con, snapshot_id: str, tables: list[str]) -> None:
     _log(f"  taking snapshot {snapshot_id} ...")
     for t in tables:
         snap = _snapshot_name(t, snapshot_id)
         con.execute(f"DROP TABLE IF EXISTS {snap}")
         con.execute(f"CREATE TABLE {snap} AS SELECT * FROM {t}")
+        _register_snapshot(con, snap, t)
         n = con.execute(f"SELECT COUNT(*) FROM {snap}").fetchone()[0]
         _log(f"    snapshot {snap}: {n} rows")
 
