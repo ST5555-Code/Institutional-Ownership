@@ -1038,6 +1038,20 @@ Session scope: design decision per table, then add `DatasetSpec` entries in one 
 
 Low-medium risk. ~45-60 min.
 
+**Execution notes — 2026-04-24 (`registry-gap-sweep` session):**
+
+Registered 2 of 4 tables in scope; 2 deliberately unregistered with documented rationale. `cusip_classifications` was listed in the §8.4 scope above but proved to be out-of-scope in the executing session (C1 `Registration pending` annotation notwithstanding) — deferred to a follow-up sweep.
+
+Registered:
+- `_cache_openfigi` → `layer=3`, `promote_strategy="upsert"`, `promote_key=("cusip",)`. Aligns REGISTRY with the existing de-facto L3 classification in `docs/data_layers.md §2` (row 138: "L3 (reference cache)") and `scripts/pipeline/validate_schema_parity.py` `L3_TABLES` (line 82). A distinct `"cache"` layer tag would be a type-invariant change (`layer: int` → Union/Enum) — deferred.
+- `cusip_retry_queue` → `layer=0`, `promote_strategy="direct_write"`, `promote_key=("cusip",)`. Matches the `pending_entity_resolution` queue-at-L0 precedent. Notes document the split vs `cusip_classifications` (operational queue vs deliverable output).
+
+Deliberately unregistered:
+- `admin_preferences` — 0-row stub from migration 016; no writer/reader found. Registering a stub locks in a design decision on an unbuilt feature. Re-evaluate when admin feature set is next revisited.
+- `admin_sessions` — **multi-DB scope issue.** Lives in `data/admin.duckdb` (per `scripts/admin_bp.py:116`, `scripts/pipeline/validate_schema_parity.py:117`), not prod `13f.duckdb`. Registering it violates the DATASET_REGISTRY invariant (`scripts/pipeline/registry.py` docstring lines 13-14: "every table listed in `SHOW TABLES` on prod") and would corrupt `unclassified_tables()` comparisons against prod. Proper fix requires extending `DatasetSpec` with a `db_file` field — tracked as a ROADMAP Current-backlog entry: `multi-db-datasetspec`.
+
+See ROADMAP Current backlog for the 2 follow-up lines.
+
 ---
 
 ## §9 — Still-open real backlog

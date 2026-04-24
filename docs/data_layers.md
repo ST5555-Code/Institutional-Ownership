@@ -2348,7 +2348,7 @@ CREATE TABLE ticker_flow_stats (
 
 ### `_cache_openfigi`
 
-- **Source bucket:** prod only — Active writer outside REGISTRY — `scripts/build_cusip.py` + `scripts/run_openfigi_retry.py`. Registration pending (see ROADMAP / DEFERRED_FOLLOWUPS after C2).
+- **Source bucket:** Registered 2026-04-24 (`registry-gap-sweep`). Layer: 3 (upsert on `cusip`). Writers: `scripts/build_cusip.py` (primary) + `scripts/run_openfigi_retry.py`. Aligned with de-facto L3 classification in §2 and `scripts/pipeline/validate_schema_parity.py` `L3_TABLES`.
 - **Object type:** BASE TABLE
 - **Row count:** 15,807 (as of 2026-04-23)
 - **Columns:** 7
@@ -2371,7 +2371,7 @@ CREATE TABLE _cache_openfigi (
 
 ### `admin_preferences`
 
-- **Source bucket:** prod only — Admin app table — created by migration 016, 0 rows, no writer/reader found in `scripts/` `web/` `tests/`. Likely stub for unfinished feature; confirm before registering.
+- **Source bucket:** Deliberately unregistered 2026-04-24 (`registry-gap-sweep`) — 0-row stub from migration 016; no writer/reader found. Tracked in ROADMAP Current backlog (`admin_preferences`). Re-evaluate when admin feature set is next revisited. Also blocked on `multi-db-datasetspec` if retained in `data/admin.duckdb`.
 - **Object type:** BASE TABLE
 - **Row count:** 0 (as of 2026-04-23)
 - **Columns:** 4
@@ -2391,7 +2391,7 @@ CREATE TABLE admin_preferences (
 
 ### `admin_sessions`
 
-- **Source bucket:** prod only — Active writer outside REGISTRY — admin app session store (`scripts/admin_bp.py`). Registration pending.
+- **Source bucket:** Deliberately unregistered 2026-04-24 (`registry-gap-sweep`) — lives in `data/admin.duckdb` (per `scripts/admin_bp.py:116`, `scripts/pipeline/validate_schema_parity.py:117`), outside the single-DB scope of `DATASET_REGISTRY`. Registering would corrupt `unclassified_tables()` invariant (registry assumes prod `13f.duckdb` per `scripts/pipeline/registry.py:13-14`). Tracked via `multi-db-datasetspec` ROADMAP backlog entry.
 - **Object type:** BASE TABLE
 - **Row count:** 9 (as of 2026-04-23)
 - **Columns:** 7
@@ -2463,7 +2463,7 @@ CREATE TABLE cusip_classifications (
 
 ### `cusip_retry_queue`
 
-- **Source bucket:** prod only — Active writer outside REGISTRY — OpenFIGI retry pipeline. Registration pending.
+- **Source bucket:** Registered 2026-04-24 (`registry-gap-sweep`). Layer: 0 (direct_write, key `cusip`). Seeded by `scripts/build_classifications.py`; drained + status-updated by `scripts/run_openfigi_retry.py`. Same L0 bucket as `pending_entity_resolution` (queue precedent). Distinct from `cusip_classifications` (L3 authoritative output) — split is operational (queue) vs deliverable (output).
 - **Object type:** BASE TABLE
 - **Row count:** 37,929 (as of 2026-04-23)
 - **Columns:** 13
