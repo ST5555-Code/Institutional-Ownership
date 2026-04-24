@@ -44,7 +44,7 @@ US_PRICEABLE_EXCHANGES = frozenset({
 # OpenFIGI v3 per-listing exchCodes for US venues. Used to pick the
 # preferred listing when the API returns multiple entries per CUSIP
 # (US composite + Frankfurt/XETRA/OTC secondary listings). See
-# docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md RC1.
+# docs/findings/2026-04-18-block-securities-data-audit.md RC1.
 US_PRICEABLE_EXCHCODES = frozenset({
     'US',                                              # composite
     'UA', 'UB', 'UC', 'UD', 'UF', 'UM', 'UN',

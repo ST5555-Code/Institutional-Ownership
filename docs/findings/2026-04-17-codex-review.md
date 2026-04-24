@@ -5,7 +5,7 @@
 ## Meta
 - HEAD at review: `da418a1e8cf766db8089026c2d50ef981ae41ae1`
 - Atlas consumed: `.claude/worktrees/competent-meitner-ac5cdf/docs/SYSTEM_ATLAS_2026_04_17.md` (54,581 bytes, 675 lines)
-- Docs consumed: `ROADMAP.md`, `ARCHITECTURE_REVIEW.md`, `ENTITY_ARCHITECTURE.md`, `MAINTENANCE.md`, `REACT_MIGRATION.md`, `Plans/admin_refresh_system_design.md`, `docs/PROCESS_RULES.md`, `docs/pipeline_inventory.md`, `docs/pipeline_violations.md`, `docs/data_layers.md`, `docs/CLASSIFICATION_METHODOLOGY.md`, `docs/NEXT_SESSION_CONTEXT.md`, `docs/endpoint_classification.md`, remaining `docs/*.md`; note that the prompt's `docs/admin_refresh_system_design.md` and `docs/data_sources.md` currently resolve to `Plans/admin_refresh_system_design.md` and `Plans/data_sources.md` instead (`Plans/admin_refresh_system_design.md:31`, read-only repo check)
+- Docs consumed: `ROADMAP.md`, `ARCHITECTURE_REVIEW.md`, `ENTITY_ARCHITECTURE.md`, `MAINTENANCE.md`, `archive/docs/REACT_MIGRATION.md`, `Plans/admin_refresh_system_design.md`, `docs/PROCESS_RULES.md`, `docs/pipeline_inventory.md`, `docs/pipeline_violations.md`, `docs/data_layers.md`, `docs/CLASSIFICATION_METHODOLOGY.md`, `docs/NEXT_SESSION_CONTEXT.md`, `docs/endpoint_classification.md`, remaining `docs/*.md`; note that the prompt's `docs/admin_refresh_system_design.md` and `docs/data_sources.md` currently resolve to `Plans/admin_refresh_system_design.md` and `Plans/data_sources.md` instead (`Plans/admin_refresh_system_design.md:31`, read-only repo check)
 - Code surface covered: 115 scripts, 44,650 lines under `scripts/` (read-only repo scan)
 - Total findings: 39 (AGREE-WITH-ATLAS: 27, DISAGREE-WITH-ATLAS: 5, NEW: 7)
 
@@ -43,8 +43,8 @@
 | DOC-01 | **CONFIRMED** | README still promotes retired entry points [`README.md:23-38`, `:107-122`]. |
 | DOC-02 | **CONFIRMED** | README tree still omits the current API/router/pipeline/migrations layout [`README.md:109-140`; `scripts/app.py:6-20`]. |
 | DOC-03 | **CONFIRMED** | `PHASE3_PROMPT.md` still instructs use of retired `fetch_nport.py` (atlas §5.2.2). |
-| DOC-04 | **CONFIRMED** | `ARCHITECTURE_REVIEW.md` still says React Phase 4 cutover is pending [`ARCHITECTURE_REVIEW.md:51-52`] while `REACT_MIGRATION.md` says cutover completed on 2026-04-13 [`REACT_MIGRATION.md:120`]. |
-| DOC-05 | **CONFIRMED** | Deploy doc still lacks the React build prerequisite [`README_deploy.md:46-47`; `REACT_MIGRATION.md:120-121`]. |
+| DOC-04 | **CONFIRMED** | `ARCHITECTURE_REVIEW.md` still says React Phase 4 cutover is pending [`ARCHITECTURE_REVIEW.md:51-52`] while `archive/docs/REACT_MIGRATION.md` says cutover completed on 2026-04-13 [`archive/docs/REACT_MIGRATION.md:120`]. |
+| DOC-05 | **CONFIRMED** | Deploy doc still lacks the React build prerequisite [`docs/deployment.md:46-47`; `archive/docs/REACT_MIGRATION.md:120-121`]. |
 | DOC-06 | **CONFIRMED** | `docs/write_path_risk_map.md` is stale relative to shipped rewrites/retirements (atlas §5.2.5). |
 | DOC-10 | **CONFIRMED** | Prompt/history docs are still orphaned or untracked as atlas notes (atlas §5.1/§5.5). |
 | DOC-11 | **CONFIRMED** | `docs/data_layers.md` still claims 84.47% `fund_holdings_v2.entity_id` coverage [`docs/data_layers.md:92`] while prod is 40.09% now (read-only SQL). |
@@ -69,7 +69,7 @@
 | P-06 | **DOWNGRADE to CLEAN** | Missing a dedicated log file for the 2026-04-17 promote is weak evidence. The data freshness and impacts timestamps do show the run completed; stdout-routing is plausible and consistent with current tooling. |
 | R-01 | **PROMOTE to CONFIRMED** | Small drift, but real: Roadmap says 928 exclusions while prod currently has 931 (`ROADMAP.md:3`; read-only SQL). |
 | DOC-07 | **DOWNGRADE to CLEAN** | Atlas misses that `fetch_13dg_v2.py` still imports `_clean_text` and `_extract_fields` from `fetch_13dg.py` [`scripts/fetch_13dg_v2.py:60`, `:214-215`]. So `PROCESS_RULES.md` naming `fetch_13dg.py` in parser-sync guidance is stale in form but still functionally relevant [`docs/PROCESS_RULES.md:93-99`]. |
-| DOC-08 | **DOWNGRADE to CLEAN** | `REACT_MIGRATION.md:121` accurately says `web/templates/index.html` was deleted; it does not claim `admin.html` was deleted. The atlas over-read that line. |
+| DOC-08 | **DOWNGRADE to CLEAN** | `archive/docs/REACT_MIGRATION.md:121` accurately says `web/templates/index.html` was deleted; it does not claim `admin.html` was deleted. The atlas over-read that line. |
 | DOC-09 | **PROMOTE to CONFIRMED** | `docs/CLASSIFICATION_METHODOLOGY.md` still references 20,205 entities [`docs/CLASSIFICATION_METHODOLOGY.md:11-13`, `:29-30`] while prod is at 26,535 now (read-only SQL). |
 | DOC-12 | **PROMOTE to CONFIRMED** | There is still no architecture doc for the split API router surface beyond the endpoint inventory [`docs/endpoint_classification.md:65-75`; `scripts/app.py:6-20`, `:73-77`]. |
 | O-01 | **DOWNGRADE to CLEAN** | `Plans/` being untracked is a repo hygiene choice, not an operational defect by itself. |
@@ -85,7 +85,7 @@
 
 1. Atlas O-02 and O-03 are stale after the FastAPI cutover. The current app does not import Flask, and smoke CI is correctly aligned to the FastAPI runtime [`scripts/app.py:28-31`; `.github/workflows/smoke.yml:24-39`].
 2. Atlas DOC-07 overstates `PROCESS_RULES.md` drift. `fetch_13dg.py` is retired as a writer, but it is still the parser-helper source imported by v2 [`scripts/fetch_13dg_v2.py:60`, `:214-215`].
-3. Atlas DOC-08 overstates the `REACT_MIGRATION.md` error. The doc says `web/templates/index.html` was deleted, which is true; `admin.html` surviving is not a contradiction on that line [`REACT_MIGRATION.md:121`; repo file check].
+3. Atlas DOC-08 overstates the `archive/docs/REACT_MIGRATION.md` error. The doc says `web/templates/index.html` was deleted, which is true; `admin.html` surviving is not a contradiction on that line [`archive/docs/REACT_MIGRATION.md:121`; repo file check].
 4. Atlas C-03 is not prod-write drift. `validate_classifications.py` reopens RW only on staging to attach prod read-only [`scripts/validate_classifications.py:145-154`].
 5. Atlas P-03 mistakes a scoped-history/control-plane limitation for a live fetch failure. The sparse 13DG manifest history is real, but it is not strong evidence that the current fetcher is failing [`scripts/fetch_13dg_v2.py:12-15`].
 
@@ -135,10 +135,10 @@
 ## 4. Cross-Doc Contradictions
 
 1. **BLOCK:** `ENTITY_ARCHITECTURE.md` says Stage 5 dropped legacy `holdings`, `fund_holdings`, and `beneficial_ownership` on 2026-04-13 [`ENTITY_ARCHITECTURE.md:287-293`], while `MAINTENANCE.md` says the drop is only authorized on or after 2026-05-09 [`MAINTENANCE.md:120-123`], and prod still contains `fund_holdings` with fresh rows (read-only SQL).
-2. **BLOCK:** `ARCHITECTURE_REVIEW.md` still describes a Flask monolith with React Phase 4 pending [`ARCHITECTURE_REVIEW.md:43-52`], but `scripts/app.py` is now a FastAPI entry point with split routers [`scripts/app.py:1-20`, `:73-77`] and `REACT_MIGRATION.md` says Phase 4 completed on 2026-04-13 [`REACT_MIGRATION.md:120-121`].
+2. **BLOCK:** `ARCHITECTURE_REVIEW.md` still describes a Flask monolith with React Phase 4 pending [`ARCHITECTURE_REVIEW.md:43-52`], but `scripts/app.py` is now a FastAPI entry point with split routers [`scripts/app.py:1-20`, `:73-77`] and `archive/docs/REACT_MIGRATION.md` says Phase 4 completed on 2026-04-13 [`archive/docs/REACT_MIGRATION.md:120-121`].
 3. **MAJOR:** `docs/data_layers.md` still reports 84.47% `fund_holdings_v2` entity coverage and 9 `data_freshness` rows [`docs/data_layers.md:92`, `:132-135`], while current prod is 40.09% coverage and 13 freshness rows (read-only SQL).
 4. **MAJOR:** `Plans/admin_refresh_system_design.md` references `docs/data_sources.md` [`Plans/admin_refresh_system_design.md:31`, `:737`, `:799`], but the file currently exists as `Plans/data_sources.md`, not under `docs/` (repo file check). The design docs already disagree with repo layout.
-5. **MAJOR:** `README_deploy.md` still describes a pure Python deploy path [`README_deploy.md:46-47`] while `REACT_MIGRATION.md` makes the React build a prerequisite [`REACT_MIGRATION.md:120-121`].
+5. **MAJOR:** `docs/deployment.md` still describes a pure Python deploy path [`docs/deployment.md:46-47`] while `archive/docs/REACT_MIGRATION.md` makes the React build a prerequisite [`archive/docs/REACT_MIGRATION.md:120-121`].
 6. **MINOR:** `CLASSIFICATION_METHODOLOGY.md` still frames classification coverage around 20,205 entities [`docs/CLASSIFICATION_METHODOLOGY.md:11-13`, `:29-30`] while prod MDM is now 26,535 entities (read-only SQL).
 
 ## 5. Extensions Beyond Atlas
@@ -197,5 +197,5 @@
 
 1. Atlas O-02/O-03 vs current code: Flask is no longer a runtime dependency of `scripts/app.py`; only `edgar` and `pdfplumber` remain genuinely unpinned [`scripts/app.py:28-31`; `requirements.txt:1-14`; `scripts/entity_sync.py:751`; `scripts/fetch_nport_v2.py:423-424`].
 2. Atlas DOC-07: `PROCESS_RULES.md` naming `fetch_13dg.py` is stale in presentation but not fully wrong because v2 still imports its parser helpers [`docs/PROCESS_RULES.md:93-99`; `scripts/fetch_13dg_v2.py:60`, `:214-215`].
-3. Atlas DOC-08: `REACT_MIGRATION.md:121` is accurate about deleting `web/templates/index.html`; the surviving `admin.html` is not a contradiction on that line.
+3. Atlas DOC-08: `archive/docs/REACT_MIGRATION.md:121` is accurate about deleting `web/templates/index.html`; the surviving `admin.html` is not a contradiction on that line.
 4. The prompt's doc paths (`docs/admin_refresh_system_design.md`, `docs/data_sources.md`) do not match repo reality (`Plans/...`). Human reconciliation is needed before that design work resumes.

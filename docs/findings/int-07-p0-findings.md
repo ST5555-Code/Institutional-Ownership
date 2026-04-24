@@ -8,7 +8,7 @@
 
 ## 1. Gate definition — source
 
-Source: [docs/BLOCK_TICKER_BACKFILL_FINDINGS.md §8](../BLOCK_TICKER_BACKFILL_FINDINGS.md) — *Phase 2 gate — post-Phase 1 validation*.
+Source: [docs/findings/2026-04-18-block-ticker-backfill.md §8](2026-04-18-block-ticker-backfill.md) — *Phase 2 gate — post-Phase 1 validation*.
 
 Three-part gate on the `benchmark_weights` table (written by [scripts/build_benchmark_weights.py](../../scripts/build_benchmark_weights.py) from Vanguard Total Stock Market series `S000002848`):
 

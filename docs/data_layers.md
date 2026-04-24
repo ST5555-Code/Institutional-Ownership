@@ -90,7 +90,7 @@ bottom.
 | `filings_deduped` | L3 | derived from `filings` | rebuild | 40,140 rows; dedup-on-accession view materialized as table |
 | `holdings_v2` | L3 | `load_13f_v2.py` (`SourcePipeline`) → `enrich_holdings.py` | append_is_latest (migration 015 added `is_latest`, `loaded_at`, `backfill_quality`) | **12,270,984 rows** (2026-04-16); canonical 13F fact table; Group 3 fully enriched (ticker 91.49% / sti 100% / mvl 77.64% / pof 61.83%) |
 | `fund_holdings_v2` | L3 | `scripts/pipeline/load_nport.py` (`SourcePipeline`, w2-03; imports `fetch_dera_nport.py` + `pipeline/nport_parsers.py`) → `enrich_holdings.py --fund-holdings` | append_is_latest (migration 015 added `accession_number`, `is_latest`, `backfill_quality`) | **14,090,397 rows** (verified 2026-04-21 post-BLOCK-2 + CUSIP v1.4); 14,060 distinct series; newest `report_date` 2026-02-28 (Mar 2026 not yet on EDGAR); DERA bulk path is primary; `entity_id` coverage **84.13%** (11,854,576 / 14,090,397 non-NULL; verified 2026-04-21 SQL against prod — stable post-BLOCK-2 backfill 2026-04-17 and CUSIP v1.4 classifications promote 2026-04-15; 1,187 NULL series remain as deferred synthetics, resolution tracked in audit §10.1); maintained by `scripts/enrich_fund_holdings_v2.py` |
-| `beneficial_ownership_v2` | L3 | `scripts/pipeline/load_13dg.py` (`SourcePipeline`, w2-01) → `enrich_13dg.py` (design: `docs/13DG_ENTITY_LINKAGE.md`) | append_is_latest (migration 015 added `is_latest`, `backfill_quality`) | 51,905 rows; canonical 13D/G fact table. Group 2 entity columns (`entity_id`, `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`, `dm_rollup_name`) enriched at **94.52%** (49,059 rows; was 77.08% pre-session #11). Coverage jump from 2026-04-17 13D/G filer resolution (commit `5efae66`, +1,640 new institution entities + 23 CIK-merges to existing entities; `scripts/resolve_13dg_filers.py` + `data/reference/13dg_filer_research_v2.csv`) |
+| `beneficial_ownership_v2` | L3 | `scripts/pipeline/load_13dg.py` (`SourcePipeline`, w2-01) → `enrich_13dg.py` (design: `docs/findings/2026-04-16-13dg-entity-linkage.md`) | append_is_latest (migration 015 added `is_latest`, `backfill_quality`) | 51,905 rows; canonical 13D/G fact table. Group 2 entity columns (`entity_id`, `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`, `dm_rollup_name`) enriched at **94.52%** (49,059 rows; was 77.08% pre-session #11). Coverage jump from 2026-04-17 13D/G filer resolution (commit `5efae66`, +1,640 new institution entities + 23 CIK-merges to existing entities; `scripts/resolve_13dg_filers.py` + `data/reference/13dg_filer_research_v2.csv`) |
 | `beneficial_ownership_current` | L4 | `promote_13dg.py` + `scripts/pipeline/shared.rebuild_beneficial_ownership_current` | rebuild | 24,756 rows; latest-per-(filer_cik, subject_ticker) with amendment logic; now carries all 5 entity columns from BO v2 (18,229 rows / 73.64% enriched) |
 | `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,835 rows** (2026-04-16 part 2, +235 from Tier A+B re-promote); now includes bond / index / MM funds via DERA path. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
 | `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 8 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `is_otc`, `ticker_expected`, `is_active`, `figi`). `is_otc` identifies OTC grey-market rows (Rule A ∪ Rule B, 850 priceable CUSIPs — see §6 **S1**, resolved int-13 / migration 012). Liquid-only queries compose `WHERE is_priceable AND NOT is_otc`. Formal PRIMARY KEY / UNIQUE on `cusip` is empirical-only, not declared; VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
@@ -133,7 +133,7 @@ bottom.
 | `ingestion_manifest` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,253 rows** (2026-04-16) — live since migration 001 (Batch 1). DERA_ZIP and per-accession keys for N-PORT |
 | `ingestion_impacts` | L0 | `scripts/pipeline/manifest.py` | direct_write | **21,245 rows** (2026-04-16) — one per promoted `(series_id, report_month)` tuple plus per-quarter DERA ZIP impacts |
 | `pending_entity_resolution` | L0 | `scripts/pipeline/shared.entity_gate_check()` + `validate_nport_subset.py` + `resolve_pending_series.py` + `resolve_13dg_filers.py --prod-exclusions` | direct_write | **6,874 rows** (2026-04-17 session #11 close). Breakdown: `13DG` source_type — 921 `excluded_individual` + 2 `excluded_law_firm` + 5 `excluded_other` + 3 legacy `pending` (from session #2); `NPORT` source_type — 4,420 `resolved` / 1,523 `pending`. 13D/G exclusions landed via new `resolve_13dg_filers.py --prod-exclusions` flag (commit `5efae66`, prod-direct because table is not in `db.ENTITY_TABLES` scope). Separate from the 2,591 13D/G-only filer CIKs that were resolved via MERGE/NEW_ENTITY into the MDM |
-| `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, `is_otc` (migration 012, int-13 / INF29), ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py`. Residual coverage gap: ~81 malformed CUSIPs from upstream ingest + legitimately-new CUSIPs in future ingestion — see ROADMAP **INF27** and `BLOCK_TICKER_BACKFILL_FINDINGS.md §10.1`. VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
+| `cusip_classifications` | L3 | `build_classifications.py` + `run_openfigi_retry.py` | upsert on cusip | **132,618 rows** (migration 003, prod promoted 2026-04-15) — canonical_type, is_equity, is_priceable, `is_otc` (migration 012, int-13 / INF29), ticker_expected, OpenFIGI metadata. Feeds `normalize_securities.py`. Residual coverage gap: ~81 malformed CUSIPs from upstream ingest + legitimately-new CUSIPs in future ingestion — see ROADMAP **INF27** and `2026-04-18-block-ticker-backfill.md §10.1`. VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
 | `cusip_retry_queue` | L0 | `build_classifications.py` + `run_openfigi_retry.py` | direct_write | **37,925 rows** — 15,807 resolved via OpenFIGI, 22,118 unmappable (private / delisted / exotic); status = pending \| resolved \| unmappable |
 | `_cache_openfigi` | L3 (reference cache) | `run_openfigi_retry.py` | upsert on cusip | **15,807 rows** — full v3 response per CUSIP (figi, ticker, exchange, security_type, market_sector). Durable cache; survives re-runs |
 | `schema_versions` | L0 | migration scripts (001–017) | direct_write | Stamps through migration 017. Newly stamped under Phase 2 + Wave 2: **015** `amendment_semantics` (is_latest / loaded_at / backfill_quality on 3 amendable tables); **016** `admin_preferences`; **017** `ncen_scd_columns` (valid_from / valid_to on `ncen_adviser_map`). |
@@ -711,7 +711,7 @@ full point-in-time reference and supports:
 
 **Subsection cross-references.** `ENTITY_ARCHITECTURE.md → Design
 Decision Log` carries the dated rationale entry (2026-04-19);
-`docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the Rewrite5
+`docs/findings/2026-04-19-rewrite-build-managers.md` documents the Rewrite5
 application of this pattern.
 
 **Cross-references.**
@@ -780,9 +780,9 @@ retired table is a writer that needs repointing or deletion, not just
 a reader that needs rewriting.
 
 **Cross-references.**
-- `docs/REWRITE_LOAD_13F_FINDINGS.md` — Rewrite4 Phase 0 addendum
+- `docs/findings/2026-04-19-rewrite-load-13f.md` — Rewrite4 Phase 0 addendum
   documents the OTHERMANAGER2 recovery.
-- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` — Rewrite5 documents the
+- `docs/findings/2026-04-19-rewrite-build-managers.md` — Rewrite5 documents the
   `build_managers.py` + `backfill_manager_types.py` repoints.
 - `docs/pipeline_violations.md` — each affected script carries a
   CLEARED note with commit citations (2026-04-19).
@@ -845,7 +845,7 @@ policy).
 **Cross-references.**
 - `ARCHITECTURE_REVIEW.md §Batch 3-A` carries the sibling note on
   `fund_family_patterns` + `data_freshness` table additions.
-- `docs/REWRITE_BUILD_MANAGERS_FINDINGS.md` documents the first use of
+- `docs/findings/2026-04-19-rewrite-build-managers.md` documents the first use of
   `rebuild` kind.
 - ROADMAP → INFRASTRUCTURE → Open items → `INF30` is the
   `merge_staging.py` analogue (NULL-only / column-scoped merge mode)
@@ -904,7 +904,7 @@ residual gap looks like, and how new CUSIPs flow through the pipeline.
 
 **Current universe.** `cusip_classifications` carries **430,149 CUSIPs**
 on prod as of BLOCK-SECURITIES-DATA-AUDIT Phase 3 close (2026-04-18;
-see `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md`). `securities` mirrors
+see `docs/findings/2026-04-18-block-securities-data-audit.md`). `securities` mirrors
 the same 430,149 row population via `normalize_securities.py`. The
 §2 table-inventory row for `cusip_classifications` still cites the
 pre-Phase-3 132,618 baseline — this section is the authoritative
@@ -954,10 +954,10 @@ trigger condition for revisiting tier cadence.
 - ROADMAP → `INF27` carries the standing-tracking row.
 - ROADMAP → `INF26` — `_update_error()` hygiene fix for permanent-pending
   rows on hard errors.
-- `docs/BLOCK_TICKER_BACKFILL_FINDINGS.md §10.1` — the 2025-08+
+- `docs/findings/2026-04-18-block-ticker-backfill.md §10.1` — the 2025-08+
   `cusip_not_in_securities` step-change that originally surfaced the
   residual-gap concern.
-- `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md` — Phase 3 close that
+- `docs/findings/2026-04-18-block-securities-data-audit.md` — Phase 3 close that
   brought the universe from 132,618 → 430,149.
 - §6 **S1** — `is_priceable` semantics for grey-market rows is a
   sibling classifier-semantics concern, tracked separately.

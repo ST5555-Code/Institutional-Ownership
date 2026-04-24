@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-22 — branch `mig-11-p0` off main HEAD `25a0263`._
 
-_Tracker: `docs/REMEDIATION_PLAN.md` Theme 3 row `mig-11` (Batch 3-D). Predecessors: `mig-09` (L4 extension, PR #74) and `mig-10` (L0 extension, PR #74) both shipped. Source design: `docs/BLOCK_SCHEMA_DIFF_FINDINGS.md` §10 Q5 / §14 INF47 (deferred CI wiring)._
+_Tracker: `docs/REMEDIATION_PLAN.md` Theme 3 row `mig-11` (Batch 3-D). Predecessors: `mig-09` (L4 extension, PR #74) and `mig-10` (L0 extension, PR #74) both shipped. Source design: `docs/findings/2026-04-19-block-schema-diff.md` §10 Q5 / §14 INF47 (deferred CI wiring)._
 
 Phase 0 is investigation only. No code changes, no DB writes. READ-ONLY inspection of the workflow file, validator behaviour, fixture inventory, and test coverage — plus a design proposal for CI integration with two open questions for Serge sign-off.
 
@@ -104,7 +104,7 @@ Not executed in Phase 0 (no code runs), but behaviour is determinate from §2 + 
 **Scenario C.** `--prod fixture.duckdb --staging empty-or-sparse.duckdb --layer all`
 - Would surface the absent tables as `TABLE MISSING` rows. But CI has no "second DB" to contrast against the fixture, so this scenario is infrastructure we'd have to build before it's reachable.
 
-**Upshot.** The validator's real product — cross-DB parity between two materially-different schemas — is unreachable from CI today, exactly as flagged in `BLOCK_SCHEMA_DIFF_FINDINGS.md` §10 Q5 and §14 INF47. The fixture is built fresh from a single source and never exhibits drift against itself.
+**Upshot.** The validator's real product — cross-DB parity between two materially-different schemas — is unreachable from CI today, exactly as flagged in `2026-04-19-block-schema-diff.md` §10 Q5 and §14 INF47. The fixture is built fresh from a single source and never exhibits drift against itself.
 
 ---
 
@@ -185,7 +185,7 @@ Question: should the CI step treat validator divergences as hard failure or warn
 
 **For Option B (self-parity smoke).** Hard fail on exit 1 or 2. Exit 0 is expected; anything else means the validator itself is broken.
 
-**For Option C (cross-DB parity, future).** Hard fail, with the accept-list providing the escape valve. This matches the baseline policy from INF39 Option B (`BLOCK_SCHEMA_DIFF_FINDINGS.md` §13.2): remediate-all, zero-baseline, any new drift is real drift.
+**For Option C (cross-DB parity, future).** Hard fail, with the accept-list providing the escape valve. This matches the baseline policy from INF39 Option B (`2026-04-19-block-schema-diff.md` §13.2): remediate-all, zero-baseline, any new drift is real drift.
 
 No warning tier needed in any scenario. The accept-list already serves the "known-accepted drift" role.
 

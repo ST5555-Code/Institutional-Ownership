@@ -2,7 +2,7 @@
 
 **Session:** `plan-review-v3-2026-04-23`
 **Mode:** Read-only critique of v3's CHANGES from v2.
-**Subject:** `docs/plans/2026-04-23-phase-b-c-execution-plan.md` (commit `727e5aa`).
+**Subject:** `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md` (commit `727e5aa`).
 **Scope:** Sections new or substantially changed since v2 (per plan §10). Confirmed-in-v2 sections not re-verified.
 
 ---
@@ -24,7 +24,7 @@ Net read: v3 closes the v2 gaps (B2.5 added, §4 fresh, V-Q3 co-lands named, R1/
 
 ### C1. Phase C1 prompt enumeration won't surface any tables
 
-`docs/plans/2026-04-23-phase-b-c-execution-plan.md:493` (Phase 2 of the C1 prompt) says:
+`archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md:493` (Phase 2 of the C1 prompt) says:
 
 ```
 > grep "^### " docs/canonical_ddl.md

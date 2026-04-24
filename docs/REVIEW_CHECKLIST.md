@@ -46,7 +46,7 @@ function with `# tier4-exempt: <reason>` on the line above the `def`. Reviewer
 confirms the exemption reason is legitimate and tracked.
 
 **References.**
-- Proposal + performance + reliability evidence: `docs/proposals/tier-4-join-pattern-proposal.md`
+- Proposal + performance + reliability evidence: `archive/docs/proposals/tier-4-join-pattern-proposal.md`
 - Helper library: `scripts/queries_helpers.py`
 - Retirement tracker: `docs/DEFERRED_FOLLOWUPS.md` (INF25)
 - Principle + sequencing: `docs/data_layers.md §7`
@@ -80,7 +80,7 @@ DM15e; INF9a through INF9e.
 
 **Picking the next number.** Before opening a new item, grep for the
 prefix in `ROADMAP.md`, `docs/DEFERRED_FOLLOWUPS.md`, `docs/findings/`,
-`docs/REMEDIATION_*.md`, and `docs/closed/`. Use max(existing) + 1. Gaps in
+`docs/REMEDIATION_*.md`, and `archive/docs/closed/`. Use max(existing) + 1. Gaps in
 the sequence are NOT free to reuse — they usually represent an assigned
 number that was closed without a ROADMAP entry (e.g. absorbed into another
 item).

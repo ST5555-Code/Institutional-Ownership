@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-21 — branch `obs-08-p1` off `main` HEAD `c4e1281`._
 
-_Tracker: SYSTEM_AUDIT MINOR-16 ([docs/SYSTEM_AUDIT_2026_04_17.md:214](docs/SYSTEM_AUDIT_2026_04_17.md:214)), Atlas O-05 ([docs/SYSTEM_ATLAS_2026_04_17.md:591](docs/SYSTEM_ATLAS_2026_04_17.md:591)), Codex PROMOTE ([docs/CODEX_REVIEW_2026_04_17.md:79](docs/CODEX_REVIEW_2026_04_17.md:79))._
+_Tracker: SYSTEM_AUDIT MINOR-16 ([docs/SYSTEM_AUDIT_2026_04_17.md:214](docs/SYSTEM_AUDIT_2026_04_17.md:214)), Atlas O-05 ([docs/SYSTEM_ATLAS_2026_04_17.md:591](docs/SYSTEM_ATLAS_2026_04_17.md:591)), Codex PROMOTE ([docs/findings/2026-04-17-codex-review.md:79](docs/findings/2026-04-17-codex-review.md:79))._
 
 ---
 
@@ -231,7 +231,7 @@ Both updates are in this PR.
 
 - Atlas drift table [docs/SYSTEM_ATLAS_2026_04_17.md:591](docs/SYSTEM_ATLAS_2026_04_17.md:591).
 - Audit tracker [docs/SYSTEM_AUDIT_2026_04_17.md:214](docs/SYSTEM_AUDIT_2026_04_17.md:214), action-list [docs/SYSTEM_AUDIT_2026_04_17.md:352](docs/SYSTEM_AUDIT_2026_04_17.md:352).
-- Codex promote rationale [docs/CODEX_REVIEW_2026_04_17.md:79](docs/CODEX_REVIEW_2026_04_17.md:79).
+- Codex promote rationale [docs/findings/2026-04-17-codex-review.md:79](docs/findings/2026-04-17-codex-review.md:79).
 - On-disk `du -sh data/backups/*/` run 2026-04-21.
 - Parquet diff `diff <(ls data/backups/…_222950/) <(ls data/backups/…_040227/)` run 2026-04-21.
 - Commit `d50b602` authored the `positions` drop + control-plane add.

@@ -8,7 +8,7 @@
 
 ## 1. Design source — BLOCK_TICKER_BACKFILL_FINDINGS
 
-Source: [docs/BLOCK_TICKER_BACKFILL_FINDINGS.md](../BLOCK_TICKER_BACKFILL_FINDINGS.md).
+Source: [docs/findings/2026-04-18-block-ticker-backfill.md](2026-04-18-block-ticker-backfill.md).
 
 - §6 *Fix shape* — proposed the subprocess-hook design (Phase 1b), initially at end of `build_cusip.py` only.
 - §10.2 *Phase 1b hook placement verification* — verified the full `securities` writer landscape and escalated to **option (d): hook at end of BOTH `build_cusip.py` AND `normalize_securities.py`**, because either script can be the last writer in a given pipeline session.
@@ -133,7 +133,7 @@ Rationale: the parent script's write is already committed and checkpointed at th
 
 ### 4.4 Why no `--no-enrich` is the right call
 
-The design is `NO_UNCONDITIONAL_FLAG`: hooks fire on every real invocation, and test paths route to staging via `--staging` or skip the parent entirely. Adding a kill-switch without a named consumer is speculative surface area — rejected per `BLOCK_TICKER_BACKFILL_FINDINGS.md §10.2` recommendation (d).
+The design is `NO_UNCONDITIONAL_FLAG`: hooks fire on every real invocation, and test paths route to staging via `--staging` or skip the parent entirely. Adding a kill-switch without a named consumer is speculative surface area — rejected per `2026-04-18-block-ticker-backfill.md §10.2` recommendation (d).
 
 ---
 
@@ -194,8 +194,8 @@ If the tail line is absent or shows `[warn] post-build ticker backfill hook fail
 
 ## 8. Cross-references
 
-- [docs/BLOCK_TICKER_BACKFILL_FINDINGS.md](../BLOCK_TICKER_BACKFILL_FINDINGS.md) §6, §10.2 — design spec
-- [docs/reports/block_ticker_backfill_closeout_20260418_205753.md](../reports/block_ticker_backfill_closeout_20260418_205753.md) — merge closeout report confirming hooks shipped
+- [docs/findings/2026-04-18-block-ticker-backfill.md](2026-04-18-block-ticker-backfill.md) §6, §10.2 — design spec
+- [archive/docs/reports/block_ticker_backfill_closeout_20260418_205753.md](../../archive/docs/reports/block_ticker_backfill_closeout_20260418_205753.md) — merge closeout report confirming hooks shipped
 - [docs/findings/int-05-p0-findings.md](int-05-p0-findings.md) — retroactive sweep NO-OP (sibling item)
 - [docs/findings/int-01-p0-findings.md:197](int-01-p0-findings.md) — cross-reference noting hook already exists
 - [docs/findings/int-04-p0-findings.md:161](int-04-p0-findings.md) — cross-reference predating the merge

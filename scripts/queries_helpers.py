@@ -8,7 +8,7 @@ on ``holdings_v2`` / ``fund_holdings_v2``. Keeps queries.py forward-compatible
 with int-09 Step 4 (BLOCK-DENORM-RETIREMENT): when the stamped columns are
 retired, callers that went through these helpers keep working.
 
-Design + rationale: ``docs/proposals/tier-4-join-pattern-proposal.md``
+Design + rationale: ``archive/docs/proposals/tier-4-join-pattern-proposal.md``
 (merged via PR #113).
 
 Example

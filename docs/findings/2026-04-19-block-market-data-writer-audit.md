@@ -150,7 +150,7 @@ No fix commits on this audit branch. Audit deliverable is this document only.
 
 - Writer enumeration: §2.2, §2.3 with file:line citations
 - Commit responsible: `2405df1` (2026-04-18 20:33:06 UTC)
-- Prior closeout report: [docs/reports/block_sector_coverage_closeout_20260419_052804.md](docs/reports/block_sector_coverage_closeout_20260419_052804.md) §8
+- Prior closeout report: [archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md](archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md) §8
 - Suspect source: [scripts/refetch_missing_sectors.py:252-257](scripts/refetch_missing_sectors.py:252)
 - Ephemeral helper input: `/tmp/refetch_tickers.txt` (355 lines, mtime 2026-04-18 19:36 UTC, contains `RILY`)
 

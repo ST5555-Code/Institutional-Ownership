@@ -357,7 +357,7 @@ cannot wait for the follow-up block) before Phase 1.
 `pct_of_float` follow-up flagged in §3.2 (Option C deferred to its own
 design pass) was addressed by the **pct-of-so workstream**
 (merged `8925347`, follow-on `12e172b`). Forward-link:
-[`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`](REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md)
+[`docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`](2026-04-19-rewrite-pct-of-so-period-accuracy.md)
 — see that doc's §4 (three-tier denominator design) and §14.10
 (terminology rename `pct_of_float → pct_of_so` + `pct_of_so_source`
 audit column). Migration 008 (`ea4ae99` amended) landed the rename +

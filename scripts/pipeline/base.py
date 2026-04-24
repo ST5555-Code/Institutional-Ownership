@@ -230,7 +230,7 @@ class SourcePipeline(ABC):
     # ``docs/findings/int-23-design.md`` §4.1 for the full rationale.
     # Columns absent from the target table are skipped by the check so
     # int-09 Step 4 column retirements (see
-    # ``docs/proposals/tier-4-join-pattern-proposal.md``) dissolve gracefully.
+    # ``archive/docs/proposals/tier-4-join-pattern-proposal.md``) dissolve gracefully.
     _DOWNGRADE_SENSITIVE_COLUMNS: tuple[str, ...] = (
         "ticker",
         "entity_id",

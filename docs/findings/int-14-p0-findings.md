@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-22 — branch `int-14-p0` off `main` HEAD `4ced172`._
 
-_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) row `int-14` (INF30 BLOCK-MERGE-UPSERT-MODE). Upstream motivation: [docs/reports/block_sector_coverage_closeout_20260419_052804.md §7](../reports/block_sector_coverage_closeout_20260419_052804.md). Roadmap: [ROADMAP.md:570](../../ROADMAP.md) `INF30`. Companion to INF11 `PROMOTE_KIND` split already shipped as `b13d5f8`._
+_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) row `int-14` (INF30 BLOCK-MERGE-UPSERT-MODE). Upstream motivation: [archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md §7](../reports/block_sector_coverage_closeout_20260419_052804.md). Roadmap: [ROADMAP.md:570](../../ROADMAP.md) `INF30`. Companion to INF11 `PROMOTE_KIND` split already shipped as `b13d5f8`._
 
 Phase 0 is investigation only. No code changes. Output is this document.
 

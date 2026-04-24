@@ -118,7 +118,7 @@ ENTITY_SEQUENCES = [
 # parent_bridge + cik_crd_direct via pk_diff (empirical PK=cik, unique);
 # managers + cik_crd_links via the new "rebuild" promote kind because
 # their natural keys are not empirically unique. See
-# promote_staging.PROMOTE_KIND and REWRITE_BUILD_MANAGERS_FINDINGS.md.
+# promote_staging.PROMOTE_KIND and 2026-04-19-rewrite-build-managers.md.
 #
 # Extended 2026-04-21 for the sec-05 Phase 1 staging conversion
 # (build_fund_classes + build_benchmark_weights): fund_classes,

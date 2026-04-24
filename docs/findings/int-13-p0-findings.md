@@ -242,7 +242,7 @@ After migration lands, run the SQL in §4 once against prod + staging (not at cl
 - Decision context: [docs/data_layers.md §6 S1](../data_layers.md#L486-L504)
 - Roadmap entry: [ROADMAP.md INF29](../../ROADMAP.md#L590)
 - Remediation plan row: [docs/REMEDIATION_PLAN.md:49](../REMEDIATION_PLAN.md#L49)
-- Prior RSMDF audit: [docs/reports/block_securities_audit_phase2b_20260418_155554.md:47](../reports/block_securities_audit_phase2b_20260418_155554.md#L47)
+- Prior RSMDF audit: [archive/docs/reports/block_securities_audit_phase2b_20260418_155554.md:47](../reports/block_securities_audit_phase2b_20260418_155554.md#L47)
 - Classifier entry point: [scripts/pipeline/cusip_classifier.py:372-523](../../scripts/pipeline/cusip_classifier.py#L372-L523)
 - `normalize_securities` propagation site: [scripts/normalize_securities.py:38-49](../../scripts/normalize_securities.py#L38-L49)
 - Migration template (capture-and-recreate pattern reference): [scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py](../../scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py)

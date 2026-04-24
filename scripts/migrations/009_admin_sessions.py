@@ -35,7 +35,7 @@ Idempotent: CREATE TABLE / CREATE INDEX use IF NOT EXISTS. Forward-only
 dropped manually if an operator ever needs to rebuild.
 
 Applied to both prod (13f.duckdb) and staging (13f_staging.duckdb) for
-schema parity per docs/BLOCK_SCHEMA_DIFF_FINDINGS.md conventions (see
+schema parity per docs/findings/2026-04-19-block-schema-diff.md conventions (see
 §10.6 of findings).
 
 Usage:

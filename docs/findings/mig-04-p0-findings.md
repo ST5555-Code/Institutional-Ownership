@@ -39,7 +39,7 @@ No runtime probing beyond read-only SELECTs — the prompt forbids any write.
 
 ## §2. `verify_migration_applied()` — not a function, a convention
 
-Grep across the repo returns **no definition** of `verify_migration_applied()` anywhere in `scripts/` or elsewhere — only prose references in `docs/REMEDIATION_PLAN.md:111,324` and in this prompt (`docs/prompts/mig-04-p0.md:5,18,38`). `scripts/db.py` does not reference `schema_versions` or `verify_migration`.
+Grep across the repo returns **no definition** of `verify_migration_applied()` anywhere in `scripts/` or elsewhere — only prose references in `docs/REMEDIATION_PLAN.md:111,324` and in this prompt (`archive/docs/prompts/mig-04-p0.md:5,18,38`). `scripts/db.py` does not reference `schema_versions` or `verify_migration`.
 
 The invariant is enforced inline. Each well-formed migration defines an `_already_stamped(con, version)` helper that runs:
 

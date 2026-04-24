@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-19 — branch `block/schema-diff-inf39` off main HEAD `12e172b`._
 
-_Precedent: `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.0 — pct-of-so Phase 4 prod apply aborted on `DependencyException` because staging had 0 non-PK indexes on `holdings_v2` while prod had 4. Staging-only Phase 2 validation passed silently. Tactical fix: capture-and-recreate in migration 008 amendment (commit `ea4ae99`). This block builds the pre-flight detection that would have caught the divergence before Phase 4 ever started._
+_Precedent: `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` §14.0 — pct-of-so Phase 4 prod apply aborted on `DependencyException` because staging had 0 non-PK indexes on `holdings_v2` while prod had 4. Staging-only Phase 2 validation passed silently. Tactical fix: capture-and-recreate in migration 008 amendment (commit `ea4ae99`). This block builds the pre-flight detection that would have caught the divergence before Phase 4 ever started._
 
 Scope locked per block prompt:
 - L3 canonical tables only.
@@ -291,7 +291,7 @@ Default behavior: L3 tables, full dimension check, compare `data/13f.duckdb` vs 
 
 ### 6.1 Current Rewrite block shape
 
-From `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md`:
+From `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`:
 
 ```
 Phase 0 — investigation / findings doc
@@ -321,7 +321,7 @@ Phase 4 — prod apply
 
 ### 6.3 Draft addendum patch (to be applied in Phase 1, not Phase 0)
 
-Append to `docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` as §14.11 or to the generic Rewrite-block template doc (if one exists; if not, create `docs/BLOCK_TEMPLATE.md`):
+Append to `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` as §14.11 or to the generic Rewrite-block template doc (if one exists; if not, create `docs/BLOCK_TEMPLATE.md`):
 
 > ### Phase 2 schema-parity pre-flight (INF39)
 >
@@ -776,7 +776,7 @@ default human-mode report against the default prod+staging paths with the
 default accept-list. Exits 0 on parity, non-zero to halt Phase 2.
 
 Block-shape documentation update applied to
-`docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md` §14.12. Future Rewrite
+`docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` §14.12. Future Rewrite
 blocks must run `make schema-parity-check` before any Phase 2 validation
 workload.
 

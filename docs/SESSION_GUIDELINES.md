@@ -151,7 +151,7 @@ Each kind of tracking content has one canonical home. When two homes could plaus
 - **Per-session findings** → `docs/findings/<session-name>-<phase>.md`. Phase 0 investigations, audit reports, decision-quality writeups. One file per finding; never paste full findings into trackers.
 - **Per-session closures** → `docs/closures/YYYY-MM-DD-<session-name>.md` (Pattern B). Replaces the legacy "append to ROADMAP closed-items log" pattern. Run `python3 scripts/concat_closed_log.py` to regenerate `docs/closed-items-log.md` for a flat view. See `docs/closures/README.md`.
 - **Frozen closure log** → `ROADMAP.md` `### Closed items (log)`. Archived through 2026-04-23. Read-only; new closures land in `docs/closures/` per above.
-- **Small one-offs** → `docs/plans/2026-04-23-phase-b-c-execution-plan.md §8`, referenced from `ROADMAP.md` `### Current backlog` when an item warrants a backlog row.
+- **Small one-offs** → `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md §8`, referenced from `ROADMAP.md` `### Current backlog` when an item warrants a backlog row.
 
 **Rule:** closing an item requires updating every tracker that references it (per §3). Run `python3 scripts/hygiene/audit_tracker_staleness.py` if in doubt about which trackers carry the item.
 

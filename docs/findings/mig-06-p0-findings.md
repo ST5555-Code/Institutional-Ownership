@@ -27,7 +27,7 @@ Phase 0 is investigation only. Read-only queries against prod; ALTER-TABLE bench
 
 | Table | rows | cols | indexes | natural-key uniqueness |
 |---|---:|---:|---:|---|
-| `holdings_v2` | 12,270,984 | 34 | 4 (`idx_hv2_cik_quarter`, `idx_hv2_entity_id`, `idx_hv2_rollup`, `idx_hv2_ticker_quarter`) | `(accession_number, cusip, quarter, cik)` — **NOT unique**: ~221K rows (≈1.8%) fall in intentional dup-groups per [REWRITE_PCT_OF_SO §14.5](docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md:1542) |
+| `holdings_v2` | 12,270,984 | 34 | 4 (`idx_hv2_cik_quarter`, `idx_hv2_entity_id`, `idx_hv2_rollup`, `idx_hv2_ticker_quarter`) | `(accession_number, cusip, quarter, cik)` — **NOT unique**: ~221K rows (≈1.8%) fall in intentional dup-groups per [REWRITE_PCT_OF_SO §14.5](docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md:1542) |
 | `fund_holdings_v2` | 14,090,397 | 26 | 3 (`idx_fhv2_entity`, `idx_fhv2_rollup`, `idx_fhv2_series`) | `(fund_cik, report_date, cusip)` — no PK enforced; amendment semantics overwrite via DELETE+INSERT by `(series_id, report_month)` |
 | `beneficial_ownership_v2` | 51,905 | 25 | 1 (`idx_bov2_entity`) | `accession_number` — no PK enforced, but promote-time DELETE+INSERT uses `accession_number` as dedup key |
 
@@ -69,7 +69,7 @@ Prod sequences already present (`SELECT sequence_name FROM duckdb_sequences()`):
 
 ### 2.4 Why a surrogate row-ID matters — rollback-replay ambiguity
 
-Source: [REWRITE_PCT_OF_SO §14.5](docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md:1542) and [§14.9 rollback SQL](docs/REWRITE_PCT_OF_SO_PERIOD_ACCURACY_FINDINGS.md:1680). During Phase 4b of the pct-of-so migration the snapshot was captured with DuckDB `rowid`, but the post-UPDATE join returned **zero matches** — DuckDB `rowid` is not stable across full-table UPDATE + CHECKPOINT + index rebuild because physical storage rewrites shift rowids. Rollback had to fall back to a natural-key aggregate join on `(accession_number, cusip, quarter, cik)` using `MAX(pct_of_float)` per group, which is lossy where the 221K dup-group members differed in pre-apply values. Acceptable for that one-off, but it sets a precedent: **the next migration that updates `holdings_v2` cannot rely on `rowid` for point-in-time rollback, and `(accession_number, cusip, quarter, cik)` is not unique enough to replace it**.
+Source: [REWRITE_PCT_OF_SO §14.5](docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md:1542) and [§14.9 rollback SQL](docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md:1680). During Phase 4b of the pct-of-so migration the snapshot was captured with DuckDB `rowid`, but the post-UPDATE join returned **zero matches** — DuckDB `rowid` is not stable across full-table UPDATE + CHECKPOINT + index rebuild because physical storage rewrites shift rowids. Rollback had to fall back to a natural-key aggregate join on `(accession_number, cusip, quarter, cik)` using `MAX(pct_of_float)` per group, which is lossy where the 221K dup-group members differed in pre-apply values. Acceptable for that one-off, but it sets a precedent: **the next migration that updates `holdings_v2` cannot rely on `rowid` for point-in-time rollback, and `(accession_number, cusip, quarter, cik)` is not unique enough to replace it**.
 
 A stable BIGINT surrogate fixes this cleanly for all three tables and, as a secondary benefit, gives promote-path crashes a row-level audit handle (who wrote this row, in what run, at what manifest_id — joinable via `ingestion_impacts` if needed).
 

@@ -141,11 +141,11 @@ Memory/context suggested "~196 high-precision + ~1,607 broad-recall rows" as the
 - 248 signature first-letter-clip rescues (classic RC2 wins).
 - 8,178 total MAX/MODE divergences.
 
-The memory estimate came from `BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md` Phase 0 (`securities` + `cusip_classifications` intersection, April audit). The delta reflects subsequent upstream cleanup (fewer clipped-prefix names overall) plus a broader comparison window (N-PORT + 13D/G now included in `all_sources`). No action required — just noting that the re-seed population is smaller than the original audit estimate.
+The memory estimate came from `2026-04-18-block-securities-data-audit.md` Phase 0 (`securities` + `cusip_classifications` intersection, April audit). The delta reflects subsequent upstream cleanup (fewer clipped-prefix names overall) plus a broader comparison window (N-PORT + 13D/G now included in `all_sources`). No action required — just noting that the re-seed population is smaller than the original audit estimate.
 
 ## 4. Source pointers
 
 - Commit: `fc2bbbc` (2026-04-18) — `fix(cusip_classifier): RC2 — mode+length aggregator for issuer_name`.
 - Code: [scripts/pipeline/cusip_classifier.py:551-635](scripts/pipeline/cusip_classifier.py:551).
-- Audit doc: `docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md` RC2 (Option B).
+- Audit doc: `docs/findings/2026-04-18-block-securities-data-audit.md` RC2 (Option B).
 - Data: `data/13f_readonly.duckdb` tables `cusip_classifications`, `securities`, `fund_holdings`, `beneficial_ownership_v2`.

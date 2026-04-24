@@ -5,7 +5,7 @@ _Prepared: 2026-04-21 — branch `remediation/ops-batch-5B` off main HEAD
 atomic promotes` landed). No code or DB writes._
 
 Meta-doc for the Batch 5-B doc updates: ops-06, ops-09, ops-15. See
-`docs/prompts/ops-batch-5B.md` for the driving prompt and
+`archive/docs/prompts/ops-batch-5B.md` for the driving prompt and
 `docs/REMEDIATION_PLAN.md` Theme 5 for context.
 
 ## Changes
@@ -65,7 +65,7 @@ Batch 4-C (2026-04-13):
   `docs/findings/sec-03-p0-findings.md` §2,
   `docs/findings/sec-02-p1-findings.md`,
   `docs/findings/sec-03-p1-findings.md`,
-  `docs/REACT_MIGRATION.md`.
+  `archive/docs/REACT_MIGRATION.md`.
 - Follow-on: Phase 2 admin refresh will add ~9 endpoints — living
   inventory needed to prevent drift.
 

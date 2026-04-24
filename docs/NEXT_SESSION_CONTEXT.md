@@ -2,7 +2,7 @@
 
 _Last updated: 2026-04-24 (post `doc-sync` — tracker reconciliation across the 10-PR wave #139–#148). HEAD on main: `143772d`._
 
-_This session was doc-only hygiene: bumped `ROADMAP.md § Current backlog` verified-date to 2026-04-24; added a **Plan status as of 2026-04-24** block + per-section **SHIPPED** tags in `docs/plans/2026-04-23-phase-b-c-execution-plan.md §2/§3/§4/§5/§6/§8.1–§8.4`; added `docs/findings/README.md` index; filed `docs/findings/2026-04-23-ops-18-investigation.md` (PARTIAL outcome placeholder backfilled from the C2 PR body). No scripts / no DB / no phase-body rewrites._
+_This session was doc-only hygiene: bumped `ROADMAP.md § Current backlog` verified-date to 2026-04-24; added a **Plan status as of 2026-04-24** block + per-section **SHIPPED** tags in `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md §2/§3/§4/§5/§6/§8.1–§8.4`; added `docs/findings/README.md` index; filed `docs/findings/2026-04-23-ops-18-investigation.md` (PARTIAL outcome placeholder backfilled from the C2 PR body). No scripts / no DB / no phase-body rewrites._
 
 _Shipped between 2026-04-23 and 2026-04-24 (10 PRs, trackers already reflect the outcomes):_
 - _#139 phase-b1-doc-hygiene (`84362d3`) — REMEDIATION_CHECKLIST archived, INF40 dual-closure annotations, 8 legacy docs archived._

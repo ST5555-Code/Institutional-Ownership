@@ -3,7 +3,7 @@
 **Date:** 2026-04-22
 **Branch:** `int-15-p0`
 **Base:** `main` @ `7b19034`
-**Scope:** Read-only survey of every writer to `market_data`. Confirms the standing hazard flagged in `docs/BLOCK_MARKET_DATA_WRITER_AUDIT_FINDINGS.md` §6 is unchanged on `main` and extends the enumeration to cover all non-`sector` writers. No code changes.
+**Scope:** Read-only survey of every writer to `market_data`. Confirms the standing hazard flagged in `docs/findings/2026-04-19-block-market-data-writer-audit.md` §6 is unchanged on `main` and extends the enumeration to cover all non-`sector` writers. No code changes.
 
 ---
 
@@ -109,8 +109,8 @@ The prior audit (2026-04-19) explicitly deferred the fix: "No fix commits on thi
 
 No. `grep -rn last_write_ts` returns three hits:
 
-- `docs/BLOCK_MARKET_DATA_WRITER_AUDIT_FINDINGS.md` — the proposal itself
-- `docs/reports/block_sector_coverage_closeout_20260419_052804.md` — references the audit
+- `docs/findings/2026-04-19-block-market-data-writer-audit.md` — the proposal itself
+- `archive/docs/reports/block_sector_coverage_closeout_20260419_052804.md` — references the audit
 - `ROADMAP.md` — INF31 mention
 
 No DDL, no migration, no writer, no reader. If Phase 1 goes with Option 1 it is a net-new column; if Option 2 it's an in-place behaviour change on one UPDATE statement.
@@ -164,7 +164,7 @@ Tradeoff vs. Option 1 ("last_write_ts retains a separate audit trail"): rejected
 
 ## 7. Citations
 
-- Prior audit: [docs/BLOCK_MARKET_DATA_WRITER_AUDIT_FINDINGS.md](../BLOCK_MARKET_DATA_WRITER_AUDIT_FINDINGS.md) — 2026-04-19, base `d7ba1c2`
+- Prior audit: [docs/findings/2026-04-19-block-market-data-writer-audit.md](2026-04-19-block-market-data-writer-audit.md) — 2026-04-19, base `d7ba1c2`
 - Remediation plan entry: [docs/REMEDIATION_PLAN.md:51](../REMEDIATION_PLAN.md#L51) (int-15 row)
 - Roadmap entry: `ROADMAP.md` INF31 row
 - `discover_market` logic: [scripts/pipeline/discover.py:367-527](../../scripts/pipeline/discover.py#L367-L527)

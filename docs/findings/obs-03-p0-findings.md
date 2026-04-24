@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-20 — branch `remediation/obs-03-p0` off main HEAD `4dd676b`._
 
-_Tracker: [docs/REMEDIATION_PLAN.md:86](docs/REMEDIATION_PLAN.md:86) Theme 2 row `obs-03`; [docs/REMEDIATION_CHECKLIST.md:50](docs/REMEDIATION_CHECKLIST.md:50) Batch 2-A. Audit refs: [docs/SYSTEM_AUDIT_2026_04_17.md:327](docs/SYSTEM_AUDIT_2026_04_17.md:327) MAJOR-13 / P-04; [docs/SYSTEM_ATLAS_2026_04_17.md:303](docs/SYSTEM_ATLAS_2026_04_17.md:303); [docs/CODEX_REVIEW_2026_04_17.md:40](docs/CODEX_REVIEW_2026_04_17.md:40); [docs/CODEX_REVIEW_2026_04_17.md:112](docs/CODEX_REVIEW_2026_04_17.md:112)._
+_Tracker: [docs/REMEDIATION_PLAN.md:86](docs/REMEDIATION_PLAN.md:86) Theme 2 row `obs-03`; [docs/REMEDIATION_CHECKLIST.md:50](docs/REMEDIATION_CHECKLIST.md:50) Batch 2-A. Audit refs: [docs/SYSTEM_AUDIT_2026_04_17.md:327](docs/SYSTEM_AUDIT_2026_04_17.md:327) MAJOR-13 / P-04; [docs/SYSTEM_ATLAS_2026_04_17.md:303](docs/SYSTEM_ATLAS_2026_04_17.md:303); [docs/findings/2026-04-17-codex-review.md:40](docs/findings/2026-04-17-codex-review.md:40); [docs/findings/2026-04-17-codex-review.md:112](docs/findings/2026-04-17-codex-review.md:112)._
 
 Phase 0 is investigation only. No code writes and no DB writes were performed. The prod database was read-only; all SQL below was executed through `duckdb.connect(..., read_only=True)`.
 
@@ -41,7 +41,7 @@ Both are `INSERT ... SELECT` from a `register()`-ed pandas frame (`prod_con.regi
 
 For completeness, `UPDATE ingestion_impacts ...` statements (no PK allocation risk): [scripts/fetch_market.py:746](scripts/fetch_market.py:746), [scripts/fetch_nport_v2.py:789](scripts/fetch_nport_v2.py:789), [scripts/fetch_dera_nport.py:813](scripts/fetch_dera_nport.py:813), [scripts/promote_nport.py:465](scripts/promote_nport.py:465)/[:480](scripts/promote_nport.py:480), [scripts/promote_13dg.py:150](scripts/promote_13dg.py:150). These mutate `load_status` / `promote_status` / `promoted_at` and are not in scope for the allocator redesign; they are listed here only so the reader can see the full `ingestion_impacts` write surface in one place.
 
-Admin surface: [scripts/admin_bp.py:260-285](scripts/admin_bp.py:260) launches `fetch_*.py` scripts via `subprocess.Popen` under a `pgrep` guard. It does not write `ingestion_impacts` itself. The CODEX-flagged TOCTOU race ([docs/CODEX_REVIEW_2026_04_17.md:111](docs/CODEX_REVIEW_2026_04_17.md:111)) between pgrep and spawn can only double-launch a fetcher; DuckDB's per-file write lock would fail the loser with a "Conflicting lock" IOException (see `fetch_nport_v2_crash.log` 2026-04-14 13:04, cited at [docs/SYSTEM_ATLAS_2026_04_17.md:304](docs/SYSTEM_ATLAS_2026_04_17.md:304)). That is a loud failure, not a silent duplicate-PK crash.
+Admin surface: [scripts/admin_bp.py:260-285](scripts/admin_bp.py:260) launches `fetch_*.py` scripts via `subprocess.Popen` under a `pgrep` guard. It does not write `ingestion_impacts` itself. The CODEX-flagged TOCTOU race ([docs/findings/2026-04-17-codex-review.md:111](docs/findings/2026-04-17-codex-review.md:111)) between pgrep and spawn can only double-launch a fetcher; DuckDB's per-file write lock would fail the loser with a "Conflicting lock" IOException (see `fetch_nport_v2_crash.log` 2026-04-14 13:04, cited at [docs/SYSTEM_ATLAS_2026_04_17.md:304](docs/SYSTEM_ATLAS_2026_04_17.md:304)). That is a loud failure, not a silent duplicate-PK crash.
 
 ---
 
@@ -65,7 +65,7 @@ The audit trail is in [docs/SYSTEM_ATLAS_2026_04_17.md:303](docs/SYSTEM_ATLAS_20
 
 - `fetch_market.py` uses **no threading, no multiprocessing, no subprocess**. `grep -n "threading\|ThreadPool\|concurrent\.futures\|multiprocessing\|subprocess"` in `scripts/fetch_market.py` returns zero hits. Connections are opened and closed per batch ([scripts/fetch_market.py:609](scripts/fetch_market.py:609), [:707](scripts/fetch_market.py:707)) on a single main thread.
 - `admin_bp.py` rejects a second invocation of the same fetcher via `pgrep` ([scripts/admin_bp.py:270-272](scripts/admin_bp.py:270)). A TOCTOU race could double-launch, but the second instance would hit DuckDB's write lock, not the PK, so that race is a noisy availability problem and not an impact_id collision path.
-- `fetch_nport_v2.py` already documents lock contention against staging as a live concern ([CODEX 3c, docs/CODEX_REVIEW_2026_04_17.md:113](docs/CODEX_REVIEW_2026_04_17.md:113)).
+- `fetch_nport_v2.py` already documents lock contention against staging as a live concern ([CODEX 3c, docs/findings/2026-04-17-codex-review.md:113](docs/findings/2026-04-17-codex-review.md:113)).
 
 **`_next_id(con, table, pk_col)` is also transactionally safe within its owning connection.** The `SELECT MAX(...)+1` and the subsequent `INSERT` run on the same `con` in sequence and see a consistent MVCC snapshot until commit; a second write on the same connection cannot interleave because Python executes the two calls serially.
 
@@ -144,8 +144,8 @@ Gaps are cosmetic — they do not break audit queries, they only waste PK space.
 
 ### §4.3 Interactions with ongoing audit items
 
-- [docs/CODEX_REVIEW_2026_04_17.md:96-98](docs/CODEX_REVIEW_2026_04_17.md:96) — `promote_nport.py` / `promote_13dg.py` are not enclosed in `BEGIN TRANSACTION` during delete+insert. An allocator change that widens the PK write window must respect the same transaction semantics the mirror paths already (imperfectly) assume. Our centralization must not add a second non-atomic step.
-- [docs/CODEX_REVIEW_2026_04_17.md:112](docs/CODEX_REVIEW_2026_04_17.md:112) — CODEX explicitly states `_next_id` is only safe under the one-writer invariant and flags that invariant has been violated in production operation at least once. Our Phase 1 must make the violation *impossible*, not just *unlikely*.
+- [docs/findings/2026-04-17-codex-review.md:96-98](docs/findings/2026-04-17-codex-review.md:96) — `promote_nport.py` / `promote_13dg.py` are not enclosed in `BEGIN TRANSACTION` during delete+insert. An allocator change that widens the PK write window must respect the same transaction semantics the mirror paths already (imperfectly) assume. Our centralization must not add a second non-atomic step.
+- [docs/findings/2026-04-17-codex-review.md:112](docs/findings/2026-04-17-codex-review.md:112) — CODEX explicitly states `_next_id` is only safe under the one-writer invariant and flags that invariant has been violated in production operation at least once. Our Phase 1 must make the violation *impossible*, not just *unlikely*.
 
 ---
 
@@ -202,7 +202,7 @@ Gaps are cosmetic — they do not break audit queries, they only waste PK space.
 ## §6. Open questions for Phase 1
 
 1. **Bulk primitive granularity.** Should `reserve_ids` take a single `n` (current proposal) or a pre-built frame whose length it infers? Frame-first is ergonomic for obs-04; `n`-first is simpler. Default to `n` and let obs-04 decide.
-2. **Fcntl on macOS / WSL.** Local dev is macOS; deploy target is Linux (per [docs/README_deploy.md](docs/README_deploy.md)). `fcntl.flock` behaves identically, but the sibling lock file path must be on the same filesystem as `13f.duckdb`. Confirm `data/.ingestion_lock` as the canonical path.
+2. **Fcntl on macOS / WSL.** Local dev is macOS; deploy target is Linux (per [docs/docs/deployment.md](docs/docs/deployment.md)). `fcntl.flock` behaves identically, but the sibling lock file path must be on the same filesystem as `13f.duckdb`. Confirm `data/.ingestion_lock` as the canonical path.
 3. **Sequence removal order.** Drop `DEFAULT nextval` first, then drop sequences. Or keep sequences in the DB for one release cycle as a diagnostic (`SELECT nextval(...)` in a health check). Prefer the latter — cheap signal that "nothing ever calls this".
 4. **Migration ordering against obs-01.** obs-01 is parallel-eligible with obs-03 per the plan. If obs-01 lands first, it adopts today's `write_impact` and inherits the Phase 1 change for free. If obs-03 lands first, obs-01 inherits `allocate_id` directly. Either order is safe **iff** Phase 1 is API-compatible. That constraint is load-bearing — call it out in the Phase 1 prompt.
 5. **Observability write.** Do we stamp allocations into a new `ingestion_allocations` table (queryable, durable) or only to the standard log? The former is cheap (∼29k impacts / ~21k manifests over the full history) and closes the "did anyone bypass" question with a SQL query forever. The latter is simpler. Recommend the table; make it additive migration.

@@ -3,7 +3,7 @@
 """Migration 010 — drop DEFAULT nextval on pipeline control-plane PKs.
 
 obs-03 Phase 1 (docs/findings/obs-03-p0-findings.md §5,
-docs/prompts/obs-03-p1.md §4). Retires the DuckDB sequence-driven default
+archive/docs/prompts/obs-03-p1.md §4). Retires the DuckDB sequence-driven default
 on ``ingestion_impacts.impact_id`` and ``ingestion_manifest.manifest_id``
 in favour of the centralized allocator in
 ``scripts/pipeline/id_allocator.py``.

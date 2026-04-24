@@ -100,16 +100,16 @@ archived.
 **Before:** `ARCHITECTURE_REVIEW.md:51-52` said "Phase 3 complete (commit
 `c836813`). Phase 4 cutover pending. Two frontends currently live —
 React at port 5174, vanilla-JS at port 8001." Contradicted
-`REACT_MIGRATION.md:120` which says Phase 4 completed 2026-04-13 at
+`archive/docs/REACT_MIGRATION.md:120` which says Phase 4 completed 2026-04-13 at
 HEAD `002fab0` with the vanilla-JS retirement done in the same session.
 
 **After:** Replaced with: Phase 4 complete 2026-04-13 (commit `002fab0`);
 single frontend; FastAPI serves `web/react-app/dist/` on port 8001;
 vanilla-JS and `web/react-src/` POC retired same session; 38 public
-routes rewritten to `/api/v1/*`. Cross-ref to `REACT_MIGRATION.md`
+routes rewritten to `/api/v1/*`. Cross-ref to `archive/docs/REACT_MIGRATION.md`
 Status section.
 
-**Verification:** `grep -n "Phase 4" REACT_MIGRATION.md` confirms the
+**Verification:** `grep -n "Phase 4" archive/docs/REACT_MIGRATION.md` confirms the
 cutover line at :120; `git log -- scripts/app.py | head` confirms the
 post-cutover FastAPI swap is in main history.
 
@@ -233,7 +233,7 @@ docs/canonical_ddl.md` returns the new §17 note.
 ## Files written (full list — matches prompt Appendix D scope)
 
 - `README.md` — ops-01, ops-02
-- `README_deploy.md` — ops-05
+- `docs/deployment.md` — ops-05
 - `PHASE3_PROMPT.md` — ops-03 + ops-08
 - `PHASE4_PROMPT.md` — ops-08
 - `ARCHITECTURE_REVIEW.md` — ops-04

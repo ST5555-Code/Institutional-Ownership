@@ -17,7 +17,7 @@ final remaining Batch 3 target. Retrofits landed via commit `831e5b4`
 4. Direct production writes of `parent_bridge` / `managers` /
    `cik_crd_links` / `cik_crd_direct`, bypassing the INF1 staging
    workflow. Flagged in `docs/pipeline_inventory.md §8` and in
-   `docs/REWRITE_LOAD_13F_FINDINGS.md §9`.
+   `docs/findings/2026-04-19-rewrite-load-13f.md §9`.
 
 Read-only throughout. Prod DB (`/Users/sergetismen/ClaudeWorkspace/Projects/13f-ownership/data/13f.duckdb`,
 13.6 GB) opened `read_only=True`. No code edits to
@@ -30,7 +30,7 @@ Read-only throughout. Prod DB (`/Users/sergetismen/ClaudeWorkspace/Projects/13f-
 1. **The legacy `holdings` block (`:520-540`) is functionally dead and
    materially broken at HEAD.** The target `holdings` table does not
    exist in prod (dropped in Stage 5 cleanup — see `fetch_ncen.py:345`
-   comment and `REWRITE_LOAD_13F_FINDINGS.md:29`). Only the `ALTER
+   comment and `2026-04-19-rewrite-load-13f.md:29`). Only the `ALTER
    TABLE` loop is wrapped in `try/except pass` (`:520-525`); the
    subsequent `UPDATE holdings h ... FROM managers m` at `:527-536`
    and `SELECT COUNT(*) FROM holdings` at `:537-539` are **not**

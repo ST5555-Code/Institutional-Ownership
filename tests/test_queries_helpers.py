@@ -2,7 +2,7 @@
 
 Golden-string tests for the Tier 4 join-pattern helper library introduced in
 the int-09 Step 4 forward-compat proposal
-(docs/proposals/tier-4-join-pattern-proposal.md, merged via PR #113).
+(archive/docs/proposals/tier-4-join-pattern-proposal.md, merged via PR #113).
 
 Helpers are pure-Python string assembly with no side effects. These tests
 pin the exact output so callers can rely on stable SQL fragments.

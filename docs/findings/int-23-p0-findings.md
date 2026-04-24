@@ -2,7 +2,7 @@
 
 _Prepared: 2026-04-22 — branch `int-23-p0` off `main` HEAD `25a0263`._
 
-_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) row `int-23` (BLOCK-SEC-AUD-5). Upstream finding: [docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md §7](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md) — "Universe expansion accepted (2026-04-18)"._
+_Tracker: [docs/REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) row `int-23` (BLOCK-SEC-AUD-5). Upstream finding: [docs/findings/2026-04-18-block-securities-data-audit.md §7](../2026-04-18-block-securities-data-audit.md) — "Universe expansion accepted (2026-04-18)"._
 
 Phase 0 is investigation only. No code writes, no DB writes.
 
@@ -81,7 +81,7 @@ Every next re-seed run will naturally include all CUSIPs present in the three L3
 
 ## §3. Decision trace — what "execute at Phase 3 re-seed" meant
 
-From [docs/BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md §7](../BLOCK_SECURITIES_DATA_AUDIT_FINDINGS.md):
+From [docs/findings/2026-04-18-block-securities-data-audit.md §7](../2026-04-18-block-securities-data-audit.md):
 
 > Decision: accept 430K as the intended canonical universe. [...] Phase 3 prod sync will promote the expanded surface.
 
