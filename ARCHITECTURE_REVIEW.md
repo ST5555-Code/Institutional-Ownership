@@ -26,8 +26,9 @@ full cross-reference): `fetch_nport` → `fetch_nport_v2` + `fetch_dera_nport` +
 `fetch_market` → rewritten as DirectWritePipeline; `build_cusip` → rewritten
 as UPSERT-only. Three canonical-DDL blockers (`holdings_v2`,
 `fund_holdings_v2`, `beneficial_ownership_v2`) previously listed as
-OWNER_BEHIND in `docs/canonical_ddl.md` are cleared by the v2 owners — see
-that doc for current verdicts.
+OWNER_BEHIND in `docs/data_layers.md` Appendix A (formerly
+`docs/canonical_ddl.md`) are cleared by the v2 owners — see that
+appendix for current verdicts.
 
 **What this does not change in the plan below:** Phase 0/1/2/3/4 structure,
 endpoint budgets, G1–G11 gap list, and the CI → contracts → correctness →
