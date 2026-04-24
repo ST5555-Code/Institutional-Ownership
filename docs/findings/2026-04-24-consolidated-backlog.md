@@ -41,8 +41,8 @@
 
 ## Executive summary
 
-- **Total distinct items catalogued**: 78 (deduplicated across trackers)
-- **Total raw items extracted before dedup**: ~160 (same item recurring in ROADMAP + DEFERRED_FOLLOWUPS + plan + findings counts once)
+- **Total distinct items catalogued**: 76 (deduplicated; matches the [Appendix](#appendix--flat-item-list) row count)
+- **Total raw hits before dedup**: ~142 across all Phase 2 sources (ROADMAP ~36, REMEDIATION_PLAN + plans ~22, findings/closures ~31, code/ops-doc TODOs ~6, architecture/operational docs ~47). Dedup rate ~46% — heavy cross-tracker overlap, consistent with INF / DM / P2-FU items appearing in 3–4 sources each.
 
 ### By category
 
@@ -76,7 +76,7 @@
 
 - **DATA_QUALITY is the largest single category** (19 items). 8 items have sat > 60 days. DM13 ADV audit (~390 suspicious rows), L4 classification audit (13 categories), L5 parents 201–720 batches, and the 1,187 DERA NULL series all carry forward without an active session slot.
 - **UI is under-tracked**. Only 8 items across all sources — and 2 are documented in design docs (`admin_refresh_system_design.md` v2 scope) rather than any primary tracker. Zero `README.md` / `TODO.md` / `CHANGELOG.md` under `web/react-app/`. Only 1 in-component TODO.
-- **Drift between `docs/REMEDIATION_PLAN.md` body and its own Changelog**. The body still flags mig-01, INF40, INF41, INF42, mig-06/07/08/09/10/11, and 5 Phase-2-native scaffold items as OPEN / PENDING; `§Changelog 2026-04-22 (conv-11 + conv-12)` closed all of them. The body was never updated.
+- **Drift between `docs/REMEDIATION_PLAN.md` body and its own Changelog**. The body (`:291`, `:375`, `:377`, `:380`, `:427`, `:457`, `:458`, `:459`) still flags mig-01, INF40, INF41, INF42, mig-06/07/08/09/10/11, and 5 Phase-2-native scaffold items as OPEN / PENDING; `:577,584,585` Changelog (conv-11 + conv-12) closed all of them. The body was never updated.
 - **DM14 + DM15 Layer 1** show as PARKED in `docs/data_layers.md §11` and `MAINTENANCE.md §Open audits` but ROADMAP records them as DONE (2026-04-15 to 2026-04-17).
 - **INF37 entity curation** shows as `STANDING` in ROADMAP and `DEFERRED_FOLLOWUPS`, but `docs/findings/entity-curation-w1-log.md` reports it CLEARED 2026-04-23 with zero residuals.
 - **int-23 design questions Q7.1 and Q7.2** remain in `docs/findings/int-23-design.md`; the impl shipped 2026-04-23 per `DEFERRED_FOLLOWUPS` — questions probably resolved by the impl, but design file was never annotated.
@@ -222,23 +222,23 @@ Also noted:
 
 ## Cross-tracker drift
 
-Items that surface in 2+ sources with disagreement on state, scope, or terminology. Recorded only; **not reconciled** in this session.
+Items that surface in 2+ sources (with file:line citations for both) and disagree on state, scope, or terminology. Recorded only; **not reconciled** in this session.
 
-| Item | Source A | Source B | Disagreement |
-|---|---|---|---|
-| `docs/REMEDIATION_PLAN.md` body vs Changelog | body (`L291`, `L375`, `L377`, `L380`, `L427`, `L457`, `L458`, `L459`): mig-01, INF40, INF41, INF42, mig-06/07/08/09/10/11, 5 Phase-2-native scaffold items listed as OPEN / PENDING | `§Changelog 2026-04-22 (conv-11 + conv-12)`: all closed | Body was never updated after conv-11 + conv-12 closures. Agent A-extraction of the body produced 10 false-positive "open" items. |
-| INF37 `backfill_manager_types` residual | `ROADMAP.md §Open items` + `docs/DEFERRED_FOLLOWUPS.md:15`: STANDING | `docs/findings/entity-curation-w1-log.md`: CLEARED 2026-04-23 with zero residuals | Findings reports closure; primary trackers still show STANDING. |
-| int-21 SELF-fallback | `docs/NEXT_SESSION_CONTEXT.md:25` + `docs/findings/entity-curation-w1-log.md`: CLOSED | (not re-asserted in a primary tracker) | Handled — no drift; session note references absence. |
-| int-23 design questions | `docs/findings/int-23-design.md:263–267` Q7.1, Q7.2 OPEN | `docs/DEFERRED_FOLLOWUPS.md:20`: int-23 CLOSED 2026-04-23 (int-23-impl, Option (a) shipped) | Impl presumably resolves Q7.1/Q7.2 but design file was never annotated. |
-| DM14 / DM15 Layer 1 | `ROADMAP.md` closed items: DONE 2026-04-15 to 2026-04-17 | `docs/data_layers.md §11 (line 393–394)` + `MAINTENANCE.md:394,395`: PARKED | Follow-on work may exist (DM8 extension for unlabeled intra-firm sub-advisers ~300–500 series); phrasing leaves both DONE and OPEN interpretations coexisting. |
-| ops-18 rotating audit | `ROADMAP.md:579`: PARTIAL | `docs/NEXT_SESSION_CONTEXT.md:38`: relabelled `maintenance-audit-design` | `docs/plans/…-phase-b-c…md §9`: "Phase C2 investigation" | Three labels for one item. |
-| Phase 0-B2 smoke CI | `ARCHITECTURE_REVIEW.md:180` (G10): PARTIAL | Auto-memory `project_session_apr13_phase0b2.md`: merged 2026-04-13 | ARCHITECTURE_REVIEW content is a snapshot — probably stale, not substantive drift. |
-| P2-FU-04 ADV ownership boundary | `docs/DEFERRED_FOLLOWUPS.md:44`: CLOSED 2026-04-22 (p2fu-04) | `docs/data_layers.md:47`: "see … P2-FU-04" cross-ref note without status | Body note not updated to reflect closure. |
-| V2 loader cycle-entry point | `docs/NEXT_SESSION_CONTEXT.md §Pipeline framework`: V2 cutover complete for scheduled paths | `docs/findings/refinement-validation-2026-04-23.md:25–125` V-Q1 PARTIAL: Makefile still invokes V1 | Findings file pre-dates PR #141 (2026-04-23 V2 cutover); drift is purely temporal. |
-| 43e family-office classification | `ROADMAP.md`: filed as open follow-on | `docs/findings/entity-curation-w1-log.md`: DE-SCOPED | Intent agrees (refactor required); terminology differs. |
-| DM13 row count | `docs/findings/dm-open-surface-2026-04-22.md:149`: ~390 remaining (after BlueCove closed) | `MAINTENANCE.md:393`: "~410 suspicious relationships" | MAINTENANCE.md cites pre-BlueCove number. |
+| # | Item | Source A (with line) | Source B (with line) | Disagreement |
+|---:|---|---|---|---|
+| 1 | `docs/REMEDIATION_PLAN.md` body vs Changelog | Body: `docs/REMEDIATION_PLAN.md:291,375,377,380,427,457,458,459` lists mig-01, INF40, INF41, INF42, mig-06/07/08/09/10/11 + 5 Phase-2-native scaffold items as OPEN / PENDING | `docs/REMEDIATION_PLAN.md:577,584,585` Changelog — `(conv-11)` + `(conv-12)` close all of them | Body was never updated after closures; same file's Changelog contradicts its body. |
+| 2 | INF37 `backfill_manager_types` residual | `docs/DEFERRED_FOLLOWUPS.md:15`: STANDING; `ROADMAP.md:604`: standing curation | `docs/findings/entity-curation-w1-log.md:11,16,23`: "APPLIED to prod. … 14,368 → 0 (zero residuals)" | Findings reports closure 2026-04-23; primary trackers still say STANDING. |
+| 3 | int-23 design questions | `docs/findings/int-23-design.md:263–267` Q7.1 / Q7.2 OPEN | `docs/DEFERRED_FOLLOWUPS.md:20`: int-23 CLOSED 2026-04-23 (int-23-impl Option (a)) | Impl presumably resolves Q7.1/Q7.2 but design file was never annotated. |
+| 4 | DM14 / DM15 Layer 1 status | `ROADMAP.md:114` (DM15 Layer 1 in `entity_rollup_history` row count); auto-memory records DM14 Layer 1 / DM15 Layer 1 DONE 2026-04-15–17 | `MAINTENANCE.md:394,395`: both listed under "Open audits"; `docs/data_layers.md:393,394`: same two items listed as PARKED | Follow-on rows exist but phrasing leaves DONE / OPEN coexisting. |
+| 5 | ops-18 rotating audit label | `ROADMAP.md:579`: "ops-18 … PARTIAL" | `docs/NEXT_SESSION_CONTEXT.md:38`: relabelled `maintenance-audit-design`; `docs/plans/2026-04-23-phase-b-c-execution-plan.md:36,46,874,876,896`: "Phase C2 investigation" | Three labels for one item. |
+| 6 | P2-FU-04 ADV ownership boundary | `docs/DEFERRED_FOLLOWUPS.md:44`: CLOSED 2026-04-22 (p2fu-04) | `docs/data_layers.md:47`: "see … P2-FU-04" cross-ref note without status | Body note not updated to reflect closure. |
+| 7 | V2 loader cycle-entry point | `docs/NEXT_SESSION_CONTEXT.md:10,82,83`: "V2 cutover complete" / Makefile invokes V2 | `docs/findings/refinement-validation-2026-04-23.md:25–125` V-Q1 PARTIAL: "Makefile:110–111 still invokes V1" | Findings file pre-dates PR #141 V2 cutover (2026-04-23); drift is temporal — finding was never annotated post-merge. |
+| 8 | 43e family-office classification | `ROADMAP.md:608,666` lists as open follow-on for taxonomy refactor | `docs/findings/entity-curation-w1-log.md:13,158,181`: "DE-SCOPED … Item C remains open in ROADMAP §Open items, re-filed as a dedicated taxonomy refactor follow-on" | Intent agrees; state label differs (OPEN follow-on vs DE-SCOPED). |
+| 9 | DM13 row count | `docs/findings/dm-open-surface-2026-04-22.md:149`: ~390 remaining (after BlueCove cluster closed) | `MAINTENANCE.md:393`: "~410 suspicious relationships" | MAINTENANCE.md cites pre-BlueCove number. |
 
-**Drift count: 11.**
+**Drift count: 9.**
+
+_Removed from prior 11-entry list: (a) int-21 SELF-fallback — no second-source citation; not actual drift. (b) Phase 0-B2 smoke CI (ARCHITECTURE_REVIEW.md G10) — second source was auto-memory, which is not a Phase 2 enumerated source; out of scope for this cross-tracker check._
 
 ---
 
