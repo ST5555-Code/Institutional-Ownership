@@ -9,14 +9,16 @@ gross short value.
 Source: https://cdn.finra.org/equity/regsho/daily/CNMSshvol{YYYYMMDD}.txt
 Data: daily short sale volume by ticker (not outstanding short interest)
 
-Run: python3 scripts/fetch_finra_short.py                     # Last 30 trading days
-     python3 scripts/fetch_finra_short.py --days 90           # Last 90 trading days
-     python3 scripts/fetch_finra_short.py --update            # Only days since last loaded
-     python3 scripts/fetch_finra_short.py --test              # Last 5 trading days
+Run: python3 scripts/fetch_finra_short.py --apply             # Last 30 trading days
+     python3 scripts/fetch_finra_short.py --dry-run           # Report planned writes, touch nothing
+     python3 scripts/fetch_finra_short.py --days 90 --apply   # Last 90 trading days
+     python3 scripts/fetch_finra_short.py --update --apply    # Only days since last loaded
+     python3 scripts/fetch_finra_short.py --test --apply      # Last 5 trading days
 """
 
 import argparse
 import os
+import sys
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -33,7 +35,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from db import set_staging_mode, get_db_path, set_test_mode, crash_handler, record_freshness
 from config import FINRA_HEADERS
 
-FINRA_BASE = "https://cdn.finra.org/equity/regsho/daily"
+# FINRA_BASE_URL_OVERRIDE allows tests to point at a local HTTP fixture
+# instead of cdn.finra.org — keeps the test suite hermetic.
+FINRA_BASE = os.environ.get("FINRA_BASE_URL_OVERRIDE", "https://cdn.finra.org/equity/regsho/daily")
 MAX_WORKERS = 8
 
 _thread_local = threading.local()
@@ -164,9 +168,13 @@ def batch_insert(con, all_rows):
 # Main
 # ---------------------------------------------------------------------------
 
-def run(days=30, update_mode=False, test_mode=False):
-    con = duckdb.connect(get_db_path())
-    create_tables(con)
+def run(days=30, update_mode=False, test_mode=False, apply_mode=True):
+    db_path = get_db_path()
+    con = duckdb.connect(db_path)
+    if apply_mode:
+        create_tables(con)
+    else:
+        print(f"[DRY-RUN] target DB: {db_path} — no DDL, no inserts, no freshness stamp")
 
     loaded_dates = get_loaded_dates(con)
     print(f"Already loaded: {len(loaded_dates)} dates")
@@ -214,19 +222,26 @@ def run(days=30, update_mode=False, test_mode=False):
     pbar.close()
 
     if all_rows:
-        print(f"\n  Inserting {len(all_rows):,} rows...")
-        # Insert in chunks
-        chunk = 50_000
-        for i in range(0, len(all_rows), chunk):
-            batch_insert(con, all_rows[i:i + chunk])
-        print("  Done.")
+        if apply_mode:
+            print(f"\n  Inserting {len(all_rows):,} rows...")
+            # Insert in chunks
+            chunk = 50_000
+            for i in range(0, len(all_rows), chunk):
+                batch_insert(con, all_rows[i:i + chunk])
+            print("  Done.")
+        else:
+            print(f"\n  [DRY-RUN] short_interest: would INSERT OR IGNORE {len(all_rows):,} rows "
+                  f"(PK (ticker, report_date); duplicates dropped by existing guard)")
     else:
         print("\n  No new data to insert.")
 
-    # Summary
-    total = con.execute("SELECT COUNT(*) FROM short_interest").fetchone()[0]
-    dates = con.execute("SELECT COUNT(DISTINCT report_date) FROM short_interest").fetchone()[0]
-    tickers = con.execute("SELECT COUNT(DISTINCT ticker) FROM short_interest").fetchone()[0]
+    # Summary — read-only; short_interest may be absent on a fresh dry-run DB.
+    try:
+        total = con.execute("SELECT COUNT(*) FROM short_interest").fetchone()[0]
+        dates = con.execute("SELECT COUNT(DISTINCT report_date) FROM short_interest").fetchone()[0]
+        tickers = con.execute("SELECT COUNT(DISTINCT ticker) FROM short_interest").fetchone()[0]
+    except duckdb.CatalogException:
+        total = dates = tickers = 0
 
     print(f"\n{'='*50}")
     print(f"short_interest: {total:,} rows, {dates} dates, {tickers:,} tickers")
@@ -235,37 +250,60 @@ def run(days=30, update_mode=False, test_mode=False):
     if test_mode:
         print("\nTest tickers:")
         for t in ["AR", "AM", "DVN", "WBD", "CVX"]:
-            row = con.execute("""
-                SELECT report_date, short_volume, total_volume, short_pct
-                FROM short_interest
-                WHERE ticker = ?
-                ORDER BY report_date DESC
-                LIMIT 1
-            """, [t]).fetchone()
+            try:
+                row = con.execute("""
+                    SELECT report_date, short_volume, total_volume, short_pct
+                    FROM short_interest
+                    WHERE ticker = ?
+                    ORDER BY report_date DESC
+                    LIMIT 1
+                """, [t]).fetchone()
+            except duckdb.CatalogException:
+                row = None
             if row:
                 print(f"  {t}: date={row[0]} short_vol={row[1]:,} total_vol={row[2]:,} short%={row[3]:.1f}")
             else:
                 print(f"  {t}: no data")
 
-    try:
-        con.execute("CHECKPOINT")
-        record_freshness(con, "short_interest")
-    except Exception as e:
-        print(f"  [warn] record_freshness(short_interest) failed: {e}", flush=True)
+    if apply_mode:
+        try:
+            con.execute("CHECKPOINT")
+            record_freshness(con, "short_interest")
+        except Exception as e:
+            print(f"  [warn] record_freshness(short_interest) failed: {e}", flush=True)
+    else:
+        print("  [DRY-RUN] data_freshness: would record freshness for short_interest (skipped)")
     con.close()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch FINRA short sale volume data")
+    parser = argparse.ArgumentParser(
+        description="Fetch FINRA short sale volume data. "
+                    "Pass --apply to execute writes or --dry-run to report planned writes only. "
+                    "If neither is passed, --apply is assumed (deprecation warning emitted) — "
+                    "this fallback is scheduled for removal on 2026-07-23 "
+                    "(ROADMAP: finra-default-flip).")
     parser.add_argument("--days", type=int, default=30, help="Number of trading days to fetch")
     parser.add_argument("--update", action="store_true", help="Only fetch since last loaded date")
     parser.add_argument("--test", action="store_true", help="Test mode (5 days)")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true",
+                      help="Report planned writes; no DDL, inserts, or freshness stamp touch the DB.")
+    mode.add_argument("--apply", action="store_true",
+                      help="Execute writes (current default; pass explicitly to silence the deprecation warning).")
     args = parser.parse_args()
+
+    should_apply = not args.dry_run  # --dry-run wins; --apply or neither → apply
+    if not args.apply and not args.dry_run:
+        print("[deprecation] fetch_finra_short.py: no mode flag passed — defaulting to --apply. "
+              "Pass --apply (or --dry-run) explicitly. "
+              "This behavior will be removed on 2026-07-23 (ROADMAP: finra-default-flip).",
+              file=sys.stderr, flush=True)
 
     if hasattr(args, 'staging') and args.staging:
         set_staging_mode(True)
     if args.test:
         set_test_mode(True)
     crash_handler("fetch_finra_short")(
-        lambda: run(days=args.days, update_mode=args.update, test_mode=args.test))
+        lambda: run(days=args.days, update_mode=args.update, test_mode=args.test, apply_mode=should_apply))

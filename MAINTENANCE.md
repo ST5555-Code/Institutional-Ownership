@@ -167,6 +167,32 @@ Observed cadence (as of 2026-04-21): 12 snapshots covering
 snapshots tracks schema evolution (table adds/drops) rather than partial
 backups — see [docs/findings/obs-08-p1-findings.md](docs/findings/obs-08-p1-findings.md).
 
+## Pipeline CLI contracts
+
+### `scripts/fetch_finra_short.py` — `--dry-run` / `--apply`
+
+Added in the `fetch-finra-short-dry-run` session (pre-Phase-B V5 gap). The
+script downloads FINRA daily CNMS short-sale-volume files and writes
+`short_interest` (PK `(ticker, report_date)`, upsert via `INSERT OR
+IGNORE`) plus the `data_freshness` row for `short_interest`.
+
+| Mode | Behaviour |
+|------|-----------|
+| `--apply` | Execute writes. Matches prior default behaviour exactly. |
+| `--dry-run` | Fetch runs; DDL, inserts, `CHECKPOINT`, and `record_freshness` are all skipped. Prints `[DRY-RUN]` lines naming each intended write. |
+| neither flag | Prints a stderr deprecation warning, then applies. Preserved for backward compatibility with any manual operator muscle memory. **Scheduled for removal on 2026-07-23** — tracked as `finra-default-flip` in ROADMAP Current backlog. |
+| `--dry-run --apply` | Rejected by argparse (mutex group). |
+
+The Makefile target `make fetch-finra-short` now passes `--apply`
+explicitly. The disabled `scripts/scheduler.py` FINRA entry keeps its
+existing `--staging --update` flags — when it is re-enabled, add
+`--apply` at the same time to silence the deprecation warning.
+
+**Tests:** `tests/pipeline/test_fetch_finra_short.py` exercises the CLI
+surface via `subprocess.run`, with a local HTTP 404 stub bound to
+`FINRA_BASE_URL_OVERRIDE` so FINRA's CDN is not contacted. DB isolation
+uses the `--test` path (`data/13f_test.duckdb`), re-seeded per test.
+
 ## Refetch Pattern for Prod Apply
 
 When a prod apply requires refetching external data (market prices,

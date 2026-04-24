@@ -170,7 +170,7 @@ fetch-ncen:
 	$(Q) $(PY) $(SCRIPTS)/fetch_ncen.py
 
 fetch-finra-short:
-	$(Q) $(PY) $(SCRIPTS)/fetch_finra_short.py
+	$(Q) $(PY) $(SCRIPTS)/fetch_finra_short.py --apply
 
 build-managers:
 	$(Q) $(PY) $(SCRIPTS)/build_managers.py
