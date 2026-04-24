@@ -61,6 +61,18 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         promote_key=("table_name",),
         notes="updated by every pipeline at end-of-run",
     ),
+    "cusip_retry_queue": DatasetSpec(
+        layer=0, owner="scripts/build_classifications.py",
+        promote_strategy="direct_write",
+        promote_key=("cusip",),
+        notes="Queue state for OpenFIGI ticker-resolution retry pipeline. "
+              "Seeded by build_classifications.py during CUSIP classification build; "
+              "drained and status-updated by run_openfigi_retry.py "
+              "(status: pending | resolved | unmappable). Operational queue — "
+              "same L0 bucket as pending_entity_resolution. Distinct from "
+              "cusip_classifications (L3 authoritative output); split is "
+              "operational (queue) vs deliverable (output). Migration 003.",
+    ),
 
     # -----------------------------------------------------------------
     # Raw (L1)
@@ -124,6 +136,20 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         promote_strategy="rebuild",
         downstream=("holdings_v2",),
         notes="CTAS-based; DDL tracks DataFrame shape",
+    ),
+    "_cache_openfigi": DatasetSpec(
+        layer=3, owner="scripts/build_cusip.py",
+        promote_strategy="upsert",
+        promote_key=("cusip",),
+        notes="OpenFIGI v3 response cache (cusip, figi, ticker, exchange, "
+              "security_type, market_sector, cached_at). Non-authoritative, "
+              "rebuildable from source — survives re-runs. Written by "
+              "build_cusip.py + run_openfigi_retry.py (migration 003). "
+              "Registered at L3 to align REGISTRY with existing de-facto "
+              "classification in docs/data_layers.md §2 ('L3 reference cache') "
+              "and scripts/pipeline/validate_schema_parity.py L3_TABLES. "
+              "A distinct 'cache' layer tag is deferred — see ROADMAP "
+              "multi-db-datasetspec / future layer-vocab extension.",
     ),
     "market_data": DatasetSpec(
         layer=3, owner="scripts/fetch_market.py",

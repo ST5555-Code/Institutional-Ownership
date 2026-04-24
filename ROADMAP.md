@@ -586,7 +586,9 @@ Canonical open-items index synced against `docs/plans/2026-04-23-phase-b-c-execu
 | 56 | Decision maker / voting rollup worldviews (DM1-DM7) | `### Open items` 56; plan §9 | Not started |
 | P2-FU-01 | `run_script` allowlist prune in `admin_bp.py` | plan §9 | Open |
 | P2-FU-03 | ADV SCD Type 2 conversion | plan §9 | Open |
-| registry-gap-sweep | Add 4 active tables to DATASET_REGISTRY (`_cache_openfigi`, `admin_sessions`, `cusip_classifications`, `cusip_retry_queue`) | plan §8.4 (added phase-c2) | Open — dedicated session after C2; not gating B3 |
+| registry-gap-sweep | Add 4 active tables to DATASET_REGISTRY (`_cache_openfigi`, `admin_sessions`, `cusip_classifications`, `cusip_retry_queue`) | plan §8.4 (added phase-c2) | **PARTIAL 2026-04-24** — registered `_cache_openfigi` (L3 upsert) + `cusip_retry_queue` (L0 direct_write). `admin_sessions` deliberately unregistered — multi-DB scope issue (lives in `data/admin.duckdb`); tracked as `multi-db-datasetspec`. `cusip_classifications` out-of-scope in executing session — separate follow-up. See plan §8.4 execution notes. |
+| admin_preferences | 0-row stub from migration 016; no writer/reader found | plan §8.4 execution notes (2026-04-24); Appendix A `docs/data_layers.md` | Open — register or retire when admin feature set is next revisited; also blocked on `multi-db-datasetspec` if kept in `data/admin.duckdb` |
+| multi-db-datasetspec | Extend `DATASET_REGISTRY` to support tables in non-prod DBs (`data/admin.duckdb` and any future secondary DBs) | plan §8.4 execution notes (2026-04-24); `registry-gap-sweep` deferral | Open — prerequisite for registering `admin_sessions`, `admin_preferences`, and any cross-DB app-state tables; requires adding a `db_file` field to `DatasetSpec` + updating `unclassified_tables()` callers |
 
 ### Open items
 
