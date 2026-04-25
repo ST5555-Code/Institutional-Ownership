@@ -191,3 +191,45 @@ def test_different_scripts_both_allowed(logged_in, popen_sleep):
     assert resp_b.status_code == 200, resp_b.text
     assert resp_a.json()["pid"] != resp_b.json()["pid"]
     assert len(popen_sleep) == 2
+
+
+def test_unknown_flag_rejected(logged_in, popen_sleep):
+    """ALLOWED_FLAGS gate: unknown flags 400 before subprocess.Popen."""
+    resp = logged_in.post(
+        "/api/admin/run_script",
+        json={"script": "compute_flows.py", "flags": ["--evil"]},
+    )
+    assert resp.status_code == 400, resp.text
+    assert "not allowed" in resp.json()["error"].lower()
+    assert popen_sleep == []
+
+
+def test_value_flag_requires_value(logged_in, popen_sleep):
+    """--quarter without a following value is rejected."""
+    resp = logged_in.post(
+        "/api/admin/run_script",
+        json={"script": "compute_flows.py", "flags": ["--quarter"]},
+    )
+    assert resp.status_code == 400, resp.text
+    assert popen_sleep == []
+
+
+def test_value_flag_value_cannot_be_flag(logged_in, popen_sleep):
+    """--quarter --all is rejected: value must not start with --."""
+    resp = logged_in.post(
+        "/api/admin/run_script",
+        json={"script": "compute_flows.py", "flags": ["--quarter", "--all"]},
+    )
+    assert resp.status_code == 400, resp.text
+    assert popen_sleep == []
+
+
+def test_allowed_flags_accepted(logged_in, popen_sleep):
+    """Documented flag set is accepted end-to-end."""
+    resp = logged_in.post(
+        "/api/admin/run_script",
+        json={"script": "compute_flows.py", "flags": ["--dry-run", "--quarter", "2024Q1"]},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "started"
+    assert len(popen_sleep) == 1

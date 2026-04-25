@@ -221,7 +221,7 @@ def enrich_with_yahoo(tickers):
                     "market_cap": m.get("market_cap") or 0,  # approximate; authoritative market_cap is computed in fetch_market.py
                     "sic_code": None,
                 }
-        except Exception:
+        except Exception:  # nosec B110 — retired script; best-effort Yahoo enrichment
             pass
 
         if i % 100 == 0:
@@ -323,7 +323,7 @@ def build_securities_table(con, df_cusips, figi_results):
     print("\nUpdating holdings.ticker from securities...")
     try:
         con.execute("ALTER TABLE holdings ALTER COLUMN ticker TYPE VARCHAR")
-    except Exception:
+    except Exception:  # nosec B110 — retired script; column may already be VARCHAR
         pass
     con.execute("""
         UPDATE holdings h

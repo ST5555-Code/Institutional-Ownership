@@ -347,7 +347,7 @@ def entity_gate_check(
             ).fetchall()
             if aliases:
                 b["alias_hint"] = [a[0] for a in aliases]
-        except Exception:
+        except Exception:  # nosec B110 — best-effort alias hint enrichment; missing hints are tolerable
             pass
         try:
             sup = con_prod.execute(
@@ -358,7 +358,7 @@ def entity_gate_check(
             ).fetchone()
             if sup and sup[0]:
                 b["suppress_hint"] = f"{sup[0]} suppress_relationship override(s)"
-        except Exception:
+        except Exception:  # nosec B110 — best-effort suppress hint enrichment; missing hints are tolerable
             pass
 
     # Queue unresolved identifiers for human review.

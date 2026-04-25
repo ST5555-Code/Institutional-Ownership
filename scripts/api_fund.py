@@ -103,7 +103,6 @@ def api_fund_portfolio_managers(ticker: str = ''):
     try:
         validate_ticker_current(con, ticker)
         df = con.execute(
-            f""  # nosec B608
             f"""
             SELECT
                 cik,
@@ -118,7 +117,7 @@ def api_fund_portfolio_managers(ticker: str = ''):
             GROUP BY cik, fund_name
             ORDER BY position_value DESC NULLS LAST
             LIMIT 50
-            """, [ticker]
+            """, [ticker]  # nosec B608
         ).fetchdf()
         return df_to_records(df)
     finally:
@@ -143,13 +142,12 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
             param = series_id
 
         fund_info = con.execute(
-            f""  # nosec B608
             f"""
             SELECT fund_name, series_id, lei, family_name, COUNT(DISTINCT quarter) as quarters
             FROM fund_holdings_v2 WHERE {where} AND is_latest = TRUE
             GROUP BY fund_name, series_id, lei, family_name
             LIMIT 1
-            """, [param]
+            """, [param]  # nosec B608
         ).fetchone()
         if not fund_info:
             return JSONResponse(status_code=404, content={'error': 'Fund not found'})
@@ -157,7 +155,6 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
         fund_name, sid, fund_lei, family, quarters = fund_info
 
         size_stats = con.execute(
-            f""  # nosec B608
             f"""
             SELECT
                 AVG(pct_of_nav) as avg_pct_nav,
@@ -167,12 +164,11 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
                 COUNT(DISTINCT quarter) as quarters_held
             FROM fund_holdings_v2
             WHERE {where} AND pct_of_nav IS NOT NULL AND pct_of_nav > 0 AND is_latest = TRUE
-            """, [param]
+            """, [param]  # nosec B608
         ).fetchone()
 
         sector_where = "fh.lei = ?" if lei else "fh.series_id = ?"
         sectors = con.execute(
-            f""  # nosec B608
             f"""
             SELECT s.sector, SUM(fh.market_value_usd) as sector_value
             FROM fund_holdings_v2 fh
@@ -184,18 +180,17 @@ def api_fund_behavioral_profile(lei: str = '', series_id: str = ''):
             GROUP BY s.sector
             ORDER BY sector_value DESC
             LIMIT 10
-            """, [param]
+            """, [param]  # nosec B608
         ).fetchdf()
 
         top = con.execute(
-            f""  # nosec B608
             f"""
             SELECT ticker, issuer_name, market_value_usd, pct_of_nav, shares_or_principal
             FROM fund_holdings_v2
             WHERE {where} AND quarter = '{LQ}' AND is_latest = TRUE
             ORDER BY market_value_usd DESC NULLS LAST
             LIMIT 10
-            """, [param]
+            """, [param]  # nosec B608
         ).fetchdf()
 
         return clean_for_json({
@@ -228,7 +223,6 @@ def api_nport_shorts(ticker: str = ''):
         where = "AND fh.ticker = ?" if ticker else ""
         params = [ticker] if ticker else []
         df = con.execute(
-            f""  # nosec B608
             f"""
             SELECT
                 fh.fund_name,
@@ -246,7 +240,7 @@ def api_nport_shorts(ticker: str = ''):
               AND fh.is_latest = TRUE
             ORDER BY fh.market_value_usd ASC
             LIMIT 200
-            """, params
+            """, params  # nosec B608
         ).fetchdf()
         return df_to_records(df)
     finally:

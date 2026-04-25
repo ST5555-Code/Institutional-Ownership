@@ -155,13 +155,13 @@ def seed_staging():
         try:
             staging.execute(f"SELECT 1 FROM {table} LIMIT 1")
             continue  # already exists in staging
-        except Exception:
+        except Exception:  # nosec B110 — table absent in staging is the expected branch; fall through to copy
             pass
         try:
             df = prod.execute(f"SELECT * FROM {table}").fetchdf()
             staging.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
             copied += 1
-        except Exception:
+        except Exception:  # nosec B110 — best-effort reference seed; missing source table is non-fatal for staging
             pass
     prod.close()
     staging.close()

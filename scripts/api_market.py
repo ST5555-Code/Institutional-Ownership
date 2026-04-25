@@ -164,7 +164,6 @@ def api_crowding(ticker: str = ''):
     try:
         validate_ticker_current(con, ticker)
         holders = con.execute(
-            f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
                    manager_type, SUM(pct_of_so) as pct_so,
@@ -172,7 +171,7 @@ def api_crowding(ticker: str = ''):
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY holder, manager_type
             ORDER BY pct_so DESC NULLS LAST LIMIT 20
-            """, [ticker]
+            """, [ticker]  # nosec B608
         ).fetchdf()
         result = {'holders': df_to_records(holders)}
         if has_table('short_interest'):
@@ -197,13 +196,12 @@ def api_smart_money(ticker: str = ''):
     try:
         validate_ticker_current(con, ticker)
         longs = con.execute(
-            f""  # nosec B608
             f"""
             SELECT manager_type, COUNT(DISTINCT cik) as holders,
                    SUM(shares) as long_shares, SUM(market_value_live) as long_value
             FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY manager_type ORDER BY long_value DESC NULLS LAST
-            """, [ticker]
+            """, [ticker]  # nosec B608
         ).fetchdf()
         result = {'long_by_type': df_to_records(longs)}
         if has_table('short_interest'):
@@ -248,18 +246,16 @@ def api_heatmap(request: Request):
             validate_ticker_current(con, t)
         if not tickers:
             top = con.execute(
-                f""  # nosec B608
                 f"""
                 SELECT ticker, SUM(market_value_usd) as val
                 FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL AND is_latest = TRUE
                 GROUP BY ticker ORDER BY val DESC LIMIT 10
-                """
+                """  # nosec B608
             ).fetchall()
             tickers = [r[0] for r in top]
 
         ticker_ph = ','.join(['?'] * len(tickers))
         managers = con.execute(
-            f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, SUM(market_value_usd) as total_val
             FROM holdings_v2
@@ -268,7 +264,7 @@ def api_heatmap(request: Request):
               AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_val DESC LIMIT 15
-            """, tickers
+            """, tickers  # nosec B608
         ).fetchall()
         manager_names = [r[0] for r in managers]
 
@@ -277,7 +273,6 @@ def api_heatmap(request: Request):
 
         mgr_ph = ','.join(['?'] * len(manager_names))
         cells = con.execute(
-            f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as manager, ticker,
                    SUM(pct_of_so) as pct_so,
@@ -289,7 +284,7 @@ def api_heatmap(request: Request):
               AND COALESCE(rollup_name, inst_parent_name) IN ({mgr_ph})
               AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name), ticker
-            """, tickers + manager_names
+            """, tickers + manager_names  # nosec B608
         ).fetchdf()
 
         return clean_for_json({

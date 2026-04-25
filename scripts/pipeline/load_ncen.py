@@ -212,7 +212,7 @@ def _download_ncen_xml(cik_raw: str, accession: str, primary_doc: str) -> Option
     try:
         resp, _ = sec_fetch(url, headers=SEC_HEADERS, max_retries=3, timeout=60)
         return resp.content
-    except Exception:  # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except  # nosec B110 — primary URL probe; falls through to alternate URL below
         pass
 
     clean_doc = (primary_doc or "").split("/")[-1]
@@ -630,7 +630,7 @@ class LoadNCENPipeline(SourcePipeline):
 
         try:
             con.execute("ALTER TABLE managers ADD COLUMN adviser_cik VARCHAR")
-        except Exception:  # nosec B110 — column already exists on re-runs
+        except duckdb.CatalogException:  # column already exists on re-runs
             pass
 
         advisers = con.execute(

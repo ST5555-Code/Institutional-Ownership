@@ -395,7 +395,7 @@ class SourcePipeline(ABC):
                     manifest_id, "failed",
                     error_message=str(e)[:500],
                 )
-            except Exception:
+            except Exception:  # nosec B110 — best-effort manifest 'failed' transition; original error is re-raised below
                 pass
             raise
         finally:

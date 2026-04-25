@@ -126,8 +126,8 @@ class SECSharesClient:
                 try:
                     with open(cache) as f:
                         return json.load(f)
-                except Exception:
-                    pass  # corrupted → refetch
+                except Exception:  # nosec B110 — corrupt cache → refetch from SEC
+                    pass
 
         self._throttle()
         url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"

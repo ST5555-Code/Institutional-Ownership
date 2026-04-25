@@ -579,14 +579,44 @@ def api_admin_run_script(body: dict = Body(default={})):
     # INF12: run_pipeline.sh and merge_staging.py removed — never web-triggerable.
     # BLOCK-1 (2026-04-17 audit): fetch_nport.py retired; removed from allowlist
     # to prevent resurrection of legacy fund_holdings.
-    allowed = {
-        'fetch_13dg.py', 'fetch_market.py',
-        'fetch_finra_short.py', 'fetch_ncen.py', 'compute_flows.py',
-        'build_cusip.py', 'build_summaries.py', 'unify_positions.py',
-        'refresh_snapshot.sh',
+    # ALLOWED_FLAGS: per-script flag allowlist. Flag values (--quarter, --limit)
+    # carry an arbitrary token so they are split into ('--flag', 'value') pairs
+    # when validated. Anything outside this allowlist is rejected before reaching
+    # subprocess.Popen — closes the argv-injection gap on body['flags'].
+    _COMMON_FLAGS = frozenset({'--dry-run', '--staging', '--all', '--quarter', '--limit'})
+    ALLOWED_FLAGS = {
+        'fetch_13dg.py': _COMMON_FLAGS,
+        'fetch_market.py': _COMMON_FLAGS,
+        'fetch_finra_short.py': _COMMON_FLAGS,
+        'fetch_ncen.py': _COMMON_FLAGS,
+        'compute_flows.py': _COMMON_FLAGS,
+        'build_cusip.py': _COMMON_FLAGS,
+        'build_summaries.py': _COMMON_FLAGS,
+        'unify_positions.py': _COMMON_FLAGS,
+        'refresh_snapshot.sh': _COMMON_FLAGS,
     }
-    if script not in allowed:
+    _VALUE_FLAGS = frozenset({'--quarter', '--limit'})
+    if script not in ALLOWED_FLAGS:
         return JSONResponse(status_code=400, content={'error': f'Script not allowed: {script}'})
+
+    if not isinstance(flags, list) or not all(isinstance(f, str) for f in flags):
+        return JSONResponse(status_code=400, content={'error': 'flags must be a list of strings'})
+
+    permitted = ALLOWED_FLAGS[script]
+    i = 0
+    while i < len(flags):
+        flag = flags[i]
+        if flag not in permitted:
+            return JSONResponse(status_code=400, content={'error': f'Flag not allowed: {flag}'})
+        if flag in _VALUE_FLAGS:
+            if i + 1 >= len(flags):
+                return JSONResponse(status_code=400, content={'error': f'Flag {flag} requires a value'})
+            value = flags[i + 1]
+            if value.startswith('--'):
+                return JSONResponse(status_code=400, content={'error': f'Flag {flag} value must not start with --'})
+            i += 2
+        else:
+            i += 1
 
     # sec-02-p1: flock-based concurrency guard. Kernel-level advisory lock on a
     # per-script sentinel file, acquired non-blocking before spawn. The fd is
@@ -642,24 +672,22 @@ def api_admin_manager_changes():
     con = _get_db()
     try:
         new_mgrs = con.execute(
-            f""  # nosec B608
             f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND is_latest = TRUE)
               AND is_latest = TRUE
             ORDER BY manager_name LIMIT 50
-            """
+            """  # nosec B608
         ).fetchdf()
         gone_mgrs = con.execute(
-            f""  # nosec B608
             f"""
             SELECT DISTINCT cik, manager_name, manager_type
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}'
               AND cik NOT IN (SELECT DISTINCT cik FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND is_latest = TRUE)
               AND is_latest = TRUE
             ORDER BY manager_name LIMIT 50
-            """
+            """  # nosec B608
         ).fetchdf()
         return clean_for_json({
             'new_managers': df_to_records(new_mgrs),
@@ -677,24 +705,22 @@ def api_admin_ticker_changes():
     con = _get_db()
     try:
         new_tickers = con.execute(
-            f""  # nosec B608
             f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL AND is_latest = TRUE)
               AND is_latest = TRUE
             GROUP BY ticker ORDER BY ticker LIMIT 100
-            """
+            """  # nosec B608
         ).fetchdf()
         gone_tickers = con.execute(
-            f""  # nosec B608
             f"""
             SELECT DISTINCT ticker, MAX(issuer_name) as company
             FROM holdings_v2 WHERE quarter = '{PREV_QUARTER}' AND ticker IS NOT NULL
               AND ticker NOT IN (SELECT DISTINCT ticker FROM holdings_v2 WHERE quarter = '{LATEST_QUARTER}' AND ticker IS NOT NULL AND is_latest = TRUE)
               AND is_latest = TRUE
             GROUP BY ticker ORDER BY ticker LIMIT 100
-            """
+            """  # nosec B608
         ).fetchdf()
         return clean_for_json({
             'new_tickers': df_to_records(new_tickers),
@@ -710,7 +736,6 @@ def api_admin_parent_health():
     con = _get_db()
     try:
         orphaned = con.execute(
-            f""  # nosec B608
             f"""
             SELECT cik, manager_name, manager_type,
                    SUM(market_value_live) as total_value
@@ -719,17 +744,16 @@ def api_admin_parent_health():
             GROUP BY cik, manager_name, manager_type
             ORDER BY total_value DESC NULLS LAST
             LIMIT 20
-            """
+            """  # nosec B608
         ).fetchdf()
         top_parents = con.execute(
-            f""  # nosec B608
             f"""
             SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, COUNT(DISTINCT cik) as child_ciks,
                    SUM(market_value_live) as total_value
             FROM holdings_v2 WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL AND is_latest = TRUE
             GROUP BY COALESCE(rollup_name, inst_parent_name)
             ORDER BY total_value DESC NULLS LAST LIMIT 20
-            """
+            """  # nosec B608
         ).fetchdf()
         return clean_for_json({
             'orphaned_managers': df_to_records(orphaned),
@@ -758,14 +782,13 @@ def api_admin_stale_data():
             result['stale_market_data'] = []
         try:
             inactive = con.execute(
-                f""  # nosec B608
                 f"""
                 SELECT cik, manager_name, MAX(quarter) as last_quarter
                 FROM holdings_v2
                 GROUP BY cik, manager_name
                 HAVING MAX(quarter) < '{PQ}'
                 ORDER BY last_quarter DESC LIMIT 20
-                """
+                """  # nosec B608
             ).fetchdf()
             result['inactive_managers'] = df_to_records(inactive)
         except Exception as e:  # pylint: disable=broad-except
@@ -782,7 +805,6 @@ def api_admin_merger_signals():
     con = _get_db()
     try:
         signals = con.execute(
-            f""  # nosec B608
             f"""
             WITH gone AS (
                 SELECT cik, manager_name, SUM(market_value_usd) as prev_value
@@ -793,7 +815,7 @@ def api_admin_merger_signals():
                 HAVING SUM(market_value_usd) > 1000000
             )
             SELECT * FROM gone ORDER BY prev_value DESC LIMIT 20
-            """
+            """  # nosec B608
         ).fetchdf()
         return clean_for_json({
             'potential_mergers': df_to_records(signals),
@@ -808,7 +830,6 @@ def api_admin_new_companies():
     con = _get_db()
     try:
         new_cos = con.execute(
-            f""  # nosec B608
             f"""
             SELECT h.ticker, MAX(h.issuer_name) as company,
                    COUNT(DISTINCT h.cik) as holder_count,
@@ -825,7 +846,7 @@ def api_admin_new_companies():
             GROUP BY h.ticker
             HAVING SUM(h.market_value_live) > 10000000
             ORDER BY total_value DESC LIMIT 30
-            """
+            """  # nosec B608
         ).fetchdf()
         return clean_for_json({
             'new_companies': df_to_records(new_cos),
@@ -842,7 +863,6 @@ def api_admin_data_quality():
         result = {}
         try:
             r = con.execute(
-                f""  # nosec B608
                 f"""
                 SELECT
                     COUNT(*) as total,
@@ -850,7 +870,7 @@ def api_admin_data_quality():
                     COUNT(market_value_live) as with_live_value,
                     COUNT(pct_of_so) as with_so_pct
                 FROM holdings_v2 WHERE quarter = '{LQ}' AND is_latest = TRUE
-                """
+                """  # nosec B608
             ).fetchone()
             result['holdings'] = {
                 'total': r[0], 'with_ticker': r[1],
