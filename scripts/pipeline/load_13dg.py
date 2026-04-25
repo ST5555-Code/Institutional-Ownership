@@ -407,7 +407,7 @@ class Load13DGPipeline(SourcePipeline):
                 "SELECT accession_number FROM stg_13dg_raw"
             ).fetchall()
             already_staged = {r[0] for r in rows if r[0]}
-        except Exception:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except  # nosec B110 — best-effort already-staged probe; empty set is the safe default
             pass
 
         rows_staged = 0

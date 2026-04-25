@@ -215,7 +215,7 @@ def download_xml(cik, accession_number, _quarter_label):
                         f.write(r3.content)
                     time.sleep(SEC_DELAY)
                     return r3.content
-        except Exception:
+        except Exception:  # nosec B110 — retired script; archived fetch fallback
             pass
         return None
 
@@ -283,7 +283,7 @@ def create_tables(con):
     ]:
         try:
             con.execute(idx_sql)
-        except Exception:
+        except Exception:  # nosec B110 — retired script; index may already exist
             pass
 
 
@@ -297,8 +297,8 @@ def is_already_loaded(con, series_id, quarter, report_month=None):
                 [series_id, report_month],
             ).fetchone()
             return result[0] > 0
-        except Exception:
-            pass  # report_month column may not exist yet
+        except Exception:  # nosec B110 — retired script; report_month column may not exist yet
+            pass
     result = con.execute(
         "SELECT COUNT(*) FROM fund_holdings WHERE series_id = ? AND quarter = ?",
         [series_id, quarter],
@@ -354,8 +354,8 @@ def load_holdings_to_db(con, metadata, holdings, quarter_label, report_date, rep
                         row,
                     )
                     inserted += 1
-                except Exception:
-                    pass  # skip bad row silently
+                except Exception:  # nosec B110 — retired script; skip malformed row silently
+                    pass
             if inserted < len(rows):
                 print(f"    WARNING: {len(rows) - inserted}/{len(rows)} rows failed to insert: {e}", flush=True)
 
@@ -756,7 +756,7 @@ def main():
         """).fetchdf()
         print("\n  By quarter:")
         print(q_summary.to_string(index=False))
-    except Exception:
+    except Exception:  # nosec B110 — retired script; summary stats are best-effort
         pass
 
     con.close()

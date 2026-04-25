@@ -34,12 +34,16 @@ repos:
         # bandit sees `B608` as a positional file path, silently dropping
         # the B608 skip. Quoting keeps the comma inside the scalar.
         #
-        # Skips: B101 assert_used, B108 hardcoded_tmp, B110 try_except_pass,
+        # Skips: B101 assert_used, B108 hardcoded_tmp,
         # B310 urlopen, B404 subprocess import, B603 subprocess-without-shell,
         # B607 start_process_with_partial_path, B608 SQL-string-construction.
-        # All pre-existing cruft as of 2026-04-13 Phase 0-A baseline — see
-        # ROADMAP for cleanup tickets.
-        args: [-r, "--skip=B101,B108,B110,B310,B404,B603,B607,B608"]
+        # B110 try_except_pass was removed from the skip list once every
+        # try/except/pass site was inline-suppressed with `# nosec B110` and a
+        # reason — new sites must follow the same pattern instead of relying
+        # on a global skip.
+        # Other entries are pre-existing cruft as of 2026-04-13 Phase 0-A
+        # baseline — see ROADMAP for cleanup tickets.
+        args: [-r, "--skip=B101,B108,B310,B404,B603,B607,B608"]
         files: ^scripts/
 
   - repo: local

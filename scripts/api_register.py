@@ -78,14 +78,13 @@ def api_tickers(request: Request):
         )
     try:
         df = con.execute(
-            f""  # nosec B608
             f"""
             SELECT ticker, MODE(issuer_name) as name
             FROM holdings_v2
             WHERE ticker IS NOT NULL AND ticker != '' AND quarter = '{LQ}' AND is_latest = TRUE
             GROUP BY ticker
             ORDER BY ticker
-            """
+            """  # nosec B608
         ).fetchdf()
         return envelope_success(df_to_records(df), request, schema=TickersEnvelope)
     finally:
@@ -288,7 +287,6 @@ def api_amendments(ticker: str = ''):
     try:
         validate_ticker_current(con, ticker)
         amendments = con.execute(
-            f""  # nosec B608
             f"""
             WITH all_filings AS (
                 SELECT cik, manager_name, rollup_name, inst_parent_name, quarter,
@@ -309,7 +307,7 @@ def api_amendments(ticker: str = ''):
             FROM all_filings a
             WHERE a.cik IN (SELECT cik FROM amended_managers)
             ORDER BY a.market_value_usd DESC LIMIT 30
-            """, [ticker]
+            """, [ticker]  # nosec B608
         ).fetchdf()
 
         return clean_for_json({
@@ -334,18 +332,16 @@ def api_manager_profile(manager: str = ''):
     con = get_db()
     try:
         top_holdings_df = con.execute(
-            f""  # nosec B608
             f"""
             SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
                    pct_of_portfolio, pct_of_so
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
             ORDER BY market_value_usd DESC LIMIT 50
-            """, [f'%{manager}%']
+            """, [f'%{manager}%']  # nosec B608
         ).fetchdf()
 
         sectors = con.execute(
-            f""  # nosec B608
             f"""
             SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
                    SUM(h.market_value_usd) as value
@@ -356,11 +352,10 @@ def api_manager_profile(manager: str = ''):
               AND h.is_latest = TRUE
             GROUP BY m.sector
             ORDER BY value DESC LIMIT 10
-            """, [f'%{manager}%']
+            """, [f'%{manager}%']  # nosec B608
         ).fetchdf()
 
         stats = con.execute(
-            f""  # nosec B608
             f"""
             SELECT COUNT(DISTINCT ticker) as num_positions,
                    SUM(market_value_usd) as total_value,
@@ -368,7 +363,7 @@ def api_manager_profile(manager: str = ''):
                    MAX(manager_type) as manager_type
             FROM holdings_v2
             WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
-            """, [f'%{manager}%']
+            """, [f'%{manager}%']  # nosec B608
         ).fetchone()
 
         qoq = con.execute("""

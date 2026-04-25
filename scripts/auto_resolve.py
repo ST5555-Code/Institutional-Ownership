@@ -201,7 +201,7 @@ def resolve_method_b(gaps, already_resolved):
                     "match_name": best_company,
                     "match_score": best_score,
                 }
-        except Exception:
+        except Exception:  # nosec B110 — best-effort SEC EDGAR fuzzy match; failures fall through to the next resolution method
             pass
 
     print(f"  Method B (SEC EDGAR): {len(results)} matches")
@@ -266,7 +266,7 @@ def validate_candidates(all_candidates, gaps):
         chunk = candidate_list[i:i + 150]
         try:
             quote_map.update(yc.fetch_quote_batch(chunk))
-        except Exception:
+        except Exception:  # nosec B110 — best-effort enrichment; missing quotes degrade gracefully downstream
             pass
 
     for cusip, info in all_candidates.items():
@@ -522,7 +522,7 @@ def fetch_market_data(auto_applied, con):
             cols = ",".join(rec.keys())
             con.execute(f"INSERT INTO market_data ({cols}) SELECT {cols} FROM df_new")
             con.unregister("df_new")
-        except Exception:
+        except Exception:  # nosec B110 — best-effort cleanup of the in-memory DuckDB df binding
             pass
 
     # Update holdings

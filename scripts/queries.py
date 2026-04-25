@@ -853,8 +853,8 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 pn = r['parent_name']
                 if pn not in aum_map and r['val_mm'] and r['val_mm'] > 0:
                     aum_map[pn] = int(r['val_mm'])
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: aum_fallback", exc_info=True)
 
         # N-PORT coverage % per parent (from summary_by_parent)
         # INF34: summary_by_parent has one row per (quarter, inst_parent_name,
@@ -871,8 +871,8 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                             for _, r in cov_df.iterrows()
                             if r['nport_coverage_pct'] is not None}
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: coverage_map", exc_info=True)
 
         # Query 2: ALL 13F children for all parents in one pass
         ph = ','.join(['?'] * len(parent_names))
@@ -1548,8 +1548,8 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 coverage_map = {r['inst_parent_name']: r['nport_coverage_pct']
                                 for _, r in cov_df.iterrows()
                                 if r['nport_coverage_pct'] is not None}
-            except Exception:  # nosec B110
-                pass
+            except Exception:
+                logger.debug("optional enrichment failed: coverage_map", exc_info=True)
 
         results = []
         for row in records:
@@ -1644,8 +1644,8 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                                     'fund_name': e[0], 'shares': e[1],
                                     'value': e[2], 'note': note,
                                 })
-                except Exception:  # nosec B110
-                    pass
+                except Exception:
+                    logger.debug("optional enrichment failed: entity_children", exc_info=True)
 
             all_children = nport_children + entity_children
             if all_children:
@@ -3020,8 +3020,8 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
                     'active_holders_from': len(from_map),
                     'active_holders_to': len(to_map),
                 })
-            except Exception:  # nosec B110
-                pass
+            except Exception:
+                logger.debug("optional enrichment failed: econ_retention", exc_info=True)
         summary['econ_retention_trend'] = econ_retention_trend
 
         return {'summary': summary, 'detail': detail}
@@ -3300,8 +3300,8 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                 ORDER BY quarter_from
             """, [ticker]).fetchdf()
             flow_trend = df_to_records(trend_df)
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: flow_trend", exc_info=True)
 
         # QoQ chart data: compute flow intensity & churn for each sequential quarter pair
         qoq_charts = []
@@ -3360,8 +3360,8 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
                     'churn_nonpassive': round(ch_np, 6),
                     'churn_active': round(ch_act, 6),
                 })
-            except Exception:  # nosec B110
-                pass
+            except Exception:
+                logger.debug("optional enrichment failed: flow_intensity", exc_info=True)
 
         return clean_for_json({
             'period': period,
@@ -3460,8 +3460,8 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 for sec, wt in bw:
                     if sec not in mkt_weights:
                         mkt_weights[sec] = float(wt)
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: mkt_weights", exc_info=True)
         subj_spx_weight = mkt_weights.get(subj_gics_sector, None)
 
         # Top 25 parents or funds by latest quarter value (same as Register)
@@ -3834,8 +3834,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                     shares = r.get('short_shares') or 0
                     if shares > 0:
                         r['short_value'] = shares * live_price
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: nport_trend", exc_info=True)
         result['nport_trend'] = nport_trend
 
         # 2. N-PORT short positions detail (latest quarter) — dedupe by fund_name
@@ -3881,8 +3881,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                 r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
                 # Name-based classification for consistent type display
                 r['type'] = _classify_fund_type(r.get('fund_name') or '')
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: nport_detail", exc_info=True)
         result['nport_detail'] = nport_detail
 
         # 3. N-PORT short positions history per fund — dedupe by (fund_name, quarter)
@@ -3907,8 +3907,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                 funds_seen[fn][r['quarter']] = float(r['short_shares'])
             nport_by_fund = list(funds_seen.values())
             nport_by_fund.sort(key=lambda x: x.get(quarter, 0), reverse=True)
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: nport_by_fund", exc_info=True)
         result['nport_by_fund'] = nport_by_fund
 
         # 4. FINRA daily short volume (all available days)
@@ -3920,8 +3920,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                 ORDER BY report_date
             """, [ticker]).fetchdf()
             short_volume = df_to_records(sv_df)
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: short_volume", exc_info=True)
         result['short_volume'] = short_volume
 
         # 5. Long/short cross-reference — institutions both long and short
@@ -3988,8 +3988,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                     'net_exposure_pct': net_pct,
                 })
             cross_ref.sort(key=lambda x: x['short_shares'], reverse=True)
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: cross_ref", exc_info=True)
         result['cross_ref'] = cross_ref
 
         # 7. Short-only funds (N-PORT shorts without matching 13F long parent)
@@ -4043,8 +4043,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                         'short_value': sv,
                         'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,
                     })
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: short_only_funds", exc_info=True)
         result['short_only_funds'] = short_only
 
         # 8. Summary card data
@@ -4246,8 +4246,8 @@ def _get_summary_impl(ticker, quarter=LQ):
             """, [ticker]).fetchone()
             if nd and nd[0]:
                 nport_date = str(nd[0])[:10]  # YYYY-MM-DD
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.debug("optional enrichment failed: nport_latest_date", exc_info=True)
 
         result = {
             'company_name': company_name,
@@ -4459,7 +4459,8 @@ def get_market_summary(limit=25, quarter=LQ, rollup_type='economic_control_v1'):
                     r['entity_id'] = None
                     r['filer_count'] = r['num_ciks']
                     r['fund_count'] = 0
-            except Exception:  # nosec B110
+            except Exception:
+                logger.debug("optional enrichment failed: entity_id_lookup", exc_info=True)
                 r['entity_id'] = None
                 r['filer_count'] = r['num_ciks']
                 r['fund_count'] = 0
@@ -4474,7 +4475,8 @@ def get_market_summary(limit=25, quarter=LQ, rollup_type='economic_control_v1'):
                       AND rollup_type = ?
                 """, [r['institution'], rollup_type]).fetchone()
                 r['nport_coverage_pct'] = cov[0] if cov and cov[0] is not None else None
-            except Exception:  # nosec B110
+            except Exception:
+                logger.debug("optional enrichment failed: nport_coverage_lookup", exc_info=True)
                 r['nport_coverage_pct'] = None
 
         return clean_for_json(rows)

@@ -323,7 +323,7 @@ def fuzzy_match_managers(con):
 
 def update_has_13dg(con):
     try: con.execute("ALTER TABLE managers ADD COLUMN has_13dg BOOLEAN DEFAULT FALSE")
-    except Exception: pass
+    except Exception: pass  # nosec B110 — retired script; column may already exist
     con.execute("UPDATE managers SET has_13dg=TRUE WHERE cik IN (SELECT DISTINCT filer_cik FROM beneficial_ownership)")
     cnt = con.execute("SELECT COUNT(*) FROM managers WHERE has_13dg=TRUE").fetchone()[0]
     print(f"  managers.has_13dg set for {cnt}")
@@ -712,7 +712,7 @@ def run_phase2(max_workers=MAX_WORKERS_PHASE2, filing_cache=None, test_mode=Fals
                 try:
                     with open(os.path.join(LOG_DIR, "phase2_progress.txt"), "w") as pf:
                         pf.write(f"{msg}\n{datetime.now().isoformat()}\n")
-                except Exception:
+                except Exception:  # nosec B110 — retired script; progress file is best-effort
                     pass
 
             if len(all_records) >= FLUSH_SIZE:
@@ -879,7 +879,7 @@ def _seed_test_db():
         try:
             df = prod.execute(f"SELECT * FROM {table}").fetchdf()  # noqa: F841
             test.execute(f"CREATE TABLE {table} AS SELECT * FROM df")  # uses df via DuckDB binding
-        except Exception:
+        except Exception:  # nosec B110 — retired script; missing source table is non-fatal for the test seed
             pass
     prod.close()
     test.close()
