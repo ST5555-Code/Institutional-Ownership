@@ -32,3 +32,6 @@ jobs:
 
       - name: Run pre-commit (ruff + pylint + bandit)
         run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Check tracker staleness
+        run: python3 scripts/hygiene/audit_tracker_staleness.py --quiet
