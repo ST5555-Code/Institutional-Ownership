@@ -66,13 +66,22 @@ def _load_adv_cls() -> Type[SourcePipeline]:
     return module.LoadADVPipeline
 
 
+def _load_peer_rotation_cls() -> Type[SourcePipeline]:
+    """Lazy-import ComputePeerRotationPipeline. perf-p0-s1 precompute."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.compute_peer_rotation")
+    return module.ComputePeerRotationPipeline
+
+
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
-    "13f_holdings":    _load_13f_cls,     # type: ignore[dict-item]
-    "13dg_ownership":  _load_13dg_cls,    # type: ignore[dict-item]
-    "market_data":     _load_market_cls,  # type: ignore[dict-item]
-    "nport_holdings":  _load_nport_cls,   # type: ignore[dict-item]
-    "ncen_advisers":   _load_ncen_cls,    # type: ignore[dict-item]
-    "adv_registrants": _load_adv_cls,     # type: ignore[dict-item]
+    "13f_holdings":    _load_13f_cls,            # type: ignore[dict-item]
+    "13dg_ownership":  _load_13dg_cls,           # type: ignore[dict-item]
+    "market_data":     _load_market_cls,         # type: ignore[dict-item]
+    "nport_holdings":  _load_nport_cls,          # type: ignore[dict-item]
+    "ncen_advisers":   _load_ncen_cls,           # type: ignore[dict-item]
+    "adv_registrants": _load_adv_cls,            # type: ignore[dict-item]
+    "peer_rotation":   _load_peer_rotation_cls,  # type: ignore[dict-item]
 }
 
 
