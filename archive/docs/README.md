@@ -25,3 +25,8 @@ forward-looking work, see `ROADMAP.md` at repo root.
 - `superpowers/` directory (3 files in `plans/` + `specs/`) — early-April implementation plans: `2026-04-01-flask-web-app.md`, `2026-04-06-peer-rotation-plan.md`, `2026-04-06-sector-rotation-redesign.md`. All shipped.
 - `plans/20260412_architecture_review_revision.md` — ARCHITECTURE_REVIEW.md revision pass C1–C6; all changes long-landed.
 - `plans/2026-04-23-phase-b-c-execution-plan.md` — All phases + §8 shipped; B3 gets a fresh plan doc when the gate opens.
+
+## 2026-04-25 backlog-collapse session
+
+- `REMEDIATION_PLAN.md` — Frozen ledger of the 2026-04-20 → 2026-04-22 remediation program plus follow-up tracking through 2026-04-24. Retired during the tracker collapse so `ROADMAP.md` is the only forward-work surface; remaining live items moved to `ROADMAP.md` "Current backlog" or "Deferred". See `docs/findings/2026-04-25-backlog-collapse.md` for the closure-rationale memo.
+- `DEFERRED_FOLLOWUPS.md` — Long-tail INF## index. Retired during the tracker collapse for the same reason; live items moved into `ROADMAP.md` "Deferred" with named triggers, KILL items removed, AMBIENT items routed to `MAINTENANCE.md`.

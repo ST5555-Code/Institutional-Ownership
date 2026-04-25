@@ -1,5 +1,11 @@
 # Deferred Followups — Tracking Index
 
+> # ARCHIVED 2026-04-25
+>
+> This document was retired during backlog-collapse. Forward work lives in ROADMAP.md. This file remains as historical narrative of the remediation program (closed 2026-04-22) and follow-up tracking through 2026-04-24.
+>
+> Do NOT add new entries here. ROADMAP.md is the only forward-work tracker.
+
 Single index of INF## items outside the active work stream. Reconciled 2026-04-22
 after conv-12 (Phase 2 admin refresh + Wave 2 pipeline migrations closed; see
 `docs/REMEDIATION_PLAN.md §Changelog (2026-04-22 conv-12)`).

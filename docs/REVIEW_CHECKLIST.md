@@ -23,7 +23,7 @@ function are rejected on review.
 **Soft rule — modifications to existing stamp-column functions.** If the
 function already reads the stamped columns, the PR MAY leave them in place.
 These functions are bundled into the int-09 Step 4 rewrite (now unblocked
-post-Phase-2 per `docs/DEFERRED_FOLLOWUPS.md` INF25; schedulable any time).
+post-Phase-2 per `archive/docs/DEFERRED_FOLLOWUPS.md` (archived 2026-04-25) INF25; schedulable any time).
 
 Do not mix patterns inside a single function. If a modification touches an
 existing stamp-column function, either leave every stamped read in place
@@ -48,7 +48,7 @@ confirms the exemption reason is legitimate and tracked.
 **References.**
 - Proposal + performance + reliability evidence: `archive/docs/proposals/tier-4-join-pattern-proposal.md`
 - Helper library: `scripts/queries_helpers.py`
-- Retirement tracker: `docs/DEFERRED_FOLLOWUPS.md` (INF25)
+- Retirement tracker: `ROADMAP.md` "Deferred" (INF25 family — `INF25 Step 4 / int-09 architectural leg`); historical narrative in `archive/docs/DEFERRED_FOLLOWUPS.md` (archived 2026-04-25)
 - Principle + sequencing: `docs/data_layers.md §7`
 
 ---
@@ -79,8 +79,8 @@ are new children that inherit its context. Precedent: DM15b, DM15c, DM15d,
 DM15e; INF9a through INF9e.
 
 **Picking the next number.** Before opening a new item, grep for the
-prefix in `ROADMAP.md`, `docs/DEFERRED_FOLLOWUPS.md`, `docs/findings/`,
-`docs/REMEDIATION_*.md`, and `archive/docs/closed/`. Use max(existing) + 1. Gaps in
+prefix in `ROADMAP.md`, `docs/findings/`, `archive/docs/DEFERRED_FOLLOWUPS.md`,
+`archive/docs/REMEDIATION_*.md` (archived 2026-04-25), and `archive/docs/closed/`. Use max(existing) + 1. Gaps in
 the sequence are NOT free to reuse — they usually represent an assigned
 number that was closed without a ROADMAP entry (e.g. absorbed into another
 item).
@@ -120,9 +120,10 @@ it, reopens it, marks it deferred/standing/superseded, re-scopes it).
 **Hard rule.** For any PR that closes or changes status on an item,
 verify the same item is updated in **every tracker doc that
 references it** — not just the one the author happened to edit.
-Tracker docs: `ROADMAP.md`, `docs/REMEDIATION_PLAN.md`,
-`docs/REMEDIATION_CHECKLIST.md`, `docs/DEFERRED_FOLLOWUPS.md`,
-`docs/NEXT_SESSION_CONTEXT.md`.
+Active tracker docs (post backlog-collapse 2026-04-25): `ROADMAP.md`,
+`MAINTENANCE.md`, `docs/NEXT_SESSION_CONTEXT.md`. Historical narrative
+in `archive/docs/REMEDIATION_PLAN.md` and `archive/docs/DEFERRED_FOLLOWUPS.md`
+is read-only — do not update.
 
 **Check.** Run `python3 scripts/hygiene/audit_tracker_staleness.py` against
 the branch head. The script prints any ID whose status disagrees

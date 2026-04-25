@@ -2,6 +2,8 @@
 
 _Every worker session appends one entry here at session close._
 
+> **Note (2026-04-25):** This log references `docs/REMEDIATION_PLAN.md` and `docs/REMEDIATION_CHECKLIST.md` as their pre-archival paths because each entry is a point-in-time record of work shipped before the backlog-collapse session. The current paths are `archive/docs/REMEDIATION_PLAN.md` (archived 2026-04-25) and `archive/docs/REMEDIATION_CHECKLIST.md` (archived 2026-04-23). Historical entries below are not retroactively edited.
+
 ## Entry template
 
 ```
