@@ -79,51 +79,28 @@ For a session that runs in a secondary worktree:
 
 ## 3. Cross-tracker update rule
 
-**Closing a tracked item requires updating every tracker that references
-it, in the same PR.**
+**Closing a tracked item requires updating every tracker that references it, in the same PR.**
 
-Tracker docs:
+After backlog-collapse (2026-04-25), the active tracker surface is intentionally narrow:
 
-- `ROADMAP.md`
-- `docs/REMEDIATION_PLAN.md`
-- `docs/DEFERRED_FOLLOWUPS.md`
-- `docs/NEXT_SESSION_CONTEXT.md`
+- `ROADMAP.md` — single source of truth for forward work (see §5).
+- `MAINTENANCE.md` — recurring/standing maintenance.
+- `docs/NEXT_SESSION_CONTEXT.md` — single-session handoff (overwritten per session; never accumulates multi-session state).
 
-Before opening a PR that closes an item, grep for the item ID / name
-across all five trackers. If more than one mentions it, update all of
-them in this PR — do not leave the stale mentions for a future
-doc-sync session. The historical cost of a stale tracker is a full
-investigation session to reconstruct state that was already known
-(see `phantom-other-managers-decision`, PR #125 — the phantom
-`other_managers` item flagged open in `REMEDIATION_PLAN.md` had
-already been resolved four days earlier, but that was only confirmed
-after a full session re-reading the code).
+`docs/REMEDIATION_PLAN.md` and `docs/DEFERRED_FOLLOWUPS.md` were archived to `archive/docs/` on 2026-04-25; do not update them and do not add new entries. Findings files in `docs/findings/` are point-in-time reference material — leave historical references intact.
 
-**Why:** trackers drift independently. A session that ships a fix
-naturally updates whichever tracker the author was looking at,
-not the other four. The next session investigating the item reads
-a stale tracker, treats it as authoritative, and wastes a session
-rediscovering what already shipped.
+Before opening a PR that closes an item, grep for the item ID / name across the active trackers. If more than one mentions it, update them all in this PR — do not leave stale mentions for a future doc-sync session. The historical cost of a stale tracker is a full investigation session to reconstruct state that was already known (see `phantom-other-managers-decision`, PR #125 — the phantom `other_managers` item flagged open in `REMEDIATION_PLAN.md` had already been resolved four days earlier, but that was only confirmed after a full session re-reading the code).
+
+**Why:** trackers drift independently. A session that ships a fix naturally updates whichever tracker the author was looking at, not the others. The next session investigating the item reads a stale tracker, treats it as authoritative, and wastes a session rediscovering what already shipped. The narrower surface after backlog-collapse exists to keep the cross-tracker audit cheap.
 
 **How to apply:**
 
-1. When preparing a PR that closes an item, run
-   `python3 scripts/hygiene/audit_tracker_staleness.py` against your branch.
-   The script prints any ID whose status disagrees across docs and
-   exits non-zero if drift exists.
-2. If the audit flags your item, update every tracker it names
-   before pushing. Use the same closure note (commit SHA, PR
-   number, date) in each.
-3. For items whose closure is partial (`Steps 1-3 done; Step 4
-   deferred`), spell out the partial state in every tracker — do
-   not rely on one tracker to carry the nuance.
-4. Reviewers check tracker consistency per the
-   `docs/REVIEW_CHECKLIST.md` tracker-consistency gate.
+1. When preparing a PR that closes an item, run `python3 scripts/hygiene/audit_tracker_staleness.py` against your branch. The script prints any ID whose status disagrees across docs and exits non-zero if drift exists.
+2. If the audit flags your item, update every tracker it names before pushing. Use the same closure note (commit SHA, PR number, date) in each.
+3. For items whose closure is partial (`Steps 1-3 done; Step 4 deferred`), spell out the partial state in every tracker — do not rely on one tracker to carry the nuance.
+4. Reviewers check tracker consistency per the `docs/REVIEW_CHECKLIST.md` tracker-consistency gate.
 
-**Scope exemption.** A PR that deliberately only touches one
-tracker (a typo fix, a link repair, a header refresh) does not need
-to update the others. The rule kicks in when the PR changes the
-**status** of an item, not when it changes prose around the item.
+**Scope exemption.** A PR that deliberately only touches one tracker (a typo fix, a link repair, a header refresh) does not need to update the others. The rule kicks in when the PR changes the **status** of an item, not when it changes prose around the item.
 
 ---
 
@@ -143,17 +120,26 @@ The `scripts/` tree is partitioned by lifecycle. Place new scripts in the direct
 
 ## 5. Tracker source-of-truth
 
-Each kind of tracking content has one canonical home. When two homes could plausibly hold the same content, default to the one named below — and link from the others rather than duplicating prose. Drift between trackers is the recurring cost the cross-tracker update rule (§3) was written to absorb; pinning a single source-of-truth per content type keeps that audit cheap.
+`ROADMAP.md` is the single source of truth for forward work. Every session updates ROADMAP at close — items live here or do not exist.
 
-- **Forward work (multi-session)** → `ROADMAP.md` `### Current backlog` + `docs/DEFERRED_FOLLOWUPS.md`. Items that span sessions or whose owner/priority is still being decided. `### Current backlog` is the curated index; `DEFERRED_FOLLOWUPS.md` carries the long-tail follow-ups not yet large enough to earn an INF##.
-- **Single-session handoff** → `docs/NEXT_SESSION_CONTEXT.md`. Volatile, refreshed at session close. Anything that won't matter two sessions from now belongs here, not in `ROADMAP.md`.
-- **Remediation narrative** → `docs/REMEDIATION_PLAN.md`. The frozen ledger of how the 2026-04-20 → 2026-04-22 remediation program was scoped and closed. Append-only changelog at the bottom. Do not rewrite historical rows; carry corrections forward as new entries.
-- **Per-session findings** → `docs/findings/<session-name>-<phase>.md`. Phase 0 investigations, audit reports, decision-quality writeups. One file per finding; never paste full findings into trackers.
-- **Per-session closures** → `docs/closures/YYYY-MM-DD-<session-name>.md` (Pattern B). Replaces the legacy "append to ROADMAP closed-items log" pattern. Run `python3 scripts/concat_closed_log.py` to regenerate `docs/closed-items-log.md` for a flat view. See `docs/closures/README.md`.
-- **Frozen closure log** → `ROADMAP.md` `### Closed items (log)`. Archived through 2026-04-23. Read-only; new closures land in `docs/closures/` per above.
-- **Small one-offs** → `archive/docs/plans/2026-04-23-phase-b-c-execution-plan.md §8`, referenced from `ROADMAP.md` `### Current backlog` when an item warrants a backlog row.
+Document roles:
 
-**Rule:** closing an item requires updating every tracker that references it (per §3). Run `python3 scripts/hygiene/audit_tracker_staleness.py` if in doubt about which trackers carry the item.
+- `ROADMAP.md` — all forward work. Current backlog (P0–P3) + Scheduled + Deferred (with triggers) + Ambient pointers.
+- `MAINTENANCE.md` — recurring/standing maintenance and operational runbook. NOT a backlog.
+- `docs/NEXT_SESSION_CONTEXT.md` — single-session handoff only. Overwritten per session. NEVER accumulates multi-session items.
+- `docs/plans/<slug>.md` — workstream-specific plan for active work. Archives to `archive/docs/plans/` on workstream close.
+- `docs/findings/` — per-session investigation outputs. Reference material; not a backlog.
+- `archive/docs/` — historical artifacts. Reference only.
+
+Rules:
+
+1. Closing an item requires updating ROADMAP. No exceptions.
+2. Deferring an item requires a named trigger documented in ROADMAP "Deferred". "I'll come back to it" is not a trigger.
+3. Recurring/standing maintenance lives in `MAINTENANCE.md`, not the ROADMAP backlog.
+4. Workstream plan docs are temporary by design. Active workstream gets one doc; archive on close.
+5. Drift between trackers is caught by `scripts/hygiene/audit_tracker_staleness.py` running in pre-commit + CI (`audit-tracker-staleness-ci` on ROADMAP P1).
+
+If a session would naturally produce content for a tracker that no longer exists (`REMEDIATION_PLAN`, `DEFERRED_FOLLOWUPS`), redirect to ROADMAP. Those trackers are archived as historical record only.
 
 ---
 

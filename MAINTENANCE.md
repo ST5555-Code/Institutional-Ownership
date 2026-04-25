@@ -94,9 +94,15 @@ python3 scripts/validate_entities.py
 git commit -am "..."
 ```
 
-## Monthly Maintenance
+## Standing curation
 
-Run on the first of each month:
+Recurring curation that the pipelines absorb on each run. No action unless the trigger fires.
+
+- **INF27 — CUSIP residual coverage.** `build_classifications.py` + `run_openfigi_retry.py` re-attempt unresolved CUSIPs on every classification rebuild. **Trigger to revisit:** net-increase in `pending` rows across two consecutive runs. Current scope is automatic; no human attention required while pending counts trend down or hold flat.
+
+## Monthly maintenance
+
+INF2 — run on the 1st of each month:
 
 ```bash
 # Production health check
@@ -109,6 +115,9 @@ ls -lt logs/staging_diff_*.txt | head -5
 # Check for overdue manual routings
 # (look for the manual_routing_review gate row in the report)
 cat logs/entity_validation_report.json | python3 -m json.tool | grep -A3 manual_routing_review
+
+# Diff staging vs prod entity layer (catches drift between cycles)
+python3 scripts/diff_staging.py
 ```
 
 **Backups are NOT part of monthly maintenance.** See "Backup Protocol" below.
@@ -390,9 +399,7 @@ date passes.
 
 All items below must go through the staging workflow:
 
-- **DM13** — ADV_SCHEDULE_A relationship quality audit (~410 suspicious relationships)
-- **DM14** — DM8 extension for unlabeled intra-firm sub-advisers (~300-500 series)
-- **DM15** — External sub-adviser coverage pass (~$549.7B AUM affected)
+- **DM13** — ADV Schedule A residual sweep (~390 suspicious rows after BlueCove cluster closed). See `ROADMAP.md` "Current backlog" P2.
 - **L5 parents 201-720 audit** (batches of 100)
 - **L4 classification audit** (13 categories)
 

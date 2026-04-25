@@ -7,9 +7,9 @@ _Revised 2026-04-22 (conv-12 — **PHASE 2 + WAVE 2 COMPLETE**). HEAD `b0baebe`.
 - _**Retired to `scripts/retired/` during Wave 2:** `fetch_13dg.py`, `fetch_13dg_v2.py`, `validate_13dg.py`, `promote_13dg.py`, `fetch_market.py`, `fetch_nport.py`, `fetch_nport_v2.py`, `validate_nport.py`, `validate_nport_subset.py`, `promote_nport.py`, `fetch_ncen.py`, `fetch_adv.py`, `promote_adv.py`. All functionality absorbed into the corresponding `load_*.py` subclass; retired copies kept for regression comparison._
 - _**Kept in `scripts/`:** `fetch_dera_nport.py` (DERA ZIP transport helper imported by `pipeline/load_nport.py` on the staging connection); `scripts/pipeline/nport_parsers.py` (shared XML parsing library)._
 - _**Migrations 015–017 applied prod + staging:** 015 amendment-semantics columns (`is_latest`, `loaded_at`, `backfill_quality`) on the three amendable fact tables + `accession_number` on `fund_holdings_v2`; 016 `admin_preferences` control-plane table; 017 `valid_from` / `valid_to` on `ncen_adviser_map` for SCD Type 2._
-- _**Legacy `run_script` allowlist** in `scripts/admin_bp.py` still references retired paths — tracked as a post-Phase-2 follow-up (see `docs/DEFERRED_FOLLOWUPS.md`). `scheduler.py`, `update.py`, `benchmark.py` stale-reference audit also queued._
+- _**Legacy `run_script` allowlist** in `scripts/admin_bp.py` still references retired paths — tracked as P2-FU-01 in `ROADMAP.md` "Deferred" (trigger: Q1 2026 cycle clean on V2). `scheduler.py`, `update.py`, `benchmark.py` stale-reference audit absorbed by the same item._
 
-_Prior revision header (phase2-prep — REMEDIATION PROGRAM COMPLETE). Remediation Program closed (105 PRs #5–#105, ~66 items; `docs/REMEDIATION_PLAN.md §Changelog`). Script-level deltas reflected below in-row:_
+_Prior revision header (phase2-prep — REMEDIATION PROGRAM COMPLETE). Remediation Program closed (105 PRs #5–#105, ~66 items; `archive/docs/REMEDIATION_PLAN.md §Changelog`, archived 2026-04-25). Script-level deltas reflected below in-row:_
 - _`fetch_adv.py` — **STAGING→PROMOTE** split (mig-02, PR #37). Writes to staging; new `promote_adv.py` handles prod atomicity._
 - _`promote_adv.py` — **NEW** (mig-02). Atomic promote for ADV data._
 - _`resolve_agent_names.py` / `resolve_bo_agents.py` / `resolve_names.py` — **RETIRED** to `scripts/retired/` (sec-06, PR #48). Target tables dropped._

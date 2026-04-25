@@ -917,7 +917,7 @@ Same pipeline cannot run twice simultaneously. 409 Conflict returned. Different 
 | 13 | **DONE** | **Admin UI tab** — `/admin/dashboard` (auth-gated React at `web/react-app/src/admin/AdminApp.tsx`). | 11 |
 | 14 | **DONE (dry-run)** | **End-to-end test on Q4 2025 13F** — framework dry-run green at +218 net rows through the full eight-step flow. First full prod refresh gated on user authorization per CLAUDE.md. | 5, 11 |
 
-All 14 phases shipped across Phase 2 (p2-01 through p2-10-fix) and Wave 2 (w2-01 through w2-05). Follow-ups tracked in `docs/DEFERRED_FOLLOWUPS.md`: legacy `run_script` allowlist cleanup, ADV SCD conversion, scheduler/update/benchmark stale-reference audit.
+All 14 phases shipped across Phase 2 (p2-01 through p2-10-fix) and Wave 2 (w2-01 through w2-05). Follow-ups tracked in `ROADMAP.md` (P2-FU-01 `run_script` allowlist prune in "Deferred"; ADV SCD conversion KILLed 2026-04-25 per `docs/findings/2026-04-25-backlog-collapse.md`); historical narrative in `archive/docs/DEFERRED_FOLLOWUPS.md` (archived 2026-04-25).
 
 ### Deferred (explicitly out of scope)
 - Auto-refresh scheduler.

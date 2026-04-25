@@ -14,7 +14,7 @@ Format: `<theme>-<seq>` or `<theme>-<seq>-<phase>` for multi-phase sessions.
 
 ## Sequence number
 
-Two digits, zero-padded. Resets per theme. Numbering in this program matches item IDs in `docs/REMEDIATION_PLAN.md` (historical checklist retired to `archive/docs/REMEDIATION_CHECKLIST.md` 2026-04-23).
+Two digits, zero-padded. Resets per theme. Numbering in this program matches item IDs in `archive/docs/REMEDIATION_PLAN.md` (archived 2026-04-25; historical checklist retired to `archive/docs/REMEDIATION_CHECKLIST.md` 2026-04-23).
 
 ## Multi-phase
 

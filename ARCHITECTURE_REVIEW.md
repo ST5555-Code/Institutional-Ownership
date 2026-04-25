@@ -7,7 +7,7 @@ layer schema changes that directly support the architecture (freshness
 metadata, precomputed artifact tables). Pipeline operations and data quality
 work remain in ROADMAP._
 
-**Remediation status (2026-04-22):** The remediation program responding to this review is COMPLETE. 105 PRs (#5-#105), ~66 items closed across 5 themes. All findings addressed or formally deferred with documented exit criteria. Full closure record: `docs/REMEDIATION_PLAN.md` (conv-11 changelog entry). Remaining deferred items: int-09 (denorm retirement, Phase 2), int-19 (float history, Phase 2), mig-12 (load_13f rewrite, Phase 3), ops-18 (design doc recovery, blocked).
+**Remediation status (2026-04-22):** The remediation program responding to this review is COMPLETE. 105 PRs (#5-#105), ~66 items closed across 5 themes. All findings addressed or formally deferred with documented exit criteria. Full closure record: `archive/docs/REMEDIATION_PLAN.md` (archived 2026-04-25; conv-11 changelog entry). Remaining deferred items: int-09 (denorm retirement, Phase 2), int-19 (float history, Phase 2), mig-12 (load_13f rewrite, Phase 3), ops-18 (design doc recovery, blocked).
 
 ---
 

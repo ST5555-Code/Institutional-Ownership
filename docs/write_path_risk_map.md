@@ -230,7 +230,7 @@ longer part of the write path:
 ## Out of scope for this audit
 
 - Fixing anything in T2-open. Implementation work is tracked as the
-  corresponding `mig-##` rows in `docs/REMEDIATION_PLAN.md` Theme 3.
+  corresponding `mig-##` rows in `archive/docs/REMEDIATION_PLAN.md` Theme 3 (archived 2026-04-25).
 - Throughput / performance regressions from wrapping in a transaction
   — separately measured at implementation time.
 - Entity MDM stack (already mitigated by the INF1 staging workflow).

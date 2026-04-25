@@ -2623,4 +2623,4 @@ CREATE INDEX idx_holdings_v2_foo ON holdings_v2(...);
 
 **Precedents:** `ea4ae99` (migration 008 amended — `pct_of_float → pct_of_so` + `pct_of_so_source`); `d0e5f45` (INF39 staging rebuild — verifies index inventory parity post-capture-and-recreate via `scripts/pipeline/validate_schema_parity.py`).
 
-**Related:** INF40 (stable L3 surrogate row-ID, shipped in migration 014) enables a replay-based migration mode as an alternative to capture-and-recreate; for now capture-and-recreate remains the standard. See `docs/DEFERRED_FOLLOWUPS.md`.
+**Related:** INF40 (stable L3 surrogate row-ID, shipped in migration 014) enables a replay-based migration mode as an alternative to capture-and-recreate; for now capture-and-recreate remains the standard. See `archive/docs/DEFERRED_FOLLOWUPS.md` (archived 2026-04-25).
