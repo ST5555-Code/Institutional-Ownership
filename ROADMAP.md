@@ -15,7 +15,6 @@ _(none — see COMPLETED table)_
 ### P1 — Active commitments
 
 - **ui-audit-walkthrough** — 24 per-tab "Bugs (visual)" + "Completeness gaps" blank rows in `docs/ui-audit-01-triage.md` need a Serge+Claude live walkthrough. 1-2 hr; not a Code session.
-- **perf-P0** — `peer_rotation_by_ticker` + `peer_rotation_detail_by_pair` precomputed tables. Cures 11.4s cold/warm. New `compute_peer_rotation.py` + `SourcePipeline` subclass. ~2-3 days.
 
 ### P2 — Next sprint
 
@@ -97,6 +96,7 @@ _(none — see COMPLETED table)_
 
 | Date | Item | Details |
 |------|------|---------|
+| 2026-04-25 | **perf-P0 — peer_rotation_flows precompute** | New precomputed table `peer_rotation_flows` (16.2M rows, 13 sectors × 3 parent pairs × 15 fund pairs × 2 rollups). Migration 019. `compute_peer_rotation.py` `SourcePipeline` subclass with h_agg materialization optimization (59s full rebuild). `queries.py` `get_peer_rotation` + `get_peer_rotation_detail` rewritten to read precomputed. Latency: 11.4s → 540ms parent (21x), 46ms detail. PRs #158 (pipeline), #159 (queries rewrite). |
 | 2026-04-25 | **audit-tracker-staleness-ci — wired staleness checker to pre-commit + CI** | Local pre-commit hook on `*.md` files + CI step in `lint.yml`. PR #155, commit `1cfd103`. |
 | 2026-04-25 | **43b SECURITY hardening** | `ALLOWED_FLAGS` per-script allowlist closing subprocess argv gap. B608 nosec markers relocated from inert stubs to live SQL lines. B110 removed from global skip — 17 `queries.py` sites got `logger.debug`, `load_ncen.py` tightened to `CatalogException`. B104 marker retained (bandit still fires). PR #156, commit `f240a09`. |
 | 2026-04-25 | **bug-1 (ui-audit-01) — `is_latest=TRUE` inversion on 2025Q4** | Verified resolved by int-22 rollback (2026-04-22). Confirmed 2026-04-25: single `is_latest=TRUE` cohort, 3.2M rows, no inversion. Closed without code change. Source: `docs/ui-audit-01-triage.md` (PR #107). Stale ROADMAP entry — fix predates backlog-collapse doc-sync. |
