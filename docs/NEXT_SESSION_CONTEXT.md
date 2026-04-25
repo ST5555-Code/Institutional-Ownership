@@ -4,12 +4,13 @@
 
 ## Last completed
 
+- bug-close-doc: moved stale bug-1 + bug-2 from P0 to COMPLETED (PR #153, `cfbbb1b`). P0 is now empty.
 - backlog-collapse: tracker consolidation per `docs/findings/2026-04-25-backlog-collapse.md`
 
 ## Up next
 
-- See `ROADMAP.md` "Current backlog" P0 / P1 sections.
-- Sprint guidance: P0 first (bug-1 verification → bug-2 fix → audit-tracker-staleness-ci), then P1 perf-P0 + 43b SECURITY hardening + walkthrough scheduling.
+- See `ROADMAP.md` "Current backlog" P1 / P2 sections (P0 empty).
+- Sprint guidance: P1 first — `audit-tracker-staleness-ci` (discipline anchor for ROADMAP-only model), then perf-P0 + 43b SECURITY hardening + ui-audit walkthrough scheduling.
 
 ## Reminders
 
