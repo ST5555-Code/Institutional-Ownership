@@ -42,5 +42,14 @@ repos:
         args: [-r, "--skip=B101,B108,B110,B310,B404,B603,B607,B608"]
         files: ^scripts/
 
+  - repo: local
+    hooks:
+      - id: tracker-staleness
+        name: tracker-staleness
+        entry: python3 scripts/hygiene/audit_tracker_staleness.py --quiet
+        language: system
+        files: \.md$
+        pass_filenames: false
+
 # NOTE: semgrep not included — broken install on Python 3.9/macOS
 # (pysemgrep binary missing). Revisit when upgrading to Python 3.11+.
