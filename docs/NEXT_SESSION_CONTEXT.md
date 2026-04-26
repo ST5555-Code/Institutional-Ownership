@@ -4,8 +4,7 @@
 
 ## Last completed
 
-- eqt-classify-codefix: classifier stops reading stale `security_type_inferred` (PR #162). Two-line fix in `cusip_classifier.py` Steps 1 + 3. 8,148 CUSIPs reclassified, 662K holdings ticker changes, 342 `manual_correction` rows eliminated.
-- doc-sync: moved eqt-classify-codefix from P2 to COMPLETED (this PR).
+- pk-enforce: migration 020 declared PRIMARY KEY on 21 L3/L4 tables in prod (CTAS rebuild + inline PK; defaults preserved verbatim). 1 dup row deleted from `cik_crd_links`; `entity_current` view dropped + recreated; total wall 138s. `other_managers` deferred (5,518 NULL `other_cik` rows; PK shape needs review). Stamp `020_pk_enforcement` at 2026-04-26 08:18 UTC.
 
 ## Up next
 
@@ -15,5 +14,6 @@
 ## Reminders
 
 - `security_type_inferred` column drop is a separate migration — not yet scheduled.
+- `other_managers` PK still pending — proposed (accession_number, sequence_number, other_cik) is blocked by 5,518 NULL `other_cik` rows; pick a PK shape (likely (accession_number, sequence_number) with 19-row dedupe) before scheduling.
 - finra-default-flip: scheduled 2026-07-23.
 - B3 calendar gate: post-Q1+Q2 2026 cycles, ~mid-Aug 2026.
