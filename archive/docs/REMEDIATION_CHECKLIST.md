@@ -39,7 +39,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] int-18 INF37 backfill_manager_types residual 9 entities (no closure expected) — CLEARED 2026-04-23 (entity-curation-w1)
 
 ### Phase 2
-- [ ] int-19 INF38 BLOCK-FLOAT-HISTORY true pct_of_float (deferred)
+- [ ] int-19 INF38 BLOCK-FLOAT-HISTORY true pct_of_so (deferred)
 
 ---
 
@@ -68,7 +68,7 @@ _Flat, grep-friendly. Grouped by theme → batch. See `docs/REMEDIATION_PLAN.md`
 - [x] obs-11 Pass 2 §6.4 flow_intensity_total formula docstring — PR #66 (9-line docstring on `_compute_ticker_stats` + new §10 Flow metrics section in data_layers.md)
 
 ### Verify
-- [x] obs-13 DIAG-23 Register %FLOAT stale dist bundle — verify served bundle post-ff1ff71 — PR #65 (verified PASS; React source + dist bundle both free of `pct_of_float`; ff1ff71 touched CI fixtures only)
+- [x] obs-13 DIAG-23 Register %FLOAT stale dist bundle — verify served bundle post-ff1ff71 — PR #65 (verified PASS; React source + dist bundle both free of `pct_of_so`; ff1ff71 touched CI fixtures only)
 
 ---
 

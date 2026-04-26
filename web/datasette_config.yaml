@@ -10,7 +10,7 @@ databases:
           - market_value_usd
           - shares
           - pct_of_portfolio
-          - pct_of_float
+          - pct_of_so
           - market_value_live
       managers:
         label_column: manager_name
@@ -33,7 +33,7 @@ databases:
               h.shares,
               h.market_value_live,
               h.pct_of_portfolio,
-              h.pct_of_float
+              h.pct_of_so
           FROM holdings h
           WHERE h.quarter = '2025Q4' AND h.ticker = :ticker
           ORDER BY h.market_value_live DESC NULLS LAST
@@ -74,7 +74,7 @@ databases:
               h.shares,
               h.market_value_live as position_value,
               h.pct_of_portfolio,
-              h.pct_of_float
+              h.pct_of_so
           FROM holdings h
           WHERE h.quarter = '2025Q4'
             AND h.ticker = :ticker
@@ -88,7 +88,7 @@ databases:
         sql: |
           SELECT
               h.ticker, h.issuer_name, h.shares,
-              h.market_value_live, h.pct_of_portfolio, h.pct_of_float
+              h.market_value_live, h.pct_of_portfolio, h.pct_of_so
           FROM holdings h
           WHERE h.cik = :cik AND h.quarter = '2025Q4'
           ORDER BY h.market_value_live DESC NULLS LAST

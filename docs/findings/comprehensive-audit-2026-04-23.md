@@ -63,7 +63,7 @@
 | `docs/findings/2026-04-19-rewrite-build-shares-history.md` | 636 | 2026-04-19 | 42f5d6e doc-sync: 2026-04-19-rewrite-build-shares-history.md | findings | REWRITE build_shares_history.py — Phase 0 Findings | 3 |
 | `docs/findings/2026-04-19-rewrite-build-summaries.md` | 330 | 2026-04-19 | 6a88816 docs(rewrite): build_summaries — phase 0 findings  | findings | REWRITE build_summaries.py — Phase 0 Findings | 2 |
 | `docs/findings/2026-04-19-rewrite-load-13f.md` | 554 | 2026-04-19 | 0a7ae35 docs(rewrite): load_13f phase 0 addendum — other_m | findings | REWRITE load_13f.py — Phase 0 Findings | 4 |
-| `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` | 2210 | 2026-04-19 | dc2e670 schema-diff Phase 1: Phase 2 pre-flight wrapper +  | findings | BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY — Phase 0 Findings | 6 |
+| `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md` | 2210 | 2026-04-19 | dc2e670 schema-diff Phase 1: Phase 2 pre-flight wrapper +  | findings | BLOCK-PCT-OF-SO-PERIOD-ACCURACY — Phase 0 Findings | 6 |
 | `docs/SCHEMA_DIFF_PHASE_1_REBUILD_LOG.md` | 444 | 2026-04-19 | 4aea6d1 schema-diff Phase 1: post-rebuild verification — b | prompt | INF39 Phase 1 — Staging Rebuild Execution Log | 3 |
 | `docs/SESSION_GUIDELINES.md` | 135 | 2026-04-23 | 28d588f hygiene-tracker-sync: codify cross-tracker update  | session-guide | Session Guidelines — Worktree Hygiene | 2 |
 | `docs/SESSION_NAMING.md` | 99 | 2026-04-23 | de5b3fd hygiene-roadmap-conflict-fix: per-session closure  | session-guide | Session Naming Convention | 3 |
@@ -517,7 +517,7 @@ Compact status legend: R=ROADMAP, P=Plan, C=Checklist, D=DeferredFollowups, N=Ne
 | **int-18 / INF37** (backfill_manager_types residual 9 entities) | R, P, C, D, N | R=c (ROADMAP.md:580) · P=o STANDING (L54) · C=o (L39) · D=o (L15) · N=c (L8) | **CLOSED 2026-04-23** (commit `6c14c35` entity-curation-w1; see `docs/findings/entity-curation-w1-log.md`) | **Y** | Close in C (L39 checkbox → `[x]`) and in D (L15 move to "Closed during Remediation Program"). Confirmed by staleness script §1. |
 | **mig-12** (load_13f_v2 rewrite) | R, P, C, D, N | R=c (ROADMAP.md:866) · P=c (L131) · C=o (L101) · D=c indirect · N=c (L73) | **CLOSED 2026-04-22** (absorbed by p2-05; `scripts/load_13f_v2.py` shipped) | **Y** | Close checkbox at `docs/REMEDIATION_CHECKLIST.md:101`. Confirmed by staleness script §2. |
 | **int-09 Step 4 / INF25** (BLOCK-DENORM-RETIREMENT — ticker/entity_id/rollup_entity_id/lei drops) | R, D, N | R=o UNBLOCKED (L575) · D=o UNBLOCKED (L13) · N=o (L67) | **OPEN — unblocked post-Phase-2**. Requires dual-graph resolution decision. No closure record. | N | Leave open; consistent across trackers. |
-| **int-19 / INF38** (BLOCK-FLOAT-HISTORY — true float-adjusted pct_of_float) | R, P, C, D, N | R=o (L578) · P=o DEFERRED (L55) · C=o (L42) · D=o (L16) · N=o (L68) | **OPEN / DEFERRED**. Needs float-history data source. | N | Leave open. Status consistent. |
+| **int-19 / INF38** (BLOCK-FLOAT-HISTORY — true float-adjusted pct_of_so) | R, P, C, D, N | R=o (L578) · P=o DEFERRED (L55) · C=o (L42) · D=o (L16) · N=o (L68) | **OPEN / DEFERRED**. Needs float-history data source. | N | Leave open. Status consistent. |
 | **mig-05** (admin refresh pre-restart rework) | P, C | P=SUPERSEDED (L445) · C=o BLOCKED (L98) | **SUPERSEDED by Phase 2** per `docs/admin_refresh_system_design.md`; checklist text still says "BLOCKED — upstream design doc missing" which is **stale** (design doc recovered `03db9ad`). | **Y** | Close checkbox at `docs/REMEDIATION_CHECKLIST.md:98` with note "SUPERSEDED by Phase 2 (p2-01..p2-10)". |
 | **ops-18** (restore rotating_audit_schedule.md) | P, C | P=BLOCKED AMBIGUOUS (L208, L446) · C=o BLOCKED (L156) | **BLOCKED** — referenced file not found in branch. Status consistent. | N | Leave open or **ask Serge**: is this still needed, or retire as ambiguous? |
 | **INF27** (CUSIP residual-coverage tracking tier) | R, D | R=o STANDING (L581) · D=o STANDING (L14) | **STANDING curation** — handled automatically by pipeline. | N | Leave. Status consistent. |
@@ -690,7 +690,7 @@ Legend: `C+T` = closed-and-tracker-updated · `C−T` = closed-no-tracker-update
 | docs/findings/obs-04-p0-findings.md | 2026-04-21 | obs-04 / D-06 13DG backfill | Phase 0: grain reframed to coverage; 51,902-row backfill needed | C+T | ✓ (CHECKLIST:54 `[x]`, PRs #36/#38) |
 | docs/findings/obs-07-p0-findings.md | 2026-04-21 | obs-07 / P-07 leak gate | Phase 0: future-dated report_month gate — no contamination, preemptive | C+T | ✓ (CHECKLIST:58 `[x]`, PRs #51/#53) |
 | docs/findings/obs-08-p1-findings.md | 2026-04-21 | obs-08 / O-05 backup | Phase 1: backup infra fully in place — no gap, wording/retention fixes only | C+T | ✓ (CHECKLIST:62 `[x]`, PR #58) |
-| docs/findings/obs-13-verify-findings.md | 2026-04-21 | obs-13 / DIAG-23 | Verify dist bundle post-ff1ff71 clean of pct_of_float — PASS | C+T | ✓ (CHECKLIST:71 `[x]`, PR #65) |
+| docs/findings/obs-13-verify-findings.md | 2026-04-21 | obs-13 / DIAG-23 | Verify dist bundle post-ff1ff71 clean of pct_of_so — PASS | C+T | ✓ (CHECKLIST:71 `[x]`, PR #65) |
 | docs/findings/ops-17-p1-findings.md | 2026-04-21 | ops-17 | Single-session verify: already-satisfied by obs-10 (b5c04aa) | C+T | ✓ (CHECKLIST:155 `[x]`, PR #55) |
 | docs/findings/ops-batch-5A-p0-findings.md | 2026-04-20 | ops-batch-5A | Doc-hygiene sweep (DOC-0x + R-0x) — ops-02..ops-12 fact-checks | C+T | ✓ (CHECKLIST:131–140 all `[x]`, PR #6) |
 | docs/findings/ops-batch-5B-findings.md | 2026-04-21 | ops-batch-5B | Doc updates for ops-06/ops-09/ops-15 | C+T | ✓ (CHECKLIST:143–145 all `[x]`, PR #32) |
@@ -805,7 +805,7 @@ drift).
 | `fund_classification` | DB-only | `data_layers.md:142` flags RETIRE; `canonical_ddl.md` silent. |
 | `entity_identifiers_staging`, `entity_relationships_staging` | DB-only | Staging-only; not in `canonical_ddl.md`. |
 | `holdings_v2`, `fund_holdings_v2`, `beneficial_ownership_v2` | Column drift | Doc says 33/26/22 cols respectively; DB reports 30/30/28 (`_db_active.json`). Counts don't match because doc reflects pre-migration-015 shape (`canonical_ddl.md:76-79, :123-131, :170-178` show the schemas without migration-015 `is_latest`/`loaded_at`/`backfill_quality` + migration-014 `row_id`). `data_layers.md:91-93` acknowledges migration 015 but `canonical_ddl.md` body text is not updated. |
-| `holdings_v2.pct_of_float` vs `pct_of_so` | Renamed | Migration 008 live (canonical_ddl.md:439); doc body still has dual references (`:82`, `:102`, `:259`). |
+| `holdings_v2.pct_of_so` vs `pct_of_so` | Renamed | Migration 008 live (canonical_ddl.md:439); doc body still has dual references (`:82`, `:102`, `:259`). |
 
 ---
 

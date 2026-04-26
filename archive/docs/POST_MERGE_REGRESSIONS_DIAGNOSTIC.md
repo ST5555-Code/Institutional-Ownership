@@ -1,7 +1,7 @@
 # Post-merge regressions — diagnostic findings
 
 Branch: `diag/post-merge-regressions`
-Base commit: `bee49ff` (main HEAD, merge of `block/pct-of-float-period-accuracy`)
+Base commit: `bee49ff` (main HEAD, merge of `block/pct-of-so-period-accuracy`)
 Date: 2026-04-19
 Ticker under test: AAPL · Quarter: 2025Q4 · Flask: live on :8001 (PID 24145)
 
@@ -40,11 +40,11 @@ Grep results against `/tmp/query1_response.json`:
 |---|---|
 | `pct_so` | **Yes** — present on every row |
 | `pct_of_so` | No |
-| `pct_of_float` | No |
+| `pct_of_so` | No |
 | `pct_float` | No |
 | Any `flt` / `float` substring | No |
 
-The backend rename from `pct_of_float` → `pct_so` (commit `f956096`, Phase 1b read-site migration) is complete on the server.
+The backend rename from `pct_of_so` → `pct_so` (commit `f956096`, Phase 1b read-site migration) is complete on the server.
 
 ### React component expected field name
 
@@ -54,7 +54,7 @@ Source — worktree, post-merge:
 - [web/react-app/src/components/tabs/RegisterTab.tsx:647](web/react-app/src/components/tabs/RegisterTab.tsx:647) — `<th style={TH_RIGHT}>% SO</th>`
 - [web/react-app/src/types/api.ts:460](web/react-app/src/types/api.ts:460) — `pct_so: number | null`
 
-Source matches the API — TSX expects `row.pct_so` with column header `% SO`. Full-tree grep for `% FLOAT` / `pct_of_float` / `pct_float` in `web/react-app/src/` returns **zero** matches (one unrelated `FLOATING MODAL` comment in `EntityGraphTab.tsx:448`).
+Source matches the API — TSX expects `row.pct_so` with column header `% SO`. Full-tree grep for `% FLOAT` / `pct_of_so` / `pct_float` in `web/react-app/src/` returns **zero** matches (one unrelated `FLOATING MODAL` comment in `EntityGraphTab.tsx:448`).
 
 ### Built bundle is stale
 
@@ -63,8 +63,8 @@ The user-facing UI renders a column labeled `% FLOAT` — a name that exists now
 Bundled artifact: `web/react-app/dist/assets/RegisterTab-C1IGmHDk.js`
 
 ```
-grep -c  pct_of_float|pct_float   → 2 hits (source-level references compiled in)
-grep -o  pct_of_float|pct_float|pct_so|"% [A-Z]+"  →
+grep -c  pct_of_so|pct_float   → 2 hits (source-level references compiled in)
+grep -o  pct_of_so|pct_float|pct_so|"% [A-Z]+"  →
    7  pct_float
    0  pct_so
 ```
@@ -73,7 +73,7 @@ Bundle reads `row.pct_float` and renders header `% FLOAT`. API returns `pct_so`.
 
 ### Hypothesis
 
-Register `% FLOAT` column shows `—` because the deployed `dist/` bundle pre-dates the `pct_of_float` → `pct_so` rename (`f956096`); source is correct, bundle is stale.
+Register `% FLOAT` column shows `—` because the deployed `dist/` bundle pre-dates the `pct_of_so` → `pct_so` rename (`f956096`); source is correct, bundle is stale.
 
 ---
 
@@ -223,7 +223,7 @@ Conviction tab 500 is a pandas nullability bug at queries.py:3658: `bool(r['is_a
 ## §4 Fix-scope preview
 
 ### §1 Register %FLOAT — **frontend build only**
-Pure artifact drift. The TSX/TS source is already post-rename (commit `f956096`). Fix is to rebuild `web/react-app/dist/` (`npm --prefix web/react-app run build`) and either commit the rebuilt bundle or wire the build into `scripts/start_app.sh` so a stale `dist/` can't outlive a rename again. No backend edit, no DB change. The fix should also double-check the `dist/` rebuild for any residual `pct_of_float` / `pct_float` strings before declaring done.
+Pure artifact drift. The TSX/TS source is already post-rename (commit `f956096`). Fix is to rebuild `web/react-app/dist/` (`npm --prefix web/react-app run build`) and either commit the rebuilt bundle or wire the build into `scripts/start_app.sh` so a stale `dist/` can't outlive a rename again. No backend edit, no DB change. The fix should also double-check the `dist/` rebuild for any residual `pct_of_so` / `pct_float` strings before declaring done.
 
 ### §2 Flow Analysis duplication — **backend query only**
 One-line-class fix in [scripts/queries.py:3156](scripts/queries.py:3156): add `AND rollup_type = ?` to the `investor_flows` SELECT (and pass `rollup_type` as the third bind). Frontend is fine — it already renders whatever rows the API gives it. Worth also checking the live-fallback branch (`_compute_flows_live`, line 3153) and any `summary_by_parent`-adjacent SELECT for the same oversight, since INF34 stated `summary_by_parent` PK now includes `rollup_type`. No migration, no backfill.

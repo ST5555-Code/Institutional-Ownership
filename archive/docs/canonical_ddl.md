@@ -84,7 +84,7 @@ the same migration — three-tier domain: `soh_period_accurate` (SOH ASOF
 lookup), `market_data_so_latest` (fallback to latest `shares_outstanding`),
 `market_data_float_latest` (last-resort fallback to latest `float_shares`).
 Canonical DDL block above reflects the 35-column post-migration shape.
-Terminology: `pct_of_float` is retired; `pct_of_so` is the canonical name._
+Terminology: `pct_of_so` is retired; `pct_of_so` is the canonical name._
 
 **Owner-script INSERT columns (`load_13f.py:222` — `CREATE TABLE holdings AS`):**
 
@@ -92,14 +92,14 @@ Terminology: `pct_of_float` is retired; `pct_of_so` is the canonical name._
 (line 222 — `CREATE TABLE holdings AS`). After Stage 5 cleanup (commit
 `305739e`) the target table was renamed to `holdings_v2` and enrichment
 columns (entity_id, rollup_entity_id, manager_type, market_value_live,
-pct_of_so [was pct_of_float pre-migration 008], pct_of_so_source, etc.)
+pct_of_so [was pct_of_so pre-migration 008], pct_of_so_source, etc.)
 were added. The owner script was not updated.
 
 **Column diff:**
 - **In prod, not in owner script:** 13 columns — `entity_id`,
   `rollup_entity_id`, `rollup_name`, `entity_type`, `dm_rollup_entity_id`,
   `dm_rollup_name`, `manager_type`, `is_passive`, `is_activist`,
-  `market_value_live`, `pct_of_so` (was `pct_of_float`), `pct_of_so_source`, `security_type_inferred`,
+  `market_value_live`, `pct_of_so` (was `pct_of_so`), `pct_of_so_source`, `security_type_inferred`,
   `classification_source`.
 - **In owner script, not in prod:** none relevant (legacy CTAS is
   broader but we ignore the dropped table).
@@ -255,7 +255,7 @@ verdict. Batch 2 swaps the source reads to `holdings_v2` +
 **Prod DDL (12 columns):**
 ```
 quarter, ticker, company_name, total_value, total_shares, holder_count,
-active_value, passive_value, active_pct, pct_of_float, top10_holders,
+active_value, passive_value, active_pct, pct_of_so, top10_holders,
 updated_at, PRIMARY KEY (quarter, ticker)
 ```
 

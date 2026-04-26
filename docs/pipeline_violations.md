@@ -51,7 +51,7 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
   `_extract_fields()`; `--dry-run` / `--apply` gates live.
 - **`fetch_market.py` (REWRITE) — CLEARED.** Rewrites in commits
   aa7603a (Batch 2B-market) + b95cb31 (Batch 2A) clear all violations.
-  No more `UPDATE holdings SET market_value_live/pct_of_float` — that
+  No more `UPDATE holdings SET market_value_live/pct_of_so` — that
   lives in Batch 3 `enrich_holdings.py` now unblocked. CUSIP-anchored
   universe via `securities.canonical_type` (CUSIP v1.4).
 - **`build_cusip.py` (REWRITE) — CLEARED.** Rewritten UPSERT-only
@@ -149,7 +149,7 @@ paths; `fetch_13f.py` is filesystem-only. `scripts/check_freshness.py`
 - §9 (dry-run): **VIOLATION** — no `--dry-run`. `--limit N` at `:559`
   exists for scale-testing but still writes to prod.
 - Legacy refs: `fetch_market.py:150` `FROM holdings`; `:422-433`
-  `UPDATE holdings SET market_value_live`, `SET pct_of_float`;
+  `UPDATE holdings SET market_value_live`, `SET pct_of_so`;
   `:434-438` COUNTs on `holdings`. All against a dropped table.
 
 ---
@@ -407,7 +407,7 @@ at commit `d7ba1c2`, Phase 4 prod apply at `443e37a`. Rewrite1 Findings
 at `docs/findings/2026-04-19-rewrite-build-shares-history.md`:
 
 - Legacy `holdings` reads at `:161-164,:201-203` and
-  `holdings.pct_of_float` UPDATEs at `:177-184,:190-199` retired —
+  `holdings.pct_of_so` UPDATEs at `:177-184,:190-199` retired —
   script no longer touches the dropped table. `--update-holdings`
   gate removed.
 - `--dry-run` flag live alongside `--staging`; dry-run opens a
@@ -427,7 +427,12 @@ and `pct_of_so_source` audit column. Commit citations: Phase 1b read-site
 migration + Phase 1c audit-column split + Phase 4b amended migration +
 Phase 4c rename sweep; merge `8925347` + follow-on `12e172b`. See
 `docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`. Original
-BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY row also closed in ROADMAP Open Items.
+BLOCK-PCT-OF-SO-PERIOD-ACCURACY row also closed in ROADMAP Open Items.
+**Terminology retirement (pct-rename-sweep) closed 2026-04-26** — final
+cleanup of legacy `pct_of_float` / `pct-of-float` references across docs
+and dead-writer comments; Phase 1b/1c/4b citations preserved on every
+historical narrative line. Migration 008 itself is the historical record
+and was left untouched.
 True float-adjusted denominator (public-float-based, distinct from
 shares-outstanding) tracked separately as **INF38 / BLOCK-FLOAT-HISTORY**.
 
@@ -441,7 +446,7 @@ Original violations retained below for historical reference.
   and `--update-holdings` gate at `:212` (writes the dropped
   `holdings` table when enabled).
 - Legacy refs: `build_shares_history.py:161-164,:201-203` reads
-  `holdings`; `:177-184,:190-199` UPDATE `holdings.pct_of_float`.
+  `holdings`; `:177-184,:190-199` UPDATE `holdings.pct_of_so`.
 
 ---
 
@@ -590,7 +595,7 @@ Phase 0 findings in [docs/findings/sec-06-p0-findings.md](docs/findings/sec-06-p
 - **Status:** HARDENED — dead `holdings` (legacy) writes removed, `--dry-run` + CHECKPOINT added (sec-06, 2026-04-21).
 - **Classification:** EXCEPTION — CUSIP→ticker enrichment updater, acceptable as direct-to-prod now that dead-table writes are gone.
 - **Tables written (live):** `securities` (UPDATE `ticker` WHERE `cusip = ?` AND `ticker IS NULL`), `market_data` (INSERT 13 columns, append-only, de-duped via `existing` set).
-- **Dead writes removed (sec-06, 2026-04-21):** UPDATE `holdings` SET `ticker` (propagate from securities); UPDATE `holdings` SET `market_value_live`; UPDATE `holdings` SET `pct_of_float`; SELECT COUNT on `holdings`. `holdings` was dropped Stage 5; `holdings_v2` enrichment lives in `enrich_holdings.py` (Batch 3).
+- **Dead writes removed (sec-06, 2026-04-21):** UPDATE `holdings` SET `ticker` (propagate from securities); UPDATE `holdings` SET `market_value_live`; UPDATE `holdings` SET `pct_of_so`; SELECT COUNT on `holdings`. `holdings` was dropped Stage 5; `holdings_v2` enrichment lives in `enrich_holdings.py` (Batch 3).
 - **Hardening added:** `--dry-run` projects new-ticker-match count + market_data delta without writing; CHECKPOINT after write operations complete.
 - **Reads that remain:** `securities` (for CUSIPs without ticker), `market_data` (for de-dupe). Both are live.
 

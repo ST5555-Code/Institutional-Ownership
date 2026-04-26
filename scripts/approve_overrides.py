@@ -156,12 +156,12 @@ def fetch_market_for_tickers(tickers, con):
           AND h.market_value_live IS NULL
     """, tickers)
     con.execute(f"""
-        UPDATE holdings h SET pct_of_float = ROUND(
+        UPDATE holdings h SET pct_of_so = ROUND(
             h.shares * 100.0 / COALESCE(m.shares_outstanding, m.float_shares), 4)
         FROM market_data m WHERE h.ticker = m.ticker
           AND COALESCE(m.shares_outstanding, m.float_shares) > 0
           AND h.ticker IN ({placeholders})
-          AND h.pct_of_float IS NULL
+          AND h.pct_of_so IS NULL
     """, tickers)
 
 

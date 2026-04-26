@@ -79,7 +79,7 @@ for its six owned tables.
 ## 6. Git history
 
 ```
-88d01d2  Major data quality fixes: market_value_usd, manager_type, FLOW_PERIODS, pct_of_float
+88d01d2  Major data quality fixes: market_value_usd, manager_type, FLOW_PERIODS, pct_of_so
 5bff348  Name resolution pipeline, short squeeze signals, incremental load, quarter centralization
 fc9c98a  Bug fixes 6-7, pyflakes cleanup, performance improvements, architecture refactor
 ```

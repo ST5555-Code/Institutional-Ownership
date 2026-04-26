@@ -94,7 +94,7 @@ bottom.
 | `beneficial_ownership_current` | L4 | `promote_13dg.py` + `scripts/pipeline/shared.rebuild_beneficial_ownership_current` | rebuild | 24,756 rows; latest-per-(filer_cik, subject_ticker) with amendment logic; now carries all 5 entity columns from BO v2 (18,229 rows / 73.64% enriched) |
 | `fund_universe` | L3 | `fetch_nport_v2.py` → `promote_nport.py` | upsert on series_id | **12,835 rows** (2026-04-16 part 2, +235 from Tier A+B re-promote); now includes bond / index / MM funds via DERA path. Has `strategy_narrative`, `strategy_source`, `strategy_fetched_at` (migration 002; not yet populated) |
 | `securities` | L3 | `build_cusip.py` + `normalize_securities.py` | upsert on cusip | **132,618 rows** (2026-04-15); 8 CUSIP-classification columns populated (`canonical_type`, `canonical_type_source`, `is_equity`, `is_priceable`, `is_otc`, `ticker_expected`, `is_active`, `figi`). `is_otc` identifies OTC grey-market rows (Rule A ∪ Rule B, 850 priceable CUSIPs — see §6 **S1**, resolved int-13 / migration 012). Liquid-only queries compose `WHERE is_priceable AND NOT is_otc`. Formal PRIMARY KEY / UNIQUE on `cusip` is empirical-only, not declared; VALIDATOR_MAP registration pending — see ROADMAP **INF28**. |
-| `market_data` | L3 | `scripts/pipeline/load_market.py` (`SourcePipeline`, w2-02) | direct_write UPSERT on ticker | **10,064 rows** (2026-04-17, refreshed overnight 2026-04-16; stamped 2026-04-16 23:27 UTC); `make freshness` PASS post-refresh. `enrich_holdings.py --fund-holdings` re-run against fresh prices lifted `holdings_v2.market_value_live` +445K, `pct_of_float` +127K, `fund_holdings_v2.ticker` +488K. |
+| `market_data` | L3 | `scripts/pipeline/load_market.py` (`SourcePipeline`, w2-02) | direct_write UPSERT on ticker | **10,064 rows** (2026-04-17, refreshed overnight 2026-04-16; stamped 2026-04-16 23:27 UTC); `make freshness` PASS post-refresh. `enrich_holdings.py --fund-holdings` re-run against fresh prices lifted `holdings_v2.market_value_live` +445K, `pct_of_so` +127K, `fund_holdings_v2.ticker` +488K. |
 | `short_interest` | L3 | `fetch_finra_short.py` | upsert on (ticker, report_date) | 328,595 rows; daily FINRA short vol (app reads directly at `api_market.py:191`) |
 | `shares_outstanding_history` | L3 | `build_shares_history.py` | upsert on (ticker, as_of_date) | 317,049 rows; SEC XBRL-sourced outstanding shares history |
 | `adv_managers` | L3 | `scripts/pipeline/load_adv.py` (`SourcePipeline`, w2-05) | direct_write on crd (SCD Type 2 conversion deferred as follow-up) | 16,606 rows; ADV Part 1 metadata per CRD |
@@ -168,7 +168,7 @@ CREATE TABLE holdings_v2(
     crd_number VARCHAR, inst_parent_name VARCHAR, "quarter" VARCHAR,
     report_date VARCHAR, cusip VARCHAR, ticker VARCHAR, issuer_name VARCHAR,
     security_type VARCHAR, market_value_usd BIGINT, shares BIGINT,
-    pct_of_portfolio DOUBLE, pct_of_float DOUBLE, manager_type VARCHAR,
+    pct_of_portfolio DOUBLE, pct_of_so DOUBLE, manager_type VARCHAR,
     is_passive BOOLEAN, is_activist BOOLEAN, discretion VARCHAR,
     vote_sole BIGINT, vote_shared BIGINT, vote_none BIGINT,
     put_call VARCHAR, market_value_live DOUBLE,
@@ -236,7 +236,8 @@ scope to one quarter.
 - `ticker` — resolved from `securities` by cusip when `cusip_classifications.is_equity=TRUE`. Null when CUSIP is non-equity (OPTION/BOND/CASH/WARRANT/...).
 - `security_type_inferred` — pulled from `securities.security_type_inferred` (legacy domain `equity/etf/derivative/money_market`); **not** from `cusip_classifications.canonical_type` (which uses BOND/COM/OPTION/... — different domain the app's read paths don't speak).
 - `market_value_live` — `shares × market_data.price_live`. Null for delisted / foreign / non-equity / missing market_data.
-- `pct_of_float` — `shares × 100.0 / market_data.float_shares`. Null when float is missing (~30% of `market_data` rows lack `float_shares`).
+- `pct_of_so` — `shares × 100.0 / market_data.float_shares`. Null when float is missing (~30% of `market_data` rows lack `float_shares`).
+- `pct_of_so_source` — Class B audit stamp recording which denominator tier produced `pct_of_so`: `soh_period_accurate` (ASOF on `shares_outstanding_history`), `market_data_so_latest` (fallback to latest `market_data.shares_outstanding`), or `market_data_float_latest` (last-resort fallback to latest `market_data.float_shares`). Added by migration 008 (`ea4ae99` amended) alongside the `pct_of_float` → `pct_of_so` rename; written by `enrich_holdings.py` Pass B.
 
 Live coverage on prod (2026-04-16, post first run): ticker 91.49% (10,395,053 / 12,270,984); sti 100.00%; mvl 77.64% (9,527,773); pof 61.83% (7,587,332).
 
@@ -370,7 +371,7 @@ so the pipeline can produce a valid L3 row *without* market data being
 available. Group 3 columns are the split boundary.
 
 **Split boundary columns:**
-- `holdings_v2.{ticker, security_type_inferred, market_value_live, pct_of_float}`
+- `holdings_v2.{ticker, security_type_inferred, market_value_live, pct_of_so}`
 - `fund_holdings_v2.ticker`
 
 **Nullability guarantee:** these columns are allowed to be NULL in
@@ -382,7 +383,7 @@ so the query layer is already Option-B-compatible.
 
 **What must be true before Option B can be safely enabled:**
 
-1. `promote_13f.py` sets `ticker`, `market_value_live`, `pct_of_float`,
+1. `promote_13f.py` sets `ticker`, `market_value_live`, `pct_of_so`,
    `security_type_inferred` to NULL on insert — never joins `securities`
    or `market_data` at promote time.
 2. `enrich_holdings.py` runs as a separate step, owns an UPDATE that
@@ -391,7 +392,7 @@ so the query layer is already Option-B-compatible.
 3. Every query function that reads these columns continues to work when
    the value is NULL. Current grep shows ~40 references across
    `queries.py` — none dereference `.market_value_live` without a
-   SUM/NULL-tolerant aggregate, and `pct_of_float` is always SUMed or
+   SUM/NULL-tolerant aggregate, and `pct_of_so` is always SUMed or
    compared with `IS NOT NULL`. Confirmed safe.
 4. `enrich_holdings.py` writes to `data_freshness` with
    `table_name='holdings_v2_enrichment'` so the FreshnessBadge can
@@ -402,7 +403,7 @@ so the query layer is already Option-B-compatible.
    tab handles that cleanly (degrades gracefully, doesn't 500). Covered
    today by the app's existing `NULLS LAST` + NULL-tolerant aggregates.
 
-**Grep evidence (market_value_live + pct_of_float in queries.py):**
+**Grep evidence (market_value_live + pct_of_so in queries.py):**
 ~40 occurrences, all inside `SUM(...)` aggregates, `NULLS LAST` ORDER
 BY, or `WHERE ... IS NOT NULL` guards. No bare-deref reads in
 record-shaping code. Option B is compatible today.
@@ -2298,7 +2299,7 @@ CREATE TABLE summary_by_ticker (
     "active_value" DOUBLE,
     "passive_value" DOUBLE,
     "active_pct" DOUBLE,
-    "pct_of_float" DOUBLE,
+    "pct_of_so" DOUBLE,
     "updated_at" TIMESTAMP,
     PRIMARY KEY ("quarter", "ticker")
 );
