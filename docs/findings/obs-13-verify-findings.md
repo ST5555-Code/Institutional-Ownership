@@ -6,8 +6,8 @@
 
 ## Summary
 
-The stale `pct_of_float` references flagged in DIAG-23 are absent from both the
-React source tree and the currently-built dist bundle. The `pct_of_float →
+The stale `pct_of_so` references flagged in DIAG-23 are absent from both the
+React source tree and the currently-built dist bundle. The `pct_of_so →
 pct_of_so` rename landed at the source layer in commit f956096 (pct-of-so Phase
 1b, 2026-04-19 11:22 EDT) and the dist bundle in the main worktree was rebuilt
 at 2026-04-19 15:26 EDT, after that source migration.
@@ -22,10 +22,10 @@ under `web/react-app/src/`, so ff1ff71 does not require a dist rebuild.
 ### 1. Source layer is clean (no stale references)
 
 ```
-$ grep -rn "pct_of_float" web/react-app/src/
+$ grep -rn "pct_of_so" web/react-app/src/
 (no matches)
 
-$ grep -rn "pct_of_so\|pct_of_float\|FLOAT" web/react-app/src/components/tabs/RegisterTab.tsx
+$ grep -rn "pct_of_so\|pct_of_so\|FLOAT" web/react-app/src/components/tabs/RegisterTab.tsx
 (no matches)
 ```
 
@@ -48,7 +48,7 @@ $ ls -la web/react-app/dist/assets/ | head -5
 -rw-r--r--  RegisterTab-MyOzRHgg.js    Apr 19 15:26
 ...
 
-$ grep -l "pct_of_float" web/react-app/dist/assets/*.js
+$ grep -l "pct_of_so" web/react-app/dist/assets/*.js
 (no matches)
 
 $ grep -c "pct_of_so" web/react-app/dist/assets/*.js
@@ -80,7 +80,7 @@ collected 97 items
 
 ## Recommendation
 
-**Close obs-13.** The dist bundle is current with respect to the pct_of_float →
+**Close obs-13.** The dist bundle is current with respect to the pct_of_so →
 pct_of_so rename. No rebuild required in this remediation.
 
 ### Related standing gap (not blocking obs-13)

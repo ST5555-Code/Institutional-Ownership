@@ -16,8 +16,8 @@
    The table is keyed by `(ticker, as_of_date)`, holds 317,049 rows across
    4,450 distinct tickers spanning 1997 → 2033 (forward-dated), and has no
    competing writer.
-2. **`update_holdings_pct_of_float()`** recomputes period-accurate
-   `pct_of_float` on the `holdings` table via DuckDB `ASOF JOIN`.
+2. **`update_holdings_pct_of_so()`** recomputes period-accurate
+   `pct_of_so` on the `holdings` table via DuckDB `ASOF JOIN`.
    **This half is dead code.** The `holdings` table was dropped at Stage 5
    (BLOCK-3 context); a fresh `SELECT COUNT(*) FROM holdings` against prod
    today returns `CatalogException: Table with name holdings does not
@@ -25,15 +25,15 @@
    crash on the first read.
 
 The REWRITE therefore splits into two questions:
-- Retire the dead `update_holdings_pct_of_float()` entirely? Or
+- Retire the dead `update_holdings_pct_of_so()` entirely? Or
 - Repoint it to `holdings_v2` and re-establish period-accurate
-  `pct_of_float` (which `enrich_holdings.py` currently computes using
+  `pct_of_so` (which `enrich_holdings.py` currently computes using
   **latest** `market_data.float_shares`, reintroducing the exact latent
   accuracy bug the original script was written to fix)?
 
 Plus the §1 / §5 / §9 retrofits shared with every Batch-3 REWRITE.
 
-**No blockers.** `holdings_v2.pct_of_float` already exists (7.79M / 12.27M
+**No blockers.** `holdings_v2.pct_of_so` already exists (7.79M / 12.27M
 rows populated, ~63.4% across 2025Q1–2025Q4). The SEC XBRL cache is
 intact (5,074 files). `market_data` is fresh through 2026-04-16.
 
@@ -53,23 +53,23 @@ if args.staging: set_staging_mode(True)                        # :216-217
 con = duckdb.connect(get_db_path())                            # :224
 build(con, client)                                             # :226
 if args.update_holdings:                                       # :228
-    update_holdings_pct_of_float(con)                          # :229
+    update_holdings_pct_of_so(con)                          # :229
 ```
 
-Two functions. `build()` is called unconditionally; `update_holdings_pct_of_float()` is gated by `--update-holdings`.
+Two functions. `build()` is called unconditionally; `update_holdings_pct_of_so()` is gated by `--update-holdings`.
 
 Helpers:
 - `_upsert_batch(con, batch)` at `:123-135` — `ON CONFLICT (ticker, as_of_date) DO UPDATE`, called via `executemany`.
 
 ### 1.2 Read operations — `holdings`
 
-Only `update_holdings_pct_of_float()` reads `holdings`. Two sites:
+Only `update_holdings_pct_of_so()` reads `holdings`. Two sites:
 
 | file:line | Query | Purpose |
 |---|---|---|
 | `build_shares_history.py:161-164` | `FROM holdings WHERE ticker IS NOT NULL AND report_date IS NOT NULL` (DISTINCT ticker, report_date) | ASOF-JOIN source: all (ticker, report_date) pairs to match against SOH |
 | `build_shares_history.py:201` | `SELECT COUNT(*) FROM holdings` | Denominator for post-update coverage report |
-| `build_shares_history.py:202` | `SELECT COUNT(*) FROM holdings WHERE pct_of_float IS NOT NULL` | Numerator for post-update coverage report |
+| `build_shares_history.py:202` | `SELECT COUNT(*) FROM holdings WHERE pct_of_so IS NOT NULL` | Numerator for post-update coverage report |
 
 `holdings.report_date` is stored as VARCHAR in `DD-MON-YYYY` format
 (e.g. `"31-MAR-2025"`) per the inline comment at `:155-156`. Conversion
@@ -95,8 +95,8 @@ Three write surfaces:
 | file:line | Target | Shape | Idempotency |
 |---|---|---|---|
 | `:125-135` (`_upsert_batch`) | `shares_outstanding_history` | 7-col INSERT ... ON CONFLICT DO UPDATE (PK `(ticker, as_of_date)`) | **YES** — upsert keyed on PK |
-| `:177-184` | `holdings.pct_of_float` (dropped) | `UPDATE holdings h SET pct_of_float = ROUND(h.shares*100/ps.period_shares, 4) FROM _period_shares ps WHERE ...` | **N/A — table gone** |
-| `:190-199` | `holdings.pct_of_float` (dropped) | Fallback `UPDATE holdings h SET pct_of_float = ... FROM market_data m, _period_shares ps WHERE ps.period_shares IS NULL` | **N/A — table gone** |
+| `:177-184` | `holdings.pct_of_so` (dropped) | `UPDATE holdings h SET pct_of_so = ROUND(h.shares*100/ps.period_shares, 4) FROM _period_shares ps WHERE ...` | **N/A — table gone** |
+| `:190-199` | `holdings.pct_of_so` (dropped) | Fallback `UPDATE holdings h SET pct_of_so = ... FROM market_data m, _period_shares ps WHERE ps.period_shares IS NULL` | **N/A — table gone** |
 
 `shares_outstanding_history` write is upsert-clean. The two `holdings`
 UPDATEs are the violations called out in `docs/pipeline_violations.md:299-300`.
@@ -123,7 +123,7 @@ UPDATEs are the violations called out in `docs/pipeline_violations.md:299-300`.
 |---|---|---|
 | `:78-81` | `if not history: if client.get_cik(tkr) is None: no_cik += 1; continue` | Missing XBRL data silently counted, continue. No unresolved-% gate at run end. |
 | `:78` | `if not history:` — treats empty *and* exception-returned-empty the same. `SECSharesClient.fetch_history` swallows parse errors internally via the sorted/dedup pattern. | Parse anomalies never surface. |
-| `:148-150` | `if is_staging_mode(): print("...skipping"); return` | Staging-mode skip of pct_of_float is fine, but no error is raised if that condition is somehow mis-detected. |
+| `:148-150` | `if is_staging_mode(): print("...skipping"); return` | Staging-mode skip of pct_of_so is fine, but no error is raised if that condition is somehow mis-detected. |
 | `:197-198` | Fallback UPDATE silently ignores rows with no `shares_outstanding` and no `float_shares`. No count of skipped. | Coverage-loss invisible. |
 
 Per `docs/pipeline_violations.md:295`: **§5 silent — empty `history` → continue.**
@@ -132,8 +132,8 @@ Per `docs/pipeline_violations.md:295`: **§5 silent — empty `history` → cont
 
 | Flag | Site | Behavior |
 |---|---|---|
-| `--staging` | `:211`, `:216-217` | Routes `get_db_path()` to `STAGING_DB`. Cross-DB reads remain on prod via `connect_read()` at `:59`. In staging mode, `update_holdings_pct_of_float` is a no-op (`:148-150`). |
-| `--update-holdings` | `:212`, `:228-229` | Gates the (currently-dead) `update_holdings_pct_of_float()` call. Default OFF. |
+| `--staging` | `:211`, `:216-217` | Routes `get_db_path()` to `STAGING_DB`. Cross-DB reads remain on prod via `connect_read()` at `:59`. In staging mode, `update_holdings_pct_of_so` is a no-op (`:148-150`). |
+| `--update-holdings` | `:212`, `:228-229` | Gates the (currently-dead) `update_holdings_pct_of_so()` call. Default OFF. |
 
 **Missing:** `--dry-run`. The script writes to prod by default — 317K
 rows get upserted into `shares_outstanding_history` with no preview.
@@ -202,26 +202,26 @@ SELECT COUNT(*) FROM holdings;
 -- CatalogException: Catalog Error: Table with name holdings does not exist!
 ```
 
-**Table is GONE.** Dropped at Stage 5. The `holdings.pct_of_float`
+**Table is GONE.** Dropped at Stage 5. The `holdings.pct_of_so`
 write target does not exist. Both UPDATE statements in
-`update_holdings_pct_of_float()` would crash if the function were called.
+`update_holdings_pct_of_so()` would crash if the function were called.
 The sole reason the script does not crash on `--update-holdings` today
 is that nobody passes the flag.
 
-### 2.3 `holdings_v2` schema and `pct_of_float` coverage
+### 2.3 `holdings_v2` schema and `pct_of_so` coverage
 
-`holdings_v2` columns include both `pct_of_float DOUBLE` and
+`holdings_v2` columns include both `pct_of_so DOUBLE` and
 `report_date VARCHAR` (verified via `PRAGMA table_info(holdings_v2)`).
 
 | metric | value |
 |---|---:|
 | `holdings_v2` rows | **12,270,984** |
-| `pct_of_float` non-null | **7,786,239** (63.5%) |
+| `pct_of_so` non-null | **7,786,239** (63.5%) |
 | `report_date` format | `DD-MON-YYYY` (same as legacy `holdings`) |
 
 Coverage by quarter (most recent):
 
-| quarter | rows | pct_of_float populated | pct |
+| quarter | rows | pct_of_so populated | pct |
 |---|---:|---:|---:|
 | 2025Q4 | 3,205,650 | 2,031,842 | 63.4% |
 | 2025Q3 | 3,024,698 | 1,935,040 | 64.0% |
@@ -229,7 +229,7 @@ Coverage by quarter (most recent):
 | 2025Q1 | 2,993,162 | 1,889,338 | 63.1% |
 
 **Writer:** `scripts/enrich_holdings.py:234-237` (Pass B) — computes
-`pct_of_float = h.shares * 100.0 / lookup.float_shares` where
+`pct_of_so = h.shares * 100.0 / lookup.float_shares` where
 `lookup.float_shares = market_data.float_shares` (latest, not
 period-accurate). The `_LOOKUP_SQL` at `enrich_holdings.py:68-74`
 confirms this:
@@ -250,14 +250,14 @@ SELECT c.cusip,
 `build_shares_history.py` was originally designed to fix (per the
 module docstring at `build_shares_history.py:13-16`):
 
-> This is the fix for a latent accuracy bug where `holdings.pct_of_float`
+> This is the fix for a latent accuracy bug where `holdings.pct_of_so`
 > used `market_data.shares_outstanding` (latest) as the denominator for
 > all historical quarters, inflating or deflating ratios for companies
 > with splits, buybacks, or offerings between the holding's report_date
 > and today.
 
 The fix was built against `holdings`, then the `holdings` table was
-dropped in Stage 5, `holdings_v2.pct_of_float` ownership moved to
+dropped in Stage 5, `holdings_v2.pct_of_so` ownership moved to
 `enrich_holdings.py`, and the period-accurate logic was not ported.
 The bug the original docstring describes is now back on `holdings_v2`.
 
@@ -307,7 +307,7 @@ WHERE (unfetchable IS NULL OR unfetchable = FALSE)
 No change needed. `market_data` is the right universe (CUSIP-anchored
 via `securities.canonical_type` post-BLOCK-2A/2B).
 
-Status quo `update_holdings_pct_of_float()`:
+Status quo `update_holdings_pct_of_so()`:
 
 ```sql
 FROM holdings WHERE ticker IS NOT NULL AND report_date IS NOT NULL   -- :163
@@ -322,24 +322,24 @@ below). Repoint to `holdings_v2` if the function is kept (Option B).
 upsert-clean. The rewrite retains the `build()` side verbatim in
 semantic terms (subject to retrofits below).
 
-`holdings.pct_of_float` writes — **retire.** The target table is gone.
+`holdings.pct_of_so` writes — **retire.** The target table is gone.
 
 Decision on what, if anything, replaces the period-accurate
-`pct_of_float` ASOF JOIN:
+`pct_of_so` ASOF JOIN:
 
 | option | description | pros | cons |
 |---|---|---|---|
-| **A — retire** | Delete `update_holdings_pct_of_float()` entirely. `enrich_holdings.py` Pass B remains sole writer of `holdings_v2.pct_of_float` using latest `market_data.float_shares`. | Minimal blast radius. Keeps `build_shares_history.py` scope literal to its filename. Matches BLOCK-3 peers which retired legacy update paths. | Re-accepts the latent period-accuracy bug the original script was written to fix. |
-| **B — repoint to `holdings_v2`** | Port the two UPDATEs to target `holdings_v2`, using the same `latest_rm`/`strptime` pattern. Keep the staging-mode skip. | Restores period-accurate `pct_of_float` on ~7.79M currently-populated rows + potentially fills some of the ~4.48M NULL rows where SOH has coverage that `market_data.float_shares` lacks. | Two writers on `holdings_v2.pct_of_float` (`enrich_holdings.py` Pass B and this) — write-order discipline becomes a new gotcha. Scope creep: a "build history" script now also owns enrichment. |
-| **C — move ASOF into `enrich_holdings.py`** | Extend Pass B's `_LOOKUP_SQL` to prefer SOH's period-accurate shares over `market_data.float_shares` when both are available. `build_shares_history.py` becomes purely a history builder; `enrich_holdings.py` owns all `pct_of_float` writes. | Separation of concerns (each script does one thing). No dual writer. Fixes the latent bug at the right layer. | Pass B is currently cusip-keyed (via `cusip_classifications`). SOH is ticker-keyed. Requires a cusip→ticker bridge (`securities.ticker` already used) plus ASOF on `report_date`. Moderate complexity increase inside an already-working script. |
+| **A — retire** | Delete `update_holdings_pct_of_so()` entirely. `enrich_holdings.py` Pass B remains sole writer of `holdings_v2.pct_of_so` using latest `market_data.float_shares`. | Minimal blast radius. Keeps `build_shares_history.py` scope literal to its filename. Matches BLOCK-3 peers which retired legacy update paths. | Re-accepts the latent period-accuracy bug the original script was written to fix. |
+| **B — repoint to `holdings_v2`** | Port the two UPDATEs to target `holdings_v2`, using the same `latest_rm`/`strptime` pattern. Keep the staging-mode skip. | Restores period-accurate `pct_of_so` on ~7.79M currently-populated rows + potentially fills some of the ~4.48M NULL rows where SOH has coverage that `market_data.float_shares` lacks. | Two writers on `holdings_v2.pct_of_so` (`enrich_holdings.py` Pass B and this) — write-order discipline becomes a new gotcha. Scope creep: a "build history" script now also owns enrichment. |
+| **C — move ASOF into `enrich_holdings.py`** | Extend Pass B's `_LOOKUP_SQL` to prefer SOH's period-accurate shares over `market_data.float_shares` when both are available. `build_shares_history.py` becomes purely a history builder; `enrich_holdings.py` owns all `pct_of_so` writes. | Separation of concerns (each script does one thing). No dual writer. Fixes the latent bug at the right layer. | Pass B is currently cusip-keyed (via `cusip_classifications`). SOH is ticker-keyed. Requires a cusip→ticker bridge (`securities.ticker` already used) plus ASOF on `report_date`. Moderate complexity increase inside an already-working script. |
 
 **Recommendation: A for Phase 1 (retire), with a follow-up block
-C-BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY for C (move ASOF into
+C-BLOCK-PCT-OF-SO-PERIOD-ACCURACY for C (move ASOF into
 `enrich_holdings.py`).** Rationale:
 
 - The dead-code symptom (script crashes on `--update-holdings`) is the
   immediate REWRITE concern. Fix that cleanly.
-- Re-introducing period-accurate `pct_of_float` deserves its own
+- Re-introducing period-accurate `pct_of_so` deserves its own
   design pass: which ticker → cusip canonicalization, how to handle
   ticker-changes mid-quarter, how to cap SOH's forward-dated rows, how
   to gate `is_equity` for ADRs with Frankfurt SOH listings (BLOCK-
@@ -354,7 +354,7 @@ cannot wait for the follow-up block) before Phase 1.
 ## 3.2.1 — Downstream readers survey
 
 **Follow-up status: DONE 2026-04-19.** The period-accurate
-`pct_of_float` follow-up flagged in §3.2 (Option C deferred to its own
+`pct_of_so` follow-up flagged in §3.2 (Option C deferred to its own
 design pass) was addressed by the **pct-of-so workstream**
 (merged `8925347`, follow-on `12e172b`). Forward-link:
 [`docs/findings/2026-04-19-rewrite-pct-of-so-period-accuracy.md`](2026-04-19-rewrite-pct-of-so-period-accuracy.md)
@@ -368,17 +368,17 @@ three-tier fallback (`soh_period_accurate` → `market_data_so_latest`
 as **INF38 / BLOCK-FLOAT-HISTORY** per `docs/DEFERRED_FOLLOWUPS.md`.
 
 Amendment 2026-04-19 — read-only grep pass for every consumer of
-`holdings.pct_of_float` and `holdings_v2.pct_of_float`.
+`holdings.pct_of_so` and `holdings_v2.pct_of_so`.
 
 ### Grep commands run
 
 ```
-rg -n "pct_of_float" scripts/
-rg -n "pct_of_float" scripts/api_market.py scripts/api_register.py scripts/admin_bp.py scripts/build_summaries.py
-rg -n "pct_of_float" web/react-app/src/
-rg -n "pct_of_float" web/datasette_config.yaml
-rg -n "pct_of_float" docs/ --glob '!*FINDINGS.md'
-rg -n "pct_of_float" notebooks/research.ipynb ROADMAP.md
+rg -n "pct_of_so" scripts/
+rg -n "pct_of_so" scripts/api_market.py scripts/api_register.py scripts/admin_bp.py scripts/build_summaries.py
+rg -n "pct_of_so" web/react-app/src/
+rg -n "pct_of_so" web/datasette_config.yaml
+rg -n "pct_of_so" docs/ --glob '!*FINDINGS.md'
+rg -n "pct_of_so" notebooks/research.ipynb ROADMAP.md
 ```
 
 Directories `sql/`, `migrations/`, `reports/` do not exist in the repo
@@ -409,7 +409,7 @@ Directories `sql/`, `migrations/`, `reports/` do not exist in the repo
 | `scripts/queries.py:1691` | per-holding row list | Fund Portfolio — displayed |
 | `scripts/queries.py:1763-1765` | per-holding rollup with market_cap | Ticker Detail (peers) — displayed |
 | `scripts/queries.py:1876` | q4 snapshot SELECT | Quarter Compare — displayed |
-| `scripts/queries.py:1918-1924` | ownership concentration top-20 | Concentration widget — displayed + `WHERE pct_of_float IS NOT NULL` filter |
+| `scripts/queries.py:1918-1924` | ownership concentration top-20 | Concentration widget — displayed + `WHERE pct_of_so IS NOT NULL` filter |
 | `scripts/queries.py:2355-2357` | peer matrix rollup | Peers tab — displayed |
 | `scripts/queries.py:2401-2403` | data-quality COUNT | Admin/QC — count only, NULL-tolerant |
 | `scripts/queries.py:2894-2903` | quarter-over-quarter by entity | Flows / Change Detail — displayed |
@@ -418,33 +418,33 @@ Directories `sql/`, `migrations/`, `reports/` do not exist in the repo
 | `scripts/api_market.py:153` | `/api/top-holders` | top-10 holders JSON → React Market tab |
 | `scripts/api_market.py:259` | `/api/heatmap` | ownership concentration heatmap (top 15 managers × tickers) → React |
 | `scripts/api_register.py:293` | `/api/register/holdings` | Register tab holdings grid → React |
-| `scripts/admin_bp.py:500` | admin data-quality counter | `COUNT(pct_of_float)` — coverage metric only |
-| `scripts/build_summaries.py:188` | reads `holdings_v2`, writes `summary_by_parent.pct_of_float` | precomputed summary table feeding many queries.py endpoints |
+| `scripts/admin_bp.py:500` | admin data-quality counter | `COUNT(pct_of_so)` — coverage metric only |
+| `scripts/build_summaries.py:188` | reads `holdings_v2`, writes `summary_by_parent.pct_of_so` | precomputed summary table feeding many queries.py endpoints |
 | `scripts/enrich_holdings.py:125,184,355` | self-QC projection / baseline / final | internal run-metrics only |
 | `web/react-app/src/components/tabs/FundPortfolioTab.tsx:119` | CSV export column | end-user downloads |
-| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:243` | `<td>` rendering | displayed as `fmtPct2(p.pct_of_float)` |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:243` | `<td>` rendering | displayed as `fmtPct2(p.pct_of_so)` |
 
 ### Live WRITE site
 
-- `scripts/enrich_holdings.py:151` — Pass A: `SET pct_of_float = NULL`
+- `scripts/enrich_holdings.py:151` — Pass A: `SET pct_of_so = NULL`
   for cusips not in `cusip_classifications`.
-- `scripts/enrich_holdings.py:234-237` — Pass B: `SET pct_of_float = h.shares * 100.0 / lookup.float_shares`
+- `scripts/enrich_holdings.py:234-237` — Pass B: `SET pct_of_so = h.shares * 100.0 / lookup.float_shares`
   where `lookup.float_shares = market_data.float_shares` (**latest**, period-agnostic).
-- Sole writer. No other live script touches `holdings_v2.pct_of_float`.
+- Sole writer. No other live script touches `holdings_v2.pct_of_so`.
 
 ### Dead / legacy WRITE sites (all targeting the dropped `holdings` table)
 
 | file:line | action | status |
 |---|---|---|
-| `scripts/build_shares_history.py:177-184, :190-199` | UPDATE holdings SET pct_of_float | dead — this rewrite's target |
-| `scripts/approve_overrides.py:159-164` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list (`pipeline_inventory.md:108`) |
-| `scripts/auto_resolve.py:536-540` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list |
-| `scripts/enrich_tickers.py:385-408` | UPDATE holdings SET pct_of_float | dead — script is on RETIRE list |
-| `scripts/load_13f.py:273` | `NULL::DOUBLE as pct_of_float` in `CREATE TABLE holdings AS SELECT` | dead — script is REWRITE target (future `load_13f_v2.py`) |
+| `scripts/build_shares_history.py:177-184, :190-199` | UPDATE holdings SET pct_of_so | dead — this rewrite's target |
+| `scripts/approve_overrides.py:159-164` | UPDATE holdings SET pct_of_so | dead — script is on RETIRE list (`pipeline_inventory.md:108`) |
+| `scripts/auto_resolve.py:536-540` | UPDATE holdings SET pct_of_so | dead — script is on RETIRE list |
+| `scripts/enrich_tickers.py:385-408` | UPDATE holdings SET pct_of_so | dead — script is on RETIRE list |
+| `scripts/load_13f.py:273` | `NULL::DOUBLE as pct_of_so` in `CREATE TABLE holdings AS SELECT` | dead — script is REWRITE target (future `load_13f_v2.py`) |
 
 All five above are documented as RETIRE or REWRITE in `docs/pipeline_inventory.md`
 and are not part of the live pipeline. None would be affected by retiring
-`build_shares_history.py`'s `update_holdings_pct_of_float()`.
+`build_shares_history.py`'s `update_holdings_pct_of_so()`.
 
 ### Broken / stale references (documented, not live)
 
@@ -453,28 +453,28 @@ and are not part of the live pipeline. None would be affected by retiring
   Any attempt to run would throw CatalogException. Separate cleanup,
   not this block.
 - `web/datasette_config.yaml:11-93` — 3 canned queries reference
-  `FROM holdings h WHERE h.quarter = '2025Q4'` and expose `pct_of_float`.
+  `FROM holdings h WHERE h.quarter = '2025Q4'` and expose `pct_of_so`.
   Datasette is local-only tooling; the config is broken today
   (any query would error). Flag only.
 
 ### Assessment — retire impact (Option A)
 
-**Retiring `update_holdings_pct_of_float()` creates ZERO NULL
+**Retiring `update_holdings_pct_of_so()` creates ZERO NULL
 regressions in the live read surface.** Mechanical check:
 
-1. All 30 live READ sites query `holdings_v2.pct_of_float` or
-   `summary_by_parent.pct_of_float`.
-2. `holdings_v2.pct_of_float` is written exclusively by
+1. All 30 live READ sites query `holdings_v2.pct_of_so` or
+   `summary_by_parent.pct_of_so`.
+2. `holdings_v2.pct_of_so` is written exclusively by
    `scripts/enrich_holdings.py` Pass B.
-3. `summary_by_parent.pct_of_float` is written by
-   `scripts/build_summaries.py:188` which reads `holdings_v2.pct_of_float`.
-4. `build_shares_history.py`'s `update_holdings_pct_of_float()` does
+3. `summary_by_parent.pct_of_so` is written by
+   `scripts/build_summaries.py:188` which reads `holdings_v2.pct_of_so`.
+4. `build_shares_history.py`'s `update_holdings_pct_of_so()` does
    **not** write `holdings_v2` or `summary_by_parent`. It writes the
    dropped `holdings` table and fails on any invocation.
 5. Removing it changes no data in any live consumer surface.
 
 **The broader accuracy concern persists unchanged**: all 30 live READ
-sites return `pct_of_float` computed against **latest**
+sites return `pct_of_so` computed against **latest**
 `market_data.float_shares`, not the historical `shares_outstanding_history`
 facts. That is the latent period-accuracy bug the original script was
 built to fix. Option A does **not** fix it. It simply clears dead code.
@@ -493,7 +493,7 @@ secondary-offering quarters):
 
 Magnitude was documented at cut-over time
 (`docs/NEXT_SESSION_CONTEXT.md:922`):
-> GOOGL 2020 pct_of_float corrected from 0.4% to 7.3% (20:1 split).
+> GOOGL 2020 pct_of_so corrected from 0.4% to 7.3% (20:1 split).
 
 That order-of-magnitude correction is exactly what's missing today.
 
@@ -516,7 +516,7 @@ Fund Portfolio, Holders, Peers), CSV exports, and the heatmap /
 concentration widgets — is materially sensitive to the period-
 accuracy bug. Option C (move ASOF into `enrich_holdings.py`) is
 higher-priority than the original Phase 0 doc suggested.
-Recommend creating `BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY` as the
+Recommend creating `BLOCK-PCT-OF-SO-PERIOD-ACCURACY` as the
 immediate next block after `rewrite-build-shares-history` merges.
 
 ### 3.3 Retrofit violations
@@ -572,16 +572,16 @@ Phase 3 (prod promotion):
 
 **Depends on:**
 - BLOCK-3 merged state (commit `bcf1e60`) — **satisfied**. Needed for
-  `holdings_v2` full schema (`pct_of_float`, `report_date`) and for
-  `enrich_holdings.py` as the single current `pct_of_float` writer.
+  `holdings_v2` full schema (`pct_of_so`, `report_date`) and for
+  `enrich_holdings.py` as the single current `pct_of_so` writer.
 - SEC XBRL cache fresh (5,074 files, 2026-04-19) — **satisfied**.
 - `market_data` fresh (`2026-04-16 23:27:35`) — **satisfied**.
 
 **Blocks (if any):**
 - Nothing on the critical path. The `build()` side works today; the
-  `update_holdings_pct_of_float()` side is dead but harmless (gated).
+  `update_holdings_pct_of_so()` side is dead but harmless (gated).
 - Potential downstream unblock: if Option C is pursued in the follow-up,
-  `enrich_holdings.py` regains period-accurate `pct_of_float`, which
+  `enrich_holdings.py` regains period-accurate `pct_of_so`, which
   improves the quality of `compute_flows.py` and `build_summaries.py`
   outputs. Not a blocker.
 
@@ -596,9 +596,9 @@ self-contained.
 
 ## 4. Out of scope
 
-- **Option C implementation** (period-accurate `pct_of_float` via SOH ASOF
+- **Option C implementation** (period-accurate `pct_of_so` via SOH ASOF
   inside `enrich_holdings.py`). Deferred to a follow-up block
-  (`BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY` or similar) if user decides the
+  (`BLOCK-PCT-OF-SO-PERIOD-ACCURACY` or similar) if user decides the
   latent accuracy bug is worth re-fixing.
 - **SOH universe expansion.** Current universe is 4,450 tickers from
   `market_data`. Extending to `holdings_v2.ticker` universe (14,165 distinct)
@@ -626,7 +626,7 @@ self-contained.
 - Read-only code inspection and prod queries only. No writes.
 - Phase 0 commit is docs only.
 - No branch merges. No staging or prod writes.
-- `holdings_v2.pct_of_float` exists (confirmed); no "rewrite target column
+- `holdings_v2.pct_of_so` exists (confirmed); no "rewrite target column
   missing" blocker.
 - SEC XBRL cache path and link to `market_data.shares_outstanding` intact
   post-Audit (confirmed).

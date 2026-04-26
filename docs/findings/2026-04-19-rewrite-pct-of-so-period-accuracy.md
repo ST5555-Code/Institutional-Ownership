@@ -1,6 +1,6 @@
-# BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY — Phase 0 Findings
+# BLOCK-PCT-OF-SO-PERIOD-ACCURACY — Phase 0 Findings
 
-- Branch: `block/pct-of-float-period-accuracy`
+- Branch: `block/pct-of-so-period-accuracy`
 - Base commit: `a409f02` (main, 2026-04-19)
 - Scope: read-only investigation. No code changes, no DB writes, no
   script runs. Deliverable is this document.
@@ -31,7 +31,7 @@ Options before we spend any more engineering time:
 
 | # | option | short description |
 |---|---|---|
-| **A** | **Change denominator semantics** — use `shares_outstanding` (period-accurate, available now) instead of `float_shares`. Existing `pct_of_float` column name becomes a misnomer; rename to `pct_of_so` or document semantics. |
+| **A** | **Change denominator semantics** — use `shares_outstanding` (period-accurate, available now) instead of `float_shares`. Existing `pct_of_so` column name becomes a misnomer; rename to `pct_of_so` or document semantics. |
 | **B** | **Build a float_shares history table** — new `float_shares_history` ingested from SEC DEF 14A / 10-K filings (public float is disclosed annually in Part I, Item 5). Material scope expansion, probably another BLOCK. |
 | **C** | **Approximation** — compute a per-ticker `float_ratio = latest_float_shares / latest_shares_outstanding` and multiply SOH `shares` by that ratio at each `as_of_date`. Assumes ratio stable over time; wrong when insider stake shifts materially (lockup expiries, secondaries, buybacks concentrated in float). |
 | **D** | **Do nothing; retire the block** — accept the latent bug already called out in the peer `build_shares_history` findings doc. |
@@ -77,7 +77,7 @@ SELECT c.cusip,
 ```sql
 UPDATE holdings_v2 AS h
    SET ...,
-       pct_of_float = CASE WHEN lookup.is_equity
+       pct_of_so = CASE WHEN lookup.is_equity
                              AND lookup.float_shares > 0
                             THEN h.shares * 100.0 / lookup.float_shares
                        END
@@ -110,10 +110,10 @@ value was pulled, not *when* that value was the accurate figure as of.
 
 ### 1.5 Sole writer
 
-Pass B is the only live writer of `holdings_v2.pct_of_float`.
+Pass B is the only live writer of `holdings_v2.pct_of_so`.
 Confirmed via `2026-04-19-rewrite-build-shares-history.md §3.2.1` and
 re-verified in §3 below. Pass A (`enrich_holdings.py:141-164`) NULLs
-`pct_of_float` for unclassified cusips; Pass B repopulates it.
+`pct_of_so` for unclassified cusips; Pass B repopulates it.
 
 ---
 
@@ -128,7 +128,7 @@ re-verified in §3 below. Pass A (`enrich_holdings.py:141-164`) NULLs
 3. Fallback policy (see §4 edge-cases): if no SOH row ≤
    `quarter_end`, fall back to `market_data.float_shares` (existing
    behavior). Record fallback source on each row (new column
-   `pct_of_float_source VARCHAR` — values: `soh_period`, `md_latest_fallback`).
+   `pct_of_so_source VARCHAR` — values: `soh_period`, `md_latest_fallback`).
 4. Consider renaming column to `pct_of_so` (pct of shares outstanding)
    or explicitly documenting the mixed semantics.
 
@@ -157,14 +157,14 @@ SELECT h.*, soh.shares AS period_shares, soh.source_tag
   designed to fix).
 
 **Cons:**
-- **Semantic drift.** Column named `pct_of_float`, value becomes
+- **Semantic drift.** Column named `pct_of_so`, value becomes
   "pct of shares outstanding." For a typical large-cap (AAPL today:
   float 14.82B, SO 14.86B, ~99.7% overlap) the drift is trivial. For
   closely-held names (meme stocks, insider-heavy small-caps,
   high-insider tech IPOs) float can be 40–70% of SO — numbers shift
   2–3×.
 - Dual semantics across rows: SOH-covered rows are pct_of_SO,
-  md-fallback rows are pct_of_float. Mixed metric in a single column
+  md-fallback rows are pct_of_so. Mixed metric in a single column
   unless per-row source flag is added and downstream readers honor it.
 - Display-side work: every user-facing site (§3) either gets a
   column-rename, a tooltip, or an asterisk explaining the semantics.
@@ -187,7 +187,7 @@ SELECT h.*, soh.shares AS period_shares, soh.source_tag
 3. Pass B ASOF-joins against it.
 
 **Pros:**
-- True period-accurate `pct_of_float` preserved.
+- True period-accurate `pct_of_so` preserved.
 - No column rename, no downstream display work.
 
 **Cons:**
@@ -215,7 +215,7 @@ SELECT h.*, soh.shares AS period_shares, soh.source_tag
 3. Denominator = `estimated_float_at_qe`.
 
 **Pros:**
-- Column name stays meaningful (`pct_of_float` *approximates* float).
+- Column name stays meaningful (`pct_of_so` *approximates* float).
 - No new ingestion.
 - Handles splits / buybacks that move SO — float scales
   proportionally.
@@ -265,7 +265,7 @@ SOH coverage (§4). Fallback rules:
 | 3 | No SOH coverage at all | `market_data.float_shares` (today's value) | `md_latest_fallback` |
 | 4 | No SOH **and** no `market_data.float_shares` | NULL | `unresolved` |
 
-The `pct_of_float_source` column makes downstream readers able to
+The `pct_of_so_source` column makes downstream readers able to
 de-mix: Register-tab counts and admin audits can filter to tier 1
 only; Ticker Detail can display all and flag the fallbacks.
 
@@ -296,7 +296,7 @@ scope) or D (document and close).
 Grep command:
 
 ```
-rg -n "pct_of_float" scripts/ web/ docs/ notebooks/ ROADMAP.md
+rg -n "pct_of_so" scripts/ web/ docs/ notebooks/ ROADMAP.md
 ```
 
 Live consumer sites — user-facing or API-returning — classified by
@@ -308,37 +308,37 @@ admin-only coverage counter and the hardcoded-None placeholders).
 
 | file:line | context | surface | notes |
 |---|---|---|---|
-| `scripts/queries.py:469-470` | read `market_data.float_shares` for recompute fallback | backend helper | not a read of `pct_of_float` itself, but load-bearing on the denominator |
-| `scripts/queries.py:574` | `holder_aggregation` `SUM(h.pct_of_float)` | Holders tab via `/api/...` | displayed |
-| `scripts/queries.py:695, :705` | parent rollup `h.pct_of_float` / `SUM(pct_of_float)` | Parent Detail | displayed |
-| `scripts/queries.py:763` | entity rollup `SUM(h.pct_of_float)` | Register tab | displayed |
-| `scripts/queries.py:865` | ownership by manager_type `SUM(h.pct_of_float)` | Market tab | displayed |
+| `scripts/queries.py:469-470` | read `market_data.float_shares` for recompute fallback | backend helper | not a read of `pct_of_so` itself, but load-bearing on the denominator |
+| `scripts/queries.py:574` | `holder_aggregation` `SUM(h.pct_of_so)` | Holders tab via `/api/...` | displayed |
+| `scripts/queries.py:695, :705` | parent rollup `h.pct_of_so` / `SUM(pct_of_so)` | Parent Detail | displayed |
+| `scripts/queries.py:763` | entity rollup `SUM(h.pct_of_so)` | Register tab | displayed |
+| `scripts/queries.py:865` | ownership by manager_type `SUM(h.pct_of_so)` | Market tab | displayed |
 | `scripts/queries.py:1310, :1346` | top-holders CTE + output | Ticker Detail | displayed, ranking-sensitive |
-| `scripts/queries.py:1530, :1545` | hardcoded `'pct_of_float': None` placeholder | N-PORT shim rows | placeholder, no change needed |
-| `scripts/queries.py:1587` | `SUM(pct_of_float) total_pct_float` | Ticker summary card | displayed |
+| `scripts/queries.py:1530, :1545` | hardcoded `'pct_of_so': None` placeholder | N-PORT shim rows | placeholder, no change needed |
+| `scripts/queries.py:1587` | `SUM(pct_of_so) total_pct_float` | Ticker summary card | displayed |
 | `scripts/queries.py:1691` | per-holding row list | Fund Portfolio (activist filter) | displayed + CSV |
 | `scripts/queries.py:1765` | peers rollup with market_cap | Ticker Detail peers | displayed |
 | `scripts/queries.py:1876` | Q4 snapshot | Quarter Compare | displayed |
-| `scripts/queries.py:1920, :1922, :1924` | concentration top-20 + `ORDER BY SUM(pct_of_float) DESC` + `WHERE pct_of_float IS NOT NULL` | concentration widget | displayed + ranking-sensitive |
+| `scripts/queries.py:1920, :1922, :1924` | concentration top-20 + `ORDER BY SUM(pct_of_so) DESC` + `WHERE pct_of_so IS NOT NULL` | concentration widget | displayed + ranking-sensitive |
 | `scripts/queries.py:2357` | peer matrix rollup | Peers tab | displayed |
-| `scripts/queries.py:2403` | `COUNT(pct_of_float IS NOT NULL)` | admin/QC counter | count only, NULL-tolerant |
+| `scripts/queries.py:2403` | `COUNT(pct_of_so IS NOT NULL)` | admin/QC counter | count only, NULL-tolerant |
 | `scripts/queries.py:2896, :2903` | QoQ by entity, quarter_from + quarter_to | Flows / Change Detail | displayed, **most period-sensitive** (same position in consecutive quarters shares the same denominator today) |
 | `scripts/queries.py:2918-2919` | `_get_pf` helper extractor | all QoQ code paths | helper |
 | `scripts/queries.py:3042-3045` | recompute fallback reading `market_data.float_shares` | fund portfolio | second-chance compute path |
-| `scripts/queries.py:3994` | `SUM(pct_of_float) total_pct_float` | Summary card | displayed |
-| `scripts/api_market.py:153` | `/api/top-holders` `SUM(pct_of_float) as pct_float` | React Market tab | displayed |
-| `scripts/api_market.py:218, :259` | `/api/heatmap` top 15 managers × tickers `SUM(pct_of_float)` | React heatmap | displayed, color-sensitive |
-| `scripts/api_register.py:293` | `/api/register/holdings` returns `pct_of_float` | React Register grid | displayed |
-| `scripts/admin_bp.py:500` | `COUNT(pct_of_float) as with_float_pct` | admin data-quality | count only |
+| `scripts/queries.py:3994` | `SUM(pct_of_so) total_pct_float` | Summary card | displayed |
+| `scripts/api_market.py:153` | `/api/top-holders` `SUM(pct_of_so) as pct_float` | React Market tab | displayed |
+| `scripts/api_market.py:218, :259` | `/api/heatmap` top 15 managers × tickers `SUM(pct_of_so)` | React heatmap | displayed, color-sensitive |
+| `scripts/api_register.py:293` | `/api/register/holdings` returns `pct_of_so` | React Register grid | displayed |
+| `scripts/admin_bp.py:500` | `COUNT(pct_of_so) as with_float_pct` | admin data-quality | count only |
 
 ### 3.2 Summary-table writer (transitive)
 
 | file:line | action |
 |---|---|
-| `scripts/build_summaries.py:121` | DDL — `pct_of_float DOUBLE` column on `summary_by_parent` |
-| `scripts/build_summaries.py:188` | `SUM(h.pct_of_float) AS pct_of_float` aggregating `holdings_v2` → `summary_by_parent` |
+| `scripts/build_summaries.py:121` | DDL — `pct_of_so DOUBLE` column on `summary_by_parent` |
+| `scripts/build_summaries.py:188` | `SUM(h.pct_of_so) AS pct_of_so` aggregating `holdings_v2` → `summary_by_parent` |
 
-`summary_by_parent.pct_of_float` is transitively read by several
+`summary_by_parent.pct_of_so` is transitively read by several
 `queries.py` endpoints. Effectively another surface requiring
 re-materialization after Pass B change.
 
@@ -346,17 +346,17 @@ re-materialization after Pass B change.
 
 | file:line | action |
 |---|---|
-| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:119` | CSV export column `p.pct_of_float.toFixed(2)` |
-| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:243` | `<td>{fmtPct2(p.pct_of_float)}</td>` rendered |
-| `web/react-app/src/types/api.ts:299` | TypeScript type `pct_of_float: number \| null` |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:119` | CSV export column `p.pct_of_so.toFixed(2)` |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx:243` | `<td>{fmtPct2(p.pct_of_so)}</td>` rendered |
+| `web/react-app/src/types/api.ts:299` | TypeScript type `pct_of_so: number \| null` |
 | `web/react-app/src/types/api-generated.ts:954` | auto-generated OpenAPI description (heatmap endpoint) |
 
 ### 3.4 Self-writer / projection
 
 | file:line | action |
 |---|---|
-| `scripts/enrich_holdings.py:125` | Pass A projection `COUNT(pct_of_float IS NOT NULL)` |
-| `scripts/enrich_holdings.py:151` | Pass A apply `SET pct_of_float = NULL` |
+| `scripts/enrich_holdings.py:125` | Pass A projection `COUNT(pct_of_so IS NOT NULL)` |
+| `scripts/enrich_holdings.py:151` | Pass A apply `SET pct_of_so = NULL` |
 | `scripts/enrich_holdings.py:184` | Pass B projection old_pof |
 | `scripts/enrich_holdings.py:234` | **Pass B apply — SOLE LIVE WRITER** |
 | `scripts/enrich_holdings.py:355` | baseline post-state |
@@ -438,7 +438,7 @@ didn't retain the delisted row.
 4,101-ticker gap is mostly CUSIPs that resolve to non-US / non-SEC-
 registrant tickers in `securities` but that no Yahoo/SEC pull has
 matched. For these, `lookup.float_shares` is NULL today, so
-`pct_of_float` is NULL. This is not a regression under any option.
+`pct_of_so` is NULL. This is not a regression under any option.
 
 ### 4.5 Forward-dated SOH rows
 
@@ -553,7 +553,7 @@ checks.
    - Breakdown by source flag: `soh_period`, `md_fallback`,
      `unresolved` — should sum to `pof_post`.
 3. Accept criteria:
-   - `pof_post` (rows with non-NULL `pct_of_float`) ≥ current prod
+   - `pof_post` (rows with non-NULL `pct_of_so`) ≥ current prod
      count × 0.98 (no net coverage regression).
    - `soh_period` ≥ 30% of `pof_post` (Option A expected gain).
 
@@ -566,7 +566,7 @@ For each of 2025Q1 / Q2 / Q3 / Q4, pick 20 tickers spanning:
 - Known secondary / offering (`TSLA` 2020, `CVNA`).
 - Small-cap insider-heavy (`GME`, `PLTR`, `AMC`).
 
-Compute `pct_of_float` three ways:
+Compute `pct_of_so` three ways:
 1. Current (latest-float) — baseline.
 2. New (SO at as_of_date, Option A).
 3. SEC EDGAR cross-check: pull `EntityCommonStockSharesOutstanding`
@@ -589,7 +589,7 @@ query output on prod (pre-change) and staging (post-change). Expect:
 
 After Pass B change lands in staging:
 1. Re-run `scripts/build_summaries.py --staging`.
-2. Compare `summary_by_parent.pct_of_float` before/after per entity.
+2. Compare `summary_by_parent.pct_of_so` before/after per entity.
 3. Expect aggregate shifts — document the top-50 biggest-delta rows
    for Serge sign-off.
 
@@ -602,10 +602,10 @@ After Pass B change lands in staging:
 
 ### 6.7 Rollback
 
-If Pass B needs reverting: `UPDATE holdings_v2 SET pct_of_float =
+If Pass B needs reverting: `UPDATE holdings_v2 SET pct_of_so =
 <old-formula>` using the same `_LOOKUP_SQL` (today's code) — full
 rewrite-idempotent. No DDL change, so no migration rollback needed
-unless a `pct_of_float_source` column is added (then a DROP COLUMN).
+unless a `pct_of_so_source` column is added (then a DROP COLUMN).
 
 ---
 
@@ -617,7 +617,7 @@ unless a `pct_of_float_source` column is added (then a DROP COLUMN).
    and document drift?** Rename is safer for auditability but
    touches ~28 live sites plus React types / CSV headers / user
    documentation. Keep-and-document is cheap but future-confusing.
-3. **Add `pct_of_float_source` column?** Enables downstream
+3. **Add `pct_of_so_source` column?** Enables downstream
    de-mixing and auditability. Cost: one column on `holdings_v2`
    (12.27M rows; adds ~25 MB). Benefit: admin data-quality widget
    can distinguish Tier 1 from Tier 3 rows.
@@ -654,7 +654,7 @@ unless a `pct_of_float_source` column is added (then a DROP COLUMN).
 - Read-only investigation. No code changes, no DB writes, no script
   runs, no `fetch_*` calls.
 - Phase 0 commit is this doc only.
-- Branch `block/pct-of-float-period-accuracy` created off main
+- Branch `block/pct-of-so-period-accuracy` created off main
   (`a409f02`). No merges, no pushes.
 - No new dependencies introduced.
 
@@ -790,10 +790,10 @@ the expected tail.
   *after* quarter_end are naturally deprioritized by the ASOF `<=`
   cut; us-gaap:CSO at exactly quarter_end wins.
 - **For holdings_v2 only**: Confirmed — `fund_holdings_v2` does NOT
-  carry `pct_of_float` (or `pct_of_so`). N-PORT uses `pct_of_nav`
+  carry `pct_of_so` (or `pct_of_so`). N-PORT uses `pct_of_nav`
   as the fund-level metric. Block prompt's "also handle
   fund_holdings_v2 with N-PORT month-end stamp" is moot.
-  `beneficial_ownership_v2` likewise has no `pct_of_float` column
+  `beneficial_ownership_v2` likewise has no `pct_of_so` column
   (verified via `PRAGMA table_info`).
 - **Scope narrows**: migration touches `holdings_v2` only. One
   column rename, one audit column add, one `enrich_holdings.py`
@@ -830,7 +830,7 @@ INSERT INTO schema_versions (version, notes) VALUES
 ### 9.2 Idempotency
 
 Probes `duckdb_columns` for current state before each step:
-- If `pct_of_so` already exists and `pct_of_float` is gone and stamped
+- If `pct_of_so` already exists and `pct_of_so` is gone and stamped
   → no-op.
 - If both columns exist simultaneously (e.g. an aborted prior run that
   added the new before dropping the old) → abort with human-resolvable
@@ -920,7 +920,7 @@ ASOF `<= quarter_end` picks:
 ### 10.4 N-PORT compute paths — Phase 1c rewrite
 
 Phase 1a §8.5 confirmed `fund_holdings_v2` does not carry a stored
-`pct_of_float` column. However, `scripts/queries.py` has **ad-hoc
+`pct_of_so` column. However, `scripts/queries.py` has **ad-hoc
 compute paths** that produce a `pct_so` value for N-PORT fund holdings
 on the fly (feeding Register children, Market heatmap, OwnershipTrend,
 FlowAnalysis, Two-Company Overlap). Phase 1b renamed the key
@@ -999,7 +999,7 @@ Pass B projection:
 
 Sum across the four tiers equals the equity-row count. Watching the
 tier 3 count pre/post-promotion is the admin signal for how many rows
-are "pct_of_float stored in pct_of_so column" — staging validation
+are "pct_of_so stored in pct_of_so column" — staging validation
 threshold TBD (expect double-digit thousands given the 70% no-SOH
 cliff from §4.1).
 
@@ -1037,18 +1037,18 @@ Commit `f956096` migrated every live read surface. Reconciliation:
 | `scripts/api_market.py` | column + alias |
 | `scripts/api_register.py` | column |
 | `scripts/admin_bp.py` | column + `with_float_pct` alias |
-| `scripts/build_summaries.py` | DDL column + aggregation alias (`summary_by_ticker.pct_of_float` column definition also renamed) |
+| `scripts/build_summaries.py` | DDL column + aggregation alias (`summary_by_ticker.pct_of_so` column definition also renamed) |
 | `scripts/enrich_holdings.py` | Pass B rewrite (`dd2b5a1`) |
 
 ### 11.2 React frontend (10 files)
 
 | file | renames applied |
 |---|---|
-| `web/react-app/src/types/api.ts` | `pct_of_float`, `pct_float`, `total_pct_float`, `pct_float_moved`, `subj_pct_float`, `sec_pct_float` — all TS field types |
+| `web/react-app/src/types/api.ts` | `pct_of_so`, `pct_float`, `total_pct_float`, `pct_float_moved`, `subj_pct_float`, `sec_pct_float` — all TS field types |
 | `web/react-app/src/types/api-generated.ts` | auto-gen OpenAPI description |
 | `web/react-app/src/components/common/TableFooter.tsx` | `pct_float` field, `% Float` label |
 | `web/react-app/src/components/tabs/RegisterTab.tsx` | `pct_float` field, `pctFloat` local, `fmtPctFloat` util, `% Float`, `%Float` labels |
-| `web/react-app/src/components/tabs/FundPortfolioTab.tsx` | `pct_of_float`, `pct_float`, `% Float` label + CSV header |
+| `web/react-app/src/components/tabs/FundPortfolioTab.tsx` | `pct_of_so`, `pct_float`, `% Float` label + CSV header |
 | `web/react-app/src/components/tabs/OwnershipTrendTab.tsx` | `pct_float`, `pct_float_moved`, `% Float`, `% Float Moved` labels |
 | `web/react-app/src/components/tabs/FlowAnalysisTab.tsx` | `pct_float`, `pctFloat`, `% Float` label |
 | `web/react-app/src/components/tabs/EntityGraphTab.tsx` | `pct_float`, `totalPctFloat`, `% Float` label |
@@ -1097,7 +1097,7 @@ is larger because React consumers multiply.
 | `scripts/enrich_tickers.py` | on RETIRE list |
 | `scripts/build_shares_history.py` | docstring mentions old block name; actual update path already retired |
 | `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | migration *performs* the rename; old column name is a constant in the file |
-| `scripts/enrich_holdings.py` | module docstring has one backward-reference note `(renamed from pct_of_float in 008)` — intentional |
+| `scripts/enrich_holdings.py` | module docstring has one backward-reference note `(renamed from pct_of_so in 008)` — intentional |
 | `notebooks/research.ipynb` | stale since Stage 5 dropped `holdings` table |
 | `web/datasette_config.yaml` | canned queries on dropped `holdings` table (already broken) |
 | `ROADMAP.md`, `NEXT_SESSION_CONTEXT.md`, `docs/*.md`, `archive/docs/reports/*.md` | deferred to batched doc-update session per prompt constraints |
@@ -1156,12 +1156,12 @@ Touch list summary:
 
 Per block prompt constraint: "Do not modify `ROADMAP.md`,
 `data_layers.md`, or other top-level docs (deferred to batched doc-
-update session)." The following docs reference `pct_of_float` /
+update session)." The following docs reference `pct_of_so` /
 `pct_float` and need updating in that session:
 
 | doc | action |
 |---|---|
-| `ROADMAP.md` | add completed block under BLOCK-PCT-OF-SO-PERIOD-ACCURACY; rename prior BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY refs; INF38 entry for BLOCK-FLOAT-HISTORY (deferred float preservation workstream) |
+| `ROADMAP.md` | add completed block under BLOCK-PCT-OF-SO-PERIOD-ACCURACY; rename prior BLOCK-PCT-OF-SO-PERIOD-ACCURACY refs; INF38 entry for BLOCK-FLOAT-HISTORY (deferred float preservation workstream) |
 | `docs/data_layers.md` | §7 cross-ref for the new `pct_of_so_source` audit column on `holdings_v2`; update the column list |
 | `docs/canonical_ddl.md` | update `holdings_v2` DDL reference to show `pct_of_so DOUBLE` + `pct_of_so_source VARCHAR` |
 | `docs/pipeline_inventory.md` | update enrichment writers list |
@@ -1231,7 +1231,7 @@ mirror of prod as of 2026-04-19 09:14). All 10 Phase 1 commits
 
 ```
 Migration 008 dry-run:
-  has pct_of_float: True
+  has pct_of_so: True
   has pct_of_so: False
   has pct_of_so_source: False
   schema_versions stamped: False
@@ -1240,7 +1240,7 @@ Migration 008 dry-run:
 
 Migration 008 apply:
   stamped schema_versions: 008_rename_pct_of_float_to_pct_of_so
-  AFTER: pct_of_float=False pct_of_so=True pct_of_so_source=True
+  AFTER: pct_of_so=False pct_of_so=True pct_of_so_source=True
 
 Migration 008 re-run (idempotency check):
   ALREADY APPLIED: no action
@@ -1252,7 +1252,7 @@ Post-apply verification:
 |---|---:|
 | holdings_v2 row count | 12,270,984 (unchanged) |
 | `pct_of_so` present | YES |
-| `pct_of_float` present | NO |
+| `pct_of_so` present | NO |
 | `pct_of_so_source` present | YES (VARCHAR, all NULL at migration time) |
 | schema_versions row | `008_rename_pct_of_float_to_pct_of_so` stamped 2026-04-19 12:51:51 |
 | `fund_holdings_v2` columns | untouched — still has `pct_of_nav`, no `pct_of_*` rename artifacts |
@@ -1438,7 +1438,7 @@ Phase 2 staging validation never exercised this path.
 **No partial write**. The DependencyException fired on the first
 ALTER; the ADD COLUMN step was gated after. Prod left in clean
 pre-migration state:
-- `pct_of_float` column intact
+- `pct_of_so` column intact
 - `pct_of_so`, `pct_of_so_source` absent
 - `schema_versions` 008 absent
 - 4 indexes untouched
@@ -1480,7 +1480,7 @@ present audit + present indexes → no-op short-circuit).
 Before retry, all assertions passed:
 
 ```
-COLUMNS  OK: pct_of_float present; pct_of_so/_source absent
+COLUMNS  OK: pct_of_so present; pct_of_so/_source absent
 INDEXES  OK: [idx_hv2_cik_quarter, idx_hv2_entity_id, idx_hv2_rollup, idx_hv2_ticker_quarter]
 SCHEMA_V OK: 008 absent
 SNAPSHOT OK: 12,270,984 rows
@@ -1508,7 +1508,7 @@ CREATE INDEX idx_hv2_ticker_quarter  : 3.114s
 post-apply row count: 12,270,984 (matches pre-apply)
 stamped schema_versions: 008_rename_pct_of_float_to_pct_of_so
 total wall clock: 9.0s
-AFTER: pct_of_float=False pct_of_so=True pct_of_so_source=True indexes_recreated=4
+AFTER: pct_of_so=False pct_of_so=True pct_of_so_source=True indexes_recreated=4
 ```
 
 Idempotency re-run → `ALREADY APPLIED: no action`. ✓
@@ -1666,10 +1666,10 @@ holdings_v2_enrichment      2026-04-19 13:32:08  10,394,757
 Snapshot table remains in place as rollback insurance:
 `holdings_v2_pct_of_so_pre_apply_snapshot_20260419` (12,270,984
 rows; columns: row_id, accession_number, cusip, quarter, cik,
-pct_of_float).
+pct_of_so).
 
 **Rollback SQL** (reverses Phase 4b apply — restores
-`pct_of_float`, drops `pct_of_so_source`, restores values from
+`pct_of_so`, drops `pct_of_so_source`, restores values from
 snapshot, reinstates indexes):
 
 ```sql
@@ -1689,18 +1689,18 @@ DROP INDEX idx_hv2_ticker_quarter;
 
 -- Step 3: Reverse the column changes
 ALTER TABLE holdings_v2 DROP COLUMN pct_of_so_source;
-ALTER TABLE holdings_v2 RENAME COLUMN pct_of_so TO pct_of_float;
+ALTER TABLE holdings_v2 RENAME COLUMN pct_of_float TO pct_of_so;
 
--- Step 4: Restore pre-apply pct_of_float values from snapshot.
+-- Step 4: Restore pre-apply pct_of_so values from snapshot.
 -- Natural-key join (rowid not stable; see §14.5). Uses SUM over the
 -- dup-group ambiguity — 221K rows (1.8%) fall in intentional dup
 -- groups and will receive the group's max pre-apply value. Acceptable
 -- for rollback since post-UPDATE values are already overwritten.
 UPDATE holdings_v2 h
-   SET pct_of_float = agg.pct
+   SET pct_of_so = agg.pct
   FROM (
       SELECT accession_number, cusip, quarter, cik,
-             MAX(pct_of_float) AS pct
+             MAX(pct_of_so) AS pct
         FROM holdings_v2_pct_of_so_pre_apply_snapshot_20260419
        GROUP BY 1,2,3,4
   ) AS agg
@@ -1727,7 +1727,7 @@ CHECKPOINT;
 ```
 
 **Verified mentally against amended migration 008 semantics**:
-post-rollback state is `pct_of_float` present, `pct_of_so` and
+post-rollback state is `pct_of_so` present, `pct_of_so` and
 `pct_of_so_source` absent, `schema_versions` 008 unstamped, 4
 indexes recreated with original DDL, row count unchanged.
 
@@ -1736,9 +1736,9 @@ Re-running migration 008 after a rollback would re-execute cleanly
 schema_versions alone.
 
 **Caveat on step 4**: the natural-key ambiguity means the 221K rows
-in intentional dup groups receive `MAX(pct_of_float)` from the
+in intentional dup groups receive `MAX(pct_of_so)` from the
 snapshot rather than each row's original value. Most dup-group
-members had identical `pct_of_float` (same cusip+quarter → same
+members had identical `pct_of_so` (same cusip+quarter → same
 denominator → same pct). Where shares differed across dups, the
 rollback yields slightly higher values than pre-apply for some rows
 in the dup group. Acceptable for a rollback scenario; documented.
@@ -1758,7 +1758,7 @@ for next batched session)
   Pre-existing FAILs are wellington_sub_advisory (known baseline)
   and phase3_resolution_rate (SEC > 80%, enrichment > 25%
   threshold). Neither caused by pct-of-so.
-- Mark `pct_of_float` terminology retired across the project;
+- Mark `pct_of_so` terminology retired across the project;
   `pct_of_so` is the canonical metric name going forward.
 - Add **INF38 — BLOCK-FLOAT-HISTORY** as new roadmap item.
   - Scope: quarterly float history from Section 13 beneficial
@@ -1769,7 +1769,7 @@ for next batched session)
   - Dependency: Section 16 ingestion infrastructure.
   - Priority: low-medium.
   - Use case: squeeze/liquidity analysis, activist targeting,
-    float-adjusted pct_of_float restoration (the semantic the
+    float-adjusted pct_of_so restoration (the semantic the
     original block prompt wanted but couldn't deliver without float
     history).
 - Add **INF39 — BLOCK-STAGING-PROD-SCHEMA-DIVERGENCE** as new
@@ -1799,7 +1799,7 @@ for next batched session)
   drops" discussion if relevant.
 
 **docs/canonical_ddl.md**
-- `holdings_v2` DDL block: rename `pct_of_float DOUBLE` →
+- `holdings_v2` DDL block: rename `pct_of_so DOUBLE` →
   `pct_of_so DOUBLE`.
 - `holdings_v2` DDL block: add `pct_of_so_source VARCHAR`.
 - Document the capture-and-recreate pattern for any L3 table
@@ -1813,7 +1813,7 @@ for next batched session)
   of `holdings_v2.pct_of_so` and `holdings_v2.pct_of_so_source`.
 
 **docs/pipeline_violations.md**
-- Close any existing pct_of_float-related violation entry with
+- Close any existing pct_of_so-related violation entry with
   commit citations (Phase 1b `dd2b5a1`, Phase 1c `b0ba86d`,
   Phase 4b `ea4ae99`).
 
@@ -1850,12 +1850,12 @@ for next batched session)
 ```
 INF38 — BLOCK-FLOAT-HISTORY
 Scope: Build float_shares_history table for true float-adjusted
-pct_of_float restoration. Data sources:
+pct_of_so restoration. Data sources:
   - 10-K Item 5 EntityPublicFloat XBRL tag (annual snapshot)
   - Schedule 13D/G filings (beneficial ownership >5%)
   - Forms 3/4/5 (Section 16 insider holdings)
   - Derived: shares_outstanding - insider_holdings - restricted
-Trigger: enables true pct_of_float metric alongside current pct_of_so.
+Trigger: enables true pct_of_so metric alongside current pct_of_so.
 Dependencies: Section 16 ingestion infrastructure (not yet built).
 Priority: low-medium. Tracked but no ETA.
 Use cases: squeeze/liquidity analysis, activist targeting, more
@@ -1995,7 +1995,7 @@ declared complete until then.
 ### §14.11.1 Missed-rename post-mortem
 
 Live app smoke during Phase 4b surfaced a `BinderException: Referenced
-column "pct_of_float" not found` at `queries.py::_get_summary_impl`.
+column "pct_of_so" not found` at `queries.py::_get_summary_impl`.
 Root cause turned out to be Flask running the **main-branch checkout**
 against the post-migration prod DB — the block-branch renames were
 present on origin but the local Flask process loaded main-branch code.
@@ -2009,7 +2009,7 @@ The event nonetheless triggered an exhaustive sweep because:
 - Phase 1c had already caught 4 N-PORT compute paths the Phase 1b
   grep missed. Two partial misses suggest systemic risk.
 
-Phase 4c sweep method: `grep -rn pct_of_float` across `*.py`,
+Phase 4c sweep method: `grep -rn pct_of_so` across `*.py`,
 `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.sql` with explicit preserve-
 list filtering. Plus alias grep for `total_pct_float`, `pct_float\b`,
 `float_pct_pct`, `with_float_pct`.
@@ -2021,13 +2021,13 @@ list filtering. Plus alias grep for `total_pct_float`, `pct_float\b`,
 | file:line | issue | fix |
 |---|---|---|
 | `scripts/queries.py:2500` | `'float_pct_pct'` response-dict key — underlying query already uses `COUNT(CASE WHEN pct_of_so IS NOT NULL…)` on line 2491, but the key retained the `float_` prefix | Renamed to `'so_pct_pct'`. No React consumer reads this key (grep confirms zero downstream refs). |
-| `scripts/build_shares_history.py:15-20` | Module docstring references "update_holdings_pct_of_float" retired path and forward-links to "BLOCK-PCT-OF-FLOAT-PERIOD-ACCURACY" (pre-rename block name) | Docstring updated to reference the landed BLOCK-PCT-OF-SO-PERIOD-ACCURACY. Historical "update_holdings_pct_of_float" symbol name preserved (it's referring to a retired function's name, not the column). |
+| `scripts/build_shares_history.py:15-20` | Module docstring references "update_holdings_pct_of_so" retired path and forward-links to "BLOCK-PCT-OF-SO-PERIOD-ACCURACY" (pre-rename block name) | Docstring updated to reference the landed BLOCK-PCT-OF-SO-PERIOD-ACCURACY. Historical "update_holdings_pct_of_so" symbol name preserved (it's referring to a retired function's name, not the column). |
 
 **Category (b) — INTENTIONAL PRESERVES**:
 
 | file | reason |
 |---|---|
-| `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | migration file — `pct_of_float` is the *source* column the migration renames; must stay |
+| `scripts/migrations/008_rename_pct_of_float_to_pct_of_so.py` | migration file — `pct_of_so` is the *source* column the migration renames; must stay |
 | `scripts/enrich_holdings.py:9, :147` | docstring + inline comment explicitly reference the rename history |
 | `scripts/auto_resolve.py:536,540` | dead writer on RETIRE list — targets dropped `holdings` table |
 | `scripts/approve_overrides.py:159,164` | dead writer on RETIRE list |
@@ -2150,7 +2150,7 @@ Precedent: pct-of-so Phase 1b/1c/4c sweep gaps — see §14.11.
 - Exhaustive grep inventory: 2 fixes, all preserve-list items
   accounted for ✓
 - Post-fix grep verification: zero alias hits, all remaining
-  `pct_of_float` references are in the preserve list ✓
+  `pct_of_so` references are in the preserve list ✓
 - Live HTTP smoke: 6/6 baseline + 10/10 integration paths PASS ✓
 - Flask killed, DB symlinks removed ✓
 

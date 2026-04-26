@@ -12,8 +12,8 @@ on-or-before that date (e.g. via DuckDB ASOF JOIN) get a denominator that
 respects splits, buybacks, and offerings between report_date and today.
 
 Writer discipline note: this script is the sole writer of
-`shares_outstanding_history`. The historical `update_holdings_pct_of_float`
-path that wrote `holdings.pct_of_float` via ASOF JOIN was retired in the
+`shares_outstanding_history`. The historical `update_holdings_pct_of_so`
+path that wrote `holdings.pct_of_so` via ASOF JOIN was retired in the
 2026-04-19 rewrite after the `holdings` table was dropped at Stage 5.
 Period-accurate denominator restoration landed under
 BLOCK-PCT-OF-SO-PERIOD-ACCURACY (2026-04-19 — ASOF moved into

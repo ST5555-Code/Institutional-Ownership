@@ -100,7 +100,7 @@ name itself).
     `manager_type = 'passive'`.
   - `active_pct` = `active_value / total_value * 100` rounded to 1 dp,
     NULL when `total_value <= 0`.
-  - `pct_of_float` = `SUM(pct_of_float)` (ticker-level stacked
+  - `pct_of_so` = `SUM(pct_of_so)` (ticker-level stacked
     ownership).
   - `top10_holders` currently NULL — placeholder column.
 
@@ -251,7 +251,7 @@ run successfully end-to-end at least once post-87ee955 and that the
 
 **`holdings_v2` columns required by the rewrite — all present:**
 `quarter`, `ticker`, `issuer_name`, `cik`, `market_value_usd`,
-`market_value_live`, `shares`, `manager_type`, `pct_of_float`,
+`market_value_live`, `shares`, `manager_type`, `pct_of_so`,
 `rollup_entity_id`, `rollup_name`, `dm_rollup_entity_id`,
 `dm_rollup_name`, `is_passive`. No missing columns.
 

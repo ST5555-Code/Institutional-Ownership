@@ -109,7 +109,7 @@
 | INF25 | BLOCK-DENORM-RETIREMENT Step 4 — drop denorm columns from v2 fact tables | OPEN | GATED | `ROADMAP.md:577,602`; `docs/DEFERRED_FOLLOWUPS.md:13`; `docs/plans/…-phase-b-c…md §9`; `docs/findings/int-09-p0-findings.md §4` | ~12 days | Unblocked post-Phase-2; waits on dual-graph resolution decision for `rollup_entity_id`. |
 | INF27 | CUSIP residual-coverage tracking tier | BACKGROUND | BACKGROUND | `ROADMAP.md:580,605`; `docs/DEFERRED_FOLLOWUPS.md:14`; `docs/data_layers.md:136` | ≥60 days | Standing curation. Revisit trigger: net-increase in `pending` rows across two consecutive runs. |
 | INF37 | `backfill_manager_types` residual — 9 entities / 14,368 rows | STANDING per trackers; CLEARED per findings | — | `ROADMAP.md:…`; `docs/DEFERRED_FOLLOWUPS.md:15`; `docs/findings/entity-curation-w1-log.md` | 1 day | See [Drift](#cross-tracker-drift). |
-| INF38 / int-19 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_float` denominator | OPEN | UNSCOPED | `ROADMAP.md:578,602`; `docs/DEFERRED_FOLLOWUPS.md:16`; `docs/plans/…-phase-b-c…md §9`; `ARCHITECTURE_REVIEW.md:10`; `docs/NEXT_SESSION_CONTEXT.md:95` | ~30 days | Blocked on a new float-history data source (10-K / 13D / Forms 3-5 ingestion). |
+| INF38 / int-19 | BLOCK-FLOAT-HISTORY — true float-adjusted `pct_of_so` denominator | OPEN | UNSCOPED | `ROADMAP.md:578,602`; `docs/DEFERRED_FOLLOWUPS.md:16`; `docs/plans/…-phase-b-c…md §9`; `ARCHITECTURE_REVIEW.md:10`; `docs/NEXT_SESSION_CONTEXT.md:95` | ~30 days | Blocked on a new float-history data source (10-K / 13D / Forms 3-5 ingestion). |
 | INF16 | Recompute `managers.aum_total` for two Soros CIKs | OPEN | UNSCOPED | `ROADMAP.md:582,606`; `docs/plans/…-phase-b-c…md §9` | ≥60 days | CIK 0001029160 ($977M) + 0001748240 ($257M). May be subsumed by INF17. |
 | 43e | Family-office classification (+ `multi_strategy` + `SWF` bucket ambiguity) | RESCOPED / OPEN | UNSCOPED | `ROADMAP.md:608`; `docs/findings/entity-curation-w1-log.md`; `docs/NEXT_SESSION_CONTEXT.md:40` | 1 day | Taxonomy refactor touching `build_summaries.py:173,181` + `queries.py:1724` closed-list checks + React `typeConfig.ts`. |
 | 43g | Drop redundant type columns — migrate queries | OPEN | UNSCOPED | `ROADMAP.md:583,609`; `docs/plans/…-phase-b-c…md §9` | ~14 days | `fund_universe.is_actively_managed`→`fund_strategy` (14 refs); `holdings_v2.manager_type`→`entity_type` (65 refs). |
@@ -200,7 +200,7 @@ Cross-reference — **PR #107 ui-audit walkthrough** per `docs/NEXT_SESSION_CONT
 | — | Rename `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` across findings docs | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:56` | ~30 days | "Next batched doc-update". |
 | — | `pct_of_float` → `pct_of_so` terminology retirement project-wide | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:57` | ~30 days | "Next batched doc-update". |
 | — | `docs/data_layers.md §7`: add `pct_of_so_source` as Class B audit column | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:58` | ~30 days | "Next batched doc-update". |
-| — | `docs/pipeline_violations.md`: close `pct_of_float` violation entries with Phase 1b/1c/4b citations | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:59` | ~30 days | "Next batched doc-update". |
+| — | `docs/pipeline_violations.md`: close `pct_of_so` violation entries with Phase 1b/1c/4b citations | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:59` | ~30 days | "Next batched doc-update". |
 | v3.3 | Incorporate reviewer feedback into `admin_refresh_system_design.md` v3.3 | PENDING | UNSCOPED | `docs/admin_refresh_system_design.md:990` | ≥30 days | "After review, incorporate feedback into v3.3, then write Claude Code prompts phase-by-phase" — prompts have been written (p2-01 … p2-10-fix shipped), so v3.3 may be moot. |
 | §14 Q1 | Migration 008 exec order decision | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:964–972` | ≥40 days | Reviewer question; migration 008 has shipped — likely moot. |
 | — | SESSION_GUIDELINES §5 enforcement automation | PARTIAL | UNSCOPED | `docs/SESSION_GUIDELINES.md:144–156` | ~2 days | Rule exists but enforcement is manual; CI gate not built. |
@@ -416,10 +416,10 @@ One row per distinct item, sorted by category then by ID or title. `age` column 
 | 58 | — | `docs/TESTING_STRATEGY.md` | DOCS | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:197` | ≥40d |
 | 59 | — | `docs/OBSERVABILITY_PLAN.md` | DOCS | TODO | UNSCOPED | `ARCHITECTURE_REVIEW.md:199` | ≥40d |
 | 60 | — | `docs/SCHEMA_MIGRATIONS.md` | DOCS | TODO | UNSCOPED | `archive/docs/plans/20260412_architecture_review_revision.md` R2 | ~12d |
-| 61 | — | Rename `block/pct-of-float…` → `block/pct-of-so…` across findings docs | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:56` | ~30d |
+| 61 | — | Rename `block/pct-of-so…` → `block/pct-of-so…` across findings docs | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:56` | ~30d |
 | 62 | — | `pct_of_float` → `pct_of_so` terminology retirement | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:57` | ~30d |
 | 63 | — | `docs/data_layers.md §7` — add `pct_of_so_source` audit column | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:58` | ~30d |
-| 64 | — | `docs/pipeline_violations.md` — close `pct_of_float` violation entries | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:59` | ~30d |
+| 64 | — | `docs/pipeline_violations.md` — close `pct_of_so` violation entries | DOCS | OPEN | UNSCOPED | `docs/DEFERRED_FOLLOWUPS.md:59` | ~30d |
 | 65 | v3.3 | Incorporate reviewer feedback into admin-refresh v3.3 | DOCS | PENDING (likely moot) | UNSCOPED | `docs/admin_refresh_system_design.md:990` | ≥30d |
 | 66 | §14 Q1 | Migration 008 exec-order decision | DOCS | OPEN (likely moot) | UNSCOPED | `docs/admin_refresh_system_design.md:964–972` | ≥40d |
 | 67 | — | SESSION_GUIDELINES §5 enforcement automation | DOCS | PARTIAL | UNSCOPED | `docs/SESSION_GUIDELINES.md:144–156` | ~2d |

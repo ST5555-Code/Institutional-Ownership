@@ -183,7 +183,7 @@ Safe in practice because the **default is staging** and `--production` is the ex
 | UPDATE | `holdings` | `ticker` | [:284-289](scripts/enrich_tickers.py:284) | JOIN on `cusip`; **legacy `holdings` table, not `holdings_v2`** |
 | INSERT | `market_data` | 13 columns (ticker, price_live, market_cap, float_shares, shares_outstanding, 52w high/low, avg_volume_30d, sector, industry, exchange, fetch_date) | [:373-379](scripts/enrich_tickers.py:373) | append-only; de-duped via `existing` set at [:313-315](scripts/enrich_tickers.py:313) |
 | UPDATE | `holdings` | `market_value_live` | [:388-395](scripts/enrich_tickers.py:388) | legacy `holdings` table, JOIN on `ticker` |
-| UPDATE | `holdings` | `pct_of_float` | [:397-405](scripts/enrich_tickers.py:397) | legacy `holdings` table |
+| UPDATE | `holdings` | `pct_of_so` | [:397-405](scripts/enrich_tickers.py:397) | legacy `holdings` table |
 | CHECKPOINT | — | — | **none** | ❌ no CHECKPOINT anywhere in the script |
 
 **Reads.** `securities` [:37-38, :147-152](scripts/enrich_tickers.py:37); `holdings` [:39-41](scripts/enrich_tickers.py:39); `market_data` [:42, :313-315](scripts/enrich_tickers.py:42).

@@ -348,7 +348,7 @@ Who populates them? Git / grep survey:
   (`registry.py:88 "scripts/promote_13f.py (proposed)"`).
 - `scripts/enrich_holdings.py:147,228` — writes Group 3 columns
   (`ticker`, `security_type_inferred`, `market_value_live`,
-  `pct_of_float`). **Does not touch any of the four manager columns.**
+  `pct_of_so`). **Does not touch any of the four manager columns.**
 - No other writer found via `grep -rn "SET inst_parent_name\|
   inst_parent_name =\|UPDATE holdings_v2" scripts/`.
 

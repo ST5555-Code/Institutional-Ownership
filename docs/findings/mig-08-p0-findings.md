@@ -36,7 +36,7 @@ $ git ls-files web/react-app/dist/
 
 **Build command.** [web/react-app/package.json:6](web/react-app/package.json:6) — `npm run build` → `tsc -b && vite build`. No checksum or provenance stamped into output bundle.
 
-**Closure status.** obs-13 (PR #65, 2026-04-19) verified the served dist bundle was free of `pct_of_float` post-ff1ff71 and closed that specific regression. INF42 as a CI gate remained open — no automated test catches "someone rebuilt locally with stale source" or "someone committed `web/react-app/dist/` by mistake."
+**Closure status.** obs-13 (PR #65, 2026-04-19) verified the served dist bundle was free of `pct_of_so` post-ff1ff71 and closed that specific regression. INF42 as a CI gate remained open — no automated test catches "someone rebuilt locally with stale source" or "someone committed `web/react-app/dist/` by mistake."
 
 **Upshot for mig-08.** The `dist/` portion is already in a reasonable state on the tracking axis (nested ignore works, nothing committed, obs-13 verified last build was clean). The gap is *defence-in-depth*: there's no repo-level hardening against a contributor accidentally removing the nested `.gitignore` or running `git add -f web/react-app/dist/` and shipping a stale bundle.
 

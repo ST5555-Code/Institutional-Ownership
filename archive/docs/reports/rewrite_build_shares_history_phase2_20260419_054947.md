@@ -10,7 +10,7 @@
 
 | commit | scope |
 |---|---|
-| `4fea358` | Phase 1a — retire `update_holdings_pct_of_float()` + `--update-holdings` flag (dead code; `holdings` table dropped at Stage 5) |
+| `4fea358` | Phase 1a — retire `update_holdings_pct_of_so()` + `--update-holdings` flag (dead code; `holdings` table dropped at Stage 5) |
 | `41fee8a` | Phase 1b — retrofits: per-batch CHECKPOINT (every 10 batches), `--dry-run`, `record_freshness` hook, `flush=True` on progress, explicit `no_cik`/`no_history_with_cik`/`fetch_errors` counters with 20% unresolved-rate WARN threshold |
 
 Pre-commit passed on both (ruff, pylint, bandit).
@@ -133,7 +133,7 @@ $ grep -ciE "from[[:space:]]+holdings\b" /tmp/build_shares_history_dryrun.log
 ```
 
 No `FROM holdings` (bare) references in either log. The retired
-`update_holdings_pct_of_float()` contained the only such queries, and
+`update_holdings_pct_of_so()` contained the only such queries, and
 Phase 1a deleted it. ✓
 
 ---
@@ -208,7 +208,7 @@ Deviations worth recording:
 - `latest_rm` CTE pattern did NOT apply — this script is ticker-scoped,
   not quarter-scoped. Script-by-script check required; not every
   Batch-3 target will benefit.
-- Empty-`update_holdings_pct_of_float()` deletion happened to also
+- Empty-`update_holdings_pct_of_so()` deletion happened to also
   delete the only `holdings` references; "repoint" scope became a
   no-op. Future REWRITEs whose dead function is *not* the only legacy
   reader will need to handle both independently.
