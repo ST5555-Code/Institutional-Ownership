@@ -16,12 +16,13 @@ Today's session (HEAD `a7e040a`, PRs #153–#166):
 - **INF16 — Soros AUM recompute** — `managers.aum_total` recomputed for CIKs `0001029160` and `0001748240`.
 - **BL-4 — snapshot roles documented** — `docs/snapshot_roles.md` added; documents serving / rollback / archive roles.
 - **cusip-classifications-registry** — registered `cusip_classifications` (L3) + `peer_rotation_flows` (L4) in `DATASET_REGISTRY` (PR #166).
+- **DM13-A** — 131 self-referential `ADV_SCHEDULE_A` edges suppressed (`scripts/oneoff/dm13a_apply.py`). 131 `suppress_relationship` overrides written (override_ids 258–388); active edge rel_id=14434 closed in same transaction. Promote snapshot `20260426_134015`. **Only Category A of DM13 closed — B/C/D/E remain.**
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog". P0 empty.
 - **P1:** `ui-audit-walkthrough` (live walkthrough — not a Code session).
-- **P2 sprint candidates:** `perf-P1`, `DM13`, `DM15d`, `pct-rename-sweep`.
+- **P2 sprint candidates:** `perf-P1`, `DM13` (B/C/D/E remain after Cat A closed today), `DM15d`, `pct-rename-sweep`.
 - **P3 quick wins:** React-1, React-2, dead-endpoints, `other_managers` PK shape decision, `ncen_adviser_map` NULLs.
 
 ## Reminders

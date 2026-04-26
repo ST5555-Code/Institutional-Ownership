@@ -19,7 +19,7 @@ _(none — see COMPLETED table)_
 ### P2 — Next sprint
 
 - **perf-P1** — `sector_flows_rollup` + `sector_flow_movers_by_quarter_sector` + `cohort_by_ticker_from` precompute. Ships after perf-P0. ~3 days combined.
-- **DM13** — ADV Schedule A residual sweep (~390 suspicious rows after the BlueCove cluster closed). Staging workflow.
+- **DM13** — ADV Schedule A residual sweep (~390 suspicious rows after the BlueCove cluster closed). Staging workflow. **Category A (131 self-referential edges) closed 2026-04-26 — see COMPLETED.** Categories B/C/D/E remain.
 - **DM15d** — N-CEN-resolvable umbrella trusts (Sterling, NEOS, Segall Bryant). Extend the DM15b/Layer 2 pattern via `ncen_adviser_map`.
 - **pct-rename-sweep** — Bundle four pct-of-float legacy follow-ups as one session: rename `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` across findings; `pct_of_float` → `pct_of_so` terminology retirement project-wide; `data_layers.md §7` add `pct_of_so_source` as Class B audit column; `pipeline_violations.md` close `pct_of_float` violation entries with Phase 1b/1c/4b citations.
 
@@ -91,7 +91,8 @@ _(none — see COMPLETED table)_
 ## COMPLETED
 
 | Date | Item | Details |
-|------|------|---------|
+| --- | --- | --- |
+| 2026-04-26 | **DM13-A — 131 self-referential ADV_SCHEDULE_A edges suppressed** | Category A of the DM13 sweep. ADV Schedule A parser had been emitting `wholly_owned`/`mutual_structure`/`parent_brand` edges where `parent_entity_id == child_entity_id` (an entity cannot wholly-own itself). 131 such rows existed in `entity_relationships` (130 already closed by past rebuilds, 1 active). New `scripts/oneoff/dm13a_apply.py` writes 131 `suppress_relationship` overrides into `entity_overrides_persistent` (one per row, idempotent on `reason`+`old_value=relationship_id`) so any future `build_entities.py --reset` re-introducing the edges will close them again, and immediately UPDATEs the lone active edge (rel_id=14434, Morgan Stanley Investment Management self-loop) to `valid_to=CURRENT_DATE`. Distribution: 73 `mutual_structure` / 57 `wholly_owned` / 1 `parent_brand`; 130/132 affected entities have an active CIK (relationship_context JSON carries both `parent_cik`/`child_cik` when present and `parent_entity_id`/`child_entity_id` always, mirroring INF9c PARENT_SEEDS fallback). Override IDs 258–388. Staging workflow: `sync_staging.py` → apply script → `promote_staging.py --approved` (snapshot `20260426_134015`). Verify post-promote: 0 active ADV_SCHEDULE_A self-loops, 131 DM13-A override rows. Pre-existing `wellington_sub_advisory` + `phase3_resolution_rate` validation FAILs unchanged (non-structural, no auto-rollback). Categories B/C/D/E of DM13 remain — see open ROADMAP entry. |
 | 2026-04-26 | **cusip-classifications-registry** | Added `cusip_classifications` to `DATASET_REGISTRY` (L3, upsert by `cusip`, downstream `securities`, ref migration 003). Also registered `peer_rotation_flows` (L4, rebuild from `holdings_v2` / `fund_holdings_v2` / `market_data`, ref migration 019) — was missing from the perf-P0 session. Both entries land in `scripts/pipeline/registry.py`. |
 | 2026-04-26 | **INF16 — Soros AUM recompute** | `managers.aum_total` recomputed for CIKs `0001029160` and `0001748240`. Data ops only — no schema change. |
 | 2026-04-26 | **BL-4 — snapshot roles documented** | `docs/snapshot_roles.md` added. Documents the three roles: serving (`data/13f_readonly.duckdb`, owned by `scripts/refresh_snapshot.sh`), rollback (`*_snapshot_YYYYMMDD_HHMMSS` tables in prod, owned by `scripts/promote_staging.py` + `scripts/hygiene/snapshot_retention.py`), and archive (`data/backups/`, owned by `scripts/backup_db.py`). One-page reference. |
