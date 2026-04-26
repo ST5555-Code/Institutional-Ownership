@@ -11,7 +11,7 @@ Classification order (see classify_cusip() docstring for detail):
   STEP 0  normalize_raw_type → tokenize_compound
   STEP 1  derivative pre-check (BEFORE market_sector — Plan v1.4 lesson)
   STEP 2  market_sector map (only for non-Equity; Equity falls through)
-  STEP 3  combined seed (security_type_inferred + asset_category_seed)
+  STEP 3  asset_category_seed → INFERRED_SEED_MAP
   STEP 4  CANONICAL_TYPE_RULES on normalized tokens
   STEP 5  manual overrides (applied by caller, not here)
 """
@@ -433,9 +433,8 @@ def classify_cusip(row: dict[str, Any]) -> dict[str, Any]:
     is_derivative_raw = any(
         re.search(r'\b' + re.escape(k) + r'\b', normalized) for k in _DERIVATIVE_KEYWORDS
     )
-    is_derivative_seed = (inferred == 'derivative')
     is_derivative_asset = (asset_cat in _DERIVATIVE_ASSET_CATS)
-    if is_derivative_raw or is_derivative_seed or is_derivative_asset:
+    if is_derivative_raw or is_derivative_asset:
         # Prefer WARRANT for explicit warrant raw_type; else OPTION.
         warrant_markers = {'WARRANT', 'WARRANTS', 'RIGHT', 'RIGHTS', 'WRT', 'WT', 'RT'}
         if normalized and any(
@@ -449,9 +448,8 @@ def classify_cusip(row: dict[str, Any]) -> dict[str, Any]:
         is_priceable = False
         is_permanent = True
         ticker_expected = False
-        canonical_type_source = 'asset_category' if is_derivative_asset and not is_derivative_seed \
-            else ('inferred' if is_derivative_seed else 'inferred')
-        confidence = 'high' if (is_derivative_seed or is_derivative_asset) else 'medium'
+        canonical_type_source = 'asset_category' if is_derivative_asset else 'raw_type'
+        confidence = 'high' if is_derivative_asset else 'medium'
 
     # --- STEP 2: market_sector map ---
     if canonical_type is None and market_sector:
@@ -474,15 +472,13 @@ def classify_cusip(row: dict[str, Any]) -> dict[str, Any]:
                 ticker_expected = eq and pr
                 confidence = 'high'
 
-    # --- STEP 3: combined seed (security_type_inferred + asset_category_seed) ---
+    # --- STEP 3: combined seed (asset_category_seed only) ---
     seed: Optional[str] = None
     seed_source: Optional[str] = None
     if canonical_type is None:
-        seed = inferred
-        seed_source = 'inferred'
-        if seed is None and asset_cat is not None:
+        if asset_cat is not None:
             seed = ASSET_CATEGORY_SEED_MAP.get(asset_cat)
-            seed_source = 'asset_category'
+            seed_source = 'asset_category' if seed else None
 
         if seed and seed in INFERRED_SEED_MAP:
             ct, eq, pr, perm = INFERRED_SEED_MAP[seed]
