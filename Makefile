@@ -30,6 +30,7 @@ endif
         build-managers build-fund-classes build-cusip \
         schema-parity-check \
         rotate-logs rotate-logs-dry \
+        snapshot-retention snapshot-retention-dry \
         audit-read-sites
 
 help:
@@ -59,6 +60,8 @@ help:
 	@echo "  Maintenance:"
 	@echo "    make rotate-logs          — compress logs >7d, delete >90d (see MAINTENANCE.md)"
 	@echo "    make rotate-logs-dry      — print rotation actions without executing"
+	@echo "    make snapshot-retention     — prune expired DB snapshots"
+	@echo "    make snapshot-retention-dry — dry-run snapshot pruning"
 	@echo ""
 	@echo "  Supplementary:"
 	@echo "    make fetch-13dg           — 13D/G beneficial ownership"
@@ -99,6 +102,7 @@ endif
 		echo "--- skip promote-adv (pass ADV_RUN_ID=<run_id> from fetch-adv to include) ---"; \
 	fi
 	$(MAKE) backup-db
+	$(MAKE) snapshot-retention
 	$(MAKE) validate
 	@echo "=== 13F quarterly-update complete ==="
 
@@ -208,6 +212,14 @@ rotate-logs:
 
 rotate-logs-dry:
 	@$(SCRIPTS)/rotate_logs.sh --dry-run
+
+snapshot-retention:
+	@echo "--- Snapshot retention (prune expired snapshots) ---"
+	$(Q) $(PY) $(SCRIPTS)/hygiene/snapshot_retention.py --apply
+
+snapshot-retention-dry:
+	@echo "--- Snapshot retention (dry run) ---"
+	@$(PY) $(SCRIPTS)/hygiene/snapshot_retention.py --dry-run
 
 # ---------------------------------------------------------------------------
 # mig-07 Mode 1 — on-demand read-site inventory audit. Scans scripts/ and
