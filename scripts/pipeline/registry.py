@@ -151,6 +151,13 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
               "A distinct 'cache' layer tag is deferred — see ROADMAP "
               "multi-db-datasetspec / future layer-vocab extension.",
     ),
+    "cusip_classifications": DatasetSpec(
+        layer=3, owner="scripts/build_classifications.py",
+        promote_strategy="upsert",
+        promote_key=("cusip",),
+        downstream=("securities",),
+        notes="canonical CUSIP type classification. Feeds normalize_securities.py → securities. Migration 003.",
+    ),
     "market_data": DatasetSpec(
         layer=3, owner="scripts/fetch_market.py",
         promote_strategy="upsert",
@@ -282,6 +289,12 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         promote_strategy="rebuild",
         rebuild_from=("holdings_v2",),
         freshness_target_hours=24,
+    ),
+    "peer_rotation_flows": DatasetSpec(
+        layer=4, owner="scripts/pipeline/compute_peer_rotation.py",
+        promote_strategy="rebuild",
+        rebuild_from=("holdings_v2", "fund_holdings_v2", "market_data"),
+        notes="Precomputed entity×ticker active flows per sector. Migration 019.",
     ),
     "ticker_flow_stats": DatasetSpec(
         layer=4, owner="scripts/compute_flows.py",
