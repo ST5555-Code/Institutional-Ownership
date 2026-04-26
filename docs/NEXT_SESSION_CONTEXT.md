@@ -4,16 +4,16 @@
 
 ## Last completed
 
-- bug-close-doc: moved stale bug-1 + bug-2 from P0 to COMPLETED (PR #153, `cfbbb1b`). P0 is now empty.
-- backlog-collapse: tracker consolidation per `docs/findings/2026-04-25-backlog-collapse.md`
+- eqt-classify-codefix: classifier stops reading stale `security_type_inferred` (PR #162). Two-line fix in `cusip_classifier.py` Steps 1 + 3. 8,148 CUSIPs reclassified, 662K holdings ticker changes, 342 `manual_correction` rows eliminated.
+- doc-sync: moved eqt-classify-codefix from P2 to COMPLETED (this PR).
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog" P1 / P2 sections (P0 empty).
-- Sprint guidance: P1 first — `audit-tracker-staleness-ci` (discipline anchor for ROADMAP-only model), then perf-P0 + 43b SECURITY hardening + ui-audit walkthrough scheduling.
+- Sprint guidance: P1 `ui-audit-walkthrough` first (live walkthrough, not a Code session). P2 sprint candidates: `perf-P1`, `DM13`, `DM15d`, `snapshot-retention-cadence`, `pct-rename-sweep`.
 
 ## Reminders
 
-- Snapshot policy first real fire: 2026-04-25. Run `python scripts/hygiene/snapshot_retention.py --dry-run` then `--apply` to clear oldest cohort.
+- `security_type_inferred` column drop is a separate migration — not yet scheduled.
 - finra-default-flip: scheduled 2026-07-23.
 - B3 calendar gate: post-Q1+Q2 2026 cycles, ~mid-Aug 2026.

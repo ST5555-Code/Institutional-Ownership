@@ -1,6 +1,6 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-04-25. Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-04-26. Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
@@ -23,7 +23,6 @@ _(none — see COMPLETED table)_
 - **DM15d** — N-CEN-resolvable umbrella trusts (Sterling, NEOS, Segall Bryant). Extend the DM15b/Layer 2 pattern via `ncen_adviser_map`.
 - **snapshot-retention-cadence** — Wire `scripts/hygiene/snapshot_retention.py --apply` to a recurring surface (cron / Makefile / scheduler). 30-min design + impl.
 - **pct-rename-sweep** — Bundle four pct-of-float legacy follow-ups as one session: rename `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` across findings; `pct_of_float` → `pct_of_so` terminology retirement project-wide; `data_layers.md §7` add `pct_of_so_source` as Class B audit column; `pipeline_violations.md` close `pct_of_float` violation entries with Phase 1b/1c/4b citations.
-- **eqt-classify-codefix** — Layer 2: `cusip_classifier.py` Step 1 derivative pre-check should not override `raw_type_mode='Common Stock'`. Layer 3: `securities.security_type_inferred` is a stale legacy column — evaluate removing it as a classifier seed. 342 CUSIPs affected, fixed via `manual_correction` data ops on 2026-04-25. Code fix prevents re-corruption on next classifier rebuild.
 
 ### P3 — Quick wins / low priority
 
@@ -97,6 +96,7 @@ _(none — see COMPLETED table)_
 
 | Date | Item | Details |
 |------|------|---------|
+| 2026-04-26 | **eqt-classify-codefix — classifier stop reading stale `security_type_inferred`** | Option B from design report. Removed `is_derivative_seed` check from Step 1 and `seed=inferred` branch from Step 3 in `cusip_classifier.py`. Two-line fix. 8,148 CUSIPs reclassified (OPTION → COM/OTHER/BOND/ETF), 662K holdings ticker changes, 342 `manual_correction` rows eliminated. `security_type_inferred` column retained in schema — column drop is a separate migration. PR #162. |
 | 2026-04-25 | **perf-P0 — peer_rotation_flows precompute** | New precomputed table `peer_rotation_flows` (16.2M rows, 13 sectors × 3 parent pairs × 15 fund pairs × 2 rollups). Migration 019. `compute_peer_rotation.py` `SourcePipeline` subclass with h_agg materialization optimization (59s full rebuild). `queries.py` `get_peer_rotation` + `get_peer_rotation_detail` rewritten to read precomputed. Latency: 11.4s → 540ms parent (21x), 46ms detail. PRs #158 (pipeline), #159 (queries rewrite). |
 | 2026-04-25 | **audit-tracker-staleness-ci — wired staleness checker to pre-commit + CI** | Local pre-commit hook on `*.md` files + CI step in `lint.yml`. PR #155, commit `1cfd103`. |
 | 2026-04-25 | **43b SECURITY hardening** | `ALLOWED_FLAGS` per-script allowlist closing subprocess argv gap. B608 nosec markers relocated from inert stubs to live SQL lines. B110 removed from global skip — 17 `queries.py` sites got `logger.debug`, `load_ncen.py` tightened to `CatalogException`. B104 marker retained (bandit still fires). PR #156, commit `f240a09`. |
