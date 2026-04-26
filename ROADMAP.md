@@ -23,6 +23,7 @@ _(none — see COMPLETED table)_
 - **DM15d** — N-CEN-resolvable umbrella trusts (Sterling, NEOS, Segall Bryant). Extend the DM15b/Layer 2 pattern via `ncen_adviser_map`.
 - **snapshot-retention-cadence** — Wire `scripts/hygiene/snapshot_retention.py --apply` to a recurring surface (cron / Makefile / scheduler). 30-min design + impl.
 - **pct-rename-sweep** — Bundle four pct-of-float legacy follow-ups as one session: rename `block/pct-of-float-period-accuracy` → `block/pct-of-so-period-accuracy` across findings; `pct_of_float` → `pct_of_so` terminology retirement project-wide; `data_layers.md §7` add `pct_of_so_source` as Class B audit column; `pipeline_violations.md` close `pct_of_float` violation entries with Phase 1b/1c/4b citations.
+- **eqt-classify-codefix** — Layer 2: `cusip_classifier.py` Step 1 derivative pre-check should not override `raw_type_mode='Common Stock'`. Layer 3: `securities.security_type_inferred` is a stale legacy column — evaluate removing it as a classifier seed. 342 CUSIPs affected, fixed via `manual_correction` data ops on 2026-04-25. Code fix prevents re-corruption on next classifier rebuild.
 
 ### P3 — Quick wins / low priority
 
