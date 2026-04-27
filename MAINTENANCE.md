@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 27, 2026 (conv-14 — wave through PR #181: DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep + INF48/INF49 entity dedup + react-cleanup-inf28 + dead-endpoints + perf-P1 sector_flows_rollup precompute + cohort_analysis cache)._
+_Last updated: April 27, 2026 (nport-refresh-catchup — N-PORT monthly-topup landed 1,164 accessions / 478,446 rows of NPORT-P data filed since 2026-04-16; bulk in 2026-02 reports closing toward the Apr 30 filing deadline. `fund_holdings_v2` 14.09M → 14.57M rows; 71 prior is_latest rows flipped on amendments. Promote initially failed on int-23 downgrade-refusal (logged as **INF52** in ROADMAP P2 — N-PORT parse step NULLs `entity_id`/`rollup_entity_id` and relies on post-promote `_bulk_enrich_run`, but the int-23 guard fires inside promote and refuses if prod has values); landed via one-shot pre-enrichment of `staging.fund_holdings_v2` from `entity_identifiers` + `entity_rollup_history` + `entity_aliases` plus a force-reset of the failed manifest to `pending_approval`. Downstream rebuilds: `sector_flows_rollup` (321 rows, 2.1s), `compute_flows.py` (`investor_flows` 19.22M, `ticker_flow_stats` 69,142, 22.3s), `build_summaries.py` (`summary_by_ticker` 42,593, `summary_by_parent` 63,916, 2.0s). Snapshot refreshed (368 tables, 7.7G). `validate_entities.py` clean — no regressions; pre-existing `wellington_sub_advisory` FAIL unchanged. Predecessor: conv-14 / PR #181._
 
 ## Pipeline refresh via admin dashboard
 
@@ -74,7 +74,8 @@ Both pipelines use `amendment_strategy='direct_write'` (truncate-and-rewrite the
 python3 scripts/pipeline/compute_peer_rotation.py --auto-approve
 
 # perf-P1 — sector_flows_rollup
-python3 scripts/pipeline/compute_sector_flows.py --auto-approve
+# (no flag = full fetch+parse+validate+promote; --staging halts at pending_approval; --dry-run = read-only)
+python3 scripts/pipeline/compute_sector_flows.py
 ```
 
 Both subclasses are wired into `PIPELINE_REGISTRY` and `DATASET_REGISTRY` (L4) and stamp `data_freshness` via the base ABC's `approve_and_promote` step.
