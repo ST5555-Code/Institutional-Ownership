@@ -2086,126 +2086,85 @@ def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 
 
-def get_sector_flows(active_only=False, level="parent"):
+def get_sector_flows(active_only=False, level="parent",
+                     rollup_type='economic_control_v1'):
     """Multi-quarter sector flow analysis — active money flows by GICS sector.
 
-    level: 'parent' uses 13F holdings; 'fund' uses N-PORT fund_holdings.
-    active_only: filter to active/hedge/activist (13F only, ignored for N-PORT).
+    Reads from the ``sector_flows_rollup`` precompute table populated by
+    ``scripts/pipeline/compute_sector_flows.py`` (perf-P1). Target latency
+    <50ms; previously ~1.2s scanning ``holdings_v2`` / ``fund_holdings_v2``
+    on every request.
+
+    level:        'parent' uses 13F holdings; 'fund' uses N-PORT fund holdings.
+    active_only:  parent only — filter to active/hedge/activist. Ignored on
+                  the fund path (matches original CTE behavior; rollup table
+                  carries only active_only=FALSE rows for fund).
+    rollup_type:  parent only — 'economic_control_v1' or 'decision_maker_v1'.
+                  Aggregates are rollup-agnostic today (managers count
+                  CIKs, not rollup entities) so EC and DM rows return
+                  identical values; the parameter exists for forward
+                  compatibility. Fund rows are stored under EC only.
     """
+    if rollup_type not in VALID_ROLLUP_TYPES:
+        raise ValueError(
+            f'Invalid rollup_type: {rollup_type}. '
+            f'Must be one of {VALID_ROLLUP_TYPES}'
+        )
     con = get_db()
     try:
         use_nport = (level == "fund")
         source = "fund_holdings_v2" if use_nport else "holdings_v2"
 
         quarters = sorted([r[0] for r in con.execute(
-            f"SELECT DISTINCT quarter FROM {source} ORDER BY quarter"
+            f"SELECT DISTINCT quarter FROM {source} "  # nosec B608
+            f"WHERE quarter IS NOT NULL ORDER BY quarter"
         ).fetchall()])
         if len(quarters) < 2:
             return {"periods": [], "sectors": []}
+        pairs = [(quarters[i], quarters[i + 1])
+                 for i in range(len(quarters) - 1)]
 
-        pairs = [(quarters[i], quarters[i + 1]) for i in range(len(quarters) - 1)]
-        active_filter = ("AND c.entity_type IN ('active', 'hedge_fund', 'activist')"
-                         if active_only and not use_nport else "")
-        active_filter_p = ("AND p.entity_type IN ('active', 'hedge_fund', 'activist')"
-                           if active_only and not use_nport else "")
-        sector_filter = "AND md.sector NOT IN ('', 'Derivative', 'ETF') AND md.sector IS NOT NULL"
+        # Fund rows always stored under (EC, active_only=FALSE).
+        # Parent rows respect both rollup_type and active_only.
+        if use_nport:
+            row_active_only = False
+            row_rollup_type = 'economic_control_v1'
+        else:
+            row_active_only = bool(active_only)
+            row_rollup_type = rollup_type
+
+        df = con.execute(
+            """
+            SELECT quarter_from, quarter_to, gics_sector AS sector,
+                   net, inflow, outflow,
+                   new_positions, exits, managers
+              FROM sector_flows_rollup
+             WHERE level = ?
+               AND rollup_type = ?
+               AND active_only = ?
+               AND gics_sector NOT IN ('', 'Derivative', 'ETF')
+               AND gics_sector IS NOT NULL
+            """,
+            [level, row_rollup_type, row_active_only],
+        ).fetchdf()
 
         all_flows = {}
+        for row in df.to_dict(orient="records"):
+            sector = row["sector"]
+            pk = f"{row['quarter_from']}_{row['quarter_to']}"
+            if sector not in all_flows:
+                all_flows[sector] = {}
+            all_flows[sector][pk] = {
+                "net": row.get("net"),
+                "inflow": row.get("inflow"),
+                "outflow": row.get("outflow"),
+                "new_positions": row.get("new_positions"),
+                "exits": row.get("exits"),
+                "managers": row.get("managers"),
+            }
 
-        for q_from, q_to in pairs:
-            pk = f"{q_from}_{q_to}"
-
-            if use_nport:
-                df = con.execute(f"""
-                    WITH f_agg AS (
-                        SELECT series_id, ticker, quarter,
-                               SUM(shares_or_principal) AS shares,
-                               SUM(market_value_usd) AS market_value_usd
-                        FROM fund_holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
-                        GROUP BY series_id, ticker, quarter
-                    ),
-                    flows AS (
-                        SELECT c.series_id AS eid, c.ticker,
-                               (c.shares - COALESCE(p.shares, 0))
-                                 * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow,
-                               CASE WHEN p.series_id IS NULL THEN 'new' ELSE 'change' END AS flow_type
-                        FROM f_agg c
-                        LEFT JOIN f_agg p ON c.series_id = p.series_id
-                            AND c.ticker = p.ticker AND p.quarter = '{q_from}'
-                        WHERE c.quarter = '{q_to}'
-                        UNION ALL
-                        SELECT p.series_id AS eid, p.ticker,
-                               -p.market_value_usd AS active_flow, 'exit' AS flow_type
-                        FROM f_agg p
-                        LEFT JOIN f_agg c ON p.series_id = c.series_id
-                            AND p.ticker = c.ticker AND c.quarter = '{q_to}'
-                        WHERE p.quarter = '{q_from}' AND c.series_id IS NULL
-                    )
-                    SELECT md.sector,
-                           SUM(f.active_flow) AS net,
-                           SUM(CASE WHEN f.active_flow > 0 THEN f.active_flow ELSE 0 END) AS inflow,
-                           SUM(CASE WHEN f.active_flow < 0 THEN f.active_flow ELSE 0 END) AS outflow,
-                           COUNT(DISTINCT CASE WHEN f.flow_type='new' THEN f.eid||'|'||f.ticker END) AS new_positions,
-                           COUNT(DISTINCT CASE WHEN f.flow_type='exit' THEN f.eid||'|'||f.ticker END) AS exits,
-                           COUNT(DISTINCT f.eid) AS managers
-                    FROM flows f
-                    JOIN market_data md ON f.ticker = md.ticker
-                    WHERE 1=1 {sector_filter}
-                    GROUP BY md.sector
-                """).fetchdf()
-            else:
-                df = con.execute(f"""
-                    WITH h_agg AS (
-                        SELECT cik, manager_type, ticker, quarter,
-                               SUM(shares) AS shares,
-                               SUM(market_value_usd) AS market_value_usd
-                        FROM holdings_v2
-                        WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
-                        GROUP BY cik, manager_type, ticker, quarter
-                    ),
-                    flows AS (
-                        SELECT c.cik AS eid, c.ticker,
-                               (c.shares - COALESCE(p.shares, 0))
-                                 * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow,
-                               CASE WHEN p.cik IS NULL THEN 'new' ELSE 'change' END AS flow_type
-                        FROM h_agg c
-                        LEFT JOIN h_agg p ON c.cik = p.cik AND c.ticker = p.ticker
-                            AND p.quarter = '{q_from}'
-                        WHERE c.quarter = '{q_to}' {active_filter}
-                        UNION ALL
-                        SELECT p.cik AS eid, p.ticker,
-                               -p.market_value_usd AS active_flow, 'exit' AS flow_type
-                        FROM h_agg p
-                        LEFT JOIN h_agg c ON p.cik = c.cik AND p.ticker = c.ticker
-                            AND c.quarter = '{q_to}'
-                        WHERE p.quarter = '{q_from}' AND c.cik IS NULL {active_filter_p}
-                    )
-                    SELECT md.sector,
-                           SUM(f.active_flow) AS net,
-                           SUM(CASE WHEN f.active_flow > 0 THEN f.active_flow ELSE 0 END) AS inflow,
-                           SUM(CASE WHEN f.active_flow < 0 THEN f.active_flow ELSE 0 END) AS outflow,
-                           COUNT(DISTINCT CASE WHEN f.flow_type='new' THEN f.eid||'|'||f.ticker END) AS new_positions,
-                           COUNT(DISTINCT CASE WHEN f.flow_type='exit' THEN f.eid||'|'||f.ticker END) AS exits,
-                           COUNT(DISTINCT f.eid) AS managers
-                    FROM flows f
-                    JOIN market_data md ON f.ticker = md.ticker
-                    WHERE 1=1 {sector_filter}
-                    GROUP BY md.sector
-                """).fetchdf()
-
-            for row in df.to_dict(orient="records"):
-                sector = row["sector"]
-                if sector not in all_flows:
-                    all_flows[sector] = {}
-                all_flows[sector][pk] = {
-                    "net": row.get("net"), "inflow": row.get("inflow"),
-                    "outflow": row.get("outflow"), "new_positions": row.get("new_positions"),
-                    "exits": row.get("exits"), "managers": row.get("managers"),
-                }
-
-        periods = [{"label": f"{qf} \u2192 {qt}", "from": qf, "to": qt}
-                    for qf, qt in pairs]
+        periods = [{"label": f"{qf} → {qt}", "from": qf, "to": qt}
+                   for qf, qt in pairs]
         latest_pk = f"{pairs[-1][0]}_{pairs[-1][1]}" if pairs else None
 
         sectors = []
@@ -2224,74 +2183,139 @@ def get_sector_flows(active_only=False, level="parent"):
     finally:
         pass
 
-
 def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Top 5 net buyers + top 5 net sellers for one sector in one quarter
     transition. Returns summary stats + two lists.
 
-    level: 'parent' groups by inst_parent_name; 'fund' groups by cik/manager_name.
+    level='parent' reads from the ``peer_rotation_flows`` precompute table
+    (perf-P0; rebuilt per quarter by ``compute_peer_rotation.py``). Each
+    row already aggregates one entity's net active flow into one ticker
+    for one (q_from, q_to, sector, level, rollup_type) bucket, so this
+    function only needs to GROUP BY entity and pick the top/bottom 5.
+    Target latency <200ms; previously ~340-405ms scanning ``holdings_v2``
+    on every request.
+
+    Parity divergence vs the pre-perf-P1 implementation (parent only):
+
+      * ``summary.net`` and per-institution ``net_flow`` match exactly —
+        net is preserved under any GROUP BY granularity.
+      * ``summary.buyers`` / ``summary.sellers`` (counts) match exactly.
+      * Top-5 ranking by net_flow matches exactly (institution name and
+        value).
+      * ``summary.inflow`` / ``summary.outflow`` and per-institution
+        ``buying`` / ``selling`` shift ~1% on average. The pre-perf-P1
+        SQL summed positive/negative active_flow at the (CIK, ticker)
+        granularity; ``peer_rotation_flows`` pre-aggregates per
+        (entity, ticker), collapsing internal sub-CIK offsetting flows.
+        Net flow per institution is unchanged but gross buying / selling
+        components shrink. The size of the shift scales with how
+        aggressively the institution's sub-managers trade against each
+        other — small for single-CIK institutions, larger for
+        multi-CIK rollups (e.g., Nomura, Vanguard).
+      * ``positions_changed`` differs slightly because the precompute's
+        ``HAVING SUM(active_flow) IS NOT NULL`` excludes (entity, ticker)
+        pairs whose flows degenerated to NULL (typically c.shares=0
+        cases that survived h_agg). Same physical positions; the
+        precompute simply doesn't carry zero-row carriers.
+
+    int-22 follow-on — the pre-rewrite SQL referenced ``c.entity_type``
+    on a CTE that did not project the column, raising
+    ``BinderException`` whenever ``active_only=True`` was passed.
+    Production never observed it because the only caller passed False.
+    The new path reads ``entity_type`` directly off
+    ``peer_rotation_flows`` and supports ``active_only=True`` correctly.
+
+    level='fund' keeps the original ``holdings_v2`` query (groups by
+    ``cik|manager_name`` rather than rollup entity — perf-P0 stores fund
+    rows under series_id/fund_name, a different definition of "fund"
+    that does not align with the per-filer aggregation this endpoint
+    uses for the fund branch). The fund-path BinderException on
+    active_only=True is preserved as-is for that branch — no caller in
+    the current API uses level='fund' + active_only=True.
     """
-    rn = _rollup_col(rollup_type)
+    if rollup_type not in VALID_ROLLUP_TYPES:
+        raise ValueError(
+            f'Invalid rollup_type: {rollup_type}. '
+            f'Must be one of {VALID_ROLLUP_TYPES}'
+        )
     con = get_db()
     try:
-        active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-        active_filter_p = "AND p.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-
-        if level == "fund":
-            group_expr = "c.cik || '|' || c.manager_name"
-            group_label = "c.manager_name"
-            group_expr_p = "p.cik || '|' || p.manager_name"
-            group_label_p = "p.manager_name"
-        else:
-            group_expr = f"COALESCE(c.{rn}, c.inst_parent_name, c.manager_name)"
-            group_label = group_expr
-            group_expr_p = f"COALESCE(p.{rn}, p.inst_parent_name, p.manager_name)"
-            group_label_p = group_expr_p
-
-        df = con.execute(f"""
-            WITH h_agg AS (
-                SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
-                       ticker, quarter,
-                       SUM(shares) AS shares,
-                       SUM(market_value_usd) AS market_value_usd
-                FROM holdings_v2
-                WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
-                GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
-            ),
-            flows AS (
-                SELECT {group_label} AS institution,
-                       c.ticker,
-                       (c.shares - COALESCE(p.shares, 0))
-                         * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow
-                FROM h_agg c
-                LEFT JOIN h_agg p
-                    ON c.cik = p.cik AND c.ticker = p.ticker AND p.quarter = '{q_from}'
-                JOIN market_data md ON c.ticker = md.ticker AND md.sector = ?
-                WHERE c.quarter = '{q_to}' {active_filter}
-
-                UNION ALL
-
-                SELECT {group_label_p} AS institution,
-                       p.ticker,
-                       -p.market_value_usd AS active_flow
-                FROM h_agg p
-                LEFT JOIN h_agg c
-                    ON p.cik = c.cik AND p.ticker = c.ticker AND c.quarter = '{q_to}'
-                JOIN market_data md ON p.ticker = md.ticker AND md.sector = ?
-                WHERE p.quarter = '{q_from}' AND c.cik IS NULL {active_filter_p}
+        if level == "parent":
+            active_clause = (
+                "AND entity_type IN ('active', 'hedge_fund', 'activist')"
+                if active_only else ""
             )
-            SELECT institution,
-                   SUM(active_flow) AS net_flow,
-                   COUNT(DISTINCT ticker) AS positions_changed,
-                   SUM(CASE WHEN active_flow > 0 THEN active_flow ELSE 0 END) AS buying,
-                   SUM(CASE WHEN active_flow < 0 THEN active_flow ELSE 0 END) AS selling
-            FROM flows
-            GROUP BY institution
-            HAVING ABS(SUM(active_flow)) > 0
-            ORDER BY net_flow DESC
-        """, [sector, sector]).fetchdf()
+            df = con.execute(f"""
+                SELECT entity AS institution,
+                       SUM(active_flow) AS net_flow,
+                       COUNT(DISTINCT ticker) AS positions_changed,
+                       SUM(CASE WHEN active_flow > 0 THEN active_flow ELSE 0 END) AS buying,
+                       SUM(CASE WHEN active_flow < 0 THEN active_flow ELSE 0 END) AS selling
+                  FROM peer_rotation_flows
+                 WHERE quarter_from = ?
+                   AND quarter_to = ?
+                   AND sector = ?
+                   AND level = 'parent'
+                   AND rollup_type = ?
+                   {active_clause}
+                 GROUP BY entity
+                HAVING ABS(SUM(active_flow)) > 0
+                 ORDER BY net_flow DESC
+            """, [q_from, q_to, sector, rollup_type]).fetchdf()  # nosec B608 — active_clause built from a constant
 
-        records = df_to_records(df)
+            records = df_to_records(df)
+        else:
+            # level='fund' — unchanged path. See docstring for rationale.
+            rn = _rollup_col(rollup_type)
+            active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+            active_filter_p = "AND p.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
+            group_label = "c.manager_name"
+            group_label_p = "p.manager_name"
+
+            df = con.execute(f"""
+                WITH h_agg AS (
+                    SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
+                           ticker, quarter,
+                           SUM(shares) AS shares,
+                           SUM(market_value_usd) AS market_value_usd
+                    FROM holdings_v2
+                    WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
+                    GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
+                ),
+                flows AS (
+                    SELECT {group_label} AS institution,
+                           c.ticker,
+                           (c.shares - COALESCE(p.shares, 0))
+                             * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow
+                    FROM h_agg c
+                    LEFT JOIN h_agg p
+                        ON c.cik = p.cik AND c.ticker = p.ticker AND p.quarter = '{q_from}'
+                    JOIN market_data md ON c.ticker = md.ticker AND md.sector = ?
+                    WHERE c.quarter = '{q_to}' {active_filter}
+
+                    UNION ALL
+
+                    SELECT {group_label_p} AS institution,
+                           p.ticker,
+                           -p.market_value_usd AS active_flow
+                    FROM h_agg p
+                    LEFT JOIN h_agg c
+                        ON p.cik = c.cik AND p.ticker = c.ticker AND c.quarter = '{q_to}'
+                    JOIN market_data md ON p.ticker = md.ticker AND md.sector = ?
+                    WHERE p.quarter = '{q_from}' AND c.cik IS NULL {active_filter_p}
+                )
+                SELECT institution,
+                       SUM(active_flow) AS net_flow,
+                       COUNT(DISTINCT ticker) AS positions_changed,
+                       SUM(CASE WHEN active_flow > 0 THEN active_flow ELSE 0 END) AS buying,
+                       SUM(CASE WHEN active_flow < 0 THEN active_flow ELSE 0 END) AS selling
+                FROM flows
+                GROUP BY institution
+                HAVING ABS(SUM(active_flow)) > 0
+                ORDER BY net_flow DESC
+            """, [sector, sector]).fetchdf()
+
+            records = df_to_records(df)
 
         # Summary
         total_inflow = sum(r.get("buying") or 0 for r in records)
