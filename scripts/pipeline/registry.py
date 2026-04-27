@@ -296,6 +296,14 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         rebuild_from=("holdings_v2", "fund_holdings_v2", "market_data"),
         notes="Precomputed entity×ticker active flows per sector. Migration 019.",
     ),
+    "sector_flows_rollup": DatasetSpec(
+        layer=4, owner="scripts/pipeline/compute_sector_flows.py",
+        promote_strategy="rebuild",
+        rebuild_from=("holdings_v2", "fund_holdings_v2", "market_data"),
+        notes="Precomputed per-sector flow rollup keyed by "
+              "(quarter pair × level × rollup_type × active_only). "
+              "Backs queries.get_sector_flows. Migration 021.",
+    ),
     "ticker_flow_stats": DatasetSpec(
         layer=4, owner="scripts/compute_flows.py",
         promote_strategy="rebuild",
