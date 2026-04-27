@@ -4,7 +4,6 @@ Routes:
   /api/v1/entity_search
   /api/v1/entity_children
   /api/v1/entity_graph          (enveloped, Phase 1-B2)
-  /api/v1/entity_resolve
   /api/v1/entity_market_summary
 """
 from __future__ import annotations
@@ -148,48 +147,6 @@ def api_entity_graph(request: Request):
             'internal_error', str(e),
             request, schema=EntityGraphEnvelope, status=500,
         )
-    finally:
-        con.close()
-
-
-@entities_router.get('/entity_resolve')
-def api_entity_resolve(entity_id: str = ''):
-    """Resolve any entity_id to its canonical institution root."""
-    entity_id = (entity_id or '').strip()
-    if not entity_id:
-        return JSONResponse(status_code=400, content={'error': 'Missing entity_id parameter'})
-    try:
-        eid = int(entity_id)
-    except ValueError:
-        return JSONResponse(status_code=400, content={'error': f'Invalid entity_id: {entity_id}'})
-
-    try:
-        con = get_db()
-    except Exception as e:
-        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
-    try:
-        ent = queries.get_entity_by_id(eid, con)
-        if not ent:
-            return JSONResponse(status_code=404, content={'error': f'entity_id {eid} not found'})
-
-        root_id = ent['rollup_entity_id'] if ent['rollup_entity_id'] else ent['entity_id']
-        root = ent if root_id == ent['entity_id'] else queries.get_entity_by_id(root_id, con)
-        if not root:
-            root = ent
-            root_id = ent['entity_id']
-
-        return queries.clean_for_json({
-            'selected_entity_id': eid,
-            'selected_display_name': ent['display_name'],
-            'root_entity_id': root_id,
-            'root_display_name': root['display_name'],
-            'entity_type': root.get('entity_type'),
-            'classification': root.get('classification'),
-            'is_self_root': root_id == ent['entity_id'],
-        })
-    except Exception as e:
-        log.error("entity_resolve error: %s", e, exc_info=True)
-        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
 

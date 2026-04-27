@@ -6,17 +6,14 @@ Routes:
   /api/v1/query1                  (enveloped, Phase 1-B2)
   /api/v1/query{qnum}             (bare, queries 2–16)
   /api/v1/export/query{qnum}
-  /api/v1/amendments
-  /api/v1/manager_profile
 
 Fund-lookup endpoints live in api_fund.py.
 """
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api_common import (
@@ -32,10 +29,8 @@ from api_common import (
 )
 from app_db import get_db
 from export import build_excel, build_excel_multisheet
-from queries import clean_for_json, df_to_records, get_summary
+from queries import df_to_records, get_summary
 from schemas import RegisterEnvelope, TickersEnvelope
-
-log = logging.getLogger(__name__)
 
 register_router = APIRouter(
     prefix='/api/v1',
@@ -275,117 +270,3 @@ def api_export(qnum: int, request: Request):
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
-
-
-@register_router.get('/amendments')
-def api_amendments(ticker: str = ''):
-    """13F-HR amendment reconciliation: show amended vs original filings per quarter."""
-    ticker = (ticker or '').upper().strip()
-    if not ticker:
-        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
-    con = get_db()
-    try:
-        validate_ticker_current(con, ticker)
-        amendments = con.execute(
-            f"""
-            WITH all_filings AS (
-                SELECT cik, manager_name, rollup_name, inst_parent_name, quarter,
-                       accession_number, shares, market_value_usd,
-                       CASE WHEN accession_number IN (
-                           SELECT accession_number FROM filings WHERE amended = true
-                       ) THEN true ELSE false END as is_amended
-                FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
-            ),
-            amended_managers AS (
-                SELECT DISTINCT cik FROM filings
-                WHERE amended = true AND quarter = '{LQ}'
-            )
-            SELECT COALESCE(a.rollup_name, a.inst_parent_name) as manager, a.shares, a.market_value_usd,
-                   CASE WHEN a.cik IN (SELECT cik FROM amended_managers)
-                        THEN 'Amended' ELSE 'Original' END as filing_status
-            FROM all_filings a
-            WHERE a.cik IN (SELECT cik FROM amended_managers)
-            ORDER BY a.market_value_usd DESC LIMIT 30
-            """, [ticker]  # nosec B608
-        ).fetchdf()
-
-        return clean_for_json({
-            'ticker': ticker,
-            'amendments': df_to_records(amendments),
-        })
-    except HTTPException:
-        raise
-    except Exception as e:
-        log.error("amendments error: %s", e)
-        return JSONResponse(status_code=500, content={'error': str(e)})
-    finally:
-        con.close()
-
-
-@register_router.get('/manager_profile')
-def api_manager_profile(manager: str = ''):
-    """Manager profile: all holdings, sector allocation, top positions."""
-    manager = (manager or '').strip()
-    if not manager:
-        return JSONResponse(status_code=400, content={'error': 'Missing manager parameter'})
-    con = get_db()
-    try:
-        top_holdings_df = con.execute(
-            f"""
-            SELECT ticker, issuer_name, shares, market_value_usd, market_value_live,
-                   pct_of_portfolio, pct_of_so
-            FROM holdings_v2
-            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
-            ORDER BY market_value_usd DESC LIMIT 50
-            """, [f'%{manager}%']  # nosec B608
-        ).fetchdf()
-
-        sectors = con.execute(
-            f"""
-            SELECT m.sector, COUNT(DISTINCT h.ticker) as tickers,
-                   SUM(h.market_value_usd) as value
-            FROM holdings_v2 h
-            LEFT JOIN market_data m ON h.ticker = m.ticker
-            WHERE h.quarter = '{LQ}' AND COALESCE(h.rollup_name, h.inst_parent_name) ILIKE ?
-              AND m.sector IS NOT NULL AND m.sector != ''
-              AND h.is_latest = TRUE
-            GROUP BY m.sector
-            ORDER BY value DESC LIMIT 10
-            """, [f'%{manager}%']  # nosec B608
-        ).fetchdf()
-
-        stats = con.execute(
-            f"""
-            SELECT COUNT(DISTINCT ticker) as num_positions,
-                   SUM(market_value_usd) as total_value,
-                   COUNT(DISTINCT cik) as num_ciks,
-                   MAX(manager_type) as manager_type
-            FROM holdings_v2
-            WHERE quarter = '{LQ}' AND COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
-            """, [f'%{manager}%']  # nosec B608
-        ).fetchone()
-
-        qoq = con.execute("""
-            SELECT quarter, COUNT(DISTINCT ticker) as positions,
-                   SUM(market_value_usd) as total_value
-            FROM holdings_v2 WHERE COALESCE(rollup_name, inst_parent_name) ILIKE ? AND is_latest = TRUE
-            GROUP BY quarter ORDER BY quarter
-        """, [f'%{manager}%']).fetchdf()
-
-        result = {
-            'manager': manager,
-            'num_positions': stats[0] if stats else 0,
-            'total_value': stats[1] if stats else 0,
-            'num_ciks': stats[2] if stats else 0,
-            'manager_type': stats[3] if stats else None,
-            'top_holdings': df_to_records(top_holdings_df),
-            'sector_allocation': df_to_records(sectors),
-            'quarterly_trend': df_to_records(qoq),
-        }
-        return clean_for_json(result)
-    except Exception as e:
-        log.error("manager_profile error: %s", e)
-        return JSONResponse(status_code=500, content={'error': str(e)})
-    finally:
-        con.close()
