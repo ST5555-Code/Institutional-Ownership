@@ -296,10 +296,49 @@ class LoadNPortPipeline(SourcePipeline):
         # would deadlock DuckDB's single-writer file lock.
         _ensure_staging_schema(staging_con)
 
+        # INF50: detect leftover rows from a prior run whose
+        # _cleanup_staging silently failed. Without this guard, parse()
+        # would pull both the new run's rows AND the leftovers into
+        # fund_holdings_v2 typed staging (parse runs an unfiltered SELECT
+        # over stg_nport_holdings).
+        self._purge_stale_raw_staging(staging_con)
+
         if scope.get("monthly_topup") or scope.get("month"):
             return self._fetch_xml_topup(scope, staging_con, t0)
 
         return self._fetch_dera_bulk(scope, staging_con, t0)
+
+    def _purge_stale_raw_staging(self, staging_con: Any) -> None:
+        """Pre-fetch guard (INF50). Drop leftover rows from stg_nport_*
+        before this run begins writing.
+
+        At the start of fetch(), any rows already in raw staging are by
+        definition from a prior run — _cleanup_staging is supposed to
+        have dropped the tables entirely. If rows are present, the prior
+        cleanup failed (historically silently). Log a WARNING with the
+        count and DELETE before proceeding so parse() does not pull the
+        leftovers into fund_holdings_v2.
+        """
+        for t in ("stg_nport_holdings", "stg_nport_fund_universe"):
+            try:
+                n = staging_con.execute(
+                    f"SELECT COUNT(*) FROM {t}"  # nosec B608
+                ).fetchone()[0]
+            except duckdb.CatalogException:
+                # Table absent — _ensure_staging_schema is supposed to
+                # have created it; missing here means the schema helper
+                # was bypassed. Skip silently; the next CREATE will
+                # surface any underlying problem.
+                continue
+            if n > 0:
+                self._logger.warning(
+                    "_purge_stale_raw_staging: %s carries %d leftover "
+                    "rows from a prior run; auto-purging before fetch "
+                    "begins (INF50 — prior _cleanup_staging may have "
+                    "silently failed)", t, n,
+                )
+                staging_con.execute(f"DELETE FROM {t}")  # nosec B608
+        staging_con.execute("CHECKPOINT")
 
     # ---- fetch: DERA bulk path ----------------------------------------
 
@@ -866,12 +905,26 @@ class LoadNPortPipeline(SourcePipeline):
 
     def promote(self, run_id: str, prod_con: Any) -> PromoteResult:
         """Delegate holdings promote to base class, then run post-promote
-        hooks in the same prod connection / transaction boundary:
+        hooks in the same prod connection / transaction boundary.
 
+        Step ordering (INF52): enrich → promote → re-enrich.
+
+          0. Pre-promote entity enrichment — populate Group 2 columns
+             (entity_id / rollup_entity_id / dm_entity_id /
+             dm_rollup_entity_id / dm_rollup_name) on
+             ``staging.fund_holdings_v2`` BEFORE super().promote()
+             runs. Without this, the int-23 downgrade-refusal guard
+             inside ``_promote_append_is_latest`` would see all-NULL
+             staged values flipping is_latest on (series, month) keys
+             where prod has populated values and would refuse the
+             promote — which is what bit the 2026-04-27 topup on
+             amendment-heavy reports.
           1. Base append_is_latest — prior (series, month) rows flip to
              is_latest=FALSE, staged rows INSERT as is_latest=TRUE.
           2. UPSERT fund_universe from stg_nport_fund_universe.
-          3. Bulk Group 2 entity enrichment over the touched series_ids.
+          3. Bulk Group 2 entity enrichment (safety net) — idempotent
+             refresh over the touched series_ids in case prod's MDM
+             state shifted between pre-enrich and promote.
         """
         rows = self._read_staged_rows()
         series_touched: set[str] = set()
@@ -880,12 +933,101 @@ class LoadNPortPipeline(SourcePipeline):
                 s for s in rows["series_id"].dropna().tolist() if s
             }
 
+        if not rows.empty:
+            self._enrich_staging_entities(prod_con, series_touched)
+
         result = super().promote(run_id, prod_con)
 
         if not rows.empty:
             self._upsert_fund_universe(prod_con, series_touched)
             self._bulk_enrich_run(prod_con, series_touched)
         return result
+
+    def _enrich_staging_entities(
+        self, prod_con: Any, series_touched: set[str],
+    ) -> int:
+        """Pre-promote enrichment of ``staging.fund_holdings_v2`` (INF52).
+
+        Mirrors the JOIN in ``_bulk_enrich_run`` but writes to staging,
+        not prod. The int-23 downgrade-refusal guard (base.py
+        ``_check_no_downgrade_refusal``) inside the base
+        ``_promote_append_is_latest`` reads the staged DataFrame; if
+        every staged row for a (series, month) key is NULL on a
+        sensitive column (entity_id / rollup_entity_id) and prod has
+        non-NULL values for that key, it raises ``DowngradeRefusalError``
+        and the promote rolls back. Populating the staging columns
+        BEFORE super().promote() runs eliminates the false-positive
+        refusal on amendments.
+
+        Returns the number of mapped series_ids; 0 when nothing matched.
+        ``_bulk_enrich_run`` still runs post-promote as a safety net.
+        """
+        if not series_touched:
+            return 0
+        sids = sorted(series_touched)
+        placeholders = ",".join("?" * len(sids))
+
+        try:
+            mapping_df = prod_con.execute(
+                f"""
+                SELECT ei.identifier_value      AS series_id,
+                       ei.entity_id             AS entity_id,
+                       ec.rollup_entity_id      AS ec_rollup_entity_id,
+                       dm.rollup_entity_id      AS dm_rollup_entity_id,
+                       ea.alias_name            AS dm_rollup_name
+                  FROM entity_identifiers ei
+                  LEFT JOIN entity_rollup_history ec
+                         ON ec.entity_id = ei.entity_id
+                        AND ec.rollup_type = 'economic_control_v1'
+                        AND ec.valid_to = DATE '9999-12-31'
+                  LEFT JOIN entity_rollup_history dm
+                         ON dm.entity_id = ei.entity_id
+                        AND dm.rollup_type = 'decision_maker_v1'
+                        AND dm.valid_to = DATE '9999-12-31'
+                  LEFT JOIN entity_aliases ea
+                         ON ea.entity_id = ec.rollup_entity_id
+                        AND ea.is_preferred = TRUE
+                        AND ea.valid_to = DATE '9999-12-31'
+                 WHERE ei.identifier_type = 'series_id'
+                   AND ei.valid_to = DATE '9999-12-31'
+                   AND ei.identifier_value IN ({placeholders})
+                """,  # nosec B608
+                sids,
+            ).fetchdf()
+        except Exception as exc:  # pylint: disable=broad-except
+            # Test fixtures and incomplete prod schemas can lack the
+            # entity_* tables. Surface as a warning — the int-23 guard
+            # still catches real downgrades and the post-promote
+            # _bulk_enrich_run logs the same condition.
+            self._logger.warning("_enrich_staging_entities: %s", exc)
+            return 0
+
+        if mapping_df.empty:
+            return 0
+
+        staging_con = duckdb.connect(self._staging_db_path)
+        try:
+            staging_con.register("entity_map", mapping_df)
+            try:
+                staging_con.execute(
+                    """
+                    UPDATE fund_holdings_v2 AS fh
+                       SET entity_id           = m.entity_id,
+                           rollup_entity_id    = m.ec_rollup_entity_id,
+                           dm_entity_id        = m.entity_id,
+                           dm_rollup_entity_id = m.dm_rollup_entity_id,
+                           dm_rollup_name      = m.dm_rollup_name
+                      FROM entity_map m
+                     WHERE fh.series_id = m.series_id
+                    """
+                )
+            finally:
+                staging_con.unregister("entity_map")
+            staging_con.execute("CHECKPOINT")
+        finally:
+            staging_con.close()
+
+        return len(mapping_df)
 
     def _upsert_fund_universe(
         self, prod_con: Any, series_touched: set[str],
@@ -1004,20 +1146,55 @@ class LoadNPortPipeline(SourcePipeline):
             self._logger.warning("refresh_snapshot: %s", exc)
         return result
 
-    # ---- cleanup override (drop N-PORT raw staging too) ---------------
+    # ---- cleanup override (drop N-PORT raw + typed staging) ----------
 
     def _cleanup_staging(self, run_id: str) -> None:
-        super()._cleanup_staging(run_id)
+        """INF50 hardening — drop the typed table AND both raw N-PORT
+        staging tables in a single connection, with a post-cleanup
+        assertion that fails LOUDLY (raise, not warn) if any table
+        still exists after the DROPs.
+
+        Replaces the prior super() + override pattern which (a) opened
+        two separate writer connections and (b) caught all exceptions
+        as warnings — silently leaving 11M+ rows in stg_nport_holdings
+        when the second connection or any DROP failed. That
+        contaminated the next run's parse() (unfiltered SELECT over
+        stg_nport_holdings) and the contamination only surfaced at
+        promote time as a row-count anomaly.
+
+        After this rewrite a real failure surfaces as a RuntimeError
+        in the approve_and_promote() path — visible immediately, with
+        the offending table name in the message.
+        """
+        tables = (
+            self.target_table,
+            "stg_nport_holdings",
+            "stg_nport_fund_universe",
+        )
+        staging_con = duckdb.connect(self._staging_db_path)
         try:
-            staging_con = duckdb.connect(self._staging_db_path)
-            try:
-                for t in ("stg_nport_holdings", "stg_nport_fund_universe"):
-                    staging_con.execute(f"DROP TABLE IF EXISTS {t}")
-                staging_con.execute("CHECKPOINT")
-            finally:
-                staging_con.close()
-        except Exception as exc:  # pylint: disable=broad-except
-            self._logger.warning("cleanup N-PORT staging: %s", exc)
+            for t in tables:
+                staging_con.execute(f"DROP TABLE IF EXISTS {t}")  # nosec B608
+            staging_con.execute("CHECKPOINT")
+
+            # INF50 post-cleanup assertion. After DROP TABLE IF EXISTS
+            # the table must not exist — a successful SELECT COUNT(*)
+            # against it means the DROP was a no-op (or DuckDB never
+            # processed it). A CatalogException is the success signal.
+            for t in tables:
+                try:
+                    rows = staging_con.execute(
+                        f"SELECT COUNT(*) FROM {t}"  # nosec B608
+                    ).fetchone()[0]
+                except duckdb.CatalogException:
+                    continue
+                raise RuntimeError(
+                    f"_cleanup_staging({run_id}): {t} still exists with "
+                    f"{rows} rows after DROP TABLE IF EXISTS — staging "
+                    f"is contaminated and will leak into the next run."
+                )
+        finally:
+            staging_con.close()
 
 
 # ---------------------------------------------------------------------------

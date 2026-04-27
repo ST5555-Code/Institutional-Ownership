@@ -655,3 +655,243 @@ def test_assert_no_future_report_month_returns_empty_for_past():
     )
     con.execute("INSERT INTO fund_holdings_v2 VALUES ('S1', '2024-06')")
     assert _assert_no_future_report_month(con) == []
+
+
+# ---------------------------------------------------------------------------
+# INF50 — _cleanup_staging hard-fail + pre-fetch purge
+# ---------------------------------------------------------------------------
+
+def test_inf50_cleanup_drops_typed_and_raw_staging(pipeline, tmp_dbs):
+    """_cleanup_staging must drop the typed target table AND both raw
+    N-PORT staging tables. After the call, none should be queryable."""
+    _seed_staging(
+        tmp_dbs["staging"],
+        [{"series_id": "S000001", "report_month": "2026-01",
+          "accession_number": "A"}],
+    )
+    # Run parse() to create the typed staging table.
+    staging_con = duckdb.connect(tmp_dbs["staging"])
+    try:
+        pipeline.parse(staging_con)
+    finally:
+        staging_con.close()
+
+    # Sanity: all three tables exist and have rows.
+    staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
+    try:
+        assert staging_con.execute(
+            "SELECT COUNT(*) FROM fund_holdings_v2"
+        ).fetchone()[0] >= 1
+        assert staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_holdings"
+        ).fetchone()[0] >= 1
+        assert staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_fund_universe"
+        ).fetchone()[0] >= 0  # universe may be empty under default seed
+    finally:
+        staging_con.close()
+
+    pipeline._cleanup_staging("test_run_50")
+
+    # All three tables must now raise CatalogException on SELECT — they
+    # were DROPped and the post-cleanup assertion confirmed it.
+    staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
+    try:
+        for t in ("fund_holdings_v2", "stg_nport_holdings",
+                  "stg_nport_fund_universe"):
+            with pytest.raises(duckdb.CatalogException):
+                staging_con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()
+    finally:
+        staging_con.close()
+
+
+def test_inf50_cleanup_raises_when_table_undropped(pipeline, tmp_dbs,
+                                                    monkeypatch):
+    """If something subverts DROP TABLE IF EXISTS so a target table
+    survives, _cleanup_staging must raise (not warn) per INF50."""
+    # Seed staging with a stg_nport_holdings table containing rows.
+    _seed_staging(
+        tmp_dbs["staging"],
+        [{"series_id": "S000001", "report_month": "2026-01",
+          "accession_number": "A"}],
+    )
+
+    # Monkeypatch duckdb.DuckDBPyConnection.execute to no-op the DROP
+    # statements but pass everything else through. Reproduces a case
+    # where DROP fails silently — the pre-fix code would have logged
+    # a warning and returned; the fix raises RuntimeError instead.
+    real_execute = duckdb.DuckDBPyConnection.execute
+
+    def fake_execute(self, sql, *args, **kwargs):
+        if isinstance(sql, str) and sql.strip().upper().startswith(
+            "DROP TABLE"
+        ):
+            return self  # no-op, mimics a silently-skipped DROP
+        return real_execute(self, sql, *args, **kwargs)
+
+    monkeypatch.setattr(
+        duckdb.DuckDBPyConnection, "execute", fake_execute,
+    )
+
+    with pytest.raises(RuntimeError, match="staging is contaminated"):
+        pipeline._cleanup_staging("test_run_50_fail")
+
+
+def test_inf50_pre_fetch_purge_clears_stale_rows(pipeline, tmp_dbs):
+    """_purge_stale_raw_staging must DELETE leftover rows from prior
+    runs before fetch begins writing."""
+    # Seed raw staging with rows from a 'prior run'.
+    _seed_staging(
+        tmp_dbs["staging"],
+        [
+            {"series_id": "S000001", "report_month": "2026-01",
+             "accession_number": "PRIOR-A"},
+            {"series_id": "S000002", "report_month": "2026-01",
+             "accession_number": "PRIOR-B"},
+        ],
+    )
+    # Add a universe row too so both tables get exercised.
+    staging_con = duckdb.connect(tmp_dbs["staging"])
+    try:
+        staging_con.execute(
+            "INSERT INTO stg_nport_fund_universe "
+            "(series_id, fund_cik, fund_name, family_name, total_net_assets, "
+            " fund_category, is_actively_managed, total_holdings_count, "
+            " equity_pct, top10_concentration, last_updated, fund_strategy, "
+            " best_index, manifest_id) VALUES "
+            "('S000001','0000000001','F','Fam',1.0,'mixed',TRUE,1,NULL,"
+            "NULL,NOW(),'mixed',NULL,NULL)"
+        )
+
+        pre_h = staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_holdings"
+        ).fetchone()[0]
+        pre_u = staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_fund_universe"
+        ).fetchone()[0]
+        assert pre_h >= 2 and pre_u == 1
+
+        pipeline._purge_stale_raw_staging(staging_con)
+
+        post_h = staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_holdings"
+        ).fetchone()[0]
+        post_u = staging_con.execute(
+            "SELECT COUNT(*) FROM stg_nport_fund_universe"
+        ).fetchone()[0]
+        assert post_h == 0
+        assert post_u == 0
+    finally:
+        staging_con.close()
+
+
+# ---------------------------------------------------------------------------
+# INF52 — pre-promote entity enrichment
+# ---------------------------------------------------------------------------
+
+def test_inf52_pre_promote_enrichment_populates_entity_columns(
+    pipeline, tmp_dbs,
+):
+    """_enrich_staging_entities must populate entity_id /
+    rollup_entity_id / dm_entity_id / dm_rollup_entity_id /
+    dm_rollup_name on staging.fund_holdings_v2 BEFORE super().promote()
+    runs the int-23 downgrade-refusal guard."""
+    # Seed staging holdings + run parse() to create typed table with
+    # NULL entity columns.
+    _seed_staging(
+        tmp_dbs["staging"],
+        [{"series_id": "S000001", "report_month": "2026-01",
+          "accession_number": "A"}],
+    )
+    staging_con = duckdb.connect(tmp_dbs["staging"])
+    try:
+        pipeline.parse(staging_con)
+    finally:
+        staging_con.close()
+
+    # Confirm pre-state: NULLs everywhere.
+    staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
+    try:
+        ent, rec, dm_e, dm_r, dm_n = staging_con.execute(
+            "SELECT entity_id, rollup_entity_id, dm_entity_id, "
+            "       dm_rollup_entity_id, dm_rollup_name "
+            "FROM fund_holdings_v2"
+        ).fetchone()
+    finally:
+        staging_con.close()
+    assert (ent, rec, dm_e, dm_r, dm_n) == (None, None, None, None, None)
+
+    # Seed prod entity tables — series_id S000001 → entity_id 42 with
+    # EC rollup → 100, DM rollup → 200, dm_rollup_name = "Test Family".
+    prod_con = duckdb.connect(tmp_dbs["prod"])
+    try:
+        prod_con.execute(
+            "INSERT INTO entity_identifiers VALUES "
+            "(42, 'series_id', 'S000001', DATE '9999-12-31')"
+        )
+        prod_con.execute(
+            "INSERT INTO entity_rollup_history VALUES "
+            "(42, 'economic_control_v1', 100, DATE '9999-12-31')"
+        )
+        prod_con.execute(
+            "INSERT INTO entity_rollup_history VALUES "
+            "(42, 'decision_maker_v1', 200, DATE '9999-12-31')"
+        )
+        prod_con.execute(
+            "INSERT INTO entity_aliases VALUES "
+            "(100, 'Test Family', TRUE, DATE '9999-12-31')"
+        )
+        prod_con.execute("CHECKPOINT")
+
+        # Run pre-promote enrichment.
+        n = pipeline._enrich_staging_entities(prod_con, {"S000001"})
+    finally:
+        prod_con.close()
+
+    assert n == 1
+
+    # Confirm post-state: entity columns populated.
+    staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
+    try:
+        ent, rec, dm_e, dm_r, dm_n = staging_con.execute(
+            "SELECT entity_id, rollup_entity_id, dm_entity_id, "
+            "       dm_rollup_entity_id, dm_rollup_name "
+            "FROM fund_holdings_v2"
+        ).fetchone()
+    finally:
+        staging_con.close()
+    assert ent == 42
+    assert rec == 100
+    assert dm_e == 42
+    assert dm_r == 200
+    assert dm_n == "Test Family"
+
+
+def test_inf52_pre_promote_enrichment_no_op_on_empty_set(pipeline):
+    """No staged series_ids → no-op, returns 0, no exception."""
+    # prod_con not even needed when series_touched is empty.
+    assert pipeline._enrich_staging_entities(None, set()) == 0
+
+
+def test_inf52_pre_promote_enrichment_warns_when_entity_tables_missing(
+    pipeline, tmp_dbs,
+):
+    """If prod's entity_* tables are absent, surface as a warning and
+    return 0 — int-23 guard still catches real downgrades and the
+    post-promote _bulk_enrich_run logs the same condition."""
+    # Build a stripped-down prod DB without entity_identifiers.
+    bare_prod = tmp_dbs["staging"].replace("staging", "bare_prod")
+    bare = duckdb.connect(bare_prod)
+    try:
+        bare.execute("CREATE TABLE other (x INTEGER)")
+        bare.execute("CHECKPOINT")
+    finally:
+        bare.close()
+
+    bare_con = duckdb.connect(bare_prod)
+    try:
+        # Should not raise; logs a warning and returns 0.
+        n = pipeline._enrich_staging_entities(bare_con, {"S000001"})
+    finally:
+        bare_con.close()
+    assert n == 0
