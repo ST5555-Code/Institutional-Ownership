@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
+import { useTickers } from '../../hooks/useTickers'
 import type { CrossOwnershipResponse } from '../../types/api'
 import {
   RollupToggle,
@@ -86,17 +87,10 @@ interface TickerSlotProps {
 function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }: TickerSlotProps) {
   const [input, setInput] = useState('')
   const [options, setOptions] = useState<Array<{ ticker: string; name: string }>>([])
-  const [allTickers, setAllTickers] = useState<Array<{ ticker: string; name: string }>>([])
+  const allTickers = useTickers()
   const [open, setOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/api/v1/tickers')
-      .then(r => r.json())
-      .then((env: { data?: Array<{ ticker: string; name: string }> }) => setAllTickers(env?.data ?? []))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (input.length < 1) { setOptions([]); setOpen(false); return }

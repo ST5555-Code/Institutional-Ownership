@@ -80,9 +80,12 @@ PK_COLUMNS = {
 #     printed so the absence is visible rather than silent.
 #
 # Entity tables share validate_entities.py (one subprocess call covers the
-# whole set). Canonical tables have no registered validator yet — follow-on
-# work. The explicit None entry is load-bearing: it documents the known gap
-# and triggers the warn path in _run_validators().
+# whole set). The "schema_pk" kind marks tables whose row-level invariants
+# are enforced at the DDL layer (formal PRIMARY KEY constraint) — no
+# subprocess validator is needed because DuckDB rejects duplicate / NULL
+# inserts at the engine. Tables still mapped to None are open follow-ups;
+# the explicit None entry is load-bearing — it documents the gap and
+# triggers the warn path in _run_validators().
 VALIDATOR_MAP = {
     # Entity tables → validate_entities.py
     "entities": "validate_entities",
@@ -94,9 +97,13 @@ VALIDATOR_MAP = {
     "entity_identifiers_staging": "validate_entities",
     "entity_relationships_staging": "validate_entities",
     "entity_overrides_persistent": "validate_entities",
+    # securities.cusip — formal PRIMARY KEY constraint shipped 2026-04-22
+    # via migration 011 (INF28 / int-12 PR #95). DDL-level enforcement is
+    # the validator: DuckDB rejects duplicate or NULL CUSIPs at insert
+    # time, so promotion does not need a separate validator subprocess.
+    "securities": "schema_pk",
     # Canonical tables — no validator registered yet
     "cusip_classifications": None,
-    "securities": None,
     # build_managers.py outputs (2026-04-19 — Batch 3 close)
     "parent_bridge": None,
     "cik_crd_direct": None,
@@ -682,6 +689,8 @@ def _run_validators(tables: list[str], snapshot_id: str) -> dict:
 
     Current validator kinds:
       'validate_entities' → subprocess call to validate_entities.py
+      'schema_pk'         → DDL-level PRIMARY KEY constraint; logged as
+                            registered, no subprocess (engine enforces).
       None                → no-op with warn
     """
     import duckdb
@@ -696,6 +705,18 @@ def _run_validators(tables: list[str], snapshot_id: str) -> dict:
                 f"Promotion proceeding without validation for this table."
             )
             out["validators_skipped"].append(t)
+
+    # Log schema-PK registrations. DuckDB rejects PK violations at
+    # insert time, so the constraint itself is the validator — no
+    # subprocess needed. Recorded so the registration is visible in
+    # promote logs alongside the entity-validator output.
+    for t in tables:
+        if VALIDATOR_MAP.get(t) == "schema_pk":
+            _log(
+                f"  schema_pk validator registered for {t} "
+                "(DDL PRIMARY KEY enforced by engine)"
+            )
+            out["validators_run"].append(f"schema_pk:{t}")
 
     kinds = {VALIDATOR_MAP.get(t) for t in tables if VALIDATOR_MAP.get(t)}
 

@@ -107,6 +107,12 @@ function FundCard({ fund }: { fund: FundInfo }) {
 
 // ── Entity search ──────────────────────────────────────────────────────────
 
+function fetchEntitySearch(q: string): Promise<EntitySearchResult[]> {
+  return fetch(`/api/v1/entity_search?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then((data: EntitySearchResult[]) => data)
+}
+
 function EntitySearch({ onSelect }: { onSelect: (id: number, name: string) => void }) {
   const [input, setInput] = useState('')
   const [results, setResults] = useState<EntitySearchResult[]>([])
@@ -122,8 +128,9 @@ function EntitySearch({ onSelect }: { onSelect: (id: number, name: string) => vo
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (v.length < 2) { setResults([]); setOpen(false); return }
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/v1/entity_search?q=${encodeURIComponent(v)}`)
-        .then(r => r.json()).then((data: EntitySearchResult[]) => { setResults(data.slice(0, 10)); setOpen(data.length > 0) }).catch(() => {})
+      fetchEntitySearch(v)
+        .then((data) => { setResults(data.slice(0, 10)); setOpen(data.length > 0) })
+        .catch(() => {})
     }, 300)
   }
   return (
@@ -227,9 +234,8 @@ export function EntityGraphTab() {
 
   // Row click in ticker holders: search entity by name → open modal
   function handleHolderClick(institutionName: string) {
-    fetch(`/api/v1/entity_search?q=${encodeURIComponent(institutionName.substring(0, 30))}`)
-      .then(r => r.json())
-      .then((results: EntitySearchResult[]) => {
+    fetchEntitySearch(institutionName.substring(0, 30))
+      .then((results) => {
         if (results.length > 0) {
           setModalEntityId(results[0].entity_id)
           setModalEntityName(institutionName)
