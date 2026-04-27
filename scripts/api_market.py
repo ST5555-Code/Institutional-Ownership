@@ -3,19 +3,15 @@
 Routes:
   /api/v1/sector_flows
   /api/v1/sector_flow_movers
-  /api/v1/sector_flow_detail
   /api/v1/short_analysis
-  /api/v1/short_long
-  /api/v1/short_volume
   /api/v1/crowding
   /api/v1/smart_money
-  /api/v1/heatmap
 """
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from api_common import (
@@ -70,26 +66,6 @@ def api_sector_flow_movers(request: Request):
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@market_router.get('/sector_flow_detail')
-def api_sector_flow_detail(request: Request):
-    """Full cross-quarter detail for one sector: inflow/outflow/net + top movers."""
-    try:
-        from queries import get_sector_flow_detail
-        sector = (request.query_params.get('sector') or '').strip()
-        active_only = request.query_params.get('active_only', '0') == '1'
-        level = (request.query_params.get('level') or 'parent').strip()
-        if not sector:
-            return JSONResponse(status_code=400, content={'error': 'Missing sector param'})
-        rank_by = (request.query_params.get('rank_by') or 'total').strip()
-        rt = get_rollup_type(request)
-        return get_sector_flow_detail(
-            sector, active_only=active_only, level=level, rank_by=rank_by,
-            rollup_type=rt)
-    except Exception as e:
-        log.error("sector_flow_detail error: %s", e)
-        return JSONResponse(status_code=500, content={'error': str(e)})
-
-
 @market_router.get('/short_analysis')
 def api_short_analysis(request: Request):
     """Short Interest Analysis — N-PORT shorts, FINRA volume, long/short cross-ref."""
@@ -106,52 +82,6 @@ def api_short_analysis(request: Request):
         return short_interest_analysis(ticker, rollup_type=rt)
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
-
-
-@market_router.get('/short_long')
-def api_short_long(request: Request):
-    """Short vs Long comparison: managers long via 13F and short via N-PORT."""
-    ticker = (request.query_params.get('ticker') or '').upper().strip()
-    if not ticker:
-        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
-    con = get_db()
-    try:
-        validate_ticker_current(con, ticker)
-    finally:
-        con.close()
-    try:
-        from queries import get_short_long_comparison
-        rt = get_rollup_type(request)
-        return get_short_long_comparison(ticker, rollup_type=rt)
-    except Exception as e:
-        log.error("short_long error for %s: %s", ticker, e)
-        return JSONResponse(status_code=500, content={'error': str(e)})
-
-
-@market_router.get('/short_volume')
-def api_short_volume(ticker: str = ''):
-    """FINRA daily short sale volume for a ticker."""
-    ticker = (ticker or '').upper().strip()
-    if not ticker:
-        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
-    con = get_db()
-    try:
-        validate_ticker_current(con, ticker)
-        if not has_table('short_interest'):
-            return JSONResponse(
-                status_code=404,
-                content={'error': 'short_interest table not loaded — run fetch_finra_short.py'},
-            )
-        df = con.execute("""
-            SELECT report_date, short_volume, total_volume, short_pct
-            FROM short_interest
-            WHERE ticker = ?
-            ORDER BY report_date DESC
-            LIMIT 60
-        """, [ticker]).fetchdf()
-        return df_to_records(df)
-    finally:
-        con.close()
 
 
 @market_router.get('/crowding')
@@ -230,72 +160,3 @@ def api_smart_money(ticker: str = ''):
         con.close()
 
 
-@market_router.get('/heatmap')
-def api_heatmap(request: Request):
-    """Ownership concentration heatmap: top managers × tickers by pct_of_so."""
-    ticker = (request.query_params.get('ticker') or '').upper().strip()
-    peers = (request.query_params.get('peers') or '').upper().strip()
-    con = get_db()
-    try:
-        tickers = [ticker] if ticker else []
-        if peers:
-            tickers += [t.strip() for t in peers.split(',') if t.strip()]
-        # BL-7: validate every ticker actually provided by the client (not the
-        # top-10 auto-backfill case where `tickers` stays empty).
-        for t in tickers:
-            validate_ticker_current(con, t)
-        if not tickers:
-            top = con.execute(
-                f"""
-                SELECT ticker, SUM(market_value_usd) as val
-                FROM holdings_v2 WHERE quarter = '{LQ}' AND ticker IS NOT NULL AND is_latest = TRUE
-                GROUP BY ticker ORDER BY val DESC LIMIT 10
-                """  # nosec B608
-            ).fetchall()
-            tickers = [r[0] for r in top]
-
-        ticker_ph = ','.join(['?'] * len(tickers))
-        managers = con.execute(
-            f"""
-            SELECT COALESCE(rollup_name, inst_parent_name) as inst_parent_name, SUM(market_value_usd) as total_val
-            FROM holdings_v2
-            WHERE quarter = '{LQ}' AND ticker IN ({ticker_ph})
-              AND COALESCE(rollup_name, inst_parent_name) IS NOT NULL
-              AND is_latest = TRUE
-            GROUP BY COALESCE(rollup_name, inst_parent_name)
-            ORDER BY total_val DESC LIMIT 15
-            """, tickers  # nosec B608
-        ).fetchall()
-        manager_names = [r[0] for r in managers]
-
-        if not manager_names:
-            return {'tickers': tickers, 'managers': [], 'cells': []}
-
-        mgr_ph = ','.join(['?'] * len(manager_names))
-        cells = con.execute(
-            f"""
-            SELECT COALESCE(rollup_name, inst_parent_name) as manager, ticker,
-                   SUM(pct_of_so) as pct_so,
-                   SUM(shares) as shares,
-                   SUM(market_value_usd) as value
-            FROM holdings_v2
-            WHERE quarter = '{LQ}'
-              AND ticker IN ({ticker_ph})
-              AND COALESCE(rollup_name, inst_parent_name) IN ({mgr_ph})
-              AND is_latest = TRUE
-            GROUP BY COALESCE(rollup_name, inst_parent_name), ticker
-            """, tickers + manager_names  # nosec B608
-        ).fetchdf()
-
-        return clean_for_json({
-            'tickers': tickers,
-            'managers': manager_names,
-            'cells': df_to_records(cells),
-        })
-    except HTTPException:
-        raise
-    except Exception as e:
-        log.error("heatmap error: %s", e)
-        return JSONResponse(status_code=500, content={'error': str(e)})
-    finally:
-        con.close()

@@ -79,11 +79,8 @@ def test_tickers_endpoint_no_validation(client):
 
 CURRENT_ROUTES = [
     "/api/v1/query1?ticker={t}",
-    "/api/v1/amendments?ticker={t}",
     "/api/v1/portfolio_context?ticker={t}",
     "/api/v1/short_analysis?ticker={t}",
-    "/api/v1/short_long?ticker={t}",
-    "/api/v1/short_volume?ticker={t}",
     "/api/v1/crowding?ticker={t}",
     "/api/v1/smart_money?ticker={t}",
     "/api/v1/fund_portfolio_managers?ticker={t}",
@@ -93,9 +90,8 @@ CURRENT_ROUTES = [
 @pytest.mark.parametrize("route_tpl", CURRENT_ROUTES)
 def test_current_valid_ticker_not_rejected_by_validator(client, route_tpl):
     """AAPL exists in LQ — validator must not 404 it. Pre-existing route 404s
-    (e.g. short_volume's 'short_interest table not loaded' when the fixture
-    lacks FINRA data) are fine; we assert only that the validator's own
-    message is absent from the response body."""
+    are fine; we assert only that the validator's own message is absent from
+    the response body."""
     resp = client.get(route_tpl.format(t="AAPL"))
     assert "not found in current holdings" not in resp.text, (
         f"{route_tpl}: validator rejected valid AAPL — {resp.text[:200]}"

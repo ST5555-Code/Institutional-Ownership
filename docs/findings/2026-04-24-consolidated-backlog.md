@@ -185,7 +185,7 @@ Cross-reference — **PR #107 ui-audit walkthrough** per `docs/NEXT_SESSION_CONT
 | §14 Q2 | Admin diff-presentation tier boundaries (1K, 100K) | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:980` | ≥30 days | Reviewer question pending. |
 | §14 Q7 | `PIPELINE_CADENCE` correctness vs SEC rules | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:987` | ≥30 days | Reviewer question pending. |
 | §14 Q8 | Probe rate-limit safety vs PROCESS_RULES §4 | OPEN | UNSCOPED | `docs/admin_refresh_system_design.md:988` | ≥30 days | Reviewer question pending. |
-| ui-audit-01 dead-endpoints | 15 routes defined in routers but not called from any tab (candidates for triage: delete vs modal-only keep) | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #5 @ branch `ui-audit-01` | 2 days | Triage out of scope for the audit itself; explicit follow-up ask. Routes: `/api/v1/config/quarters`, `/api/v1/amendments`, `/api/v1/manager_profile`, `/api/v1/fund_rollup_context`, `/api/v1/fund_behavioral_profile`, `/api/v1/nport_shorts`, `/api/v1/entity_resolve`, `/api/v1/sector_flow_detail`, `/api/v1/short_long`, `/api/v1/short_volume`, `/api/v1/crowding`, `/api/v1/smart_money`, `/api/v1/heatmap`, `/api/v1/peer_groups/{group_id}`, `/api/v1/export/query{qnum}`. |
+| ui-audit-01 dead-endpoints | 15 routes defined in routers but not called from any tab (candidates for triage: delete vs modal-only keep) | CLOSED 2026-04-27 | DONE | `docs/ui-audit-01-triage.md` §Technical anomalies #5 @ branch `ui-audit-01` | 2 days | Triaged on `dead-endpoints` branch: 11 deleted (`config/quarters`, `amendments`, `manager_profile`, `fund_rollup_context`, `fund_behavioral_profile`, `nport_shorts`, `entity_resolve`, `sector_flow_detail`, `short_long`, `short_volume`, `heatmap`), 4 KEPT (`export/query{qnum}`, `crowding`, `smart_money`, `peer_groups/{group_id}`). |
 
 ---
 
@@ -441,7 +441,7 @@ One row per distinct item, sorted by category then by ID or title. `age` column 
 | 83 | ui-audit-01 React-1 | Consolidate `/api/v1/tickers` into shared hook | UI | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing | 2d |
 | 84 | ui-audit-01 React-2 | Collapse duplicate `/api/v1/entity_search` in EntityGraphTab | UI | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Work item routing | 2d |
 | 85 | ui-audit-01 walkthrough | 24 blank per-tab "Bugs (visual)" + "Completeness gaps" rows | UI | OPEN | GATED | `docs/ui-audit-01-triage.md` §per-tab sections | 2d |
-| 86 | ui-audit-01 dead-endpoints | 15 router-defined but tab-uncalled routes — triage (delete vs keep) | ARCHITECTURE | OPEN | UNSCOPED | `docs/ui-audit-01-triage.md` §Technical anomalies #5 | 2d |
+| 86 | ui-audit-01 dead-endpoints | 15 router-defined but tab-uncalled routes — triage (delete vs keep) | ARCHITECTURE | CLOSED 2026-04-27 | DONE | `docs/ui-audit-01-triage.md` §Technical anomalies #5 | 2d |
 
 ---
 

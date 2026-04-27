@@ -4,11 +4,20 @@
 
 ## Last completed
 
-This session — INF48 + INF49 entity dedup (branch `inf48-49-entity-dedup`, snapshot `20260427_064049`):
+This session — `dead-endpoints` (branch `dead-endpoints`, no DB writes, no schema changes):
 
-- **INF48 / INF49** — duplicate adviser entities merged into their canonicals using a new `scripts/oneoff/inf48_49_apply.py`. **NEOS:** dup eid=10825 (no comma, cik=`0002001019`) merged into canonical eid=20105 (with comma, crd=`000321256`). **Segall Bryant:** dup eid=254 (uppercase ADV-style; cik=`0001006378`, crd=`001006378`, crd=`106505`) merged into canonical eid=18157 (mixed case, crd=`000106505`). New script mirrors INF23 mechanics with one addition — per-entity identifier transfer (INSERT on survivor BEFORE close on dup, never break total_aum gate). Per-merge: transfer identifiers, add dup's preferred name as `alias_type='legal_name'` secondary alias on survivor, close inverted survivor→dup `wholly_owned/orphan_scan` edges (rel_id 15179 NEOS / rel_id 15231 SBH — closed not re-pointed to avoid self-edges), close dup's aliases / classification / rollups, insert `merged_into` rollup rows (one EC, one DM) on dup, write `entity_overrides_persistent` row keyed on dup CIK with `action='merge'`. Override IDs **1055** (NEOS) and **1056** (SBH). **Suspect-CRD exclusion (INF49):** dup's crd=`001006378` (`source=cik_crd_direct`) was numerically identical to its own CIK — excluded from transfer per user direction before promote (added to `TRANSFER_EXCLUSIONS` set in script and surgically dropped from survivor row before promote). Verify post-promote: dups hold zero active aliases / classifications / identifiers / non-`merged_into` rollups and zero active relationships in either direction; survivor 18157 ends with one CIK + 2 CRDs (`000106505` padded original + transferred unpadded `106505`); EC and DM open row counts both 26602 (parity preserved). `total_aum` PASS confirms identifier transfer didn't break the ~$166B INF4c gate.
+- Triaged the 15 router-defined uncalled `/api/v1/*` routes pre-identified in `docs/findings/2026-04-24-consolidated-backlog.md` row 86. Discovery cross-checked React `fetch` sites, `tests/`, and Python callers — confirmed exactly 15 dead.
+- **Deleted 11 routes + handlers:** `config/quarters` (api_config.py); `amendments` + `manager_profile` (api_register.py); `fund_rollup_context` + `fund_behavioral_profile` + `nport_shorts` (api_fund.py — only `fund_portfolio_managers` survives); `entity_resolve` (api_entities.py); `sector_flow_detail` + `short_long` + `short_volume` + `heatmap` (api_market.py).
+- **Deleted 2 query helpers** in `scripts/queries.py`: `get_sector_flow_detail` and `get_short_long_comparison` (no other callers). `get_entity_by_id` retained — three other queries.py functions still call it.
+- **Kept 4** per triage: `/api/v1/export/query{qnum}`, `/api/v1/crowding`, `/api/v1/smart_money`, `/api/v1/peer_groups/{group_id}` (modal-only / planned-feature / low-cost).
+- Removed 3 dead routes (`amendments`, `short_long`, `short_volume`) from `CURRENT_ROUTES` in `tests/test_app_ticker_validation.py`. `crowding` + `smart_money` remain in the list (KEEP).
+- Cleaned unused imports: `HTTPException` from api_register.py + api_market.py; `clean_for_json` + `logging` + `log` from api_register.py; `validate_ticker_historical` + `clean_for_json` from api_fund.py.
+- Updated `docs/endpoint_classification.md` (route table, Phase 4 Batch 4-A Blueprint mapping, footnote pointing to this work). Marked `docs/findings/2026-04-24-consolidated-backlog.md` row 86 + the §Backlog detail row CLOSED.
+- Verification: `npm run build` passes (1.74s). `pre-commit run --files <touched>` passes (ruff + pylint + bandit + tracker-staleness). `pytest tests/test_app_ticker_validation.py` 38/38 pass. `pytest tests/smoke/` 8/8 pass. Smoke-imported all 7 routers — clean.
 
-Prior wave (HEAD `15b2da6`, PRs #168–#174 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep):
+**Open follow-up:** `web/react-app/src/types/api-generated.ts` is regenerated via `npx openapi-typescript http://localhost:8001/openapi.json` against the running server; not refreshed in this PR. Stale entries for the 11 deleted routes will linger until the React types pipeline runs again (per the `ARCH-4C-followup` deferred item in ROADMAP).
+
+Prior wave (HEAD `983db36`, PRs #168–#177 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep + INF48/INF49 entity dedup + react-cleanup-inf28):
 
 - **DM13-A** (PR #168) — 131 self-referential `ADV_SCHEDULE_A` edges suppressed. Override IDs **258–388**. `scripts/oneoff/dm13a_apply.py`. Promote snapshot `20260426_134015`.
 - **DM13-B/C** (PR #169) — 107 non-operating / redundant rollup edges suppressed (Cat B AUM-inversion + Cat C non-operating parent / graph noise). Override IDs **389–495**. `scripts/oneoff/dm13bc_apply.py`. Promote snapshot `20260426_171207`.
@@ -32,7 +41,7 @@ Prod entity-layer state at end of wave (read-only `data/13f.duckdb`):
 
 - See `ROADMAP.md` "Current backlog". **P0 empty. P2 empty.**
 - **P1:** `ui-audit-walkthrough` (live Serge+Claude walkthrough — not a Code session); `perf-P0` (shipped PRs #158/#159 — peer_rotation precompute, verify no regressions); `audit-tracker-staleness-ci` (shipped PR #155 — verify no regressions); `43b-security` (shipped PR #156 — verify no regressions).
-- **P3 quick wins:** React-1, React-2, dead-endpoints, INF28, `other_managers` PK shape decision, `ncen_adviser_map` NULLs.
+- **P3 quick wins:** `other_managers` PK shape decision, `ncen_adviser_map` NULLs. (React-1, React-2, dead-endpoints, INF28 all closed in PRs #177 and this branch.)
 
 ## Reminders
 

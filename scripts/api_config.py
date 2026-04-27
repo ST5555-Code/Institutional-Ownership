@@ -1,6 +1,5 @@
 """Config + meta endpoints (FastAPI).
 
-/api/v1/config/quarters  — quarter list / URLs / report dates (public, no auth)
 /api/v1/freshness        — data_freshness snapshot (ARCH-3A)
 /api/v1/data-sources     — docs/data_sources.md content (p2-08 Data Source tab)
 """
@@ -24,25 +23,6 @@ config_router = APIRouter(
     tags=['config'],
     dependencies=[Depends(validate_query_params_dep)],
 )
-
-
-def _quarter_config_payload() -> dict:
-    from config import QUARTERS, QUARTER_URLS, QUARTER_REPORT_DATES, QUARTER_SNAPSHOT_DATES
-    return {
-        'quarters': QUARTERS,
-        'urls': QUARTER_URLS,
-        'report_dates': QUARTER_REPORT_DATES,
-        'snapshot_dates': QUARTER_SNAPSHOT_DATES,
-        'config_file': os.path.join(BASE_DIR, 'scripts', 'config.py'),
-    }
-
-
-@config_router.get('/config/quarters')
-def api_config_quarters():
-    """Quarter configuration. ARCH-1A rename from legacy /api/admin/quarter_config
-    (removed 2026-04-13 with the vanilla-JS retirement). Public — no auth,
-    loaded by React on every page."""
-    return _quarter_config_payload()
 
 
 @config_router.get('/freshness')
