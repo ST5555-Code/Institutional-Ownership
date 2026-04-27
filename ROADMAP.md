@@ -18,11 +18,13 @@ _(none — see COMPLETED table)_
 
 ### P2 — Next sprint
 
-_(none — see COMPLETED table)_
+- **ui-audit-01 perf-P2** (`flow_analysis` + `market_summary` + `holder_momentum` precompute) — moved here from Deferred 2026-04-27 (roadmap-priority-moves). Trigger ("perf-P0 + perf-P1 shipped AND latency complaints persist") partially met — perf-P0 (PRs #158 / #159) and perf-P1 (PRs #180 / #181) both shipped; activated proactively ahead of VPS hosting rather than waiting for in-prod latency complaints.
 
 ### P3 — Quick wins / low priority
 
 - **43g drop redundant type columns** — moved here from Deferred 2026-04-27 (conv-14 audit). Trigger ("first session touching `holdings_v2` query patterns") fired during perf-P1: PR #180 rewrote `queries.py` sector flow paths reading `holdings_v2` / `fund_holdings_v2`, PR #181 rewrote `cohort_analysis` reading the same. Bundling opportunity passed without bundling the column drop. Schedule a dedicated migration session against `holdings_v2` / `fund_holdings_v2` to drop redundant type columns next.
+- **BL-3 Write-path consistency (non-entity)** — moved here from Deferred 2026-04-27 (roadmap-priority-moves). Trigger ("non-entity write-path bug surfaces in prod") not yet fired; activated as preventive hardening before production traffic. Implementation target per `docs/write_path_risk_map.md` is the T2 tier (`build_cusip` / `build_managers` / `load_13f` / `unify_positions` / `compute_flows` / `fetch_adv` / `fetch_13dg` — drop+recreate without explicit BEGIN/COMMIT/ROLLBACK).
+- **D10 Admin UI for `entity_identifiers_staging`** — moved here from Deferred 2026-04-27 (roadmap-priority-moves). Trigger ("next admin UI iteration") not yet fired; activated to surface the 280-row staging backlog for review before the Q1 2026 cycle (~2026-05-15).
 
 ---
 
@@ -38,7 +40,6 @@ _(none — see COMPLETED table)_
 |---|---|
 | P2-FU-01 (`run_script` allowlist prune) | Q1 2026 cycle runs clean on V2 |
 | V-Q3 co-land cleanups for B3 denorm drops | B3 dispatch |
-| ui-audit-01 perf-P2 (`flow_analysis` + `market_summary` + `holder_momentum` precompute) | perf-P0 + perf-P1 shipped AND latency complaints persist |
 | INF25 Step 4 / int-09 architectural leg (denorm retirement) | B3 dispatch |
 | INF38 / int-19 BLOCK-FLOAT-HISTORY | Float-history data source acquired (10-K / 13D / Forms 3-5 ingestion) |
 | 43e family-office taxonomy | Next classification taxonomy work |
@@ -49,11 +50,9 @@ _(none — see COMPLETED table)_
 | DM15e prospectus-blocked umbrella trusts (7) | Ad-hoc manual override session when any of the 7 trusts becomes analytically important |
 | DERA 1,187 NULL-series synthetics | Next N-PORT data quality sweep |
 | Item 56 — DM & voting rollup worldviews | Voting-vs-economic gap becomes analytically important (activist defense or proxy contest) |
-| BL-3 Write-path consistency (non-entity) | Non-entity write-path bug surfaces in prod |
 | BL-5 Zustand scope enforcement | Next substantial React refactor session |
 | BL-6 Loading-state standardization | Next substantial React refactor session |
 | BL-7 DB-universe ticker validation at route layer | Actual ticker-not-found error surfaces for a valid ticker |
-| D10 Admin UI for `entity_identifiers_staging` | Next admin UI iteration |
 | ARCH-4C-followup React `api.ts` → `api-generated.ts` | `scripts/schemas.py` expanded for ~55 response types |
 | `DataSourceTab.tsx` cadence timeline SVG | ui-audit-01 walkthrough surfaces this as user-visible pain |
 | Type-badge `family_office` color | Bundled with 43e taxonomy refactor |
@@ -85,6 +84,7 @@ _(none — see COMPLETED table)_
 
 | Date | Item | Details |
 | --- | --- | --- |
+| 2026-04-27 | **roadmap-priority-moves** | Three items moved Deferred → active backlog ahead of VPS hosting / Q1 2026 cycle. (a) `ui-audit-01 perf-P2` (`flow_analysis` + `market_summary` + `holder_momentum` precompute) → P2; trigger ("perf-P0 + perf-P1 shipped AND latency complaints persist") partially met — perf-P0 (PRs #158 / #159) + perf-P1 (PRs #180 / #181) both shipped — activated proactively before VPS rather than waiting for in-prod complaints. (b) `BL-3 Write-path consistency (non-entity)` → P3; trigger ("non-entity write-path bug surfaces in prod") not fired — preventive hardening ahead of production traffic; T2 target tier per `docs/write_path_risk_map.md` (`build_cusip` / `build_managers` / `load_13f` / `unify_positions` / `compute_flows` / `fetch_adv` / `fetch_13dg`). (c) `D10 Admin UI for entity_identifiers_staging` → P3; trigger ("next admin UI iteration") not fired — surfaces the 280-row staging backlog for review before the Q1 2026 cycle (~2026-05-15). Pure ROADMAP.md edit + NEXT_SESSION_CONTEXT.md refresh; no DB writes, no schema changes, no code touched. |
 | 2026-04-27 | **conv-14-doc-sync** | End-of-sprint doc sync after the 13-PR wave (#169–#181). Refreshed `docs/NEXT_SESSION_CONTEXT.md` (full rewrite), `ENTITY_ARCHITECTURE.md` header (override count 1052→1054 / MAX 1054→1056, INF48/INF49 entity merges, perf-P1 `sector_flows_rollup` schema note), `MAINTENANCE.md` (last-updated + new "Precompute / rollup pipelines" section pointing to `compute_peer_rotation.py` + `compute_sector_flows.py`), `docs/findings/CHAT_HANDOVER.md` (full rewrite), and `ROADMAP.md` (this entry, deferred-item audit, verification date 2026-04-25→2026-04-27). **Deferred-item audit:** 5 candidates checked; **1 trigger fired** — `43g drop redundant type columns` ("first session touching `holdings_v2` query patterns"); perf-P1 (PRs #180 + #181) rewrote `queries.py` paths reading `holdings_v2` / `fund_holdings_v2` without bundling the column drop, so the item moved Deferred → P3. The other 4 (P2-FU-01 run_script allowlist prune, perf-P2, DM14c Voya residual, categorized-funds-csv-relocate) stay Deferred — triggers not met. No DB writes, no schema changes. |
 | 2026-04-27 | **perf-p1-discovery (PR #179) — scoping for sector flows / movers / cohort precomputes** | Read-only scoping study at `docs/findings/perf-p1-scoping.md`. Sized the cross-products for the three Sector Rotation / Ownership Trend hot-path queries; recommended (a) `sector_flows_rollup` precompute (low cardinality, ~351 rows), (b) `peer_rotation_flows` reuse for `get_sector_flow_movers` `level='parent'` (semantic match), (c) `cohort_by_ticker_from` precompute deferred in favor of a 60s TTL cache (full cross-product ~2.3M rows). Outcomes drove the part-1 (#180) and part-2 (#181) implementations. |
 | 2026-04-27 | **conv-13-doc-sync (PR #175)** | Mid-wave doc sync after the DM13 sweep + DM15d/f/g + pct-rename-sweep landed (PRs #168–#174). Refreshed `docs/NEXT_SESSION_CONTEXT.md`, `ENTITY_ARCHITECTURE.md` header, `MAINTENANCE.md`, and `docs/findings/CHAT_HANDOVER.md`. Pure documentation; HEAD then `15b2da6`. Subsequently superseded by `conv-14-doc-sync` for the full #169–#181 wave. |
