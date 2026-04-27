@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 27, 2026 (conv-13 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep)._
+_Last updated: April 27, 2026 (conv-14 — wave through PR #181: DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep + INF48/INF49 entity dedup + react-cleanup-inf28 + dead-endpoints + perf-P1 sector_flows_rollup precompute + cohort_analysis cache)._
 
 ## Pipeline refresh via admin dashboard
 
@@ -59,6 +59,25 @@ This replaces the legacy `python3 scripts/load_13f.py` (no-arg) full-reload patt
 **Stop the app before promote.** DuckDB allows a single writer per file; the framework opens prod in write mode at step 5 (snapshot) and step 6 (promote). If the FastAPI process holds the file open, promote errors with "unable to open file". Standard pattern: `./scripts/start_app.sh stop` → run pipeline → `./scripts/start_app.sh start`.
 
 **Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The `adviser_cik` stamping on `managers` now runs inside `scripts/pipeline/load_ncen.py._update_managers_adviser_cik` during promote — the legacy post-hoc writer-ordering hazard (fetch_13dg Phase 3 + fetch_ncen running after build_managers) is gone with those scripts' retirement in Wave 2.
+
+**Precompute / rollup pipelines (L4 derived).** Two `SourcePipeline` subclasses materialize precomputed views read by hot-path query endpoints. Both run on quarterly cadence — trigger after the source pipelines (`13f_holdings`, `nport_holdings`, `market_data`) have promoted for the new period.
+
+| Precompute | Pipeline name | Script | Source tables | Reader | Cadence trigger |
+|---|---|---|---|---|---|
+| `peer_rotation_flows` (perf-P0, migration 019) | `peer_rotation` | `scripts/pipeline/compute_peer_rotation.py` | `holdings_v2` + `fund_holdings_v2` + `market_data` | `queries.get_peer_rotation` / `get_peer_rotation_detail` (and `get_sector_flow_movers` `level='parent'` after perf-P1) | Quarterly — after the new-period 13F + N-PORT promotes land |
+| `sector_flows_rollup` (perf-P1, migration 021) | `sector_flows` | `scripts/pipeline/compute_sector_flows.py` | `holdings_v2` + `fund_holdings_v2` + `market_data` | `queries.get_sector_flows` | Quarterly — same as above; ~2.1s end-to-end rebuild |
+
+Both pipelines use `amendment_strategy='direct_write'` (truncate-and-rewrite the precompute table from current `holdings_v2` / `fund_holdings_v2` / `market_data` rows). Manual rebuild:
+
+```bash
+# perf-P0 — peer_rotation_flows
+python3 scripts/pipeline/compute_peer_rotation.py --auto-approve
+
+# perf-P1 — sector_flows_rollup
+python3 scripts/pipeline/compute_sector_flows.py --auto-approve
+```
+
+Both subclasses are wired into `PIPELINE_REGISTRY` and `DATASET_REGISTRY` (L4) and stamp `data_freshness` via the base ABC's `approve_and_promote` step.
 
 ---
 
