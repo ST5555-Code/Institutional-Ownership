@@ -1,22 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-
-interface TickerOption { ticker: string; name: string }
+import { useTickers, type TickerOption } from '../../hooks/useTickers'
 
 export function TickerInput() {
   const { loadCompany } = useAppStore()
   const [value, setValue] = useState('')
   const [options, setOptions] = useState<TickerOption[]>([])
-  const [allTickers, setAllTickers] = useState<TickerOption[]>([])
+  const allTickers = useTickers()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/api/v1/tickers')
-      .then(r => r.json())
-      .then((env: { data?: TickerOption[] }) => setAllTickers(env?.data ?? []))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (value.length < 1) { setOptions([]); setOpen(false); return }

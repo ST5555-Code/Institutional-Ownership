@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
+import { useTickers } from '../../hooks/useTickers'
 import type {
   TwoCompanyOverlapResponse,
   TwoCompanyInstitutionalRow,
@@ -70,17 +71,10 @@ interface TickerSearchProps {
 function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
   const [input, setInput] = useState(value)
   const [options, setOptions] = useState<Array<{ ticker: string; name: string }>>([])
-  const [allTickers, setAllTickers] = useState<Array<{ ticker: string; name: string }>>([])
+  const allTickers = useTickers()
   const [open, setOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/api/v1/tickers')
-      .then(r => r.json())
-      .then((env: { data?: Array<{ ticker: string; name: string }> }) => setAllTickers(env?.data ?? []))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => { setInput(value) }, [value])
 
