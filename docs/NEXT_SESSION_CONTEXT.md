@@ -4,7 +4,11 @@
 
 ## Last completed
 
-Today's wave (HEAD `15b2da6`, PRs #168–#174 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep):
+This session — INF48 + INF49 entity dedup (branch `inf48-49-entity-dedup`, snapshot `20260427_064049`):
+
+- **INF48 / INF49** — duplicate adviser entities merged into their canonicals using a new `scripts/oneoff/inf48_49_apply.py`. **NEOS:** dup eid=10825 (no comma, cik=`0002001019`) merged into canonical eid=20105 (with comma, crd=`000321256`). **Segall Bryant:** dup eid=254 (uppercase ADV-style; cik=`0001006378`, crd=`001006378`, crd=`106505`) merged into canonical eid=18157 (mixed case, crd=`000106505`). New script mirrors INF23 mechanics with one addition — per-entity identifier transfer (INSERT on survivor BEFORE close on dup, never break total_aum gate). Per-merge: transfer identifiers, add dup's preferred name as `alias_type='legal_name'` secondary alias on survivor, close inverted survivor→dup `wholly_owned/orphan_scan` edges (rel_id 15179 NEOS / rel_id 15231 SBH — closed not re-pointed to avoid self-edges), close dup's aliases / classification / rollups, insert `merged_into` rollup rows (one EC, one DM) on dup, write `entity_overrides_persistent` row keyed on dup CIK with `action='merge'`. Override IDs **1055** (NEOS) and **1056** (SBH). **Suspect-CRD exclusion (INF49):** dup's crd=`001006378` (`source=cik_crd_direct`) was numerically identical to its own CIK — excluded from transfer per user direction before promote (added to `TRANSFER_EXCLUSIONS` set in script and surgically dropped from survivor row before promote). Verify post-promote: dups hold zero active aliases / classifications / identifiers / non-`merged_into` rollups and zero active relationships in either direction; survivor 18157 ends with one CIK + 2 CRDs (`000106505` padded original + transferred unpadded `106505`); EC and DM open row counts both 26602 (parity preserved). `total_aum` PASS confirms identifier transfer didn't break the ~$166B INF4c gate.
+
+Prior wave (HEAD `15b2da6`, PRs #168–#174 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep):
 
 - **DM13-A** (PR #168) — 131 self-referential `ADV_SCHEDULE_A` edges suppressed. Override IDs **258–388**. `scripts/oneoff/dm13a_apply.py`. Promote snapshot `20260426_134015`.
 - **DM13-B/C** (PR #169) — 107 non-operating / redundant rollup edges suppressed (Cat B AUM-inversion + Cat C non-operating parent / graph noise). Override IDs **389–495**. `scripts/oneoff/dm13bc_apply.py`. Promote snapshot `20260426_171207`.
@@ -18,17 +22,17 @@ Prod entity-layer state at end of wave (read-only `data/13f.duckdb`):
 | Metric | Value |
 |---|---|
 | `entities` | **26,602** |
-| `entity_overrides_persistent` | **1,052 rows** (MAX `override_id` = **1,054**; the 2 missing IDs are 425/488 deleted by PR #170) |
+| `entity_overrides_persistent` | **1,054 rows** (MAX `override_id` = **1,056**; missing IDs 425/488 deleted by PR #170) |
 | `entity_rollup_history` open `economic_control_v1` | 26,602 |
 | `entity_rollup_history` open `decision_maker_v1` | 26,602 |
-| `entity_relationships` active (`valid_to=9999-12-31`) | 16,318 (of 18,363 total) |
+| `entity_relationships` active (`valid_to=9999-12-31`) | 16,316 (of 18,363 total) |
 | `ncen_adviser_map` | 11,209 |
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog". **P0 empty. P2 empty.**
 - **P1:** `ui-audit-walkthrough` (live Serge+Claude walkthrough — not a Code session); `perf-P0` (shipped PRs #158/#159 — peer_rotation precompute, verify no regressions); `audit-tracker-staleness-ci` (shipped PR #155 — verify no regressions); `43b-security` (shipped PR #156 — verify no regressions).
-- **P3 quick wins:** React-1, React-2, dead-endpoints, INF28, INF48 (NEOS dedup), INF49 (Segall Bryant dedup), `other_managers` PK shape decision, `ncen_adviser_map` NULLs.
+- **P3 quick wins:** React-1, React-2, dead-endpoints, INF28, `other_managers` PK shape decision, `ncen_adviser_map` NULLs.
 
 ## Reminders
 
