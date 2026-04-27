@@ -122,6 +122,8 @@ No discrepancies. DM/EC rollup parity is holding. Override ledger is dense (no g
 | Champlain | 0 | Needs DM6/DM3 |
 | FPA | 0 | Needs DM6/DM3 |
 
+> **Correction (2026-04-27):** the 19 / 17 / 16 row counts above are `role='adviser'` rows in `ncen_adviser_map`, not `role='subadviser'` rows. None of Sterling Capital Funds, NEOS ETF Trust, or Segall Bryant & Hamill Trust have any `role='subadviser'` rows — they are single-adviser trusts where the namesake firm is both sponsor and sole adviser. The DM15b/L2 retarget pattern requires subadviser rows, so DM15d closed as a no-op. See ROADMAP COMPLETED 2026-04-27.
+
 **Implication:** 3 of 10 umbrella trusts can be resolved by extending the DM15b/L2 pattern (add N-CEN rows, run retarget). 7 of 10 are blocked behind DM6 (N-1A prospectus parser) or DM3 (N-PORT metadata extension). The v3 brief frames DM15 umbrella-trusts as a single Tier 2 item — it should be split: **DM15d** (N-CEN-resolvable: Sterling/NEOS/Segall Bryant) now, and **DM15e** (prospectus-blocked: 7 remaining trusts) behind DM6/DM3.
 
 ### 5.2 77 entities with DM self-rollup + `classification='passive'`
