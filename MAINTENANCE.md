@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 22, 2026 (conv-12 — Phase 2 + Wave 2 close)._
+_Last updated: April 27, 2026 (conv-13 — DM13 sweep close + DM15d no-op + DM15f/g hard-delete + pct-rename-sweep)._
 
 ## Pipeline refresh via admin dashboard
 
@@ -399,15 +399,18 @@ date passes.
 
 All items below must go through the staging workflow:
 
-- **DM13** — ADV Schedule A residual sweep (~390 suspicious rows after BlueCove cluster closed). See `ROADMAP.md` "Current backlog" P2.
 - **L5 parents 201-720 audit** (batches of 100)
 - **L4 classification audit** (13 categories)
+- **DM15e** — 7 prospectus-blocked umbrella trusts (Gotham, Mairs & Power, Brandes, Crawford, Bridges, Champlain, FPA). Blocked behind DM6 (N-1A parser) or DM3 (N-PORT metadata extension); not actionable in current Tier 2 scope.
 
 ## Completed Audit Work
 
-- **Securian / Sterling** — **Closed 2026-04-10 (DM12, `ada58ac`)**.
-- **HC Capital Trust (7 sub-adviser routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Note: original MAINTENANCE count of 5 was understated; actual scope 7.
-- **CRI / Christian Brothers (5 missing series routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Note: original MAINTENANCE count of 4 was understated; actual scope 5.
+- **Securian / Sterling** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Confirmed stale and re-verified read-only against prod by `docs/findings/dm-open-surface-2026-04-22.md` §3.1.
+- **HC Capital Trust (7 sub-adviser routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Original MAINTENANCE count of 5 was understated; actual scope 7. Re-verified §3.2 of the dm-open-surface audit.
+- **CRI / Christian Brothers (5 missing series routings)** — **Closed 2026-04-10 (DM12, `ada58ac`)**. Original MAINTENANCE count of 4 was understated; actual scope 5. Re-verified §3.3 of the dm-open-surface audit.
+- **DM13 ADV Schedule A residual sweep** — **Closed 2026-04-26/27 across PRs #168 / #169 / #170 / #173**. 797 relationships suppressed (Cat A self-loops 131; Cat B+C non-operating / redundant 107; Cat D+E dormant / residual 559) + 2 hard-deleted by DM15f/g. Override ID ranges 258–388 / 389–495 / 496–1054. Promote snapshots `20260426_134015` / `20260426_171207` / `20260426_174146` / `20260427_045843`.
+- **DM15d (N-CEN-resolvable umbrella trusts)** — **Closed 2026-04-27 as no-op (PR #174)**. Sterling Capital / NEOS / Segall Bryant are single-adviser trusts (52 rows are all `role='adviser'`, zero `role='subadviser'`); the DM15b/L2 retarget pattern is not applicable. Two entity-merge candidates surfaced as side-observations: INF48 (NEOS dupe eids 10825 vs 20105) and INF49 (Segall Bryant dupe eids 254 vs 18157).
+- **DM15f / DM15g** — **Closed 2026-04-26 (PR #170)**. 2 ADV Schedule A false-positive `wholly_owned` edges hard-`DELETE`d (StoneX→StepStone rel 14408; Pacer→Mercer rel 12022) along with their DM13-B/C suppression overrides (override_ids 425, 488).
 
 ## Stage 5 Cleanup — CLOSED 2026-04-13
 
