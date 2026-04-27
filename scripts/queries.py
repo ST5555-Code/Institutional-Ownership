@@ -34,7 +34,7 @@ import math
 import pandas as pd
 # import duckdb  # unused, connection passed in
 from config import QUARTERS, LATEST_QUARTER, FIRST_QUARTER, PREV_QUARTER, SUBADVISER_EXCLUSIONS
-from cache import cached, CACHE_KEY_SUMMARY
+from cache import cached, CACHE_KEY_SUMMARY, CACHE_KEY_COHORT, CACHE_TTL_COHORT
 # Response-shaping helpers moved to serializers.py in Phase 4 Batch 4-B.
 # clean_for_json / df_to_records are re-exported here so existing handler
 # imports (`from queries import clean_for_json, df_to_records`) keep
@@ -2782,10 +2782,27 @@ def _build_cohort(q1_map, q4_map):
 
 
 def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1', quarter=LQ):
-    """Cohort retention analysis: compare two quarters.
+    """Cohort retention analysis: compare two quarters. Cached for 60s.
+
     level: 'parent' (13F institutional) or 'fund' (N-PORT fund series).
     active_only: when level='fund', exclude passive/index funds.
     """
+    fq = from_quarter or PQ
+    key = CACHE_KEY_COHORT.format(
+        ticker=ticker, quarter=quarter, rollup_type=rollup_type,
+        level=level, active_only=active_only, from_quarter=fq,
+    )
+    return cached(
+        key,
+        lambda: _cohort_analysis_impl(
+            ticker, from_quarter=fq, level=level, active_only=active_only,
+            rollup_type=rollup_type, quarter=quarter,
+        ),
+        ttl=CACHE_TTL_COHORT,
+    )
+
+
+def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1', quarter=LQ):
     rn = _rollup_col(rollup_type)
     con = get_db()
     try:
