@@ -4,50 +4,62 @@
 
 ## Last completed
 
-This session closed a **27-PR arc (#169–#196)** ending on `p3-audit-dryrun` (PR #196 — this PR). HEAD reflects the post-merge state of #196: `make audit` runner live; `--dry-run` flag uniform across all non-pipeline write scripts (`build_entities.py` + `resolve_adv_ownership.py` were the last two holdouts and shipped here); P3 backlog cleared of every non-UI item.
+`dera-synthetic-phase1-2` (this session, branch `claude/nice-vaughan-8da17c`,
+not yet merged). Phase 1 (Tier 1, 1 reg / 72 rows) + Phase 2 (Tier 3, 55 regs
+/ ~$1.98T NAV / 1,285,589 rows) of the DERA synthetic-series resolution are
+done. Tier 4 (658 unmapped CIKs / $570.8B NAV) remains as the P2 sprint slot
+under a renamed item.
 
-Three discrete legs across the 27 PRs:
+## This session
 
-1. **DM13 + INF48/49 + perf-P1 wave (PRs #169–#181, conv-14 close).** 797 ADV_SCHEDULE_A rollup edges suppressed + 2 hard-deleted; 2 NEOS / Segall Bryant entity merges; `sector_flows_rollup` + `cohort_analysis` cache → perf-P1 closed.
-2. **N-PORT pipeline / dedup / 43g (PRs #183–#187, conv-15 close) + post-conv-15 trio (#189 BL-3+INF53, #190 perf-P2 scoping, #191 perf-P2 holder_momentum).** N-PORT topup +478K rows, INF50/INF52 hardening, 68 byte-identical INF51 dupes deleted, 3 redundant v2 columns dropped (migration 022), `parent_fund_map` precompute (migration 023, 5.6× holder_momentum speedup) → perf-P2 closed.
-3. **End-of-arc P3 sweep (PRs #192–#196).** DM14c Voya residual ($21.74B / 49 series DM re-route); CSV file-system relocate + DERA synthetic-series discovery & promotion to P2; Rule 9 dry-run uniformity (8 scripts) + 43e family-office taxonomy (51 managers + 36,950 holdings reclassified); G7 `scripts/queries.py` 5,455-line monolith split into 8 domain modules; **this PR** wires `scripts/run_audits.py` + `make audit` and closes the dry-run sweep on the last two deferred scripts.
-
-**Migrations 022 + 023 applied this arc.** No migration this PR.
-
-## This session — Tasks A/B (PR #196)
-
-| Task | Slug | Outcome |
+| Phase | Slug | Outcome |
 |---|---|---|
-| A | maintenance-audit-design | New `scripts/run_audits.py` runner wraps the 5 read-only audit / validation scripts (`check_freshness`, `verify_migration_stamps`, `validate_classifications`, `validate_entities --prod`, `validate_phase4`) in subprocess invocations that preserve each script's exit codes / JSON reports / side files. PASS / FAIL / MANUAL via `_classify(returncode, stdout)`; `--quick` skips the two slow checks; `--verbose` echoes full subprocess output. Returns 0 on all-PASS-or-MANUAL, 1 on any FAIL. New Makefile targets `audit` + `audit-quick`; new "Running Audits" section in `MAINTENANCE.md` between Standing curation and Monthly maintenance. No existing audit logic touched. |
-| B | dry-run sweep follow-up | Closes the rule9-43e residual on the last two scripts. **`build_entities.py`:** top-level `--dry-run` guard in `main()` opens DuckDB read-only and prints the planned table operations (refresh-reference-tables 7-table DROP+CREATE, reset 7-table DELETE + 2-sequence DROP/CREATE) plus per-step row-count estimates from cheap `COUNT(*)` probes (PARENT_SEEDS, distinct CIKs in managers, fund_universe, ncen_adviser_map, cik_crd_links, cik_crd_direct). Composes with `--reset` and `--refresh-reference-tables`. **`resolve_adv_ownership.py`:** top-level `--dry-run` guard after target fetch (read-only DB open when set); resolves which phase(s) the selected mode would invoke and prints a numbered phase plan naming each phase's side-effect targets (PDF cache dir, `adv_schedules.csv`, the four `logs/phase35_*.csv` artifacts, staging entity tables). Covers all 8 modes — `--qc`, `--manual-add`, `--refresh`, `--oversized`, `--download-only`, `--parse-only`, `--match-only`, full default. `docs/PROCESS_RULES.md §9a` compliance table updated — both flipped ⚠️ deferred → ✅. Zero behavior change when `--dry-run` is not set. |
+| Pre-flight | backup + baselines | Backup `data/backups/13f_backup_20260428_124210/` (3.2 GB EXPORT DATABASE PARQUET). Pre-state baselines: fund_holdings_v2 14,568,775 (all) / 14,568,704 (`is_latest`); 14,441 distinct series_id (`is_latest`); $161,598.7428058227B NAV (`is_latest`); fund_universe 12,971; synth `{cik}_{accession}` inventory 2,169,573 rows / 1,235 series / $2,543.4B NAV. App not running — no stop needed. |
+| Phase 1 | dera-synthetic-phase1 | New `scripts/oneoff/dera_synthetic_stabilize.py` (`--phase 1\|2\|all`, default `--dry-run`, `--confirm` to write). Tier 1 case: synthetic `2060415_0002071691-26-007379` → real `S000093420` for First Eagle High Yield Municipal Completion Fund (CIK 0002060415); the real S-number already existed in the same fund's prior-quarter row (Q1'26 DERA bulk dropped SERIES_ID for the new filing, Q4'25 carried it). Pure key rename (72 rows), no row delta, no entity backfill (Tier 1 CIK has no `entity_identifier` row), 0 fund_universe rows touched. Commit `3043b34`. |
+| Phase 2 | dera-synthetic-phase2 | Tier 3 stable-key migration: collapsed per-quarter `{cik}_{accession}` synth keys to `SYN_{cik_padded}` for 55 entity-mapped single-fund stand-alone registrants (ETFs, BDCs, interval funds, CEFs). Per CIK in one tx: rekeyed fund_holdings_v2 (1,285,589 rows total); deleted prior fund_universe rows by `fund_cik` (always 10-padded; -12 across 7 of 55); inserted one canonical SYN_* fund_universe row (+55 — 7 sourced from existing fund_universe attrs, 48 fall back to fund_holdings_v2 metadata since those CIKs had no fund_universe row); backfilled `entity_id` + EC `rollup_entity_id` + DM `dm_entity_id` + `dm_rollup_entity_id` + `dm_rollup_name` from `entity_identifiers` + `entity_rollup_history` (SCD open at `9999-12-31`) — 1,285,589 rows backfilled, 0 NULL `entity_id` remaining. Commit `7b84637`. |
+| Recompute | downstream pipelines | `compute_parent_fund_map` (109,723 upserted, 95s); `compute_sector_flows` (321 upserted, 2s); `compute_flows` (19,224,688 investor_flows / 69,142 ticker_flow_stats, 20s); `build_summaries` (10,969 / 8,438 / 8,438 rows, 1.7s); `refresh_snapshot.sh` (7.7 GB / 378 tables). |
+| Verify | post-state assertions | All 8 PASS: 0 residual `{cik}_{accession}` synth rows for entity-mapped CIKs; 55 distinct `SYN_*` keys; 0 `SYN_*` rows with NULL `entity_id`; 55 `SYN_*` fund_universe rows; Tier 1 final state real=140 (72+68) synth=0; fund_holdings_v2 totals **unchanged** at 14,568,775 / 14,568,704; NAV `is_latest` $161,598.7428058224B (delta vs pre 1.62e-13%, float aggregation); fund_universe 13,014 (delta +43); distinct series_id `is_latest` 14,389 (delta -52). `validate_entities --prod --read-only` 7 PASS / 1 FAIL (`wellington_sub_advisory` baseline) / 8 MANUAL — same as the `dm14c-voya` close. |
+
+**Implementation refinements vs original plan:**
+
+- fund_universe matches CIKs by `fund_cik` (always 10-padded) rather than
+  `SPLIT_PART(series_id,'_',1)` — synth series_id prefixes are
+  inconsistently padded (some `'1285650_…'`, some `'0002007649_…'`); a
+  series_id-prefix match would miss rows.
+- Falls back to fund_holdings_v2 `(fund_cik, fund_name, family_name)` when
+  fund_universe has no row for the CIK (48 of 55 cases).
+- Uses pre-DML `SELECT COUNT(*)` for rowcount tracking — DuckDB has no
+  SQLite-style `SELECT changes()`.
+
+**Ran from main checkout** (`/Users/sergetismen/ClaudeWorkspace/Projects/13f-ownership`)
+with explicit `--prod-db` override. The `claude/nice-vaughan-8da17c`
+worktree under `.claude/worktrees/` has no `data/` subdir, so all pipeline /
+oneoff invocations need either main-checkout `cwd` + script path into the
+worktree, or `--prod-db <abs>` override.
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog".
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` only (live Serge+Claude session — not a Code session).
-- **P2:** `DERA-synthetic-series-resolution` (1,236 synthetic series_ids covering 2,172,757 rows / **$2.55T NAV** / 1.58% of `is_latest=TRUE` market value; multi-day resolution via `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier extension; see `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`).
+- **P2:** `DERA-synthetic-series-resolution Tier 4` — 658 registrant CIKs / 1,134 synth series / ~886K rows / $570.8B NAV that don't yet exist in `entity_identifiers`. Bootstrap entity rows by `fund_cik` (re-use `scripts/bootstrap_residual_advisers.py` pattern), then apply the same `SYN_{cik_padded}` migration. Multi-day. Medium confidence — entity-naming dedup risk: some Tier 4 CIKs may already be entities under different identifiers (CRD, ADV file number). Scoping: `docs/findings/dera-synthetic-resolution-scoping.md` Tier 4 row.
 - **P3 (2 items, both UI):**
-  - `D10 Admin UI for entity_identifiers_staging` — surface the 280-row staging backlog for review before Q1 2026 cycle (~2026-05-15).
+  - `D10 Admin UI for entity_identifiers_staging` — surface the 280-row staging backlog before Q1 2026 cycle (~2026-05-15).
   - `Type-badge family_office color` — `web/react-app/src/common/typeConfig.ts` needs a `family_office` case so the 36,950 reclassified `holdings_v2` rows render with a dedicated chip.
-- **All non-UI P3 items cleared this arc.** `categorized-funds-csv-relocate` (PR #193), `DERA-synthetic-series-resolution` (PR #193, promoted to P2), `Rule 9 dry-run uniformity` (PR #194 + this PR), `43e family-office taxonomy` (PR #194), `G7 queries.py monolith split` (PR #195), `maintenance-audit-design` (this PR), `dry-run sweep follow-up` (this PR).
 - **Next external events:**
-  - **Stage 5 cleanup DROP window opens 2026-05-09** (legacy `holdings` / `fund_holdings` / `beneficial_ownership` already retired 2026-04-13; this is the gate to drop their snapshots / final cleanup pass per `MAINTENANCE.md`).
+  - **Stage 5 cleanup DROP window opens 2026-05-09** (legacy `holdings` / `fund_holdings` / `beneficial_ownership` already retired 2026-04-13; gate to drop snapshots / final cleanup pass per `MAINTENANCE.md`).
   - **Q1 2026 13F cycle, ~2026-05-15** (filings for period ending 2026-03-31, 45-day reporting window).
-  - **Q1 2026 N-PORT DERA bulk, ~late May 2026** — first live exercise of INF50 + INF52 fixes (`scripts/pipeline/load_nport.py` `_cleanup_staging` hard-fail + `_enrich_staging_entities` pre-promote enrich) **and** of `compute_parent_fund_map.py` quarterly rebuild. Re-measure synthetic-series count after this drop and judge whether the P2 resolution scope changed.
+  - **Q1 2026 N-PORT DERA bulk, ~late May 2026** — first live exercise of INF50 + INF52 fixes and of `compute_parent_fund_map.py` quarterly rebuild. **Re-measure Tier 1/3 residuals** after this drop — new filings can re-seed synth keys for the 56 already-resolved CIKs (Phase 1+2 are idempotent: re-run `--phase all --confirm` against the new period).
 
 ## Reminders
 
-- **DERA synthetic-series is a P2 sprint slot, not a passive defer.** Resolution scope: extend `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier to recover series→entity via DERA registrant tables + N-CEN adviser map + fund_cik-as-entity inference, then backfill `entity_id` / `rollup_entity_id` on the affected `fund_holdings_v2` rows and re-emit `parent_fund_map`. Validator FLAG (`series_id_synthetic_fallback`, `scripts/pipeline/load_nport.py:437`) stays in place until closure.
-- **`make audit` is the new front door for read-only audits.** Wraps `check_freshness` + `verify_migration_stamps` + `validate_classifications` + `validate_entities --prod` + `validate_phase4`. `make audit-quick` skips the two slow checks (`validate_entities`, `validate_phase4`). See `MAINTENANCE.md` → "Running Audits" for baseline expectations (incl. the known `validate_entities` non-structural FAIL on `wellington_sub_advisory` until INF3 lands).
-- **`--dry-run` is now uniform across every non-pipeline write script.** `docs/PROCESS_RULES.md §9a` is the audited compliance table. SourcePipeline subclasses inherit `--dry-run` from `scripts/pipeline/base.py` (halts at `pending_approval`).
-- **`scripts/queries.py` is now a package: `scripts/queries/`.** 8 domain modules (`common`, `register`, `fund`, `flows`, `market`, `cross`, `trend`, `entities`) plus `__init__.py` re-exporting all 91 symbols. Existing `from queries import X` imports keep working unchanged. Touch the right domain file when adding/editing a query.
-- **`scripts/backfill_manager_types.py` CSV path is `data/reference/categorized_institutions_funds_v2.csv`.** Edit in place. The script reads via `Path(__file__).parent.parent / 'data' / 'reference' / ...`.
-- **`managers.strategy_type='family_office'` = 51 rows; `holdings_v2.manager_type='family_office'` = 36,950 rows** (PR #194 43e backfill). React badge config still shows the default chip until the P3 follow-up lands.
-- **`fund_holdings_v2` is at 14,568,775 rows** post-INF51 dedup; 5,587,231 value-divergent rows across 55,924 groups remain documented as INF53 (closed recommendation-only per PR #189 — N-PORT multi-row-per-key is by design). **Plus 2,172,757 synthetic-series rows now formally FLAG/deferred under the P2 item** — same physical table, separate metadata defect.
-- **Migration 023 (`parent_fund_map`)** is live; 109,723 rows. `holder_momentum` parent path now reads from it (5.6× speedup, PR #191). Quarterly rebuild via `python3 scripts/pipeline/compute_parent_fund_map.py` (~115s end-to-end) — trigger after the new-period 13F + N-PORT promotes.
+- **PR for this session is open but NOT merged.** Per session brief: "do not merge". Three commits on `claude/nice-vaughan-8da17c`: `3043b34` (Phase 1), `7b84637` (Phase 2), and the docs commit landing this file.
+- **App is started from `data/13f_readonly.duckdb`** (refreshed in this session). If the user starts it with the standard incantation it will pick up the new SYN_* keys + entity backfill automatically.
+- **`SYN_{cik_padded}` is the new stable per-fund synthetic key pattern.** Do not introduce another fallback — load_nport's `series_id_synthetic_fallback` should follow the same `SYN_{cik_padded}` shape if it ever has a CIK with no SERIES_ID at promote time. (`scripts/fetch_dera_nport.py:460` still mints `{raw_cik}_{accession}` per filing; that's the upstream bug. Fix is out of scope for this PR — track via the Tier 4 work.)
+- **`make audit` baseline preserved post-Phase-2.** `validate_entities --prod` 7 PASS / 1 FAIL (`wellington_sub_advisory`) / 8 MANUAL.
+- **Validator FLAG `series_id_synthetic_fallback` (`scripts/pipeline/load_nport.py:437`) stays in place** until Tier 4 closes — Phase 1+2 closed the entity-mapped subset, but new filings still mint `{raw_cik}_{accession}` keys for the unmapped 658 registrants.
 - **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows).
-- **Do not run `build_classifications.py --reset`.** eqt-classify-codefix (PR #162) landed but `security_type_inferred` column still in schema; a `--reset` would re-seed from a column the classifier no longer reads.
+- **Do not run `build_classifications.py --reset`.** Same as previous sessions.
 - **No `--reset` runs anywhere** without explicit user authorization.
 - **Stage 5 cleanup** (legacy-table DROP window) authorized **on or after 2026-05-09** per `MAINTENANCE.md`.
 - `other_managers` PK still pending — proposed `(accession_number, sequence_number, other_cik)` blocked by 5,518 NULL `other_cik` rows.
