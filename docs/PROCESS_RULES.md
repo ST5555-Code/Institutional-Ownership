@@ -109,7 +109,7 @@ When fixing parsing patterns (regex, clean_text, QC gates):
   `--dry-run` is the explicit form of the default safe mode and overrides
   `--apply` if both are passed.
 
-### 9a. Compliance Table (audited 2026-04-28)
+### 9a. Compliance Table (audited 2026-04-28, refreshed p3-audit-dryrun)
 
 Pipeline scripts (`scripts/pipeline/*.py`) — SourcePipeline subclasses inherit
 `--dry-run` semantics from `scripts/pipeline/base.py`. The base class halts at
@@ -166,8 +166,8 @@ Non-pipeline scripts (`scripts/*.py`) with CLI write paths:
 | `resolve_pending_series.py` | ✅ | — |
 | `run_openfigi_retry.py` | ✅ | — |
 | `sync_staging.py` | ✅ | — |
-| `build_entities.py` | ⚠️ deferred | `--reset` only; `--dry-run` requires gating ~15 INSERT/UPDATE sites — tracked as follow-up |
-| `resolve_adv_ownership.py` | ⚠️ deferred | `--staging` required; multi-phase (download/parse/match) — tracked as follow-up |
+| `build_entities.py` | ✅ (p3-audit-dryrun) | Top-level guard: opens read-only DuckDB, prints planned step ops + estimated row counts (PARENT_SEEDS, distinct CIKs, fund_universe rows, ncen rows, cik_crd_links, cik_crd_direct), exits before any step. Composes with `--reset` and `--refresh-reference-tables` (both reported in plan, neither executed). |
+| `resolve_adv_ownership.py` | ✅ (p3-audit-dryrun) | Top-level guard: prints which phase(s) would run for the selected mode (`--download-only` / `--parse-only` / `--match-only` / `--refresh` / `--oversized` / `--qc` / `--manual-add` / full), names the side-effect targets (PDF cache dir, `adv_schedules.csv`, results/JV/unmatched CSVs, staging entity tables), exits before downloads or DB writes. |
 
 Read-only scripts that do not need `--dry-run`: `backup_db.py`, `benchmark.py`,
 `check_freshness.py`, `diff_staging.py`, `rollback_promotion.py` (gated by

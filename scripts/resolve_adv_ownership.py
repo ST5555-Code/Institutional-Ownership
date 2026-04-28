@@ -10,6 +10,10 @@ Three-phase pipeline, each fully restartable:
 Full run (all three phases in one):
   python3 scripts/resolve_adv_ownership.py --staging --all
 
+Add --dry-run to any invocation to print the plan (target count, output paths,
+phases that would run) and exit without performing network downloads, file
+writes, or DB mutations.
+
 Rate limit: 5 req/s. PDF source: reports.adviserinfo.sec.gov
 """
 from __future__ import annotations
@@ -1034,18 +1038,27 @@ def main():
     ap.add_argument("--manual-add", type=str, default=None, help="CSV file of manual entity additions (crd,name,jurisdiction,ownership_code)")
     ap.add_argument("--timeout", type=int, default=PARSE_TIMEOUT, help="Per-PDF parse timeout in seconds (default 180)")
     ap.add_argument("--workers", type=int, default=PARSE_WORKERS, help="Parallel parse workers (default 4)")
+    ap.add_argument(
+        "--dry-run", action="store_true",
+        help="Print the plan (selected phases, target count, output paths) and exit without writes/downloads",
+    )
     args = ap.parse_args()
 
     db.set_staging_mode(True)
 
     # Open DB only when needed — parse-only reads local files and should NOT
     # hold the DuckDB write lock for hours (blocks all other DB operations).
-    print("Phase 3.5 — resolve_adv_ownership.py")
+    print("Phase 3.5 — resolve_adv_ownership.py" + (" [DRY-RUN]" if args.dry_run else ""))
     print(f"  DB: {db.get_db_path()}")
     print(f"  started: {datetime.now().isoformat()}")
 
-    # Get targets (brief DB read, then close)
-    con = db.connect_write()
+    # Get targets (brief DB read, then close). In dry-run, open read-only
+    # so we never hold a write lock or risk a stray mutation.
+    if args.dry_run:
+        import duckdb  # pylint: disable=import-outside-toplevel
+        con = duckdb.connect(db.get_db_path(), read_only=True)
+    else:
+        con = db.connect_write()
     targets = get_adv_targets(con)
     con.close()
     del con
@@ -1054,6 +1067,48 @@ def main():
     print(f"  targets: {len(targets)}, limit: {limit or 'all'}")
 
     parse_timeout = args.timeout
+
+    if args.dry_run:
+        # Decide which phase(s) WOULD run, and report the side-effects each
+        # phase would have. No network, no file writes, no DB writes.
+        if args.qc:
+            phases = ["qc (read-only report; no writes)"]
+        elif args.manual_add:
+            phases = [
+                f"manual_add: read {args.manual_add}, would INSERT entities/identifiers/relationships in staging DB",
+            ]
+        elif args.refresh:
+            phases = [
+                f"refresh: download missing PDFs to {PDF_DIR} (5 req/s)",
+                f"refresh: parse with pymupdf primary ({args.workers} workers) → pdfplumber fallback; writes {SCHEDULES_CSV} + {OVERSIZED_CSV} + {TIMEDOUT_CSV}",
+                "refresh: match → INSERT entity_relationships + entity_rollup_history in staging",
+            ]
+        elif args.oversized:
+            phases = [
+                f"oversized: parse pre-flagged PDFs from {OVERSIZED_CSV} (timeout=300s, 1 worker, pymupdf); writes {SCHEDULES_CSV}",
+            ]
+        elif args.download_only:
+            phases = [f"download: write missing PDFs to {PDF_DIR} (5 req/s)"]
+        elif args.parse_only:
+            phases = [
+                f"parse: timeout={parse_timeout}s, workers={args.workers}; writes {SCHEDULES_CSV} + side CSVs in {LOG_DIR}",
+            ]
+        elif args.match_only:
+            phases = [
+                f"match: read {SCHEDULES_CSV}; INSERT entity_relationships + entity_rollup_history in staging; writes {RESULTS_CSV} + {JV_CSV} + {UNMATCHED_CSV}",
+            ]
+        else:
+            phases = [
+                f"download: write missing PDFs to {PDF_DIR} (5 req/s)",
+                f"parse: workers={args.workers}; writes {SCHEDULES_CSV} + side CSVs in {LOG_DIR}",
+                "match: INSERT entity_relationships + entity_rollup_history in staging",
+            ]
+        print("\n[dry-run] phase plan:")
+        for i, p in enumerate(phases, 1):
+            print(f"  {i}. {p}")
+        print("[dry-run] no downloads, file writes, or DB mutations performed.")
+        print("\nDone.")
+        return
 
     if args.qc:
         print("\n--- QUALITY CONTROL ---")
