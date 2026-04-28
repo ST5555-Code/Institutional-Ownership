@@ -31,7 +31,7 @@ endif
         schema-parity-check \
         rotate-logs rotate-logs-dry \
         snapshot-retention snapshot-retention-dry \
-        audit-read-sites
+        audit audit-quick audit-read-sites
 
 help:
 	@echo "13F pipeline targets:"
@@ -58,6 +58,8 @@ help:
 	@echo "    make schema-parity-check  — validate staging↔prod L3 schema parity"
 	@echo ""
 	@echo "  Maintenance:"
+	@echo "    make audit                — run all read-only audits (see MAINTENANCE.md → Running Audits)"
+	@echo "    make audit-quick          — skip slow audits (validate_entities, validate_phase4)"
 	@echo "    make rotate-logs          — compress logs >7d, delete >90d (see MAINTENANCE.md)"
 	@echo "    make rotate-logs-dry      — print rotation actions without executing"
 	@echo "    make snapshot-retention     — prune expired DB snapshots"
@@ -229,3 +231,14 @@ snapshot-retention-dry:
 # ---------------------------------------------------------------------------
 audit-read-sites:
 	$(Q) $(PY) $(SCRIPTS)/hygiene/audit_read_sites.py --csv
+
+# ---------------------------------------------------------------------------
+# Audit suite — wraps validate_*, check_*, verify_* scripts in one runner.
+# See MAINTENANCE.md → "Running Audits" for descriptions and baseline results.
+# Read-only; safe to run any time. Returns non-zero if any check fails.
+# ---------------------------------------------------------------------------
+audit:
+	@$(PY) $(SCRIPTS)/run_audits.py
+
+audit-quick:
+	@$(PY) $(SCRIPTS)/run_audits.py --quick

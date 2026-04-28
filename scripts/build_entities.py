@@ -19,6 +19,7 @@ All Phase 1 seed data has is_inferred=TRUE and valid_from='2000-01-01'.
 Usage:
   python scripts/build_entities.py            # build in staging (default)
   python scripts/build_entities.py --reset    # truncate entity tables before build
+  python scripts/build_entities.py --dry-run  # print plan, no DB writes
 
 Staging only. Never touches production.
 """
@@ -959,6 +960,66 @@ def refresh_reference_tables(con):
     logger.info("[refresh] done")
 
 
+def _dry_run_plan(con, seeds, refresh_reference_tables_arg, reset_arg):
+    """Print the planned operations without executing any DB writes."""
+    logger.info("[dry-run] no INSERT/UPDATE/DELETE/DROP/CREATE will be executed")
+    logger.info("[dry-run] plan:")
+
+    if refresh_reference_tables_arg:
+        ref_tables = [
+            "managers", "parent_bridge", "fund_universe", "adv_managers",
+            "ncen_adviser_map", "cik_crd_links", "cik_crd_direct",
+        ]
+        logger.info(
+            "[dry-run]   refresh_reference_tables: would DROP+CREATE %d tables "
+            "from prod: %s", len(ref_tables), ", ".join(ref_tables),
+        )
+
+    if reset_arg:
+        reset_tables = [
+            "entity_rollup_history", "entity_classification_history",
+            "entity_aliases", "entity_relationships",
+            "entity_identifiers_staging", "entity_identifiers", "entities",
+        ]
+        logger.info(
+            "[dry-run]   reset: would DELETE FROM %d entity tables + "
+            "DROP/CREATE 2 sequences", len(reset_tables),
+        )
+
+    # Cheap source-row counts for the planned inserts.
+    def _count(sql: str) -> int:
+        try:
+            return int(con.execute(sql).fetchone()[0])
+        except Exception:  # pylint: disable=broad-exception-caught
+            return -1
+
+    seed_count = len(seeds)
+    mgr_distinct_ciks = _count(
+        "SELECT COUNT(DISTINCT cik) FROM managers WHERE cik IS NOT NULL"
+    )
+    fund_count = _count(
+        "SELECT COUNT(*) FROM fund_universe WHERE series_id IS NOT NULL"
+    )
+    ncen_rows = _count(
+        "SELECT COUNT(*) FROM ncen_adviser_map "
+        "WHERE series_id IS NOT NULL AND adviser_crd IS NOT NULL"
+    )
+    cik_crd_links = _count("SELECT COUNT(*) FROM cik_crd_links")
+    cik_crd_direct = _count("SELECT COUNT(*) FROM cik_crd_direct")
+
+    logger.info("[dry-run]   step 2  INSERT entities (PARENT_SEEDS):       ~%d rows", seed_count)
+    logger.info("[dry-run]   step 2.5 INSERT entities (managers/CIK):       ~%d rows (less seed-absorbed)", mgr_distinct_ciks)
+    logger.info("[dry-run]   step 2.6 INSERT entities (fund_universe):      ~%d rows", fund_count)
+    logger.info("[dry-run]   step 3  INSERT entity_identifiers:            cik+crd from %d distinct CIKs, +cik_crd_links=%d, +cik_crd_direct=%d, +series_id=%d",
+                mgr_distinct_ciks, cik_crd_links, cik_crd_direct, fund_count)
+    logger.info("[dry-run]   step 4  INSERT entity_relationships:          parent_bridge + ncen rows=%d", ncen_rows)
+    logger.info("[dry-run]   step 5  INSERT entity_aliases:                brand+filing+normalized per entity")
+    logger.info("[dry-run]   step 6  INSERT entity_classification_history: 1 active row per entity")
+    logger.info("[dry-run]   step 7  INSERT entity_rollup_history:         1 active row per entity (economic_control_v1)")
+    logger.info("[dry-run]   step 8  REPLAY entity_overrides_persistent (still_valid=TRUE)")
+    logger.info("[dry-run] no writes performed; exit 0")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reset", action="store_true", help="Truncate entity tables before build")
@@ -966,16 +1027,31 @@ def main():
         "--refresh-reference-tables", action="store_true",
         help="Copy latest reference tables from production to staging before build",
     )
+    ap.add_argument(
+        "--dry-run", action="store_true",
+        help="Print the plan (table operations + estimated row counts) and exit without writes",
+    )
     args = ap.parse_args()
 
     db.set_staging_mode(True)
     db_path = db.get_db_path()
     logger.info("=" * 72)
     logger.info("Entity MDM Phase 1 build — %s", datetime.now().isoformat())
-    logger.info("Staging DB: %s", db_path)
+    logger.info("Staging DB: %s%s", db_path, " [DRY-RUN]" if args.dry_run else "")
     logger.info("=" * 72)
 
     seeds = load_parent_seeds()
+
+    if args.dry_run:
+        # Open read-only — no possibility of accidental writes.
+        import duckdb  # pylint: disable=import-outside-toplevel
+        con = duckdb.connect(db_path, read_only=True)
+        try:
+            _dry_run_plan(con, seeds, args.refresh_reference_tables, args.reset)
+        finally:
+            con.close()
+        return
+
     con = db.connect_write()
     try:
         if args.refresh_reference_tables:

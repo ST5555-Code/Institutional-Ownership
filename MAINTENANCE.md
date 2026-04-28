@@ -124,6 +124,45 @@ Recurring curation that the pipelines absorb on each run. No action unless the t
 
 - **INF27 — CUSIP residual coverage.** `build_classifications.py` + `run_openfigi_retry.py` re-attempt unresolved CUSIPs on every classification rebuild. **Trigger to revisit:** net-increase in `pending` rows across two consecutive runs. Current scope is automatic; no human attention required while pending counts trend down or hold flat.
 
+## Running Audits
+
+`make audit` is the single entry point for the read-only audit / validation
+suite. The runner (`scripts/run_audits.py`) invokes each underlying script as
+a subprocess, captures pass/fail/manual results, prints a summary table, and
+exits non-zero if any check fails.
+
+```bash
+make audit                          # all checks (recommended monthly)
+make audit-quick                    # skip slow checks
+python3 scripts/run_audits.py --verbose  # show full subprocess output
+```
+
+The runner does NOT alter any underlying script's logic — it only orchestrates
+and summarises. Each wrapped script remains independently runnable.
+
+| Check | Slow? | Description | Baseline |
+|---|---|---|---|
+| `check_freshness` | no | `data_freshness` staleness gate. Fails if any tracked-and-thresholded table is older than its threshold or untracked. | All critical tables fresh. |
+| `verify_migration_stamps` | no | Every file in `scripts/migrations/` has a row in `schema_versions` on prod. Mechanises the `verify_migration_applied()` invariant from `docs/REMEDIATION_PLAN.md`. | All migrations stamped. |
+| `validate_classifications` | no | CUSIP / fund-class classification BLOCK + WARN gates. BLOCK on missing classifications above tolerance; WARN on coverage degradation. | `READY: YES`, optional WARN tokens. |
+| `validate_entities` | yes | Entity MDM structural + semantic gates (916 LOC). Writes `logs/entity_validation_report.json`. Structural gates exit 2 and block; non-structural exit 1 and surface for review. | All structural PASS; expect 1 non-structural FAIL on `wellington_sub_advisory` until INF3 lands. |
+| `validate_phase4` | yes | Holdings/fund-holdings parity gates carried forward from the Phase 4 cutover. | All gates PASS post-Phase-4 promotion. |
+
+Interpretation:
+
+- **PASS** — exit 0 from the wrapped script. No action.
+- **FAIL** — exit 1 (non-structural / BLOCK / staleness) or exit 2
+  (structural). Open `logs/entity_validation_report.json` (entities) or the
+  printed BLOCK token (classifications) and triage. A persistent expected
+  failure (e.g. INF3) should be referenced in the relevant findings doc.
+- **MANUAL** — exit 0 but stdout signals manual review needed
+  (`validate_phase4` uses this for parity gates that need human sign-off).
+
+For deeper triage on a single check, run it directly with `--verbose` or pass
+`--prod` / `--staging` flags as documented in the script's own `--help`. The
+runner targets prod by default — staging audits are out of scope for `make
+audit` (use `python3 scripts/validate_entities.py --staging` etc.).
+
 ## Monthly maintenance
 
 INF2 — run on the 1st of each month:
