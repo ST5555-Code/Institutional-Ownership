@@ -1,8 +1,8 @@
-# Chat Handover — 2026-04-28 (p3-audit-dryrun close, 27-PR arc)
+# Chat Handover — 2026-04-28 (dera-synthetic-tier4 close, 30-PR arc)
 
 ## State
 
-HEAD (post this PR): `p3-audit-dryrun` (PR #196).
+HEAD (post this PR): `dera-synthetic-tier4` (PR-pending; do not merge per session brief).
 Migrations: 001–023 applied (022 = drop redundant v2 columns, PR #187; 023 = `parent_fund_map`, PR #191). No migration in this PR.
 Open PRs:
 - **#172** — `dm13-de-discovery: triage CSV for residual ADV_SCHEDULE_A edges` (intentional, paired with #173 apply; close after reconciling).
@@ -10,10 +10,20 @@ Open PRs:
 
 P0: empty.
 P1: `ui-audit-walkthrough` only (live walkthrough).
-P2: `DERA-synthetic-series-resolution` (1,236 synthetic series_ids, 2,172,757 rows, **$2.55T NAV**, 1.58% of `is_latest=TRUE` market value; promoted from P3 in PR #193).
-P3: 2 UI items only — `D10 Admin UI for entity_identifiers_staging` and `Type-badge family_office color`. **All non-UI P3 items cleared this arc.**
+P2: **empty** — `DERA-synthetic-series-resolution Tier 4` closed in this session (713 distinct SYN_* keys, $2.55T NAV resolved across 714 registrants).
+P3 (3 items): `D10 Admin UI for entity_identifiers_staging`, `Type-badge family_office color`, `Calamos eid 20206 / 20207 entity-merge` (new this session).
 
-Worktrees: this branch (`p3-audit-dryrun` / worktree `funny-newton-fe14c8`) only.
+Worktrees: this branch (`claude/optimistic-lamport-78dc7e` / worktree `optimistic-lamport-78dc7e`) only.
+
+## Post-arc additions
+
+The 27-PR arc closed at `p3-audit-dryrun` (PR #196). Three further PRs this same day:
+
+| PR | Slug | Notes |
+|---|---|---|
+| #197 | dera-synthetic-series-discovery | Read-only resolution scoping for the $2.55T DERA synthetic backlog. Tier classification (Tier 1: 1 reg / 0 NAV; Tier 2: 0; Tier 3: 55 / $1.98T; Tier 4: 658 / $570.8B). Findings doc `docs/findings/dera-synthetic-resolution-scoping.md`. No DB writes. |
+| #198 | dera-synthetic-phase1-2 | New `scripts/oneoff/dera_synthetic_stabilize.py`. Phase 1 (Tier 1, 1 reg / 72 rows) Tier-1-style swap. Phase 2 (Tier 3, 55 regs / 1.29M rows / $1.98T NAV) `SYN_{cik_padded}` stable-key migration. 8/8 verifications PASS; recompute pipelines clean; validate baseline 7 PASS / 1 FAIL / 8 MANUAL. |
+| **(this PR)** | **dera-synthetic-tier4** | **Phase 3 (Tier 4, 658 regs / 884K rows / $566.7B NAV).** Extended script with `--phase 3`. **657 institution entities bootstrapped** (`classification='unknown'`, `created_source='bootstrap_tier4'`, self-rooted EC + DM rollups). **1 attach (Calamos CIK 0001285650 → eid 20206)**, with stale synth-series identifiers closed on both 20206 + 20207. **Dedup gate: 3 name hits, threshold 50 → PROCEED** — but cross-checking matched eids' `fund_holdings_v2.fund_cik` flagged 2 of 3 as name collisions across different registrants (Nuveen FRI eid 20950 = Nuveen Investment Trust III; Alt Strats eid 16596 = Morgan Stanley Pathway Funds). 10/10 hard verifications PASS; row count + NAV unchanged; entities +657 / entity_identifiers +658 / fund_universe +609 / distinct series_id `is_latest` -470. **Closes the umbrella DERA initiative across all 4 tiers.** Calamos eid 20207 logged as P3 follow-up entity-merge (orphan: 0 holdings / 0 open identifiers, not deleted in this PR). |
 
 ## Session arc 2026-04-26/28 — 27 PRs (#169–#196)
 
@@ -95,33 +105,37 @@ The end-of-arc leg cleared every non-UI P3 item activated in #192's deferred-ite
 | **MAX(override_id)** | | **1105** |
 | **Active count** | | **1103** (gaps at 425, 488 from #170) |
 
-## Prod entity-layer state (read-only `data/13f.duckdb`, post-promote `20260428_081209`)
+## Prod entity-layer state (read-only `data/13f.duckdb`, post-tier4 close)
 
 | Metric | Value | Δ vs prior handover (dm14c-voya close) |
 |---|---|---|
-| `entities` | 26,602 | unchanged |
-| `entity_overrides_persistent` rows | **1,103** | unchanged |
+| `entities` | **27,259** | **+657** (Tier 4 institution bootstraps; PR-pending) |
+| `entity_overrides_persistent` rows | 1,103 | unchanged |
 | `MAX(override_id)` | 1,105 | unchanged |
-| `entity_rollup_history` open `economic_control_v1` | 26,602 | unchanged |
-| `entity_rollup_history` open `decision_maker_v1` | 26,602 | unchanged |
+| `entity_rollup_history` open `economic_control_v1` | **27,259** | **+657** (Tier 4 self-rooted EC) |
+| `entity_rollup_history` open `decision_maker_v1` | **27,259** | **+657** (Tier 4 self-rooted DM) |
 | `entity_relationships` total / active | 18,363 / 16,316 | unchanged |
-| `entity_aliases` | 26,943 | unchanged |
-| `entity_identifiers` | 35,516 | unchanged |
-| `parent_fund_map` (migration 023) | 109,723 | unchanged |
+| `entity_aliases` | **27,600** | **+657** (Tier 4 brand aliases, preferred=TRUE) |
+| `entity_identifiers` | **36,174** | **+658** (657 Tier 4 CIK identifiers + 1 Calamos attach) |
+| `parent_fund_map` (migration 023) | **109,721** | -2 (re-emit post Tier 4 rekey) |
 | `sector_flows_rollup` (migration 021) | 321 | unchanged |
-| `holdings_v2` rows / cols | **12,270,984 / 36** | unchanged |
-| `fund_holdings_v2` rows / cols | **14,568,775 / 29** | unchanged |
-| `managers.strategy_type='family_office'` | **51** | **+51** (PR #194 43e backfill — was 0) |
-| `holdings_v2.manager_type='family_office'` | **36,950** | **+36,950** (PR #194 43e backfill — was 0) |
+| `holdings_v2` rows / cols | 12,270,984 / 36 | unchanged |
+| `fund_holdings_v2` rows / cols | **14,568,775 / 29** | unchanged total (rekey only) |
+| `fund_holdings_v2` distinct `series_id` (`is_latest`) | **13,919** | **-470** (1,128 Tier 4 synth series collapsed to 658 SYN_*) |
+| `fund_holdings_v2` SYN_* `is_latest` rows | **2,169,501** | **+883,912** (Tier 4 rekey; Phase 2 was 1,285,589) |
+| Distinct SYN_* keys | **713** | **+658** (= 55 Phase 2 + 658 Phase 3) |
+| `fund_universe` | **13,623** | **+609** (= -49 Tier 4 fund_universe rows / +658 canonical SYN_* rows) |
+| `managers.strategy_type='family_office'` | 51 | unchanged (PR #194 43e backfill) |
+| `holdings_v2.manager_type='family_office'` | 36,950 | unchanged (PR #194 43e backfill) |
 
-`validate_entities` baseline preserved through all 5 promotes this arc: **7 PASS / 1 FAIL (`wellington_sub_advisory`, long-standing) / 8 MANUAL**. No auto-rollback fired.
+NAV `is_latest` $161,598,742,805,818.09 (pre $161,598,742,805,816.56; delta +9.48e-13% — float aggregation order, not data change). `validate_entities` baseline preserved post-Tier-4: **7 PASS / 1 FAIL (`wellington_sub_advisory`, long-standing) / 8 MANUAL**.
 
-## P0 / P1 / P2 / P3 status (post-merge)
+## P0 / P1 / P2 / P3 status (post Tier 4 close)
 
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` only (live walkthrough — not a Code session).
-- **P2:** `DERA-synthetic-series-resolution` ($2.55T NAV scope; multi-day work in `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier extension).
-- **P3 (2 items, both UI):** `D10 Admin UI for entity_identifiers_staging`, `Type-badge family_office color`. **All non-UI P3 items cleared.**
+- **P2:** **empty.** DERA umbrella initiative closed (Tier 1 + Tier 3 + Tier 4); $2.55T NAV / 2.17M synth rows resolved.
+- **P3 (3 items):** `D10 Admin UI for entity_identifiers_staging`, `Type-badge family_office color`, `Calamos eid 20206 / 20207 entity-merge` (new this session — orphan eid 20207 with 0 holdings / 0 open identifiers needs merge into 20206 in next entity-curation pass).
 
 ## INF50 + INF52 — pending live verification
 
@@ -136,23 +150,23 @@ If the post-cleanup `CatalogException` assertion ever fires, capture the full `R
 
 55,924 groups (5,587,231 rows) with same `(series_id, report_month, accession_number, cusip)` key but different shares/value/pct. **By design** — N-PORT lets a fund report multiple `<invstOrSec>` line items per security (Long+Short hedged pairs, multiple lots / sub-portfolios, placeholder-CUSIP buckets). The actual PK is `row_id BIGINT` (migration `020_pk_enforcement.py`); `(series_id, report_month, accession_number, cusip)` was never a natural key. **No fix.** Findings doc `docs/findings/inf53-backfill-mig015-multirow.md`.
 
-## DERA synthetic-series — P2 sprint slot (recap)
+## DERA synthetic-series — closed (Tier 1 + Tier 3 + Tier 4)
 
-`scripts/fetch_dera_nport.py:460` mints synthetic series_ids of form `{cik_no_leading_zeros}_{accession_number}` when DERA `FUND_REPORTED_INFO.SERIES_ID` is missing in the source XML. Validator FLAGs them as `series_id_synthetic_fallback` (`scripts/pipeline/load_nport.py:437`). Current scale:
+`scripts/fetch_dera_nport.py:460` mints synthetic series_ids of form `{cik_no_leading_zeros}_{accession_number}` when DERA `FUND_REPORTED_INFO.SERIES_ID` is missing in the source XML. Closure path: `scripts/oneoff/dera_synthetic_stabilize.py` (`--phase 1|2|3|all`).
 
-| Metric | Value |
-|---|---|
-| Synthetic rows | **2,172,757** |
-| Distinct synthetic series_ids | **1,236** |
-| Distinct fund_ciks | 714 |
-| Distinct accessions | 1,247 |
-| NAV exposure | **$2,553B** |
-| Share of total `is_latest=TRUE` market value | 1.58% |
-| Rows with `fund_universe` match | 18,510 (0.85%) |
-| Rows with `entity_id` resolved | 5,383 (0.25%) |
-| Distinct synthetics in `parent_fund_map` | 395 / 1,236 (32%) |
+| Tier | Approach | Registrants | Rows | NAV |
+|---|---|---:|---:|---:|
+| Tier 1 (PR #198) | Real-series swap (synthetic → existing `Sxxxxxxxxx`) | 1 | 72 | <$0.1B |
+| Tier 2 | n/a (N-CEN does not cover any) | 0 | 0 | 0 |
+| Tier 3 (PR #198) | `SYN_{cik_padded}` stable-key migration; entity already mapped | 55 | 1,285,589 | $1,977.6B |
+| **Tier 4 (this PR)** | **Bootstrap institution entity + same SYN migration** | **658** | **883,912** | **$566.7B** |
+| **Cumulative** | | **714** | **2,169,573** | **$2,544.3B** |
 
-Resolution path (multi-day, P2): extend `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier to (i) cross-reference DERA registrant tables + N-CEN adviser map for series→entity recovery, (ii) backfill `entity_id` / `rollup_entity_id` on the affected `fund_holdings_v2` rows, (iii) re-emit `parent_fund_map` to pick up new linkages, (iv) decide retain-as-synthetic vs hard-resolve vs drop for residual unmatched. Findings: `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`.
+The 8-CIK literal `'UNKNOWN'` legacy fallback (3,184 rows / pre-`fetch_dera_nport.py` loader) is intentionally excluded — those are pre-DERA-Session-2 data with no per-row registrant CIK to bootstrap from. Tracked separately if it ever becomes load-bearing.
+
+**Validator FLAG `series_id_synthetic_fallback` (`scripts/pipeline/load_nport.py:437`) can be retired** in the next `load_nport.py` audit pass — there are no remaining Tier 1/3/4 candidates as of this PR. Future N-PORT filings without SERIES_ID will mint net-new `{raw_cik}_{accession}` keys; re-running `dera_synthetic_stabilize.py --phase 3 --confirm` against the new period absorbs them (the script is idempotent).
+
+Findings: `docs/findings/dera-synthetic-resolution-scoping.md` (scoping, PR #197), `docs/findings/2026-04-28-dera-synthetic-series-discovery.md` (initial FLAG/discovery, PR #193).
 
 ## N-PORT data status
 
@@ -190,7 +204,7 @@ PRs #192–#196 add **no schema migrations** — all data, file-system, or code-
 |---|---|
 | **2026-05-09** | Stage 5 DROP window opens (legacy-table snapshot cleanup gate). |
 | **~2026-05-15** | Q1 2026 13F cycle (filings for period ending 2026-03-31; 45-day reporting window). |
-| **~late May 2026** | Q1 2026 N-PORT DERA bulk — first live exercise of INF50 + INF52 fixes; first live exercise of `compute_parent_fund_map.py` quarterly rebuild; re-measure DERA synthetic-series count and judge whether the P2 resolution scope changed. |
+| **~late May 2026** | Q1 2026 N-PORT DERA bulk — first live exercise of INF50 + INF52 fixes; first live exercise of `compute_parent_fund_map.py` quarterly rebuild; re-run `dera_synthetic_stabilize.py --phase 3 --confirm` against the new period to absorb any net-new Tier-4-shape registrants. |
 | **2026-07-23** | finra-default-flip — delete deprecation-warning path in `scripts/fetch_finra_short.py`. |
 | **~mid-Aug 2026** | B3 calendar gate — post-Q1+Q2 2026 cycles, retire V1 + drop denorm columns. |
 
@@ -198,9 +212,11 @@ PRs #192–#196 add **no schema migrations** — all data, file-system, or code-
 
 A. **Type-badge `family_office` color (P3, UI)** — `web/react-app/src/common/typeConfig.ts` needs a `family_office` case. The 36,950 reclassified `holdings_v2` rows currently render with the default chip. Trivial; first session touching the badge config closes it.
 B. **D10 Admin UI for `entity_identifiers_staging` (P3, UI)** — surface the 280-row staging backlog before Q1 2026 cycle (~2026-05-15).
-C. **DERA synthetic-series resolution (P2)** — multi-day. Start with `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier extension + DERA-registrant cross-reference; do not start until the Q1 2026 DERA bulk lands (late May) so the working set is current.
-D. **PR #172 close** — reconcile `dm13-de-discovery` doc with #173 apply outcome and close the PR. Carried over.
-E. **Passive Voya-Voya cleanup (DM14c follow-up, optional)** — 32 passive series at eid=2489 that should mirror EC (eid=4071). Not blocking; ship if a session already touches DM rollups.
-F. **`other_managers` PK shape decision** — 5,518 NULL `other_cik` rows + 19-row dedupe; finalize PK shape before stamping a PK enforcement migration.
-G. **INF50 + INF52 live verification** — wait for next N-PORT topup or Q1 2026 DERA bulk; capture the full `RuntimeError` if the contamination assertion fires.
-H. **DM15e** — still deferred behind DM6 / DM3. Do not slot until parsers ship.
+C. **Calamos eid 20207 entity-merge (P3, this-session follow-up)** — orphan: 0 holdings, 0 open identifiers (closed in Tier 4 close), but `entities` row + classification + rollup history still in place. Merge into 20206 in next entity-curation pass: re-point `entity_relationships` / `entity_overrides_persistent` / aliases on 20207 to 20206; close the entities row.
+D. **`load_nport.py:437` `series_id_synthetic_fallback` validator FLAG retire** — no remaining Tier 1/3/4 candidates after this PR. Audit-pass cleanup; flip the FLAG semantics from "block legacy backlog" to "warn on new mints" if any.
+E. **PR #172 close** — reconcile `dm13-de-discovery` doc with #173 apply outcome and close the PR. Carried over.
+F. **Passive Voya-Voya cleanup (DM14c follow-up, optional)** — 32 passive series at eid=2489 that should mirror EC (eid=4071). Not blocking; ship if a session already touches DM rollups.
+G. **`other_managers` PK shape decision** — 5,518 NULL `other_cik` rows + 19-row dedupe; finalize PK shape before stamping a PK enforcement migration.
+H. **INF50 + INF52 live verification** — wait for next N-PORT topup or Q1 2026 DERA bulk; capture the full `RuntimeError` if the contamination assertion fires.
+I. **Tier 4 classification sweep** — 657 new institution entities are `classification='unknown'`. Next `build_classifications.py` non-`--reset` sweep will assign them based on fund_strategy / SIC / N-PORT signals. No manual action needed unless the run shows >5% staying unknown.
+J. **DM15e** — still deferred behind DM6 / DM3. Do not slot until parsers ship.
