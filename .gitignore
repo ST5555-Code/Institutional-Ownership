@@ -2,6 +2,10 @@
 data/13f.duckdb
 data/13f.duckdb.wal
 
+# DuckDB write-ahead logs + runtime per-pipeline lock files
+data/*.lock
+data/*.wal
+
 # Generated flat closures log — rebuildable via
 # `python3 scripts/hygiene/concat_closed_log.py` from docs/closures/*.md.
 docs/closed-items-log.md

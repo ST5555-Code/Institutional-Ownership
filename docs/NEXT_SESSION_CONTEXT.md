@@ -4,25 +4,25 @@
 
 ## Last completed
 
-This session — `p3-quick-wins` (worktree `stoic-nash-325d62`, branch `claude/stoic-nash-325d62`):
+This session — `csv-cleanup-g7-split` (worktree `sleepy-pasteur-21634a`, branch `claude/sleepy-pasteur-21634a`, PR #195):
 
-- **Two P3 items, one PR.** (A) `categorized-funds-csv-relocate` — actioned. (B) `DERA 1,187 NULL-series synthetics cleanup` — discovery + FLAG/defer with documented reactivation triggers.
-- **HEAD at session start:** `8bfbeca` (dm14c-voya, PR #192). No new schema migrations, no DB writes, no staging promote — entity layer state unchanged from dm14c-voya close.
+- **Two refactor tasks, one PR.** (A) `categorized CSV duplicate cleanup` — 5 carry-over `family_office` dupes removed. (B) `G7 queries.py monolith split` — 5,455-line `scripts/queries.py` split into a `scripts/queries/` package with 8 domain modules. Pure refactor — no logic, signature, SQL, or return-value changes. `__init__.py` re-exports all 91 symbols so `from queries import X` keeps working unchanged.
+- **HEAD at session start:** `a95c0f0` (rule9-43e, PR #194). No schema migrations, no DB writes, no staging promote.
 
 ## This session — Tasks A/B
 
 | Task | Slug | Outcome |
 |---|---|---|
-| A | categorized-funds-csv-relocate | `categorized_institutions_funds_v2.csv` (5,790 rows) `git mv`d to `data/reference/`. `scripts/backfill_manager_types.py:39` `CSV_PATH` updated. Verified via `--dry-run` (CSV loads, 13 categories, 0 rows projected to update — already-applied idempotent state). Repo-wide grep: no other live code references; archive/docs/findings narrative refs left intact (historical record); `docs/data_layers.md` already documents the target path. |
-| B | dera-synthetic-series — FLAG | Discovery only, no DB writes. `fund_holdings_v2` has 0 rows with `series_id IS NULL`; the "1,187" figure refers to synthetic-fallback series_ids of form `{cik}_{accession}` minted at DERA load when `FUND_REPORTED_INFO.SERIES_ID` is missing. Current count: 2,172,757 rows / 1,236 distinct synthetic series / $2,553B AUM (1.58% of total `is_latest=TRUE` MV). Decision: defer — real holdings, no downstream regression (`parent_fund_map` already excludes 68% of synthetic series that have no entity rollup), proper resolution requires multi-day work on `resolve_pending_series.py` tiers. Findings doc `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`. |
+| A | csv-dupe-cleanup | Removed 5 carry-over duplicate `family_office` rows from `data/reference/categorized_institutions_funds_v2.csv` (`Custos`, `Forthright`, `Fusion`, `QTR`, `RPg`). CSV row count 5,807 → 5,802; `family_office` distinct names 57 → 52. Verified via pandas (`5,801 data rows / 4 cols / 15 categories`) and `backfill_manager_types.py --dry-run` (CSV load is upstream and clean). The 52nd un-matched `managers` name flagged in rule9-43e left for next curator pass — out of scope for a pure dupe cleanup. |
+| B | g7-queries-split | `scripts/queries.py` (5,455 L) split into `scripts/queries/` package — `common.py` (798 L), `register.py` (1,436 L), `fund.py` (455 L), `flows.py` (695 L), `market.py` (693 L), `cross.py` (452 L), `trend.py` (744 L), `entities.py` (551 L), `__init__.py` (re-exports all 91 names). Each domain module imports only what it actually uses (per-module audited; ruff F401 + pylint W0611 clean). Original `queries.py` deleted. **Verification:** `pytest tests/` 364 passed; `pytest tests/smoke/` 8 passed; `pre-commit run --all-files` PASS; all 91 expected symbols accessible via `import queries`; `_setup` correctly wires shared `common._get_db` / `_has_table` state; `api_*.py`, `admin_bp.py`, `serializers.py`, `oneoff/migrate_batch_3a.py` all `import` cleanly. |
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog".
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` only (live Serge+Claude session — not a Code session).
-- **P2:** `DERA-synthetic-series-resolution` (promoted from this session's FLAG discovery — 1,236 synthetic series_ids covering 2,172,757 rows / $2.55T NAV / 1.58% of `is_latest=TRUE` market value; multi-day resolution via `scripts/resolve_pending_series.py` tier extension; see `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`).
-- **P3:** `D10 Admin UI for entity_identifiers_staging`, `INF53 BACKFILL_MIG015 multi-row investigation`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 queries.py monolith split`, `maintenance-audit-design`. (Two of the eight items activated by `roadmap-priority-moves` / `dm14c-voya` are closed in this PR — `categorized-funds-csv-relocate` to COMPLETED, `DERA NULL-series synthetics` promoted to P2.)
+- **P2:** `DERA-synthetic-series-resolution` (1,236 synthetic series_ids covering 2,172,757 rows / $2.55T NAV / 1.58% of `is_latest=TRUE` market value; multi-day resolution via `scripts/resolve_pending_series.py` tier extension; see `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`).
+- **P3 (4 items remaining):** `D10 Admin UI for entity_identifiers_staging` (UI), `Type-badge family_office color` (UI), `dry-run sweep follow-up` (~1 hr — `build_entities.py` + `resolve_adv_ownership.py` only), `maintenance-audit-design` (~2 hrs). **Non-UI quick wins remaining:** `dry-run sweep follow-up` (~1 hr) and `maintenance-audit-design` (~2 hrs). Both `categorized CSV dupe cleanup` and `G7 queries.py monolith split` closed in this PR.
 - **Next external events:**
   - **Stage 5 cleanup DROP window opens 2026-05-09** (legacy `holdings` / `fund_holdings` / `beneficial_ownership` already retired 2026-04-13; this is the gate to drop their snapshots / final cleanup pass per `MAINTENANCE.md`).
   - **Q1 2026 13F cycle, ~2026-05-15** (filings for period ending 2026-03-31, 45-day reporting window).
@@ -32,6 +32,8 @@ This session — `p3-quick-wins` (worktree `stoic-nash-325d62`, branch `claude/s
 
 - **DERA synthetic-series promoted to P2 sprint slot.** Resolution scope: extend `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier to recover series→entity via DERA registrant tables + N-CEN adviser map + fund_cik-as-entity inference, then backfill `entity_id` / `rollup_entity_id` on the affected `fund_holdings_v2` rows and re-emit `parent_fund_map`. Validator FLAG (`series_id_synthetic_fallback`) stays in place until closure. See `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`.
 - **`scripts/backfill_manager_types.py` CSV path now lives at `data/reference/`.** Same applies if the curation is ever re-extended — edit the CSV in place; the script reads via `Path(__file__).parent.parent / 'data' / 'reference' / 'categorized_institutions_funds_v2.csv'`.
+- **`scripts/queries.py` is now a package: `scripts/queries/`.** 8 domain modules (`common`, `register`, `fund`, `flows`, `market`, `cross`, `trend`, `entities`) plus `__init__.py` that re-exports the full 91-symbol public surface. **All existing `from queries import X` imports continue to work unchanged** — touch the right domain file (not a single 5,500-line monolith) when adding/editing a query. Shared helpers (`get_db`, `has_table`, `_setup`, `get_cusip`, NPORT family-pattern + children fetchers, `_resolve_pct_of_so_denom`, `_quarter_to_date`, rollup helpers) live in `common.py`. Domain modules import only what they use from `.common` / `cache` / `config` / `serializers`; pylint/ruff are clean.
+- **`data/*.lock` and `data/*.wal` now in `.gitignore`** — DuckDB WAL + per-pipeline runtime locks are no longer tracked. If they appear in `git status` after a session restart, ignore them (already gitignored as of this PR).
 - **`fund_holdings_v2` is at 14,568,775 rows** post-INF51 dedup; 5,587,231 value-divergent rows across 55,924 groups remain as **INF53** P3 follow-up. **Plus 2,172,757 synthetic-series rows now formally FLAG/deferred** (this session) — same physical table, separate metadata defect.
 - **Migration 023 (`parent_fund_map`)** is live; 109,723 rows. `holder_momentum` parent path now reads from it (5.6× speedup; PR #191). Quarterly rebuild via `python3 scripts/pipeline/compute_parent_fund_map.py` (~115s end-to-end) — trigger after the new-period 13F + N-PORT promotes.
 - **`fund_holdings_v2_enrichment` not rebuilt this session** — last computed 2026-04-17. Separate cadence; next refresh is on a different trigger.
