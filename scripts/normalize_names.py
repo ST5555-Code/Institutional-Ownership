@@ -199,13 +199,16 @@ def normalize_table(con, table, column, apply=False):
 def main():
     parser = argparse.ArgumentParser(description="Normalize investor name casing")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default is dry-run)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip all writes (PROCESS_RULES §9). Overrides --apply if both are set.")
     args = parser.parse_args()
+    apply = args.apply and not args.dry_run
 
     db_path = get_db_path()
     con = duckdb.connect(db_path)
 
     print(f"Database: {db_path}")
-    print(f"Mode: {'APPLY' if args.apply else 'DRY RUN'}")
+    print(f"Mode: {'APPLY' if apply else 'DRY RUN'}")
     print(f"Started: {time.strftime('%H:%M:%S')}\n")
 
     # Normalize each table/column
@@ -223,11 +226,11 @@ def main():
     total = 0
     for table, column in tables:
         try:
-            total += normalize_table(con, table, column, apply=args.apply)
+            total += normalize_table(con, table, column, apply=apply)
         except Exception as e:
             print(f"  {table}.{column}: skipped ({e})")
 
-    if args.apply:
+    if apply:
         con.execute("CHECKPOINT")
         print(f"\nTotal rows updated: {total:,}")
     else:

@@ -279,11 +279,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Re-parse all null beneficial_ownership filings")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip all writes (PROCESS_RULES §9). Overrides --apply if both set.")
     parser.add_argument("--staging", action="store_true")
     args = parser.parse_args()
     if args.staging:
         set_staging_mode(True)
+    apply_writes = args.apply and not args.dry_run
     from db import crash_handler
     crash_handler("reparse_all_nulls")(
-        lambda: main(apply=args.apply)
+        lambda: main(apply=apply_writes)
     )

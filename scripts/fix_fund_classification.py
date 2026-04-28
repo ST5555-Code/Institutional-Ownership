@@ -49,9 +49,11 @@ def classify(fund_name):
     return 'active'
 
 
-def run(db_path):
+def run(db_path, dry_run=False):
     print(f'Opening {db_path}...')
-    con = duckdb.connect(db_path, read_only=False)
+    if dry_run:
+        print('DRY-RUN: classification will be computed but no UPDATE will run.')
+    con = duckdb.connect(db_path, read_only=dry_run)
 
     # Snapshot current state
     before = con.execute("""
@@ -83,12 +85,15 @@ def run(db_path):
     print(f'Classification result: {active_count} active, {passive_count} passive')
 
     # Apply updates in batches
-    print('Applying updates...')
-    con.executemany(
-        "UPDATE fund_universe SET is_actively_managed = ? WHERE series_id = ?",
-        updates
-    )
-    con.execute("CHECKPOINT")
+    if dry_run:
+        print('DRY-RUN: would issue UPDATE for {:,} series_ids'.format(len(updates)))
+    else:
+        print('Applying updates...')
+        con.executemany(
+            "UPDATE fund_universe SET is_actively_managed = ? WHERE series_id = ?",
+            updates
+        )
+        con.execute("CHECKPOINT")
 
     # Verify
     after = con.execute("""
@@ -132,6 +137,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--production', action='store_true',
                         help='Target production DB (default: staging)')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Skip the UPDATE write — discovery only (PROCESS_RULES §9).')
     args = parser.parse_args()
 
     base = Path(__file__).parent.parent
@@ -146,7 +153,7 @@ def main():
         print(f'Database not found: {db}')
         sys.exit(1)
 
-    run(str(db))
+    run(str(db), dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
