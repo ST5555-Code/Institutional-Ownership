@@ -1,12 +1,12 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-04-28 (p3-quick-wins). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-04-28 (rule9-43e). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
 ---
 
-## Current backlog (verified 2026-04-28 p3-quick-wins)
+## Current backlog (verified 2026-04-28 rule9-43e)
 
 ### P0 — Production blockers
 
@@ -25,6 +25,7 @@ _(none — see COMPLETED table)_
 - **D10 Admin UI for `entity_identifiers_staging`** — moved here from Deferred 2026-04-27 (roadmap-priority-moves). Trigger ("next admin UI iteration") not yet fired; activated to surface the 280-row staging backlog for review before the Q1 2026 cycle (~2026-05-15).
 - **Type-badge `family_office` color** — pull-forward from Deferred 2026-04-28 (rule9-43e). 43e DB backfill landed in this session; the React badge config (`common/typeConfig.ts`) needs a `family_office` case so the 36,950 reclassified holdings_v2 rows render with a dedicated chip color instead of the default fallback. Trigger: next session touching the badge config.
 - **dry-run sweep follow-up** — partial closure 2026-04-28 (rule9-43e). 8 high-risk write scripts gained `--dry-run` (auto_resolve, build_benchmark_weights, enrich_fund_holdings_v2, fix_fund_classification, normalize_names, normalize_securities, reparse_13d, reparse_all_nulls). Two scripts deferred: `build_entities.py` (~15 INSERT/UPDATE sites — needs methodical refactor) and `resolve_adv_ownership.py` (multi-phase download/parse/match — write paths span phases). Compliance table in `docs/PROCESS_RULES.md §9a`.
+- **categorized CSV duplicate cleanup** — follow-up from rule9-43e 2026-04-28. `data/reference/categorized_institutions_funds_v2.csv` has 5 duplicate `family_office` rows (`Custos Family Office, LLC`, `Forthright Family Wealth Advisory LLC`, `Fusion Family Wealth, LLC`, `QTR Family Wealth, LLC`, `RPg Family Wealth Advisory, LLC`) carried over from the prior `wealth_management` curation. Plus one CSV `family_office` name (52nd distinct) had no matching `managers` row at apply time — likely punctuation/case variation. Deduplicate the 5 pairs and resolve the un-matched name in the same pass. No DB impact (the apply was JOIN-deduped); purely curation hygiene. Trigger: next session touching `categorized_institutions_funds_v2.csv`.
 - **G7 `scripts/queries.py` monolith split** — moved here from Deferred 2026-04-28 (dm14c-voya). 5,390-line query monolith (per BL-3 audit, PR #189) is hot for merge conflicts and load-time regressions. Split into per-domain modules (rollups / flows / cohort / momentum / sector / ticker / parent). Trigger ("`queries.py` touches become painful") fires every session that touches it.
 - **maintenance-audit-design** — moved here from Deferred 2026-04-28 (dm14c-voya). Wire the existing rotating audit scripts (`audit_*.py`) into a runnable program with a stable contract (one entry point per audit, JSON-emitting, hooked into `MAINTENANCE.md` schedule). Trigger ("audit surfaces ready to be implemented as runnable programs") was self-referential.
 
