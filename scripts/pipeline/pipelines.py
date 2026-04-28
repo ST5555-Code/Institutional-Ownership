@@ -82,15 +82,24 @@ def _load_sector_flows_cls() -> Type[SourcePipeline]:
     return module.ComputeSectorFlowsPipeline
 
 
+def _load_parent_fund_map_cls() -> Type[SourcePipeline]:
+    """Lazy-import ComputeParentFundMapPipeline. perf-P2 precompute."""
+    # pylint: disable=import-outside-toplevel
+    import importlib
+    module = importlib.import_module("pipeline.compute_parent_fund_map")
+    return module.ComputeParentFundMapPipeline
+
+
 PIPELINE_REGISTRY: dict[str, "Type[SourcePipeline]"] = {
-    "13f_holdings":    _load_13f_cls,            # type: ignore[dict-item]
-    "13dg_ownership":  _load_13dg_cls,           # type: ignore[dict-item]
-    "market_data":     _load_market_cls,         # type: ignore[dict-item]
-    "nport_holdings":  _load_nport_cls,          # type: ignore[dict-item]
-    "ncen_advisers":   _load_ncen_cls,           # type: ignore[dict-item]
-    "adv_registrants": _load_adv_cls,            # type: ignore[dict-item]
-    "peer_rotation":   _load_peer_rotation_cls,  # type: ignore[dict-item]
-    "sector_flows":    _load_sector_flows_cls,   # type: ignore[dict-item]
+    "13f_holdings":     _load_13f_cls,               # type: ignore[dict-item]
+    "13dg_ownership":   _load_13dg_cls,              # type: ignore[dict-item]
+    "market_data":      _load_market_cls,            # type: ignore[dict-item]
+    "nport_holdings":   _load_nport_cls,             # type: ignore[dict-item]
+    "ncen_advisers":    _load_ncen_cls,              # type: ignore[dict-item]
+    "adv_registrants":  _load_adv_cls,               # type: ignore[dict-item]
+    "peer_rotation":    _load_peer_rotation_cls,     # type: ignore[dict-item]
+    "sector_flows":     _load_sector_flows_cls,      # type: ignore[dict-item]
+    "parent_fund_map":  _load_parent_fund_map_cls,   # type: ignore[dict-item]
 }
 
 
