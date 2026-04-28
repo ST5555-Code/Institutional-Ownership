@@ -21,8 +21,8 @@ This session — `p3-quick-wins` (worktree `stoic-nash-325d62`, branch `claude/s
 - See `ROADMAP.md` "Current backlog".
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` only (live Serge+Claude session — not a Code session).
-- **P2:** _empty_.
-- **P3:** `D10 Admin UI for entity_identifiers_staging`, `INF53 BACKFILL_MIG015 multi-row investigation`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 queries.py monolith split`, `maintenance-audit-design`. (Two of the eight items activated by `roadmap-priority-moves` / `dm14c-voya` are now closed in this PR.)
+- **P2:** `DERA-synthetic-series-resolution` (promoted from this session's FLAG discovery — 1,236 synthetic series_ids covering 2,172,757 rows / $2.55T NAV / 1.58% of `is_latest=TRUE` market value; multi-day resolution via `scripts/resolve_pending_series.py` tier extension; see `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`).
+- **P3:** `D10 Admin UI for entity_identifiers_staging`, `INF53 BACKFILL_MIG015 multi-row investigation`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 queries.py monolith split`, `maintenance-audit-design`. (Two of the eight items activated by `roadmap-priority-moves` / `dm14c-voya` are closed in this PR — `categorized-funds-csv-relocate` to COMPLETED, `DERA NULL-series synthetics` promoted to P2.)
 - **Next external events:**
   - **Stage 5 cleanup DROP window opens 2026-05-09** (legacy `holdings` / `fund_holdings` / `beneficial_ownership` already retired 2026-04-13; this is the gate to drop their snapshots / final cleanup pass per `MAINTENANCE.md`).
   - **Q1 2026 13F cycle, ~2026-05-15** (filings for period ending 2026-03-31, 45-day reporting window).
@@ -30,7 +30,7 @@ This session — `p3-quick-wins` (worktree `stoic-nash-325d62`, branch `claude/s
 
 ## Reminders
 
-- **DERA synthetic-series stays FLAGGED.** Reactivate only when (a) `resolve_pending_series.py` tier work is being done for unrelated reasons, (b) Q1 2026 DERA bulk lands and percentage of synthetic NAV materially changes, or (c) a specific analytical workflow surfaces user-visible friction from a fund stuck behind a synthetic series_id. Validator FLAG already in place; aggregates already exclude.
+- **DERA synthetic-series promoted to P2 sprint slot.** Resolution scope: extend `scripts/resolve_pending_series.py:830-847` `deferred_synthetic` tier to recover series→entity via DERA registrant tables + N-CEN adviser map + fund_cik-as-entity inference, then backfill `entity_id` / `rollup_entity_id` on the affected `fund_holdings_v2` rows and re-emit `parent_fund_map`. Validator FLAG (`series_id_synthetic_fallback`) stays in place until closure. See `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`.
 - **`scripts/backfill_manager_types.py` CSV path now lives at `data/reference/`.** Same applies if the curation is ever re-extended — edit the CSV in place; the script reads via `Path(__file__).parent.parent / 'data' / 'reference' / 'categorized_institutions_funds_v2.csv'`.
 - **`fund_holdings_v2` is at 14,568,775 rows** post-INF51 dedup; 5,587,231 value-divergent rows across 55,924 groups remain as **INF53** P3 follow-up. **Plus 2,172,757 synthetic-series rows now formally FLAG/deferred** (this session) — same physical table, separate metadata defect.
 - **Migration 023 (`parent_fund_map`)** is live; 109,723 rows. `holder_momentum` parent path now reads from it (5.6× speedup; PR #191). Quarterly rebuild via `python3 scripts/pipeline/compute_parent_fund_map.py` (~115s end-to-end) — trigger after the new-period 13F + N-PORT promotes.
