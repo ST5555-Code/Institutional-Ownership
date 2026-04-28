@@ -1273,20 +1273,40 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 results.append(row)
             return results
 
-        # --- Parent-level branch (original logic) ---
-        # Top 25 parents by latest quarter value
-        top_parents = con.execute(f"""
+        # --- Parent-level branch ---
+        # rollup_entity_id column on holdings_v2 mirrors `rn` (the rollup
+        # name column). Used to JOIN against parent_fund_map below.
+        eid_col = (
+            'dm_rollup_entity_id' if rollup_type == 'decision_maker_v1'
+            else 'rollup_entity_id'
+        )
+
+        # Top 25 parents by latest quarter value. Also fetch the rollup
+        # entity_id so the parent_fund_map JOIN below avoids a name->eid
+        # lookup. parents without a rollup_entity_id (the COALESCE fallback
+        # to inst_parent_name / manager_name) carry eid=None and fall
+        # through to the legacy ILIKE path inside _get_fund_children.
+        top_df = con.execute(f"""
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
+                   MAX({eid_col}) as rollup_eid,
                    SUM(market_value_live) as parent_val
             FROM holdings_v2
             WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
             GROUP BY parent_name
             ORDER BY parent_val DESC NULLS LAST
             LIMIT 25
-        """, [ticker, cusip]).fetchdf()['parent_name'].tolist()
+        """, [ticker, cusip]).fetchdf()
 
-        if not top_parents:
+        if top_df.empty:
             return []
+
+        top_parents = top_df['parent_name'].tolist()
+        parent_eids = {
+            row['parent_name']: (
+                int(row['rollup_eid']) if pd.notna(row['rollup_eid']) else None
+            )
+            for _, row in top_df.iterrows()
+        }
 
         # Shares per quarter per parent
         ph = ','.join(['?'] * len(top_parents))
@@ -1314,29 +1334,74 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             if r['type'] and r['type'] != 'unknown':
                 parent_types[pn] = r['type']
 
-        # For each parent, get N-PORT fund children across all quarters
-        # Union of top 5 per quarter → up to ~10 unique funds
-        def _get_fund_children(pname):
-            patterns = match_nport_family(pname)
-            if not patterns:
-                return []
-            like_patterns = ['%' + p + '%' for p in patterns]
-            lph = ','.join(['?'] * len(like_patterns))
-            excl_clause, excl_params = _build_excl_clause(patterns)
+        pfm_available = has_table('parent_fund_map')
+
+        # Batched fund-children lookup (perf-P2): one SQL fetches every
+        # parent's N-PORT fund children at once. Replaces the 25 sequential
+        # per-parent ILIKE queries (728ms / 91% of pre-rewrite latency).
+        # parent_fund_map provides (rollup_entity_id → series_id, quarter);
+        # JOIN to fund_holdings_v2 on (series_id, quarter) returns share
+        # totals for the subject ticker across all quarters in one round-trip.
+        eids_with_rollups = [
+            parent_eids[p] for p in top_parents if parent_eids.get(p) is not None
+        ]
+        children_by_parent: dict[str, pd.DataFrame] = {}
+        if pfm_available and eids_with_rollups:
             try:
-                fund_df = con.execute(f"""
-                    SELECT fund_name, quarter,
-                           MAX(shares_or_principal) as shares,
-                           series_id
-                    FROM fund_holdings_v2 fh
-                    WHERE EXISTS (SELECT 1 FROM UNNEST([{lph}]) t(p) WHERE family_name ILIKE t.p)
-                      AND ticker = ?
-                      AND quarter IN ({q_placeholders})
-                      {excl_clause}
-                      AND fh.is_latest = TRUE
-                    GROUP BY fund_name, quarter, series_id
-                """, like_patterns + [ticker] + excl_params).fetchdf()
-                if fund_df.empty:
+                eid_ph = ','.join(['?'] * len(eids_with_rollups))
+                batch_df = con.execute(f"""
+                    SELECT pfm.rollup_entity_id AS eid,
+                           fh.fund_name,
+                           fh.quarter,
+                           MAX(fh.shares_or_principal) AS shares,
+                           fh.series_id
+                      FROM parent_fund_map pfm
+                      JOIN fund_holdings_v2 fh
+                        ON fh.series_id = pfm.series_id
+                       AND fh.quarter   = pfm.quarter
+                     WHERE pfm.rollup_entity_id IN ({eid_ph})
+                       AND pfm.rollup_type = ?
+                       AND fh.ticker = ?
+                       AND fh.quarter IN ({q_placeholders})
+                       AND fh.is_latest = TRUE
+                     GROUP BY pfm.rollup_entity_id, fh.fund_name, fh.quarter, fh.series_id
+                """, eids_with_rollups + [rollup_type, ticker]).fetchdf()
+                if not batch_df.empty:
+                    for eid_val, group in batch_df.groupby('eid'):
+                        children_by_parent[int(eid_val)] = group
+            except Exception:
+                children_by_parent = {}
+
+        def _get_fund_children(pname, rollup_eid):
+            """Return up to 10 child fund rows for ``pname`` shaped as
+            ``[{'fund_name': str, 'quarters': {q: shares}}]``.
+            Resolves from the batched parent_fund_map result when
+            ``rollup_eid`` is populated; falls back to the legacy
+            per-call ILIKE path otherwise."""
+            fund_df = None
+            try:
+                if rollup_eid is not None and rollup_eid in children_by_parent:
+                    fund_df = children_by_parent[rollup_eid]
+                elif not pfm_available or rollup_eid is None:
+                    patterns = match_nport_family(pname)
+                    if not patterns:
+                        return []
+                    like_patterns = ['%' + p + '%' for p in patterns]
+                    lph = ','.join(['?'] * len(like_patterns))
+                    excl_clause, excl_params = _build_excl_clause(patterns)
+                    fund_df = con.execute(f"""
+                        SELECT fund_name, quarter,
+                               MAX(shares_or_principal) as shares,
+                               series_id
+                        FROM fund_holdings_v2 fh
+                        WHERE EXISTS (SELECT 1 FROM UNNEST([{lph}]) t(p) WHERE family_name ILIKE t.p)
+                          AND ticker = ?
+                          AND quarter IN ({q_placeholders})
+                          {excl_clause}
+                          AND fh.is_latest = TRUE
+                        GROUP BY fund_name, quarter, series_id
+                    """, like_patterns + [ticker] + excl_params).fetchdf()
+                if fund_df is None or fund_df.empty:
                     return []
 
                 # For each quarter, rank funds by shares and take top 5
@@ -1377,7 +1442,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             chg = last_s - first_s
             chg_pct = round(chg / first_s * 100, 1) if first_s > 0 else None
 
-            children = _get_fund_children(pname)
+            children = _get_fund_children(pname, parent_eids.get(pname))
             has_kids = len(children) >= 2
 
             row = {

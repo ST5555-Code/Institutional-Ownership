@@ -304,6 +304,18 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
               "(quarter pair × level × rollup_type × active_only). "
               "Backs queries.get_sector_flows. Migration 021.",
     ),
+    "parent_fund_map": DatasetSpec(
+        layer=4, owner="scripts/pipeline/compute_parent_fund_map.py",
+        promote_strategy="rebuild",
+        rebuild_from=(
+            "holdings_v2", "fund_holdings_v2",
+            "ncen_adviser_map", "fund_family_patterns",
+        ),
+        notes="Precomputed parent → N-PORT fund-children map keyed by "
+              "(rollup_entity_id × rollup_type × series_id × quarter). "
+              "Replaces the 25-ILIKE per-call loop in "
+              "queries.holder_momentum._get_fund_children. Migration 023.",
+    ),
     "ticker_flow_stats": DatasetSpec(
         layer=4, owner="scripts/compute_flows.py",
         promote_strategy="rebuild",
