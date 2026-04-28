@@ -4,39 +4,36 @@
 
 ## Last completed
 
-This session — `dm14c-voya` (worktree `beautiful-shaw-b808a4`, branch `claude/beautiful-shaw-b808a4`):
+This session — `p3-quick-wins` (worktree `stoic-nash-325d62`, branch `claude/stoic-nash-325d62`):
 
-- **Three-task session:** end-of-leg doc sync (Task 0), ROADMAP priority moves activating 7 Deferred items (Task 1), and DM14c Voya residual entity-seed + DM re-route (Task 2). One PR opened off branch `claude/beautiful-shaw-b808a4`.
-- **HEAD at session start:** `771e79f` (perf-P2 holder_momentum, PR #191). This sync closes the conv-15 → dm14c-voya leg of the longer arc that began with the DM13 sweep at PR #168.
-- **22-PR session arc (#169–#191) now closed.** PRs #169–#181 closed by conv-14 (`#182`); PRs #183–#187 closed by conv-15 (`#188`); PRs #189, #190, #191 added in the post-conv-15 trio (BL-3/INF53, perf-P2 scoping, perf-P2 holder_momentum). This session's PR adds DM14c Voya residual on top of that arc.
+- **Two P3 items, one PR.** (A) `categorized-funds-csv-relocate` — actioned. (B) `DERA 1,187 NULL-series synthetics cleanup` — discovery + FLAG/defer with documented reactivation triggers.
+- **HEAD at session start:** `8bfbeca` (dm14c-voya, PR #192). No new schema migrations, no DB writes, no staging promote — entity layer state unchanged from dm14c-voya close.
 
-## This session — Tasks 0/1/2
+## This session — Tasks A/B
 
-| Task | Slug | Notes |
+| Task | Slug | Outcome |
 |---|---|---|
-| 0 | doc sync | Full rewrite of `docs/NEXT_SESSION_CONTEXT.md` + `docs/findings/CHAT_HANDOVER.md`; `MAINTENANCE.md` last-updated date refreshed and `compute_parent_fund_map.py` added to the L4 precompute table; `ENTITY_ARCHITECTURE.md` header updated for the override-count delta from Task 2. |
-| 1 | roadmap-priority-moves | 7 items moved Deferred → active backlog. **P2:** `DM14c Voya residual` (this session's Task 2). **P3:** `categorized-funds-csv-relocate`, `DERA 1,187 NULL-series synthetics`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 scripts/queries.py monolith split`, `maintenance-audit-design`. All 7 had self-referential triggers (e.g. "next session touching X" where X is the work itself); activated to surface them as actionable items rather than perpetually deferred. |
-| 2 | dm14c-voya | **49 actively-managed Voya-Voya intra-firm series ($21.74B AUM)** re-targeted on `decision_maker_v1` from holding co `eid=2489` (Voya Financial, Inc.) to operating sub-adviser `eid=17915` (Voya Investment Management Co. LLC, CRD 106494). Scope: `adviser_crd='000111091'` (Voya Investments LLC, eid=4071) AND `subadviser_crd='000106494'` AND `fund_universe.is_actively_managed=TRUE`. **No new entity created** — eid=2489 seed already existed. **No new edges** — wholly_owned 2489→{17915, 4071, 1591} already present from prior dm14c oneoff (commit `8136434`). Per-series flow: SCD-close DM rollup row at 2489, SCD-open new row at 17915 (`rule_applied='manual_override'`, `confidence='exact'`, `routing_confidence='high'`), insert one `entity_overrides_persistent` row per series (`action='merge'`, `rollup_type='decision_maker_v1'`, `identifier_type='series_id'`, `new_value='17915'`). **Override IDs 1057–1105 (+49).** Promote snapshot `20260428_081209`. `economic_control_v1` UNTOUCHED (all 49 still at eid=4071 VOYA INVESTMENTS, LLC via fund_sponsor — correct). Script: `scripts/oneoff/dm14c_voya_apply.py`. The 32 passive Voya-Voya series at eid=2489 intentionally NOT retargeted in this session — passive funds should mirror EC, but that's a separate cleanup pass tracked under DM14c follow-up if it surfaces. |
+| A | categorized-funds-csv-relocate | `categorized_institutions_funds_v2.csv` (5,790 rows) `git mv`d to `data/reference/`. `scripts/backfill_manager_types.py:39` `CSV_PATH` updated. Verified via `--dry-run` (CSV loads, 13 categories, 0 rows projected to update — already-applied idempotent state). Repo-wide grep: no other live code references; archive/docs/findings narrative refs left intact (historical record); `docs/data_layers.md` already documents the target path. |
+| B | dera-synthetic-series — FLAG | Discovery only, no DB writes. `fund_holdings_v2` has 0 rows with `series_id IS NULL`; the "1,187" figure refers to synthetic-fallback series_ids of form `{cik}_{accession}` minted at DERA load when `FUND_REPORTED_INFO.SERIES_ID` is missing. Current count: 2,172,757 rows / 1,236 distinct synthetic series / $2,553B AUM (1.58% of total `is_latest=TRUE` MV). Decision: defer — real holdings, no downstream regression (`parent_fund_map` already excludes 68% of synthetic series that have no entity rollup), proper resolution requires multi-day work on `resolve_pending_series.py` tiers. Findings doc `docs/findings/2026-04-28-dera-synthetic-series-discovery.md`. |
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog".
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` only (live Serge+Claude session — not a Code session).
-- **P2:** _empty_ (this session's `DM14c Voya residual` will move to COMPLETED after PR merge).
-- **P3:** `D10 Admin UI for entity_identifiers_staging`, `INF53 BACKFILL_MIG015 multi-row investigation`, plus the 6 freshly-activated items from Task 1 (`categorized-funds-csv-relocate`, `DERA 1,187 NULL-series synthetics`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 queries.py monolith split`, `maintenance-audit-design`).
+- **P2:** _empty_.
+- **P3:** `D10 Admin UI for entity_identifiers_staging`, `INF53 BACKFILL_MIG015 multi-row investigation`, `43e family-office taxonomy`, `PROCESS_RULES Rule 9 dry-run uniformity`, `G7 queries.py monolith split`, `maintenance-audit-design`. (Two of the eight items activated by `roadmap-priority-moves` / `dm14c-voya` are now closed in this PR.)
 - **Next external events:**
   - **Stage 5 cleanup DROP window opens 2026-05-09** (legacy `holdings` / `fund_holdings` / `beneficial_ownership` already retired 2026-04-13; this is the gate to drop their snapshots / final cleanup pass per `MAINTENANCE.md`).
   - **Q1 2026 13F cycle, ~2026-05-15** (filings for period ending 2026-03-31, 45-day reporting window).
-  - **Q1 2026 N-PORT DERA bulk, ~late May 2026** — first live exercise of INF50 + INF52 fixes (`scripts/pipeline/load_nport.py` `_cleanup_staging` hard-fail + `_enrich_staging_entities` pre-promote enrich).
+  - **Q1 2026 N-PORT DERA bulk, ~late May 2026** — first live exercise of INF50 + INF52 fixes (`scripts/pipeline/load_nport.py` `_cleanup_staging` hard-fail + `_enrich_staging_entities` pre-promote enrich). Re-measure synthetic-series count after this drop and decide whether to reactivate the cleanup item.
 
 ## Reminders
 
-- **DM14c Voya residual is closed for the active subset only.** 49 active series re-routed 2489 → 17915. The 32 passive Voya-Voya series at eid=2489 (still routed to the holding co under `manual_override`) remain a known follow-up — per architecture they should mirror EC (eid=4071), but the passive cleanup is a separate scoping decision and was not included in this session.
-- **EC never moves on these 49.** All still at eid=4071 (VOYA INVESTMENTS, LLC) via `fund_sponsor`. DM-only retarget by design — don't touch EC on a Voya-Voya re-routing pass.
-- **INF50 + INF52 fixes are still code-only and have not been exercised against prod yet.** Next monthly N-PORT topup that touches amendments (or the Q1 2026 DERA bulk) is the live test. If the post-cleanup `CatalogException` assertion ever fires, capture the full `RuntimeError` — that is the actual root cause of the prior silent failure, finally visible.
-- **`fund_holdings_v2` is at 14,568,775 rows** post-INF51 dedup; 5,587,231 value-divergent rows across 55,924 groups remain as **INF53** P3 follow-up (BL-3/INF53 closed in PR #189: by-design N-PORT multi-row pattern, not a migration bug; recommendation is annotative, no fix planned).
-- **Migration 023 (`parent_fund_map`)** is live; 109,723 rows. `holder_momentum` parent path now reads from it (5.6× speedup; PR #191). Quarterly rebuild via `python3 scripts/pipeline/compute_parent_fund_map.py` (~115s end-to-end) — trigger after the new-period 13F + N-PORT promotes, same cadence as `compute_peer_rotation.py` and `compute_sector_flows.py`.
+- **DERA synthetic-series stays FLAGGED.** Reactivate only when (a) `resolve_pending_series.py` tier work is being done for unrelated reasons, (b) Q1 2026 DERA bulk lands and percentage of synthetic NAV materially changes, or (c) a specific analytical workflow surfaces user-visible friction from a fund stuck behind a synthetic series_id. Validator FLAG already in place; aggregates already exclude.
+- **`scripts/backfill_manager_types.py` CSV path now lives at `data/reference/`.** Same applies if the curation is ever re-extended — edit the CSV in place; the script reads via `Path(__file__).parent.parent / 'data' / 'reference' / 'categorized_institutions_funds_v2.csv'`.
+- **`fund_holdings_v2` is at 14,568,775 rows** post-INF51 dedup; 5,587,231 value-divergent rows across 55,924 groups remain as **INF53** P3 follow-up. **Plus 2,172,757 synthetic-series rows now formally FLAG/deferred** (this session) — same physical table, separate metadata defect.
+- **Migration 023 (`parent_fund_map`)** is live; 109,723 rows. `holder_momentum` parent path now reads from it (5.6× speedup; PR #191). Quarterly rebuild via `python3 scripts/pipeline/compute_parent_fund_map.py` (~115s end-to-end) — trigger after the new-period 13F + N-PORT promotes.
 - **`fund_holdings_v2_enrichment` not rebuilt this session** — last computed 2026-04-17. Separate cadence; next refresh is on a different trigger.
 - **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows).
 - **Do not run `build_classifications.py --reset`.** eqt-classify-codefix (PR #162) landed but `security_type_inferred` column still in schema.

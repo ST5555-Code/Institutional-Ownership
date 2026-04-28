@@ -36,7 +36,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import record_freshness  # noqa: E402
 
-CSV_PATH = Path(__file__).parent.parent / 'categorized_institutions_funds_v2.csv'
+CSV_PATH = Path(__file__).parent.parent / 'data' / 'reference' / 'categorized_institutions_funds_v2.csv'
 
 
 def normalize_name(name):
