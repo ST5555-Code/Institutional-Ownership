@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 27, 2026 (conv-15-doc-sync — end-of-leg sync after PRs #183–#187. Migration 022 (`drop_redundant_v2_columns`) stamped — 3 write-only columns dropped from v2 holdings tables (`holdings_v2.crd_number`, `holdings_v2.security_type`, `fund_holdings_v2.best_index`); rebuild path used (DuckDB 1.4 limitation), 38s wall on prod 25 GB DB, row counts preserved 1:1. INF51 prod-dedup deleted 68 byte-identical duplicates from `fund_holdings_v2` (14,568,843 → 14,568,775); 5.59M value-divergent rows on the same dedup key kept under spec carve-out, logged as **INF53** for follow-up (P3, BACKFILL_MIG015 multi-row pattern). INF50 + INF52 N-PORT pipeline hardening landed code-only — `_cleanup_staging` now hard-fails on contamination, new `_purge_stale_raw_staging` at start of `fetch()`, new `_enrich_staging_entities` runs in `LoadNPortPipeline.promote()` BEFORE `super().promote()` to satisfy the int-23 downgrade guard. Both fixes pending live exercise on the next N-PORT amendment-touching topup (or Q1 2026 DERA bulk ~late May 2026). ROADMAP re-prioritization (#183): `perf-P2` Deferred → P2; `BL-3` + `D10` Deferred → P3. Predecessor: nport-refresh-catchup / PR #184._
+_Last updated: April 28, 2026 (dm14c-voya — end-of-leg sync after the post-conv-15 trio (PRs #189 BL-3+INF53, #190 perf-P2 scoping, #191 perf-P2 holder_momentum) plus this session's 7 ROADMAP priority moves and DM14c Voya residual DM re-route. **Migration 023 (`parent_fund_map`)** stamped — new precompute table (PK `(rollup_entity_id, rollup_type, series_id, quarter)`, 109,723 rows; 55K EC + 54K DM × 147 distinct parents that have N-PORT children) populated by new `scripts/pipeline/compute_parent_fund_map.py` `SourcePipeline` subclass (`name='parent_fund_map'`, `direct_write` strategy, ~115s end-to-end). `queries.holder_momentum` parent path rewritten to issue ONE batched JOIN against `parent_fund_map` covering all top-25 parents at once, replacing 25 sequential ILIKE family-name patterns against `fund_holdings_v2`; AAPL parent EC 800ms → 142ms (5.6×). **DM14c Voya residual** — 49 actively-managed Voya-Voya intra-firm series ($21.74B AUM) DM-retargeted from holding co eid=2489 (Voya Financial, Inc.) to operating sub-adviser eid=17915 (Voya Investment Management Co. LLC, CRD 106494); override IDs 1057–1105; promote snapshot `20260428_081209`; EC untouched. **BL-3 + INF53** closed as recommendation-only (PR #189) — N-PORT multi-row-per-key is by design (Long+Short pairs, multiple lots, placeholder CUSIPs); `row_id BIGINT` is the PK, the natural-key tuple was never unique. ROADMAP re-prioritization (this session): 7 Deferred → active backlog. Predecessor: conv-15-doc-sync / PR #188._
 
 ## Pipeline refresh via admin dashboard
 
@@ -60,14 +60,15 @@ This replaces the legacy `python3 scripts/load_13f.py` (no-arg) full-reload patt
 
 **Writer ordering now handled by the framework.** `SourcePipeline` manifests are sequenced at the control-plane level; per-pipeline `_bulk_enrich_run` / `stamp_freshness` / `refresh_snapshot` hooks fire deterministically in the subclass's `approve_and_promote()`. The `adviser_cik` stamping on `managers` now runs inside `scripts/pipeline/load_ncen.py._update_managers_adviser_cik` during promote — the legacy post-hoc writer-ordering hazard (fetch_13dg Phase 3 + fetch_ncen running after build_managers) is gone with those scripts' retirement in Wave 2.
 
-**Precompute / rollup pipelines (L4 derived).** Two `SourcePipeline` subclasses materialize precomputed views read by hot-path query endpoints. Both run on quarterly cadence — trigger after the source pipelines (`13f_holdings`, `nport_holdings`, `market_data`) have promoted for the new period.
+**Precompute / rollup pipelines (L4 derived).** Three `SourcePipeline` subclasses materialize precomputed views read by hot-path query endpoints. All run on quarterly cadence — trigger after the source pipelines (`13f_holdings`, `nport_holdings`, `market_data`) have promoted for the new period.
 
 | Precompute | Pipeline name | Script | Source tables | Reader | Cadence trigger |
 |---|---|---|---|---|---|
 | `peer_rotation_flows` (perf-P0, migration 019) | `peer_rotation` | `scripts/pipeline/compute_peer_rotation.py` | `holdings_v2` + `fund_holdings_v2` + `market_data` | `queries.get_peer_rotation` / `get_peer_rotation_detail` (and `get_sector_flow_movers` `level='parent'` after perf-P1) | Quarterly — after the new-period 13F + N-PORT promotes land |
 | `sector_flows_rollup` (perf-P1, migration 021) | `sector_flows` | `scripts/pipeline/compute_sector_flows.py` | `holdings_v2` + `fund_holdings_v2` + `market_data` | `queries.get_sector_flows` | Quarterly — same as above; ~2.1s end-to-end rebuild |
+| `parent_fund_map` (perf-P2, migration 023) | `parent_fund_map` | `scripts/pipeline/compute_parent_fund_map.py` | `holdings_v2` + `fund_holdings_v2` + `ncen_adviser_map` + `fund_family_patterns` | `queries.holder_momentum` parent path | Quarterly — same as above; ~115s end-to-end rebuild (~38s parse + ~77s promote); 109,723 rows (55K EC + 54K DM × 147 parents with N-PORT children); rebuilds when the source tables advance |
 
-Both pipelines use `amendment_strategy='direct_write'` (truncate-and-rewrite the precompute table from current `holdings_v2` / `fund_holdings_v2` / `market_data` rows). Manual rebuild:
+All three pipelines use `amendment_strategy='direct_write'` (truncate-and-rewrite the precompute table from current source rows). Manual rebuild:
 
 ```bash
 # perf-P0 — peer_rotation_flows
@@ -76,6 +77,9 @@ python3 scripts/pipeline/compute_peer_rotation.py --auto-approve
 # perf-P1 — sector_flows_rollup
 # (no flag = full fetch+parse+validate+promote; --staging halts at pending_approval; --dry-run = read-only)
 python3 scripts/pipeline/compute_sector_flows.py
+
+# perf-P2 — parent_fund_map
+python3 scripts/pipeline/compute_parent_fund_map.py
 ```
 
 Both subclasses are wired into `PIPELINE_REGISTRY` and `DATASET_REGISTRY` (L4) and stamp `data_freshness` via the base ABC's `approve_and_promote` step.
