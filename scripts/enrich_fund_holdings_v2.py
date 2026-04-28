@@ -138,11 +138,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--apply", action="store_true",
                         help="Write to prod. Without it, the script is "
                              "a read-only projection.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip all writes (PROCESS_RULES §9). Overrides "
+                             "--apply if both are set.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Cap total NULL rows targeted (for testing).")
     parser.add_argument("--report-month", dest="report_month", default=None,
                         help="Scope to one report_month (YYYY-MM).")
     args = parser.parse_args()
+    if args.dry_run:
+        args.apply = False
     if args.report_month and not REPORT_MONTH_RE.match(args.report_month):
         raise SystemExit(
             f"--report-month must be YYYY-MM (got {args.report_month!r})")

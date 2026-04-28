@@ -121,15 +121,20 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Port classifications → securities")
     p.add_argument("--staging", action="store_true",
                    help="Write to staging DB")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Skip the UPDATE/INSERT writes and the post-build "
+                        "enrich_holdings hook (PROCESS_RULES §9).")
     args = p.parse_args()
 
     db = STAGING_DB if args.staging else PROD_DB
     print("normalize_securities.py")
     print("=" * 60)
     print(f"  DB: {db}")
+    if args.dry_run:
+        print("  MODE: DRY-RUN (no writes)")
     print()
 
-    con = duckdb.connect(db)
+    con = duckdb.connect(db, read_only=args.dry_run)
     try:
         try:
             con.execute("SELECT 1 FROM cusip_classifications LIMIT 1")
@@ -137,9 +142,17 @@ def main() -> None:
             print(f"ERROR: cusip_classifications missing from {db}. "
                   f"Run Migration 003 first. ({exc})")
             sys.exit(1)
-        normalize(con)
+        if args.dry_run:
+            print("  [dry-run] skipping normalize() — UPDATE/INSERT into "
+                  "securities not executed")
+        else:
+            normalize(con)
     finally:
         con.close()
+
+    if args.dry_run:
+        print("  [dry-run] skipping post-build ticker backfill hook")
+        return
 
     # BLOCK-TICKER-BACKFILL: re-stamp historical fund_holdings_v2.ticker on
     # securities mapping changes. Pass C in enrich_holdings.py is

@@ -349,7 +349,7 @@ def validate_candidates(all_candidates, gaps):
 # =========================================================================
 # Step 4 — Route results
 # =========================================================================
-def route_results(validated, unresolved_cusips, gaps, con):
+def route_results(validated, unresolved_cusips, gaps, con, dry_run: bool = False):
     """Route validated results to auto-apply, pending, or log-only."""
     auto_applied = []
     pending = []
@@ -383,13 +383,18 @@ def route_results(validated, unresolved_cusips, gaps, con):
 
         df_new = pd.DataFrame(new_rows)
         combined = pd.concat([existing, df_new], ignore_index=True)
-        combined.to_csv(OVERRIDES_PATH, index=False)
+        if dry_run:
+            print(f"  [dry-run] would append {len(df_new)} rows to {OVERRIDES_PATH}")
+        else:
+            combined.to_csv(OVERRIDES_PATH, index=False)
 
         # Apply to database
         for v in auto_applied:
             cusip = v["cusip"]
             ticker = v["candidate_ticker"]
             wrong = v["wrong_ticker"]
+            if dry_run:
+                continue
             if wrong:
                 con.execute(f"UPDATE securities SET ticker = '{ticker}' WHERE cusip = '{cusip}' AND ticker = '{wrong}'")
                 con.execute(f"UPDATE holdings SET ticker = '{ticker}' WHERE cusip = '{cusip}' AND ticker = '{wrong}'")
@@ -417,7 +422,10 @@ def route_results(validated, unresolved_cusips, gaps, con):
             df_pending = df_pending[~df_pending["cusip"].isin(existing_cusips)]
             df_pending = pd.concat([existing_pending, df_pending], ignore_index=True)
 
-        df_pending.to_csv(PENDING_PATH, index=False)
+        if dry_run:
+            print(f"  [dry-run] would write {len(df_pending)} pending rows to {PENDING_PATH}")
+        else:
+            df_pending.to_csv(PENDING_PATH, index=False)
 
     # --- Unresolved CUSIPs ---
     for cusip in unresolved_cusips:
@@ -463,7 +471,10 @@ def route_results(validated, unresolved_cusips, gaps, con):
         if os.path.exists(LOG_PATH):
             existing_log = pd.read_csv(LOG_PATH, dtype=str)
             df_log = pd.concat([existing_log, df_log], ignore_index=True)
-        df_log.to_csv(LOG_PATH, index=False)
+        if dry_run:
+            print(f"  [dry-run] would write {len(df_log)} log rows to {LOG_PATH}")
+        else:
+            df_log.to_csv(LOG_PATH, index=False)
 
     return auto_applied, pending, logged_unresolved
 
@@ -471,11 +482,15 @@ def route_results(validated, unresolved_cusips, gaps, con):
 # =========================================================================
 # Step 5 — Fetch market data for auto-applied tickers
 # =========================================================================
-def fetch_market_data(auto_applied, con):
+def fetch_market_data(auto_applied, con, dry_run: bool = False):
     """Fetch market data for newly applied tickers via YahooClient + SEC XBRL.
 
     market_cap is computed as SEC shares_outstanding × Yahoo price_live.
     """
+    if dry_run:
+        print(f"  [dry-run] skipping market_data INSERT/UPDATE for "
+              f"{len(auto_applied)} tickers")
+        return
     from yahoo_client import YahooClient
     from sec_shares_client import SECSharesClient
 
@@ -544,12 +559,14 @@ def fetch_market_data(auto_applied, con):
 # =========================================================================
 # Main
 # =========================================================================
-def main():
+def main(dry_run: bool = False):
     print("=" * 60)
     print("AUTO-RESOLVE — Ticker gap resolution")
+    if dry_run:
+        print("MODE: DRY-RUN (no writes — UPDATE/INSERT/CSV emit will be skipped)")
     print("=" * 60)
 
-    con = duckdb.connect(get_db_path())
+    con = duckdb.connect(get_db_path(), read_only=dry_run)
 
     # Step 1
     print("\nStep 1 — Finding gaps...")
@@ -585,10 +602,11 @@ def main():
 
     # Step 4
     print("\nStep 4 — Routing results...")
-    auto_applied, pending, logged_unresolved = route_results(validated, unresolved, gaps, con)
+    auto_applied, pending, logged_unresolved = route_results(
+        validated, unresolved, gaps, con, dry_run=dry_run)
 
     # Fetch market data
-    fetch_market_data(auto_applied, con)
+    fetch_market_data(auto_applied, con, dry_run=dry_run)
 
     # Step 5 — Summary
     total = con.execute("SELECT SUM(market_value_usd) FROM holdings WHERE quarter='2025Q4'").fetchone()[0]
@@ -619,8 +637,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Auto-resolve ticker gaps")
     parser.add_argument("--staging", action="store_true", help="Write to staging DB")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip all writes — read-only DB conn, no CSV emit "
+                             "(PROCESS_RULES §9).")
     args = parser.parse_args()
     if args.staging:
         set_staging_mode(True)
     from db import crash_handler
-    crash_handler("auto_resolve")(main)
+    crash_handler("auto_resolve")(lambda: main(dry_run=args.dry_run))

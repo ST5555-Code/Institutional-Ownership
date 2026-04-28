@@ -54,21 +54,24 @@ def _map_to_gics(yf_sector, yf_industry):
     return YF_TO_GICS.get(yf_sector)
 
 
-def build():
-    con = duckdb.connect(get_db_path())
+def build(dry_run: bool = False):
+    con = duckdb.connect(get_db_path(), read_only=dry_run)
 
-    # Ensure table exists
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS benchmark_weights (
-            index_name VARCHAR,
-            gics_sector VARCHAR,
-            gics_code VARCHAR,
-            weight_pct DOUBLE,
-            as_of_date DATE,
-            source VARCHAR,
-            PRIMARY KEY (index_name, gics_sector, as_of_date)
-        )
-    """)
+    if dry_run:
+        print("DRY-RUN: skipping CREATE TABLE / DELETE / INSERT (preview only)")
+    else:
+        # Ensure table exists
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS benchmark_weights (
+                index_name VARCHAR,
+                gics_sector VARCHAR,
+                gics_code VARCHAR,
+                weight_pct DOUBLE,
+                as_of_date DATE,
+                source VARCHAR,
+                PRIMARY KEY (index_name, gics_sector, as_of_date)
+            )
+        """)
 
     for q in QUARTERS:
         as_of = QUARTER_END_DATES.get(q)
@@ -125,20 +128,22 @@ def build():
             continue
 
         # Delete existing entries for this index/date
-        con.execute(
-            "DELETE FROM benchmark_weights WHERE index_name = ? AND as_of_date = ?",
-            [BENCHMARK_INDEX_NAME, as_of]
-        )
+        if not dry_run:
+            con.execute(
+                "DELETE FROM benchmark_weights WHERE index_name = ? AND as_of_date = ?",
+                [BENCHMARK_INDEX_NAME, as_of]
+            )
 
         print(f'\n{q} ({as_of}):')
         for (sec, code), val in sorted(gics_totals.items(), key=lambda x: x[1], reverse=True):
             pct = round(val / total * 100, 2)
             print(f'  {sec:25s} {code} {pct:5.1f}%')
-            con.execute(
-                "INSERT INTO benchmark_weights VALUES (?, ?, ?, ?, ?, ?)",
-                [BENCHMARK_INDEX_NAME, sec, code, pct, as_of,
-                 f'Vanguard Total Stock Market {BENCHMARK_SERIES_ID}']
-            )
+            if not dry_run:
+                con.execute(
+                    "INSERT INTO benchmark_weights VALUES (?, ?, ?, ?, ?, ?)",
+                    [BENCHMARK_INDEX_NAME, sec, code, pct, as_of,
+                     f'Vanguard Total Stock Market {BENCHMARK_SERIES_ID}']
+                )
 
     con.close()
     print('\nDone.')
@@ -151,6 +156,8 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--staging", action="store_true",
                         help="Write to staging DB instead of prod.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip the DELETE+INSERT writes (PROCESS_RULES §9).")
     return parser.parse_args()
 
 
@@ -159,4 +166,4 @@ if __name__ == '__main__':
     if _args.staging:
         set_staging_mode(True)
         seed_staging()
-    build()
+    build(dry_run=_args.dry_run)

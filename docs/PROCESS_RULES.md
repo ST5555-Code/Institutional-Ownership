@@ -103,6 +103,78 @@ When fixing parsing patterns (regex, clean_text, QC gates):
 - Default mode: process 10 samples, print results, exit.
 - `--apply` flag required for real writes.
 - Never auto-apply on first run.
+- **Every script with a CLI write path MUST accept `--dry-run`.** When set, the
+  script performs no DB mutations, no CSV/file writes, and no network POSTs.
+- For scripts whose existing safe-default flag is `--apply` / `--production`,
+  `--dry-run` is the explicit form of the default safe mode and overrides
+  `--apply` if both are passed.
+
+### 9a. Compliance Table (audited 2026-04-28)
+
+Pipeline scripts (`scripts/pipeline/*.py`) — SourcePipeline subclasses inherit
+`--dry-run` semantics from `scripts/pipeline/base.py`. The base class halts at
+the `pending_approval` step (after fetch / parse / validate / diff into the
+staging DB) and only writes to prod when `approve_and_promote(run_id)` is
+called explicitly. `--dry-run` on a SourcePipeline subclass therefore always
+exits before prod is touched.
+
+| Script | Has --dry-run | Notes |
+|---|---|---|
+| `pipeline/load_13dg.py` | ✅ | SourcePipeline; halts at pending_approval |
+| `pipeline/load_adv.py` | ✅ | SourcePipeline; halts at pending_approval |
+| `pipeline/load_market.py` | ✅ | SourcePipeline; halts at pending_approval |
+| `pipeline/load_ncen.py` | ✅ | SourcePipeline; halts at pending_approval |
+| `pipeline/load_nport.py` | ✅ | SourcePipeline; halts at pending_approval |
+| `pipeline/compute_parent_fund_map.py` | ✅ | SourcePipeline; preview-only when set |
+| `pipeline/compute_peer_rotation.py` | ✅ | SourcePipeline; preview-only when set |
+| `pipeline/compute_sector_flows.py` | ✅ | SourcePipeline; preview-only when set |
+| `pipeline/validate_schema_parity.py` | n/a | Read-only validator |
+
+Non-pipeline scripts (`scripts/*.py`) with CLI write paths:
+
+| Script | --dry-run | Other write-gating flag(s) |
+|---|---|---|
+| `auto_resolve.py` | ✅ (rule9-43e) | `--staging` (DB target) |
+| `backfill_manager_types.py` | ✅ | `--production` (prod vs staging) |
+| `build_classifications.py` | ✅ | `--staging` |
+| `build_cusip.py` | ✅ | — |
+| `build_fixture.py` | ✅ | — |
+| `build_fund_classes.py` | ✅ | — |
+| `build_managers.py` | ✅ | — |
+| `build_shares_history.py` | ✅ | — |
+| `build_summaries.py` | ✅ | — |
+| `build_benchmark_weights.py` | ✅ (rule9-43e) | `--staging` |
+| `compute_flows.py` | ✅ | — |
+| `enrich_13dg.py` | ✅ | — |
+| `enrich_fund_holdings_v2.py` | ✅ (rule9-43e) | `--apply` (alias) |
+| `enrich_holdings.py` | ✅ | — |
+| `enrich_tickers.py` | ✅ | — |
+| `fetch_dera_nport.py` | ✅ | — |
+| `fetch_finra_short.py` | ✅ | — |
+| `fix_fund_classification.py` | ✅ (rule9-43e) | `--production` |
+| `load_13f.py` | ✅ | — |
+| `load_13f_v2.py` | ✅ | `--staging` (SourcePipeline halt) |
+| `merge_staging.py` | ✅ | — |
+| `normalize_names.py` | ✅ (rule9-43e) | `--apply` (alias) |
+| `normalize_securities.py` | ✅ (rule9-43e) | `--staging` |
+| `promote_staging.py` | ✅ | `--approved` |
+| `queue_nport_excluded.py` | ✅ | — |
+| `reparse_13d.py` | ✅ (rule9-43e) | `--apply` (alias) |
+| `reparse_all_nulls.py` | ✅ (rule9-43e) | `--apply` (alias) |
+| `resolve_13dg_filers.py` | ✅ | — |
+| `resolve_long_tail.py` | ✅ | — |
+| `resolve_pending_series.py` | ✅ | — |
+| `run_openfigi_retry.py` | ✅ | — |
+| `sync_staging.py` | ✅ | — |
+| `build_entities.py` | ⚠️ deferred | `--reset` only; `--dry-run` requires gating ~15 INSERT/UPDATE sites — tracked as follow-up |
+| `resolve_adv_ownership.py` | ⚠️ deferred | `--staging` required; multi-phase (download/parse/match) — tracked as follow-up |
+
+Read-only scripts that do not need `--dry-run`: `backup_db.py`, `benchmark.py`,
+`check_freshness.py`, `diff_staging.py`, `rollback_promotion.py` (gated by
+`--confirm`/`--restore`), `rollback_run.py` (gated by
+`--confirm`/`--i-understand-this-writes`), `scheduler.py`,
+`validate_classifications.py`, `validate_entities.py`,
+`verify_migration_stamps.py`, `yahoo_client.py`, `db.py`.
 
 ## 10. Script Structure Template
 
