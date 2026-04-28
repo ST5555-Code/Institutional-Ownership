@@ -223,6 +223,47 @@ def _canonical_name(con, entity_id: int):
     return row[0] if row else None
 
 
+def _canon_from_fund_universe(con, cik_padded: str):
+    """Pull a canonical fund_universe row (most-recent last_updated) keyed by
+    fund_cik. fund_universe.fund_cik is always 10-padded; series_id prefixes
+    are inconsistently padded so we match on fund_cik."""
+    return con.execute(
+        "SELECT fund_cik, fund_name, family_name, total_net_assets, "
+        "  fund_category, is_actively_managed, total_holdings_count, "
+        "  equity_pct, top10_concentration, last_updated, "
+        "  fund_strategy, best_index, strategy_narrative, "
+        "  strategy_source, strategy_fetched_at "
+        "FROM fund_universe WHERE fund_cik = ? "
+        "ORDER BY last_updated DESC NULLS LAST LIMIT 1",
+        [cik_padded],
+    ).fetchone()
+
+
+def _canon_from_holdings(con, raw_cik: str, _cik_padded: str):
+    """Synthesize a canonical row from fund_holdings_v2 when fund_universe is
+    empty for this CIK. Picks the most-recent (fund_cik, fund_name, family_name)
+    triple by report_month."""
+    row = con.execute(
+        "SELECT fund_cik, fund_name, family_name "
+        "FROM fund_holdings_v2 "
+        "WHERE is_latest "
+        "  AND SPLIT_PART(series_id, '_', 1) = ? "
+        "  AND series_id NOT LIKE 'S%' "
+        "  AND series_id NOT LIKE 'SYN_%' "
+        "ORDER BY report_month DESC LIMIT 1",
+        [raw_cik],
+    ).fetchone()
+    if row is None:
+        return None
+    fc, fn, fam = row
+    # fund_universe.fund_cik is always padded; fund_holdings_v2.fund_cik is
+    # already padded too (verified at script time), but coerce defensively.
+    if fc and len(fc) < 10:
+        fc = fc.zfill(10)
+    return (fc, fn, fam, None, None, None, None, None, None, None,
+            None, None, None, None, None)
+
+
 def phase2_apply(con) -> None:
     cands = load_tier3_candidates(con)
     print(f"PHASE 2: applying to {len(cands)} CIKs")
@@ -231,7 +272,8 @@ def phase2_apply(con) -> None:
     fu_inserted = 0
     fu_deleted = 0
     holdings_backfilled = 0
-    skipped_no_fu = 0
+    canon_from_fu = 0
+    canon_from_holdings = 0
 
     for raw_cik, cik_padded, entity_id in cands:
         new_series = f"SYN_{cik_padded}"
@@ -242,18 +284,22 @@ def phase2_apply(con) -> None:
 
         con.execute("BEGIN")
         try:
-            canon = con.execute(
-                "SELECT fund_cik, fund_name, family_name, total_net_assets, "
-                "  fund_category, is_actively_managed, total_holdings_count, "
-                "  equity_pct, top10_concentration, last_updated, "
-                "  fund_strategy, best_index, strategy_narrative, "
-                "  strategy_source, strategy_fetched_at "
-                "FROM fund_universe "
-                "WHERE SPLIT_PART(series_id, '_', 1) = ? "
-                "ORDER BY last_updated DESC NULLS LAST LIMIT 1",
-                [raw_cik],
-            ).fetchone()
+            canon = _canon_from_fund_universe(con, cik_padded)
+            if canon is None:
+                canon = _canon_from_holdings(con, raw_cik, cik_padded)
+                canon_from_holdings += 1
+            else:
+                canon_from_fu += 1
 
+            # 1. Rekey holdings. Pre-count the predicate then run UPDATE; the
+            #    count is the rowcount (DuckDB has no SELECT changes()).
+            rk = con.execute(
+                "SELECT COUNT(*) FROM fund_holdings_v2 "
+                "WHERE SPLIT_PART(series_id, '_', 1) = ? "
+                "  AND series_id NOT LIKE 'S%' "
+                "  AND series_id NOT LIKE 'SYN_%'",
+                [raw_cik],
+            ).fetchone()[0]
             con.execute(
                 "UPDATE fund_holdings_v2 SET series_id = ? "
                 "WHERE SPLIT_PART(series_id, '_', 1) = ? "
@@ -261,19 +307,23 @@ def phase2_apply(con) -> None:
                 "  AND series_id NOT LIKE 'SYN_%'",
                 [new_series, raw_cik],
             )
-            rk = con.execute("SELECT changes()").fetchone()[0]
             rekeyed += rk
 
+            # 2. Drop old fund_universe rows for this CIK. Match by fund_cik
+            #    (padded) — series_id prefixes are inconsistently padded so
+            #    a series_id-prefix match would miss some. By construction
+            #    these CIKs have NO real S% row in fund_universe.
+            fud = con.execute(
+                "SELECT COUNT(*) FROM fund_universe WHERE fund_cik = ?",
+                [cik_padded],
+            ).fetchone()[0]
             con.execute(
-                "DELETE FROM fund_universe "
-                "WHERE SPLIT_PART(series_id, '_', 1) = ? "
-                "  AND series_id NOT LIKE 'S%' "
-                "  AND series_id NOT LIKE 'SYN_%'",
-                [raw_cik],
+                "DELETE FROM fund_universe WHERE fund_cik = ?",
+                [cik_padded],
             )
-            fud = con.execute("SELECT changes()").fetchone()[0]
             fu_deleted += fud
 
+            # 3. Insert canonical fund_universe row keyed by SYN_{cik}.
             if canon is not None:
                 con.execute(
                     "INSERT INTO fund_universe ("
@@ -297,9 +347,12 @@ def phase2_apply(con) -> None:
                     ],
                 )
                 fu_inserted += 1
-            else:
-                skipped_no_fu += 1
 
+            # 4. Backfill entity columns on rekeyed rows.
+            bf = con.execute(
+                "SELECT COUNT(*) FROM fund_holdings_v2 WHERE series_id = ?",
+                [new_series],
+            ).fetchone()[0]
             con.execute(
                 "UPDATE fund_holdings_v2 SET "
                 "  entity_id = ?, "
@@ -310,7 +363,6 @@ def phase2_apply(con) -> None:
                 "WHERE series_id = ?",
                 [entity_id, ec_rollup, entity_id, dm_rollup, dm_name, new_series],
             )
-            bf = con.execute("SELECT changes()").fetchone()[0]
             holdings_backfilled += bf
 
             con.execute("COMMIT")
@@ -321,7 +373,7 @@ def phase2_apply(con) -> None:
     print(
         f"PHASE 2: rekeyed {rekeyed:,} holdings rows; "
         f"fund_universe -{fu_deleted} +{fu_inserted} "
-        f"(skipped_no_fu={skipped_no_fu}); "
+        f"(canon_from_fu={canon_from_fu}, canon_from_holdings={canon_from_holdings}); "
         f"backfilled {holdings_backfilled:,} entity/rollup cells"
     )
 
