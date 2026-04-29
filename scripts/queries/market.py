@@ -112,6 +112,60 @@ def get_sector_flows(active_only=False, level="parent",
     finally:
         pass
 
+def get_sector_summary():
+    """Market-wide totals for the latest quarter — used by Sector Rotation
+    KPI row. Always total market; ignores active/passive filters and rollup
+    type. Reads ``holdings_v2`` for the latest quarter where
+    ``is_latest = TRUE``.
+
+    Returns:
+        quarter, total_aum, total_holders, pct_active, pct_passive,
+        pct_hedge_fund (each pct as a fraction 0–1 of total_aum).
+    """
+    con = get_db()
+    try:
+        row = con.execute(
+            """
+            WITH latest AS (
+                SELECT MAX(quarter) AS q FROM holdings_v2 WHERE is_latest = TRUE
+            ),
+            base AS (
+                SELECT manager_type,
+                       market_value_usd,
+                       COALESCE(rollup_name, inst_parent_name, manager_name) AS holder
+                  FROM holdings_v2, latest
+                 WHERE holdings_v2.quarter = latest.q
+                   AND is_latest = TRUE
+            )
+            SELECT
+                (SELECT q FROM latest) AS quarter,
+                SUM(market_value_usd) AS total_aum,
+                COUNT(DISTINCT holder) AS total_holders,
+                SUM(CASE WHEN manager_type IN ('active', 'mixed', 'strategic')
+                         THEN market_value_usd ELSE 0 END) AS aum_active,
+                SUM(CASE WHEN manager_type = 'passive'
+                         THEN market_value_usd ELSE 0 END) AS aum_passive,
+                SUM(CASE WHEN manager_type IN ('hedge_fund', 'quantitative')
+                         THEN market_value_usd ELSE 0 END) AS aum_hedge
+              FROM base
+            """
+        ).fetchone()
+
+        quarter, total_aum, total_holders, a_act, a_pas, a_hf = row
+        total_aum = float(total_aum or 0)
+        denom = total_aum if total_aum > 0 else None
+        return clean_for_json({
+            "quarter": quarter,
+            "total_aum": total_aum,
+            "total_holders": int(total_holders or 0),
+            "pct_active": (float(a_act or 0) / denom) if denom else 0,
+            "pct_passive": (float(a_pas or 0) / denom) if denom else 0,
+            "pct_hedge_fund": (float(a_hf or 0) / denom) if denom else 0,
+        })
+    finally:
+        pass
+
+
 def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Top 5 net buyers + top 5 net sellers for one sector in one quarter
     transition. Returns summary stats + two lists.

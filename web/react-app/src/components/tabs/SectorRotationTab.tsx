@@ -1,50 +1,44 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useFetch } from '../../hooks/useFetch'
 import type {
   SectorFlowsResponse,
   SectorFlowMoversResponse,
+  SectorSummaryResponse,
 } from '../../types/api'
 import {
   FundViewToggle,
   ActiveOnlyToggle,
   ExportBar,
-  ColumnGroupHeader,
   FreshnessBadge,
 } from '../common'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts'
-
-// ── GICS sector colors ─────────────────────────────────────────────────────
-
-const SECTOR_COLORS: Record<string, string> = {
-  'Technology': '#7aadde',
-  'Health Care': 'var(--pos)',
-  'Financials': 'var(--header)',
-  'Energy': 'var(--gold)',
-  'Consumer Discretionary': '#b09ee0',
-  'Industrials': 'var(--gold)',
-  'Communication Services': 'var(--text-mute)',
-  'Consumer Staples': '#5cb87a',
-  'Materials': 'var(--text-dim)',
-  'Real Estate': 'var(--neg)',
-  'Utilities': 'var(--text-dim)',
-}
-
-function sectorColor(sector: string): string {
-  return SECTOR_COLORS[sector] || 'var(--text-dim)'
-}
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 
-function fmtMm(v: number | null): string {
+function fmtAum(v: number | null | undefined): string {
+  if (v == null || !isFinite(v)) return '—'
+  const abs = Math.abs(v)
+  if (abs >= 1e12) return `$${NUM_1.format(v / 1e12)}T`
+  if (abs >= 1e9) return `$${NUM_0.format(v / 1e9)}B`
+  if (abs >= 1e6) return `$${NUM_0.format(v / 1e6)}M`
+  return `$${NUM_0.format(v)}`
+}
+
+function fmtMm(v: number | null | undefined): string {
   if (v == null || v === 0) return '—'
   return `$${NUM_0.format(v / 1e6)}`
+}
+
+function fmtPct(v: number | null | undefined): string {
+  if (v == null || !isFinite(v)) return '—'
+  return `${NUM_1.format(v * 100)}%`
 }
 
 function SignedMm({ v }: { v: number | null }) {
@@ -58,14 +52,15 @@ function SignedMm({ v }: { v: number | null }) {
 
 const TH: React.CSSProperties = {
   padding: '7px 8px', fontSize: 9, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  textTransform: 'uppercase', letterSpacing: '0.16em',
+  fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
   textAlign: 'left', borderBottom: '1px solid var(--line)',
-  whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
+  whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+  padding: '6px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -74,14 +69,24 @@ const TD_R: React.CSSProperties = {
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
-// Footer cell
-const FC: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 11, fontWeight: 600,
-  color: 'var(--white)', backgroundColor: 'var(--header)',
-  position: 'sticky', bottom: 0, zIndex: 2,
-  borderTop: '2px solid var(--header)',
+const KICKER: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
+  fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)',
 }
-const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+const KPI_VALUE: React.CSSProperties = {
+  fontSize: 24, fontFamily: "'JetBrains Mono', monospace",
+  color: 'var(--white)', letterSpacing: '-0.01em', fontWeight: 400,
+  fontVariantNumeric: 'tabular-nums', marginTop: 6,
+}
+const PANEL_TITLE: React.CSSProperties = {
+  fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
+  fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)',
+  padding: '10px 14px', borderBottom: '1px solid var(--line)',
+  backgroundColor: 'var(--card)',
+}
+
+// Period bar tints — three monochrome shades inside the same group
+const PERIOD_FILLS = ['rgba(122,173,222,0.55)', 'rgba(122,173,222,0.78)', '#7aadde']
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -91,71 +96,88 @@ export function SectorRotationTab() {
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
   const [activeOnly, setActiveOnly] = useState(false)
   const [selectedSector, setSelectedSector] = useState<string | null>(null)
-  const [periodCount, setPeriodCount] = useState<1 | 2 | 3>(3)
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
 
-  // Market-wide — no ticker dependency. Load on tab activation.
-  const url = `/api/v1/sector_flows?active_only=${ao}&level=${level}`
-  const { data, loading, error } = useFetch<SectorFlowsResponse>(url)
+  // Static fetches (KPI row + net flows chart) — never refetch
+  const summary = useFetch<SectorSummaryResponse>('/api/v1/sector_summary')
+  const parentStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=parent&active_only=0')
+  const fundStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=fund&active_only=0')
 
-  // Filter periods based on period selector (last N)
-  const allPeriods = data?.periods ?? []
-  const periods = allPeriods.slice(-periodCount)
+  // Toggleable fetch (chart + table + drives movers)
+  const { data, loading, error } = useFetch<SectorFlowsResponse>(
+    `/api/v1/sector_flows?active_only=${ao}&level=${level}`,
+  )
 
-  // Movers fetch — on sector row click, for the selected period range's latest
+  const periods = data?.periods ?? []
+
+  // Sectors ranked 1..N by sum of net flow across all periods (desc)
+  const ranked = useMemo(() => {
+    if (!data) return []
+    return [...data.sectors].sort((a, b) => (b.total_net || 0) - (a.total_net || 0))
+  }, [data])
+
+  // Auto-select rank-1 sector on data load and on toggle change
+  useEffect(() => {
+    if (!data || ranked.length === 0) return
+    const top = ranked[0].sector
+    if (!ranked.some(s => s.sector === selectedSector)) {
+      setSelectedSector(top)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, level, ao])
+
+  // Movers fetch — latest period of selected sector
   const latestPeriod = periods[periods.length - 1] ?? null
   const moversUrl = selectedSector && latestPeriod
     ? `/api/v1/sector_flow_movers?from=${enc(latestPeriod.from)}&to=${enc(latestPeriod.to)}&sector=${enc(selectedSector)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
     : null
   const movers = useFetch<SectorFlowMoversResponse>(moversUrl)
 
-  // Sort sectors by latest_net descending for chart + table
-  const sortedSectors = useMemo(() => {
+  // Sector grouped chart — one row per sector with one column per period
+  const sectorChartData = useMemo(() => {
     if (!data) return []
-    return [...data.sectors].sort((a, b) => b.latest_net - a.latest_net)
-  }, [data])
-
-  // periods already computed above from allPeriods.slice(-periodCount)
-
-  // Chart data — latest period net per sector
-  const chartData = useMemo(() => {
-    if (!data || !latestPeriod) return []
-    const key = `${latestPeriod.from}_${latestPeriod.to}`
-    return sortedSectors.map(s => ({
-      sector: s.sector.length > 12 ? s.sector.substring(0, 12) + '…' : s.sector,
-      sectorFull: s.sector,
-      net: (s.flows[key]?.net || 0) / 1e9,
-      netRaw: s.flows[key]?.net || 0,
-      inflow: s.flows[key]?.inflow || 0,
-      outflow: s.flows[key]?.outflow || 0,
-    }))
-  }, [data, sortedSectors, latestPeriod])
-
-  // Footer totals
-  const footerTotals = useMemo(() => {
-    if (!data) return { totalNet: 0, periods: {} as Record<string, number> }
-    let totalNet = 0
-    const byPeriod: Record<string, number> = {}
-    for (const p of periods) {
-      const key = `${p.from}_${p.to}`
-      byPeriod[key] = 0
-    }
-    for (const s of data.sectors) {
-      totalNet += s.total_net
-      for (const p of periods) {
-        const key = `${p.from}_${p.to}`
-        byPeriod[key] += s.flows[key]?.net || 0
+    return ranked.map((s, i) => {
+      const row: Record<string, number | string> = {
+        rank: i + 1,
+        sector: s.sector,
+        label: `${i + 1}. ${s.sector}`,
       }
-    }
-    return { totalNet, periods: byPeriod }
-  }, [data, periods])
+      data.periods.forEach((p, pi) => {
+        const key = `${p.from}_${p.to}`
+        row[`p${pi}`] = (s.flows[key]?.net || 0) / 1e9
+        row[`p${pi}_raw`] = s.flows[key]?.net || 0
+      })
+      return row
+    })
+  }, [data, ranked])
+
+  // Net flows chart — sum each sector's net per period for parent + fund.
+  // Compute from the static (active_only=0) responses so this never moves.
+  const netFlowsChartData = useMemo(() => {
+    const p = parentStatic.data
+    const f = fundStatic.data
+    const periodsRef = p?.periods ?? f?.periods ?? []
+    return periodsRef.map(period => {
+      const key = `${period.from}_${period.to}`
+      const inst = (p?.sectors ?? []).reduce((sum, s) => sum + (s.flows[key]?.net || 0), 0)
+      const fund = (f?.sectors ?? []).reduce((sum, s) => sum + (s.flows[key]?.net || 0), 0)
+      return {
+        period: period.label,
+        institutional: inst / 1e9,
+        institutionalRaw: inst,
+        fund: fund / 1e9,
+        fundRaw: fund,
+      }
+    })
+  }, [parentStatic.data, fundStatic.data])
 
   function onExcel() {
     if (!data) return
-    const h = ['Sector', 'Total Net ($MM)', ...periods.map(p => `${p.label} Net ($MM)`)]
-    const csv = [h, ...sortedSectors.map(s => [
+    const h = ['Rank', 'Sector', 'Total Net ($MM)', ...periods.map(p => `${p.label} Net ($MM)`)]
+    const csv = [h, ...ranked.map((s, i) => [
+      i + 1,
       `"${s.sector}"`, (s.total_net / 1e6).toFixed(0),
       ...periods.map(p => {
         const key = `${p.from}_${p.to}`
@@ -167,7 +189,7 @@ export function SectorRotationTab() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflow: 'hidden' }}>
       <style>{`
         @media print {
           .sr-controls { display:none!important }
@@ -177,25 +199,7 @@ export function SectorRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-        {/* Period selector */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
-            <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
-              style={{
-                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
-                fontWeight: periodCount === p.n ? 700 : 400,
-                color: periodCount === p.n ? '#000000' : 'var(--text-dim)',
-                backgroundColor: periodCount === p.n ? 'var(--gold)' : 'transparent',
-                border: '1px solid var(--line)',
-                letterSpacing: '0.06em', textTransform: 'uppercase',
-                fontFamily: "'Inter', sans-serif",
-                transition: 'all 0.12s',
-              }}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -206,174 +210,267 @@ export function SectorRotationTab() {
 
       {/* Content */}
       <div className="sr-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
-        {data && !loading && (
-          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Sector flow chart */}
-            {chartData.length > 0 && (
-              <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)' }}>
-                <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>
-                  Sector Net Flow — {latestPeriod?.label}
-                </div>
-                <div style={{ padding: '8px 8px 4px' }}>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData} barSize={28}>
-                      <XAxis dataKey="sector" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={40} />
-                      <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `$${NUM_1.format(v)}B`} width={52} />
-                      <Tooltip content={({ active, payload }) => {
-                        if (!active || !payload || !payload[0]) return null
-                        const d = payload[0].payload as { sectorFull: string; netRaw: number; inflow: number; outflow: number }
-                        return (
-                          <div style={{ backgroundColor: 'var(--bg)', color: 'var(--line)', padding: '8px 12px', borderRadius: 0, border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6 }}>
-                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{d.sectorFull}</div>
-                            <div>Net: <span style={{ color: d.netRaw >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(d.netRaw)}</span></div>
-                            <div><span style={{ color: 'var(--pos)' }}>Inflow:</span> {fmtMm(d.inflow)}</div>
-                            <div><span style={{ color: 'var(--neg)' }}>Outflow:</span> {fmtMm(d.outflow)}</div>
-                          </div>
-                        )
-                      }} />
-                      <ReferenceLine y={0} stroke="var(--text-dim)" strokeDasharray="3 3" />
-                      <Bar dataKey="net" radius={[2, 2, 0, 0]}>
-                        {chartData.map((d, i) => (
-                          <Cell key={i} fill={d.net >= 0 ? sectorColor(d.sectorFull) : 'var(--neg)'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Table + detail panel */}
-            <div style={{ display: 'flex', gap: 12 }}>
-              {/* Left: sector table */}
-              <div style={{ flex: 3, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
-                <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
-                    <colgroup>
-                      <col style={{ width: 160 }} />
-                      <col style={{ width: 100 }} />
-                      {periods.map(p => <col key={p.label} style={{ width: 90 }} />)}
-                    </colgroup>
-                    <thead>
-                      <ColumnGroupHeader groups={[
-                        { label: '', colSpan: 2 },
-                        { label: 'Net Flow by Period', colSpan: periods.length || 1 },
-                      ]} />
-                      <tr>
-                        <th style={TH}>Sector</th>
-                        <th style={TH_R}>Total Net</th>
-                        {periods.map(p => <th key={p.label} style={TH_R}>{p.label}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedSectors.map(s => {
-                        const isSel = s.sector === selectedSector
-                        return (
-                          <tr key={s.sector}
-                            onClick={() => setSelectedSector(isSel ? null : s.sector)}
-                            style={{ backgroundColor: isSel ? 'rgba(122,173,222,0.08)' : undefined, cursor: 'pointer' }}>
-                            <td style={{ ...TD, fontWeight: 600, borderLeft: `3px solid ${sectorColor(s.sector)}`, paddingLeft: 10 }}>
-                              {s.sector}
-                            </td>
-                            <td style={TD_R}><SignedMm v={s.total_net} /></td>
-                            {periods.map(p => {
-                              const key = `${p.from}_${p.to}`
-                              const n = s.flows[key]?.net ?? null
-                              return <td key={p.label} style={TD_R}><SignedMm v={n} /></td>
-                            })}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td style={FC}>Total</td>
-                        <td style={FCR}><span style={{ color: footerTotals.totalNet >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(footerTotals.totalNet)}</span></td>
-                        {periods.map(p => {
-                          const key = `${p.from}_${p.to}`
-                          const n = footerTotals.periods[key] || 0
-                          return <td key={p.label} style={FCR}><span style={{ color: n >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(n)}</span></td>
+          {/* B. KPI row + Net Flows chart (3/4 + 1/4) — STATIC */}
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
+            <KpiRow summary={summary.data} loading={summary.loading} />
+            <NetFlowsCard data={netFlowsChartData} loading={parentStatic.loading || fundStatic.loading} />
+          </div>
+
+          {/* C. Sector rotation chart — toggle-driven */}
+          <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
+            <div style={PANEL_TITLE}>
+              Sector Rotation — Net Flow by Period
+            </div>
+            <div style={{ padding: '12px 12px 4px', height: 320 }}>
+              {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+              {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
+              {!loading && !error && sectorChartData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sectorChartData} barCategoryGap={20} barGap={0}>
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
+                      interval={0} angle={-25} textAnchor="end" height={70}
+                      stroke="var(--line)" />
+                    <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
+                      tickFormatter={(v: number) => `$${NUM_1.format(v)}B`} width={56}
+                      stroke="var(--line)" />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null
+                      const row = payload[0].payload as Record<string, number | string>
+                      return (
+                        <div style={{ backgroundColor: 'var(--panel)', color: 'var(--text)', padding: '8px 12px', border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--white)', marginBottom: 4 }}>{label}</div>
+                          {(data?.periods ?? []).map((p, pi) => {
+                            const raw = (row[`p${pi}_raw`] as number) || 0
+                            return (
+                              <div key={pi} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                                <span style={{ color: 'var(--text-dim)' }}>{p.label}</span>
+                                <span style={{ color: raw >= 0 ? 'var(--pos)' : 'var(--neg)', fontFamily: "'JetBrains Mono', monospace" }}>{fmtMm(raw)}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    }} />
+                    <ReferenceLine y={0} stroke="var(--line)" />
+                    {(data?.periods ?? []).map((_, pi) => (
+                      <Bar key={pi} dataKey={`p${pi}`} fill={PERIOD_FILLS[pi] || '#7aadde'} isAnimationActive={false}>
+                        {sectorChartData.map((d, i) => {
+                          const v = (d[`p${pi}`] as number) || 0
+                          return <Cell key={i} fill={v >= 0 ? (PERIOD_FILLS[pi] || '#7aadde') : 'var(--neg)'} />
                         })}
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-
-              {/* Right: mover detail panel */}
-              <div style={{ flex: 2 }}>
-                {!selectedSector && (
-                  <div style={{ ...CENTER_MSG, color: 'var(--text-dim)', border: '1px dashed var(--text-dim)', borderRadius: 0, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    Click a sector to see top movers
-                  </div>
-                )}
-                {selectedSector && movers.loading && (
-                  <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading movers…</div>
-                )}
-                {selectedSector && !movers.loading && movers.data && (
-                  <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
-                    {/* Header */}
-                    <div style={{ padding: '8px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{selectedSector} — {latestPeriod?.label}</span>
-                      <button type="button" onClick={() => setSelectedSector(null)}
-                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16 }}>×</button>
-                    </div>
-                    {/* Summary */}
-                    <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--text-dim)', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', display: 'flex', gap: 16 }}>
-                      <span>Net: <b style={{ color: movers.data.summary.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(movers.data.summary.net)}</b></span>
-                      <span>Managers: <b>{NUM_0.format(movers.data.summary.buyers)}</b></span>
-                    </div>
-                    {/* Buyers */}
-                    <MoverTable title="Top Buyers" rows={movers.data.top_buyers} color="var(--pos)" />
-                    {/* Sellers */}
-                    <MoverTable title="Top Sellers" rows={movers.data.top_sellers} color="var(--neg)" />
-                  </div>
-                )}
-              </div>
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
+
+          {/* D + E. Sector table + movers panel */}
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}>
+            {/* Sector table */}
+            <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
+              <div style={PANEL_TITLE}>Sector Ranking</div>
+              <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+                  <colgroup>
+                    <col style={{ width: 50 }} />
+                    <col style={{ width: 170 }} />
+                    <col style={{ width: 100 }} />
+                    {periods.map(p => <col key={p.label} style={{ width: 90 }} />)}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th style={TH_R}>#</th>
+                      <th style={TH}>Sector</th>
+                      <th style={TH_R}>Total Net</th>
+                      {periods.map(p => <th key={p.label} style={TH_R}>{p.label}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ranked.map((s, i) => {
+                      const isSel = s.sector === selectedSector
+                      return (
+                        <tr key={s.sector}
+                          onClick={() => setSelectedSector(s.sector)}
+                          style={{
+                            backgroundColor: isSel ? 'var(--gold-soft)' : undefined,
+                            borderLeft: isSel ? '2px solid var(--gold)' : '2px solid transparent',
+                            cursor: 'pointer',
+                            transition: 'all 0.12s',
+                          }}>
+                          <td style={{ ...TD_R, color: 'var(--text-dim)' }}>{i + 1}</td>
+                          <td style={{ ...TD, fontWeight: 500, color: isSel ? 'var(--white)' : 'var(--text)' }}>{s.sector}</td>
+                          <td style={TD_R}><SignedMm v={s.total_net} /></td>
+                          {periods.map(p => {
+                            const key = `${p.from}_${p.to}`
+                            const n = s.flows[key]?.net ?? null
+                            return <td key={p.label} style={TD_R}><SignedMm v={n} /></td>
+                          })}
+                        </tr>
+                      )
+                    })}
+                    {ranked.length === 0 && !loading && (
+                      <tr><td colSpan={3 + periods.length} style={{ ...TD, textAlign: 'center', color: 'var(--text-dim)', padding: 30 }}>No data.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Movers panel */}
+            <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
+              <div style={{ ...PANEL_TITLE, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Movers — {selectedSector ?? '—'}</span>
+                <span style={{ color: 'var(--text-mute)' }}>{latestPeriod?.label ?? ''}</span>
+              </div>
+              {!selectedSector && (
+                <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Select a sector</div>
+              )}
+              {selectedSector && movers.loading && (
+                <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading movers…</div>
+              )}
+              {selectedSector && !movers.loading && movers.data && (
+                <>
+                  <div style={{
+                    padding: '8px 14px', fontSize: 11, color: 'var(--text-dim)',
+                    backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line-soft)',
+                    display: 'flex', gap: 16, fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    <span>Net <b style={{ color: movers.data.summary.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(movers.data.summary.net)}</b></span>
+                    <span>Mgrs <b style={{ color: 'var(--text)' }}>{NUM_0.format(movers.data.summary.buyers)}</b></span>
+                  </div>
+                  <MoverTable title="Top Buyers" rows={movers.data.top_buyers} accent="var(--pos)" />
+                  <MoverTable title="Top Sellers" rows={movers.data.top_sellers} accent="var(--neg)" />
+                </>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── KPI Row ────────────────────────────────────────────────────────────────
+
+function KpiCard({ kicker, value }: { kicker: string; value: string }) {
+  return (
+    <div style={{
+      backgroundColor: 'var(--card)', border: '1px solid var(--line)',
+      padding: 16, display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={KICKER}>{kicker}</div>
+      <div style={KPI_VALUE}>{value}</div>
+    </div>
+  )
+}
+
+function KpiRow({ summary, loading }: { summary: SectorSummaryResponse | null; loading: boolean }) {
+  const v = (n: number | null | undefined, fmt: (x: number) => string) =>
+    loading || summary == null ? '…' : fmt(n ?? 0)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+      <KpiCard kicker="Total AUM" value={v(summary?.total_aum, fmtAum)} />
+      <KpiCard kicker="Total Holders" value={v(summary?.total_holders, x => NUM_0.format(x))} />
+      <KpiCard kicker="% Active" value={v(summary?.pct_active, fmtPct)} />
+      <KpiCard kicker="% Passive" value={v(summary?.pct_passive, fmtPct)} />
+      <KpiCard kicker="% Hedge Fund" value={v(summary?.pct_hedge_fund, fmtPct)} />
+    </div>
+  )
+}
+
+// ── Net Flows Card ─────────────────────────────────────────────────────────
+
+interface NetFlowsRow {
+  period: string
+  institutional: number
+  institutionalRaw: number
+  fund: number
+  fundRaw: number
+}
+
+function NetFlowsCard({ data, loading }: { data: NetFlowsRow[]; loading: boolean }) {
+  return (
+    <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column' }}>
+      <div style={PANEL_TITLE}>Net Flows</div>
+      <div style={{ padding: '8px 8px 4px', height: 168 }}>
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)', padding: 20 }}>Loading…</div>}
+        {!loading && (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} barCategoryGap={12} barGap={2}>
+              <XAxis dataKey="period" tick={{ fontSize: 9, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }} stroke="var(--line)" />
+              <YAxis tick={{ fontSize: 9, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
+                tickFormatter={(v: number) => `$${NUM_0.format(v)}B`} width={42} stroke="var(--line)" />
+              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={({ active, payload, label }) => {
+                if (!active || !payload || payload.length === 0) return null
+                const row = payload[0].payload as NetFlowsRow
+                return (
+                  <div style={{ backgroundColor: 'var(--panel)', color: 'var(--text)', padding: '8px 12px', border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--white)', marginBottom: 4 }}>{label}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ color: 'var(--text-dim)' }}>Institutional</span>
+                      <span style={{ color: row.institutionalRaw >= 0 ? 'var(--pos)' : 'var(--neg)', fontFamily: "'JetBrains Mono', monospace" }}>{fmtMm(row.institutionalRaw)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ color: 'var(--text-dim)' }}>Fund</span>
+                      <span style={{ color: row.fundRaw >= 0 ? 'var(--pos)' : 'var(--neg)', fontFamily: "'JetBrains Mono', monospace" }}>{fmtMm(row.fundRaw)}</span>
+                    </div>
+                  </div>
+                )
+              }} />
+              <Legend wrapperStyle={{ fontSize: 9, fontFamily: "'Hanken Grotesk', sans-serif", textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--text-dim)' }} iconSize={8} verticalAlign="top" align="right" />
+              <ReferenceLine y={0} stroke="var(--line)" />
+              <Bar dataKey="institutional" name="Institutional" isAnimationActive={false}>
+                {data.map((d, i) => <Cell key={i} fill={d.institutional >= 0 ? 'var(--pos)' : 'var(--neg)'} />)}
+              </Bar>
+              <Bar dataKey="fund" name="Fund" isAnimationActive={false}>
+                {data.map((d, i) => <Cell key={i} fill={d.fund >= 0 ? 'var(--pos)' : 'var(--neg)'} fillOpacity={0.55} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         )}
       </div>
     </div>
   )
 }
 
-// ── Mover table ─────────────────────────────────────────────────────────────
+// ── Mover table ────────────────────────────────────────────────────────────
 
-function MoverTable({ title, rows, color }: {
+function MoverTable({ title, rows, accent }: {
   title: string
   rows: Array<{ institution: string; net_flow: number; buying: number; selling: number; positions_changed: number }>
-  color: string
+  accent: string
 }) {
   return (
     <div>
-      <div style={{ padding: '5px 12px', backgroundColor: color, color: 'var(--white)', fontSize: 11, fontWeight: 700 }}>{title}</div>
+      <div style={{
+        padding: '6px 14px', fontSize: 9, fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.16em',
+        fontFamily: "'Hanken Grotesk', sans-serif",
+        color: accent, backgroundColor: 'var(--panel)',
+        borderBottom: '1px solid var(--line-soft)',
+      }}>{title}</div>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
-        <thead>
-          <tr>
-            <th style={{ ...TH, fontSize: 9, padding: '4px 6px' }}>#</th>
-            <th style={{ ...TH, fontSize: 9, padding: '4px 6px' }}>Institution</th>
-            <th style={{ ...TH_R, fontSize: 9, padding: '4px 6px' }}>Net Flow</th>
-          </tr>
-        </thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.institution}>
-              <td style={{ ...TD, fontSize: 11, padding: '3px 6px', width: 24, textAlign: 'right', color: 'var(--text-dim)' }}>{i + 1}</td>
-              <td style={{ ...TD, fontSize: 11, padding: '3px 6px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.institution}>{r.institution}</td>
-              <td style={{ ...TD_R, fontSize: 11, padding: '3px 6px' }}><SignedMm v={r.net_flow} /></td>
+              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', width: 26, textAlign: 'right', color: 'var(--text-mute)' }}>{i + 1}</td>
+              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.institution}>{r.institution}</td>
+              <td style={{ ...TD_R, fontSize: 11, padding: '4px 8px' }}><SignedMm v={r.net_flow} /></td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={3} style={{ ...TD, textAlign: 'center', color: 'var(--text-dim)', padding: 10 }}>None</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={3} style={{ ...TD, textAlign: 'center', color: 'var(--text-mute)', padding: 10 }}>None</td></tr>}
         </tbody>
       </table>
     </div>
   )
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 function enc(s: string) { return encodeURIComponent(s) }
 

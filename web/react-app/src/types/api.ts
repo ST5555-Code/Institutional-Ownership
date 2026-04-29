@@ -579,6 +579,17 @@ export interface SectorFlowsResponse {
   sectors: SectorFlowRow[]
 }
 
+// ── Sector Summary — /api/v1/sector_summary ───────────────────────────────
+
+export interface SectorSummaryResponse {
+  quarter: string
+  total_aum: number
+  total_holders: number
+  pct_active: number
+  pct_passive: number
+  pct_hedge_fund: number
+}
+
 // ── Sector Flow Movers — /api/sector_flow_movers ──────────────────────────
 
 export interface SectorFlowMover {
