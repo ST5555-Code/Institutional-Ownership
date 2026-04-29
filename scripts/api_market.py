@@ -77,6 +77,31 @@ def api_sector_flow_movers(request: Request):
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
+@market_router.get('/sector_flow_mover_detail')
+def api_sector_flow_mover_detail(request: Request):
+    """Top 5 individual ticker moves making up one institution's net flow
+    inside a sector for one quarter transition. Drill-down for the
+    Sector Rotation movers panel.
+    """
+    try:
+        from queries import get_sector_flow_mover_detail
+        q_from = (request.query_params.get('from') or '').strip()
+        q_to = (request.query_params.get('to') or '').strip()
+        sector = (request.query_params.get('sector') or '').strip()
+        institution = (request.query_params.get('institution') or '').strip()
+        active_only = request.query_params.get('active_only', '0') == '1'
+        level = (request.query_params.get('level') or 'parent').strip()
+        if not q_from or not q_to or not sector or not institution:
+            return JSONResponse(status_code=400, content={'error': 'Missing required params: from, to, sector, institution'})
+        rt = get_rollup_type(request)
+        return get_sector_flow_mover_detail(q_from, q_to, sector, institution,
+                                            active_only=active_only, level=level,
+                                            rollup_type=rt)
+    except Exception as e:
+        log.error("sector_flow_mover_detail error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
 @market_router.get('/short_analysis')
 def api_short_analysis(request: Request):
     """Short Interest Analysis — N-PORT shorts, FINRA volume, long/short cross-ref."""
