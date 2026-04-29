@@ -63,8 +63,8 @@ function nportBadgeStyle(cov: number | null): React.CSSProperties | null {
 // ── Shared inline styles ───────────────────────────────────────────────────
 
 const TH_STYLE: React.CSSProperties = {
-  padding: '9px 10px',
-  fontSize: 9,
+  padding: '4px 8px',
+  fontSize: 8,
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
@@ -81,8 +81,8 @@ const TH_STYLE: React.CSSProperties = {
 const TH_RIGHT: React.CSSProperties = { ...TH_STYLE, textAlign: 'right' }
 
 const TD_STYLE: React.CSSProperties = {
-  padding: '7px 10px',
-  fontSize: 13,
+  padding: '4px 8px',
+  fontSize: 12,
   color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
@@ -96,8 +96,8 @@ const TD_RIGHT: React.CSSProperties = {
 
 const BADGE: React.CSSProperties = {
   display: 'inline-block',
-  padding: '2px 8px',
-  fontSize: 11,
+  padding: '1px 6px',
+  fontSize: 10,
   fontWeight: 600,
   borderRadius: 1,
   letterSpacing: '0.02em',
@@ -128,20 +128,21 @@ interface FundViewRow extends RegisterRow {
 
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 
-// Column layout (12 cols):
-//   1  Rank
-//   2  Institution
-//   3  Type
-//   4  (empty spacer — pushes Shares/Value/%SO right by one Type-width)
-//   5  Shares (MM)
-//   6  Value ($MM)
-//   7  % SO
-//   8  (empty spacer — pushes AUM / % AUM / Port. Coverage further right)
-//   9  AUM ($MM)
-//  10  % of AUM
-//  11  Port. Coverage
-//  12  Trailing spacer (flex — absorbs remainder on wide viewports)
-const TOTAL_COLS = 12
+// Column layout (13 cols):
+//   1  Expand triangle (gold, ~24px)
+//   2  Rank
+//   3  Institution
+//   4  Type
+//   5  (empty spacer)
+//   6  Shares (MM)
+//   7  Value ($MM)
+//   8  % SO
+//   9  (empty spacer)
+//  10  AUM ($MM)
+//  11  % of AUM
+//  12  Port. Coverage
+//  13  Trailing spacer (flex)
+const TOTAL_COLS = 13
 
 // ── InvestorSearchWithDropdown ────────────────────────────────────────────
 // Local to this file per spec — the shared common/InvestorSearch stays a
@@ -527,8 +528,8 @@ export function RegisterTab() {
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'flex-end',
-          gap: 16,
-          padding: '12px 16px',
+          gap: 10,
+          padding: '8px 12px',
           backgroundColor: 'var(--panel)',
           borderBottom: '1px solid var(--line)',
           flexShrink: 0,
@@ -611,7 +612,8 @@ export function RegisterTab() {
             }}
           >
             <colgroup>
-              <col style={{ width: 60 }} />
+              <col style={{ width: 24 }} /> {/* Expand triangle */}
+              <col style={{ width: 48 }} /> {/* Rank */}
               {/* Institution: fixed at 440 so it doesn't balloon on Fund
                   view and gives enough room for most parent names. */}
               <col style={{ width: 440 }} />
@@ -630,15 +632,16 @@ export function RegisterTab() {
             <thead>
               <ColumnGroupHeader
                 groups={[
-                  // cols 1-8: Rank, Inst, Type, gap, Shares, Value, %F, gap
-                  { label: '', colSpan: 8 },
-                  // cols 9-11: AUM, % AUM, Port. Coverage
+                  // cols 1-9: Expand, Rank, Inst, Type, gap, Shares, Value, %F, gap
+                  { label: '', colSpan: 9 },
+                  // cols 10-12: AUM, % AUM, Port. Coverage
                   { label: 'Investor', colSpan: 3 },
-                  // col 12: trailing spacer
+                  // col 13: trailing spacer
                   { label: '', colSpan: 1 },
                 ]}
               />
               <tr>
+                <th style={TH_STYLE} />
                 <th style={TH_RIGHT}>Rank</th>
                 <th style={TH_STYLE}>Institution</th>
                 <th style={TH_STYLE}>Type</th>
@@ -772,6 +775,7 @@ export function RegisterTab() {
             </tbody>
             <TableFooter
               totalColumns={TOTAL_COLS}
+              leadingEmptyCols={1}
               skipBeforeNumbers={1}
               skipAfterNumbers={1}
               rows={[
@@ -832,10 +836,10 @@ function renderRow(
   }
   const nameCell: React.CSSProperties = {
     ...TD_STYLE,
-    paddingLeft: indent === 1 ? 24 : 10,
+    paddingLeft: indent === 1 ? 24 : 8,
     fontWeight: indent === 0 ? 600 : 400,
     color: indent === 0 ? 'var(--text)' : 'var(--text-mute)',
-    fontSize: indent === 1 ? 12 : 13,
+    fontSize: 12,
     cursor: canExpand ? 'pointer' : 'default',
     userSelect: 'none',
     // Long fund-series names must truncate with ellipsis instead of
@@ -848,6 +852,18 @@ function renderRow(
   }
   const ts = getTypeStyle(row.type)
   const nport = nportBadgeStyle(row.nport_cov)
+  // Gold left border lives on the leftmost expand cell only — child
+  // rows show the rail there; parent rows get a transparent rail so
+  // column geometry matches.
+  const expandCell: React.CSSProperties = {
+    ...TD_STYLE,
+    padding: '4px 0 4px 4px',
+    textAlign: 'center',
+    cursor: canExpand ? 'pointer' : 'default',
+    userSelect: 'none',
+    borderLeft:
+      indent === 1 ? '2px solid var(--gold)' : '2px solid transparent',
+  }
   return (
     <tr
       key={key}
@@ -855,12 +871,30 @@ function renderRow(
       data-institution={indent === 0 ? row.institution : undefined}
     >
       <td
+        style={expandCell}
+        onClick={canExpand ? () => toggle(key) : undefined}
+      >
+        {indent === 0 && canExpand && (
+          <span
+            style={{
+              display: 'inline-block',
+              color: 'var(--gold)',
+              fontSize: 9,
+              transition: 'transform 0.12s',
+              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            }}
+          >
+            ▶
+          </span>
+        )}
+      </td>
+      <td
         style={{
           ...TD_STYLE,
           textAlign: 'right',
           fontWeight: indent === 0 ? 700 : 400,
-          color: indent === 0 ? 'var(--text-dim)' : 'var(--text-dim)',
-          fontSize: indent === 1 ? 12 : 13,
+          color: 'var(--text-dim)',
+          fontSize: 12,
         }}
       >
         {displayRank ?? row.rank}
@@ -870,22 +904,15 @@ function renderRow(
         title={row.institution}
         onClick={canExpand ? () => toggle(key) : undefined}
       >
-        {/* Caret slot — always reserved for indent=0 rows so fund view,
-            hierarchy-expanded parents, and single-child parents all align
-            institution text at the same offset. Empty content when the
-            row can't expand; a real arrow when it can. Child rows
-            (indent=1) don't get this slot — they rely on paddingLeft:24
-            to land text at the same offset. */}
-        {indent === 0 && (
+        {indent === 1 && (
           <span
             style={{
-              display: 'inline-block',
-              width: 14,
-              color: 'var(--text-dim)',
-              fontSize: 10,
+              color: 'var(--text-mute)',
+              marginRight: 6,
+              fontSize: 11,
             }}
           >
-            {canExpand ? (isOpen ? '▼' : '▶') : ''}
+            └
           </span>
         )}
         {row.institution}

@@ -20,8 +20,8 @@ const WRAP: React.CSSProperties = {
 const HEADER: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 12,
-  padding: '12px 16px',
+  gap: 10,
+  padding: '8px 12px',
   backgroundColor: 'var(--panel)',
   borderBottom: '1px solid var(--line)',
   flexShrink: 0,
