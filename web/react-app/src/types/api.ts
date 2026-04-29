@@ -723,6 +723,31 @@ export interface MarketSummaryRow {
   nport_coverage_pct: number | null
 }
 
+// ── Institution Hierarchy — /api/v1/institution_hierarchy ─────────────────
+
+export interface InstitutionHierarchyFund {
+  entity_id: number
+  fund_name: string
+  series_id: string | null
+  nav: number | null
+}
+
+export interface InstitutionHierarchyFiler {
+  entity_id: number
+  name: string
+  cik: string | null
+  aum: number | null
+  fund_count: number
+  funds: InstitutionHierarchyFund[]
+}
+
+export interface InstitutionHierarchyResponse {
+  entity_id: number
+  institution: string
+  quarter: string
+  filers: InstitutionHierarchyFiler[]
+}
+
 // ── Entity Graph — /api/entity_search + /api/entity_children + /api/entity_graph
 
 export interface EntitySearchResult {
