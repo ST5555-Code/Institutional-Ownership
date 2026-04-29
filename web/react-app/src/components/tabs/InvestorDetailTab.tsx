@@ -12,6 +12,22 @@ import { QuarterSelector, ExportBar, FreshnessBadge, getTypeStyle } from '../com
 const NUM_0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const NUM_1 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
+function dedupeBy<T>(rows: T[], keyOf: (r: T) => string | number | null | undefined): T[] {
+  const seen = new Set<string | number>()
+  const out: T[] = []
+  for (const r of rows) {
+    const k = keyOf(r)
+    if (k == null) {
+      out.push(r)
+      continue
+    }
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
+  }
+  return out
+}
+
 function fmtAumB(v: number | null | undefined): string {
   if (v == null || v === 0) return '—'
   if (v >= 1e12) return `$${NUM_1.format(v / 1e12)}T`
@@ -372,7 +388,7 @@ function InstitutionRow({
         </tr>
       )}
       {isOpen &&
-        hierarchy?.filers.map((f) => (
+        dedupeBy(hierarchy?.filers ?? [], (f) => f.entity_id).map((f) => (
           <FilerRows
             key={f.entity_id}
             filer={f}
@@ -440,7 +456,7 @@ function FilerRows({
         <td style={TD} />
       </tr>
       {isOpen &&
-        filer.funds.map((fund) => (
+        dedupeBy(filer.funds, (fund) => fund.series_id).map((fund) => (
           <tr key={fund.entity_id} style={{ backgroundColor: 'rgba(197,162,84,0.03)' }}>
             <td style={{ ...TD, borderLeft: '2px solid var(--gold)' }} />
             <td

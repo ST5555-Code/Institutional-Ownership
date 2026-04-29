@@ -241,7 +241,7 @@ def get_institution_hierarchy(entity_id, quarter, con):
     filer_rows = con.execute("""
         SELECT er.child_entity_id,
                ec.display_name,
-               ei.identifier_value AS cik
+               MIN(ei.identifier_value) AS cik
         FROM entity_relationships er
         JOIN entity_current ec ON ec.entity_id = er.child_entity_id
         JOIN entity_identifiers ei
@@ -251,6 +251,7 @@ def get_institution_hierarchy(entity_id, quarter, con):
         WHERE er.parent_entity_id = ?
           AND er.relationship_type != 'sub_adviser'
           AND er.valid_to = DATE '9999-12-31'
+        GROUP BY er.child_entity_id, ec.display_name
         ORDER BY ec.display_name
     """, [eid]).fetchall()
 
@@ -265,8 +266,8 @@ def get_institution_hierarchy(entity_id, quarter, con):
         funds_q = con.execute("""
             SELECT ec.entity_id,
                    ec.display_name AS fund_name,
-                   ei.identifier_value AS series_id,
-                   fu.total_net_assets AS nav
+                   MIN(ei.identifier_value) AS series_id,
+                   MAX(fu.total_net_assets) AS nav
             FROM entity_relationships er
             JOIN entity_current ec ON ec.entity_id = er.child_entity_id
             LEFT JOIN entity_identifiers ei
@@ -278,7 +279,8 @@ def get_institution_hierarchy(entity_id, quarter, con):
               AND er.relationship_type = 'fund_sponsor'
               AND er.valid_to = DATE '9999-12-31'
               AND ei.identifier_value IS NOT NULL
-            ORDER BY fu.total_net_assets DESC NULLS LAST, ec.display_name
+            GROUP BY ec.entity_id, ec.display_name
+            ORDER BY MAX(fu.total_net_assets) DESC NULLS LAST, ec.display_name
         """, [int(fid)]).fetchall()
         funds = [
             {
