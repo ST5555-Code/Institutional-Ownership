@@ -194,7 +194,7 @@ export function OwnershipTrendTab() {
                 padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                 fontWeight: subView === t.id ? 600 : 400,
                 color: subView === t.id ? 'var(--white)' : 'var(--text-dim)',
-                backgroundColor: subView === t.id ? 'var(--header)' : 'var(--white)',
+                backgroundColor: subView === t.id ? 'var(--header)' : 'transparent',
                 border: `1px solid ${subView === t.id ? 'var(--header)' : 'var(--line)'}`,
               }}>
               {t.label}
@@ -214,7 +214,7 @@ export function OwnershipTrendTab() {
                     padding: '5px 11px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                     fontWeight: cohortFrom === q ? 600 : 400,
                     color: cohortFrom === q ? 'var(--white)' : 'var(--text-dim)',
-                    backgroundColor: cohortFrom === q ? 'var(--header)' : 'var(--white)',
+                    backgroundColor: cohortFrom === q ? 'var(--header)' : 'transparent',
                     border: `1px solid ${cohortFrom === q ? 'var(--header)' : 'var(--line)'}`,
                   }}>
                   {q}
@@ -384,7 +384,7 @@ function renderMomentumRow(
   canExpand: boolean, isOpen: boolean, toggle: (k: string) => void,
   qKeys: string[], displayRank?: string,
 ) {
-  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)' }
+  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'var(--panel)' : 'transparent' }
   const nameCell: React.CSSProperties = {
     ...TD, paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,

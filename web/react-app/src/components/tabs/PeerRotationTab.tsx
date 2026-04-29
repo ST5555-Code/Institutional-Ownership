@@ -148,7 +148,7 @@ export function PeerRotationTab() {
                 padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                 fontWeight: periodCount === p.n ? 600 : 400,
                 color: periodCount === p.n ? 'var(--white)' : 'var(--text-dim)',
-                backgroundColor: periodCount === p.n ? 'var(--header)' : 'var(--white)',
+                backgroundColor: periodCount === p.n ? 'var(--header)' : 'transparent',
                 border: `1px solid ${periodCount === p.n ? 'var(--header)' : 'var(--line)'}`,
               }}>
               {p.label}
