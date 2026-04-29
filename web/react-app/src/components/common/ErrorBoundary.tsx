@@ -47,10 +47,10 @@ export class ErrorBoundary extends Component<Props, State> {
           style={{
             padding: 32,
             margin: 16,
-            border: '1px solid #fecaca',
-            borderRadius: 6,
-            backgroundColor: '#fef2f2',
-            color: '#7f1d1d',
+            border: '1px solid rgba(224,90,90,0.16)',
+            borderRadius: 0,
+            backgroundColor: 'rgba(224,90,90,0.08)',
+            color: 'var(--neg)',
           }}
           role="alert"
         >
@@ -66,10 +66,10 @@ export class ErrorBoundary extends Component<Props, State> {
             style={{
               padding: '6px 12px',
               fontSize: 13,
-              color: '#ffffff',
-              backgroundColor: '#991b1b',
+              color: 'var(--white)',
+              backgroundColor: 'var(--neg)',
               border: 'none',
-              borderRadius: 4,
+              borderRadius: 0,
               cursor: 'pointer',
             }}
           >

@@ -4,10 +4,10 @@ import { SidebarItem } from './SidebarItem'
 export function Sidebar() {
   return (
     <nav style={{
-      width: '200px', minWidth: '200px',
-      backgroundColor: 'var(--sidebar-bg)',
+      width: '220px', minWidth: '220px',
+      backgroundColor: 'var(--header)',
       height: '100vh', overflowY: 'auto',
-      borderRight: '1px solid #1e2d47',
+      borderRight: '1px solid var(--line)',
       paddingTop: '20px'
     }}>
       <SidebarSection title="Market Snapshot & Trends">

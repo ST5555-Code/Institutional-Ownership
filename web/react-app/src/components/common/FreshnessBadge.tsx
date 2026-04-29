@@ -37,10 +37,10 @@ const SLA: Record<string, { amber: number; red: number }> = {
 type Status = 'fresh' | 'amber' | 'red' | 'never'
 
 const PALETTE: Record<Status, { bg: string; fg: string; label: string }> = {
-  fresh: { bg: '#ecfdf5', fg: '#047857', label: 'Fresh' },
-  amber: { bg: '#fef3c7', fg: '#92400e', label: 'Stale' },
-  red: { bg: '#fee2e2', fg: '#991b1b', label: 'Stale' },
-  never: { bg: '#f1f5f9', fg: '#64748b', label: 'No data' },
+  fresh: { bg: 'rgba(92,184,122,0.08)',  fg: '#5cb87a', label: 'Fresh' },
+  amber: { bg: 'rgba(197,162,84,0.08)',  fg: 'var(--gold)', label: 'Stale' },
+  red:   { bg: 'rgba(224,90,90,0.08)',   fg: '#e05a5a', label: 'Stale' },
+  never: { bg: 'rgba(255,255,255,0.05)', fg: '#5c5c68', label: 'No data' },
 }
 
 // Module-level cache: one in-flight fetch shared across every badge on the
@@ -123,7 +123,7 @@ export function FreshnessBadge({ tableName, label }: Props) {
         fontWeight: 500,
         color: palette.fg,
         backgroundColor: palette.bg,
-        borderRadius: 10,
+        borderRadius: 1,
         lineHeight: '16px',
       }}
     >

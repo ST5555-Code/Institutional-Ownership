@@ -31,28 +31,29 @@ function fmtPct2(v: number | null): string {
 // ── Styles (Register-consistent first 3 columns) ──────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 11, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '2px 8px', fontSize: 11,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
 // Overlap row: investor holds ALL tickers in the group with non-null values.
-const OVERLAP_BG = '#eff6ff'
+const OVERLAP_BG = 'rgba(122,173,222,0.08)'
 
 type ViewMode = 'anchor' | 'top'
 
@@ -119,12 +120,12 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
       <div style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
         padding: '4px 8px', fontSize: 12, fontWeight: 600,
-        backgroundColor: 'var(--glacier-blue)', color: '#fff',
-        borderRadius: 4, minWidth: 70,
+        backgroundColor: 'var(--gold)', color: 'var(--white)',
+        borderRadius: 0, minWidth: 70,
       }}>
         {value}
         <button type="button" onClick={onClear}
-          style={{ backgroundColor: 'transparent', border: 'none', color: '#fff',
+          style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--white)',
             cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
       </div>
     )
@@ -144,9 +145,9 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
         onFocus={() => { setFocused(true); if (input.length > 0) setOpen(true) }}
         onBlur={() => setFocused(false)}
         style={{
-          width: 120, padding: '5px 8px', fontSize: 12, color: '#1e293b',
-          backgroundColor: '#fff', borderRadius: 4, outline: 'none',
-          border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`,
+          width: 120, padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+          backgroundColor: 'var(--panel)', borderRadius: 0, outline: 'none',
+          border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
           transition: 'border-color 0.1s',
         }}
       />
@@ -154,16 +155,16 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
         <div style={{
           position: 'absolute', top: '100%', left: 0, marginTop: 2,
           width: 220, maxHeight: 200, overflowY: 'auto',
-          backgroundColor: '#fff', border: '1px solid #e2e8f0',
-          borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000,
+          backgroundColor: 'var(--panel)', border: '1px solid var(--line)',
+          borderRadius: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000,
         }}>
           {options.map(o => (
             <div key={o.ticker} onMouseDown={() => select(o.ticker)}
               style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f4f6f9')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-              <span style={{ color: 'var(--accent-gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
-              <span style={{ color: '#94a3b8', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+              <span style={{ color: 'var(--gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
             </div>
           ))}
         </div>
@@ -307,25 +308,25 @@ export function CrossOwnershipTab() {
   }
 
   if (!ticker) {
-    return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load cross-ownership</span></div>
+    return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load cross-ownership</span></div>
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`@media print { .co-controls { display:none!important } .co-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls */}
-      <div className="co-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="co-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {/* View toggle */}
         <div style={{ display: 'flex', gap: 4 }}>
           {(['anchor', 'top'] as const).map(v => (
             <button key={v} type="button" onClick={() => setViewMode(v)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                 fontWeight: viewMode === v ? 600 : 400,
-                color: viewMode === v ? '#fff' : '#64748b',
-                backgroundColor: viewMode === v ? 'var(--oxford-blue)' : '#fff',
-                border: `1px solid ${viewMode === v ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                color: viewMode === v ? 'var(--white)' : 'var(--text-dim)',
+                backgroundColor: viewMode === v ? 'var(--header)' : 'var(--white)',
+                border: `1px solid ${viewMode === v ? 'var(--header)' : 'var(--line)'}`,
               }}>
               {v === 'anchor' ? 'By Anchor' : 'Across Group'}
             </button>
@@ -334,13 +335,13 @@ export function CrossOwnershipTab() {
 
         {/* Ticker slots */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tickers</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tickers</span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Header ticker — locked */}
             <span style={{
               display: 'inline-flex', alignItems: 'center', padding: '4px 8px',
-              fontSize: 12, fontWeight: 700, backgroundColor: 'var(--oxford-blue)',
-              color: '#fff', borderRadius: 4,
+              fontSize: 12, fontWeight: 700, backgroundColor: 'var(--header)',
+              color: 'var(--white)', borderRadius: 0,
             }}>
               {headerTicker}
             </span>
@@ -354,9 +355,9 @@ export function CrossOwnershipTab() {
             {additionalTickers.length < MAX_ADDITIONAL && (
               <button type="button" onClick={addSlot}
                 style={{
-                  padding: '4px 10px', fontSize: 12, color: '#64748b',
-                  backgroundColor: '#fff', border: '1px dashed #cbd5e1',
-                  borderRadius: 4, cursor: 'pointer',
+                  padding: '4px 10px', fontSize: 12, color: 'var(--text-dim)',
+                  backgroundColor: 'var(--panel)', border: '1px dashed var(--text-dim)',
+                  borderRadius: 0, cursor: 'pointer',
                 }}>
                 + Add
               </button>
@@ -367,14 +368,14 @@ export function CrossOwnershipTab() {
         {/* Peer group selector */}
         {peerGroups.data && peerGroups.data.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Peer Group</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Peer Group</span>
             <select
               value={selectedPeerGroup}
               onChange={e => setSelectedPeerGroup(e.target.value)}
               style={{
-                padding: '5px 10px', fontSize: 12, color: '#1e293b',
-                backgroundColor: '#fff', border: '1px solid #e2e8f0',
-                borderRadius: 4, outline: 'none',
+                padding: '5px 10px', fontSize: 12, color: 'var(--text)',
+                backgroundColor: 'var(--panel)', border: '1px solid var(--line)',
+                borderRadius: 0, outline: 'none',
               }}>
               <option value="">— Select group —</option>
               {peerGroups.data.map(g => (
@@ -387,14 +388,14 @@ export function CrossOwnershipTab() {
         {/* Anchor selector — only in anchor view */}
         {viewMode === 'anchor' && anchorOptions.length > 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Anchor</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Anchor</span>
             <select
               value={anchor}
               onChange={e => setAnchor(e.target.value)}
               style={{
-                padding: '5px 10px', fontSize: 12, color: '#1e293b',
-                backgroundColor: '#fff', border: '1px solid #e2e8f0',
-                borderRadius: 4, outline: 'none',
+                padding: '5px 10px', fontSize: 12, color: 'var(--text)',
+                backgroundColor: 'var(--panel)', border: '1px solid var(--line)',
+                borderRadius: 0, outline: 'none',
               }}>
               {anchorOptions.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -412,10 +413,10 @@ export function CrossOwnershipTab() {
 
       {/* Content */}
       <div className="co-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {!loading && needsMoreTickers && (
-          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Add at least one comparison ticker or select a peer group to see cross-ownership analysis</div>
+          <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Add at least one comparison ticker or select a peer group to see cross-ownership analysis</div>
         )}
         {data && !loading && (
           <div style={{ padding: 16 }}>
@@ -453,7 +454,7 @@ export function CrossOwnershipTab() {
                   const effectiveAnchor = anchor && groupTickers.includes(anchor) ? anchor : groupTickers[0]
                   return (
                     <tr key={inv.investor} style={{ backgroundColor: rowBg }}>
-                      <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{i + 1}</td>
+                      <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{i + 1}</td>
                       <td style={{
                         ...TD, fontWeight: 600, whiteSpace: 'nowrap',
                         overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
@@ -470,8 +471,8 @@ export function CrossOwnershipTab() {
                         return (
                           <td key={t} style={{
                             ...TD_R,
-                            backgroundColor: isAnchorCol && !overlap ? '#e0f2fe' : undefined,
-                            color: v == null ? '#94a3b8' : '#1e293b',
+                            backgroundColor: isAnchorCol && !overlap ? 'rgba(122,173,222,0.08)' : undefined,
+                            color: v == null ? 'var(--text-dim)' : 'var(--text)',
                           }}>
                             {v != null ? fmtValueMm(v) : '—'}
                           </td>
@@ -483,7 +484,7 @@ export function CrossOwnershipTab() {
                   )
                 })}
                 {data.investors.length === 0 && (
-                  <tr><td colSpan={totalCols} style={{ ...TD, textAlign: 'center', padding: 30, color: '#64748b' }}>No investors found</td></tr>
+                  <tr><td colSpan={totalCols} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No investors found</td></tr>
                 )}
               </tbody>
               {footerSums && (
@@ -516,9 +517,9 @@ function FooterCell({ children, align = 'left' }: {
   return (
     <td style={{
       padding: '7px 10px', fontSize: 13, fontWeight: 600,
-      color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
+      color: 'var(--white)', backgroundColor: 'var(--header)',
       position: 'sticky', bottom: 0, zIndex: 2,
-      borderTop: '2px solid var(--oxford-blue)',
+      borderTop: '2px solid var(--header)',
       textAlign: align, fontVariantNumeric: align === 'right' ? 'tabular-nums' : undefined,
     }}>
       {children}

@@ -37,41 +37,42 @@ function fmtInt(v: number | null): string {
 
 function SignedPct1({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
-  if (v < 0) return <span style={{ color: '#ef4444' }}>({NUM_1.format(Math.abs(v))})</span>
-  if (v > 0) return <span style={{ color: '#27AE60' }}>+{NUM_1.format(v)}</span>
+  if (v < 0) return <span style={{ color: 'var(--neg)' }}>({NUM_1.format(Math.abs(v))})</span>
+  if (v > 0) return <span style={{ color: 'var(--pos)' }}>+{NUM_1.format(v)}</span>
   return <>{NUM_1.format(v)}</>
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 11, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   // top: 30 sits below the sticky ColumnGroupHeader row (~30px tall)
   // so the sandstone underline stays visible during scroll.
   whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '2px 8px', fontSize: 11,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
 function nportBadgeStyle(cov: number | null | undefined): React.CSSProperties | null {
   if (cov == null || cov <= 0) return null
-  if (cov >= 80) return { backgroundColor: '#27AE60', color: '#fff' }
-  if (cov >= 50) return { backgroundColor: '#F5A623', color: '#fff' }
-  return { backgroundColor: '#94a3b8', color: '#fff' }
+  if (cov >= 80) return { backgroundColor: 'var(--pos-soft)', color: 'var(--pos)' }
+  if (cov >= 50) return { backgroundColor: 'var(--gold-soft)', color: 'var(--gold)' }
+  return { backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-dim)' }
 }
 
 // ── Grouping ───────────────────────────────────────────────────────────────
@@ -124,15 +125,15 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
         onChange={e => { setValue(e.target.value); setOpen(e.target.value.length > 0) }}
         onFocus={() => { setFocused(true); if (value.length > 0) setOpen(true) }}
         onBlur={() => setFocused(false)}
-        style={{ width: 200, padding: '6px 28px 6px 10px', fontSize: 13, color: '#1e293b', backgroundColor: '#fff', border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`, borderRadius: 4, outline: 'none', transition: 'border-color 0.1s' }}
+        style={{ width: 200, padding: '6px 28px 6px 10px', fontSize: 13, color: 'var(--text)', backgroundColor: 'var(--panel)', border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 0, outline: 'none', transition: 'border-color 0.1s' }}
       />
-      {value && <button type="button" onClick={clear} aria-label="Clear" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, padding: 0, lineHeight: '16px', fontSize: 14, color: '#94a3b8', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>}
+      {value && <button type="button" onClick={clear} aria-label="Clear" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, padding: 0, lineHeight: '16px', fontSize: 14, color: 'var(--text-dim)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>}
       {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 280, maxHeight: 240, overflowY: 'auto', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 280, maxHeight: 240, overflowY: 'auto', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000 }}>
           {matches.map(m => (
             <div key={m.institution} onMouseDown={() => select(m.institution)}
-              style={{ padding: '7px 12px', fontSize: 13, color: '#1e293b', cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f4f6f9')}
+              style={{ padding: '7px 12px', fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
               {m.institution}
             </div>
@@ -250,17 +251,17 @@ export function ConvictionTab() {
     downloadCsv(csv, `conviction_${ticker}.csv`)
   }
 
-  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load conviction analysis</span></div>
+  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load conviction analysis</span></div>
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
-        .cv-row-highlight > td { background-color: #fef9c3 !important; transition: background-color 0.4s ease-in-out; }
+        .cv-row-highlight > td { background-color: rgba(197,162,84,0.12) !important; transition: background-color 0.4s ease-in-out; }
       `}</style>
 
       {/* Controls */}
-      <div className="cv-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="cv-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
@@ -276,12 +277,12 @@ export function ConvictionTab() {
 
       {/* Content */}
       <div ref={tableWrapRef} className="cv-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {data && !loading && (
           <div style={{ padding: 16 }}>
             {/* Subject sector card */}
-            <div style={{ display: 'flex', gap: 32, padding: '10px 16px', backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 32, padding: '10px 16px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, marginBottom: 12 }}>
               {data.subject_sector ? (
                 <>
                   <InfoChip label="Sector" value={data.subject_sector} />
@@ -289,7 +290,7 @@ export function ConvictionTab() {
                   <InfoChip label="SPX Weight" value={data.subject_spx_weight != null ? `${NUM_2.format(data.subject_spx_weight)}%` : '—'} />
                 </>
               ) : (
-                <span style={{ color: '#94a3b8', fontSize: 13 }}>Sector data unavailable</span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Sector data unavailable</span>
               )}
             </div>
 
@@ -354,7 +355,7 @@ export function ConvictionTab() {
                     })
                 }
                 {(fundView === 'fund' ? fundRowsDisplay.length : groups.length) === 0 && (
-                  <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 30, color: '#64748b' }}>No rows match the current filters</td></tr>
+                  <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No rows match the current filters</td></tr>
                 )}
               </tbody>
               <TableFooter totalColumns={TOTAL_COLS} rows={[{
@@ -376,8 +377,8 @@ export function ConvictionTab() {
 function InfoChip({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#1e293b' }}>{value}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--text)' }}>{value}</div>
     </div>
   )
 }
@@ -390,8 +391,8 @@ function SectorCell({ entry }: { entry: { code: string; weight_pct: number } | u
   if (!entry) return <td style={TD}>—</td>
   return (
     <td style={TD}>
-      <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{entry.code}</span>
-      <span style={{ color: '#64748b', fontSize: 11, marginLeft: 4 }}>{entry.weight_pct}%</span>
+      <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13 }}>{entry.code}</span>
+      <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 4 }}>{entry.weight_pct}%</span>
     </td>
   )
 }
@@ -401,11 +402,11 @@ function renderRow(
   canExpand: boolean, isOpen: boolean, toggle: (k: string) => void,
   displayRank?: string,
 ) {
-  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? '#f8fafc' : '#fff' }
+  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)' }
   const nameCell: React.CSSProperties = {
     ...TD, paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,
-    color: indent === 0 ? '#0f172a' : '#475569',
+    color: indent === 0 ? 'var(--text)' : 'var(--text-mute)',
     fontSize: indent === 1 ? 12 : 13,
     cursor: canExpand ? 'pointer' : 'default', userSelect: 'none',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
@@ -414,11 +415,11 @@ function renderRow(
   const nport = nportBadgeStyle(row.nport_cov)
   return (
     <tr key={key} style={bg} data-institution={indent === 0 ? row.institution : undefined}>
-      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: indent === 0 ? '#64748b' : '#94a3b8', fontSize: indent === 1 ? 12 : 13 }}>
+      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: indent === 0 ? 'var(--text-dim)' : 'var(--text-dim)', fontSize: indent === 1 ? 12 : 13 }}>
         {displayRank ?? row.rank ?? ''}
       </td>
       <td style={nameCell} title={row.institution} onClick={canExpand ? () => toggle(key) : undefined}>
-        {indent === 0 && <span style={{ display: 'inline-block', width: 14, color: '#64748b', fontSize: 10 }}>{canExpand ? (isOpen ? '▼' : '▶') : ''}</span>}
+        {indent === 0 && <span style={{ display: 'inline-block', width: 14, color: 'var(--text-dim)', fontSize: 10 }}>{canExpand ? (isOpen ? '▼' : '▶') : ''}</span>}
         {row.institution}
       </td>
       <td style={TD}>

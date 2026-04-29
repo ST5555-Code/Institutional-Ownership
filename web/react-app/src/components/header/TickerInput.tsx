@@ -45,28 +45,51 @@ export function TickerInput() {
         autoCorrect="off"
         spellCheck={false}
         style={{
-          backgroundColor: '#1a2a4a', border: '1px solid #2d3f5e',
-          borderRadius: '4px', color: '#ffffff', padding: '6px 10px',
-          fontSize: '13px', width: '140px', outline: 'none'
+          backgroundColor: 'var(--bg)',
+          border: '1px solid var(--line)',
+          borderRadius: 0,
+          color: 'var(--white)',
+          padding: '6px 10px',
+          fontSize: '12px',
+          fontFamily: "'Inter', sans-serif",
+          letterSpacing: '0.04em',
+          width: '140px',
+          outline: 'none'
         }}
       />
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, zIndex: 1000,
-          backgroundColor: '#0d1526', border: '1px solid #2d3f5e',
-          borderRadius: '4px', marginTop: '2px', width: '260px',
+          backgroundColor: 'var(--panel)',
+          border: '1px solid var(--line)',
+          borderRadius: 0,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          marginTop: '2px', width: '260px',
           maxHeight: '300px', overflowY: 'auto'
         }}>
           {options.map(o => (
             <div key={o.ticker} onMouseDown={() => select(o.ticker)} style={{
               padding: '7px 12px', cursor: 'pointer', display: 'flex',
-              gap: '10px', alignItems: 'center'
+              gap: '10px', alignItems: 'center',
+              transition: 'all 0.12s'
             }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1a2a4a')}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
-              <span style={{ color: '#f5a623', fontWeight: 700, width: '52px', flexShrink: 0 }}>{o.ticker}</span>
-              <span style={{ color: '#94a3b8', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+              <span style={{
+                color: 'var(--gold)',
+                fontWeight: 700,
+                width: '52px',
+                flexShrink: 0,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>{o.ticker}</span>
+              <span style={{
+                color: 'var(--text-dim)',
+                fontSize: '12px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>{o.name}</span>
             </div>
           ))}
         </div>

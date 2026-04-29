@@ -33,29 +33,30 @@ function fmtPct2(v: number | null): string {
 // ── Styles (Register-consistent first 3 cols) ─────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '8px 8px', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '8px 8px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 12, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '6px 8px', fontSize: 12, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '1px 6px', fontSize: 10,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
 const OVERLAP_ROW: React.CSSProperties = {
-  backgroundColor: '#fef9c3',
-  borderLeft: '3px solid var(--accent-gold)',
+  backgroundColor: 'rgba(197,162,84,0.12)',
+  borderLeft: '3px solid var(--gold)',
 }
 
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
@@ -108,23 +109,23 @@ function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
         onFocus={() => { setFocused(true); if (input.length > 0) setOpen(true) }}
         onBlur={() => setFocused(false)}
         style={{
-          width: 180, padding: '6px 28px 6px 10px', fontSize: 13, color: '#1e293b',
-          backgroundColor: '#fff', borderRadius: 4, outline: 'none',
-          border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`,
+          width: 180, padding: '6px 28px 6px 10px', fontSize: 13, color: 'var(--text)',
+          backgroundColor: 'var(--panel)', borderRadius: 0, outline: 'none',
+          border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
           transition: 'border-color 0.1s',
         }}
       />
       {input && <button type="button" onClick={clear} aria-label="Clear"
-        style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, padding: 0, lineHeight: '16px', fontSize: 14, color: '#94a3b8', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>}
+        style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, padding: 0, lineHeight: '16px', fontSize: 14, color: 'var(--text-dim)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>}
       {open && options.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 260, maxHeight: 220, overflowY: 'auto', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 260, maxHeight: 220, overflowY: 'auto', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 1000 }}>
           {options.map(o => (
             <div key={o.ticker} onMouseDown={() => select(o.ticker)}
               style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', gap: 8 }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f4f6f9')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-              <span style={{ color: 'var(--accent-gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
-              <span style={{ color: '#94a3b8', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+              <span style={{ color: 'var(--gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
             </div>
           ))}
         </div>
@@ -202,17 +203,17 @@ export function OverlapAnalysisTab() {
   }
 
   if (!ticker) {
-    return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load overlap analysis</span></div>
+    return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load overlap analysis</span></div>
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`@media print { .oa-controls { display:none!important } }`}</style>
 
       {/* Controls */}
-      <div className="oa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="oa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Second Ticker</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Second Ticker</span>
           <SecondTickerInput value={secondTicker || ''} onSelect={setSecondTicker} />
         </div>
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={setQuarter} />
@@ -223,8 +224,8 @@ export function OverlapAnalysisTab() {
       </div>
 
       {/* Content — two panels */}
-      {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-      {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+      {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+      {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
       {data && !loading && (
         <div style={{ display: 'flex', flex: 1, gap: 12, padding: 16, overflow: 'hidden' }}>
           {/* Institutional panel */}
@@ -295,11 +296,11 @@ function PanelTable({
   const sum25 = sumRows(rows.slice(0, 25))
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: 0 }}>
       {/* Panel header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--oxford-blue)' }}>{title}</span>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', cursor: 'pointer' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--header)' }}>{title}</span>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
           <input type="checkbox" checked={activeOnly} onChange={e => onActiveOnlyChange(e.target.checked)} />
           {activeLabel}
         </label>
@@ -338,24 +339,24 @@ function PanelTable({
               const isOv = r.is_overlap && hasSecond
               return (
                 <tr key={r.holder} style={isOv ? OVERLAP_ROW : undefined}>
-                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{i + 1}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
                   <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.holder}>
                     {r.holder}
                   </td>
                   <td style={TD}>{renderType(r)}</td>
                   <td style={TD_R}>{fmtPct2(r.subj_pct_so)}</td>
-                  <td style={{ ...TD_R, color: r.sec_pct_so == null ? '#cbd5e1' : '#1e293b' }}>
+                  <td style={{ ...TD_R, color: r.sec_pct_so == null ? 'var(--text-dim)' : 'var(--text)' }}>
                     {fmtPct2(r.sec_pct_so)}
                   </td>
                   <td style={TD_R}>{fmtValueMm(r.subj_dollars)}</td>
-                  <td style={{ ...TD_R, color: r.sec_dollars == null ? '#cbd5e1' : '#1e293b' }}>
+                  <td style={{ ...TD_R, color: r.sec_dollars == null ? 'var(--text-dim)' : 'var(--text)' }}>
                     {fmtValueMm(r.sec_dollars)}
                   </td>
                 </tr>
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 20, color: '#64748b' }}>No holders found</td></tr>
+              <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No holders found</td></tr>
             )}
           </tbody>
           <tfoot>
@@ -367,7 +368,7 @@ function PanelTable({
 
       {/* Cohort summary */}
       {hasSecond && (
-        <div style={{ display: 'flex', gap: 16, padding: '10px 12px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 16, padding: '10px 12px', borderTop: '1px solid var(--line)', backgroundColor: 'var(--panel)', flexShrink: 0 }}>
           <Tile label="Top 25 overlap" value={String(top25Overlap)} />
           <Tile label="Top 50 overlap" value={String(top50Overlap)} />
           <Tile label="Overlap %" value={`${overlapPct.toFixed(2)}%`} />
@@ -397,9 +398,9 @@ function sumRows(rows: AnyRow[]): RowSums {
 function FooterRow({ label, sums, bottomPx }: { label: string; sums: RowSums; bottomPx: number }) {
   const s: React.CSSProperties = {
     padding: '6px 8px', fontSize: 12, fontWeight: 600,
-    color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
+    color: 'var(--white)', backgroundColor: 'var(--header)',
     position: 'sticky', bottom: bottomPx, zIndex: 2,
-    borderTop: '2px solid var(--oxford-blue)',
+    borderTop: '2px solid var(--header)',
   }
   const sr: React.CSSProperties = { ...s, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
   return (
@@ -418,8 +419,8 @@ function FooterRow({ label, sums, bottomPx }: { label: string; sums: RowSums; bo
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--oxford-blue)' }}>{value}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--header)' }}>{value}</div>
     </div>
   )
 }

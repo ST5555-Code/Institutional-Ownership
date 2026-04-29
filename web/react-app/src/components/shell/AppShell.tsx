@@ -27,9 +27,9 @@ export function AppShell() {
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header />
-        <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--content-bg)', padding: '20px' }}>
+        <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--bg)', padding: '20px' }}>
           <ErrorBoundary key={activeTab} tab={activeTab}>
-            <Suspense fallback={<div style={{ color: '#94a3b8', padding: '20px' }}>Loading…</div>}>
+            <Suspense fallback={<div style={{ color: 'var(--text-mute)', padding: '20px' }}>Loading…</div>}>
               {TabComponent ? <TabComponent /> : <div>Tab not found</div>}
             </Suspense>
           </ErrorBoundary>

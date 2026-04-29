@@ -12,8 +12,8 @@ interface Props {
 }
 
 export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
-  const bg = darkFill ? 'var(--oxford-blue)' : 'transparent'
-  const text = darkFill ? '#ffffff' : '#475569'
+  const bg = darkFill ? 'var(--header)' : 'transparent'
+  const text = darkFill ? 'var(--white)' : 'var(--text-dim)'
 
   // When dark, pin both the group header row and (via the column label
   // row's own top offset) the label row so the sandstone underline stays
@@ -32,7 +32,7 @@ export function ColumnGroupHeader({ groups, darkFill = true }: Props) {
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    borderBottom: '2px solid var(--sandstone)',
+    borderBottom: '2px solid var(--gold)',
     ...sticky,
   }
 

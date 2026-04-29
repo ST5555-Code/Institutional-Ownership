@@ -43,48 +43,49 @@ function SignedCell({ v, decimals = 2 }: { v: number | null; decimals?: number }
   if (v == null || v === 0) return <>—</>
   const fmt = decimals === 2 ? NUM_2 : decimals === 1 ? NUM_1 : NUM_0
   if (v < 0)
-    return <span style={{ color: '#ef4444' }}>({fmt.format(Math.abs(v))})</span>
+    return <span style={{ color: 'var(--neg)' }}>({fmt.format(Math.abs(v))})</span>
   if (v > 0)
-    return <span style={{ color: '#27AE60' }}>+{fmt.format(v)}</span>
+    return <span style={{ color: 'var(--pos)' }}>+{fmt.format(v)}</span>
   return <>{fmt.format(v)}</>
 }
 
 function SignedPctCell({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
   if (v < 0)
-    return <span style={{ color: '#ef4444' }}>({NUM_2.format(Math.abs(v))}%)</span>
+    return <span style={{ color: 'var(--neg)' }}>({NUM_2.format(Math.abs(v))}%)</span>
   if (v > 0)
-    return <span style={{ color: '#27AE60' }}>+{NUM_2.format(v)}%</span>
+    return <span style={{ color: 'var(--pos)' }}>+{NUM_2.format(v)}%</span>
   return <>{NUM_2.format(v)}%</>
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 11, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '2px 8px', fontSize: 11,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 
 function typeBadgeStyle(type: string | null): React.CSSProperties {
   const t = (type || '').toLowerCase()
-  if (t === 'passive') return { backgroundColor: '#4A90D9', color: '#fff' }
-  if (t === 'active' || t === 'hedge_fund') return { backgroundColor: '#002147', color: '#fff' }
-  return { backgroundColor: '#cbd5e1', color: '#1e293b' }
+  if (t === 'passive') return { backgroundColor: '#7aadde', color: 'var(--white)' }
+  if (t === 'active' || t === 'hedge_fund') return { backgroundColor: 'var(--header)', color: 'var(--white)' }
+  return { backgroundColor: 'var(--text-dim)', color: 'var(--text)' }
 }
 
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
@@ -176,25 +177,25 @@ export function OwnershipTrendTab() {
   }
 
   if (!ticker) {
-    return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load the ownership trend</span></div>
+    return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load the ownership trend</span></div>
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`@media print { .ot-controls { display:none!important } .ot-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls bar */}
-      <div className="ot-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="ot-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {/* Sub-view tabs */}
         <div style={{ display: 'flex', gap: 4 }}>
           {SUB_TABS.map(t => (
             <button key={t.id} type="button" onClick={() => setSubView(t.id)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                 fontWeight: subView === t.id ? 600 : 400,
-                color: subView === t.id ? '#ffffff' : '#64748b',
-                backgroundColor: subView === t.id ? 'var(--oxford-blue)' : '#ffffff',
-                border: `1px solid ${subView === t.id ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                color: subView === t.id ? 'var(--white)' : 'var(--text-dim)',
+                backgroundColor: subView === t.id ? 'var(--header)' : 'var(--white)',
+                border: `1px solid ${subView === t.id ? 'var(--header)' : 'var(--line)'}`,
               }}>
               {t.label}
             </button>
@@ -205,16 +206,16 @@ export function OwnershipTrendTab() {
         <FundViewToggle value={fundView} onChange={setFundView} />
         {subView === 'cohort' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>From Quarter</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>From Quarter</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {COHORT_FROM_QUARTERS.map(q => (
                 <button key={q} type="button" onClick={() => setCohortFrom(q)}
                   style={{
-                    padding: '5px 11px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                    padding: '5px 11px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                     fontWeight: cohortFrom === q ? 600 : 400,
-                    color: cohortFrom === q ? '#fff' : '#64748b',
-                    backgroundColor: cohortFrom === q ? 'var(--oxford-blue)' : '#fff',
-                    border: `1px solid ${cohortFrom === q ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                    color: cohortFrom === q ? 'var(--white)' : 'var(--text-dim)',
+                    backgroundColor: cohortFrom === q ? 'var(--header)' : 'var(--white)',
+                    border: `1px solid ${cohortFrom === q ? 'var(--header)' : 'var(--line)'}`,
                   }}>
                   {q}
                 </button>
@@ -230,8 +231,8 @@ export function OwnershipTrendTab() {
 
       {/* Content area */}
       <div className="ot-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {!loading && !error && subView === 'quarterly' && trend.data && <QuarterlySummaryView data={trend.data} />}
         {!loading && !error && subView === 'holders' && momentum.data && <HolderChangesView data={momentum.data} />}
         {!loading && !error && subView === 'cohort' && cohort.data && <CohortAnalysisView data={cohort.data} />}
@@ -244,14 +245,14 @@ export function OwnershipTrendTab() {
 
 function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
   const s = data.summary
-  const trendColor = s.trend.includes('↑') ? '#27AE60' : s.trend.includes('↓') ? '#ef4444' : 'var(--oxford-blue)'
-  const sharesColor = s.total_shares_added >= 0 ? '#27AE60' : '#ef4444'
-  const holdersColor = s.net_new_holders >= 0 ? '#27AE60' : '#ef4444'
+  const trendColor = s.trend.includes('↑') ? 'var(--pos)' : s.trend.includes('↓') ? 'var(--neg)' : 'var(--header)'
+  const sharesColor = s.total_shares_added >= 0 ? 'var(--pos)' : 'var(--neg)'
+  const holdersColor = s.net_new_holders >= 0 ? 'var(--pos)' : 'var(--neg)'
 
   return (
     <div style={{ padding: 16 }}>
       {/* Summary card */}
-      <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, marginBottom: 16 }}>
         <MetricTile label="Trend" value={s.trend} color={trendColor} />
         <MetricTile label="Total Shares Added (MM)" value={`${s.total_shares_added >= 0 ? '+' : ''}${NUM_2.format(s.total_shares_added / 1e6)}`} color={sharesColor} />
         <MetricTile label="Net New Holders" value={`${s.net_new_holders >= 0 ? '+' : ''}${s.net_new_holders}`} color={holdersColor} />
@@ -294,14 +295,14 @@ function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
 
 function SignalBadge({ signal }: { signal: string | null }) {
   if (!signal) return <>—</>
-  const color = signal.includes('↑') ? '#27AE60' : signal.includes('↓') ? '#ef4444' : '#94a3b8'
+  const color = signal.includes('↑') ? 'var(--pos)' : signal.includes('↓') ? 'var(--neg)' : 'var(--text-dim)'
   return <span style={{ color, fontWeight: 600 }}>{signal}</span>
 }
 
 function MetricTile({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color }}>{value}</div>
     </div>
   )
@@ -370,7 +371,7 @@ function HolderChangesView({ data }: { data: HolderMomentumRow[] }) {
             return trs
           })}
           {groups.length === 0 && (
-            <tr><td colSpan={5 + qKeys.length} style={{ ...TD, textAlign: 'center', padding: 30, color: '#64748b' }}>No data</td></tr>
+            <tr><td colSpan={5 + qKeys.length} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No data</td></tr>
           )}
         </tbody>
       </table>
@@ -383,23 +384,23 @@ function renderMomentumRow(
   canExpand: boolean, isOpen: boolean, toggle: (k: string) => void,
   qKeys: string[], displayRank?: string,
 ) {
-  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? '#f8fafc' : '#fff' }
+  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)' }
   const nameCell: React.CSSProperties = {
     ...TD, paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,
-    color: indent === 0 ? '#0f172a' : '#475569',
+    color: indent === 0 ? 'var(--text)' : 'var(--text-mute)',
     fontSize: indent === 1 ? 12 : 13,
     cursor: canExpand ? 'pointer' : 'default', userSelect: 'none',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   }
   return (
     <tr key={key} style={bg}>
-      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: indent === 0 ? '#64748b' : '#94a3b8', fontSize: indent === 1 ? 12 : 13, width: 60 }}>
+      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: indent === 0 ? 'var(--text-dim)' : 'var(--text-dim)', fontSize: indent === 1 ? 12 : 13, width: 60 }}>
         {displayRank ?? row.rank ?? ''}
       </td>
       <td style={nameCell} title={row.institution} onClick={canExpand ? () => toggle(key) : undefined}>
         {indent === 0 && (
-          <span style={{ display: 'inline-block', width: 14, color: '#64748b', fontSize: 10 }}>
+          <span style={{ display: 'inline-block', width: 14, color: 'var(--text-dim)', fontSize: 10 }}>
             {canExpand ? (isOpen ? '▼' : '▶') : ''}
           </span>
         )}
@@ -421,12 +422,12 @@ function renderMomentumRow(
 // ── Sub-view 3: Cohort Analysis ────────────────────────────────────────────
 
 const COHORT_COLORS: Record<string, React.CSSProperties> = {
-  'Retained': { borderLeft: '3px solid var(--oxford-blue)' },
-  'Increased': { borderLeft: '3px solid #27AE60' },
-  'Decreased': { borderLeft: '3px solid #ef4444' },
-  'Unchanged': { borderLeft: '3px solid #94a3b8' },
-  'New Entries': { backgroundColor: '#f0fdf4', borderLeft: '3px solid #27AE60' },
-  'Exits': { backgroundColor: '#fef2f2', borderLeft: '3px solid #ef4444' },
+  'Retained': { borderLeft: '3px solid var(--header)' },
+  'Increased': { borderLeft: '3px solid var(--pos)' },
+  'Decreased': { borderLeft: '3px solid var(--neg)' },
+  'Unchanged': { borderLeft: '3px solid var(--text-dim)' },
+  'New Entries': { backgroundColor: 'rgba(92,184,122,0.08)', borderLeft: '3px solid var(--pos)' },
+  'Exits': { backgroundColor: 'rgba(224,90,90,0.08)', borderLeft: '3px solid var(--neg)' },
 }
 
 function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
@@ -464,37 +465,37 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
             const canExpand = r.has_children && r.children && r.children.length > 0
 
             const rowStyle: React.CSSProperties = isTotal
-              ? { backgroundColor: 'var(--oxford-blue)' }
+              ? { backgroundColor: 'var(--header)' }
               : { ...cohortStyle }
-            const cellColor = isTotal ? '#ffffff' : '#1e293b'
+            const cellColor = isTotal ? 'var(--white)' : 'var(--text)'
             const cellWeight = (isTotal || r.level === 0) ? 600 : 400
 
             const trs = [(
               <tr key={r.category} style={rowStyle}>
-                <td style={{ ...TD, fontWeight: cellWeight, color: cellColor, cursor: canExpand ? 'pointer' : 'default', userSelect: 'none', paddingLeft: r.level === 1 ? 24 : 10, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}
+                <td style={{ ...TD, fontWeight: cellWeight, color: cellColor, cursor: canExpand ? 'pointer' : 'default', userSelect: 'none', paddingLeft: r.level === 1 ? 24 : 10, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}
                   onClick={canExpand ? () => toggle(r.category) : undefined}>
                   {canExpand && (
-                    <span style={{ display: 'inline-block', width: 14, color: isTotal ? '#fff' : '#64748b', fontSize: 10 }}>
+                    <span style={{ display: 'inline-block', width: 14, color: isTotal ? 'var(--white)' : 'var(--text-dim)', fontSize: 10 }}>
                       {isOpen ? '▼' : '▶'}
                     </span>
                   )}
                   {r.category}
                 </td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{NUM_0.format(r.holders)}</td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtSharesMm(r.shares)}</td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtValueMm(r.value)}</td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{`$${NUM_1.format(r.avg_position / 1e6)}`}</td>
-                <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_shares != null ? r.delta_shares / 1e6 : null} /></td>
-                <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_value != null ? r.delta_value / 1e6 : null} decimals={0} /></td>
-                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--oxford-blue)' } : {}) }}>{fmtPct2(r.pct_so_moved)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}>{NUM_0.format(r.holders)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}>{fmtSharesMm(r.shares)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}>{fmtValueMm(r.value)}</td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}>{`$${NUM_1.format(r.avg_position / 1e6)}`}</td>
+                <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--header)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_shares != null ? r.delta_shares / 1e6 : null} /></td>
+                <td style={{ ...TD_R, ...(isTotal ? { backgroundColor: 'var(--header)', color: cellColor, fontWeight: cellWeight } : {}) }}><SignedCell v={r.delta_value != null ? r.delta_value / 1e6 : null} decimals={0} /></td>
+                <td style={{ ...TD_R, color: cellColor, fontWeight: cellWeight, ...(isTotal ? { backgroundColor: 'var(--header)' } : {}) }}>{fmtPct2(r.pct_so_moved)}</td>
               </tr>
             )]
 
             if (isOpen && r.children) {
               r.children.forEach((c, ci) => {
                 trs.push(
-                  <tr key={`${r.category}:${ci}`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td style={{ ...TD, paddingLeft: 32, fontWeight: 400, color: '#475569', fontSize: 12 }}>
+                  <tr key={`${r.category}:${ci}`} style={{ backgroundColor: 'var(--panel)' }}>
+                    <td style={{ ...TD, paddingLeft: 32, fontWeight: 400, color: 'var(--text-mute)', fontSize: 12 }}>
                       {ci + 1}. {c.category}
                     </td>
                     <td style={TD_R}>{NUM_0.format(c.holders)}</td>
@@ -515,13 +516,13 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
       </table>
 
       {/* Summary metrics */}
-      <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, marginTop: 16 }}>
-        <MetricTile label={`${s.from_quarter} → ${s.to_quarter}`} value="Cohort Analysis" color="var(--oxford-blue)" />
-        <MetricTile label="Retention Rate" value={`${NUM_2.format(s.retention_rate)}%`} color="var(--oxford-blue)" />
-        <MetricTile label="Economic Retention" value={`${NUM_2.format(s.econ_retention)}%`} color="var(--oxford-blue)" />
-        <MetricTile label="Net Holders" value={`${s.net_holders >= 0 ? '+' : ''}${s.net_holders}`} color={s.net_holders >= 0 ? '#27AE60' : '#ef4444'} />
-        <MetricTile label="Net Shares (MM)" value={`${s.net_shares >= 0 ? '+' : ''}${NUM_2.format(s.net_shares / 1e6)}`} color={s.net_shares >= 0 ? '#27AE60' : '#ef4444'} />
-        <MetricTile label="Net Value ($MM)" value={`${s.net_value >= 0 ? '+' : ''}$${NUM_0.format(s.net_value / 1e6)}`} color={s.net_value >= 0 ? '#27AE60' : '#ef4444'} />
+      <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, marginTop: 16 }}>
+        <MetricTile label={`${s.from_quarter} → ${s.to_quarter}`} value="Cohort Analysis" color="var(--header)" />
+        <MetricTile label="Retention Rate" value={`${NUM_2.format(s.retention_rate)}%`} color="var(--header)" />
+        <MetricTile label="Economic Retention" value={`${NUM_2.format(s.econ_retention)}%`} color="var(--header)" />
+        <MetricTile label="Net Holders" value={`${s.net_holders >= 0 ? '+' : ''}${s.net_holders}`} color={s.net_holders >= 0 ? 'var(--pos)' : 'var(--neg)'} />
+        <MetricTile label="Net Shares (MM)" value={`${s.net_shares >= 0 ? '+' : ''}${NUM_2.format(s.net_shares / 1e6)}`} color={s.net_shares >= 0 ? 'var(--pos)' : 'var(--neg)'} />
+        <MetricTile label="Net Value ($MM)" value={`${s.net_value >= 0 ? '+' : ''}$${NUM_0.format(s.net_value / 1e6)}`} color={s.net_value >= 0 ? 'var(--pos)' : 'var(--neg)'} />
       </div>
     </div>
   )

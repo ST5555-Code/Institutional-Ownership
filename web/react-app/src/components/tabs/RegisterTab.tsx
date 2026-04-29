@@ -46,7 +46,7 @@ function PctCell({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
   if (v < 0)
     return (
-      <span style={{ color: '#c0392b' }}>({NUM_2.format(Math.abs(v))}%)</span>
+      <span style={{ color: 'var(--neg)' }}>({NUM_2.format(Math.abs(v))}%)</span>
     )
   return <>{NUM_2.format(v)}%</>
 }
@@ -55,23 +55,23 @@ function PctCell({ v }: { v: number | null }) {
 
 function nportBadgeStyle(cov: number | null): React.CSSProperties | null {
   if (cov == null || cov <= 0) return null
-  if (cov >= 80) return { backgroundColor: '#27AE60', color: '#ffffff' }
-  if (cov >= 50) return { backgroundColor: '#F5A623', color: '#ffffff' }
-  return { backgroundColor: '#94a3b8', color: '#ffffff' }
+  if (cov >= 80) return { backgroundColor: 'var(--pos-soft)', color: 'var(--pos)' }
+  if (cov >= 50) return { backgroundColor: 'var(--gold-soft)', color: 'var(--gold)' }
+  return { backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-dim)' }
 }
 
 // ── Shared inline styles ───────────────────────────────────────────────────
 
 const TH_STYLE: React.CSSProperties = {
   padding: '9px 10px',
-  fontSize: 11,
+  fontSize: 9,
   fontWeight: 700,
   textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  color: '#ffffff',
-  backgroundColor: 'var(--oxford-blue)',
+  letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)',
+  backgroundColor: 'var(--header)',
   textAlign: 'left',
-  borderBottom: '1px solid #1e2d47',
+  borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap',
   position: 'sticky',
   top: 0,
@@ -83,14 +83,15 @@ const TH_RIGHT: React.CSSProperties = { ...TH_STYLE, textAlign: 'right' }
 const TD_STYLE: React.CSSProperties = {
   padding: '7px 10px',
   fontSize: 13,
-  color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 
 const TD_RIGHT: React.CSSProperties = {
   ...TD_STYLE,
   textAlign: 'right',
   fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 
 const BADGE: React.CSSProperties = {
@@ -98,7 +99,7 @@ const BADGE: React.CSSProperties = {
   padding: '2px 8px',
   fontSize: 11,
   fontWeight: 600,
-  borderRadius: 3,
+  borderRadius: 1,
   letterSpacing: '0.02em',
 }
 
@@ -215,10 +216,10 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
           width: 200,
           padding: '6px 28px 6px 10px',
           fontSize: 13,
-          color: '#1e293b',
-          backgroundColor: '#ffffff',
-          border: `1px solid ${focused ? 'var(--glacier-blue)' : '#e2e8f0'}`,
-          borderRadius: 4,
+          color: 'var(--text)',
+          backgroundColor: 'var(--panel)',
+          border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
+          borderRadius: 0,
           outline: 'none',
           transition: 'border-color 0.1s',
         }}
@@ -238,7 +239,7 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
             padding: 0,
             lineHeight: '16px',
             fontSize: 14,
-            color: '#94a3b8',
+            color: 'var(--text-dim)',
             backgroundColor: 'transparent',
             border: 'none',
             cursor: 'pointer',
@@ -257,9 +258,9 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
             width: 280,
             maxHeight: 240,
             overflowY: 'auto',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 4,
+            backgroundColor: 'var(--panel)',
+            border: '1px solid var(--line)',
+            borderRadius: 0,
             boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             zIndex: 1000,
           }}
@@ -273,11 +274,11 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
               style={{
                 padding: '7px 12px',
                 fontSize: 13,
-                color: '#1e293b',
+                color: 'var(--text)',
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = '#f4f6f9')
+                (e.currentTarget.style.backgroundColor = 'var(--bg)')
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.backgroundColor = 'transparent')
@@ -482,7 +483,7 @@ export function RegisterTab() {
   if (!ticker) {
     return (
       <div style={CENTER_MSG}>
-        <span style={{ color: '#94a3b8' }}>
+        <span style={{ color: 'var(--text-dim)' }}>
           Enter a ticker to load the register
         </span>
       </div>
@@ -498,8 +499,8 @@ export function RegisterTab() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: 'var(--card-bg)',
-        borderRadius: 6,
+        backgroundColor: 'var(--panel)',
+        borderRadius: 0,
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
         overflow: 'hidden',
       }}
@@ -514,7 +515,7 @@ export function RegisterTab() {
           .register-table-wrap { overflow: visible !important; }
         }
         .register-row-highlight > td {
-          background-color: #fef9c3 !important;
+          background-color: rgba(197,162,84,0.12) !important;
           transition: background-color 0.4s ease-in-out;
         }
       `}</style>
@@ -528,8 +529,8 @@ export function RegisterTab() {
           alignItems: 'flex-end',
           gap: 16,
           padding: '12px 16px',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: 'var(--panel)',
+          borderBottom: '1px solid var(--line)',
           flexShrink: 0,
         }}
       >
@@ -543,7 +544,7 @@ export function RegisterTab() {
             title="Quarter selector takes effect on tabs that support it"
             style={{
               cursor: 'help',
-              color: '#94a3b8',
+              color: 'var(--text-dim)',
               fontSize: 14,
               userSelect: 'none',
             }}
@@ -590,10 +591,10 @@ export function RegisterTab() {
         }}
       >
         {loading && (
-          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>
+          <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>
         )}
         {error && !loading && (
-          <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>
+          <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>
         )}
         {data && !loading && (
           <table
@@ -670,13 +671,13 @@ export function RegisterTab() {
                           transform: 'translateX(-50%)',
                           zIndex: 1000,
                           marginTop: 4,
-                          backgroundColor: '#0d1526',
-                          color: '#e2e8f0',
+                          backgroundColor: 'var(--bg)',
+                          color: 'var(--line)',
                           fontSize: 11,
                           lineHeight: 1.6,
                           padding: '8px 12px',
-                          borderRadius: 4,
-                          border: '1px solid #2d3f5e',
+                          borderRadius: 0,
+                          border: '1px solid var(--line)',
                           width: 200,
                           whiteSpace: 'pre-line',
                           textAlign: 'left',
@@ -696,19 +697,19 @@ export function RegisterTab() {
                           Port. Coverage — % of AUM visible in N-PORT filings
                         </span>
                         <span style={{ display: 'block' }}>
-                          <span style={{ color: '#27AE60' }}>■</span>
+                          <span style={{ color: 'var(--pos)' }}>■</span>
                           {' Green   ≥ 80%  High confidence'}
                         </span>
                         <span style={{ display: 'block' }}>
-                          <span style={{ color: '#F5A623' }}>■</span>
+                          <span style={{ color: 'var(--gold)' }}>■</span>
                           {' Amber  50–79%  Partial coverage'}
                         </span>
                         <span style={{ display: 'block' }}>
-                          <span style={{ color: '#94a3b8' }}>■</span>
+                          <span style={{ color: 'var(--text-dim)' }}>■</span>
                           {' Grey     1–49%  Low coverage'}
                         </span>
                         <span
-                          style={{ display: 'block', color: '#94a3b8' }}
+                          style={{ display: 'block', color: 'var(--text-dim)' }}
                         >
                           {'  No badge   No N-PORT data'}
                         </span>
@@ -761,7 +762,7 @@ export function RegisterTab() {
                       ...TD_STYLE,
                       textAlign: 'center',
                       padding: '30px 10px',
-                      color: '#64748b',
+                      color: 'var(--text-dim)',
                     }}
                   >
                     No rows match the current filters
@@ -827,13 +828,13 @@ function renderRow(
   displayRank?: string,
 ) {
   const rowBg: React.CSSProperties = {
-    backgroundColor: indent === 1 ? '#f8fafc' : '#ffffff',
+    backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)',
   }
   const nameCell: React.CSSProperties = {
     ...TD_STYLE,
     paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,
-    color: indent === 0 ? '#0f172a' : '#475569',
+    color: indent === 0 ? 'var(--text)' : 'var(--text-mute)',
     fontSize: indent === 1 ? 12 : 13,
     cursor: canExpand ? 'pointer' : 'default',
     userSelect: 'none',
@@ -858,7 +859,7 @@ function renderRow(
           ...TD_STYLE,
           textAlign: 'right',
           fontWeight: indent === 0 ? 700 : 400,
-          color: indent === 0 ? '#64748b' : '#94a3b8',
+          color: indent === 0 ? 'var(--text-dim)' : 'var(--text-dim)',
           fontSize: indent === 1 ? 12 : 13,
         }}
       >
@@ -880,7 +881,7 @@ function renderRow(
             style={{
               display: 'inline-block',
               width: 14,
-              color: '#64748b',
+              color: 'var(--text-dim)',
               fontSize: 10,
             }}
           >
@@ -892,7 +893,7 @@ function renderRow(
           <span
             style={{
               fontSize: 11,
-              color: '#64748b',
+              color: 'var(--text-dim)',
               marginLeft: 6,
               fontStyle: 'italic',
             }}
