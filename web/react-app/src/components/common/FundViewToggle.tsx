@@ -18,14 +18,10 @@ export function FundViewToggle({ value, onChange }: Props) {
     <div
       style={{
         display: 'inline-flex',
-        gap: 2,
-        padding: 2,
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 6,
+        backgroundColor: 'transparent',
       }}
     >
-      {OPTIONS.map((o) => {
+      {OPTIONS.map((o, i) => {
         const active = o.id === value
         return (
           <button
@@ -34,14 +30,18 @@ export function FundViewToggle({ value, onChange }: Props) {
             onClick={() => onChange(o.id)}
             style={{
               padding: '5px 12px',
-              fontSize: 12,
-              fontWeight: active ? 600 : 400,
-              color: active ? '#ffffff' : '#64748b',
-              backgroundColor: active ? 'var(--oxford-blue)' : '#f4f6f9',
-              border: 'none',
-              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: active ? 700 : 400,
+              color: active ? '#000000' : 'var(--text-dim)',
+              backgroundColor: active ? 'var(--gold)' : 'transparent',
+              border: '1px solid var(--line)',
+              borderLeft: i === 0 ? '1px solid var(--line)' : 'none',
+              borderRadius: 0,
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
               cursor: 'pointer',
-              transition: 'background 0.1s, color 0.1s',
+              transition: 'all 0.12s',
             }}
           >
             {o.label}

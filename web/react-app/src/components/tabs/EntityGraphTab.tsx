@@ -36,12 +36,14 @@ function fmtAum(v: number | null): string {
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
-const TH: React.CSSProperties = { padding: '7px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff', backgroundColor: 'var(--oxford-blue)', textAlign: 'left', borderBottom: '1px solid #1e2d47', whiteSpace: 'nowrap' }
+const TH: React.CSSProperties = { padding: '7px 10px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)', backgroundColor: 'var(--header)', textAlign: 'left', borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
-const TD: React.CSSProperties = { padding: '7px 10px', fontSize: 13, color: '#1e293b', borderBottom: '1px solid #e5e7eb' }
-const TD_R: React.CSSProperties = { ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-const BADGE: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', fontSize: 11, fontWeight: 600, borderRadius: 3 }
-const FC: React.CSSProperties = { padding: '7px 10px', fontSize: 13, fontWeight: 600, color: '#fff', backgroundColor: 'var(--oxford-blue)', position: 'sticky', bottom: 0, zIndex: 2, borderTop: '2px solid var(--oxford-blue)' }
+const TD: React.CSSProperties = { padding: '7px 10px', fontSize: 13, color: 'var(--text)', borderBottom: '1px solid var(--line-soft)' }
+const TD_R: React.CSSProperties = { ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
+}
+const BADGE: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', fontSize: 11, fontWeight: 600, borderRadius: 1 }
+const FC: React.CSSProperties = { padding: '7px 10px', fontSize: 13, fontWeight: 600, color: 'var(--white)', backgroundColor: 'var(--header)', position: 'sticky', bottom: 0, zIndex: 2, borderTop: '2px solid var(--header)' }
 const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
 // ── React Flow layout ──────────────────────────────────────────────────────
@@ -66,22 +68,22 @@ function layoutFilerGraph(nodes: EntityGraphNode[]): { rfNodes: RFNode[]; graphH
 
 function filerEdges(edges: EntityGraphEdge[], nodeIds: Set<string>): Edge[] {
   return edges.filter(e => nodeIds.has(e.from) && nodeIds.has(e.to)).map(e => ({
-    id: `e-${e.from}-${e.to}`, source: e.from, target: e.to, style: { stroke: '#002147', strokeWidth: 2 },
+    id: `e-${e.from}-${e.to}`, source: e.from, target: e.to, style: { stroke: 'var(--header)', strokeWidth: 2 },
   }))
 }
 
 function InstitutionNode({ data }: NodeProps) {
   return (
-    <div style={{ backgroundColor: '#002147', color: '#fff', borderRadius: 8, padding: '10px 16px', minWidth: 180, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
+    <div style={{ backgroundColor: 'var(--header)', color: 'var(--white)', borderRadius: 0, padding: '10px 16px', minWidth: 180, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
       <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
       <div>{data.label}</div>
-      {data.aum != null && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{fmtAum(data.aum)}</div>}
+      {data.aum != null && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{fmtAum(data.aum)}</div>}
     </div>
   )
 }
 function FilerNode({ data }: NodeProps) {
   return (
-    <div style={{ backgroundColor: '#4A90D9', color: '#fff', borderRadius: 6, padding: '7px 12px', minWidth: 140, textAlign: 'center', fontSize: 11, fontWeight: 500 }}>
+    <div style={{ backgroundColor: '#7aadde', color: 'var(--white)', borderRadius: 0, padding: '7px 12px', minWidth: 140, textAlign: 'center', fontSize: 11, fontWeight: 500 }}>
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
       <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{data.label}</div>
       {data.aum != null && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{fmtAum(data.aum)}</div>}
@@ -95,11 +97,11 @@ const nodeTypes = { institution: InstitutionNode, filer: FilerNode }
 interface FundInfo { id: string; name: string; aum: number | null; subAdviser: string | null }
 function FundCard({ fund }: { fund: FundInfo }) {
   return (
-    <div style={{ padding: '8px 10px', borderRadius: 4, border: `1px solid ${fund.subAdviser ? '#C9B99A' : '#e2e8f0'}`, borderLeft: `3px solid ${fund.subAdviser ? '#C9B99A' : '#2E7D32'}`, backgroundColor: '#fff', fontSize: 11 }}>
-      <div style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fund.name}>{fund.name}</div>
+    <div style={{ padding: '8px 10px', borderRadius: 0, border: `1px solid ${fund.subAdviser ? 'var(--gold)' : 'var(--line)'}`, borderLeft: `3px solid ${fund.subAdviser ? 'var(--gold)' : '#5cb87a'}`, backgroundColor: 'var(--panel)', fontSize: 11 }}>
+      <div style={{ fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fund.name}>{fund.name}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-        <span style={{ color: '#64748b', fontSize: 10 }}>{fmtAum(fund.aum)}</span>
-        {fund.subAdviser && <span style={{ color: '#8a7d66', fontSize: 9, fontStyle: 'italic' }}>{fund.subAdviser}</span>}
+        <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{fmtAum(fund.aum)}</span>
+        {fund.subAdviser && <span style={{ color: 'var(--gold-dim)', fontSize: 9, fontStyle: 'italic' }}>{fund.subAdviser}</span>}
       </div>
     </div>
   )
@@ -137,14 +139,14 @@ function EntitySearch({ onSelect }: { onSelect: (id: number, name: string) => vo
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <input type="text" value={input} placeholder="Search institution…" autoComplete="off" autoCorrect="off" spellCheck={false}
         onChange={e => handleInput(e.target.value)} onFocus={() => { if (results.length > 0) setOpen(true) }}
-        style={{ width: 260, padding: '6px 10px', fontSize: 13, color: '#fff', backgroundColor: '#1a2a4a', border: '1px solid #2d3f5e', borderRadius: 4, outline: 'none' }} />
+        style={{ width: 260, padding: '6px 10px', fontSize: 13, color: 'var(--white)', backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 0, outline: 'none' }} />
       {open && results.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 320, maxHeight: 280, overflowY: 'auto', backgroundColor: '#0d1526', border: '1px solid #2d3f5e', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 320, maxHeight: 280, overflowY: 'auto', backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 1000 }}>
           {results.map(r => (
             <div key={r.entity_id} onMouseDown={() => { setInput(r.display_name); setOpen(false); onSelect(r.entity_id, r.display_name) }}
-              style={{ padding: '7px 12px', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1a2a4a')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-              <div style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>{r.display_name}</div>
-              <div style={{ color: '#94a3b8', fontSize: 11 }}>{r.classification || r.entity_type}</div>
+              style={{ padding: '7px 12px', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+              <div style={{ color: 'var(--white)', fontWeight: 600, fontSize: 13 }}>{r.display_name}</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{r.classification || r.entity_type}</div>
             </div>
           ))}
         </div>
@@ -225,7 +227,7 @@ export function EntityGraphTab() {
     if (!activeCo || expanded) return
     fetch(`/api/v1/entity_children?entity_id=${activeCo.metadata.root_entity_id}&level=fund&top_n=0`)
       .then(r => r.json()).then((children: Array<{ entity_id: number; display_name: string; aum: number | null }>) => {
-        setAllFundNodes(children.map(c => ({ id: `fund-${c.entity_id}`, entity_id: c.entity_id, node_type: 'fund', display_name: c.display_name, label: c.display_name, title: c.display_name, level: 2, classification: null, aum: c.aum, aum_type: null, color: { background: '#2E7D32', border: '#1B5E20' }, font: { color: '#fff' } })))
+        setAllFundNodes(children.map(c => ({ id: `fund-${c.entity_id}`, entity_id: c.entity_id, node_type: 'fund', display_name: c.display_name, label: c.display_name, title: c.display_name, level: 2, classification: null, aum: c.aum, aum_type: null, color: { background: '#5cb87a', border: '#5cb87a' }, font: { color: 'var(--white)' } })))
         setExpanded(true)
       }).catch(() => {})
   }
@@ -265,15 +267,15 @@ export function EntityGraphTab() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--shell-bg)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflow: 'hidden' }}>
       <style>{`@media print { .eg-controls { display:none!important } }`}</style>
 
       {/* Controls */}
-      <div className="eg-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '10px 16px', backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid #1e2d47', flexShrink: 0 }}>
+      <div className="eg-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '10px 16px', backgroundColor: 'var(--header)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {(['market', 'company'] as const).map(m => (
             <button key={m} type="button" onClick={() => setViewMode(m)}
-              style={{ padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer', fontWeight: viewMode === m ? 600 : 400, color: viewMode === m ? '#fff' : '#94a3b8', backgroundColor: viewMode === m ? 'var(--oxford-blue)' : '#1a2a4a', border: `1px solid ${viewMode === m ? 'var(--oxford-blue)' : '#2d3f5e'}` }}>
+              style={{ padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer', fontWeight: viewMode === m ? 600 : 400, color: viewMode === m ? 'var(--white)' : 'var(--text-dim)', backgroundColor: viewMode === m ? 'var(--header)' : 'var(--panel-hi)', border: `1px solid ${viewMode === m ? 'var(--header)' : 'var(--line)'}` }}>
               {m === 'market' ? 'Market' : 'Company'}
             </button>
           ))}
@@ -285,7 +287,7 @@ export function EntityGraphTab() {
         }} />}
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={q => { setQuarter(q); setModalEntityId(null) }} />
         {viewMode === 'company' && !ticker && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
             <input type="checkbox" checked={showSubAdvisers} onChange={e => setShowSubAdvisers(e.target.checked)} /> Sub-Advisers
           </label>
         )}
@@ -299,9 +301,9 @@ export function EntityGraphTab() {
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
         {/* ── MARKET MODE — always market leaderboard ── */}
         {viewMode === 'market' && (
-          <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
-            {market.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading market summary…</div>}
-            {market.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {market.error}</div>}
+          <div style={{ padding: 16, backgroundColor: 'var(--panel)', minHeight: '100%' }}>
+            {market.loading && <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>Loading market summary…</div>}
+            {market.error && <div style={{ padding: 40, color: 'var(--neg)', textAlign: 'center' }}>Error: {market.error}</div>}
             {market.data && (() => {
               const totalAum = market.data.reduce((s, r) => s + r.total_aum, 0)
               const totalFilers = market.data.reduce((s, r) => s + r.filer_count, 0)
@@ -318,11 +320,11 @@ export function EntityGraphTab() {
                   {market.data.map(r => {
                     const ts = getTypeStyle(r.manager_type)
                     const pct = totalAum > 0 ? (r.total_aum / totalAum * 100) : 0
-                    const covStyle = r.nport_coverage_pct != null && r.nport_coverage_pct > 0 ? r.nport_coverage_pct >= 80 ? { color: '#27AE60' } : r.nport_coverage_pct >= 50 ? { color: '#F5A623' } : { color: '#94a3b8' } : { color: '#cbd5e1' }
+                    const covStyle = r.nport_coverage_pct != null && r.nport_coverage_pct > 0 ? r.nport_coverage_pct >= 80 ? { color: 'var(--pos)' } : r.nport_coverage_pct >= 50 ? { color: 'var(--gold)' } : { color: 'var(--text-dim)' } : { color: 'var(--text-dim)' }
                     return (
                       <tr key={r.rank} onClick={() => handleMarketClick(r.entity_id, r.institution)} style={{ cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{r.rank}</td>
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{r.rank}</td>
                         <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                         <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                         <td style={TD_R}>{NUM_0.format(r.total_aum / 1e6)}</td>
@@ -351,10 +353,10 @@ export function EntityGraphTab() {
           <>
             {/* Ticker set: show top holders table with modal on click */}
             {ticker && (
-              <div style={{ padding: 16, backgroundColor: 'var(--card-bg)', minHeight: '100%' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>Top Holders of {ticker.toUpperCase()} — click to view entity structure</div>
-                {tickerHolders.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading holders…</div>}
-                {tickerHolders.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {tickerHolders.error}</div>}
+              <div style={{ padding: 16, backgroundColor: 'var(--panel)', minHeight: '100%' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Top Holders of {ticker.toUpperCase()} — click to view entity structure</div>
+                {tickerHolders.loading && <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>Loading holders…</div>}
+                {tickerHolders.error && <div style={{ padding: 40, color: 'var(--neg)', textAlign: 'center' }}>Error: {tickerHolders.error}</div>}
                 {tickerHolders.data && (() => {
                   const parentRows = tickerHolders.data.rows.filter(r => r.level === 0)
                   const totalValue = parentRows.reduce((s, r) => s + (r.value_live || 0), 0)
@@ -370,8 +372,8 @@ export function EntityGraphTab() {
                         const ts = getTypeStyle(r.type)
                         return (
                           <tr key={i} onClick={() => handleHolderClick(r.institution)} style={{ cursor: 'pointer' }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                            <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{r.rank}</td>
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                            <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{r.rank}</td>
                             <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                             <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                             <td style={TD_R}>{r.value_live != null && r.value_live !== 0 ? `$${NUM_0.format(r.value_live / 1e6)}` : '—'}</td>
@@ -397,46 +399,46 @@ export function EntityGraphTab() {
               <>
                 {!selectedEntityId && (
                   <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                    <div style={{ fontSize: 32, color: '#2d3f5e' }}>🔍</div>
-                    <div style={{ color: '#94a3b8', fontSize: 14 }}>Search for an institution to view its entity structure</div>
+                    <div style={{ fontSize: 32, color: 'var(--line)' }}>🔍</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 14 }}>Search for an institution to view its entity structure</div>
                   </div>
                 )}
-                {loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading…</div>}
-                {error && !loading && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {error}</div>}
+                {loading && <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>Loading…</div>}
+                {error && !loading && <div style={{ padding: 40, color: 'var(--neg)', textAlign: 'center' }}>Error: {error}</div>}
             {data && !loading && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                <div style={{ height: graphHeight, borderBottom: '1px solid #1e2d47', flexShrink: 0 }}>
-                  <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={handleNodeClick} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }} style={{ backgroundColor: 'var(--shell-bg)' }} proOptions={{ hideAttribution: true }}>
-                    <Background color="#1e2d47" gap={20} /><Controls style={{ bottom: 10, left: 10 }} />
+                <div style={{ height: graphHeight, borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                  <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={handleNodeClick} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }} style={{ backgroundColor: 'var(--bg)' }} proOptions={{ hideAttribution: true }}>
+                    <Background color="var(--line)" gap={20} /><Controls style={{ bottom: 10, left: 10 }} />
                   </ReactFlow>
                 </div>
-                <div style={{ display: 'flex', gap: 32, padding: '10px 20px', backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid #1e2d47' }}>
+                <div style={{ display: 'flex', gap: 32, padding: '10px 20px', backgroundColor: 'var(--header)', borderBottom: '1px solid var(--line)' }}>
                   <AumChip label="Total AUM" value={fmtAum(data.nodes.find(n => n.node_type === 'institution')?.aum ?? null)} />
                   <AumChip label="Owned Funds" value={fmtAum(ownedFunds.reduce((s, f) => s + (f.aum || 0), 0))} count={ownedFunds.length} />
                   {subAdvisedFunds.length > 0 && <AumChip label="Sub-Advised" value={fmtAum(subAdvisedFunds.reduce((s, f) => s + (f.aum || 0), 0))} count={subAdvisedFunds.length} />}
                   <AumChip label="Filers" value={String(data.metadata.filer_count)} />
-                  {selectedFiler && <span style={{ fontSize: 11, color: '#64748b', alignSelf: 'center' }}>Filer: {selectedFiler}</span>}
+                  {selectedFiler && <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center' }}>Filer: {selectedFiler}</span>}
                   {data.metadata.truncated && !expanded && (
-                    <button type="button" onClick={expandFunds} style={{ padding: '4px 12px', fontSize: 11, color: 'var(--glacier-blue)', backgroundColor: 'transparent', border: '1px solid var(--glacier-blue)', borderRadius: 4, cursor: 'pointer', alignSelf: 'center' }}>
+                    <button type="button" onClick={expandFunds} style={{ padding: '4px 12px', fontSize: 11, color: 'var(--gold)', backgroundColor: 'transparent', border: '1px solid var(--gold)', borderRadius: 0, cursor: 'pointer', alignSelf: 'center' }}>
                       Show all funds ({Object.values(data.metadata.total_funds_by_filer).reduce((a, b) => a + b, 0)})
                     </button>
                   )}
-                  {expanded && <span style={{ fontSize: 11, color: '#27AE60', alignSelf: 'center' }}>✓ All funds loaded</span>}
+                  {expanded && <span style={{ fontSize: 11, color: 'var(--pos)', alignSelf: 'center' }}>✓ All funds loaded</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 0, flex: 1 }}>
-                  <div style={{ flex: subAdvisedFunds.length > 0 ? 3 : 1, padding: 16, overflowY: 'auto', borderRight: subAdvisedFunds.length > 0 ? '1px solid #e2e8f0' : undefined }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#2E7D32', borderRadius: 2 }} /> Owned Funds ({ownedFunds.length})
+                  <div style={{ flex: subAdvisedFunds.length > 0 ? 3 : 1, padding: 16, overflowY: 'auto', borderRight: subAdvisedFunds.length > 0 ? '1px solid var(--line)' : undefined }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#5cb87a', borderRadius: 0 }} /> Owned Funds ({ownedFunds.length})
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
                       {ownedFunds.map(f => <FundCard key={f.id} fund={f} />)}
                     </div>
-                    {ownedFunds.length === 0 && <div style={{ color: '#94a3b8', fontSize: 13 }}>No fund data available</div>}
+                    {ownedFunds.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No fund data available</div>}
                   </div>
                   {subAdvisedFunds.length > 0 && (
-                    <div style={{ flex: 2, padding: 16, overflowY: 'auto', backgroundColor: '#faf9f7' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#C9B99A', borderRadius: 2 }} /> Sub-Advised Funds ({subAdvisedFunds.length})
+                    <div style={{ flex: 2, padding: 16, overflowY: 'auto', backgroundColor: 'var(--panel)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: 'var(--gold)', borderRadius: 0 }} /> Sub-Advised Funds ({subAdvisedFunds.length})
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
                         {subAdvisedFunds.map(f => <FundCard key={f.id} fund={f} />)}
@@ -456,17 +458,17 @@ export function EntityGraphTab() {
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={() => setModalEntityId(null)}>
             <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-            <div style={{ position: 'relative', width: '90%', maxWidth: 1100, maxHeight: '85vh', backgroundColor: 'var(--card-bg)', borderRadius: 8, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            <div style={{ position: 'relative', width: '90%', maxWidth: 1100, maxHeight: '85vh', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
               onClick={e => e.stopPropagation()}>
               {/* Modal header */}
-              <div style={{ padding: '12px 20px', backgroundColor: 'var(--oxford-blue)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ padding: '12px 20px', backgroundColor: 'var(--header)', color: 'var(--white)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontWeight: 700, fontSize: 15 }}>{modalEntityName} — Entity Structure</span>
-                <button type="button" onClick={() => setModalEntityId(null)} style={{ backgroundColor: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20 }}>×</button>
+                <button type="button" onClick={() => setModalEntityId(null)} style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 20 }}>×</button>
               </div>
               {/* Modal content */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: 16, color: '#1e293b' }}>
-                {modalGraph.loading && <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading entity structure…</div>}
-                {modalGraph.error && <div style={{ padding: 40, color: '#ef4444', textAlign: 'center' }}>Error: {modalGraph.error}</div>}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 16, color: 'var(--text)' }}>
+                {modalGraph.loading && <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>Loading entity structure…</div>}
+                {modalGraph.error && <div style={{ padding: 40, color: 'var(--neg)', textAlign: 'center' }}>Error: {modalGraph.error}</div>}
                 {modalGraph.data && <ModalGraphContent data={modalGraph.data} quarter={quarter} />}
               </div>
             </div>
@@ -497,7 +499,7 @@ function ModalGraphContent({ data, quarter }: { data: EntityGraphResponse; quart
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Summary */}
-      <div style={{ display: 'flex', gap: 32, padding: '10px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+      <div style={{ display: 'flex', gap: 32, padding: '10px 16px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0 }}>
         <SummaryTile label="Institution" value={instName} />
         <SummaryTile label="Total AUM" value={fmtAum(instAum ?? null)} />
         <SummaryTile label="Filers" value={String(filers.length)} />
@@ -508,12 +510,12 @@ function ModalGraphContent({ data, quarter }: { data: EntityGraphResponse; quart
       {/* Filers */}
       {filers.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#4A90D9', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#4A90D9', borderRadius: 2 }} /> Filers ({filers.length})
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#7aadde', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#7aadde', borderRadius: 0 }} /> Filers ({filers.length})
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filers.map(f => (
-              <span key={f.id} style={{ padding: '4px 10px', fontSize: 11, backgroundColor: '#4A90D9', color: '#fff', borderRadius: 4 }}>{f.display_name}{f.aum ? ` · ${fmtAum(f.aum)}` : ''}</span>
+              <span key={f.id} style={{ padding: '4px 10px', fontSize: 11, backgroundColor: '#7aadde', color: 'var(--white)', borderRadius: 0 }}>{f.display_name}{f.aum ? ` · ${fmtAum(f.aum)}` : ''}</span>
             ))}
           </div>
         </div>
@@ -521,31 +523,31 @@ function ModalGraphContent({ data, quarter }: { data: EntityGraphResponse; quart
 
       {/* Owned funds */}
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#2E7D32', borderRadius: 2 }} /> Owned Funds ({owned.length})
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#5cb87a', borderRadius: 0 }} /> Owned Funds ({owned.length})
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
           {owned.map(f => (
-            <div key={f.id} style={{ padding: '5px 8px', fontSize: 11, backgroundColor: '#fff', border: '1px solid #e2e8f0', borderLeft: '3px solid #2E7D32', borderRadius: 3 }}>
+            <div key={f.id} style={{ padding: '5px 8px', fontSize: 11, backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderLeft: '3px solid #5cb87a', borderRadius: 0 }}>
               <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.display_name}>{f.display_name}</div>
-              <div style={{ color: '#64748b', marginTop: 1 }}>{fmtAum(f.aum)}</div>
+              <div style={{ color: 'var(--text-dim)', marginTop: 1 }}>{fmtAum(f.aum)}</div>
             </div>
           ))}
-          {owned.length === 0 && <div style={{ color: '#94a3b8', fontSize: 13 }}>No fund data</div>}
+          {owned.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No fund data</div>}
         </div>
       </div>
 
       {/* Sub-advised funds */}
       {subAdvised.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: '#C9B99A', borderRadius: 2 }} /> Sub-Advised Funds ({subAdvised.length})
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 10, height: 10, backgroundColor: 'var(--gold)', borderRadius: 0 }} /> Sub-Advised Funds ({subAdvised.length})
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
             {subAdvised.map(f => (
-              <div key={f.id} style={{ padding: '5px 8px', fontSize: 11, backgroundColor: '#faf9f7', border: '1px solid #C9B99A', borderLeft: '3px solid #C9B99A', borderRadius: 3 }}>
+              <div key={f.id} style={{ padding: '5px 8px', fontSize: 11, backgroundColor: 'var(--panel)', border: '1px solid var(--gold)', borderLeft: '3px solid var(--gold)', borderRadius: 0 }}>
                 <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.display_name}>{f.display_name}</div>
-                <div style={{ color: '#8a7d66', marginTop: 1, fontStyle: 'italic' }}>{saMap.get(f.id)} · {fmtAum(f.aum)}</div>
+                <div style={{ color: 'var(--gold-dim)', marginTop: 1, fontStyle: 'italic' }}>{saMap.get(f.id)} · {fmtAum(f.aum)}</div>
               </div>
             ))}
           </div>
@@ -558,11 +560,11 @@ function ModalGraphContent({ data, quarter }: { data: EntityGraphResponse; quart
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function SummaryTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (<div><div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.08em' }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{value}{sub && <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8', marginLeft: 4 }}>{sub}</span>}</div></div>)
+  return (<div><div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em' }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{value}{sub && <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-dim)', marginLeft: 4 }}>{sub}</span>}</div></div>)
 }
 
 function AumChip({ label, value, count }: { label: string; value: string; count?: number }) {
-  return (<div><div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.08em' }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{value}{count != null && <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8', marginLeft: 4 }}>({count})</span>}</div></div>)
+  return (<div><div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em' }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--line)' }}>{value}{count != null && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-dim)', marginLeft: 4 }}>({count})</span>}</div></div>)
 }
 
 function enc(s: string) { return encodeURIComponent(s) }

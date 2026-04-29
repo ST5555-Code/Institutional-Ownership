@@ -8,9 +8,11 @@ export function SidebarSection({ title, children }: Props) {
     <div style={{ marginBottom: '8px' }}>
       <div style={{
         padding: '10px 16px 4px',
-        fontSize: '10px', fontWeight: 700,
-        letterSpacing: '0.08em',
-        color: 'var(--accent-gold)', textTransform: 'uppercase'
+        fontSize: '9px', fontWeight: 700,
+        letterSpacing: '0.16em',
+        color: 'var(--gold)',
+        textTransform: 'uppercase',
+        fontFamily: "'Hanken Grotesk', sans-serif"
       }}>
         {title}
       </div>

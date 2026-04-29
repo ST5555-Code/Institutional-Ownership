@@ -30,23 +30,24 @@ function fmtPct2(v: number | null): string {
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 11, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '2px 8px', fontSize: 11,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
@@ -138,26 +139,26 @@ export function FundPortfolioTab() {
   }, [managers.data, selectedCik, selectedFundName])
 
   if (!ticker) {
-    return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load fund portfolios</span></div>
+    return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load fund portfolios</span></div>
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
         .fp-ticker-link:hover { text-decoration: underline; }
       `}</style>
 
       {/* Controls bar */}
-      <div className="fp-controls" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="fp-controls" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <select
           value={selectedIdx}
           onChange={onManagerChange}
           disabled={!managers.data || managers.data.length === 0}
           style={{
-            flex: 1, padding: '6px 10px', fontSize: 13, color: '#1e293b',
-            backgroundColor: '#ffffff', border: '1px solid #e2e8f0',
-            borderRadius: 4, outline: 'none',
+            flex: 1, padding: '6px 10px', fontSize: 13, color: 'var(--text)',
+            backgroundColor: 'var(--bg)', border: '1px solid var(--line)',
+            borderRadius: 0, outline: 'none',
           }}
         >
           {managers.loading && <option>Loading managers…</option>}
@@ -176,12 +177,12 @@ export function FundPortfolioTab() {
 
       {/* Content */}
       <div className="fp-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', position: 'relative' }}>
-        {portfolio.loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading portfolio…</div>}
+        {portfolio.loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading portfolio…</div>}
         {!portfolio.loading && !portfolio.data && !portfolio.error && (
-          <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Select a manager to view their portfolio</div>
+          <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Select a manager to view their portfolio</div>
         )}
         {portfolio.error && !portfolio.loading && (
-          <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {portfolio.error}</div>
+          <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {portfolio.error}</div>
         )}
         {portfolio.data && !portfolio.loading && (
           <div style={{ padding: 16 }}>
@@ -216,17 +217,17 @@ export function FundPortfolioTab() {
                 {portfolio.data.positions.map(p => {
                   const isSubject = ticker && p.ticker === ticker.toUpperCase()
                   const rowBg: React.CSSProperties = isSubject
-                    ? { backgroundColor: '#fef9c3' }
+                    ? { backgroundColor: 'rgba(197,162,84,0.12)' }
                     : {}
                   const canNav = !!p.ticker && !isSubject
                   return (
                     <tr key={p.rank} style={rowBg}>
-                      <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b' }}>{p.rank}</td>
+                      <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{p.rank}</td>
                       <td
                         style={{
                           ...TD,
                           fontWeight: isSubject ? 700 : 600,
-                          color: 'var(--glacier-blue)',
+                          color: 'var(--gold)',
                           cursor: canNav ? 'pointer' : 'default',
                         }}
                         className={canNav ? 'fp-ticker-link' : undefined}
@@ -236,7 +237,7 @@ export function FundPortfolioTab() {
                         {p.ticker}
                       </td>
                       <td style={{ ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0, fontWeight: isSubject ? 600 : 400 }} title={p.issuer_name || ''}>{p.issuer_name || '—'}</td>
-                      <td style={{ ...TD, color: '#64748b', fontSize: 12 }}>{p.sector || '—'}</td>
+                      <td style={{ ...TD, color: 'var(--text-dim)', fontSize: 12 }}>{p.sector || '—'}</td>
                       <td style={TD_R}>{fmtSharesMm(p.shares)}</td>
                       <td style={TD_R}>{fmtValueMm(p.market_value_live)}</td>
                       <td style={TD_R}>{fmtPct2(p.pct_of_portfolio)}</td>
@@ -245,7 +246,7 @@ export function FundPortfolioTab() {
                   )
                 })}
                 {portfolio.data.positions.length === 0 && (
-                  <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 30, color: '#64748b' }}>No positions found</td></tr>
+                  <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No positions found</td></tr>
                 )}
               </tbody>
               <TableFooter totalColumns={TOTAL_COLS} rows={[{
@@ -267,9 +268,9 @@ export function FundPortfolioTab() {
 function StatsCard({ stats }: { stats: FundPortfolioResponse['stats'] }) {
   const ts = getTypeStyle(stats.manager_type)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '12px 16px', backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '12px 16px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, marginBottom: 12, flexWrap: 'wrap' }}>
       <div>
-        <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{stats.manager_name}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{stats.manager_name}</span>
         <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color, marginLeft: 10 }}>{ts.label}</span>
       </div>
       <MetricTile label="Total Value" value={fmtValueMm(stats.total_value)} />
@@ -282,8 +283,8 @@ function StatsCard({ stats }: { stats: FundPortfolioResponse['stats'] }) {
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{value}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{value}</div>
     </div>
   )
 }

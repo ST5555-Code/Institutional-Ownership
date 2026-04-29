@@ -58,14 +58,14 @@ function cellStyle(bottomPx: number): React.CSSProperties {
     padding: '7px 10px',
     fontSize: 13,
     fontWeight: 600,
-    color: '#ffffff',
-    backgroundColor: 'var(--oxford-blue)',
+    color: 'var(--white)',
+    backgroundColor: 'var(--header)',
     position: 'sticky',
     bottom: bottomPx,
     zIndex: 2,
     // First sticky row gets the top accent border; subsequent rows draw a
     // thinner internal divider so the stacked rows read as one footer block.
-    borderTop: '2px solid var(--oxford-blue)',
+    borderTop: '2px solid var(--gold)',
   }
 }
 
@@ -74,6 +74,7 @@ function cellStyleRight(bottomPx: number): React.CSSProperties {
     ...cellStyle(bottomPx),
     textAlign: 'right',
     fontVariantNumeric: 'tabular-nums',
+    fontFamily: "'JetBrains Mono', monospace",
   }
 }
 

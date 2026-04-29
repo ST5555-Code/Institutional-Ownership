@@ -17,11 +17,12 @@ export function RollupToggle() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span
         style={{
-          fontSize: 10,
-          fontWeight: 600,
-          color: '#94a3b8',
+          fontSize: 9,
+          fontWeight: 700,
+          color: 'var(--text-dim)',
           textTransform: 'uppercase',
-          letterSpacing: '0.08em',
+          letterSpacing: '0.16em',
+          fontFamily: "'Hanken Grotesk', sans-serif",
         }}
       >
         Rollup
@@ -29,13 +30,10 @@ export function RollupToggle() {
       <div
         style={{
           display: 'inline-flex',
-          gap: 2,
-          padding: 2,
-          backgroundColor: '#0d1526',
-          borderRadius: 6,
+          backgroundColor: 'transparent',
         }}
       >
-        {OPTIONS.map((o) => {
+        {OPTIONS.map((o, i) => {
           const active = o.id === rollupType
           return (
             <button
@@ -44,14 +42,18 @@ export function RollupToggle() {
               onClick={() => setRollupType(o.id)}
               style={{
                 padding: '5px 12px',
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: active ? 700 : 400,
-                color: active ? '#0a0f1e' : '#94a3b8',
-                backgroundColor: active ? 'var(--accent-gold)' : '#1a2a4a',
-                border: 'none',
-                borderRadius: 4,
+                color: active ? '#000000' : 'var(--text-dim)',
+                backgroundColor: active ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                borderLeft: i === 0 ? '1px solid var(--line)' : 'none',
+                borderRadius: 0,
+                fontFamily: "'Inter', sans-serif",
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
                 cursor: 'pointer',
-                transition: 'background 0.1s, color 0.1s',
+                transition: 'all 0.12s',
               }}
             >
               {o.label}

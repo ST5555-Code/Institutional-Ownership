@@ -33,26 +33,27 @@ function fmtMm(v: number | null): string {
 function SignedMm({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
   const mm = v / 1e6
-  if (v < 0) return <span style={{ color: '#ef4444' }}>({NUM_0.format(Math.abs(mm))})</span>
-  return <span style={{ color: '#27AE60' }}>+{NUM_0.format(mm)}</span>
+  if (v < 0) return <span style={{ color: 'var(--neg)' }}>({NUM_0.format(Math.abs(mm))})</span>
+  return <span style={{ color: 'var(--pos)' }}>+{NUM_0.format(mm)}</span>
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '7px 8px', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '7px 8px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 12, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
@@ -125,10 +126,10 @@ export function PeerRotationTab() {
     downloadCsv(csv.map(r => r.join(',')).join('\n'), `peer_rotation_${ticker}.csv`)
   }
 
-  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load peer rotation</span></div>
+  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load peer rotation</span></div>
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print {
           .pr-controls { display:none!important }
@@ -138,17 +139,17 @@ export function PeerRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="pr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="pr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {/* Period selector */}
         <div style={{ display: 'flex', gap: 4 }}>
           {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
             <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
                 fontWeight: periodCount === p.n ? 600 : 400,
-                color: periodCount === p.n ? '#fff' : '#64748b',
-                backgroundColor: periodCount === p.n ? 'var(--oxford-blue)' : '#fff',
-                border: `1px solid ${periodCount === p.n ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                color: periodCount === p.n ? 'var(--white)' : 'var(--text-dim)',
+                backgroundColor: periodCount === p.n ? 'var(--header)' : 'transparent',
+                border: `1px solid ${periodCount === p.n ? 'var(--header)' : 'var(--line)'}`,
               }}>
               {p.label}
             </button>
@@ -165,12 +166,12 @@ export function PeerRotationTab() {
 
       {/* Content */}
       <div className="pr-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {data && !loading && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Subject card */}
-            <div style={{ display: 'flex', gap: 24, padding: '10px 16px', backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+            <div style={{ display: 'flex', gap: 24, padding: '10px 16px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0 }}>
               <InfoChip label="Ticker" value={data.subject.ticker} />
               <InfoChip label="Sector" value={data.subject.sector} />
               <InfoChip label="Industry" value={data.subject.industry} />
@@ -180,10 +181,10 @@ export function PeerRotationTab() {
             <div style={{ display: 'flex', gap: 12 }}>
               {/* Left: ticker vs sector flow bars per period */}
               {chartData.length > 0 ? (
-                <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
-                  <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)' }}>
+                  <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{data.subject.ticker} vs {data.subject.sector} Sector — Flow by Quarter</span>
-                    <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>
+                    <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-dim)' }}>
                       % of industry flow to {data.subject.ticker}: {data.subject_pct_of_sector.total != null ? `${data.subject_pct_of_sector.total}%` : '—'}
                     </span>
                   </div>
@@ -194,20 +195,20 @@ export function PeerRotationTab() {
                         <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `$${NUM_1.format(v)}M`} width={56} />
                         <Tooltip formatter={(v: number) => `$${NUM_1.format(v)}M`} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
-                        <Bar dataKey="ticker" name={data.subject.ticker} fill="#f5a623" radius={[2, 2, 0, 0]} />
-                        <Bar dataKey="sector" name="Sector" fill="#4A90D9" radius={[2, 2, 0, 0]} />
+                        <ReferenceLine y={0} stroke="var(--text-dim)" strokeDasharray="3 3" />
+                        <Bar dataKey="ticker" name={data.subject.ticker} fill="var(--gold)" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="sector" name="Sector" fill="#7aadde" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
               ) : (
-                <div style={{ flex: 1, ...CENTER_MSG, color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 6 }}>Insufficient period data</div>
+                <div style={{ flex: 1, ...CENTER_MSG, color: 'var(--text-dim)', border: '1px solid var(--line)', borderRadius: 0 }}>Insufficient period data</div>
               )}
 
               {/* Right: Top Sector Movers chart */}
-              <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
-                <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Top Sector Movers — Net Flow</div>
+              <div style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)', position: 'relative' }}>
+                <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>Top Sector Movers — Net Flow</div>
                 <div style={{ padding: '8px 8px 4px' }}>
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart
@@ -239,20 +240,20 @@ export function PeerRotationTab() {
                         if (!active || !payload || !payload[0]) return null
                         const d = payload[0].payload as { ticker: string; inflow: number; outflow: number; netRaw: number; isSubject: boolean }
                         return (
-                          <div style={{ backgroundColor: '#0d1526', color: '#e2e8f0', padding: '8px 12px', borderRadius: 4, border: '1px solid #2d3f5e', fontSize: 11, lineHeight: 1.6 }}>
+                          <div style={{ backgroundColor: 'var(--bg)', color: 'var(--line)', padding: '8px 12px', borderRadius: 0, border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6 }}>
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{d.ticker}{d.isSubject ? ' (Subject)' : ''}</div>
-                            <div><span style={{ color: '#27AE60' }}>Inflow:</span> ${NUM_0.format(d.inflow / 1e6)}M</div>
-                            <div><span style={{ color: '#ef4444' }}>Outflow:</span> (${NUM_0.format(Math.abs(d.outflow) / 1e6)}M)</div>
-                            <div style={{ borderTop: '1px solid #2d3f5e', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
-                              Net: <span style={{ color: d.netRaw >= 0 ? '#27AE60' : '#ef4444' }}>${NUM_0.format(d.netRaw / 1e6)}M</span>
+                            <div><span style={{ color: 'var(--pos)' }}>Inflow:</span> ${NUM_0.format(d.inflow / 1e6)}M</div>
+                            <div><span style={{ color: 'var(--neg)' }}>Outflow:</span> (${NUM_0.format(Math.abs(d.outflow) / 1e6)}M)</div>
+                            <div style={{ borderTop: '1px solid var(--line)', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
+                              Net: <span style={{ color: d.netRaw >= 0 ? 'var(--pos)' : 'var(--neg)' }}>${NUM_0.format(d.netRaw / 1e6)}M</span>
                             </div>
                           </div>
                         )
                       }} />
-                      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                      <ReferenceLine y={0} stroke="var(--text-dim)" strokeDasharray="3 3" />
                       <Bar dataKey="net" radius={[2, 2, 0, 0]}>
                         {data.top_sector_movers.map((m, idx) => (
-                          <Cell key={idx} fill={m.is_subject ? '#f5a623' : '#002147'} />
+                          <Cell key={idx} fill={m.is_subject ? 'var(--gold)' : 'var(--header)'} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -260,15 +261,15 @@ export function PeerRotationTab() {
                 </div>
                 {/* Click popup overlay */}
                 {moverPopup && (
-                  <div style={{ position: 'absolute', top: 40, right: 12, backgroundColor: '#0d1526', color: '#e2e8f0', padding: '10px 14px', borderRadius: 6, border: '1px solid #2d3f5e', fontSize: 12, lineHeight: 1.7, zIndex: 10, minWidth: 160 }}>
+                  <div style={{ position: 'absolute', top: 40, right: 12, backgroundColor: 'var(--bg)', color: 'var(--line)', padding: '10px 14px', borderRadius: 0, border: '1px solid var(--line)', fontSize: 12, lineHeight: 1.7, zIndex: 10, minWidth: 160 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <span style={{ fontWeight: 700, fontSize: 13 }}>{moverPopup.ticker}</span>
-                      <button type="button" onClick={() => setMoverPopup(null)} style={{ backgroundColor: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}>×</button>
+                      <button type="button" onClick={() => setMoverPopup(null)} style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14 }}>×</button>
                     </div>
-                    <div><span style={{ color: '#27AE60' }}>Inflow:</span> ${NUM_0.format(moverPopup.inflow / 1e6)}M</div>
-                    <div><span style={{ color: '#ef4444' }}>Outflow:</span> (${NUM_0.format(Math.abs(moverPopup.outflow) / 1e6)}M)</div>
-                    <div style={{ borderTop: '1px solid #2d3f5e', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
-                      Net: <span style={{ color: moverPopup.net >= 0 ? '#27AE60' : '#ef4444' }}>${NUM_0.format(moverPopup.net / 1e6)}M</span>
+                    <div><span style={{ color: 'var(--pos)' }}>Inflow:</span> ${NUM_0.format(moverPopup.inflow / 1e6)}M</div>
+                    <div><span style={{ color: 'var(--neg)' }}>Outflow:</span> (${NUM_0.format(Math.abs(moverPopup.outflow) / 1e6)}M)</div>
+                    <div style={{ borderTop: '1px solid var(--line)', marginTop: 4, paddingTop: 4, fontWeight: 600 }}>
+                      Net: <span style={{ color: moverPopup.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>${NUM_0.format(moverPopup.net / 1e6)}M</span>
                     </div>
                   </div>
                 )}
@@ -315,8 +316,8 @@ function SectionTable({ title, rows, selectedPeer, onSelectPeer, subject }: {
   onSelectPeer: (t: string | null) => void; subject: string
 }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>{title}</div>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>{title}</div>
       <div style={{ maxHeight: 280, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
           <colgroup>
@@ -345,16 +346,16 @@ function SectionTable({ title, rows, selectedPeer, onSelectPeer, subject }: {
                 <tr key={r.ticker}
                   onClick={() => onSelectPeer(isSel ? null : r.ticker)}
                   style={{
-                    backgroundColor: isSubj ? '#fef9c3' : isSel ? '#eff6ff' : undefined,
+                    backgroundColor: isSubj ? 'rgba(197,162,84,0.12)' : isSel ? 'rgba(122,173,222,0.08)' : undefined,
                     cursor: 'pointer',
                   }}>
-                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{i + 1}</td>
-                  <td style={{ ...TD, fontWeight: 700, color: 'var(--glacier-blue)' }}>{r.ticker}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
+                  <td style={{ ...TD, fontWeight: 700, color: 'var(--gold)' }}>{r.ticker}</td>
                   <td style={{ ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.industry}>{r.industry}</td>
                   <td style={TD_R}><SignedMm v={r.net_peer_flow} /></td>
-                  <td style={TD_R}><span style={{ color: '#27AE60' }}>{fmtMm(r.contra_subject_flow)}</span></td>
+                  <td style={TD_R}><span style={{ color: 'var(--pos)' }}>{fmtMm(r.contra_subject_flow)}</span></td>
                   <td style={TD_R}>
-                    {r.net_peer_flow < 0 ? <span style={{ color: '#ef4444' }}>({NUM_0.format(Math.abs(r.net_peer_flow - r.contra_subject_flow) / 1e6)})</span> : '—'}
+                    {r.net_peer_flow < 0 ? <span style={{ color: 'var(--neg)' }}>({NUM_0.format(Math.abs(r.net_peer_flow - r.contra_subject_flow) / 1e6)})</span> : '—'}
                   </td>
                 </tr>
               )
@@ -370,8 +371,8 @@ function SectionTable({ title, rows, selectedPeer, onSelectPeer, subject }: {
 
 function MoversTable({ rows }: { rows: TopSectorMover[] }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Top Sector Movers</div>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>Top Sector Movers</div>
       <div style={{ maxHeight: 240, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
           <colgroup>
@@ -390,9 +391,9 @@ function MoversTable({ rows }: { rows: TopSectorMover[] }) {
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.ticker} style={{ backgroundColor: r.is_subject ? '#fef9c3' : undefined }}>
-                <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{r.rank}</td>
-                <td style={{ ...TD, fontWeight: 700, color: 'var(--glacier-blue)' }}>{r.ticker}</td>
+              <tr key={r.ticker} style={{ backgroundColor: r.is_subject ? 'rgba(197,162,84,0.12)' : undefined }}>
+                <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{r.rank}</td>
+                <td style={{ ...TD, fontWeight: 700, color: 'var(--gold)' }}>{r.ticker}</td>
                 <td style={{ ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.industry}>{r.industry}</td>
                 <td style={TD_R}><SignedMm v={r.net_flow} /></td>
               </tr>
@@ -408,8 +409,8 @@ function MoversTable({ rows }: { rows: TopSectorMover[] }) {
 
 function StoriesTable({ rows }: { rows: EntityStoryRow[] }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Entity Stories</div>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>Entity Stories</div>
       <div style={{ maxHeight: 240, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
           <colgroup>
@@ -432,12 +433,12 @@ function StoriesTable({ rows }: { rows: EntityStoryRow[] }) {
                 <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.entity}>{r.entity}</td>
                 <td style={TD_R}><SignedMm v={r.subject_flow} /></td>
                 <td style={TD_R}><SignedMm v={r.sector_flow} /></td>
-                <td style={{ ...TD, fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }}
+                <td style={{ ...TD, fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }}
                   title={r.top_contra_peers.map(p => `${p.ticker} (${p.flow >= 0 ? '+' : ''}$${NUM_0.format(p.flow / 1e6)}M)`).join(', ')}>
                   {r.top_contra_peers.slice(0, 3).map((p, i) => (
                     <span key={p.ticker}>
                       {i > 0 && ', '}
-                      <span style={{ color: p.flow >= 0 ? '#27AE60' : '#ef4444' }}>
+                      <span style={{ color: p.flow >= 0 ? 'var(--pos)' : 'var(--neg)' }}>
                         {p.ticker} {p.flow >= 0 ? '+' : ''}${NUM_0.format(p.flow / 1e6)}M
                       </span>
                     </span>
@@ -459,16 +460,16 @@ function DetailPanel({ ticker, peer, entities, loading, onClose }: {
   loading: boolean; onClose: () => void
 }) {
   return (
-    <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid #e2e8f0', borderRadius: 6, padding: 16 }}>
+    <div style={{ backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--oxford-blue)' }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--header)' }}>
           {ticker} ↔ {peer} — Entity Breakdown
         </span>
         <button type="button" onClick={onClose}
-          style={{ backgroundColor: 'transparent', border: 'none', fontSize: 18, color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          style={{ backgroundColor: 'transparent', border: 'none', fontSize: 18, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
       </div>
-      {loading && <div style={{ color: '#94a3b8', fontSize: 13 }}>Loading…</div>}
-      {!loading && entities.length === 0 && <div style={{ color: '#94a3b8', fontSize: 13 }}>No entity data</div>}
+      {loading && <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading…</div>}
+      {!loading && entities.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No entity data</div>}
       {!loading && entities.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
           <colgroup>
@@ -506,8 +507,8 @@ function DetailPanel({ ticker, peer, entities, loading, onClose }: {
 function InfoChip({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#1e293b' }}>{value}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--text)' }}>{value}</div>
     </div>
   )
 }

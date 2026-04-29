@@ -20,21 +20,21 @@ import {
 // ── GICS sector colors ─────────────────────────────────────────────────────
 
 const SECTOR_COLORS: Record<string, string> = {
-  'Technology': '#4A90D9',
-  'Health Care': '#27AE60',
-  'Financials': '#002147',
-  'Energy': '#F5A623',
-  'Consumer Discretionary': '#7B2D8B',
-  'Industrials': '#B45309',
-  'Communication Services': '#475569',
-  'Consumer Staples': '#2D6A4F',
-  'Materials': '#94a3b8',
-  'Real Estate': '#ef4444',
-  'Utilities': '#64748b',
+  'Technology': '#7aadde',
+  'Health Care': 'var(--pos)',
+  'Financials': 'var(--header)',
+  'Energy': 'var(--gold)',
+  'Consumer Discretionary': '#b09ee0',
+  'Industrials': 'var(--gold)',
+  'Communication Services': 'var(--text-mute)',
+  'Consumer Staples': '#5cb87a',
+  'Materials': 'var(--text-dim)',
+  'Real Estate': 'var(--neg)',
+  'Utilities': 'var(--text-dim)',
 }
 
 function sectorColor(sector: string): string {
-  return SECTOR_COLORS[sector] || '#94a3b8'
+  return SECTOR_COLORS[sector] || 'var(--text-dim)'
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -50,35 +50,36 @@ function fmtMm(v: number | null): string {
 function SignedMm({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
   const mm = v / 1e6
-  if (v < 0) return <span style={{ color: '#ef4444' }}>({NUM_0.format(Math.abs(mm))})</span>
-  return <span style={{ color: '#27AE60' }}>+{NUM_0.format(mm)}</span>
+  if (v < 0) return <span style={{ color: 'var(--neg)' }}>({NUM_0.format(Math.abs(mm))})</span>
+  return <span style={{ color: 'var(--pos)' }}>+{NUM_0.format(mm)}</span>
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '7px 8px', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '7px 8px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 30, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 12, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
 // Footer cell
 const FC: React.CSSProperties = {
   padding: '5px 8px', fontSize: 11, fontWeight: 600,
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
+  color: 'var(--white)', backgroundColor: 'var(--header)',
   position: 'sticky', bottom: 0, zIndex: 2,
-  borderTop: '2px solid var(--oxford-blue)',
+  borderTop: '2px solid var(--header)',
 }
 const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
@@ -166,7 +167,7 @@ export function SectorRotationTab() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`
         @media print {
           .sr-controls { display:none!important }
@@ -176,17 +177,20 @@ export function SectorRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {/* Period selector */}
         <div style={{ display: 'flex', gap: 4 }}>
           {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
             <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
-                fontWeight: periodCount === p.n ? 600 : 400,
-                color: periodCount === p.n ? '#fff' : '#64748b',
-                backgroundColor: periodCount === p.n ? 'var(--oxford-blue)' : '#fff',
-                border: `1px solid ${periodCount === p.n ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
+                fontWeight: periodCount === p.n ? 700 : 400,
+                color: periodCount === p.n ? '#000000' : 'var(--text-dim)',
+                backgroundColor: periodCount === p.n ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: "'Inter', sans-serif",
+                transition: 'all 0.12s',
               }}>
               {p.label}
             </button>
@@ -202,14 +206,14 @@ export function SectorRotationTab() {
 
       {/* Content */}
       <div className="sr-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {data && !loading && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Sector flow chart */}
             {chartData.length > 0 && (
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
-                <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>
+              <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)' }}>
+                <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>
                   Sector Net Flow — {latestPeriod?.label}
                 </div>
                 <div style={{ padding: '8px 8px 4px' }}>
@@ -221,18 +225,18 @@ export function SectorRotationTab() {
                         if (!active || !payload || !payload[0]) return null
                         const d = payload[0].payload as { sectorFull: string; netRaw: number; inflow: number; outflow: number }
                         return (
-                          <div style={{ backgroundColor: '#0d1526', color: '#e2e8f0', padding: '8px 12px', borderRadius: 4, border: '1px solid #2d3f5e', fontSize: 11, lineHeight: 1.6 }}>
+                          <div style={{ backgroundColor: 'var(--bg)', color: 'var(--line)', padding: '8px 12px', borderRadius: 0, border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6 }}>
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{d.sectorFull}</div>
-                            <div>Net: <span style={{ color: d.netRaw >= 0 ? '#27AE60' : '#ef4444' }}>{fmtMm(d.netRaw)}</span></div>
-                            <div><span style={{ color: '#27AE60' }}>Inflow:</span> {fmtMm(d.inflow)}</div>
-                            <div><span style={{ color: '#ef4444' }}>Outflow:</span> {fmtMm(d.outflow)}</div>
+                            <div>Net: <span style={{ color: d.netRaw >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(d.netRaw)}</span></div>
+                            <div><span style={{ color: 'var(--pos)' }}>Inflow:</span> {fmtMm(d.inflow)}</div>
+                            <div><span style={{ color: 'var(--neg)' }}>Outflow:</span> {fmtMm(d.outflow)}</div>
                           </div>
                         )
                       }} />
-                      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                      <ReferenceLine y={0} stroke="var(--text-dim)" strokeDasharray="3 3" />
                       <Bar dataKey="net" radius={[2, 2, 0, 0]}>
                         {chartData.map((d, i) => (
-                          <Cell key={i} fill={d.net >= 0 ? sectorColor(d.sectorFull) : '#ef4444'} />
+                          <Cell key={i} fill={d.net >= 0 ? sectorColor(d.sectorFull) : 'var(--neg)'} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -244,7 +248,7 @@ export function SectorRotationTab() {
             {/* Table + detail panel */}
             <div style={{ display: 'flex', gap: 12 }}>
               {/* Left: sector table */}
-              <div style={{ flex: 3, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ flex: 3, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
                 <div style={{ maxHeight: 500, overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
                     <colgroup>
@@ -269,7 +273,7 @@ export function SectorRotationTab() {
                         return (
                           <tr key={s.sector}
                             onClick={() => setSelectedSector(isSel ? null : s.sector)}
-                            style={{ backgroundColor: isSel ? '#eff6ff' : undefined, cursor: 'pointer' }}>
+                            style={{ backgroundColor: isSel ? 'rgba(122,173,222,0.08)' : undefined, cursor: 'pointer' }}>
                             <td style={{ ...TD, fontWeight: 600, borderLeft: `3px solid ${sectorColor(s.sector)}`, paddingLeft: 10 }}>
                               {s.sector}
                             </td>
@@ -286,11 +290,11 @@ export function SectorRotationTab() {
                     <tfoot>
                       <tr>
                         <td style={FC}>Total</td>
-                        <td style={FCR}><span style={{ color: footerTotals.totalNet >= 0 ? '#27AE60' : '#ef4444' }}>{fmtMm(footerTotals.totalNet)}</span></td>
+                        <td style={FCR}><span style={{ color: footerTotals.totalNet >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(footerTotals.totalNet)}</span></td>
                         {periods.map(p => {
                           const key = `${p.from}_${p.to}`
                           const n = footerTotals.periods[key] || 0
-                          return <td key={p.label} style={FCR}><span style={{ color: n >= 0 ? '#27AE60' : '#ef4444' }}>{fmtMm(n)}</span></td>
+                          return <td key={p.label} style={FCR}><span style={{ color: n >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(n)}</span></td>
                         })}
                       </tr>
                     </tfoot>
@@ -301,30 +305,30 @@ export function SectorRotationTab() {
               {/* Right: mover detail panel */}
               <div style={{ flex: 2 }}>
                 {!selectedSector && (
-                  <div style={{ ...CENTER_MSG, color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: 6, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ ...CENTER_MSG, color: 'var(--text-dim)', border: '1px dashed var(--text-dim)', borderRadius: 0, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     Click a sector to see top movers
                   </div>
                 )}
                 {selectedSector && movers.loading && (
-                  <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading movers…</div>
+                  <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading movers…</div>
                 )}
                 {selectedSector && !movers.loading && movers.data && (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{ border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden' }}>
                     {/* Header */}
-                    <div style={{ padding: '8px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ padding: '8px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>{selectedSector} — {latestPeriod?.label}</span>
                       <button type="button" onClick={() => setSelectedSector(null)}
-                        style={{ backgroundColor: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>×</button>
+                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16 }}>×</button>
                     </div>
                     {/* Summary */}
-                    <div style={{ padding: '6px 12px', fontSize: 11, color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 16 }}>
-                      <span>Net: <b style={{ color: movers.data.summary.net >= 0 ? '#27AE60' : '#ef4444' }}>{fmtMm(movers.data.summary.net)}</b></span>
+                    <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--text-dim)', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', display: 'flex', gap: 16 }}>
+                      <span>Net: <b style={{ color: movers.data.summary.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMm(movers.data.summary.net)}</b></span>
                       <span>Managers: <b>{NUM_0.format(movers.data.summary.buyers)}</b></span>
                     </div>
                     {/* Buyers */}
-                    <MoverTable title="Top Buyers" rows={movers.data.top_buyers} color="#27AE60" />
+                    <MoverTable title="Top Buyers" rows={movers.data.top_buyers} color="var(--pos)" />
                     {/* Sellers */}
-                    <MoverTable title="Top Sellers" rows={movers.data.top_sellers} color="#ef4444" />
+                    <MoverTable title="Top Sellers" rows={movers.data.top_sellers} color="var(--neg)" />
                   </div>
                 )}
               </div>
@@ -345,7 +349,7 @@ function MoverTable({ title, rows, color }: {
 }) {
   return (
     <div>
-      <div style={{ padding: '5px 12px', backgroundColor: color, color: '#fff', fontSize: 11, fontWeight: 700 }}>{title}</div>
+      <div style={{ padding: '5px 12px', backgroundColor: color, color: 'var(--white)', fontSize: 11, fontWeight: 700 }}>{title}</div>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
         <thead>
           <tr>
@@ -357,12 +361,12 @@ function MoverTable({ title, rows, color }: {
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.institution}>
-              <td style={{ ...TD, fontSize: 11, padding: '3px 6px', width: 24, textAlign: 'right', color: '#64748b' }}>{i + 1}</td>
+              <td style={{ ...TD, fontSize: 11, padding: '3px 6px', width: 24, textAlign: 'right', color: 'var(--text-dim)' }}>{i + 1}</td>
               <td style={{ ...TD, fontSize: 11, padding: '3px 6px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.institution}>{r.institution}</td>
               <td style={{ ...TD_R, fontSize: 11, padding: '3px 6px' }}><SignedMm v={r.net_flow} /></td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={3} style={{ ...TD, textAlign: 'center', color: '#94a3b8', padding: 10 }}>None</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={3} style={{ ...TD, textAlign: 'center', color: 'var(--text-dim)', padding: 10 }}>None</td></tr>}
         </tbody>
       </table>
     </div>

@@ -39,36 +39,37 @@ function fmtPct2(v: number | null): string {
 function Signed({ v, decimals = 2, suffix = '' }: { v: number | null; decimals?: number; suffix?: string }) {
   if (v == null || v === 0) return <>—</>
   const fmt = decimals === 2 ? NUM_2 : decimals === 1 ? NUM_1 : NUM_0
-  if (v < 0) return <span style={{ color: '#ef4444' }}>({fmt.format(Math.abs(v))}{suffix})</span>
-  return <span style={{ color: '#27AE60' }}>+{fmt.format(v)}{suffix}</span>
+  if (v < 0) return <span style={{ color: 'var(--neg)' }}>({fmt.format(Math.abs(v))}{suffix})</span>
+  return <span style={{ color: 'var(--pos)' }}>+{fmt.format(v)}{suffix}</span>
 }
 
 function SignalBadge({ signal }: { signal: string | null }) {
   if (!signal) return <>—</>
-  const color = signal.includes('↑') ? '#27AE60' : signal.includes('↓') ? '#ef4444' : '#94a3b8'
+  const color = signal.includes('↑') ? 'var(--pos)' : signal.includes('↓') ? 'var(--neg)' : 'var(--text-dim)'
   return <span style={{ color, fontWeight: 600 }}>{signal}</span>
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '7px 8px', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
-  textAlign: 'left', borderBottom: '1px solid #1e2d47',
+  padding: '7px 8px', fontSize: 9, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
+  color: 'var(--text-dim)', backgroundColor: 'var(--header)',
+  textAlign: 'left', borderBottom: '1px solid var(--line)',
   whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 3,
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 12, color: '#1e293b',
-  borderBottom: '1px solid #e5e7eb',
+  padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+  borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
   ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block', padding: '1px 6px', fontSize: 10,
-  fontWeight: 600, borderRadius: 3,
+  fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
@@ -133,23 +134,26 @@ export function FlowAnalysisTab() {
     downloadCsv(csv, `flow_analysis_${ticker}_${period}.csv`)
   }
 
-  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: '#94a3b8' }}>Enter a ticker to load flow analysis</span></div>
+  if (!ticker) return <div style={CENTER_MSG}><span style={{ color: 'var(--text-dim)' }}>Enter a ticker to load flow analysis</span></div>
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--card-bg)', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
       <style>{`@media print { .fa-controls { display:none!important } }`}</style>
 
       {/* Controls */}
-      <div className="fa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <div className="fa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {PERIODS.map(p => (
             <button key={p.id} type="button" onClick={() => setPeriod(p.id)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
-                fontWeight: period === p.id ? 600 : 400,
-                color: period === p.id ? '#fff' : '#64748b',
-                backgroundColor: period === p.id ? 'var(--oxford-blue)' : '#fff',
-                border: `1px solid ${period === p.id ? 'var(--oxford-blue)' : '#e2e8f0'}`,
+                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
+                fontWeight: period === p.id ? 700 : 400,
+                color: period === p.id ? '#000000' : 'var(--text-dim)',
+                backgroundColor: period === p.id ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: "'Inter', sans-serif",
+                transition: 'all 0.12s',
               }}>
               {p.label}
             </button>
@@ -166,11 +170,11 @@ export function FlowAnalysisTab() {
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-        {loading && <div style={{ ...CENTER_MSG, color: '#94a3b8' }}>Loading…</div>}
-        {error && !loading && <div style={{ ...CENTER_MSG, color: '#ef4444' }}>Error: {error}</div>}
+        {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+        {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
         {data && !loading && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
               {data.quarter_from} → {data.quarter_to}
             </div>
 
@@ -179,10 +183,10 @@ export function FlowAnalysisTab() {
 
             {/* Four sections 2×2 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <FlowSection title="Buyers" rows={data.buyers} color="#27AE60" type="buyers" />
-              <FlowSection title="New Entries" rows={data.new_entries} color="#002147" type="new_entries" />
-              <FlowSection title="Sellers" rows={data.sellers} color="#ef4444" type="sellers" />
-              <FlowSection title="Exits" rows={data.exits} color="#475569" type="exits" />
+              <FlowSection title="Buyers" rows={data.buyers} color="var(--pos)" type="buyers" />
+              <FlowSection title="New Entries" rows={data.new_entries} color="var(--header)" type="new_entries" />
+              <FlowSection title="Sellers" rows={data.sellers} color="var(--neg)" type="sellers" />
+              <FlowSection title="Exits" rows={data.exits} color="var(--text-mute)" type="exits" />
             </div>
           </div>
         )}
@@ -195,7 +199,7 @@ export function FlowAnalysisTab() {
 
 function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
   if (!qoqCharts || qoqCharts.length === 0) {
-    return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13 }}>No chart data available</div>
+    return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>No chart data available</div>
   }
 
   const pctFmt = (v: number) => `${(v * 100).toFixed(1)}%`
@@ -204,8 +208,8 @@ function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
   return (
     <div style={{ display: 'flex', gap: 12 }}>
       {/* Flow Intensity — Total + Active grouped */}
-      <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
-        <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Flow Intensity</div>
+      <div style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)' }}>
+        <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>Flow Intensity</div>
         <div style={{ padding: '8px 8px 4px' }}>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={qoqCharts} barSize={18} barGap={2}>
@@ -213,16 +217,16 @@ function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
               <YAxis tick={{ fontSize: 10 }} tickFormatter={pctFmt} width={44} />
               <Tooltip formatter={pctTip} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="flow_intensity_total" name="Total" fill="#002147" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="flow_intensity_active" name="Active" fill="#4A90D9" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="flow_intensity_total" name="Total" fill="var(--header)" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="flow_intensity_active" name="Active" fill="#7aadde" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Churn — Non-Passive + Active grouped */}
-      <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', backgroundColor: '#fff' }}>
-        <div style={{ padding: '6px 12px', backgroundColor: 'var(--oxford-blue)', color: '#fff', fontSize: 12, fontWeight: 700 }}>Churn</div>
+      <div style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 0, overflow: 'hidden', backgroundColor: 'var(--panel)' }}>
+        <div style={{ padding: '6px 12px', backgroundColor: 'var(--header)', color: 'var(--white)', fontSize: 12, fontWeight: 700 }}>Churn</div>
         <div style={{ padding: '8px 8px 4px' }}>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={qoqCharts} barSize={18} barGap={2}>
@@ -230,8 +234,8 @@ function ChartsRow({ qoqCharts }: { qoqCharts: QoqChartRow[] }) {
               <YAxis tick={{ fontSize: 10 }} tickFormatter={pctFmt} width={44} />
               <Tooltip formatter={pctTip} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="churn_nonpassive" name="Non-Passive" fill="#002147" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="churn_active" name="Active" fill="#f5a623" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="churn_nonpassive" name="Non-Passive" fill="var(--header)" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="churn_active" name="Active" fill="var(--gold)" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -253,7 +257,7 @@ function FlowSection({ title, rows, type }: SectionProps) {
   const isBuyerSeller = type === 'buyers' || type === 'sellers'
   const isPositive = type === 'buyers' || type === 'new_entries'
   // Title bar: top sections (buyers/new entries) green, bottom (sellers/exits) red
-  const titleBg = isPositive ? '#27AE60' : '#ef4444'
+  const titleBg = isPositive ? 'var(--pos)' : 'var(--neg)'
   const colCount = isBuyerSeller ? 10 : 6
 
   // Compute totals for sticky footer
@@ -272,18 +276,18 @@ function FlowSection({ title, rows, type }: SectionProps) {
 
   const FC: React.CSSProperties = {
     padding: '5px 8px', fontSize: 11, fontWeight: 600,
-    color: '#ffffff', backgroundColor: 'var(--oxford-blue)',
+    color: 'var(--white)', backgroundColor: 'var(--header)',
     position: 'sticky', bottom: 0, zIndex: 2,
-    borderTop: '2px solid var(--oxford-blue)',
+    borderTop: '2px solid var(--header)',
   }
   const FCR: React.CSSProperties = { ...FC, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column', maxHeight: 350, overflow: 'hidden' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 0, display: 'flex', flexDirection: 'column', maxHeight: 350, overflow: 'hidden' }}>
       {/* Title bar — green for inflow sections, red for outflow */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: titleBg, flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#ffffff' }}>{title}</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: 8 }}>{rows.length}</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--white)' }}>{title}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: 0 }}>{rows.length}</span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -345,7 +349,7 @@ function FlowSection({ title, rows, type }: SectionProps) {
               const ts = getTypeStyle(r.manager_type)
               return (
                 <tr key={r.inst_parent_name}>
-                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{i + 1}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
                   <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.inst_parent_name}>
                     {r.inst_parent_name}
                   </td>
@@ -379,7 +383,7 @@ function FlowSection({ title, rows, type }: SectionProps) {
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={colCount} style={{ ...TD, textAlign: 'center', padding: 20, color: '#64748b' }}>No data</td></tr>
+              <tr><td colSpan={colCount} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No data</td></tr>
             )}
           </tbody>
           {rows.length > 0 && (
@@ -392,8 +396,8 @@ function FlowSection({ title, rows, type }: SectionProps) {
                   <>
                     <td style={FCR}>{fmtSharesMm(totals.fromShares)}</td>
                     <td style={FCR}>{fmtSharesMm(totals.toShares)}</td>
-                    <td style={FCR}><span style={{ color: totals.netShares >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netShares !== 0 ? NUM_2.format(totals.netShares / 1e6) : '—'}</span></td>
-                    <td style={FCR}><span style={{ color: totals.netValue >= 0 ? '#27AE60' : '#ef4444' }}>{totals.netValue !== 0 ? `$${NUM_0.format(totals.netValue / 1e6)}` : '—'}</span></td>
+                    <td style={FCR}><span style={{ color: totals.netShares >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{totals.netShares !== 0 ? NUM_2.format(totals.netShares / 1e6) : '—'}</span></td>
+                    <td style={FCR}><span style={{ color: totals.netValue >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{totals.netValue !== 0 ? `$${NUM_0.format(totals.netValue / 1e6)}` : '—'}</span></td>
                     <td style={FC} />
                     <td style={FCR}>{fmtPct2(totals.pctSo)}</td>
                     <td style={FC} />

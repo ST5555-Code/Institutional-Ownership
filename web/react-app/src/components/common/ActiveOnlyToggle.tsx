@@ -39,8 +39,8 @@ export function ActiveOnlyToggle({ value, onChange, label = 'Active Only' }: Pro
           position: 'relative',
           width: 28,
           height: 16,
-          borderRadius: 8,
-          backgroundColor: value ? 'var(--glacier-blue)' : '#2d3f5e',
+          borderRadius: 0,
+          backgroundColor: value ? 'var(--gold)' : 'var(--line)',
           transition: 'background 0.15s',
           flexShrink: 0,
         }}
@@ -53,13 +53,13 @@ export function ActiveOnlyToggle({ value, onChange, label = 'Active Only' }: Pro
             width: 12,
             height: 12,
             borderRadius: '50%',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--white)',
             transition: 'left 0.15s',
             boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
           }}
         />
       </div>
-      <span style={{ fontSize: 12, color: '#94a3b8' }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{label}</span>
     </label>
   )
 }

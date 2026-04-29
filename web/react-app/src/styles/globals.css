@@ -1,28 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --shell-bg: #0a0f1e;
-  --sidebar-bg: #0d1526;
-  --sidebar-active: #1a2a4a;
-  --accent-gold: #f5a623;
-  --content-bg: #f4f6f9;
-  --card-bg: #ffffff;
-  --oxford-blue: #002147;
-  --glacier-blue: #4A90D9;
-  --sandstone: #C9B99A;
+  /* Backgrounds */
+  --bg:        #0c0c0e;
+  --panel:     #131316;
+  --panel-hi:  #1a1a1f;
+  --card:      #18181c;
+  --header:    #000000;
+
+  /* Borders */
+  --line:      #28282e;
+  --line-soft: #1e1e24;
+
+  /* Text */
+  --white:     #ffffff;
+  --text:      #e8e8ec;
+  --text-dim:  #9a9aa6;
+  --text-mute: #5c5c68;
+
+  /* Accent — warm gold */
+  --gold:      #c5a254;
+  --gold-dim:  #7a6433;
+  --gold-soft: rgba(197,162,84,0.08);
+
+  /* Semantic */
+  --pos:       #5cb87a;
+  --neg:       #e05a5a;
+  --pos-soft:  rgba(92,184,122,0.08);
+  --neg-soft:  rgba(224,90,90,0.08);
+
+  /* Legacy aliases (remove after full sweep) */
+  --shell-bg:      var(--bg);
+  --sidebar-bg:    var(--header);
+  --sidebar-active: var(--panel-hi);
+  --accent-gold:   var(--gold);
+  --content-bg:    var(--bg);
+  --card-bg:       var(--panel);
+  --oxford-blue:   var(--header);
+  --glacier-blue:  #4A90D9;
+  --sandstone:     var(--gold);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background-color: var(--shell-bg);
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-::-webkit-scrollbar-thumb { background: #2d3f5e; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }

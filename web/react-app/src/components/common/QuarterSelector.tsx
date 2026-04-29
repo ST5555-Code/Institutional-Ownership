@@ -7,8 +7,8 @@ interface Props {
 
 export function QuarterSelector({ quarters, value, onChange, disabled }: Props) {
   return (
-    <div style={{ display: 'flex', gap: 6 }}>
-      {quarters.map((q) => {
+    <div style={{ display: 'inline-flex' }}>
+      {quarters.map((q, i) => {
         const active = q === value
         return (
           <button
@@ -18,15 +18,19 @@ export function QuarterSelector({ quarters, value, onChange, disabled }: Props) 
             onClick={() => onChange(q)}
             style={{
               padding: '5px 12px',
-              fontSize: 12,
-              fontWeight: active ? 600 : 400,
-              color: active ? '#ffffff' : '#64748b',
-              backgroundColor: active ? 'var(--oxford-blue)' : '#ffffff',
-              border: `1px solid ${active ? 'var(--oxford-blue)' : '#e2e8f0'}`,
-              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: active ? 700 : 400,
+              color: active ? '#000000' : 'var(--text-dim)',
+              backgroundColor: active ? 'var(--gold)' : 'transparent',
+              border: '1px solid var(--line)',
+              borderLeft: i === 0 ? '1px solid var(--line)' : 'none',
+              borderRadius: 0,
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
               cursor: disabled ? 'not-allowed' : 'pointer',
               opacity: disabled ? 0.5 : 1,
-              transition: 'background 0.1s, color 0.1s',
+              transition: 'all 0.12s',
             }}
           >
             {q}

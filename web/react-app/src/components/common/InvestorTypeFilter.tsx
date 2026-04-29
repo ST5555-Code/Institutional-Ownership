@@ -14,23 +14,23 @@ const TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-// Background colors when selected. Unselected always uses the neutral
-// white/border style so the gold accent reads cleanly on the dark shell.
-const TYPE_COLORS: Record<string, string> = {
-  passive: '#4A90D9',
-  active: '#002147',
-  hedge_fund: '#7B2D8B',
-  wealth_management: '#2D6A4F',
-  pension_insurance: '#B45309',
-  mixed: '#475569',
-  other: '#475569',
+// DarkStyle category palette — translucent fills + colored text per category.
+interface CatColor { bg: string; fg: string }
+const TYPE_COLORS: Record<string, CatColor> = {
+  passive:           { bg: 'rgba(92,140,200,0.12)', fg: '#7aadde' },
+  active:            { bg: 'rgba(92,184,122,0.08)', fg: '#5cb87a' },
+  hedge_fund:        { bg: 'rgba(224,90,90,0.08)',  fg: '#e05a5a' },
+  wealth_management: { bg: 'rgba(197,162,84,0.08)', fg: 'var(--gold)' },
+  pension_insurance: { bg: 'rgba(160,130,220,0.12)', fg: '#b09ee0' },
+  mixed:             { bg: 'rgba(255,255,255,0.05)', fg: '#9a9aa6' },
+  other:             { bg: 'rgba(255,255,255,0.05)', fg: '#9a9aa6' },
 }
 
 function labelFor(t: string): string {
   return TYPE_LABELS[t] || t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function colorFor(t: string): string {
+function colorFor(t: string): CatColor {
   return TYPE_COLORS[t] || TYPE_COLORS.other
 }
 
@@ -39,13 +39,13 @@ const CHIP_BASE: React.CSSProperties = {
   alignItems: 'center',
   gap: 5,
   padding: '4px 10px',
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 500,
-  borderRadius: 12,
+  borderRadius: 1,
   cursor: 'pointer',
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--line)',
   userSelect: 'none',
-  transition: 'background 0.1s, color 0.1s, border-color 0.1s',
+  transition: 'all 0.12s',
 }
 
 export function InvestorTypeFilter({ available, selected, onChange }: Props) {
@@ -69,16 +69,17 @@ export function InvestorTypeFilter({ available, selected, onChange }: Props) {
         onClick={selectAll}
         style={{
           ...CHIP_BASE,
-          backgroundColor: allSelected ? 'var(--oxford-blue)' : '#ffffff',
-          color: allSelected ? '#ffffff' : '#94a3b8',
-          borderColor: allSelected ? 'var(--oxford-blue)' : '#e2e8f0',
+          backgroundColor: allSelected ? 'var(--gold)' : 'transparent',
+          color: allSelected ? '#000000' : 'var(--text-dim)',
+          borderColor: allSelected ? 'var(--gold)' : 'var(--line)',
+          fontWeight: allSelected ? 700 : 500,
         }}
       >
         All
       </button>
       {available.map((t) => {
         const isSelected = selected.has(t)
-        const bg = colorFor(t)
+        const c = colorFor(t)
         return (
           <button
             key={t}
@@ -86,9 +87,9 @@ export function InvestorTypeFilter({ available, selected, onChange }: Props) {
             onClick={() => toggle(t)}
             style={{
               ...CHIP_BASE,
-              backgroundColor: isSelected ? bg : '#ffffff',
-              color: isSelected ? '#ffffff' : '#94a3b8',
-              borderColor: isSelected ? bg : '#e2e8f0',
+              backgroundColor: isSelected ? c.bg : 'transparent',
+              color: isSelected ? c.fg : 'var(--text-dim)',
+              borderColor: isSelected ? c.fg : 'var(--line)',
             }}
           >
             {labelFor(t)}
