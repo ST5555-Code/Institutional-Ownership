@@ -94,6 +94,7 @@ from .flows import (  # noqa: F401
 from .market import (  # noqa: F401
     get_sector_flows,
     get_sector_flow_movers,
+    get_sector_summary,
     short_interest_analysis,
     get_market_summary,
 )

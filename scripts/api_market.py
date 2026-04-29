@@ -45,6 +45,17 @@ def api_sector_flows(request: Request):
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
+@market_router.get('/sector_summary')
+def api_sector_summary():
+    """Market-wide totals for the latest quarter (KPI row)."""
+    try:
+        from queries import get_sector_summary
+        return get_sector_summary()
+    except Exception as e:
+        log.error("sector_summary error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
 @market_router.get('/sector_flow_movers')
 def api_sector_flow_movers(request: Request):
     """Top buyers/sellers for one sector in one quarter transition."""
