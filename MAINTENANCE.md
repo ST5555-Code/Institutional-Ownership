@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 28, 2026 (conv-16-doc-sync — final-session sync after the 31-PR arc #169–#200, closing the umbrella DERA synthetic-series initiative ($2.55T NAV across Tiers 1+3+4) and the Calamos eid 20206/20207 entity-merge surfaced by the Tier 4 close. **Migration 023 (`parent_fund_map`)** stamped in PR #191; **Migration 022 (drop redundant v2 columns)** stamped in PR #187. `parent_fund_map` is the single quarterly precompute that powers `holder_momentum`, `peer_rotation`, and `sector_flows` parent paths — populated by `scripts/pipeline/compute_parent_fund_map.py` `SourcePipeline` subclass (`name='parent_fund_map'`, `direct_write` strategy, ~115s end-to-end; current row count **111,941**). Predecessor: dm14c-voya / PR #192._
+_Last updated: April 29, 2026 (conv-17-doc-sync — PRs #202/#203 merged; #202 visual-only, #203 test fix, no pipeline or migration changes). Predecessor: conv-16-doc-sync / PR #201._
 
 ## Pipeline refresh via admin dashboard
 

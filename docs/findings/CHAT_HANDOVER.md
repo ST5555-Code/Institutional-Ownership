@@ -1,3 +1,29 @@
+# Chat Handover
+
+## conv-17-doc-sync (2026-04-29)
+
+HEAD: **`5f7781f`** on `main` after two squash-merges this session.
+
+### PRs landed
+
+- **PR #202 `dark-ui-restyle`** (squash commit `5f7781f`) — full dark/cinematic UI restyle per `docs/plans/DarkStyle.md`. **33 files, 3 commits on the branch.** Touched `web/react-app/src/styles/globals.css` (new token palette: `--bg #0c0c0e`, `--panel #131316`, `--header #000000`, `--gold #c5a254`, semantic `--pos`/`--neg`, plus 3 Google Fonts via `@import`: Hanken Grotesk / Inter / JetBrains Mono), 5 shell components (Header / Sidebar / SidebarSection / SidebarItem / AppShell), 9 common components (typeConfig, QuarterSelector, RollupToggle, FundViewToggle, ActiveOnlyToggle, InvestorTypeFilter, FreshnessBadge, ExportBar, ColumnGroupHeader, TableFooter, plus InvestorSearch + ErrorBoundary as collateral), 12 tab files, and `web/templates/admin.html`. **Branch commit sequence:** `c384b4c` initial restyle (33 files +869/−738) → `14ae269` audit pass (10 files +59/−47, fixing residual white parent rows in Register/Conviction, inactive segmented buttons in CrossOwnership/FlowAnalysis/SectorRotation, DataSourceTab markdown headings rendering invisible black, dropdown row hover unification, input/select backgrounds moved to `var(--bg)`) → `8779ed8` final sweep (2 files +4/−4, fixing 4 missed `var(--white)` backgroundColor leaks in PeerRotationTab + OwnershipTrendTab). **Also resolves prior P3 item "Type-badge `family_office` color"** — `family_office` now in `common/typeConfig.ts` mapped to the gold category palette (translucent fills + colored text). Visual-only — no API, data-logic, or component-contract changes; all collapsibles, tooltips, sorting, filtering, ExcelExport, and Print preserved. Build clean (`cd web/react-app && npm run build` ✓ 1.62s, 0 TS errors). Style guide: [docs/plans/DarkStyle.md](docs/plans/DarkStyle.md). Implementation spec: [docs/plans/dark-ui-restyle-prompt.md](docs/plans/dark-ui-restyle-prompt.md).
+- **PR #203 `ci-fix-stale-test`** (squash commit `03914f2`) — replaced three hardcoded `fetch_date` strings in `tests/pipeline/test_load_market.py::test_scope_stale_days_queries_prod` with `dt.date.today()`-relative offsets (`FRESH = today − 1d`, `STALE = today − 30d`, `UNFETCHABLE = today − 120d`) so the test cannot drift stale as calendar time passes. The hardcoded `FRESH = '2026-04-21'` had crossed the 7-day staleness boundary on 2026-04-28 and was failing CI for every open PR (notably PR #202, which is frontend-only and unrelated). Test intent unchanged. 1 file, +12/−3.
+
+### Process notes
+
+- Workflow: opened #202 first (dark UI). CI failed on the smoke check in `test_load_market.py` — root cause was the time-bomb test, not the PR. Cut #203 as a dedicated test fix off `origin/main`, merged it, then `gh pr update-branch 202` to pull main into #202's branch so CI re-ran against post-fix main; both checks went green; squash-merged #202.
+- Local main worktree had the three #202 branch commits replayed onto local main as fast-forward (a state divergence from `origin/main`). Reset to `origin/main` before the squash-merge to keep history matching the project's `(#NNN)` squash-per-PR pattern. No work lost — all commits were on the PR branch.
+- Doc-sync (this commit, `conv-17-doc-sync`) is direct to main per session brief.
+
+### Backlog state
+
+- **P0:** empty.
+- **P1:** `ui-audit-walkthrough` (PR #107) only.
+- **P2:** empty.
+- **P3 (2 items, was 3):** `D10 Admin UI for entity_identifiers_staging`; `Tier 4 unmatched classifications (427)`. The third (`Type-badge family_office color`) closed by PR #202.
+
+---
+
 # Chat Handover — 2026-04-28 (conv-16-doc-sync, 31-PR arc close)
 
 ## State

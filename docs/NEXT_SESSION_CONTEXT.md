@@ -4,25 +4,29 @@
 
 ## Last completed
 
-`conv-16-doc-sync` — final-session doc sync covering the **31-PR arc #169–#200**. Current HEAD: `5a77c5c` (PR #200 `calamos-merge-tier4-classify`). The umbrella **DERA synthetic-series initiative is fully resolved across Tiers 1+3+4** ($2.55T NAV / 714 registrants / 713 distinct `SYN_*` stable keys / 2,170,629 holdings rows rekeyed). The Calamos eid 20206/20207 entity-merge surfaced by Tier 4 close was applied in PR #200 alongside a Tier 4 keyword classification sweep (230 of 657 `bootstrap_tier4` entities labeled `active`/`passive`; 427 remain `unknown` and are logged as new P3).
+`conv-17-doc-sync` — covers two PRs squash-merged today:
 
-This sync (no PR yet — being opened):
+- **PR #202 `dark-ui-restyle`** (squash commit `5f7781f`) — full dark/cinematic UI restyle per `docs/plans/DarkStyle.md`. 33 files: new token palette in `web/react-app/src/styles/globals.css` (20 CSS vars + Hanken Grotesk / Inter / JetBrains Mono via Google Fonts), 5 shell components, 9 common components, 12 tab files, `web/templates/admin.html`. Three commits on the branch (initial restyle, audit pass, final `var(--white)` sweep). Visual-only — no API, data-logic, or component-contract changes. Also closes the prior P3 item "Type-badge `family_office` color" (`family_office` now in `common/typeConfig.ts` mapped to the gold category palette).
+- **PR #203 `ci-fix-stale-test`** (squash commit `03914f2`) — replaced hardcoded `fetch_date` strings in `tests/pipeline/test_load_market.py::test_scope_stale_days_queries_prod` with `dt.date.today()`-relative offsets so the test cannot drift stale. The hardcoded `FRESH = '2026-04-21'` had crossed the 7-day staleness boundary on 2026-04-28 and was failing CI for every open PR.
 
-- **`ROADMAP.md`** — added two missing scoping rows so all 31 PRs have standalone COMPLETED entries: PR #190 `perf-p2-discovery` and PR #197 `dera-synthetic-series-discovery`.
-- **`MAINTENANCE.md`** — last-updated stamp refreshed to `conv-16-doc-sync`; precompute row count corrected to 111,941.
-- **`ENTITY_ARCHITECTURE.md`** — header rewritten with current prod counts (entities 27,259; overrides 1,104 / MAX 1,106; relationships 18,363 / 16,315 active; aliases 27,601; identifiers 36,174; rollup_history open 27,259 each on EC + DM; classifications_active 27,152 with full distribution; fund_holdings_v2 14,568,775 / 14,568,704; SYN_* 713; fund_universe 13,623; parent_fund_map 111,941; sector_flows_rollup 321).
-- **`docs/findings/CHAT_HANDOVER.md`** — full rewrite for the 31-PR arc.
+Current HEAD: `5f7781f` on `main`.
+
+This sync (this commit, direct to main):
+
+- **`ROADMAP.md`** — header date refreshed to `2026-04-29 (conv-17-doc-sync)`; P3 item "Type-badge `family_office` color" removed (resolved by #202); two new COMPLETED rows added for #202 (full summary) and #203 (one-line summary).
+- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten for the new state.
+- **`docs/findings/CHAT_HANDOVER.md`** — new conv-17 section prepended at top.
+- **`MAINTENANCE.md`** — last-updated stamp refreshed.
 
 ## Up next
 
 - See `ROADMAP.md` "Current backlog".
 - **P0:** empty.
 - **P1:** `ui-audit-walkthrough` (PR #107) only — live Serge+Claude session, not a Code session.
-- **P2:** empty (DERA umbrella initiative closed across all four tiers in #198/#199; Calamos merge follow-up closed in #200).
-- **P3 (3 items):**
+- **P2:** empty.
+- **P3 (2 items, was 3 — `family_office` chip resolved by #202):**
   - `D10 Admin UI for entity_identifiers_staging` — surface the 280-row staging backlog before Q1 2026 cycle (~2026-05-15).
-  - `Type-badge family_office color` — `web/react-app/src/common/typeConfig.ts` needs a `family_office` case so the 36,950 reclassified `holdings_v2` rows render with a dedicated chip color.
-  - `Tier 4 unmatched classifications (427)` — surfaced by PR #200's keyword sweep; remaining 427 `bootstrap_tier4` entities still carry `classification='unknown'`. Trigger: next entity-curation pass willing to expand the keyword set (`Trust`, `MuniYield`, `Private`, `Opportunity`, `High Yield`, ADV-anchored CEF lookup) or do per-entity manual sign-off. NAV exposure bounded at ~$370B (427 / 657 × $566.7B Tier-4 cohort).
+  - `Tier 4 unmatched classifications (427)` — surfaced by PR #200's keyword sweep; remaining 427 `bootstrap_tier4` entities still carry `classification='unknown'`. Trigger: next entity-curation pass willing to expand the keyword set or do per-entity manual sign-off. NAV exposure bounded at ~$370B.
 
 ## Next external events
 
@@ -36,7 +40,8 @@ This sync (no PR yet — being opened):
 
 ## Reminders
 
-- **PR for this conv-16-doc-sync session is open but NOT merged.** Per session brief: "do not merge". One commit on `conv-16-doc-sync` covering the 5 doc updates.
+- **HEAD on main is `5f7781f`** after PR #202 + PR #203 squash-merges. Both PRs closed and remote branches deleted.
+- **Dark UI is now production styling.** Style guide: `docs/plans/DarkStyle.md`. Implementation spec: `docs/plans/dark-ui-restyle-prompt.md`. New token palette in `web/react-app/src/styles/globals.css`; legacy CSS-var aliases (`--shell-bg` / `--sidebar-bg` / `--oxford-blue` / `--card-bg` / `--accent-gold` / etc.) preserved as token aliases for backward compatibility — safe to remove in a future cleanup once no production references remain.
 - **App is started from `data/13f_readonly.duckdb`** (last refreshed in PR #200, 2026-04-28 ~15:09). It carries the 657 Tier-4 institution bootstraps + Calamos merge + Tier-4 keyword sweep.
 - **`SYN_{cik_padded}` stable-key pattern** is now applied to every entity-mapped synth registrant (713 distinct keys: 55 Phase 2 + 658 Phase 3). The `{cik}_{accession}` minting in `scripts/fetch_dera_nport.py:460` is upstream and only fires when DERA `FUND_REPORTED_INFO.SERIES_ID` is missing in the source XML.
 - **Validator FLAG `series_id_synthetic_fallback` (`scripts/pipeline/load_nport.py:437`) can be retired** in the next `load_nport.py` audit pass — there are no remaining Tier 1/3/4 candidates as of PR #200. Future N-PORT filings without SERIES_ID will mint net-new `{raw_cik}_{accession}` keys; re-running `dera_synthetic_stabilize.py --phase 3 --confirm` against the new period absorbs them.
