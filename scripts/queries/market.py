@@ -119,48 +119,54 @@ def get_sector_summary():
     ``is_latest = TRUE``.
 
     Returns:
-        quarter, total_aum, total_holders, pct_active, pct_passive,
-        pct_hedge_fund (each pct as a fraction 0–1 of total_aum).
+        quarter, total_aum, total_holders, type_breakdown — an array of
+        {type, pct_aum, aum} sorted by pct_aum desc, one entry per distinct
+        manager_type in the latest quarter (pct as 0–100 percent).
     """
     con = get_db()
     try:
-        row = con.execute(
+        head = con.execute(
             """
             WITH latest AS (
                 SELECT MAX(quarter) AS q FROM holdings_v2 WHERE is_latest = TRUE
-            ),
-            base AS (
-                SELECT manager_type,
-                       market_value_usd,
-                       COALESCE(rollup_name, inst_parent_name, manager_name) AS holder
-                  FROM holdings_v2, latest
-                 WHERE holdings_v2.quarter = latest.q
-                   AND is_latest = TRUE
             )
-            SELECT
-                (SELECT q FROM latest) AS quarter,
-                SUM(market_value_usd) AS total_aum,
-                COUNT(DISTINCT holder) AS total_holders,
-                SUM(CASE WHEN manager_type IN ('active', 'mixed', 'strategic')
-                         THEN market_value_usd ELSE 0 END) AS aum_active,
-                SUM(CASE WHEN manager_type = 'passive'
-                         THEN market_value_usd ELSE 0 END) AS aum_passive,
-                SUM(CASE WHEN manager_type IN ('hedge_fund', 'quantitative')
-                         THEN market_value_usd ELSE 0 END) AS aum_hedge
-              FROM base
+            SELECT (SELECT q FROM latest) AS quarter,
+                   SUM(market_value_usd) AS total_aum,
+                   COUNT(DISTINCT COALESCE(rollup_name, inst_parent_name, manager_name)) AS total_holders
+              FROM holdings_v2, latest
+             WHERE holdings_v2.quarter = latest.q AND is_latest = TRUE
             """
         ).fetchone()
-
-        quarter, total_aum, total_holders, a_act, a_pas, a_hf = row
+        quarter, total_aum, total_holders = head
         total_aum = float(total_aum or 0)
         denom = total_aum if total_aum > 0 else None
+
+        rows = con.execute(
+            """
+            WITH latest AS (
+                SELECT MAX(quarter) AS q FROM holdings_v2 WHERE is_latest = TRUE
+            )
+            SELECT manager_type, SUM(market_value_usd) AS aum
+              FROM holdings_v2, latest
+             WHERE holdings_v2.quarter = latest.q AND is_latest = TRUE
+             GROUP BY manager_type
+             ORDER BY aum DESC
+            """
+        ).fetchall()
+        type_breakdown = []
+        for mt, aum in rows:
+            aum_f = float(aum or 0)
+            type_breakdown.append({
+                "type": mt or "unknown",
+                "aum": aum_f,
+                "pct_aum": (aum_f / denom * 100.0) if denom else 0.0,
+            })
+
         return clean_for_json({
             "quarter": quarter,
             "total_aum": total_aum,
             "total_holders": int(total_holders or 0),
-            "pct_active": (float(a_act or 0) / denom) if denom else 0,
-            "pct_passive": (float(a_pas or 0) / denom) if denom else 0,
-            "pct_hedge_fund": (float(a_hf or 0) / denom) if denom else 0,
+            "type_breakdown": type_breakdown,
         })
     finally:
         pass
@@ -248,44 +254,44 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
 
             records = df_to_records(df)
         else:
-            # level='fund' — unchanged path. See docstring for rationale.
-            rn = _rollup_col(rollup_type)
-            active_filter = "AND c.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-            active_filter_p = "AND p.entity_type IN ('active', 'hedge_fund', 'activist')" if active_only else ""
-            group_label = "c.manager_name"
-            group_label_p = "p.manager_name"
-
+            # level='fund' — query fund_holdings_v2 (N-PORT). Group by
+            # family_name (fall back to fund_name) as the institution. Active
+            # flow = delta_shares * implied_price; exits = -prior_value.
             df = con.execute(f"""
                 WITH h_agg AS (
-                    SELECT cik, {rn}, inst_parent_name, manager_name, manager_type,
+                    SELECT COALESCE(family_name, fund_name) AS institution,
                            ticker, quarter,
-                           SUM(shares) AS shares,
+                           SUM(shares_or_principal) AS shares,
                            SUM(market_value_usd) AS market_value_usd
-                    FROM holdings_v2
-                    WHERE ticker IS NOT NULL AND quarter IN ('{q_from}', '{q_to}') AND is_latest = TRUE
-                    GROUP BY cik, {rn}, inst_parent_name, manager_name, manager_type, ticker, quarter
+                    FROM fund_holdings_v2
+                    WHERE ticker IS NOT NULL
+                      AND asset_category IN ('EC','EP')
+                      AND shares_or_principal > 0
+                      AND quarter IN ('{q_from}', '{q_to}')
+                      AND is_latest = TRUE
+                    GROUP BY institution, ticker, quarter
                 ),
                 flows AS (
-                    SELECT {group_label} AS institution,
+                    SELECT c.institution,
                            c.ticker,
                            (c.shares - COALESCE(p.shares, 0))
                              * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow
                     FROM h_agg c
                     LEFT JOIN h_agg p
-                        ON c.cik = p.cik AND c.ticker = p.ticker AND p.quarter = '{q_from}'
+                        ON c.institution = p.institution AND c.ticker = p.ticker AND p.quarter = '{q_from}'
                     JOIN market_data md ON c.ticker = md.ticker AND md.sector = ?
-                    WHERE c.quarter = '{q_to}' {active_filter}
+                    WHERE c.quarter = '{q_to}'
 
                     UNION ALL
 
-                    SELECT {group_label_p} AS institution,
+                    SELECT p.institution,
                            p.ticker,
                            -p.market_value_usd AS active_flow
                     FROM h_agg p
                     LEFT JOIN h_agg c
-                        ON p.cik = c.cik AND p.ticker = c.ticker AND c.quarter = '{q_to}'
+                        ON p.institution = c.institution AND p.ticker = c.ticker AND c.quarter = '{q_to}'
                     JOIN market_data md ON p.ticker = md.ticker AND md.sector = ?
-                    WHERE p.quarter = '{q_from}' AND c.cik IS NULL {active_filter_p}
+                    WHERE p.quarter = '{q_from}' AND c.institution IS NULL
                 )
                 SELECT institution,
                        SUM(active_flow) AS net_flow,
@@ -321,6 +327,114 @@ def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="paren
             "top_sellers": list(reversed(records[-5:])) if len(records) > 5 else
                            [r for r in reversed(records) if (r.get("net_flow") or 0) < 0][:5],
         }
+    finally:
+        pass
+
+
+def get_sector_flow_mover_detail(q_from, q_to, sector, institution,
+                                 active_only=False, level="parent",
+                                 rollup_type='economic_control_v1'):
+    """Top 5 individual ticker moves making up one institution's net flow
+    inside a sector for one quarter transition. Drives the click-through
+    drill-down on the Sector Rotation movers panel.
+
+    level='parent' reads ``peer_rotation_flows`` (already aggregated to
+    one row per (entity, ticker, sector, period)).
+    level='fund'   reads ``fund_holdings_v2`` and computes active_flow on
+    the fly, mirroring the fund-level movers query.
+
+    Returns: { sector, period, institution, level, rows: [{ticker,
+    company_name, net_flow, shares_changed}] } where rows are sorted by
+    abs(net_flow) desc, top 5.
+    """
+    if rollup_type not in VALID_ROLLUP_TYPES:
+        raise ValueError(
+            f'Invalid rollup_type: {rollup_type}. '
+            f'Must be one of {VALID_ROLLUP_TYPES}'
+        )
+    con = get_db()
+    try:
+        if level == "parent":
+            active_clause = (
+                "AND prf.entity_type IN ('active', 'hedge_fund', 'activist')"
+                if active_only else ""
+            )
+            df = con.execute(f"""
+                SELECT prf.ticker AS ticker,
+                       MAX(s.issuer_name) AS company_name,
+                       SUM(prf.active_flow) AS net_flow,
+                       NULL::DOUBLE AS shares_changed
+                  FROM peer_rotation_flows prf
+                  LEFT JOIN securities s ON prf.ticker = s.ticker
+                 WHERE prf.quarter_from = ?
+                   AND prf.quarter_to = ?
+                   AND prf.sector = ?
+                   AND prf.level = 'parent'
+                   AND prf.rollup_type = ?
+                   AND prf.entity = ?
+                   {active_clause}
+                 GROUP BY prf.ticker
+                HAVING ABS(SUM(prf.active_flow)) > 0
+                 ORDER BY ABS(SUM(prf.active_flow)) DESC
+                 LIMIT 5
+            """, [q_from, q_to, sector, rollup_type, institution]).fetchdf()  # nosec B608
+        else:
+            # level='fund' — recompute from fund_holdings_v2.
+            df = con.execute(f"""
+                WITH h_agg AS (
+                    SELECT COALESCE(family_name, fund_name) AS institution,
+                           ticker, quarter,
+                           SUM(shares_or_principal) AS shares,
+                           SUM(market_value_usd) AS market_value_usd
+                    FROM fund_holdings_v2
+                    WHERE ticker IS NOT NULL
+                      AND asset_category IN ('EC','EP')
+                      AND shares_or_principal > 0
+                      AND quarter IN ('{q_from}', '{q_to}')
+                      AND is_latest = TRUE
+                    GROUP BY institution, ticker, quarter
+                ),
+                flows AS (
+                    SELECT c.institution, c.ticker,
+                           (c.shares - COALESCE(p.shares, 0)) AS shares_changed,
+                           (c.shares - COALESCE(p.shares, 0))
+                             * (c.market_value_usd * 1.0 / NULLIF(c.shares, 0)) AS active_flow
+                    FROM h_agg c
+                    LEFT JOIN h_agg p
+                        ON c.institution = p.institution AND c.ticker = p.ticker AND p.quarter = '{q_from}'
+                    JOIN market_data md ON c.ticker = md.ticker AND md.sector = ?
+                    WHERE c.quarter = '{q_to}' AND c.institution = ?
+
+                    UNION ALL
+
+                    SELECT p.institution, p.ticker,
+                           -p.shares AS shares_changed,
+                           -p.market_value_usd AS active_flow
+                    FROM h_agg p
+                    LEFT JOIN h_agg c
+                        ON p.institution = c.institution AND p.ticker = c.ticker AND c.quarter = '{q_to}'
+                    JOIN market_data md ON p.ticker = md.ticker AND md.sector = ?
+                    WHERE p.quarter = '{q_from}' AND c.institution IS NULL AND p.institution = ?
+                )
+                SELECT f.ticker AS ticker,
+                       MAX(s.issuer_name) AS company_name,
+                       SUM(f.active_flow) AS net_flow,
+                       SUM(f.shares_changed) AS shares_changed
+                  FROM flows f
+                  LEFT JOIN securities s ON f.ticker = s.ticker
+                 GROUP BY f.ticker
+                HAVING ABS(SUM(f.active_flow)) > 0
+                 ORDER BY ABS(SUM(f.active_flow)) DESC
+                 LIMIT 5
+            """, [sector, institution, sector, institution]).fetchdf()  # nosec B608
+
+        return clean_for_json({
+            "sector": sector,
+            "period": {"from": q_from, "to": q_to},
+            "institution": institution,
+            "level": level,
+            "rows": df_to_records(df),
+        })
     finally:
         pass
 

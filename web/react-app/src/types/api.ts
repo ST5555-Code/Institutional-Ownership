@@ -581,13 +581,17 @@ export interface SectorFlowsResponse {
 
 // ── Sector Summary — /api/v1/sector_summary ───────────────────────────────
 
+export interface SectorSummaryTypeBreakdown {
+  type: string
+  pct_aum: number
+  aum: number
+}
+
 export interface SectorSummaryResponse {
   quarter: string
   total_aum: number
   total_holders: number
-  pct_active: number
-  pct_passive: number
-  pct_hedge_fund: number
+  type_breakdown: SectorSummaryTypeBreakdown[]
 }
 
 // ── Sector Flow Movers — /api/sector_flow_movers ──────────────────────────
@@ -613,6 +617,23 @@ export interface SectorFlowMoversResponse {
   summary: SectorFlowMoverSummary
   top_buyers: SectorFlowMover[]
   top_sellers: SectorFlowMover[]
+}
+
+// ── Sector Flow Mover Detail — /api/v1/sector_flow_mover_detail ───────────
+
+export interface SectorFlowMoverDetailRow {
+  ticker: string
+  company_name: string | null
+  net_flow: number | null
+  shares_changed: number | null
+}
+
+export interface SectorFlowMoverDetailResponse {
+  sector: string
+  period: { from: string; to: string }
+  institution: string
+  level: string
+  rows: SectorFlowMoverDetailRow[]
 }
 
 // ── Peer Rotation — /api/peer_rotation + /api/peer_rotation_detail ────────
