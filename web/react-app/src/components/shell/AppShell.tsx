@@ -23,10 +23,10 @@ export function AppShell() {
   const { activeTab } = useAppStore()
   const TabComponent = TAB_MAP[activeTab]
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Header />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <Header />
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <Sidebar />
         <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--bg)', padding: '20px' }}>
           <ErrorBoundary key={activeTab} tab={activeTab}>
             <Suspense fallback={<div style={{ color: 'var(--text-mute)', padding: '20px' }}>Loading…</div>}>

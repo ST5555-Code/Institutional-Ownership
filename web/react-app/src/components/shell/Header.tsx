@@ -12,7 +12,7 @@ export function Header() {
       flexShrink: 0
     }}>
       <span style={{
-        color: 'var(--gold)',
+        color: 'var(--white)',
         fontWeight: 700,
         fontSize: '12px',
         letterSpacing: '0.16em',
@@ -20,7 +20,7 @@ export function Header() {
         fontFamily: "'Hanken Grotesk', sans-serif",
         marginRight: '8px'
       }}>
-        13F
+        SHAREHOLDER INTELLIGENCE
       </span>
       <TickerInput />
       <CompanyCard />
