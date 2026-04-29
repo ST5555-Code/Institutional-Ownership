@@ -127,6 +127,7 @@ from .entities import (  # noqa: F401
     get_entity_filer_children,
     get_entity_fund_children,
     get_entity_sub_advisers,
+    get_institution_hierarchy,
     build_entity_graph,
     _eg_node_institution,
     _eg_node_filer,

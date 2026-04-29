@@ -4,7 +4,7 @@ const TICKER = 'AAPL'
 
 const TABS = [
   { id: 'sector-rotation',  label: 'Sector Rotation' },
-  { id: 'entity-graph',     label: 'Entity Graph' },
+  { id: 'investor-detail',  label: 'Investor Detail' },
   { id: 'register',         label: 'Register' },
   { id: 'ownership-trend',  label: 'Ownership Trend' },
   { id: 'conviction',       label: 'Conviction' },

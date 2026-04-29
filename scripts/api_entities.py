@@ -152,12 +152,43 @@ def api_entity_graph(request: Request):
 
 
 @entities_router.get('/entity_market_summary')
-def api_entity_market_summary(limit: int = 25, rollup_type: str = 'economic_control_v1'):
+def api_entity_market_summary(request: Request, limit: int = 25, rollup_type: str = 'economic_control_v1'):
     """Market-wide: top institutions by 13F book value with filer + fund counts."""
+    quarter = _eg_quarter(request)
     try:
         from queries import get_market_summary
-        result = get_market_summary(limit=limit, rollup_type=rollup_type)
+        result = get_market_summary(limit=limit, quarter=quarter, rollup_type=rollup_type)
         return result
     except Exception as e:
         log.error("entity_market_summary error: %s", e, exc_info=True)
         return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@entities_router.get('/institution_hierarchy')
+def api_institution_hierarchy(request: Request):
+    """Institution → 13F filers → fund series drill-down for the Investor
+    Detail tab. Returns filers (with CIK + AUM for the quarter) and the funds
+    each filer sponsors (with series_id + NAV)."""
+    entity_id = (request.query_params.get('entity_id') or '').strip()
+    if not entity_id:
+        return JSONResponse(status_code=400, content={'error': 'Missing entity_id parameter'})
+    try:
+        eid = int(entity_id)
+    except ValueError:
+        return JSONResponse(status_code=400, content={'error': f'Invalid entity_id: {entity_id}'})
+
+    quarter = _eg_quarter(request)
+    try:
+        con = get_db()
+    except Exception as e:
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
+    try:
+        data = queries.get_institution_hierarchy(eid, quarter, con)
+        if isinstance(data, dict) and data.get('error'):
+            return JSONResponse(status_code=404, content={'error': data['error']})
+        return queries.clean_for_json(data)
+    except Exception as e:
+        log.error("institution_hierarchy error: %s", e, exc_info=True)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+    finally:
+        con.close()
