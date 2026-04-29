@@ -41,11 +41,25 @@ function fmtPct(v: number | null | undefined): string {
   return `${NUM_1.format(v * 100)}%`
 }
 
+function fmtQuarterLabel(q: string): string {
+  // "2025Q2" → "Q2 '25"
+  const m = /^(\d{4})Q(\d)$/.exec(q)
+  if (!m) return q
+  return `Q${m[2]} '${m[1].slice(2)}`
+}
+
 function SignedMm({ v }: { v: number | null }) {
   if (v == null || v === 0) return <>—</>
   const mm = v / 1e6
   if (v < 0) return <span style={{ color: 'var(--neg)' }}>({NUM_0.format(Math.abs(mm))})</span>
   return <span style={{ color: 'var(--pos)' }}>+{NUM_0.format(mm)}</span>
+}
+
+function SignedDollar({ v }: { v: number | null }) {
+  if (v == null || v === 0) return <>—</>
+  const mm = v / 1e6
+  if (v < 0) return <span style={{ color: 'var(--neg)' }}>(${NUM_0.format(Math.abs(mm))})</span>
+  return <span style={{ color: 'var(--pos)' }}>+${NUM_0.format(mm)}</span>
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
@@ -73,11 +87,6 @@ const KICKER: React.CSSProperties = {
   fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
   fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)',
 }
-const KPI_VALUE: React.CSSProperties = {
-  fontSize: 24, fontFamily: "'JetBrains Mono', monospace",
-  color: 'var(--white)', letterSpacing: '-0.01em', fontWeight: 400,
-  fontVariantNumeric: 'tabular-nums', marginTop: 6,
-}
 const PANEL_TITLE: React.CSSProperties = {
   fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
   fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)',
@@ -96,6 +105,7 @@ export function SectorRotationTab() {
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
   const [activeOnly, setActiveOnly] = useState(false)
   const [selectedSector, setSelectedSector] = useState<string | null>(null)
+  const [excludeOutliers, setExcludeOutliers] = useState(false)
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
@@ -135,6 +145,23 @@ export function SectorRotationTab() {
     : null
   const movers = useFetch<SectorFlowMoversResponse>(moversUrl)
 
+  // Display quarters for table — Q1..Q4 of the latest period's destination year.
+  // Quarters without matching period data render as placeholder columns.
+  const displayQuarters = useMemo(() => {
+    if (!periods.length) return [] as string[]
+    const last = periods[periods.length - 1]
+    const m = /^(\d{4})Q\d$/.exec(last.to)
+    if (!m) return periods.map(p => p.to)
+    const y = m[1]
+    return [`${y}Q1`, `${y}Q2`, `${y}Q3`, `${y}Q4`]
+  }, [periods])
+
+  const periodByDest = useMemo(() => {
+    const m: Record<string, typeof periods[number]> = {}
+    periods.forEach(p => { m[p.to] = p })
+    return m
+  }, [periods])
+
   // Sector grouped chart — one row per sector with one column per period
   const sectorChartData = useMemo(() => {
     if (!data) return []
@@ -172,6 +199,40 @@ export function SectorRotationTab() {
       }
     })
   }, [parentStatic.data, fundStatic.data])
+
+  // Y-axis bounds for sector chart. When excludeOutliers is on, clamp to ±2σ
+  // of all bar values so a single extreme sector doesn't compress the rest.
+  const sectorYDomain = useMemo<[number | string, number | string]>(() => {
+    if (!excludeOutliers) return ['auto', 'auto']
+    const vals: number[] = []
+    sectorChartData.forEach(row => {
+      ;(data?.periods ?? []).forEach((_, pi) => {
+        const v = row[`p${pi}`] as number
+        if (typeof v === 'number' && isFinite(v)) vals.push(v)
+      })
+    })
+    if (vals.length < 3) return ['auto', 'auto']
+    const mean = vals.reduce((s, x) => s + x, 0) / vals.length
+    const variance = vals.reduce((s, x) => s + (x - mean) ** 2, 0) / vals.length
+    const sd = Math.sqrt(variance)
+    const lo = mean - 2 * sd
+    const hi = mean + 2 * sd
+    return [Math.min(0, lo), Math.max(0, hi)]
+  }, [excludeOutliers, sectorChartData, data?.periods])
+
+  const sectorOutliersClipped = useMemo(() => {
+    if (!excludeOutliers) return 0
+    const [lo, hi] = sectorYDomain
+    if (typeof lo !== 'number' || typeof hi !== 'number') return 0
+    let n = 0
+    sectorChartData.forEach(row => {
+      ;(data?.periods ?? []).forEach((_, pi) => {
+        const v = row[`p${pi}`] as number
+        if (typeof v === 'number' && (v < lo || v > hi)) n += 1
+      })
+    })
+    return n
+  }, [excludeOutliers, sectorYDomain, sectorChartData, data?.periods])
 
   function onExcel() {
     if (!data) return
@@ -212,16 +273,35 @@ export function SectorRotationTab() {
       <div className="sr-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* B. KPI row + Net Flows chart (3/4 + 1/4) — STATIC */}
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
+          {/* B. KPI block (compact, 2 tiers) + Net Flows chart (2fr / 3fr) — STATIC */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 16, alignItems: 'stretch' }}>
             <KpiRow summary={summary.data} loading={summary.loading} />
             <NetFlowsCard data={netFlowsChartData} loading={parentStatic.loading || fundStatic.loading} />
           </div>
 
           {/* C. Sector rotation chart — toggle-driven */}
           <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
-            <div style={PANEL_TITLE}>
-              Sector Rotation — Net Flow by Period
+            <div style={{ ...PANEL_TITLE, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Sector Rotation — Net Flow by Period</span>
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
+                color: excludeOutliers ? 'var(--gold)' : 'var(--text-dim)',
+                cursor: 'pointer', userSelect: 'none',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={excludeOutliers}
+                  onChange={e => setExcludeOutliers(e.target.checked)}
+                  style={{ accentColor: 'var(--gold)', cursor: 'pointer', margin: 0 }}
+                />
+                Exclude outliers
+                {excludeOutliers && sectorOutliersClipped > 0 && (
+                  <span style={{ color: 'var(--text-mute)', fontWeight: 400, letterSpacing: '0.04em', textTransform: 'none' }}>
+                    ({sectorOutliersClipped} clipped)
+                  </span>
+                )}
+              </label>
             </div>
             <div style={{ padding: '12px 12px 4px', height: 320 }}>
               {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
@@ -234,6 +314,7 @@ export function SectorRotationTab() {
                       stroke="var(--line)" />
                     <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
                       tickFormatter={(v: number) => `$${NUM_1.format(v)}B`} width={56}
+                      domain={sectorYDomain} allowDataOverflow={excludeOutliers}
                       stroke="var(--line)" />
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={({ active, payload, label }) => {
                       if (!active || !payload || payload.length === 0) return null
@@ -278,15 +359,38 @@ export function SectorRotationTab() {
                   <colgroup>
                     <col style={{ width: 50 }} />
                     <col style={{ width: 170 }} />
-                    <col style={{ width: 100 }} />
-                    {periods.map(p => <col key={p.label} style={{ width: 90 }} />)}
+                    {displayQuarters.map(q => <col key={q} style={{ width: 90 }} />)}
+                    <col style={{ width: 110 }} />
                   </colgroup>
                   <thead>
+                    {/* Year group header */}
                     <tr>
-                      <th style={TH_R}>#</th>
-                      <th style={TH}>Sector</th>
-                      <th style={TH_R}>Total Net</th>
-                      {periods.map(p => <th key={p.label} style={TH_R}>{p.label}</th>)}
+                      <th style={{ ...TH, top: 0, borderBottom: 'none' }} />
+                      <th style={{ ...TH, top: 0, borderBottom: 'none' }} />
+                      <th colSpan={displayQuarters.length} style={{
+                        ...TH, top: 0, textAlign: 'center', borderBottom: '1px solid var(--line-soft)',
+                        color: 'var(--text-dim)',
+                      }}>
+                        {tableYear(displayQuarters)}
+                      </th>
+                      <th style={{
+                        ...TH_R, top: 0, borderBottom: 'none',
+                        borderLeft: '2px solid var(--gold)',
+                        backgroundColor: 'var(--card)',
+                      }} />
+                    </tr>
+                    <tr>
+                      <th style={{ ...TH_R, top: 26 }}>#</th>
+                      <th style={{ ...TH, top: 26 }}>Sector</th>
+                      {displayQuarters.map(q => (
+                        <th key={q} style={{ ...TH_R, top: 26 }}>{fmtQuarterLabel(q)}</th>
+                      ))}
+                      <th style={{
+                        ...TH_R, top: 26,
+                        borderLeft: '2px solid var(--gold)',
+                        backgroundColor: 'var(--card)',
+                        color: 'var(--gold)',
+                      }}>Total Net</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -303,17 +407,28 @@ export function SectorRotationTab() {
                           }}>
                           <td style={{ ...TD_R, color: 'var(--text-dim)' }}>{i + 1}</td>
                           <td style={{ ...TD, fontWeight: 500, color: isSel ? 'var(--white)' : 'var(--text)' }}>{s.sector}</td>
-                          <td style={TD_R}><SignedMm v={s.total_net} /></td>
-                          {periods.map(p => {
+                          {displayQuarters.map(q => {
+                            const p = periodByDest[q]
+                            if (!p) {
+                              return <td key={q} style={{ ...TD_R, color: 'var(--text-mute)' }}>—</td>
+                            }
                             const key = `${p.from}_${p.to}`
                             const n = s.flows[key]?.net ?? null
-                            return <td key={p.label} style={TD_R}><SignedMm v={n} /></td>
+                            return <td key={q} style={TD_R}><SignedMm v={n} /></td>
                           })}
+                          <td style={{
+                            ...TD_R,
+                            borderLeft: '2px solid var(--gold)',
+                            backgroundColor: isSel ? 'var(--gold-soft)' : 'var(--card)',
+                            fontWeight: 600,
+                          }}>
+                            <SignedMm v={s.total_net} />
+                          </td>
                         </tr>
                       )
                     })}
                     {ranked.length === 0 && !loading && (
-                      <tr><td colSpan={3 + periods.length} style={{ ...TD, textAlign: 'center', color: 'var(--text-dim)', padding: 30 }}>No data.</td></tr>
+                      <tr><td colSpan={3 + displayQuarters.length} style={{ ...TD, textAlign: 'center', color: 'var(--text-dim)', padding: 30 }}>No data.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -344,6 +459,13 @@ export function SectorRotationTab() {
                   </div>
                   <MoverTable title="Top Buyers" rows={movers.data.top_buyers} accent="var(--pos)" />
                   <MoverTable title="Top Sellers" rows={movers.data.top_sellers} accent="var(--neg)" />
+                  <div style={{
+                    padding: '8px 14px', fontSize: 10, fontStyle: 'italic',
+                    color: 'var(--text-mute)', borderTop: '1px solid var(--line-soft)',
+                    fontFamily: "'Inter', sans-serif",
+                  }}>
+                    Flows reflect changes in position size net of share price appreciation.
+                  </div>
                 </>
               )}
             </div>
@@ -357,14 +479,35 @@ export function SectorRotationTab() {
 
 // ── KPI Row ────────────────────────────────────────────────────────────────
 
-function KpiCard({ kicker, value }: { kicker: string; value: string }) {
+function KpiTile({ kicker, value }: { kicker: string; value: string }) {
   return (
     <div style={{
       backgroundColor: 'var(--card)', border: '1px solid var(--line)',
-      padding: 16, display: 'flex', flexDirection: 'column',
+      padding: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center',
     }}>
-      <div style={KICKER}>{kicker}</div>
-      <div style={KPI_VALUE}>{value}</div>
+      <div style={{ ...KICKER, fontSize: 9 }}>{kicker}</div>
+      <div style={{
+        fontSize: 18, fontFamily: "'JetBrains Mono', monospace",
+        color: 'var(--white)', letterSpacing: '-0.01em', fontWeight: 400,
+        fontVariantNumeric: 'tabular-nums', marginTop: 4,
+      }}>{value}</div>
+    </div>
+  )
+}
+
+function KpiMini({ kicker, value }: { kicker: string; value: string }) {
+  return (
+    <div style={{
+      backgroundColor: 'var(--card)', border: '1px solid var(--line)',
+      padding: '6px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    }}>
+      <div style={{ ...KICKER, fontSize: 9 }}>{kicker}</div>
+      <div style={{
+        fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
+        color: 'var(--white)', letterSpacing: '-0.01em', fontWeight: 400,
+        fontVariantNumeric: 'tabular-nums',
+      }}>{value}</div>
     </div>
   )
 }
@@ -373,12 +516,16 @@ function KpiRow({ summary, loading }: { summary: SectorSummaryResponse | null; l
   const v = (n: number | null | undefined, fmt: (x: number) => string) =>
     loading || summary == null ? '…' : fmt(n ?? 0)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-      <KpiCard kicker="Total AUM" value={v(summary?.total_aum, fmtAum)} />
-      <KpiCard kicker="Total Holders" value={v(summary?.total_holders, x => NUM_0.format(x))} />
-      <KpiCard kicker="% Active" value={v(summary?.pct_active, fmtPct)} />
-      <KpiCard kicker="% Passive" value={v(summary?.pct_passive, fmtPct)} />
-      <KpiCard kicker="% Hedge Fund" value={v(summary?.pct_hedge_fund, fmtPct)} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+        <KpiTile kicker="Total AUM" value={v(summary?.total_aum, fmtAum)} />
+        <KpiTile kicker="Total Holders" value={v(summary?.total_holders, x => NUM_0.format(x))} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <KpiMini kicker="Active" value={v(summary?.pct_active, fmtPct)} />
+        <KpiMini kicker="Passive" value={v(summary?.pct_passive, fmtPct)} />
+        <KpiMini kicker="Hedge Fund" value={v(summary?.pct_hedge_fund, fmtPct)} />
+      </div>
     </div>
   )
 }
@@ -397,7 +544,7 @@ function NetFlowsCard({ data, loading }: { data: NetFlowsRow[]; loading: boolean
   return (
     <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column' }}>
       <div style={PANEL_TITLE}>Net Flows</div>
-      <div style={{ padding: '8px 8px 4px', height: 168 }}>
+      <div style={{ padding: '8px 12px 8px', flex: 1, minHeight: 200 }}>
         {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)', padding: 20 }}>Loading…</div>}
         {!loading && (
           <ResponsiveContainer width="100%" height="100%">
@@ -454,13 +601,18 @@ function MoverTable({ title, rows, accent }: {
         color: accent, backgroundColor: 'var(--panel)',
         borderBottom: '1px solid var(--line-soft)',
       }}>{title}</div>
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: 26 }} />
+          <col />
+          <col style={{ width: 90 }} />
+        </colgroup>
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.institution}>
-              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', width: 26, textAlign: 'right', color: 'var(--text-mute)' }}>{i + 1}</td>
-              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.institution}>{r.institution}</td>
-              <td style={{ ...TD_R, fontSize: 11, padding: '4px 8px' }}><SignedMm v={r.net_flow} /></td>
+              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', textAlign: 'right', color: 'var(--text-mute)' }}>{i + 1}</td>
+              <td style={{ ...TD, fontSize: 11, padding: '4px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.institution}>{r.institution}</td>
+              <td style={{ ...TD_R, fontSize: 11, padding: '4px 8px' }}><SignedDollar v={r.net_flow} /></td>
             </tr>
           ))}
           {rows.length === 0 && <tr><td colSpan={3} style={{ ...TD, textAlign: 'center', color: 'var(--text-mute)', padding: 10 }}>None</td></tr>}
@@ -473,6 +625,12 @@ function MoverTable({ title, rows, accent }: {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function enc(s: string) { return encodeURIComponent(s) }
+
+function tableYear(qs: string[]): string {
+  if (!qs.length) return ''
+  const m = /^(\d{4})Q\d$/.exec(qs[0])
+  return m ? m[1] : ''
+}
 
 function downloadCsv(csv: string, filename: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
