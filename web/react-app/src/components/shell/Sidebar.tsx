@@ -6,7 +6,7 @@ export function Sidebar() {
     <nav style={{
       width: '220px', minWidth: '220px',
       backgroundColor: 'var(--header)',
-      height: '100vh', overflowY: 'auto',
+      height: '100%', overflowY: 'auto',
       borderRight: '1px solid var(--line)',
       paddingTop: '20px'
     }}>
