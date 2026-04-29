@@ -7,6 +7,7 @@ its scope resolver handles the three documented scope shapes.
 """
 from __future__ import annotations
 
+import datetime as dt
 import sys
 from pathlib import Path
 from typing import Any
@@ -194,13 +195,21 @@ def test_scope_tickers_uppercases_and_dedupes(pipeline):
 
 def test_scope_stale_days_queries_prod(tmp_dbs):
     """{"stale_days": N} queries prod.market_data for stale fetch_date rows."""
+    # Dates are computed relative to today so the test cannot drift stale as
+    # calendar time passes. FRESH = 1 day old (well inside the 7-day
+    # threshold), STALE = 30 days (well past), UNFETCHABLE = 120 days
+    # (past, but the unfetchable flag should exclude it regardless).
+    today = dt.date.today()
+    fresh_date = (today - dt.timedelta(days=1)).isoformat()
+    stale_date = (today - dt.timedelta(days=30)).isoformat()
+    unfetchable_date = (today - dt.timedelta(days=120)).isoformat()
     _init_prod_db(
         tmp_dbs["prod"],
         market_rows=[
-            {"ticker": "FRESH", "fetch_date": "2026-04-21"},
-            {"ticker": "STALE", "fetch_date": "2026-04-01"},
+            {"ticker": "FRESH", "fetch_date": fresh_date},
+            {"ticker": "STALE", "fetch_date": stale_date},
             {"ticker": "NULL_DATE", "fetch_date": None},
-            {"ticker": "UNFETCHABLE", "fetch_date": "2026-01-01",
+            {"ticker": "UNFETCHABLE", "fetch_date": unfetchable_date,
              "unfetchable": True},
         ],
     )
