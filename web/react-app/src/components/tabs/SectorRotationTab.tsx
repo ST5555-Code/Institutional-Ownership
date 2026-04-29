@@ -14,10 +14,6 @@ import {
   FreshnessBadge,
   getTypeStyle,
 } from '../common'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, LabelList,
-  ResponsiveContainer, ReferenceLine, Legend,
-} from 'recharts'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -40,22 +36,6 @@ function fmtBillionsCell(v: number | null | undefined): string {
   const abs = Math.abs(b)
   const s = abs >= 10 ? NUM_1.format(abs) : abs.toFixed(1)
   return v < 0 ? `($${s}B)` : `$${s}B`
-}
-
-// "$1B" / "($2B)" — integer billions for net-flows axis ticks and value labels.
-function fmtBillionsInt(v: number | null | undefined): string {
-  if (v == null || !isFinite(v)) return ''
-  if (v === 0) return '$0B'
-  const b = Math.round(v / 1e9)
-  if (b === 0) {
-    // sub-1B values — round to nearest 100M for readability
-    const m = Math.round(v / 1e8) * 100
-    if (m === 0) return '$0B'
-    const text = `$${Math.abs(m / 1000).toFixed(1)}B`
-    return v < 0 ? `(${text})` : text
-  }
-  const text = `$${Math.abs(b)}B`
-  return v < 0 ? `(${text})` : text
 }
 
 function fmtQuarterLabel(q: string): string {
@@ -111,6 +91,19 @@ const FOOTNOTE: React.CSSProperties = {
   padding: '8px 14px',
 }
 
+// Short display labels for KPI manager-type tiles. Falls back to typeConfig label.
+const KPI_SHORT_LABEL: Record<string, string> = {
+  wealth_management:    'Wealth Mgmt',
+  quantitative:         'Quant',
+  pension_insurance:    'Pension',
+  endowment_foundation: 'Endowment',
+  family_office:        'Family Office',
+  multi_strategy:       'Multi-Strat',
+  hedge_fund:           'Quant/HF',
+  private_equity:       'PE',
+  venture_capital:      'VC',
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 const COLOR_INST = '#7aadde'
@@ -130,14 +123,14 @@ export function SectorRotationTab() {
   } | null>(null)
   const [cellTooltip, setCellTooltip] = useState<{
     x: number; y: number
-    sector: string; periodLabel: string
+    title: string; periodLabel: string
     inflow: number | null; outflow: number | null; net: number | null
   } | null>(null)
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
 
-  // Static fetches (KPI row + Net Flows chart) — never refetch on toggle.
+  // Static fetches (KPI row + Net Flows heatmap) — never refetch on toggle.
   const summary = useFetch<SectorSummaryResponse>('/api/v1/sector_summary')
   const parentStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=parent&active_only=0')
   const fundStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=fund&active_only=0')
@@ -155,15 +148,12 @@ export function SectorRotationTab() {
     return [...data.sectors].sort((a, b) => (b.total_net || 0) - (a.total_net || 0))
   }, [data])
 
-  // Auto-select rank-1 sector on data load and on toggle change.
+  // Auto-select rank-1 sector on data load and on every toggle change.
   useEffect(() => {
     if (!data || ranked.length === 0) return
-    const top = ranked[0].sector
-    if (!ranked.some(s => s.sector === selectedSector)) {
-      setSelectedSector(top)
-      setSelectedPeriodTo(null)
-      setMoverDetail(null)
-    }
+    setSelectedSector(ranked[0].sector)
+    setSelectedPeriodTo(null)
+    setMoverDetail(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, level, ao])
 
@@ -218,57 +208,49 @@ export function SectorRotationTab() {
     : null
   const movers = useFetch<SectorFlowMoversResponse>(moversUrl)
 
-  // Net flows chart — sum each sector's net per period for parent + fund.
-  // Compute from the static (active_only=0) responses so this never moves.
-  // 4 destination columns; if fewer periods exist, pad with empty placeholders.
-  const netFlowsChartData = useMemo(() => {
+  // Net Flows heatmap data — sum across all sectors per period for parent + fund.
+  // Always uses static (active_only=0) responses.
+  const netFlowsHeatmap = useMemo(() => {
     const p = parentStatic.data
     const f = fundStatic.data
     const periodsRef = p?.periods ?? f?.periods ?? []
     const tail = periodsRef.slice(-4)
+
+    // Pad to 4 columns with placeholders if fewer.
     const filled: (typeof periodsRef[number] | null)[] = [...tail]
     while (filled.length < 4) filled.unshift(null)
-    return filled.map(period => {
-      if (!period) {
-        return {
-          periodLabel: '',
-          institutionalRaw: 0, fundRaw: 0,
-          institutional: 0, fund: 0,
-          institutionalInflow: 0, institutionalOutflow: 0,
-          fundInflow: 0, fundOutflow: 0,
-          empty: true,
-        }
-      }
+
+    function aggregate(resp: SectorFlowsResponse | null, period: typeof periodsRef[number] | null) {
+      if (!resp || !period) return { inflow: 0, outflow: 0, net: 0 }
       const key = `${period.from}_${period.to}`
-      let instInflow = 0, instOutflow = 0, instNet = 0
-      let fundInflow = 0, fundOutflow = 0, fundNet = 0
-      ;(p?.sectors ?? []).forEach(s => {
-        const f = s.flows[key]
-        if (!f) return
-        instInflow += f.inflow || 0
-        instOutflow += f.outflow || 0
-        instNet += f.net || 0
-      })
-      ;(f?.sectors ?? []).forEach(s => {
+      let inflow = 0, outflow = 0, net = 0
+      resp.sectors.forEach(s => {
         const fl = s.flows[key]
         if (!fl) return
-        fundInflow += fl.inflow || 0
-        fundOutflow += fl.outflow || 0
-        fundNet += fl.net || 0
+        inflow += fl.inflow || 0
+        outflow += fl.outflow || 0
+        net += fl.net || 0
       })
-      return {
-        periodLabel: fmtQuarterLabel(period.to),
-        institutional: instNet / 1e9,
-        institutionalRaw: instNet,
-        institutionalInflow: instInflow,
-        institutionalOutflow: instOutflow,
-        fund: fundNet / 1e9,
-        fundRaw: fundNet,
-        fundInflow,
-        fundOutflow,
-        empty: false,
-      }
-    })
+      return { inflow, outflow, net }
+    }
+
+    const instCells = filled.map(period => aggregate(p, period))
+    const fundCells = filled.map(period => aggregate(f, period))
+
+    const sumCells = (cells: { inflow: number; outflow: number; net: number }[]) =>
+      cells.reduce((acc, c) => ({
+        inflow: acc.inflow + c.inflow,
+        outflow: acc.outflow + c.outflow,
+        net: acc.net + c.net,
+      }), { inflow: 0, outflow: 0, net: 0 })
+
+    return {
+      quarters: filled.map(period => period?.to ?? ''),
+      rows: [
+        { label: 'Institutional', color: COLOR_INST, cells: instCells, total: sumCells(instCells) },
+        { label: 'Fund',          color: COLOR_FUND_HEX, cells: fundCells, total: sumCells(fundCells) },
+      ],
+    }
   }, [parentStatic.data, fundStatic.data])
 
   // Mover detail fetch.
@@ -316,93 +298,106 @@ export function SectorRotationTab() {
       <div className="sr-wrap" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* B. KPI block (compact, 2 tiers) + Net Flows chart (2fr / 3fr) — STATIC */}
+          {/* Top row: KPI block (2fr) + Net Flows heatmap (3fr) — STATIC */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 16, alignItems: 'stretch' }}>
             <KpiRow summary={summary.data} loading={summary.loading} />
-            <NetFlowsCard data={netFlowsChartData} loading={parentStatic.loading || fundStatic.loading} />
+            <NetFlowsHeatmap
+              data={netFlowsHeatmap}
+              loading={parentStatic.loading || fundStatic.loading}
+              onCellHover={setCellTooltip}
+            />
           </div>
 
-          {/* C. Sector heatmap — replaces both bar chart + sector table. */}
-          <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
-            <div style={PANEL_TITLE}>Sector Rotation — Net Flow by Period</div>
-            {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
-            {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
-            {!loading && !error && ranked.length === 0 && (
-              <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>No data.</div>
-            )}
-            {!loading && !error && ranked.length > 0 && (
-              <SectorHeatmap
-                ranked={ranked}
-                displayQuarters={displayQuarters}
-                periodByDest={periodByDest}
-                selectedSector={selectedSector}
-                onSelectRow={(s) => { setSelectedSector(s); setSelectedPeriodTo(null) }}
-                onSelectCell={(s, q) => { setSelectedSector(s); setSelectedPeriodTo(q) }}
-                onCellHover={(t) => setCellTooltip(t)}
-              />
-            )}
-            <div style={{ ...FOOTNOTE, borderTop: '1px solid var(--line-soft)' }}>
-              Flows reflect changes in position size net of share price appreciation.
-            </div>
-          </div>
-
-          {/* D. Movers panel */}
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}>
-            <div /> {/* empty cell — heatmap above already spans full width */}
-            <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
-              <div style={{ ...PANEL_TITLE, display: 'flex', justifyContent: 'space-between' }}>
-                <span>
-                  {selectedSector ?? '—'}
-                  {selectedSector && moverPeriod && ` — ${fmtQuarterLabel(moverPeriod.to)}`}
-                </span>
-                <span style={{ color: 'var(--text-mute)', textTransform: 'none', letterSpacing: '0.04em' }}>
-                  {fundView === 'fund' ? 'fund' : 'parent'}
-                </span>
+          {/* Main row: sector heatmap (flex 3) + movers panel (flex 2) */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 3, minWidth: 0, backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
+              <div style={PANEL_TITLE}>Sector Rotation — Net Flow by Period</div>
+              {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}
+              {error && !loading && <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {error}</div>}
+              {!loading && !error && ranked.length === 0 && (
+                <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>No data.</div>
+              )}
+              {!loading && !error && ranked.length > 0 && (
+                <SectorHeatmap
+                  ranked={ranked}
+                  displayQuarters={displayQuarters}
+                  periodByDest={periodByDest}
+                  selectedSector={selectedSector}
+                  onSelectRow={(s) => { setSelectedSector(s); setSelectedPeriodTo(null) }}
+                  onSelectCell={(s, q) => { setSelectedSector(s); setSelectedPeriodTo(q) }}
+                  onCellHover={(t) => setCellTooltip(t)}
+                />
+              )}
+              <div style={{ ...FOOTNOTE, borderTop: '1px solid var(--line-soft)' }}>
+                Flows reflect changes in position size net of share price appreciation.
               </div>
-              {!selectedSector && (
-                <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Select a sector</div>
-              )}
-              {selectedSector && movers.loading && (
-                <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading movers…</div>
-              )}
-              {selectedSector && !movers.loading && movers.error && (
-                <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {movers.error}</div>
-              )}
-              {selectedSector && !movers.loading && !movers.error && movers.data && (
-                movers.data.top_buyers.length === 0 && movers.data.top_sellers.length === 0 ? (
-                  <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>
-                    {fundView === 'fund' ? 'No fund-level mover data available' : 'No mover data'}
+            </div>
+
+            <div style={{ flex: 2, minWidth: 0 }}>
+              {!selectedSector ? (
+                <div style={{
+                  border: '1px dashed var(--line)',
+                  padding: 40, textAlign: 'center',
+                  color: 'var(--text-dim)', fontSize: 12,
+                  fontFamily: "'Inter', sans-serif",
+                  backgroundColor: 'transparent',
+                }}>
+                  Click a sector to see top movers
+                </div>
+              ) : (
+                <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)' }}>
+                  <div style={{ ...PANEL_TITLE, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>
+                      {selectedSector}
+                      {moverPeriod && ` — ${fmtQuarterLabel(moverPeriod.to)}`}
+                    </span>
+                    <span style={{ color: 'var(--text-mute)', textTransform: 'none', letterSpacing: '0.04em' }}>
+                      {fundView === 'fund' ? 'fund' : 'parent'}
+                    </span>
                   </div>
-                ) : (
-                  <>
-                    <div style={{
-                      padding: '8px 14px', fontSize: 11, color: 'var(--text-dim)',
-                      backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line-soft)',
-                      display: 'flex', gap: 16, fontFamily: "'JetBrains Mono', monospace",
-                    }}>
-                      <span>Net <b style={{ color: movers.data.summary.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>
-                        <SignedMm v={movers.data.summary.net} />
-                      </b></span>
-                      <span>Mgrs <b style={{ color: 'var(--text)' }}>{NUM_0.format(movers.data.summary.buyers)}</b></span>
-                    </div>
-                    <MoverTable title="Top Buyers" rows={movers.data.top_buyers} accent="var(--pos)"
-                      onClickInstitution={(institution, e) => setMoverDetail({
-                        institution,
-                        anchor: { x: e.clientX, y: e.clientY },
-                      })} />
-                    <MoverTable title="Top Sellers" rows={movers.data.top_sellers} accent="var(--neg)"
-                      onClickInstitution={(institution, e) => setMoverDetail({
-                        institution,
-                        anchor: { x: e.clientX, y: e.clientY },
-                      })} />
-                    <div style={{
-                      ...FOOTNOTE,
-                      borderTop: '1px solid var(--line-soft)',
-                    }}>
-                      Flows reflect changes in position size net of share price appreciation.
-                    </div>
-                  </>
-                )
+                  {movers.loading && (
+                    <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading movers…</div>
+                  )}
+                  {!movers.loading && movers.error && (
+                    <div style={{ ...CENTER_MSG, color: 'var(--neg)' }}>Error: {movers.error}</div>
+                  )}
+                  {!movers.loading && !movers.error && movers.data && (
+                    movers.data.top_buyers.length === 0 && movers.data.top_sellers.length === 0 ? (
+                      <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>
+                        {fundView === 'fund' ? 'No fund-level mover data available' : 'No mover data'}
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{
+                          padding: '8px 14px', fontSize: 11, color: 'var(--text-dim)',
+                          backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line-soft)',
+                          display: 'flex', gap: 16, fontFamily: "'JetBrains Mono', monospace",
+                        }}>
+                          <span>Net <b style={{ color: movers.data.summary.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>
+                            <SignedMm v={movers.data.summary.net} />
+                          </b></span>
+                          <span>Mgrs <b style={{ color: 'var(--text)' }}>{NUM_0.format(movers.data.summary.buyers)}</b></span>
+                        </div>
+                        <MoverTable title="Top Buyers" rows={movers.data.top_buyers} accent="var(--pos)"
+                          onClickInstitution={(institution, e) => setMoverDetail({
+                            institution,
+                            anchor: { x: e.clientX, y: e.clientY },
+                          })} />
+                        <MoverTable title="Top Sellers" rows={movers.data.top_sellers} accent="var(--neg)"
+                          onClickInstitution={(institution, e) => setMoverDetail({
+                            institution,
+                            anchor: { x: e.clientX, y: e.clientY },
+                          })} />
+                        <div style={{
+                          ...FOOTNOTE,
+                          borderTop: '1px solid var(--line-soft)',
+                        }}>
+                          Flows reflect changes in position size net of share price appreciation.
+                        </div>
+                      </>
+                    )
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -453,16 +448,19 @@ function KpiMini({ label, color, value }: { label: string; color: string; value:
       backgroundColor: 'var(--card)', border: '1px solid var(--line)',
       padding: '6px 10px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      minWidth: 0,
     }}>
       <div style={{
-        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
+        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em',
         fontFamily: "'Hanken Grotesk', sans-serif", color,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        lineHeight: 1.25,
+        minWidth: 0, flex: 1,
+        overflowWrap: 'anywhere',
       }}>{label}</div>
       <div style={{
         fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
         color: 'var(--white)', letterSpacing: '-0.01em', fontWeight: 400,
-        fontVariantNumeric: 'tabular-nums',
+        fontVariantNumeric: 'tabular-nums', flexShrink: 0,
       }}>{value}</div>
     </div>
   )
@@ -483,8 +481,9 @@ function KpiRow({ summary, loading }: { summary: SectorSummaryResponse | null; l
         {loading && [0,1,2].map(i => <KpiMini key={i} label="…" color="var(--text-dim)" value="…" />)}
         {!loading && sorted.map(t => {
           const style = getTypeStyle(t.type)
+          const label = KPI_SHORT_LABEL[t.type] || style.label || t.type
           return (
-            <KpiMini key={t.type} label={style.label || t.type}
+            <KpiMini key={t.type} label={label}
               color={style.color}
               value={`${NUM_1.format(t.pct_aum)}%`} />
           )
@@ -497,145 +496,136 @@ function KpiRow({ summary, loading }: { summary: SectorSummaryResponse | null; l
   )
 }
 
-// ── Net Flows Card ─────────────────────────────────────────────────────────
+// ── Net Flows Heatmap (static) ─────────────────────────────────────────────
 
-interface NetFlowsRow {
-  periodLabel: string
-  institutional: number
-  institutionalRaw: number
-  institutionalInflow: number
-  institutionalOutflow: number
-  fund: number
-  fundRaw: number
-  fundInflow: number
-  fundOutflow: number
-  empty: boolean
+interface NetFlowsCell {
+  inflow: number
+  outflow: number
+  net: number
+}
+interface NetFlowsHeatmapData {
+  quarters: string[]   // 4 destination quarters; '' for placeholder cols
+  rows: {
+    label: string
+    color: string
+    cells: NetFlowsCell[]
+    total: NetFlowsCell
+  }[]
 }
 
-function NetFlowsCard({ data, loading }: { data: NetFlowsRow[]; loading: boolean }) {
+function NetFlowsHeatmap({ data, loading, onCellHover }: {
+  data: NetFlowsHeatmapData
+  loading: boolean
+  onCellHover: (t: {
+    x: number; y: number
+    title: string; periodLabel: string
+    inflow: number | null; outflow: number | null; net: number | null
+  } | null) => void
+}) {
+  // Color intensity scale across the 4-column data cells (exclude total).
+  const scaleRef = useMemo(() => {
+    let m = 0
+    data.rows.forEach(r => r.cells.forEach(c => {
+      if (isFinite(c.net)) m = Math.max(m, Math.abs(c.net))
+    }))
+    return m * 0.4
+  }, [data])
+
+  // Separate scale for total column.
+  const totalScaleRef = useMemo(() => {
+    let m = 0
+    data.rows.forEach(r => { if (isFinite(r.total.net)) m = Math.max(m, Math.abs(r.total.net)) })
+    return m * 0.4
+  }, [data])
+
   return (
     <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column' }}>
-      <div style={PANEL_TITLE}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Net Flows</span>
-          <NetFlowsLegend />
-        </div>
-      </div>
-      <div style={{ padding: '12px 12px 8px', flex: 1, minHeight: 200 }}>
+      <div style={PANEL_TITLE}>Net Flows</div>
+      <div style={{ padding: '12px 12px 12px', flex: 1 }}>
         {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)', padding: 20 }}>Loading…</div>}
         {!loading && (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barCategoryGap={20} barGap={4} margin={{ top: 24, right: 12, left: 0, bottom: 4 }}>
-              <XAxis dataKey="periodLabel"
-                tick={{ fontSize: 10, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
-                stroke="var(--line)" />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}
-                tickFormatter={fmtBillionsInt} width={56}
-                stroke="var(--line)" />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={({ active, payload, label }) => {
-                if (!active || !payload || payload.length === 0) return null
-                const row = payload[0].payload as NetFlowsRow
-                if (row.empty) return null
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+            <colgroup>
+              <col style={{ width: 130 }} />
+              {data.quarters.map((_, i) => <col key={i} />)}
+              <col style={{ width: 110 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={{ ...TH, position: 'static' }} />
+                {data.quarters.map((q, i) => (
+                  <th key={i} style={{ ...TH_C, position: 'static' }}>
+                    {q ? fmtQuarterLabel(q) : ''}
+                  </th>
+                ))}
+                <th style={{ ...TH_R, position: 'static', color: 'var(--gold)' }}>Total Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r, rowIdx) => {
+                const isLast = rowIdx === data.rows.length - 1
                 return (
-                  <div style={{ backgroundColor: 'var(--bg)', color: 'var(--text)', padding: '8px 12px', border: '1px solid var(--line)', fontSize: 11, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--white)', marginBottom: 4 }}>{label}</div>
-                    <NetFlowsTooltipBlock label="Institutional" color={COLOR_INST}
-                      inflow={row.institutionalInflow} outflow={row.institutionalOutflow} net={row.institutionalRaw} />
-                    <div style={{ height: 4 }} />
-                    <NetFlowsTooltipBlock label="Fund" color={COLOR_FUND_HEX}
-                      inflow={row.fundInflow} outflow={row.fundOutflow} net={row.fundRaw} />
-                  </div>
+                  <tr key={r.label}>
+                    <td style={{
+                      ...TD,
+                      borderBottom: isLast ? 'none' : TD.borderBottom,
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 500,
+                      color: 'var(--text)',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <span style={{
+                          width: 10, height: 10, backgroundColor: r.color,
+                          display: 'inline-block', flexShrink: 0,
+                        }} />
+                        <span>{r.label}</span>
+                      </span>
+                    </td>
+                    {r.cells.map((c, i) => (
+                      <HeatCell
+                        key={i}
+                        value={c.net}
+                        maxRef={scaleRef}
+                        onClick={() => {}}
+                        onHover={(pos) => {
+                          if (!pos) { onCellHover(null); return }
+                          onCellHover({
+                            x: pos.x, y: pos.y,
+                            title: r.label,
+                            periodLabel: data.quarters[i] ? fmtQuarterLabel(data.quarters[i]) : '',
+                            inflow: c.inflow, outflow: c.outflow, net: c.net,
+                          })
+                        }}
+                        cellBorderBottom={isLast ? 'none' : undefined}
+                      />
+                    ))}
+                    <HeatCell
+                      value={r.total.net}
+                      maxRef={totalScaleRef}
+                      onClick={() => {}}
+                      onHover={(pos) => {
+                        if (!pos) { onCellHover(null); return }
+                        onCellHover({
+                          x: pos.x, y: pos.y,
+                          title: r.label, periodLabel: 'Total',
+                          inflow: r.total.inflow, outflow: r.total.outflow, net: r.total.net,
+                        })
+                      }}
+                      cellBorderLeft="2px solid var(--gold)"
+                      cellBackground="var(--card)"
+                      cellBorderBottom={isLast ? 'none' : undefined}
+                    />
+                  </tr>
                 )
-              }} />
-              <Legend wrapperStyle={{ display: 'none' }} />
-              <ReferenceLine y={0} stroke="var(--line)" />
-              <Bar dataKey="institutional" name="Institutional" fill={COLOR_INST} isAnimationActive={false}>
-                <LabelList dataKey="institutionalRaw" content={renderValueLabel} />
-              </Bar>
-              <Bar dataKey="fund" name="Fund" fill={COLOR_FUND_HEX} isAnimationActive={false}>
-                <LabelList dataKey="fundRaw" content={renderValueLabel} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
-  )
-}
-
-function NetFlowsLegend() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <LegendSwatch color={COLOR_INST} label="Institutional" />
-      <LegendSwatch color={COLOR_FUND_HEX} label="Fund" />
-    </div>
-  )
-}
-
-function LegendSwatch({ color, label }: { color: string; label: string }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ width: 10, height: 10, backgroundColor: color, display: 'inline-block' }} />
-      <span style={{
-        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
-        fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)',
-      }}>{label}</span>
-    </span>
-  )
-}
-
-function NetFlowsTooltipBlock({ label, color, inflow, outflow, net }: {
-  label: string; color: string; inflow: number; outflow: number; net: number
-}) {
-  const fmtBn = (v: number) => {
-    if (v === 0) return '—'
-    const abs = Math.abs(v) / 1e9
-    const s = abs >= 10 ? NUM_0.format(abs) : abs.toFixed(1)
-    return v < 0 ? `($${s}B)` : `$${s}B`
-  }
-  return (
-    <div style={{ minWidth: 160 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-        <span style={{ width: 8, height: 8, backgroundColor: color, display: 'inline-block' }} />
-        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em',
-          fontFamily: "'Hanken Grotesk', sans-serif", color: 'var(--text-dim)' }}>{label}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-        <span style={{ color: 'var(--text-dim)' }}>Inflows</span>
-        <span style={{ color: 'var(--pos)' }}>{fmtBn(inflow)}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-        <span style={{ color: 'var(--text-dim)' }}>Outflows</span>
-        <span style={{ color: 'var(--neg)' }}>{fmtBn(outflow)}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-        <span style={{ color: 'var(--text-dim)' }}>Net</span>
-        <span style={{ color: net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtBn(net)}</span>
-      </div>
-    </div>
-  )
-}
-
-// LabelList content: render the bar's true value above (positive) or below (negative).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderValueLabel(props: any) {
-  const x = (props?.x as number) ?? 0
-  const y = (props?.y as number) ?? 0
-  const width = (props?.width as number) ?? 0
-  const height = (props?.height as number) ?? 0
-  const value = (props?.value as number) ?? 0
-  if (!isFinite(value) || value === 0) return null
-  const isNeg = value < 0
-  const labelY = isNeg ? y + height + 11 : y - 5
-  const text = fmtBillionsInt(value)
-  return (
-    <text x={x + width / 2} y={labelY}
-      fontSize={9}
-      fill="var(--text)"
-      textAnchor="middle"
-      fontFamily="'JetBrains Mono', monospace">
-      {text}
-    </text>
   )
 }
 
@@ -650,7 +640,7 @@ interface HeatmapProps {
   onSelectCell: (sector: string, periodTo: string) => void
   onCellHover: (t: {
     x: number; y: number
-    sector: string; periodLabel: string
+    title: string; periodLabel: string
     inflow: number | null; outflow: number | null; net: number | null
   } | null) => void
 }
@@ -659,7 +649,7 @@ function SectorHeatmap({
   ranked, displayQuarters, periodByDest, selectedSector,
   onSelectRow, onSelectCell, onCellHover,
 }: HeatmapProps) {
-  // Compute global max abs across all visible cells for color intensity scaling.
+  // Compute global max abs across all visible quarter cells for color intensity scaling.
   const globalMax = useMemo(() => {
     let m = 0
     ranked.forEach(s => {
@@ -674,6 +664,37 @@ function SectorHeatmap({
 
   // Scale relative to 40% of global max to keep mid-range cells visible.
   const scaleRef = globalMax * 0.4
+
+  // Totals row — sum across sectors per quarter, plus grand total.
+  const totalsRow = useMemo(() => {
+    const perQuarter: Record<string, { inflow: number; outflow: number; net: number }> = {}
+    let grandInflow = 0, grandOutflow = 0, grandNet = 0
+    displayQuarters.forEach(q => {
+      const p = periodByDest[q]
+      if (!p) { perQuarter[q] = { inflow: 0, outflow: 0, net: 0 }; return }
+      let inflow = 0, outflow = 0, net = 0
+      ranked.forEach(s => {
+        const fl = s.flows[`${p.from}_${p.to}`]
+        if (!fl) return
+        inflow += fl.inflow || 0
+        outflow += fl.outflow || 0
+        net += fl.net || 0
+      })
+      perQuarter[q] = { inflow, outflow, net }
+      grandInflow += inflow
+      grandOutflow += outflow
+      grandNet += net
+    })
+    return { perQuarter, total: { inflow: grandInflow, outflow: grandOutflow, net: grandNet } }
+  }, [ranked, displayQuarters, periodByDest])
+
+  // Scale for total_net column (sectors + totals row's grand total).
+  const totalNetScaleRef = useMemo(() => {
+    let m = 0
+    ranked.forEach(s => { if (isFinite(s.total_net)) m = Math.max(m, Math.abs(s.total_net)) })
+    if (isFinite(totalsRow.total.net)) m = Math.max(m, Math.abs(totalsRow.total.net))
+    return m * 0.4
+  }, [ranked, totalsRow])
 
   return (
     <div style={{ maxHeight: 600, overflowY: 'auto' }}>
@@ -696,7 +717,6 @@ function SectorHeatmap({
             </th>
             <th style={{
               ...TH_R, top: 0, borderBottom: 'none',
-              borderLeft: '2px solid var(--gold)',
               backgroundColor: 'var(--card)',
             }} />
           </tr>
@@ -708,7 +728,6 @@ function SectorHeatmap({
             ))}
             <th style={{
               ...TH_R, top: 26,
-              borderLeft: '2px solid var(--gold)',
               backgroundColor: 'var(--card)',
               color: 'var(--gold)',
             }}>Total Net</th>
@@ -745,19 +764,15 @@ function SectorHeatmap({
                       key={q}
                       value={v}
                       maxRef={scaleRef}
-                      sector={s.sector}
-                      periodLabel={fmtQuarterLabel(q)}
-                      inflow={flow?.inflow ?? null}
-                      outflow={flow?.outflow ?? null}
                       onClick={(e) => {
-                        e.stopPropagation()
+                        e?.stopPropagation()
                         if (p) onSelectCell(s.sector, q)
                       }}
                       onHover={(pos) => {
                         if (!pos) { onCellHover(null); return }
                         onCellHover({
                           x: pos.x, y: pos.y,
-                          sector: s.sector,
+                          title: s.sector,
                           periodLabel: fmtQuarterLabel(q),
                           inflow: flow?.inflow ?? null,
                           outflow: flow?.outflow ?? null,
@@ -767,19 +782,79 @@ function SectorHeatmap({
                     />
                   )
                 })}
-                <td style={{
-                  ...TD_R,
-                  borderLeft: '2px solid var(--gold)',
-                  backgroundColor: 'var(--card)',
-                  fontWeight: 600,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  color: (s.total_net ?? 0) >= 0 ? 'var(--pos)' : 'var(--neg)',
-                }}>
-                  {fmtBillionsCell(s.total_net)}
-                </td>
+                <HeatCell
+                  value={s.total_net}
+                  maxRef={totalNetScaleRef}
+                  onClick={() => {}}
+                  onHover={(pos) => {
+                    if (!pos) { onCellHover(null); return }
+                    onCellHover({
+                      x: pos.x, y: pos.y,
+                      title: s.sector, periodLabel: 'Total',
+                      inflow: null, outflow: null, net: s.total_net,
+                    })
+                  }}
+                  cellBorderLeft="2px solid var(--gold)"
+                  cellBackground={isSel ? 'var(--gold-soft)' : 'var(--card)'}
+                />
               </tr>
             )
           })}
+
+          {/* Totals row */}
+          <tr style={{ backgroundColor: 'var(--header)' }}>
+            <td style={{
+              ...TD_R, color: 'var(--text-dim)',
+              borderTop: '2px solid var(--gold)',
+              backgroundColor: 'var(--header)',
+              fontWeight: 700,
+            }} />
+            <td style={{
+              ...TD,
+              borderTop: '2px solid var(--gold)',
+              backgroundColor: 'var(--header)',
+              color: 'var(--white)', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 11,
+              fontFamily: "'Hanken Grotesk', sans-serif",
+            }}>Total</td>
+            {displayQuarters.map(q => {
+              const cell = totalsRow.perQuarter[q] ?? { inflow: 0, outflow: 0, net: 0 }
+              return (
+                <HeatCell
+                  key={q}
+                  value={cell.net}
+                  maxRef={scaleRef}
+                  onClick={() => {}}
+                  onHover={(pos) => {
+                    if (!pos) { onCellHover(null); return }
+                    onCellHover({
+                      x: pos.x, y: pos.y,
+                      title: 'Total', periodLabel: fmtQuarterLabel(q),
+                      inflow: cell.inflow, outflow: cell.outflow, net: cell.net,
+                    })
+                  }}
+                  cellBorderTop="2px solid var(--gold)"
+                  cellBackground="var(--header)"
+                />
+              )
+            })}
+            <HeatCell
+              value={totalsRow.total.net}
+              maxRef={totalNetScaleRef}
+              onClick={() => {}}
+              onHover={(pos) => {
+                if (!pos) { onCellHover(null); return }
+                onCellHover({
+                  x: pos.x, y: pos.y,
+                  title: 'Total', periodLabel: 'Total',
+                  inflow: totalsRow.total.inflow, outflow: totalsRow.total.outflow, net: totalsRow.total.net,
+                })
+              }}
+              cellBorderLeft="2px solid var(--gold)"
+              cellBorderTop="2px solid var(--gold)"
+              cellBackground="var(--header)"
+            />
+          </tr>
         </tbody>
       </table>
     </div>
@@ -788,22 +863,23 @@ function SectorHeatmap({
 
 function HeatCell({
   value, maxRef, onClick, onHover,
+  cellBorderLeft, cellBorderTop, cellBorderBottom, cellBackground,
 }: {
   value: number | null
   maxRef: number
-  sector: string
-  periodLabel: string
-  inflow: number | null
-  outflow: number | null
-  onClick: (e: React.MouseEvent) => void
+  onClick: (e?: React.MouseEvent) => void
   onHover: (pos: { x: number; y: number } | null) => void
+  cellBorderLeft?: string
+  cellBorderTop?: string
+  cellBorderBottom?: string
+  cellBackground?: string
 }) {
   const noData = value == null || !isFinite(value) || value === 0
   let bg = 'transparent'
   let fg: string = 'var(--text-mute)'
   if (!noData) {
-    const intensity = Math.min(0.6, Math.max(0.05, (Math.abs(value) / Math.max(maxRef, 1)) * 0.6))
-    if (value >= 0) {
+    const intensity = Math.min(0.6, Math.max(0.05, (Math.abs(value as number) / Math.max(maxRef, 1)) * 0.6))
+    if ((value as number) >= 0) {
       bg = `rgba(92,184,122,${intensity})`
       fg = '#5cb87a'
     } else {
@@ -811,18 +887,23 @@ function HeatCell({
       fg = '#e05a5a'
     }
   }
+  const cellStyle: React.CSSProperties = {
+    ...TD_R,
+    textAlign: 'center',
+    padding: '4px 6px',
+    cursor: noData ? 'default' : 'pointer',
+  }
+  if (cellBorderLeft) cellStyle.borderLeft = cellBorderLeft
+  if (cellBorderTop) cellStyle.borderTop = cellBorderTop
+  if (cellBorderBottom !== undefined) cellStyle.borderBottom = cellBorderBottom
+  if (cellBackground) cellStyle.backgroundColor = cellBackground
   return (
     <td
       onClick={onClick}
       onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY })}
       onMouseMove={(e) => onHover({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => onHover(null)}
-      style={{
-        ...TD_R,
-        textAlign: 'center',
-        padding: '4px 6px',
-        cursor: noData ? 'default' : 'pointer',
-      }}
+      style={cellStyle}
     >
       <span style={{
         display: 'inline-block',
@@ -840,9 +921,9 @@ function HeatCell({
   )
 }
 
-function CellTooltip({ x, y, sector, periodLabel, inflow, outflow, net }: {
+function CellTooltip({ x, y, title, periodLabel, inflow, outflow, net }: {
   x: number; y: number
-  sector: string; periodLabel: string
+  title: string; periodLabel: string
   inflow: number | null; outflow: number | null; net: number | null
 }) {
   const fmtBn = (v: number | null) => {
@@ -855,6 +936,7 @@ function CellTooltip({ x, y, sector, periodLabel, inflow, outflow, net }: {
   const W = 240, H = 110
   const left = Math.min(Math.max(8, x + 14), window.innerWidth - W - 8)
   const top = Math.min(Math.max(8, y - H - 10), window.innerHeight - H - 8)
+  const showInOut = inflow != null || outflow != null
   return (
     <div style={{
       position: 'fixed', left, top, width: W, zIndex: 60,
@@ -865,16 +947,20 @@ function CellTooltip({ x, y, sector, periodLabel, inflow, outflow, net }: {
       boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
       pointerEvents: 'none',
     }}>
-      <div style={{ color: 'var(--white)', fontWeight: 600, marginBottom: 2 }}>{sector}</div>
-      <div style={{ color: 'var(--text-mute)', fontSize: 10, marginBottom: 4 }}>{periodLabel}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono', monospace" }}>
-        <span style={{ color: 'var(--text-dim)' }}>Inflows</span>
-        <span style={{ color: 'var(--pos)' }}>{fmtBn(inflow)}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono', monospace" }}>
-        <span style={{ color: 'var(--text-dim)' }}>Outflows</span>
-        <span style={{ color: 'var(--neg)' }}>{fmtBn(outflow)}</span>
-      </div>
+      <div style={{ color: 'var(--white)', fontWeight: 600, marginBottom: 2 }}>{title}</div>
+      {periodLabel && <div style={{ color: 'var(--text-mute)', fontSize: 10, marginBottom: 4 }}>{periodLabel}</div>}
+      {showInOut && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ color: 'var(--text-dim)' }}>Inflows</span>
+            <span style={{ color: 'var(--pos)' }}>{fmtBn(inflow)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ color: 'var(--text-dim)' }}>Outflows</span>
+            <span style={{ color: 'var(--neg)' }}>{fmtBn(outflow)}</span>
+          </div>
+        </>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono', monospace" }}>
         <span style={{ color: 'var(--text-dim)' }}>Net</span>
         <span style={{ color: (net ?? 0) >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtBn(net)}</span>
