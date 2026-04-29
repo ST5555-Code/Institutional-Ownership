@@ -45,7 +45,7 @@ function SignedPct1({ v }: { v: number | null }) {
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  padding: '4px 8px', fontSize: 8, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
   textAlign: 'left', borderBottom: '1px solid var(--line)',
@@ -55,7 +55,7 @@ const TH: React.CSSProperties = {
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  padding: '4px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -63,7 +63,7 @@ const TD_R: React.CSSProperties = {
   fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
-  display: 'inline-block', padding: '2px 8px', fontSize: 11,
+  display: 'inline-block', padding: '1px 6px', fontSize: 10,
   fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
@@ -91,7 +91,7 @@ function groupRows(rows: ConvictionRow[]): ConvictionGroup[] {
 
 interface FundRow extends ConvictionRow { parentInstitution: string }
 
-const TOTAL_COLS = 14
+const TOTAL_COLS = 15
 
 // ── InvestorSearchWithDropdown (local, same pattern as Register) ──────────
 
@@ -261,7 +261,7 @@ export function ConvictionTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="cv-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="cv-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
@@ -297,8 +297,9 @@ export function ConvictionTab() {
             {/* Table */}
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 13 }}>
               <colgroup>
+                <col style={{ width: 24 }} />   {/* Expand triangle */}
                 {/* Match Register widths for first 3 cols */}
-                <col style={{ width: 60 }} />   {/* Rank */}
+                <col style={{ width: 48 }} />   {/* Rank */}
                 <col style={{ width: 440 }} />  {/* Institution */}
                 <col style={{ width: 120 }} />  {/* Type */}
                 {/* Position group */}
@@ -317,11 +318,12 @@ export function ConvictionTab() {
               </colgroup>
               <thead>
                 <ColumnGroupHeader groups={[
-                  { label: '', colSpan: 3 },
+                  { label: '', colSpan: 4 },
                   { label: 'Position', colSpan: 6 },
                   { label: 'Portfolio', colSpan: 5 },
                 ]} />
                 <tr>
+                  <th style={TH} />
                   <th style={TH_R}>Rank</th>
                   <th style={TH}>Institution</th>
                   <th style={TH}>Type</th>
@@ -358,7 +360,7 @@ export function ConvictionTab() {
                   <tr><td colSpan={TOTAL_COLS} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No rows match the current filters</td></tr>
                 )}
               </tbody>
-              <TableFooter totalColumns={TOTAL_COLS} rows={[{
+              <TableFooter totalColumns={TOTAL_COLS} leadingEmptyCols={1} rows={[{
                 label: `Top ${visibleSums.count} Shown`,
                 shares_mm: null,
                 value_mm: visibleSums.value / 1e6,
@@ -404,22 +406,37 @@ function renderRow(
 ) {
   const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'rgba(197,162,84,0.03)' : 'transparent' }
   const nameCell: React.CSSProperties = {
-    ...TD, paddingLeft: indent === 1 ? 24 : 10,
+    ...TD, paddingLeft: indent === 1 ? 24 : 8,
     fontWeight: indent === 0 ? 600 : 400,
     color: indent === 0 ? 'var(--text)' : 'var(--text-mute)',
-    fontSize: indent === 1 ? 12 : 13,
+    fontSize: 12,
     cursor: canExpand ? 'pointer' : 'default', userSelect: 'none',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0,
+  }
+  const expandCell: React.CSSProperties = {
+    ...TD,
+    padding: '4px 0 4px 4px',
+    textAlign: 'center',
+    cursor: canExpand ? 'pointer' : 'default',
+    userSelect: 'none',
+    borderLeft: indent === 1 ? '2px solid var(--gold)' : '2px solid transparent',
   }
   const ts = getTypeStyle(row.type)
   const nport = nportBadgeStyle(row.nport_cov)
   return (
     <tr key={key} style={bg} data-institution={indent === 0 ? row.institution : undefined}>
-      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: indent === 0 ? 'var(--text-dim)' : 'var(--text-dim)', fontSize: indent === 1 ? 12 : 13 }}>
+      <td style={expandCell} onClick={canExpand ? () => toggle(key) : undefined}>
+        {indent === 0 && canExpand && (
+          <span style={{ display: 'inline-block', color: 'var(--gold)', fontSize: 9, transition: 'transform 0.12s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+        )}
+      </td>
+      <td style={{ ...TD, textAlign: 'right', fontWeight: indent === 0 ? 700 : 400, color: 'var(--text-dim)', fontSize: 12 }}>
         {displayRank ?? row.rank ?? ''}
       </td>
       <td style={nameCell} title={row.institution} onClick={canExpand ? () => toggle(key) : undefined}>
-        {indent === 0 && <span style={{ display: 'inline-block', width: 14, color: 'var(--text-dim)', fontSize: 10 }}>{canExpand ? (isOpen ? '▼' : '▶') : ''}</span>}
+        {indent === 1 && (
+          <span style={{ color: 'var(--text-mute)', marginRight: 6, fontSize: 11 }}>└</span>
+        )}
         {row.institution}
       </td>
       <td style={TD}>

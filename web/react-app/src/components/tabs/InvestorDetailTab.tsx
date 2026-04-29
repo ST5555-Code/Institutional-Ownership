@@ -48,8 +48,8 @@ function nportBadgeStyle(cov: number | null): React.CSSProperties | null {
 // ── Shared inline styles ───────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px',
-  fontSize: 9,
+  padding: '4px 8px',
+  fontSize: 8,
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.16em',
@@ -65,8 +65,8 @@ const TH: React.CSSProperties = {
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px',
-  fontSize: 13,
+  padding: '4px 8px',
+  fontSize: 12,
   color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
@@ -78,8 +78,8 @@ const TD_R: React.CSSProperties = {
 }
 const BADGE: React.CSSProperties = {
   display: 'inline-block',
-  padding: '2px 8px',
-  fontSize: 11,
+  padding: '1px 6px',
+  fontSize: 10,
   fontWeight: 600,
   borderRadius: 1,
 }
@@ -221,8 +221,8 @@ export function InvestorDetailTab() {
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'flex-end',
-          gap: 16,
-          padding: '10px 16px',
+          gap: 10,
+          padding: '8px 12px',
           backgroundColor: 'var(--header)',
           borderBottom: '1px solid var(--line)',
           flexShrink: 0,
@@ -243,7 +243,7 @@ export function InvestorDetailTab() {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-        <div style={{ padding: 16, backgroundColor: 'var(--panel)', minHeight: '100%' }}>
+        <div style={{ padding: 10, backgroundColor: 'var(--panel)', minHeight: '100%' }}>
           {market.loading && (
             <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>
               Loading top institutions…
@@ -253,9 +253,10 @@ export function InvestorDetailTab() {
             <div style={{ padding: 40, color: 'var(--neg)', textAlign: 'center' }}>Error: {market.error}</div>
           )}
           {market.data && (
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
               <thead>
                 <tr>
+                  <th style={{ ...TH, width: 24 }} />
                   <th style={{ ...TH, width: 48 }}>Rank</th>
                   <th style={TH}>Institution</th>
                   <th style={TH}>Type</th>
@@ -334,22 +335,30 @@ function InstitutionRow({
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
       >
-        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{row.rank}</td>
-        <td style={{ ...TD, fontWeight: 600 }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 14,
-              color: 'var(--gold)',
-              fontSize: 10,
-              transition: 'transform 0.12s',
-              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}
-          >
-            {canExpand ? '▶' : ''}
-          </span>
-          {row.institution}
+        <td
+          style={{
+            ...TD,
+            padding: '4px 0 4px 4px',
+            textAlign: 'center',
+            borderLeft: '2px solid transparent',
+          }}
+        >
+          {canExpand && (
+            <span
+              style={{
+                display: 'inline-block',
+                color: 'var(--gold)',
+                fontSize: 9,
+                transition: 'transform 0.12s',
+                transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              ▶
+            </span>
+          )}
         </td>
+        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{row.rank}</td>
+        <td style={{ ...TD, fontWeight: 600 }}>{row.institution}</td>
         <td style={TD}>
           <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span>
         </td>
@@ -368,21 +377,21 @@ function InstitutionRow({
       </tr>
       {isOpen && hierarchyLoading && (
         <tr>
-          <td colSpan={7} style={{ ...TD, color: 'var(--text-dim)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
+          <td colSpan={8} style={{ ...TD, color: 'var(--text-dim)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
             Loading filers…
           </td>
         </tr>
       )}
       {isOpen && hierarchyError && (
         <tr>
-          <td colSpan={7} style={{ ...TD, color: 'var(--neg)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
+          <td colSpan={8} style={{ ...TD, color: 'var(--neg)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
             Error: {hierarchyError}
           </td>
         </tr>
       )}
       {isOpen && hierarchy && hierarchy.filers.length === 0 && !hierarchyLoading && (
         <tr>
-          <td colSpan={7} style={{ ...TD, color: 'var(--text-dim)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
+          <td colSpan={8} style={{ ...TD, color: 'var(--text-dim)', padding: '12px 24px', backgroundColor: 'rgba(197,162,84,0.03)' }}>
             No filer entities for {hierarchy.institution}.
           </td>
         </tr>
@@ -419,7 +428,29 @@ function FilerRows({
           backgroundColor: 'rgba(197,162,84,0.03)',
         }}
       >
-        <td style={{ ...TD, borderLeft: '2px solid var(--gold)' }} />
+        <td
+          style={{
+            ...TD,
+            padding: '4px 0 4px 4px',
+            textAlign: 'center',
+            borderLeft: '2px solid var(--gold)',
+          }}
+        >
+          {canExpand && (
+            <span
+              style={{
+                display: 'inline-block',
+                color: 'var(--gold)',
+                fontSize: 9,
+                transition: 'transform 0.12s',
+                transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              ▶
+            </span>
+          )}
+        </td>
+        <td style={TD} />
         <td
           style={{
             ...TD,
@@ -433,32 +464,26 @@ function FilerRows({
           }}
           title={filer.name}
         >
-          <span
-            style={{
-              display: 'inline-block',
-              width: 14,
-              color: 'var(--gold)',
-              fontSize: 10,
-              transition: 'transform 0.12s',
-              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}
-          >
-            {canExpand ? '▶' : ''}
-          </span>
+          <span style={{ color: 'var(--text-mute)', marginRight: 6, fontSize: 11 }}>└</span>
           {filer.name}
         </td>
-        <td style={{ ...TD, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-dim)' }}>
-          {filer.cik || '—'}
-        </td>
-        <td style={{ ...TD_R, fontSize: 12 }}>{fmtAumB(filer.aum)}</td>
-        <td style={{ ...TD_R, fontSize: 12 }}>{NUM_0.format(filer.fund_count)}</td>
         <td style={TD} />
+        <td style={{ ...TD_R, fontSize: 12 }}>{fmtAumB(filer.aum)}</td>
+        <td style={TD} />
+        <td style={{ ...TD_R, fontSize: 12 }}>{NUM_0.format(filer.fund_count)}</td>
         <td style={TD} />
       </tr>
       {isOpen &&
         dedupeBy(filer.funds, (fund) => fund.series_id).map((fund) => (
           <tr key={fund.entity_id} style={{ backgroundColor: 'rgba(197,162,84,0.03)' }}>
-            <td style={{ ...TD, borderLeft: '2px solid var(--gold)' }} />
+            <td
+              style={{
+                ...TD,
+                padding: '4px 0 4px 4px',
+                borderLeft: '2px solid var(--gold)',
+              }}
+            />
+            <td style={TD} />
             <td
               style={{
                 ...TD,
@@ -472,11 +497,10 @@ function FilerRows({
               }}
               title={fund.fund_name}
             >
+              <span style={{ color: 'var(--text-mute)', marginRight: 6, fontSize: 11 }}>└</span>
               {fund.fund_name}
             </td>
-            <td style={{ ...TD, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-dim)' }}>
-              {fund.series_id || '—'}
-            </td>
+            <td style={TD} />
             <td style={{ ...TD_R, fontSize: 12 }}>{fmtAumB(fund.nav)}</td>
             <td style={TD} />
             <td style={TD} />
