@@ -146,11 +146,14 @@ export function FlowAnalysisTab() {
           {PERIODS.map(p => (
             <button key={p.id} type="button" onClick={() => setPeriod(p.id)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
-                fontWeight: period === p.id ? 600 : 400,
-                color: period === p.id ? 'var(--white)' : 'var(--text-dim)',
-                backgroundColor: period === p.id ? 'var(--header)' : 'var(--white)',
-                border: `1px solid ${period === p.id ? 'var(--header)' : 'var(--line)'}`,
+                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
+                fontWeight: period === p.id ? 700 : 400,
+                color: period === p.id ? '#000000' : 'var(--text-dim)',
+                backgroundColor: period === p.id ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: "'Inter', sans-serif",
+                transition: 'all 0.12s',
               }}>
               {p.label}
             </button>

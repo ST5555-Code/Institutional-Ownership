@@ -139,7 +139,7 @@ function EntitySearch({ onSelect }: { onSelect: (id: number, name: string) => vo
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <input type="text" value={input} placeholder="Search institution…" autoComplete="off" autoCorrect="off" spellCheck={false}
         onChange={e => handleInput(e.target.value)} onFocus={() => { if (results.length > 0) setOpen(true) }}
-        style={{ width: 260, padding: '6px 10px', fontSize: 13, color: 'var(--white)', backgroundColor: 'var(--panel-hi)', border: '1px solid var(--line)', borderRadius: 0, outline: 'none' }} />
+        style={{ width: 260, padding: '6px 10px', fontSize: 13, color: 'var(--white)', backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 0, outline: 'none' }} />
       {open && results.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, width: 320, maxHeight: 280, overflowY: 'auto', backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 1000 }}>
           {results.map(r => (
@@ -323,7 +323,7 @@ export function EntityGraphTab() {
                     const covStyle = r.nport_coverage_pct != null && r.nport_coverage_pct > 0 ? r.nport_coverage_pct >= 80 ? { color: 'var(--pos)' } : r.nport_coverage_pct >= 50 ? { color: 'var(--gold)' } : { color: 'var(--text-dim)' } : { color: 'var(--text-dim)' }
                     return (
                       <tr key={r.rank} onClick={() => handleMarketClick(r.entity_id, r.institution)} style={{ cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                         <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{r.rank}</td>
                         <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                         <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
@@ -372,7 +372,7 @@ export function EntityGraphTab() {
                         const ts = getTypeStyle(r.type)
                         return (
                           <tr key={i} onClick={() => handleHolderClick(r.institution)} style={{ cursor: 'pointer' }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                             <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)' }}>{r.rank}</td>
                             <td style={{ ...TD, fontWeight: 600 }}>{r.institution}</td>
                             <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>

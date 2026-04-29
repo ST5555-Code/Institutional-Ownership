@@ -110,7 +110,7 @@ function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
         onBlur={() => setFocused(false)}
         style={{
           width: 180, padding: '6px 28px 6px 10px', fontSize: 13, color: 'var(--text)',
-          backgroundColor: 'var(--panel)', borderRadius: 0, outline: 'none',
+          backgroundColor: 'var(--bg)', borderRadius: 0, outline: 'none',
           border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
           transition: 'border-color 0.1s',
         }}
@@ -122,7 +122,7 @@ function SecondTickerInput({ value, onSelect }: TickerSearchProps) {
           {options.map(o => (
             <div key={o.ticker} onMouseDown={() => select(o.ticker)}
               style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', gap: 8 }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
               <span style={{ color: 'var(--gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
               <span style={{ color: 'var(--text-dim)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>

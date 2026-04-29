@@ -146,7 +146,7 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
         onBlur={() => setFocused(false)}
         style={{
           width: 120, padding: '5px 8px', fontSize: 12, color: 'var(--text)',
-          backgroundColor: 'var(--panel)', borderRadius: 0, outline: 'none',
+          backgroundColor: 'var(--bg)', borderRadius: 0, outline: 'none',
           border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
           transition: 'border-color 0.1s',
         }}
@@ -161,7 +161,7 @@ function TickerSlot({ value, onChange, onClear, placeholder = 'Add ticker…' }:
           {options.map(o => (
             <div key={o.ticker} onMouseDown={() => select(o.ticker)}
               style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
               <span style={{ color: 'var(--gold)', fontWeight: 700, width: 48, flexShrink: 0 }}>{o.ticker}</span>
               <span style={{ color: 'var(--text-dim)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
@@ -322,11 +322,14 @@ export function CrossOwnershipTab() {
           {(['anchor', 'top'] as const).map(v => (
             <button key={v} type="button" onClick={() => setViewMode(v)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
-                fontWeight: viewMode === v ? 600 : 400,
-                color: viewMode === v ? 'var(--white)' : 'var(--text-dim)',
-                backgroundColor: viewMode === v ? 'var(--header)' : 'var(--white)',
-                border: `1px solid ${viewMode === v ? 'var(--header)' : 'var(--line)'}`,
+                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
+                fontWeight: viewMode === v ? 700 : 400,
+                color: viewMode === v ? '#000000' : 'var(--text-dim)',
+                backgroundColor: viewMode === v ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: "'Inter', sans-serif",
+                transition: 'all 0.12s',
               }}>
               {v === 'anchor' ? 'By Anchor' : 'Across Group'}
             </button>

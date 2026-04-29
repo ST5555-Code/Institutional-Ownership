@@ -157,7 +157,7 @@ export function FundPortfolioTab() {
           disabled={!managers.data || managers.data.length === 0}
           style={{
             flex: 1, padding: '6px 10px', fontSize: 13, color: 'var(--text)',
-            backgroundColor: 'var(--panel)', border: '1px solid var(--line)',
+            backgroundColor: 'var(--bg)', border: '1px solid var(--line)',
             borderRadius: 0, outline: 'none',
           }}
         >

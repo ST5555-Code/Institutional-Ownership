@@ -217,7 +217,7 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
           padding: '6px 28px 6px 10px',
           fontSize: 13,
           color: 'var(--text)',
-          backgroundColor: 'var(--panel)',
+          backgroundColor: 'var(--bg)',
           border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`,
           borderRadius: 0,
           outline: 'none',
@@ -278,7 +278,7 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = 'var(--bg)')
+                (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.backgroundColor = 'transparent')
@@ -828,7 +828,7 @@ function renderRow(
   displayRank?: string,
 ) {
   const rowBg: React.CSSProperties = {
-    backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)',
+    backgroundColor: indent === 1 ? 'rgba(197,162,84,0.03)' : 'transparent',
   }
   const nameCell: React.CSSProperties = {
     ...TD_STYLE,

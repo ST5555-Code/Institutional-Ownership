@@ -125,7 +125,7 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
         onChange={e => { setValue(e.target.value); setOpen(e.target.value.length > 0) }}
         onFocus={() => { setFocused(true); if (value.length > 0) setOpen(true) }}
         onBlur={() => setFocused(false)}
-        style={{ width: 200, padding: '6px 28px 6px 10px', fontSize: 13, color: 'var(--text)', backgroundColor: 'var(--panel)', border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 0, outline: 'none', transition: 'border-color 0.1s' }}
+        style={{ width: 200, padding: '6px 28px 6px 10px', fontSize: 13, color: 'var(--text)', backgroundColor: 'var(--bg)', border: `1px solid ${focused ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 0, outline: 'none', transition: 'border-color 0.1s' }}
       />
       {value && <button type="button" onClick={clear} aria-label="Clear" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, padding: 0, lineHeight: '16px', fontSize: 14, color: 'var(--text-dim)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>}
       {open && matches.length > 0 && (
@@ -133,7 +133,7 @@ function InvestorSearchWithDropdown({ data, onSelect }: SearchProps) {
           {matches.map(m => (
             <div key={m.institution} onMouseDown={() => select(m.institution)}
               style={{ padding: '7px 12px', fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--panel-hi)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
               {m.institution}
             </div>
@@ -402,7 +402,7 @@ function renderRow(
   canExpand: boolean, isOpen: boolean, toggle: (k: string) => void,
   displayRank?: string,
 ) {
-  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'var(--panel)' : 'var(--white)' }
+  const bg: React.CSSProperties = { backgroundColor: indent === 1 ? 'rgba(197,162,84,0.03)' : 'transparent' }
   const nameCell: React.CSSProperties = {
     ...TD, paddingLeft: indent === 1 ? 24 : 10,
     fontWeight: indent === 0 ? 600 : 400,

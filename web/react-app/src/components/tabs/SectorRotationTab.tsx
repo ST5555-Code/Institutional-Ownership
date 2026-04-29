@@ -183,11 +183,14 @@ export function SectorRotationTab() {
           {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (
             <button key={p.n} type="button" onClick={() => setPeriodCount(p.n)}
               style={{
-                padding: '5px 12px', fontSize: 12, borderRadius: 0, cursor: 'pointer',
-                fontWeight: periodCount === p.n ? 600 : 400,
-                color: periodCount === p.n ? 'var(--white)' : 'var(--text-dim)',
-                backgroundColor: periodCount === p.n ? 'var(--header)' : 'var(--white)',
-                border: `1px solid ${periodCount === p.n ? 'var(--header)' : 'var(--line)'}`,
+                padding: '5px 12px', fontSize: 11, borderRadius: 0, cursor: 'pointer',
+                fontWeight: periodCount === p.n ? 700 : 400,
+                color: periodCount === p.n ? '#000000' : 'var(--text-dim)',
+                backgroundColor: periodCount === p.n ? 'var(--gold)' : 'transparent',
+                border: '1px solid var(--line)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: "'Inter', sans-serif",
+                transition: 'all 0.12s',
               }}>
               {p.label}
             </button>
