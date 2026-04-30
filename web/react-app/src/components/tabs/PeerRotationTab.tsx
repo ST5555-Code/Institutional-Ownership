@@ -15,6 +15,7 @@ import {
   ActiveOnlyToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
 } from '../common'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell,
@@ -130,6 +131,11 @@ export function PeerRotationTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Flow & Rotation"
+        title="Peer Rotation"
+        description="Cross-name rotation across a peer group. Identifies capital shifting between related securities."
+      />
       <style>{`
         @media print {
           .pr-controls { display:none!important }

@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useFetch } from '../../hooks/useFetch'
-import { FreshnessBadge } from '../common'
+import { FreshnessBadge, PageHeader } from '../common'
 
 interface DataSourcesPayload {
   content: string
@@ -25,14 +25,6 @@ const HEADER: React.CSSProperties = {
   backgroundColor: 'var(--panel)',
   borderBottom: '1px solid var(--line)',
   flexShrink: 0,
-}
-const TITLE: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: 'var(--gold)',
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  fontFamily: "'Hanken Grotesk', sans-serif",
 }
 const SUB: React.CSSProperties = {
   fontSize: 11,
@@ -61,8 +53,12 @@ export function DataSourceTab() {
 
   return (
     <div style={WRAP}>
+      <PageHeader
+        section="Reference"
+        title="Data Source"
+        description="Filing coverage, data freshness, and pipeline status across all SEC data sources."
+      />
       <div style={HEADER}>
-        <div style={TITLE}>Data Sources</div>
         {data && <div style={SUB}>Last updated: {fmtDate(data.last_modified)}</div>}
         <div style={{ marginLeft: 'auto' }}>
           <FreshnessBadge tableName="holdings_v2" label="13F" />

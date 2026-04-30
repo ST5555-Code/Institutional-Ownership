@@ -11,6 +11,7 @@ import {
   FreshnessBadge,
   TableFooter,
   ColumnGroupHeader,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -255,6 +256,11 @@ export function ConvictionTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Ownership"
+        title="Conviction Analysis"
+        description="High-conviction holders ranked by portfolio concentration, with direction and tenure signals."
+      />
       <style>{`
         @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
         .cv-row-highlight > td { background-color: rgba(197,162,84,0.12) !important; transition: background-color 0.4s ease-in-out; }

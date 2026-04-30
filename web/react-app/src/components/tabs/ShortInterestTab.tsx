@@ -8,7 +8,7 @@ import type {
   ShortOnlyFundRow,
   NportByFundRow,
 } from '../../types/api'
-import { ExportBar, ColumnGroupHeader, FreshnessBadge, getTypeStyle } from '../common'
+import { ExportBar, ColumnGroupHeader, FreshnessBadge, PageHeader, getTypeStyle } from '../common'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -87,6 +87,11 @@ export function ShortInterestTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Targeting"
+        title="Short Interest Analysis"
+        description="Short interest trend, N-PORT short positions, and long/short cross-reference."
+      />
       <style>{`
         @media print {
           .si-controls { display:none!important }

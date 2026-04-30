@@ -12,6 +12,7 @@ import {
   ExportBar,
   ColumnGroupHeader,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -208,6 +209,11 @@ export function OverlapAnalysisTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Targeting"
+        title="Overlap Analysis"
+        description="Pairwise holder overlap between securities. Identifies shared institutional ownership patterns."
+      />
       <style>{`@media print { .oa-controls { display:none!important } }`}</style>
 
       {/* Controls */}

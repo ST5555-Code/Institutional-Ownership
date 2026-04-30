@@ -15,6 +15,7 @@ import {
   FundViewToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -182,6 +183,11 @@ export function OwnershipTrendTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Ownership"
+        title="Ownership Trend"
+        description="Quarterly ownership changes, holder momentum, and cohort analysis across reporting periods."
+      />
       <style>{`@media print { .ot-controls { display:none!important } .ot-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls bar */}
