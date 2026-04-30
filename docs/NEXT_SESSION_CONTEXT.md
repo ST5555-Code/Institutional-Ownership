@@ -4,24 +4,25 @@
 
 ## Last completed
 
-`sr-fund-quarter-filter` (PR #215) — Two enhancements to the Sector Rotation tab's Fund view:
+`conv-20` — Short Interest redesign, sector rotation polish, export bar alignment, controls panel borders. Eight PRs landed (`#215`–`#222`):
 
-- **Partial-quarter filter.** New `GET /api/v1/fund_quarter_completeness` returns per-quarter `months_available` + `complete` flag (true iff 3 monthly N-PORT report-months filed) from `fund_holdings_v2`. Fetched once on tab mount; when `level='fund'`, periods whose destination quarter is incomplete are filtered out of the sector heatmap. Institution view + the static Net Flows heatmap unaffected.
-- **Monthly hover tooltip.** New `GET /api/v1/sector_monthly_flows?sector=&quarter=` computes monthly net flows from paired filers (funds present in both current and prior month). **Months are derived from the data, not the quarter label** — N-PORT report-months trail the filing quarter by one period (`quarter='2026Q1'` → report_months `2025-10/11/12`). Funds present in only one of the two months are excluded — most filers report only at quarter-end, so missing-month ≠ exit; treating it as exit produced spurious trillion-dollar swings. Heatmap tooltip lazy-fetches per `(sector, quarter)`, caches in component state (`monthlyByKey`), shows "Loading monthly detail…" while in-flight, renders abbreviated month labels in JetBrains Mono with green/red semantic colors per `docs/plans/DarkStyle.md`.
+- **PR #215 `sr-fund-quarter-filter`** — Sector Rotation Fund view: partial-quarter filter + monthly hover tooltip. New endpoints `/api/v1/fund_quarter_completeness` and `/api/v1/sector_monthly_flows`.
+- **PR #216 `si-tab-redesign`** — Short Interest full redesign with sector/industry overlays. Two new endpoints (`/api/v1/short_position_pct`, `/api/v1/short_volume_comparison`), 5 KPI tiles.
+- **PR #217 `si-restore-tables`** — Restored 3 tables dropped in #216: CrossRef, ShortOnly, NportByFund.
+- **PR #218 `sr-polish-v2` (on-main rebuild)** — Net flows heatmap table, sector totals row, movers beside heatmap, compact KPI labels.
+- **PR #219 `si-layout-fix`** — Short Interest layout: full-width stacked tables, axis line removal, named legends (Ticker/Sector/Industry), FINRA footnote.
+- **PR #220 `si-chart-table-align`** — Ticker bar chart converted to line chart with dots; column widths normalized across the 4 SI tables.
+- **PR #221 `export-bar-align`** — `ExportBar` + `FreshnessBadge` moved to the top-right header row on all 12 tabs.
+- **PR #222 `controls-panel-border`** — Bordered control panel applied to the 10 tabs that have controls bars.
 
-Earlier in `conv-19`:
+Current HEAD: **`3a5e2a1`** on `main`.
 
-- **PR #213** — N-PORT quarter bucketing fix + 14.6M-row migration + downstream rebuild. Backup at `data/13f_pre_quarter_fix.duckdb`. Closes the N-PORT quarter bucketing Known Issue.
-- **PR #214** — Shared `PageHeader` rollout to all 12 tabs.
+This sync (direct to `main`, post-merge):
 
-Current HEAD: post-`#215` squash on `main`.
-
-Gotcha to remember: `fund_holdings_v2.report_month` trails `quarter` by one period (filing-quarter convention). Anything that wants per-month detail for a filing quarter must look up the actual `report_month` values from the data — do not derive months from the quarter label.
-
-This sync (direct to main, post-merge):
-
-- **`ROADMAP.md`** — new COMPLETED row for #215 (still under conv-19 sync header).
+- **`ROADMAP.md`** — header updated to conv-20 reference; 7 new COMPLETED rows for `#216`–`#222`.
 - **`docs/NEXT_SESSION_CONTEXT.md`** — this file refreshed.
+- **`docs/findings/CHAT_HANDOVER.md`** — new conv-20 section at top.
+- **`MAINTENANCE.md`** — last-updated bumped.
 
 ## Up next
 
@@ -35,9 +36,9 @@ This sync (direct to main, post-merge):
 
 ### Priority order for next session
 
-1. **Sector Rotation fund view follow-ups** — partial-quarter filter, monthly hover tooltip.
-2. **Stale worktree branches cleanup** — sweep merged-PR worktrees that were not torn down.
-3. **Stage 5 cleanup DROP** — authorized on or after 2026-05-09 per `MAINTENANCE.md`.
+1. **13F-as-fund coverage gap** — fund view of Sector Rotation excludes hedge funds, family offices, and other 13F-only filers that lack N-PORT filings. Decide whether to surface them via a separate "13F filer" track (pure 13F holdings, no monthly cadence) or document the omission as expected behavior.
+2. **Stale worktree cleanup** — sweep merged-PR worktrees that were not torn down. Quick `git worktree list` audit, then prune anything whose branch is gone from `origin`.
+3. **Stage 5 cleanup DROP** — authorized on or after **2026-05-09** per `MAINTENANCE.md`.
 
 ## Next external events
 
@@ -51,13 +52,12 @@ This sync (direct to main, post-merge):
 
 ## Reminders
 
-- **HEAD on main is `e090ab7`** after PR #214 squash-merge. Branches deleted.
-- **N-PORT quarter bucketing is now correct** (calendar convention). Pre-fix snapshot preserved at `data/13f_pre_quarter_fix.duckdb` if rollback needed.
-- **Git ops change** (from conv-18). Code pushes the branch, opens the PR, waits for CI green, then merges via `gh pr merge --squash --delete-branch` and pulls main. Reflected in `docs/PROCESS_RULES.md`.
-- **Branch naming.** Always use a short descriptive slug (e.g. `nport-quarter-fix`, `tab-page-headers`). Claude must propose the short name before writing any prompt for Code.
+- **HEAD on main is `3a5e2a1`** after PR #222 squash-merge. Branches deleted.
+- **Git ops** (rule change from conv-18, reaffirmed in conv-20). Code now merges PRs autonomously after CI passes: pushes branch, opens PR, waits for CI green, then `gh pr merge --squash --delete-branch` and pulls main. Reflected in `docs/PROCESS_RULES.md`.
+- **Branch naming.** Always use a short descriptive slug (e.g. `si-tab-redesign`, `controls-panel-border`). Claude must propose the short name before writing any prompt for Code.
 - **Dark UI is production styling.** `docs/plans/DarkStyle.md` is the spec. Token palette + Hanken Grotesk / Inter / JetBrains Mono live in `web/react-app/src/styles/globals.css`.
 - **App is started from `data/13f_readonly.duckdb`** (last refreshed in PR #200, 2026-04-28 ~15:09).
-- **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows). Quarter labels now reflect calendar convention.
+- **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows). Quarter labels reflect calendar convention (PR #213).
 - **Do not run `build_classifications.py --reset`.** Same as previous sessions.
 - **No `--reset` runs anywhere** without explicit user authorization.
 - **Stage 5 cleanup** (legacy-table DROP window) authorized **on or after 2026-05-09** per `MAINTENANCE.md`.
@@ -66,3 +66,4 @@ This sync (direct to main, post-merge):
 - **B3 calendar gate:** post-Q1+Q2 2026 cycles, ~mid-Aug 2026.
 - **DM15e** (7 prospectus-blocked umbrella trusts) remains deferred behind DM6 / DM3.
 - **PR #172** (`dm13-de-discovery`) remains intentionally OPEN — paired-with-#173 triage CSV; close after reconciling.
+- **Sector Rotation fund-view caveat** (from PR #215): `fund_holdings_v2.report_month` trails `quarter` by one period (filing-quarter convention). Anything that wants per-month detail for a filing quarter must look up the actual `report_month` values from the data — do not derive months from the quarter label.

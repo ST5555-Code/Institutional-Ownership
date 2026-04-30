@@ -1,5 +1,40 @@
 # Chat Handover
 
+## conv-20-doc-sync (2026-04-30)
+
+HEAD: **`3a5e2a1`** on `main` after PRs `#215`–`#222` merged.
+
+### PRs landed (#215–#222)
+
+Eight PRs merged across the Sector Rotation fund view + Short Interest redesign + UI alignment arc:
+
+- **PR #215 `sr-fund-quarter-filter`** — Sector Rotation Fund-view enhancements: partial-quarter filter (drop incomplete destination quarters from the sector heatmap when `level='fund'`) + monthly hover tooltip. New `GET /api/v1/fund_quarter_completeness` and `GET /api/v1/sector_monthly_flows`. Squash `2a296ce`.
+- **PR #216 `si-tab-redesign`** — Short Interest tab fully redesigned with sector/industry overlays. Two new endpoints: `GET /api/v1/short_position_pct` and `GET /api/v1/short_volume_comparison`. 5 KPI tiles. Squash `e9b09aa`.
+- **PR #217 `si-restore-tables`** — Restored 3 tables dropped during the #216 redesign: CrossRef, ShortOnly, NportByFund. Squash `26b7553`.
+- **PR #218 `sr-polish-v2` (on-main rebuild)** — Net flows heatmap table, totals row, movers panel beside heatmap, compact KPI labels. Same scope as #209; #218 is the on-`main` rebuild after subsequent SR work. Squash `89f2ac4`.
+- **PR #219 `si-layout-fix`** — Short Interest layout polish: full-width stacked tables, axis-line removal, named legends (Ticker / Sector / Industry), FINRA-attribution footnote. Squash `f2b3e76`.
+- **PR #220 `si-chart-table-align`** — Ticker series converted from bar chart to line-with-dots; column widths normalized across the 4 SI tables. Squash `ce54d6f`.
+- **PR #221 `export-bar-align`** — `ExportBar` + `FreshnessBadge` moved into the top-right header row on every one of the 12 tabs. Squash `370619f`.
+- **PR #222 `controls-panel-border`** — Bordered control panel applied to the 10 tabs that have controls bars (Overview, Holdings, Investors, Performers, Sector Rotation, Short Interest, Investor Detail, Network Map, Activity, Filings). Squash `3a5e2a1`.
+
+### New endpoints
+
+- `/api/v1/fund_quarter_completeness` — per-quarter `months_available` + `complete` flag (true iff 3 monthly N-PORT report-months filed) from `fund_holdings_v2`. Backs the SR Fund-view partial-quarter filter (PR #215).
+- `/api/v1/sector_monthly_flows?sector=&quarter=` — per-month net flows for a given (sector, quarter) pair, computed from paired filers (funds present in both current and prior month). Backs the SR Fund-view monthly hover tooltip (PR #215).
+- `/api/v1/short_position_pct` — per-ticker short-position percent of shares outstanding, time-series. Backs the redesigned Short Interest tab (PR #216).
+- `/api/v1/short_volume_comparison` — per-ticker short-volume vs total-volume, time-series. Backs the redesigned Short Interest tab (PR #216).
+
+### Git ops
+
+- **Code now merges PRs autonomously after CI passes** (rule change from conv-18, reaffirmed in conv-20). Workflow: push branch → open PR → wait for CI green → `gh pr merge --squash --delete-branch` → `git pull` on main. Reflected in `docs/PROCESS_RULES.md`.
+
+### Known issues
+
+- **N-PORT quarter bucketing:** **CLOSED** by PR #213 (closed in conv-19).
+- **No new known issues opened in conv-20.**
+
+---
+
 ## conv-19-doc-sync (2026-04-30)
 
 HEAD: **`e090ab7`** on `main` after PR #214 squash-merge, on top of PR #213.
