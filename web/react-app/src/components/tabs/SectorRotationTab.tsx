@@ -357,7 +357,7 @@ export function SectorRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 12px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, margin: '0 12px', flexShrink: 0 }}>
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
       </div>

@@ -544,10 +544,12 @@ export function RegisterTab() {
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'flex-end',
-          gap: 10,
-          padding: '8px 12px',
+          gap: 12,
+          padding: '10px 12px',
           backgroundColor: 'var(--panel)',
-          borderBottom: '1px solid var(--line)',
+          border: '1px solid var(--line)',
+          borderRadius: 0,
+          margin: '0 12px',
           flexShrink: 0,
         }}
       >

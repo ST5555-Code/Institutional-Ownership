@@ -331,7 +331,7 @@ export function CrossOwnershipTab() {
       <style>{`@media print { .co-controls { display:none!important } .no-print { display:none!important } .co-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls */}
-      <div className="co-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="co-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12, padding: '10px 12px', backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, margin: '0 12px', flexShrink: 0 }}>
         {/* View toggle */}
         <div style={{ display: 'flex', gap: 4 }}>
           {(['anchor', 'top'] as const).map(v => (
