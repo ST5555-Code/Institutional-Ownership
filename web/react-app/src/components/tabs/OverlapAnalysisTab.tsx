@@ -65,6 +65,20 @@ const BADGE: React.CSSProperties = {
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
 
+const TOTAL_TD: React.CSSProperties = {
+  padding: '6px 8px', fontSize: 12, color: 'var(--text)',
+  backgroundColor: 'var(--header)', borderTop: '2px solid var(--gold)',
+}
+const TOTAL_TD_R: React.CSSProperties = {
+  ...TOTAL_TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+}
+const TOTAL_LABEL: React.CSSProperties = {
+  fontSize: 9, fontFamily: "'Hanken Grotesk', sans-serif", fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--text-dim)',
+}
+const TOTAL_LABEL_R: React.CSSProperties = { ...TOTAL_LABEL, textAlign: 'right' }
+
 const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
 
 // ── Second ticker input with dropdown ──────────────────────────────────────
@@ -168,6 +182,11 @@ export function OverlapAnalysisTab() {
   const second = meta?.second || secondTicker || ''
   const hasSecond = !!secondTicker
 
+  const isInstActive = (mt: string | null) => {
+    const t = (mt || '').toLowerCase()
+    return t === 'active' || t === 'mixed' || t === 'strategic'
+  }
+
   const instRows = useMemo(() => {
     if (!data) return []
     let rows = data.institutional
@@ -182,10 +201,24 @@ export function OverlapAnalysisTab() {
     return rows
   }, [data, fundActiveOnly])
 
-  // Cross-ownership stats (computed from holders that appear in BOTH lists,
-  // valued at their A holdings / B holdings respectively).
-  const instStats = useMemo(() => computeOverlapStats(instRows), [instRows])
-  const fundStats = useMemo(() => computeOverlapStats(fundRows), [fundRows])
+  // KPI tiles — computed from the FULL holder lists (independent of table
+  // active-only toggles) and also for active-only subsets.
+  const instStatsAll = useMemo(
+    () => computeOverlapStats(data?.institutional ?? []),
+    [data]
+  )
+  const instStatsActive = useMemo(
+    () => computeOverlapStats((data?.institutional ?? []).filter(r => isInstActive(r.manager_type))),
+    [data]
+  )
+  const fundStatsAll = useMemo(
+    () => computeOverlapStats(data?.fund ?? []),
+    [data]
+  )
+  const fundStatsActive = useMemo(
+    () => computeOverlapStats((data?.fund ?? []).filter(r => r.is_active !== false)),
+    [data]
+  )
 
   function onExcel() {
     if (!data) return
@@ -246,50 +279,37 @@ export function OverlapAnalysisTab() {
       {data && !loading && (
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Institutional Level */}
-            <div>
-              <InstitutionalTable
-                rows={instRows}
+            {hasSecond && (
+              <CrossOwnershipStats
                 subject={subject}
                 second={second}
-                hasSecond={hasSecond}
-                quarter={quarter}
-                activeOnly={instActiveOnly}
-                onActiveOnlyChange={setInstActiveOnly}
+                instAll={instStatsAll}
+                instActive={instStatsActive}
+                fundAll={fundStatsAll}
+                fundActive={fundStatsActive}
               />
-              {hasSecond && (
-                <StatsRow
-                  subject={subject}
-                  second={second}
-                  pctAOwnedByB={instStats.pctAOwnedByB}
-                  pctBOwnedByA={instStats.pctBOwnedByA}
-                  top25Overlap={instRows.slice(0, 25).filter(r => r.is_overlap).length}
-                  overlapPct={instStats.overlapPct}
-                />
-              )}
-            </div>
+            )}
+
+            {/* Institutional Level */}
+            <InstitutionalTable
+              rows={instRows}
+              subject={subject}
+              second={second}
+              hasSecond={hasSecond}
+              quarter={quarter}
+              activeOnly={instActiveOnly}
+              onActiveOnlyChange={setInstActiveOnly}
+            />
 
             {/* Fund Level */}
-            <div>
-              <FundTable
-                rows={fundRows}
-                subject={subject}
-                second={second}
-                hasSecond={hasSecond}
-                activeOnly={fundActiveOnly}
-                onActiveOnlyChange={setFundActiveOnly}
-              />
-              {hasSecond && (
-                <StatsRow
-                  subject={subject}
-                  second={second}
-                  pctAOwnedByB={fundStats.pctAOwnedByB}
-                  pctBOwnedByA={fundStats.pctBOwnedByA}
-                  top25Overlap={fundRows.slice(0, 25).filter(r => r.is_overlap).length}
-                  overlapPct={fundStats.overlapPct}
-                />
-              )}
-            </div>
+            <FundTable
+              rows={fundRows}
+              subject={subject}
+              second={second}
+              hasSecond={hasSecond}
+              activeOnly={fundActiveOnly}
+              onActiveOnlyChange={setFundActiveOnly}
+            />
           </div>
         </div>
       )}
@@ -300,9 +320,8 @@ export function OverlapAnalysisTab() {
 // ── Overlap-stat math ─────────────────────────────────────────────────────
 
 interface OverlapStats {
-  pctAOwnedByB: number | null
-  pctBOwnedByA: number | null
-  overlapPct: number
+  pctSubjOwnedBySecHolders: number | null
+  pctSecOwnedBySubjHolders: number | null
 }
 
 function computeOverlapStats(rows: Array<{ is_overlap: boolean; subj_dollars: number | null; sec_dollars: number | null }>): OverlapStats {
@@ -310,7 +329,6 @@ function computeOverlapStats(rows: Array<{ is_overlap: boolean; subj_dollars: nu
   let totalB = 0
   let overlapA = 0
   let overlapB = 0
-  let overlapCount = 0
   for (const r of rows) {
     const a = r.subj_dollars || 0
     const b = r.sec_dollars || 0
@@ -319,47 +337,85 @@ function computeOverlapStats(rows: Array<{ is_overlap: boolean; subj_dollars: nu
     if (r.is_overlap) {
       overlapA += a
       overlapB += b
-      overlapCount += 1
     }
   }
   return {
-    pctAOwnedByB: totalA > 0 ? (overlapA / totalA) * 100 : null,
-    pctBOwnedByA: totalB > 0 ? (overlapB / totalB) * 100 : null,
-    overlapPct: rows.length > 0 ? (overlapCount / rows.length) * 100 : 0,
+    pctSubjOwnedBySecHolders: totalA > 0 ? (overlapA / totalA) * 100 : null,
+    pctSecOwnedBySubjHolders: totalB > 0 ? (overlapB / totalB) * 100 : null,
   }
 }
 
-// ── Stats row (bottom of each table) ──────────────────────────────────────
+// ── Cross-ownership stat tiles (above tables) ─────────────────────────────
 
-interface StatsRowProps {
+interface CrossOwnershipStatsProps {
   subject: string
   second: string
-  pctAOwnedByB: number | null
-  pctBOwnedByA: number | null
-  top25Overlap: number
-  overlapPct: number
+  instAll: OverlapStats
+  instActive: OverlapStats
+  fundAll: OverlapStats
+  fundActive: OverlapStats
 }
 
-function StatsRow({ subject, second, pctAOwnedByB, pctBOwnedByA, top25Overlap, overlapPct }: StatsRowProps) {
+function CrossOwnershipStats({ subject, second, instAll, instActive, fundAll, fundActive }: CrossOwnershipStatsProps) {
+  const fmt = (v: number | null) => v != null ? `${NUM_2.format(v)}%` : '—'
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
-      <StatBox
-        kicker={`${subject} OWNED BY ${second} HOLDERS`}
-        value={pctAOwnedByB != null ? `${NUM_2.format(pctAOwnedByB)}%` : '—'}
-      />
-      <StatBox
-        kicker={`${second} OWNED BY ${subject} HOLDERS`}
-        value={pctBOwnedByA != null ? `${NUM_2.format(pctBOwnedByA)}%` : '—'}
-      />
-      <StatBox kicker="TOP 25 OVERLAP" value={String(top25Overlap)} />
-      <StatBox kicker="OVERLAP %" value={`${NUM_2.format(overlapPct)}%`} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <StatBox
+          kicker={`% OF ${second} OWNED BY ${subject} HOLDERS`}
+          value={fmt(instAll.pctSecOwnedBySubjHolders)}
+          group="INSTITUTIONAL"
+        />
+        <StatBox
+          kicker={`% OF ${subject} OWNED BY ${second} HOLDERS`}
+          value={fmt(instAll.pctSubjOwnedBySecHolders)}
+          group="INSTITUTIONAL"
+        />
+        <StatBox
+          kicker={`% OF ${second} OWNED BY ${subject} HOLDERS (ACTIVE)`}
+          value={fmt(instActive.pctSecOwnedBySubjHolders)}
+          group="INSTITUTIONAL"
+        />
+        <StatBox
+          kicker={`% OF ${subject} OWNED BY ${second} HOLDERS (ACTIVE)`}
+          value={fmt(instActive.pctSubjOwnedBySecHolders)}
+          group="INSTITUTIONAL"
+        />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <StatBox
+          kicker={`% OF ${second} OWNED BY ${subject} HOLDERS`}
+          value={fmt(fundAll.pctSecOwnedBySubjHolders)}
+          group="FUND"
+        />
+        <StatBox
+          kicker={`% OF ${subject} OWNED BY ${second} HOLDERS`}
+          value={fmt(fundAll.pctSubjOwnedBySecHolders)}
+          group="FUND"
+        />
+        <StatBox
+          kicker={`% OF ${second} OWNED BY ${subject} HOLDERS (ACTIVE)`}
+          value={fmt(fundActive.pctSecOwnedBySubjHolders)}
+          group="FUND"
+        />
+        <StatBox
+          kicker={`% OF ${subject} OWNED BY ${second} HOLDERS (ACTIVE)`}
+          value={fmt(fundActive.pctSubjOwnedBySecHolders)}
+          group="FUND"
+        />
+      </div>
     </div>
   )
 }
 
-function StatBox({ kicker, value }: { kicker: string; value: string }) {
+function StatBox({ kicker, value, group }: { kicker: string; value: string; group?: string }) {
   return (
     <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--line)', borderRadius: 0, padding: 10 }}>
+      {group && (
+        <div style={{ fontSize: 9, fontFamily: "'Hanken Grotesk', sans-serif", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--gold)', marginBottom: 4 }}>
+          {group}
+        </div>
+      )}
       <div style={{ fontSize: 9, fontFamily: "'Hanken Grotesk', sans-serif", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--text-dim)', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
         title={kicker}>
         {kicker}
@@ -426,7 +482,21 @@ function InstitutionalTable({ rows, subject, second, hasSecond, quarter, activeO
     })
   }
 
+  const totals = useMemo(() => {
+    let aPct = 0, bPct = 0, aVal = 0, bVal = 0
+    for (const r of rows) {
+      aPct += r.subj_pct_so || 0
+      bPct += r.sec_pct_so || 0
+      aVal += r.subj_dollars || 0
+      bVal += r.sec_dollars || 0
+    }
+    return { aPct, bPct, aVal, bVal }
+  }, [rows])
+
   const colCount = 8
+  const groupTH: React.CSSProperties = {
+    ...TH, textAlign: 'center', borderBottom: '1px solid var(--line-soft)',
+  }
   return (
     <TableBox title="Institutional Level" activeOnly={activeOnly} onActiveOnlyChange={onActiveOnlyChange}>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
@@ -435,21 +505,29 @@ function InstitutionalTable({ rows, subject, second, hasSecond, quarter, activeO
           <col style={{ width: 36 }} />   {/* # */}
           <col />                          {/* Institution */}
           <col style={{ width: 90 }} />   {/* Type */}
-          <col style={{ width: 95 }} />   {/* A %SO */}
+          <col style={{ width: 90 }} />   {/* A %SO */}
+          <col style={{ width: 90 }} />   {/* B %SO */}
           <col style={{ width: 100 }} />  {/* A Value */}
-          <col style={{ width: 95 }} />   {/* B %SO */}
           <col style={{ width: 100 }} />  {/* B Value */}
         </colgroup>
         <thead>
           <tr>
             <th style={TH} />
+            <th style={TH} />
+            <th style={TH} />
+            <th style={TH} />
+            <th colSpan={2} style={groupTH}>% of Outstanding</th>
+            <th colSpan={2} style={groupTH}>Value ($MM)</th>
+          </tr>
+          <tr>
+            <th style={TH} />
             <th style={TH_R}>#</th>
             <th style={TH}>Institution</th>
             <th style={TH}>Type</th>
-            <th style={TH_R}>{subject} % SO</th>
-            <th style={TH_R}>{subject} VALUE</th>
-            <th style={TH_R}>{hasSecond ? `${second} % SO` : '—'}</th>
-            <th style={TH_R}>{hasSecond ? `${second} VALUE` : '—'}</th>
+            <th style={TH_R}>{subject}</th>
+            <th style={TH_R}>{hasSecond ? second : '—'}</th>
+            <th style={TH_R}>{subject}</th>
+            <th style={TH_R}>{hasSecond ? second : '—'}</th>
           </tr>
         </thead>
         <tbody>
@@ -479,6 +557,20 @@ function InstitutionalTable({ rows, subject, second, hasSecond, quarter, activeO
             <tr><td colSpan={colCount} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No holders found</td></tr>
           )}
         </tbody>
+        {rows.length > 0 && (
+          <tfoot>
+            <tr>
+              <td style={{ ...TOTAL_TD }} />
+              <td style={{ ...TOTAL_TD, ...TOTAL_LABEL_R }}>{`TOP ${rows.length}`}</td>
+              <td style={{ ...TOTAL_TD, ...TOTAL_LABEL }}>Total</td>
+              <td style={TOTAL_TD} />
+              <td style={TOTAL_TD_R}>{fmtPct2(totals.aPct)}</td>
+              <td style={TOTAL_TD_R}>{hasSecond ? fmtPct2(totals.bPct) : '—'}</td>
+              <td style={TOTAL_TD_R}>{fmtValueMm(totals.aVal)}</td>
+              <td style={TOTAL_TD_R}>{hasSecond ? fmtValueMm(totals.bVal) : '—'}</td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </TableBox>
   )
@@ -530,8 +622,8 @@ function RowFragment({ rowKey, rank, row, ts, isOpen, canExpand, toggle, subject
         </td>
         <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
         <td style={TD_R}>{fmtPct2(row.subj_pct_so)}</td>
-        <td style={TD_R}>{fmtValueMm(row.subj_dollars)}</td>
         <td style={{ ...TD_R, color: row.sec_pct_so == null ? 'var(--text-dim)' : 'var(--text)' }}>{fmtPct2(row.sec_pct_so)}</td>
+        <td style={TD_R}>{fmtValueMm(row.subj_dollars)}</td>
         <td style={{ ...TD_R, color: row.sec_dollars == null ? 'var(--text-dim)' : 'var(--text)' }}>{fmtValueMm(row.sec_dollars)}</td>
       </tr>
       {isOpen && canExpand && hasSecond && (
@@ -609,20 +701,19 @@ function InstitutionDetail({ institution, subject, second, quarter }: Institutio
           </td>
           <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
           <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
-          <td style={TD_R}>{fmtValueMm(f.value_a)}</td>
           <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
+          <td style={TD_R}>{fmtValueMm(f.value_a)}</td>
           <td style={TD_R}>{fmtValueMm(f.value_b)}</td>
         </tr>
       )
     })
   }
-  if (data.non_overlapping.length > 0) {
-    rows.push(subHeaderRow('nh', 'Non-Overlapping Funds'))
-    data.non_overlapping.forEach((f, i) => {
+  if (data.ticker_a_only.length > 0) {
+    rows.push(subHeaderRow('ah', `${subject} Only`))
+    data.ticker_a_only.forEach((f, i) => {
       const ts = getTypeStyle(f.type)
-      const isA = f.holds === subject
       rows.push(
-        <tr key={`n-${i}-${f.series_id || f.fund_name}`} style={{ backgroundColor: childBg }}>
+        <tr key={`a-${i}-${f.series_id || f.fund_name}`} style={{ backgroundColor: childBg }}>
           <td style={{ ...TD, borderLeft: '2px solid var(--gold)' }} />
           <td style={TD} />
           <td style={{ ...TD_TRUNC, color: 'var(--text-mute)', paddingLeft: 24 }} title={f.fund_name}>
@@ -631,9 +722,30 @@ function InstitutionDetail({ institution, subject, second, quarter }: Institutio
           </td>
           <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
           <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
-          <td style={{ ...TD_R, color: isA ? 'var(--text)' : 'var(--text-dim)' }}>{isA ? fmtValueMm(f.value) : '—'}</td>
           <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
-          <td style={{ ...TD_R, color: !isA ? 'var(--text)' : 'var(--text-dim)' }}>{!isA ? fmtValueMm(f.value) : '—'}</td>
+          <td style={TD_R}>{fmtValueMm(f.value)}</td>
+          <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
+        </tr>
+      )
+    })
+  }
+  if (data.ticker_b_only.length > 0) {
+    rows.push(subHeaderRow('bh', `${second} Only`))
+    data.ticker_b_only.forEach((f, i) => {
+      const ts = getTypeStyle(f.type)
+      rows.push(
+        <tr key={`b-${i}-${f.series_id || f.fund_name}`} style={{ backgroundColor: childBg }}>
+          <td style={{ ...TD, borderLeft: '2px solid var(--gold)' }} />
+          <td style={TD} />
+          <td style={{ ...TD_TRUNC, color: 'var(--text-mute)', paddingLeft: 24 }} title={f.fund_name}>
+            <span style={{ color: 'var(--text-mute)', marginRight: 6, fontSize: 11 }}>└</span>
+            {f.fund_name}
+          </td>
+          <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
+          <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
+          <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
+          <td style={{ ...TD_R, color: 'var(--text-dim)' }}>—</td>
+          <td style={TD_R}>{fmtValueMm(f.value)}</td>
         </tr>
       )
     })
@@ -662,6 +774,20 @@ interface FundTableProps {
 
 function FundTable({ rows, subject, second, hasSecond, activeOnly, onActiveOnlyChange }: FundTableProps) {
   const colCount = 7
+  const totals = useMemo(() => {
+    let aPct = 0, bPct = 0, aVal = 0, bVal = 0
+    for (const r of rows) {
+      aPct += r.subj_pct_so || 0
+      bPct += r.sec_pct_so || 0
+      aVal += r.subj_dollars || 0
+      bVal += r.sec_dollars || 0
+    }
+    return { aPct, bPct, aVal, bVal }
+  }, [rows])
+
+  const groupTH: React.CSSProperties = {
+    ...TH, textAlign: 'center', borderBottom: '1px solid var(--line-soft)',
+  }
   return (
     <TableBox title="Fund Level" activeOnly={activeOnly} onActiveOnlyChange={onActiveOnlyChange}>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
@@ -669,20 +795,27 @@ function FundTable({ rows, subject, second, hasSecond, activeOnly, onActiveOnlyC
           <col style={{ width: 36 }} />
           <col />
           <col style={{ width: 90 }} />
-          <col style={{ width: 95 }} />
+          <col style={{ width: 90 }} />
+          <col style={{ width: 90 }} />
           <col style={{ width: 100 }} />
-          <col style={{ width: 95 }} />
           <col style={{ width: 100 }} />
         </colgroup>
         <thead>
           <tr>
+            <th style={TH} />
+            <th style={TH} />
+            <th style={TH} />
+            <th colSpan={2} style={groupTH}>% of Outstanding</th>
+            <th colSpan={2} style={groupTH}>Value ($MM)</th>
+          </tr>
+          <tr>
             <th style={TH_R}>#</th>
             <th style={TH}>Fund</th>
             <th style={TH}>Type</th>
-            <th style={TH_R}>{subject} % SO</th>
-            <th style={TH_R}>{subject} VALUE</th>
-            <th style={TH_R}>{hasSecond ? `${second} % SO` : '—'}</th>
-            <th style={TH_R}>{hasSecond ? `${second} VALUE` : '—'}</th>
+            <th style={TH_R}>{subject}</th>
+            <th style={TH_R}>{hasSecond ? second : '—'}</th>
+            <th style={TH_R}>{subject}</th>
+            <th style={TH_R}>{hasSecond ? second : '—'}</th>
           </tr>
         </thead>
         <tbody>
@@ -695,8 +828,8 @@ function FundTable({ rows, subject, second, hasSecond, activeOnly, onActiveOnlyC
                 <td style={{ ...TD_TRUNC, fontWeight: 500 }} title={r.holder}>{r.holder}</td>
                 <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                 <td style={TD_R}>{fmtPct2(r.subj_pct_so)}</td>
-                <td style={TD_R}>{fmtValueMm(r.subj_dollars)}</td>
                 <td style={{ ...TD_R, color: r.sec_pct_so == null ? 'var(--text-dim)' : 'var(--text)' }}>{fmtPct2(r.sec_pct_so)}</td>
+                <td style={TD_R}>{fmtValueMm(r.subj_dollars)}</td>
                 <td style={{ ...TD_R, color: r.sec_dollars == null ? 'var(--text-dim)' : 'var(--text)' }}>{fmtValueMm(r.sec_dollars)}</td>
               </tr>
             )
@@ -705,6 +838,19 @@ function FundTable({ rows, subject, second, hasSecond, activeOnly, onActiveOnlyC
             <tr><td colSpan={colCount} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No funds found</td></tr>
           )}
         </tbody>
+        {rows.length > 0 && (
+          <tfoot>
+            <tr>
+              <td style={{ ...TOTAL_TD, ...TOTAL_LABEL_R }}>{`TOP ${rows.length}`}</td>
+              <td style={{ ...TOTAL_TD, ...TOTAL_LABEL }}>Total</td>
+              <td style={TOTAL_TD} />
+              <td style={TOTAL_TD_R}>{fmtPct2(totals.aPct)}</td>
+              <td style={TOTAL_TD_R}>{hasSecond ? fmtPct2(totals.bPct) : '—'}</td>
+              <td style={TOTAL_TD_R}>{fmtValueMm(totals.aVal)}</td>
+              <td style={TOTAL_TD_R}>{hasSecond ? fmtValueMm(totals.bVal) : '—'}</td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </TableBox>
   )
