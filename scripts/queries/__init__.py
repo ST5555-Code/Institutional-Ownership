@@ -96,6 +96,8 @@ from .market import (  # noqa: F401
     get_sector_flow_movers,
     get_sector_flow_mover_detail,
     get_sector_summary,
+    get_fund_quarter_completeness,
+    get_sector_monthly_flows,
     short_interest_analysis,
     get_market_summary,
 )

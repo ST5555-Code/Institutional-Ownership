@@ -172,6 +172,145 @@ def get_sector_summary():
         pass
 
 
+def get_fund_quarter_completeness():
+    """Per-quarter monthly filing completeness for fund_holdings_v2.
+
+    Returns one row per quarter with the count of distinct report_month
+    values present, plus a ``complete`` flag (True iff all 3 months are
+    filed). Drives the Sector Rotation tab's Fund-view filter to hide
+    partial-quarter destination periods that would otherwise underreport
+    flows.
+    """
+    con = get_db()
+    try:
+        rows = con.execute(
+            """
+            SELECT quarter,
+                   COUNT(DISTINCT report_month) AS months_available
+              FROM fund_holdings_v2
+             WHERE quarter IS NOT NULL
+             GROUP BY quarter
+             ORDER BY quarter
+            """
+        ).fetchall()
+        return [
+            {
+                "quarter": q,
+                "months_available": int(m),
+                "complete": int(m) == 3,
+            }
+            for q, m in rows
+        ]
+    finally:
+        pass
+
+
+def get_sector_monthly_flows(sector, quarter):
+    """Monthly net active flows for one (sector, quarter) at fund level.
+
+    For each report month in the requested filing quarter, computes the
+    net flow contribution from funds that filed N-PORTs in BOTH the
+    current month and the immediately preceding calendar month, summing
+    delta_shares × implied price per (institution, ticker) where the
+    ticker maps to ``sector`` via ``market_data``. Funds present in only
+    one of the two months are excluded — most N-PORT filers report just
+    once per quarter, so a missing month is a non-filing rather than an
+    exit, and treating it as an exit produces spurious trillion-dollar
+    swings.
+
+    Months are derived from ``fund_holdings_v2`` rather than from the
+    quarter label because N-PORT report months trail the filing quarter
+    by one period (e.g. quarter='2026Q1' contains report_months
+    2025-10/11/12).
+
+    Drives the Sector Rotation tab's Fund-view tooltip drill-down on
+    quarterly heatmap cells.
+    """
+    if not quarter or not sector:
+        return {"sector": sector, "quarter": quarter, "months": []}
+
+    con = get_db()
+    try:
+        months = [r[0] for r in con.execute(
+            """
+            SELECT DISTINCT report_month
+              FROM fund_holdings_v2
+             WHERE quarter = ?
+               AND report_month IS NOT NULL
+             ORDER BY report_month
+            """, [quarter],
+        ).fetchall()]
+
+        if not months:
+            return {"sector": sector, "quarter": quarter, "months": []}
+
+        def prev_calendar_month(m):
+            y, mm = int(m[:4]), int(m[5:7])
+            if mm == 1:
+                return f"{y - 1}-12"
+            return f"{y}-{mm - 1:02d}"
+
+        # Build (prev, curr) pairs — first month chains off the calendar
+        # month immediately preceding it; subsequent months chain off
+        # their predecessor in the quarter.
+        pairs = []
+        for i, m_to in enumerate(months):
+            m_from = months[i - 1] if i > 0 else prev_calendar_month(m_to)
+            pairs.append((m_from, m_to))
+
+        results = []
+        for m_from, m_to in pairs:
+            row = con.execute(
+                """
+                WITH h_agg AS (
+                    SELECT COALESCE(family_name, fund_name) AS institution,
+                           ticker, report_month,
+                           SUM(shares_or_principal) AS shares,
+                           SUM(market_value_usd) AS market_value_usd
+                      FROM fund_holdings_v2
+                     WHERE ticker IS NOT NULL
+                       AND asset_category IN ('EC','EP')
+                       AND shares_or_principal > 0
+                       AND report_month IN (?, ?)
+                       AND is_latest = TRUE
+                     GROUP BY institution, ticker, report_month
+                ),
+                paired_filers AS (
+                    -- Restrict to (institution, ticker) pairs present in
+                    -- BOTH months. Missing-month rows are non-filings,
+                    -- not exits, so we cannot attribute flow to them.
+                    SELECT c.institution, c.ticker,
+                           c.shares AS curr_shares,
+                           c.market_value_usd AS curr_mv,
+                           p.shares AS prev_shares
+                      FROM h_agg c
+                      JOIN h_agg p
+                        ON c.institution = p.institution
+                       AND c.ticker = p.ticker
+                       AND p.report_month = ?
+                      JOIN market_data md
+                        ON c.ticker = md.ticker AND md.sector = ?
+                     WHERE c.report_month = ?
+                )
+                SELECT SUM(
+                    (curr_shares - prev_shares)
+                    * (curr_mv * 1.0 / NULLIF(curr_shares, 0))
+                ) AS net
+                  FROM paired_filers
+                """,
+                [m_from, m_to, m_from, sector, m_to],
+            ).fetchone()
+            net = float(row[0]) if row and row[0] is not None else 0.0
+            results.append({"month": m_to, "net": net})
+        return clean_for_json({
+            "sector": sector,
+            "quarter": quarter,
+            "months": results,
+        })
+    finally:
+        pass
+
+
 def get_sector_flow_movers(q_from, q_to, sector, active_only=False, level="parent", rollup_type='economic_control_v1'):
     """Top 5 net buyers + top 5 net sellers for one sector in one quarter
     transition. Returns summary stats + two lists.
