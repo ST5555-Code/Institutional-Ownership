@@ -5,7 +5,7 @@ import type {
   InstitutionHierarchyResponse,
   InstitutionHierarchyFiler,
 } from '../../types/api'
-import { QuarterSelector, ExportBar, FreshnessBadge, getTypeStyle } from '../common'
+import { QuarterSelector, ExportBar, FreshnessBadge, PageHeader, getTypeStyle } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -213,6 +213,11 @@ export function InvestorDetailTab() {
         overflow: 'hidden',
       }}
     >
+      <PageHeader
+        section="Market Snapshot"
+        title="Investor Detail"
+        description="Top 50 institutions by AUM with expandable hierarchy: parent, 13F filers, and fund series."
+      />
       <style>{`@media print { .id-controls { display:none!important } }`}</style>
 
       <div

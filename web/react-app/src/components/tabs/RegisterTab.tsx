@@ -12,6 +12,7 @@ import {
   FreshnessBadge,
   TableFooter,
   ColumnGroupHeader,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -506,6 +507,11 @@ export function RegisterTab() {
         overflow: 'hidden',
       }}
     >
+      <PageHeader
+        section="Ownership"
+        title="Shareholder Register"
+        description="Top institutional parents and their underlying funds. Expand any row to see constituent fund positions."
+      />
       {/* Print CSS + highlight class. !important on the highlight so it
           survives mid-fade React re-renders that would otherwise restore
           the row's inline backgroundColor. */}

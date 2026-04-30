@@ -10,6 +10,7 @@ import {
   ExportBar,
   ColumnGroupHeader,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -313,6 +314,11 @@ export function CrossOwnershipTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Targeting"
+        title="Cross-Ownership"
+        description="Multi-ticker institutional holder comparison. Add tickers to see who owns what across the group."
+      />
       <style>{`@media print { .co-controls { display:none!important } .co-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls */}

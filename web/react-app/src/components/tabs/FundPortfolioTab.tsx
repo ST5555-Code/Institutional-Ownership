@@ -5,7 +5,7 @@ import type {
   FundPortfolioManager,
   FundPortfolioResponse,
 } from '../../types/api'
-import { ExportBar, FreshnessBadge, TableFooter, getTypeStyle } from '../common'
+import { ExportBar, FreshnessBadge, PageHeader, TableFooter, getTypeStyle } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -144,6 +144,11 @@ export function FundPortfolioTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Ownership"
+        title="Fund Portfolio"
+        description="Individual fund holdings for any active institutional holder. Select a manager to view positions."
+      />
       <style>{`
         @media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
         .fp-ticker-link:hover { text-decoration: underline; }

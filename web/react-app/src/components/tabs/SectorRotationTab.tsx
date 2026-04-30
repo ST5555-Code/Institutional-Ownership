@@ -12,6 +12,7 @@ import {
   ActiveOnlyToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -276,6 +277,11 @@ export function SectorRotationTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Market Snapshot"
+        title="Sector Rotation"
+        description="Net institutional flows by sector. Heatmap view with drill-down to top movers per sector."
+      />
       <style>{`
         @media print {
           .sr-controls { display:none!important }

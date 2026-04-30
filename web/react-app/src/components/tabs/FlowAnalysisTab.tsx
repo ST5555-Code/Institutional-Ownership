@@ -8,6 +8,7 @@ import {
   ActiveOnlyToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 import {
@@ -138,6 +139,11 @@ export function FlowAnalysisTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Flow & Rotation"
+        title="Flow Analysis"
+        description="Net institutional flows by period. Tracks buyers, sellers, new entries, and complete exits."
+      />
       <style>{`@media print { .fa-controls { display:none!important } }`}</style>
 
       {/* Controls */}
