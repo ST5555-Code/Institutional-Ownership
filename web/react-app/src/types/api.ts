@@ -391,6 +391,9 @@ export interface CrossOwnershipInvestor {
   pct_of_portfolio: number | null
   // holdings is keyed by ticker → position value (null when investor doesn't hold)
   holdings: Record<string, number | null>
+  // True when fund_holdings_v2 has rows under this investor's dm_rollup_name
+  // or family_name for the current quarter — controls expand-triangle render.
+  has_fund_detail?: boolean
 }
 
 export interface CrossOwnershipResponse {
