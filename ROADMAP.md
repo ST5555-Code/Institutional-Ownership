@@ -1,12 +1,12 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-04-30 (conv-20-doc-sync — PRs #215–#222: Sector Rotation fund-view enhancements, full Short Interest redesign with sector/industry overlays + restored tables + column alignment, ExportBar/FreshnessBadge top-right alignment across all 12 tabs, bordered controls panels; HEAD `3a5e2a1`). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-04-30 (conv-21-doc-sync). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
 ---
 
-## Current backlog (verified 2026-04-30 conv-20-doc-sync)
+## Current backlog (verified 2026-04-30 conv-21-doc-sync)
 
 ### P0 — Production blockers
 
@@ -81,7 +81,10 @@ _(none open — N-PORT quarter bucketing closed by PR #213)_
 
 | Date | Item | Details |
 | --- | --- | --- |
+| 2026-04-30 | **conv-21-doc-sync (PR #227)** | Documentation sync after conv-21: ROADMAP header bumped to conv-21-doc-sync, NEXT_SESSION_CONTEXT rewritten for current state, CHAT_HANDOVER section added, MAINTENANCE last-updated bumped. Direct-to-main commit. |
 | 2026-04-30 | **quarter-label-global (PR #226)** | Global consistency pass on quarter labels across the React app. New shared `web/react-app/src/components/common/formatters.ts` exports a single `fmtQuarter` (`"2025Q3" → "Q3 '25"`); `QuarterSelector` now defaults `formatLabel` to it so any tab passing raw quarters renders the canonical format with no extra wiring. Removed seven tab-local copies (RegisterTab, OverlapAnalysisTab, InvestorDetailTab `quarterLabel`, OwnershipTrendTab cohort row, SectorRotationTab `fmtQuarterLabel`, ShortInterestTab, FlowAnalysisTab) and routed all of them through the shared util. CompanyCard `latest_quarter` chip now formatted. Quarter button arrays reordered oldest-left → newest-right in RegisterTab, OverlapAnalysisTab, OwnershipTrendTab cohort selector; InvestorDetailTab selector simplified to pass raw quarters with default formatter. SectorRotationTab year group header preserved (`2025` row above quarter columns). API responses unchanged — formatting is display-layer only. Squash commit on `main`. |
+| 2026-04-30 | **overlap-tab-redesign (PR #224)** | Overlap Analysis tab redesigned from a single side-by-side comparison to a vertical stack of two tables (institutional + fund). Each row is expandable to drill into per-fund detail backed by the new `GET /api/v1/overlap_institution_detail` endpoint. Cross-ownership stat boxes summarize overlap counts and dollar value at the top. Per-table "Active Only" toggles filter to active managers / funds independently. Squash commit `0a6d759`. |
+| 2026-04-30 | **si-table-quarter-polish (PR #223)** | Short Interest tab polish: applied fixed-width `colgroup` definitions across the 4 SI tables (CrossRef, ShortOnly, NportByFund, per-ticker detail) so the Type column lines up cleanly across tables; quarter labels formatted to the canonical `Q4 '25` style ahead of the global `quarter-label-global` work in #226. UI-only, no data-logic or contract changes. Squash commit `a49bac5`. |
 | 2026-04-30 | **overlap-column-stats (PR #225)** | Overlap Analysis tab polish: (1) institutional + fund tables regrouped to spanning headers "% of Outstanding" and "Value ($MM)" (two-row thead, ticker labels under each group) — replaces the old A%/A$/B%/B$ alternation; (2) row-expand returns 3 sections — Overlapping Funds, "{TICKER_A} Only", "{TICKER_B} Only" — each capped at top 5 by value; `/api/v1/overlap_institution_detail` updated to return `{overlapping, ticker_a_only, ticker_b_only}` (was `non_overlapping`); (3) cross-ownership KPI tiles moved ABOVE tables — two rows of 4 tiles (institutional / fund) with all-holders + active-only variants; active-only computed client-side from holder lists (`manager_type ∈ {active, mixed, strategic}` for institutional, `is_active !== false` for fund); (4) totals footer (`tfoot`) on both tables with summed % and $, gold top border. UI + endpoint shape change. Squash commit `ebdc8f5`. |
 | 2026-04-30 | **controls-panel-border (PR #222)** | Bordered control panel applied to all 10 tabs that have controls bars: Overview, Holdings, Investors, Performers, Sector Rotation, Short Interest, Investor Detail, Network Map, Activity, Filings. Wraps the controls bar (filters + ExportBar + FreshnessBadge) in a single panel with consistent border, background, and padding per `docs/plans/DarkStyle.md`. UI-only, no data-logic or contract changes. Squash commit `3a5e2a1`. |
 | 2026-04-30 | **export-bar-align (PR #221)** | `ExportBar` + `FreshnessBadge` moved into the top-right header row on every one of the 12 tabs. Replaces the inconsistent footer-row / inline-controls placements that had drifted across tabs. UI-only, no data-logic or contract changes. Squash commit `370619f`. |

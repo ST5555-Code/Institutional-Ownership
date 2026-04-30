@@ -1,5 +1,47 @@
 # Chat Handover
 
+## conv-21-doc-sync (2026-04-30)
+
+HEAD: **`5c06e32`** on `main` after PRs `#223`–`#227` merged.
+
+### PRs landed (#223–#227)
+
+Five PRs merged across the SI table polish + Overlap Analysis tab redesign + global quarter label standardization arc:
+
+- **PR #223 `si-table-quarter-polish`** — Fixed-width `colgroup` definitions across the 4 SI tables (CrossRef, ShortOnly, NportByFund, per-ticker detail) for consistent Type column alignment; quarter labels formatted to `Q4 '25` style ahead of the global `quarter-label-global` work in #226. Squash `a49bac5`.
+- **PR #224 `overlap-tab-redesign`** — Overlap Analysis tab redesigned from a single side-by-side comparison to a vertical stack of two tables (institutional + fund). Each row expands to per-fund detail backed by the new `GET /api/v1/overlap_institution_detail` endpoint. Cross-ownership stat boxes summarize overlap counts and dollar value. Per-table "Active Only" toggles filter independently. Squash `0a6d759`.
+- **PR #225 `overlap-column-stats`** — Overlap Analysis polish: spanning-header column groups (`% of Outstanding` / `Value ($MM)`), 8 KPI stat tiles above tables (institutional + fund × all-holders + active-only), 3-section row-expand (Overlapping / `{TICKER_A}` Only / `{TICKER_B}` Only — each capped at top 5 by value), totals footer rows. `/api/v1/overlap_institution_detail` updated to return `{overlapping, ticker_a_only, ticker_b_only}`. Squash `ebdc8f5`.
+- **PR #226 `quarter-label-global`** — Shared `fmtQuarter` in `web/react-app/src/components/common/formatters.ts` (`"2025Q3" → "Q3 '25"`). `QuarterSelector` defaults `formatLabel` to it. Removed 7 tab-local copies (RegisterTab, OverlapAnalysisTab, InvestorDetailTab, OwnershipTrendTab cohort, SectorRotationTab, ShortInterestTab, FlowAnalysisTab). Quarter button arrays reordered oldest-left → newest-right. Squash `3248162`.
+- **PR #227 `conv-21-doc-sync`** — This sync (direct to main).
+
+### New / updated endpoints
+
+- **NEW** `/api/v1/overlap_institution_detail` — per-institution overlap drill-down for the Overlap Analysis tab (PR #224). Updated in PR #225 to return `{overlapping, ticker_a_only, ticker_b_only}` (replacing earlier `non_overlapping`).
+
+### Index benchmark coverage analysis
+
+- New findings doc: `docs/findings/index_benchmark_coverage.md` — 27 benchmarks identified from `fund_universe` naming (S&P 500: 227 funds / $4.0T; Total Stock Market: 14 / $2.7T; Nasdaq 100: 98 / $579B; plus sector + international). 3,599 funds with "Index"/"ETF" in name ($4.6T) remain unmatched to a specific benchmark. 11 GICS sector benchmarks identified.
+- New roadmap entry under **P2 — `index-benchmark-validation`**: 4-phase plan to systematize fund-to-index classification using N-PORT holdings data (reference table → correlation scoring → unmatched fund classification → sector fund integration).
+
+### Session totals — conv-15 through conv-21
+
+26 PRs merged (`#202`–`#227`) across:
+
+- Dark UI restyle + page-level framing (PageHeader, ExportBar/FreshnessBadge alignment, controls panel borders).
+- Sector Rotation tab redesign + polish + fund-view enhancements (heatmap, totals row, monthly tooltip, partial-quarter filter).
+- Investor Detail tab introduction + 3-level hierarchy drill-down.
+- N-PORT calendar-quarter fix (PR #213 — Jan-Mar→Q1, etc.) + derived-table rebuild.
+- Short Interest tab full redesign + restored reference tables + chart polish + column alignment.
+- Overlap Analysis tab full redesign (vertical stack, expandable rows, KPI tiles, 3-section expand, totals).
+- Global UI consistency: page headers, export bar / freshness badge alignment, controls panel borders, compact density, quarter label standardization.
+
+### Git ops
+
+- **Code merges PRs autonomously after CI passes** (rule from conv-18, reaffirmed in conv-21). Workflow: push branch → open PR → wait for CI green → `gh pr merge --squash --delete-branch` → `git pull` on main. Reflected in `docs/PROCESS_RULES.md` §11.
+- **Every Code prompt must start with the session/branch name on the first line.**
+
+---
+
 ## conv-20-doc-sync (2026-04-30)
 
 HEAD: **`3a5e2a1`** on `main` after PRs `#215`–`#222` merged.

@@ -212,6 +212,8 @@ Set 2026-04-29 (conv-18-doc-sync). Replaces the prior split where the operator d
 
   **Claude must propose the short slug before writing any prompt for Code.** Code does not invent the branch name.
 
+- **Every Code prompt must start with the session/branch name on the first line.** Claude includes the slug at the very top of any prompt handed to Code so the branch / PR title / commit prefix are unambiguous from the first read.
+
 - **Doc-sync PRs are an exception** — they commit directly to main per session brief, not via PR.
 
 - **Never `--no-verify` / `--no-gpg-sign`** unless the user explicitly asks.

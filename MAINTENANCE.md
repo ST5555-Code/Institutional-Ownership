@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 30, 2026 (conv-20-doc-sync — PRs #215–#222: SI redesign, SR polish, export bar + controls panel alignment). Predecessor: conv-19-doc-sync._
+_Last updated: April 30, 2026 (conv-21-doc-sync — session complete, 26 PRs #202-#227). Predecessor: conv-20-doc-sync._
 
 ## Pipeline refresh via admin dashboard
 
