@@ -1,12 +1,12 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-04-29 (conv-18-doc-sync — PRs #202–#212 squash-merged across two waves: dark UI restyle + CI test fix in conv-17, then full-width header / sector-rotation redesign / Investor Detail tab / compact density in conv-18; HEAD `922ef6a`). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-04-30 (conv-19-doc-sync — PR #213 N-PORT quarter bucketing fix + data migration + downstream rebuild, PR #214 shared PageHeader on every tab; HEAD `e090ab7`). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
 ---
 
-## Current backlog (verified 2026-04-29 conv-18-doc-sync)
+## Current backlog (verified 2026-04-30 conv-19-doc-sync)
 
 ### P0 — Production blockers
 
@@ -66,7 +66,7 @@ _(none — see COMPLETED table; DERA Tier 4 closed 2026-04-28 dera-synthetic-tie
 
 ## Known issues
 
-- **N-PORT quarter bucketing off by one** — pipeline assigns `Q+1` instead of the calendar quarter for N-PORT periods. Manifests as `2026Q1` containing Oct–Dec 2025 data and `2026Q2` containing Jan–Mar 2026 data (surfaced 2026-04-29 conv-18-doc-sync while building Sector Rotation quarter columns). User-visible in Sector Rotation, Investor Detail hierarchy quarters, and any UI that bins N-PORT period to quarter. Pipeline fix needed — locate the period→quarter mapping in N-PORT load path and shift by one. No data loss; downstream displays just need re-bucketing on next refresh.
+_(none open — N-PORT quarter bucketing closed by PR #213)_
 
 ---
 
@@ -81,6 +81,8 @@ _(none — see COMPLETED table; DERA Tier 4 closed 2026-04-28 dera-synthetic-tie
 
 | Date | Item | Details |
 | --- | --- | --- |
+| 2026-04-30 | **tab-page-headers (PR #214)** | New shared `PageHeader` component (gold section kicker, 24px light title, dim description) added to all 12 tabs for consistent page-level framing. UI-only, no data-logic or contract changes. Squash commit `e090ab7`. |
+| 2026-04-30 | **nport-quarter-fix (PR #213)** | Fixed `quarter_label_for_month()` to calendar convention (Jan–Mar→Q1, Apr–Jun→Q2, Jul–Sep→Q3, Oct–Dec→Q4) — previously assigned `Q+1`. Migrated 14.6M `fund_holdings_v2` + 31K `fund_classes` + 22K `fund_holdings` rows. Rebuilt `parent_fund_map` (109K), `sector_flows_rollup` (321), `peer_rotation_flows` (17.5M, pruned 960K stale shifted rows). Cleared 3 stale `peer_rotation` manifest entries. Backup at `data/13f_pre_quarter_fix.duckdb`. Closes the N-PORT quarter bucketing Known Issue. Squash commit `19a7b15`. |
 | 2026-04-29 | **compact-density (PR #212)** | Tighter padding across all 12 tabs; expand triangle moved to a dedicated first column; gold left border applied only to the leftmost edge (not stacked on every nested column); child-row connectors added for visual hierarchy. UI-only, no data-logic or contract changes. Squash commit `922ef6a`. |
 | 2026-04-29 | **investor-detail-dedup (PR #211)** | `GROUP BY` dedup applied to filer-level and fund-level hierarchy queries on `/api/v1/institution_hierarchy` so the 3-level Investor Detail drill-down no longer double-counts duplicate filer/fund rows. Squash commit `c04bca4`. |
 | 2026-04-29 | **investor-detail-redesign (PR #210)** | Renamed "Entity Graph" tab → "Investor Detail". New 3-level hierarchy drill-down (institution → filer → fund) backed by new `/api/v1/institution_hierarchy` endpoint. Quarter selector + market-wide static view added. Squash commit `f480e3e`. |

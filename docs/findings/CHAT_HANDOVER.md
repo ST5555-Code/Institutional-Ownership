@@ -1,5 +1,20 @@
 # Chat Handover
 
+## conv-19-doc-sync (2026-04-30)
+
+HEAD: **`e090ab7`** on `main` after PR #214 squash-merge, on top of PR #213.
+
+### PRs landed (#213, #214)
+
+- **PR #213 `nport-quarter-fix`** — N-PORT quarter bucketing fixed. `quarter_label_for_month()` rewritten to calendar convention (Jan–Mar→Q1, Apr–Jun→Q2, Jul–Sep→Q3, Oct–Dec→Q4); previously assigned `Q+1`. Migrated 14.6M `fund_holdings_v2` + 31K `fund_classes` + 22K `fund_holdings` rows. Rebuilt `parent_fund_map` (109K), `sector_flows_rollup` (321), `peer_rotation_flows` (17.5M, pruned 960K stale shifted rows). Cleared 3 stale `peer_rotation` manifest entries. Backup at `data/13f_pre_quarter_fix.duckdb`. Squash `19a7b15`.
+- **PR #214 `tab-page-headers`** — Shared `PageHeader` component (gold section kicker, 24px light title, dim description) added to all 12 tabs for consistent page-level framing. UI-only, no data-logic or contract changes. Squash `e090ab7`.
+
+### Known issues
+
+- **N-PORT quarter bucketing:** **CLOSED** by PR #213.
+
+---
+
 ## conv-18-doc-sync (2026-04-29)
 
 HEAD: **`922ef6a`** on `main` after 9 squash-merges this session (#204–#212), on top of the conv-17 base (#202–#203).
