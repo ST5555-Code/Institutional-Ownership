@@ -56,6 +56,32 @@ def api_sector_summary():
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
+@market_router.get('/fund_quarter_completeness')
+def api_fund_quarter_completeness():
+    """Per-quarter monthly filing completeness for fund_holdings_v2."""
+    try:
+        from queries import get_fund_quarter_completeness
+        return get_fund_quarter_completeness()
+    except Exception as e:
+        log.error("fund_quarter_completeness error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@market_router.get('/sector_monthly_flows')
+def api_sector_monthly_flows(request: Request):
+    """Monthly net active flows for one (sector, quarter) at fund level."""
+    try:
+        from queries import get_sector_monthly_flows
+        sector = (request.query_params.get('sector') or '').strip()
+        quarter = (request.query_params.get('quarter') or '').strip()
+        if not sector or not quarter:
+            return JSONResponse(status_code=400, content={'error': 'Missing required params: sector, quarter'})
+        return get_sector_monthly_flows(sector, quarter)
+    except Exception as e:
+        log.error("sector_monthly_flows error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
 @market_router.get('/sector_flow_movers')
 def api_sector_flow_movers(request: Request):
     """Top buyers/sellers for one sector in one quarter transition."""

@@ -579,6 +579,29 @@ export interface SectorFlowsResponse {
   sectors: SectorFlowRow[]
 }
 
+// ── Fund Quarter Completeness — /api/v1/fund_quarter_completeness ─────────
+
+export interface FundQuarterCompletenessRow {
+  quarter: string
+  months_available: number
+  complete: boolean
+}
+
+export type FundQuarterCompletenessResponse = FundQuarterCompletenessRow[]
+
+// ── Sector Monthly Flows — /api/v1/sector_monthly_flows ───────────────────
+
+export interface SectorMonthlyFlowRow {
+  month: string  // 'YYYY-MM'
+  net: number
+}
+
+export interface SectorMonthlyFlowsResponse {
+  sector: string
+  quarter: string
+  months: SectorMonthlyFlowRow[]
+}
+
 // ── Sector Summary — /api/v1/sector_summary ───────────────────────────────
 
 export interface SectorSummaryTypeBreakdown {
