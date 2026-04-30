@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 30, 2026 (conv-21-doc-sync — session complete, 26 PRs #202-#227). Predecessor: conv-20-doc-sync._
+_Last updated: April 30, 2026 (conv-22-doc-sync — Cross-Ownership tab redesign + fix-up, PRs #228-#229). Predecessor: conv-21-doc-sync._
 
 ## Pipeline refresh via admin dashboard
 

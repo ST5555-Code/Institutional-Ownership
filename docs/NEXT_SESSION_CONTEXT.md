@@ -4,43 +4,37 @@
 
 ## Last completed
 
-`conv-21` — SI table polish, overlap tab redesign + column stats, global quarter label standardization. Five PRs landed (`#223`–`#227`):
+`conv-22` — Cross-Ownership tab redesign (peer-driven dropdown, expandable rows with per-fund drill-down, fund-level toggle fixed) plus fix-up pass (sticky gold Group Total, fund-level 500 fix, per-ticker fund positions across the full peer group). Two PRs landed (`#228`–`#229`):
 
-- **PR #223 `si-table-quarter-polish`** — Fixed-width `colgroup` across the 4 SI tables for consistent Type column alignment; quarter labels formatted to `Q4 '25` style.
-- **PR #224 `overlap-tab-redesign`** — Overlap Analysis tab redesigned to a vertical stack of two tables (institutional + fund); expandable rows drill to per-fund detail; cross-ownership stat boxes; per-table Active Only toggles. New `GET /api/v1/overlap_institution_detail` endpoint.
-- **PR #225 `overlap-column-stats`** — Grouped column headers (`% of Outstanding` / `Value ($MM)`); 8 KPI stat tiles above tables; row-expand returns 3 sections (Overlapping / `{TICKER_A}` Only / `{TICKER_B}` Only); totals footer rows. Endpoint shape change on `/api/v1/overlap_institution_detail`.
-- **PR #226 `quarter-label-global`** — Shared `fmtQuarter` in `web/react-app/src/components/common/formatters.ts`; `QuarterSelector` defaults to `Q3 '25` format; quarter button arrays reordered oldest-left → newest-right; 7 tab-local copies removed.
-- **PR #227 `conv-21-doc-sync`** — This sync: ROADMAP, NEXT_SESSION_CONTEXT, CHAT_HANDOVER, MAINTENANCE, PROCESS_RULES.
+- **PR #228 `cross-ownership-polish`** — Cross-Ownership tab polish. Peer Group dropdown driven by the loaded ticker's classification (new `GET /api/v1/peer_tickers`); inline ticker input always visible; expandable investor rows with per-anchor fund drill-down (new `GET /api/v1/cross_ownership_fund_detail`); fund-level toggle now actually changes data (`/cross_ownership` + `/cross_ownership_top` accept `level=parent|fund`); Group Total footer restyled gold; page title appends current quarter via shared `fmtQuarter`. Squash `f46c88c`.
+- **PR #229 `cross-ownership-fix`** — Cross-Ownership tab fix-ups on top of #228. Fund-level 500 fixed (pivot reference bug in `_cross_ownership_fund_query`); `has_fund_detail` flag added to `/cross_ownership` parent rollup so the `▶` expand triangle only renders for investors that actually have N-PORT fund detail; `/cross_ownership_fund_detail` rewritten for per-peer-ticker positions (top 5 funds by total value across the peer group); sticky gold Group Total + % of Portfolio summary block at the top of the table; expanded child rows mirror the parent column structure (per-ticker columns populated from `positions[ticker].value`). Squash `f2194b8`.
 
-Current HEAD: **`5c06e32`** on `main`.
+Current HEAD: **`7203539`** on `main`.
 
 This sync (direct to `main`):
 
-- **`ROADMAP.md`** — header bumped to conv-21; new COMPLETED rows for `#223`, `#224`, `#227`.
+- **`ROADMAP.md`** — header bumped to conv-22; new Known Issue (`fund_strategy classification drift`).
 - **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten.
-- **`docs/findings/CHAT_HANDOVER.md`** — new conv-21 section at top.
-- **`MAINTENANCE.md`** — last-updated bumped to conv-21.
-- **`docs/PROCESS_RULES.md`** — verified Code session/branch and autonomous-merge rules.
-
-## Session totals (conv-15 through conv-21)
-
-26 PRs merged across the dark-UI restyle + sector rotation redesign + investor detail + N-PORT quarter fix + short interest redesign + overlap analysis redesign + global UI consistency arc: PRs `#202`–`#227`. Highlights: dark UI restyle, sector rotation redesign + polish, investor detail tab, N-PORT calendar-quarter fix (PR #213), short interest redesign + restore + chart polish, overlap tab full redesign, ExportBar / FreshnessBadge / controls panel / page header / quarter label global consistency.
+- **`docs/findings/CHAT_HANDOVER.md`** — new conv-22 section at top.
+- **`MAINTENANCE.md`** — last-updated bumped to conv-22.
 
 ## Up next
 
-- See `ROADMAP.md` "Current backlog".
-- **P0:** empty.
-- **P1:** `ui-audit-walkthrough` (PR #107) — live Serge+Claude session, not a Code session.
-- **P2:** `index-benchmark-validation` — fund-to-index classification pipeline (Phase 1 reference table → Phase 2 correlation scoring → Phase 3 unmatched fund classification → Phase 4 sector fund integration). Coverage findings: `docs/findings/index_benchmark_coverage.md`.
-- **P3 (2 items):**
-  - `D10 Admin UI for entity_identifiers_staging` — surface the 280-row staging backlog before Q1 2026 cycle (~2026-05-15).
-  - `Tier 4 unmatched classifications (427)` — keyword sweep left 427 `bootstrap_tier4` entities at `classification='unknown'`. NAV exposure bounded at ~$370B.
+- See `ROADMAP.md` "Current backlog" + "Known issues".
 
 ### Priority order for next session
 
-1. **13F-as-fund coverage gap** — fund view of Sector Rotation (and other fund-keyed tabs) excludes hedge funds, family offices, and other 13F-only filers that lack N-PORT filings. Decide whether to surface them via a separate "13F filer" track (pure 13F holdings, no monthly cadence) or document the omission as expected behavior.
-2. **Index benchmark validation pipeline** — start Phase 1 (build `benchmark_portfolios` reference table). Roadmap entry under P2; coverage in `docs/findings/index_benchmark_coverage.md`.
-3. **Stage 5 cleanup DROP** — authorized on or after **2026-05-09** per `MAINTENANCE.md`.
+1. **fund_strategy classification drift fix** — surfaced this session and logged as a Known Issue. `classify_fund()` recomputes per quarter, so 6,195 of ~14,000 funds in `fund_holdings_v2` carry 2+ distinct `fund_strategy` values across their history. **Scope both legs together:** **(pipeline)** lock `fund_universe.fund_strategy` on the first classification — once a series_id has a non-null value, do not overwrite on later quarters unless an analyst forces a reclassification. **(query)** for `active_only` / passive filters, JOIN `fund_universe` to read the locked strategy instead of reading `fund_holdings_v2.fund_strategy` (per-row, drifts per quarter). Both changes need to land in the same PR so the lock and the join cut over together.
+2. **13F-as-fund coverage gap** — fund view of Sector Rotation (and other fund-keyed tabs) excludes hedge funds, family offices, and other 13F-only filers that lack N-PORT filings. Decide whether to surface them via a separate "13F filer" track (pure 13F holdings, no monthly cadence) or document the omission as expected behavior.
+3. **Index benchmark validation pipeline** — start Phase 1 (build `benchmark_portfolios` reference table). Roadmap entry under P2; coverage in `docs/findings/index_benchmark_coverage.md`.
+4. **Stage 5 cleanup DROP** — authorized on or after **2026-05-09** per `MAINTENANCE.md`.
+
+### Backlog
+
+- **P1:** `ui-audit-walkthrough` (PR #107) — live Serge+Claude session, not a Code session.
+- **P3 (2 items):**
+  - `D10 Admin UI for entity_identifiers_staging` — surface the 280-row staging backlog before Q1 2026 cycle (~2026-05-15).
+  - `Tier 4 unmatched classifications (427)` — keyword sweep left 427 `bootstrap_tier4` entities at `classification='unknown'`. NAV exposure bounded at ~$370B.
 
 ## Next external events
 
@@ -54,13 +48,15 @@ This sync (direct to `main`):
 
 ## Reminders
 
-- **HEAD on main is `5c06e32`** after PR #226 squash-merge + #227 doc-sync commit.
+- **HEAD on main is `7203539`** after PRs #228 + #229 squash-merged and the #229 commit-hash doc tweak.
 - **Git ops** (rule from conv-18, reaffirmed each session). Code merges PRs autonomously after CI passes: pushes branch, opens PR, waits for CI green, then `gh pr merge --squash --delete-branch` and pulls main. Reflected in `docs/PROCESS_RULES.md` §11.
-- **Branch naming.** Always use a short descriptive slug (e.g. `overlap-tab-redesign`, `quarter-label-global`). Claude must propose the short name before writing any prompt for Code. **Every Code prompt must start with the session/branch name on the first line.**
+- **Branch naming.** Always use a short descriptive slug (e.g. `cross-ownership-polish`, `cross-ownership-fix`). Claude must propose the short name before writing any prompt for Code. **Every Code prompt must start with the session/branch name on the first line.**
 - **Dark UI is production styling.** `docs/plans/DarkStyle.md` is the spec. Token palette + Hanken Grotesk / Inter / JetBrains Mono live in `web/react-app/src/styles/globals.css`.
 - **Quarter formatting.** All quarter labels in the React app go through `fmtQuarter` from `web/react-app/src/components/common/formatters.ts`. `QuarterSelector` defaults to it. Oldest-left → newest-right ordering for quarter button arrays.
 - **App is started from `data/13f_readonly.duckdb`** (last refreshed in PR #200, 2026-04-28 ~15:09).
 - **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows). Quarter labels reflect calendar convention (PR #213).
+- **fund_strategy drift (conv-22).** `fund_holdings_v2.fund_strategy` is per-row / per-quarter and drifts (6,195 funds carry 2+ distinct values). Until the fix lands, prefer reading the strategy via `fund_universe` JOIN for any active/passive filter.
+- **Cross-Ownership tab (conv-22).** Peer dropdown reads `/api/v1/peer_tickers` (sector + industry from `market_data`). Investor row expand fires `/api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` and is gated by `has_fund_detail` on the parent rollup. Fund-level toggle pulls from `fund_holdings_v2` (pivot now references the outer `fund_pos` aggregation, not `fh.ticker` / `fh.holding_value`).
 - **Do not run `build_classifications.py --reset`.** Same as previous sessions.
 - **No `--reset` runs anywhere** without explicit user authorization.
 - **Stage 5 cleanup** (legacy-table DROP window) authorized **on or after 2026-05-09** per `MAINTENANCE.md`.

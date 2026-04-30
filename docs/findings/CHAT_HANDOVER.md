@@ -1,5 +1,38 @@
 # Chat Handover
 
+## conv-22-doc-sync (2026-04-30)
+
+HEAD: **`7203539`** on `main` after PRs `#228`–`#229` merged.
+
+### PRs landed (#228–#229)
+
+Two PRs merged across the Cross-Ownership tab redesign + fix-up arc:
+
+- **PR #228 `cross-ownership-polish`** — Cross-Ownership tab polish. (1) Peer Group dropdown driven by the loaded ticker's classification — new `GET /api/v1/peer_tickers?ticker=X` returns `{sector, industry, sector_peers, industry_peers}` from `market_data`; "Industry Peers" / "Sector Peers" auto-fill, "Custom" preserves manual editing (replaces the old `peer_groups` table-driven dropdown). (2) Inline ticker input always visible in the controls panel (Add button removed); commits on Enter or autocomplete. (3) Expandable institution rows match RegisterTab / OverlapAnalysisTab pattern (24px gold ▶ column + `└` connector child rows + gold left rail); expand fetches new `GET /api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` (top 5 N-PORT funds under that institution holding the active anchor by value). (4) Fund-level toggle now actually changes data: `_cross_ownership_query(level='fund')` pulls from `fund_holdings_v2`; both `/cross_ownership` and `/cross_ownership_top` accept `level=parent|fund`. (5) Group Total footer restyled gold per DarkStyle. (6) Page title appends current quarter via shared `fmtQuarter`. Squash `f46c88c`.
+- **PR #229 `cross-ownership-fix`** — Cross-Ownership tab fix-ups on top of #228. (1) **Fund-level 500 fixed** — `_cross_ownership_fund_query` pivot was emitting `SUM(CASE WHEN fh.ticker = …)` against the outer `FROM fund_pos fp` aggregation (`BinderException`); pivot now references `fp.ticker` / `fp.holding_value`. (2) **`has_fund_detail` flag** added to `/cross_ownership` parent rollup — new `fund_parents` CTE collects DISTINCT `dm_rollup_name` ∪ `family_name` from `fund_holdings_v2` for the active quarter; LEFT JOIN exposes a per-investor boolean, frontend renders the `▶` only when true. (3) **`/cross_ownership_fund_detail` rewritten** for per-peer-ticker positions — accepts the full `tickers=…` list, returns `{fund_name, series_id, type, positions: {ticker → {value, shares}}}` for top 5 funds by total value across the peer group. (4) **Sticky summary block** — Group Total + % of Portfolio rows moved out of `<tfoot>` into `<thead>` with `position: sticky` (top 60 / 88), solid `var(--header)` bg, `var(--gold)` text + 700 weight, 2px gold borders top + bottom. (5) **Expanded child rows** mirror parent column structure — one row per fund, per-ticker columns from `positions[ticker].value`, missing tickers render `—`, Group Total column carries per-fund cross-peer total. Squash `f2194b8`.
+
+### New / updated endpoints
+
+- **NEW** `/api/v1/peer_tickers?ticker=X` — returns `{sector, industry, sector_peers, industry_peers}` for the loaded ticker (PR #228). Drives the peer-group dropdown.
+- **NEW** `/api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` — top 5 N-PORT funds under an institution holding the active anchor by value (PR #228). Rewritten in PR #229 to return per-peer-ticker positions across the full `tickers=…` list.
+- **UPDATED** `/api/v1/cross_ownership` and `/api/v1/cross_ownership_top` — accept `level=parent|fund` (PR #228); parent response gains `has_fund_detail` boolean (PR #229).
+
+### fund_strategy classification drift (new Known Issue)
+
+Surfaced this session and logged on `ROADMAP.md` "Known issues":
+
+- **What:** `classify_fund()` recomputes the active/passive label per quarter, so the same series_id can flip values across periods. **6,195 of ~14,000 funds** in `fund_holdings_v2` currently carry 2+ distinct `fund_strategy` values across their history.
+- **Pipeline fix:** lock `fund_universe.fund_strategy` on first classification — once a series_id has a non-null value, do not overwrite on later quarters unless an analyst forces a reclassification.
+- **Query fix:** for `active_only` / passive filters, JOIN `fund_universe` to read the locked strategy instead of reading `fund_holdings_v2.fund_strategy` (per-row, drifts per quarter).
+- **Scope rule:** both legs land in the same PR so the lock and the join cut over together.
+
+### Git ops
+
+- **Code merges PRs autonomously after CI passes** (rule from conv-18, reaffirmed in conv-21–22). Workflow: push branch → open PR → wait for CI green → `gh pr merge --squash --delete-branch` → `git pull` on main. Reflected in `docs/PROCESS_RULES.md` §11.
+- **Every Code prompt must start with the session/branch name on the first line.**
+
+---
+
 ## conv-21-doc-sync (2026-04-30)
 
 HEAD: **`5c06e32`** on `main` after PRs `#223`–`#227` merged.

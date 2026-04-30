@@ -1,12 +1,12 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-04-30 (conv-21-doc-sync). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-04-30 (conv-22-doc-sync). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
 ---
 
-## Current backlog (verified 2026-04-30 conv-21-doc-sync)
+## Current backlog (verified 2026-04-30 conv-22-doc-sync)
 
 ### P0 — Production blockers
 
@@ -66,7 +66,7 @@ _(none — see COMPLETED table)_
 
 ## Known issues
 
-_(none open — N-PORT quarter bucketing closed by PR #213)_
+- **fund_strategy classification drift** — surfaced 2026-04-30 (conv-22). `classify_fund()` recomputes per quarter, so the same fund can flip active/passive across periods; **6,195 of ~14,000 funds in `fund_holdings_v2` carry 2+ distinct `fund_strategy` values** across their history. Two-part fix: **(pipeline)** lock `fund_universe.fund_strategy` on the first classification — once a series_id has a non-null value, do not overwrite on later quarters unless the analyst forces a reclassification. **(query)** for `active_only` / passive filters, JOIN `fund_universe` to read the locked strategy instead of reading `fund_holdings_v2.fund_strategy` (per-row, per-quarter and drifts). Scope both legs together so the lock and the join cut over in the same change.
 
 ---
 
