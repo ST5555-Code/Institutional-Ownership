@@ -30,11 +30,6 @@ function fmtPct2(v: number | null): string {
   return `${NUM_2.format(v)}%`
 }
 
-function fmtSharesMm(v: number | null): string {
-  if (v == null || v === 0) return '—'
-  return NUM_2.format(v / 1e6)
-}
-
 // ── Styles (Register-consistent first 3 columns) ──────────────────────────
 
 const TH: React.CSSProperties = {
@@ -58,6 +53,29 @@ const BADGE: React.CSSProperties = {
   fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
+
+// Sticky Group Total / % of Portfolio summary rows. Pinned beneath the column
+// header (top: 30) so they stay visible while the body scrolls. Strong gold
+// borders frame the block; solid header bg keeps content underneath legible.
+const SUMMARY_BASE: React.CSSProperties = {
+  padding: '4px 8px', fontSize: 12, fontWeight: 700,
+  color: 'var(--gold)', backgroundColor: 'var(--header)',
+  position: 'sticky', zIndex: 3,
+}
+const SUMMARY_CELL_TOP: React.CSSProperties = {
+  ...SUMMARY_BASE, top: 60, borderTop: '2px solid var(--gold)',
+}
+const SUMMARY_CELL_BOT: React.CSSProperties = {
+  ...SUMMARY_BASE, top: 88, borderBottom: '2px solid var(--gold)',
+}
+const SUMMARY_LABEL: React.CSSProperties = {
+  textTransform: 'uppercase', letterSpacing: '0.06em',
+  fontFamily: "'Inter', sans-serif",
+}
+const SUMMARY_VALUE: React.CSSProperties = {
+  textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  fontFamily: "'JetBrains Mono', monospace",
+}
 
 // Overlap row: investor holds ALL tickers in the group with non-null values.
 const OVERLAP_BG = 'rgba(122,173,222,0.08)'
@@ -89,16 +107,21 @@ interface PeerTickersResponse {
 
 // ── Fund-detail response ───────────────────────────────────────────────────
 
+interface FundDetailPosition {
+  value: number
+  shares: number
+}
 interface FundDetailFund {
   fund_name: string
   series_id: string | null
   type: string
-  value: number
-  shares: number
+  // positions keyed by ticker → { value, shares }; missing entries = no position
+  positions: Record<string, FundDetailPosition>
 }
 interface FundDetailResponse {
   institution: string
   anchor: string
+  tickers: string[]
   funds: FundDetailFund[]
 }
 
@@ -501,6 +524,42 @@ export function CrossOwnershipTab() {
                   <th style={TH_R}>Group Total</th>
                   <th style={TH_R}>% Portfolio</th>
                 </tr>
+                {footerSums && (
+                  <>
+                    <tr>
+                      <td style={SUMMARY_CELL_TOP} />
+                      <td style={SUMMARY_CELL_TOP} />
+                      <td style={{ ...SUMMARY_LABEL, ...SUMMARY_CELL_TOP }}>Group Total</td>
+                      <td style={SUMMARY_CELL_TOP} />
+                      {dataTickers.map(t => (
+                        <td key={t} style={{ ...SUMMARY_VALUE, ...SUMMARY_CELL_TOP }}>
+                          {fmtValueMm(footerSums.perTicker[t] || 0)}
+                        </td>
+                      ))}
+                      <td style={{ ...SUMMARY_VALUE, ...SUMMARY_CELL_TOP }}>{fmtValueMm(footerSums.totalAcross)}</td>
+                      <td style={SUMMARY_CELL_TOP} />
+                    </tr>
+                    <tr>
+                      <td style={SUMMARY_CELL_BOT} />
+                      <td style={SUMMARY_CELL_BOT} />
+                      <td style={{ ...SUMMARY_LABEL, ...SUMMARY_CELL_BOT }}>% of Portfolio</td>
+                      <td style={SUMMARY_CELL_BOT} />
+                      {dataTickers.map(t => {
+                        const total = footerSums.totalAcross || 0
+                        const pct = total > 0 ? ((footerSums.perTicker[t] || 0) / total) * 100 : 0
+                        return (
+                          <td key={t} style={{ ...SUMMARY_VALUE, ...SUMMARY_CELL_BOT }}>
+                            {pct > 0 ? fmtPct2(pct) : '—'}
+                          </td>
+                        )
+                      })}
+                      <td style={{ ...SUMMARY_VALUE, ...SUMMARY_CELL_BOT }}>
+                        {footerSums.totalAcross > 0 ? fmtPct2(100) : '—'}
+                      </td>
+                      <td style={SUMMARY_CELL_BOT} />
+                    </tr>
+                  </>
+                )}
               </thead>
               <tbody>
                 {data.investors.map((inv, i) => {
@@ -510,7 +569,10 @@ export function CrossOwnershipTab() {
                   const rowKey = `${i}:${inv.investor}`
                   const isOpen = expanded.has(rowKey)
                   // Fund-level rows are individual fund series; no parent→fund drill-down.
-                  const canExpand = fundView !== 'fund'
+                  // Parent rows expand only when the backend confirms fund_holdings_v2
+                  // has rows under this institution (has_fund_detail flag). Avoids
+                  // showing a triangle for institutions with no N-PORT children.
+                  const canExpand = fundView !== 'fund' && inv.has_fund_detail === true
                   return (
                     <Fragment key={rowKey}>
                       <tr style={{ backgroundColor: rowBg }}>
@@ -576,21 +638,6 @@ export function CrossOwnershipTab() {
                   <tr><td colSpan={totalCols} style={{ ...TD, textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>No investors found</td></tr>
                 )}
               </tbody>
-              {footerSums && (
-                <tfoot>
-                  <tr>
-                    <FooterCell />
-                    <FooterCell />
-                    <FooterCell>Group Total</FooterCell>
-                    <FooterCell />
-                    {dataTickers.map(t => (
-                      <FooterCell key={t} align="right">{fmtValueMm(footerSums.perTicker[t] || 0)}</FooterCell>
-                    ))}
-                    <FooterCell align="right">{fmtValueMm(footerSums.totalAcross)}</FooterCell>
-                    <FooterCell />
-                  </tr>
-                </tfoot>
-              )}
             </table>
           </div>
         )}
@@ -655,6 +702,11 @@ function FundDetailRows({ institution, anchor, tickers, quarter, totalCols }: Fu
     <>
       {data.funds.map((f, i) => {
         const ts = getTypeStyle(f.type)
+        let totalAcross = 0
+        for (const t of tickers) {
+          const pos = f.positions[t]
+          if (pos) totalAcross += pos.value
+        }
         return (
           <tr key={`fd-${i}-${f.series_id || f.fund_name}`} style={{ backgroundColor: CHILD_BG }}>
             <td style={railCell} />
@@ -673,39 +725,26 @@ function FundDetailRows({ institution, anchor, tickers, quarter, totalCols }: Fu
             <td style={{ ...TD, backgroundColor: CHILD_BG }}>
               <span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span>
             </td>
-            {/* Per-ticker holding columns: blank — drill-down focuses on the anchor */}
-            {tickers.map(t => (
-              <td key={t} style={{ ...TD_R, color: 'var(--text-dim)', backgroundColor: CHILD_BG }}>—</td>
-            ))}
-            {/* Group Total column repurposed as the anchor $MM value */}
-            <td style={{ ...TD_R, backgroundColor: CHILD_BG }}>{fmtValueMm(f.value)}</td>
-            {/* % Portfolio column repurposed as shares (MM) */}
-            <td style={{ ...TD_R, backgroundColor: CHILD_BG }}>{fmtSharesMm(f.shares)}</td>
+            {tickers.map(t => {
+              const pos = f.positions[t]
+              return (
+                <td key={t} style={{
+                  ...TD_R,
+                  color: pos ? 'var(--text)' : 'var(--text-dim)',
+                  backgroundColor: CHILD_BG,
+                }}>
+                  {pos ? fmtValueMm(pos.value) : '—'}
+                </td>
+              )
+            })}
+            <td style={{ ...TD_R, backgroundColor: CHILD_BG, fontWeight: 600 }}>
+              {totalAcross > 0 ? fmtValueMm(totalAcross) : '—'}
+            </td>
+            <td style={{ ...TD_R, backgroundColor: CHILD_BG, color: 'var(--text-dim)' }}>—</td>
           </tr>
         )
       })}
     </>
-  )
-}
-
-// ── Footer cell ─────────────────────────────────────────────────────────────
-
-function FooterCell({ children, align = 'left' }: {
-  children?: React.ReactNode; align?: 'left' | 'right'
-}) {
-  return (
-    <td style={{
-      padding: '7px 10px', fontSize: 13, fontWeight: 700,
-      color: 'var(--gold)', backgroundColor: 'rgba(197,162,84,0.03)',
-      position: 'sticky', bottom: 0, zIndex: 2,
-      borderTop: '2px solid var(--gold)',
-      textAlign: align, fontVariantNumeric: align === 'right' ? 'tabular-nums' : undefined,
-      fontFamily: align === 'right' ? "'JetBrains Mono', monospace" : "'Inter', sans-serif",
-      letterSpacing: align === 'left' ? '0.06em' : undefined,
-      textTransform: align === 'left' ? 'uppercase' : undefined,
-    }}>
-      {children}
-    </td>
   )
 }
 
