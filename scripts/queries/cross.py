@@ -285,6 +285,102 @@ def get_two_company_overlap(subject, second, quarter, con):
     })
 
 
+def get_overlap_institution_detail(subject, second, institution, quarter, con):
+    """Drill-down into an institution's funds for a two-ticker overlap view.
+
+    Returns funds under `institution` (matched on fund_holdings_v2.dm_rollup_name
+    or family_name) holding `subject` and/or `second` in `quarter`. Funds that
+    hold both are returned in `overlapping`; funds that hold only one are in
+    `non_overlapping`.
+    """
+    rows = con.execute("""
+        WITH inst_funds AS (
+            SELECT DISTINCT
+                fh.fund_name,
+                fh.series_id,
+                fh.family_name
+            FROM fund_holdings_v2 fh
+            WHERE fh.quarter = ?
+              AND fh.is_latest = TRUE
+              AND (fh.dm_rollup_name = ? OR fh.family_name = ?)
+              AND fh.ticker IN (?, ?)
+        ),
+        subj_pos AS (
+            SELECT fh.series_id, SUM(fh.market_value_usd) AS value
+            FROM fund_holdings_v2 fh
+            WHERE fh.quarter = ?
+              AND fh.is_latest = TRUE
+              AND fh.ticker = ?
+              AND fh.market_value_usd > 0
+            GROUP BY fh.series_id
+        ),
+        sec_pos AS (
+            SELECT fh.series_id, SUM(fh.market_value_usd) AS value
+            FROM fund_holdings_v2 fh
+            WHERE fh.quarter = ?
+              AND fh.is_latest = TRUE
+              AND fh.ticker = ?
+              AND fh.market_value_usd > 0
+            GROUP BY fh.series_id
+        )
+        SELECT
+            f.fund_name,
+            f.series_id,
+            f.family_name,
+            fu.is_actively_managed AS is_active,
+            COALESCE(sp.value, 0) AS value_a,
+            COALESCE(xp.value, 0) AS value_b
+        FROM inst_funds f
+        LEFT JOIN subj_pos sp ON sp.series_id = f.series_id
+        LEFT JOIN sec_pos  xp ON xp.series_id = f.series_id
+        LEFT JOIN fund_universe fu ON fu.series_id = f.series_id
+        ORDER BY (COALESCE(sp.value, 0) + COALESCE(xp.value, 0)) DESC
+    """, [quarter, institution, institution, subject, second,
+          quarter, subject,
+          quarter, second]).fetchall()
+
+    overlapping = []
+    non_overlapping = []
+    for r in rows:
+        fund_name, series_id, family_name, is_active, value_a, value_b = r
+        va = float(value_a) if value_a is not None else 0.0
+        vb = float(value_b) if value_b is not None else 0.0
+        if va <= 0 and vb <= 0:
+            continue
+        type_label = (
+            'active' if is_active is True
+            else 'passive' if is_active is False
+            else 'mixed'
+        )
+        if va > 0 and vb > 0:
+            overlapping.append({
+                'fund_name': fund_name,
+                'series_id': series_id,
+                'family_name': family_name,
+                'type': type_label,
+                'value_a': va,
+                'value_b': vb,
+            })
+        else:
+            non_overlapping.append({
+                'fund_name': fund_name,
+                'series_id': series_id,
+                'family_name': family_name,
+                'type': type_label,
+                'holds': subject if va > 0 else second,
+                'value': va if va > 0 else vb,
+            })
+
+    return clean_for_json({
+        'institution': institution,
+        'subject': subject,
+        'second': second,
+        'quarter': quarter,
+        'overlapping': overlapping,
+        'non_overlapping': non_overlapping,
+    })
+
+
 def get_two_company_subject(subject, quarter, con):
     """Subject-only variant of get_two_company_overlap.
 

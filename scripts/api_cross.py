@@ -142,6 +142,36 @@ def api_two_company_subject(request: Request):
         con.close()
 
 
+@cross_router.get('/overlap_institution_detail')
+def api_overlap_institution_detail(request: Request):
+    """Drill-down: funds under an institution holding subject/second tickers."""
+    from config import QUARTERS as _QUARTERS, LATEST_QUARTER
+    subject = (request.query_params.get('subject') or '').upper().strip()
+    second = (request.query_params.get('second') or '').upper().strip()
+    institution = (request.query_params.get('institution') or '').strip()
+    quarter = (request.query_params.get('quarter') or '').strip() or LATEST_QUARTER
+    if quarter not in _QUARTERS:
+        quarter = LATEST_QUARTER
+    if not subject or not second or not institution:
+        return JSONResponse(status_code=400, content={'error': 'Missing subject, second, or institution'})
+    try:
+        con = get_db()
+    except Exception as e:
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
+    try:
+        validate_ticker_historical(con, subject)
+        validate_ticker_historical(con, second)
+        result = queries.get_overlap_institution_detail(subject, second, institution, quarter, con)
+        return clean_for_json(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("overlap_institution_detail error: %s", e, exc_info=True)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+    finally:
+        con.close()
+
+
 @cross_router.get('/peer_groups')
 def api_peer_groups():
     """Return all peer groups."""
