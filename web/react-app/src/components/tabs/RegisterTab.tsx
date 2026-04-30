@@ -127,7 +127,7 @@ interface FundViewRow extends RegisterRow {
   parentInstitution: string
 }
 
-const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
+const QUARTERS = ['2025Q1', '2025Q2', '2025Q3', '2025Q4']
 
 // Column layout (13 cols):
 //   1  Expand triangle (gold, ~24px)

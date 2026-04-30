@@ -1,3 +1,5 @@
+import { fmtQuarter } from './formatters'
+
 interface Props {
   quarters: string[]
   value: string
@@ -6,7 +8,7 @@ interface Props {
   formatLabel?: (q: string) => string
 }
 
-export function QuarterSelector({ quarters, value, onChange, disabled, formatLabel }: Props) {
+export function QuarterSelector({ quarters, value, onChange, disabled, formatLabel = fmtQuarter }: Props) {
   return (
     <div style={{ display: 'inline-flex' }}>
       {quarters.map((q, i) => {
@@ -34,7 +36,7 @@ export function QuarterSelector({ quarters, value, onChange, disabled, formatLab
               transition: 'all 0.12s',
             }}
           >
-            {formatLabel ? formatLabel(q) : q}
+            {formatLabel(q)}
           </button>
         )
       })}
