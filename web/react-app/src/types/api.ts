@@ -461,12 +461,11 @@ export interface OverlapInstitutionOverlapFund {
   value_b: number
 }
 
-export interface OverlapInstitutionNonOverlapFund {
+export interface OverlapInstitutionSingleFund {
   fund_name: string
   series_id: string | null
   family_name: string | null
   type: string
-  holds: string
   value: number
 }
 
@@ -476,7 +475,8 @@ export interface OverlapInstitutionDetailResponse {
   second: string
   quarter: string
   overlapping: OverlapInstitutionOverlapFund[]
-  non_overlapping: OverlapInstitutionNonOverlapFund[]
+  ticker_a_only: OverlapInstitutionSingleFund[]
+  ticker_b_only: OverlapInstitutionSingleFund[]
 }
 
 // ── Crowding / Short Interest — /api/crowding?ticker=EQT ──────────────────

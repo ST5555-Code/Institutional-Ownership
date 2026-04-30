@@ -288,10 +288,10 @@ def get_two_company_overlap(subject, second, quarter, con):
 def get_overlap_institution_detail(subject, second, institution, quarter, con):
     """Drill-down into an institution's funds for a two-ticker overlap view.
 
-    Returns funds under `institution` (matched on fund_holdings_v2.dm_rollup_name
-    or family_name) holding `subject` and/or `second` in `quarter`. Funds that
-    hold both are returned in `overlapping`; funds that hold only one are in
-    `non_overlapping`.
+    Returns top 5 funds in each of three buckets:
+      * `overlapping`     — hold both tickers, sorted by (value_a + value_b) desc
+      * `ticker_a_only`   — hold subject but not second, sorted by value desc
+      * `ticker_b_only`   — hold second but not subject, sorted by value desc
     """
     rows = con.execute("""
         WITH inst_funds AS (
@@ -340,7 +340,8 @@ def get_overlap_institution_detail(subject, second, institution, quarter, con):
           quarter, second]).fetchall()
 
     overlapping = []
-    non_overlapping = []
+    ticker_a_only = []
+    ticker_b_only = []
     for r in rows:
         fund_name, series_id, family_name, is_active, value_a, value_b = r
         va = float(value_a) if value_a is not None else 0.0
@@ -361,23 +362,35 @@ def get_overlap_institution_detail(subject, second, institution, quarter, con):
                 'value_a': va,
                 'value_b': vb,
             })
-        else:
-            non_overlapping.append({
+        elif va > 0:
+            ticker_a_only.append({
                 'fund_name': fund_name,
                 'series_id': series_id,
                 'family_name': family_name,
                 'type': type_label,
-                'holds': subject if va > 0 else second,
-                'value': va if va > 0 else vb,
+                'value': va,
             })
+        else:
+            ticker_b_only.append({
+                'fund_name': fund_name,
+                'series_id': series_id,
+                'family_name': family_name,
+                'type': type_label,
+                'value': vb,
+            })
+
+    overlapping.sort(key=lambda f: (f['value_a'] + f['value_b']), reverse=True)
+    ticker_a_only.sort(key=lambda f: f['value'], reverse=True)
+    ticker_b_only.sort(key=lambda f: f['value'], reverse=True)
 
     return clean_for_json({
         'institution': institution,
         'subject': subject,
         'second': second,
         'quarter': quarter,
-        'overlapping': overlapping,
-        'non_overlapping': non_overlapping,
+        'overlapping': overlapping[:5],
+        'ticker_a_only': ticker_a_only[:5],
+        'ticker_b_only': ticker_b_only[:5],
     })
 
 
