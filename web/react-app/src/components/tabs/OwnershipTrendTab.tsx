@@ -183,12 +183,21 @@ export function OwnershipTrendTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Ownership"
-        title="Ownership Trend"
-        description="Quarterly ownership changes, holder momentum, and cohort analysis across reporting periods."
-      />
-      <style>{`@media print { .ot-controls { display:none!important } .ot-wrap { height:auto!important; overflow:visible!important } }`}</style>
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Ownership"
+            title="Ownership Trend"
+            description="Quarterly ownership changes, holder momentum, and cohort analysis across reporting periods."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="investor_flows" label="flows" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={loading} />
+        </div>
+      </div>
+      <style>{`@media print { .ot-controls { display:none!important } .no-print { display:none!important } .ot-wrap { height:auto!important; overflow:visible!important } }`}</style>
 
       {/* Controls bar */}
       <div className="ot-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
@@ -229,10 +238,6 @@ export function OwnershipTrendTab() {
             </div>
           </div>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="investor_flows" label="flows" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={loading} />
-        </div>
       </div>
 
       {/* Content area */}

@@ -144,13 +144,22 @@ export function FundPortfolioTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Ownership"
-        title="Fund Portfolio"
-        description="Individual fund holdings for any active institutional holder. Select a manager to view positions."
-      />
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Ownership"
+            title="Fund Portfolio"
+            description="Individual fund holdings for any active institutional holder. Select a manager to view positions."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="fund_holdings_v2" label="N-PORT" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!portfolio.data} />
+        </div>
+      </div>
       <style>{`
-        @media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
+        @media print { .fp-controls { display:none!important } .no-print { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
         .fp-ticker-link:hover { text-decoration: underline; }
       `}</style>
 
@@ -176,8 +185,6 @@ export function FundPortfolioTab() {
             </option>
           ))}
         </select>
-        <FreshnessBadge tableName="fund_holdings_v2" label="N-PORT" />
-        <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!portfolio.data} />
       </div>
 
       {/* Content */}

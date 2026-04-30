@@ -209,12 +209,21 @@ export function OverlapAnalysisTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Targeting"
-        title="Overlap Analysis"
-        description="Pairwise holder overlap between securities. Identifies shared institutional ownership patterns."
-      />
-      <style>{`@media print { .oa-controls { display:none!important } }`}</style>
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Targeting"
+            title="Overlap Analysis"
+            description="Pairwise holder overlap between securities. Identifies shared institutional ownership patterns."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
+        </div>
+      </div>
+      <style>{`@media print { .oa-controls { display:none!important } .no-print { display:none!important } }`}</style>
 
       {/* Controls */}
       <div className="oa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
@@ -223,10 +232,6 @@ export function OverlapAnalysisTab() {
           <SecondTickerInput value={secondTicker || ''} onSelect={setSecondTicker} />
         </div>
         <QuarterSelector quarters={QUARTERS} value={quarter} onChange={setQuarter} />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="summary_by_parent" label="register" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
-        </div>
       </div>
 
       {/* Content — two panels */}

@@ -256,13 +256,22 @@ export function ConvictionTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Ownership"
-        title="Conviction Analysis"
-        description="High-conviction holders ranked by portfolio concentration, with direction and tenure signals."
-      />
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Ownership"
+            title="Conviction Analysis"
+            description="High-conviction holders ranked by portfolio concentration, with direction and tenure signals."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
+        </div>
+      </div>
       <style>{`
-        @media print { .cv-controls { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
+        @media print { .cv-controls { display:none!important } .no-print { display:none!important } .cv-wrap { height:auto!important; overflow:visible!important } }
         .cv-row-highlight > td { background-color: rgba(197,162,84,0.12) !important; transition: background-color 0.4s ease-in-out; }
       `}</style>
 
@@ -275,10 +284,6 @@ export function ConvictionTab() {
           <InvestorTypeFilter available={availableTypes} selected={effectiveTypes} onChange={setSelectedTypes} />
         )}
         <InvestorSearchWithDropdown data={data?.rows ?? []} onSelect={handleSearchSelect} />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="summary_by_parent" label="register" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
-        </div>
       </div>
 
       {/* Content */}

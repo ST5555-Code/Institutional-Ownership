@@ -507,17 +507,27 @@ export function RegisterTab() {
         overflow: 'hidden',
       }}
     >
-      <PageHeader
-        section="Ownership"
-        title="Shareholder Register"
-        description="Top institutional parents and their underlying funds. Expand any row to see constituent fund positions."
-      />
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Ownership"
+            title="Shareholder Register"
+            description="Top institutional parents and their underlying funds. Expand any row to see constituent fund positions."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
+          <ExportBar onExcel={onExcel} onPrint={onPrint} disabled={!data} />
+        </div>
+      </div>
       {/* Print CSS + highlight class. !important on the highlight so it
           survives mid-fade React re-renders that would otherwise restore
           the row's inline backgroundColor. */}
       <style>{`
         @media print {
           .register-controls-bar { display: none !important; }
+          .no-print { display: none !important; }
           .register-tab-container { height: auto !important; overflow: visible !important; }
           .register-table-wrap { overflow: visible !important; }
         }
@@ -577,10 +587,6 @@ export function RegisterTab() {
           data={data?.rows ?? []}
           onSelect={handleSearchSelect}
         />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="summary_by_parent" label="register" />
-          <ExportBar onExcel={onExcel} onPrint={onPrint} disabled={!data} />
-        </div>
       </div>
 
       {/* Table container */}

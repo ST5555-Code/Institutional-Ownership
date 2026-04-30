@@ -131,14 +131,24 @@ export function PeerRotationTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Flow & Rotation"
-        title="Peer Rotation"
-        description="Cross-name rotation across a peer group. Identifies capital shifting between related securities."
-      />
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Flow & Rotation"
+            title="Peer Rotation"
+            description="Cross-name rotation across a peer group. Identifies capital shifting between related securities."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="investor_flows" label="flows" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
+        </div>
+      </div>
       <style>{`
         @media print {
           .pr-controls { display:none!important }
+          .no-print { display:none!important }
           .pr-wrap { height:auto!important; max-height:none!important; overflow:visible!important }
           .pr-wrap * { max-height:none!important }
         }
@@ -164,10 +174,6 @@ export function PeerRotationTab() {
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="investor_flows" label="flows" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
-        </div>
       </div>
 
       {/* Content */}
