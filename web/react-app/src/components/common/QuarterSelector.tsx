@@ -3,9 +3,10 @@ interface Props {
   value: string
   onChange: (q: string) => void
   disabled?: boolean
+  formatLabel?: (q: string) => string
 }
 
-export function QuarterSelector({ quarters, value, onChange, disabled }: Props) {
+export function QuarterSelector({ quarters, value, onChange, disabled, formatLabel }: Props) {
   return (
     <div style={{ display: 'inline-flex' }}>
       {quarters.map((q, i) => {
@@ -33,7 +34,7 @@ export function QuarterSelector({ quarters, value, onChange, disabled }: Props) 
               transition: 'all 0.12s',
             }}
           >
-            {q}
+            {formatLabel ? formatLabel(q) : q}
           </button>
         )
       })}
