@@ -84,19 +84,9 @@ from pipeline.nport_parsers import classify_fund  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 
 def quarter_label_for_month(year: int, month: int) -> str:
-    """Map N-PORT report month -> prod ``quarter`` label.
-
-    Convention observed in prod ``fund_holdings_v2``:
-      Jan/Feb/Mar -> YYYY-Q2,  Apr/May/Jun -> YYYY-Q3,
-      Jul/Aug/Sep -> YYYY-Q4,  Oct/Nov/Dec -> (YYYY+1)-Q1.
-    """
-    if month >= 10:
-        return f"{year + 1}Q1"
-    if month >= 7:
-        return f"{year}Q4"
-    if month >= 4:
-        return f"{year}Q3"
-    return f"{year}Q2"
+    """Map N-PORT report month to calendar quarter label."""
+    q = (month - 1) // 3 + 1
+    return f"{year}Q{q}"
 
 
 def quarter_label_for_date(d: date) -> str:
