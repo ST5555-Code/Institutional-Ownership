@@ -149,7 +149,7 @@ export function ShortInterestTab() {
 
             {/* Charts row */}
             <div style={{ display: 'flex', gap: 10 }}>
-              <ShortPositionPctChart data={posData} />
+              <ShortPositionPctChart data={posData} ticker={ticker} />
               <ShortVolumeChart data={volData} ticker={ticker} />
             </div>
 
@@ -161,8 +161,8 @@ export function ShortInterestTab() {
               Short Volume % reflects daily off-exchange volume reported to FINRA. It includes market-maker hedging and is not equivalent to short interest.
             </div>
 
-            {/* Tables 2×2 grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {/* Tables — stacked full width */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <NportDetailTable rows={data.nport_detail} />
               <CrossRefTable rows={data.cross_ref} />
               <ShortOnlyTable rows={data.short_only_funds} />
@@ -263,7 +263,7 @@ interface CombinedQRow {
   industry_pct: number | null
 }
 
-function ShortPositionPctChart({ data }: { data: ShortPositionPctResponse | null }) {
+function ShortPositionPctChart({ data, ticker }: { data: ShortPositionPctResponse | null; ticker: string }) {
   const merged: CombinedQRow[] = (() => {
     if (!data) return []
     const all = new Set<string>()
@@ -281,14 +281,17 @@ function ShortPositionPctChart({ data }: { data: ShortPositionPctResponse | null
     }))
   })()
 
+  const sectorLabel = `${data?.sector_name ?? 'Sector'} Avg`
+  const industryLabel = `${data?.industry_name ?? 'Industry'} Avg`
+
   return (
     <ChartBox title="Short Position % of SO (Fund Level, Quarterly)">
       {merged.length > 0 ? (
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={merged} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--line-soft)" strokeDasharray="2 2" vertical={false} />
-            <XAxis dataKey="quarter" tick={AXIS_TICK} stroke="var(--line)" />
-            <YAxis tick={AXIS_TICK} stroke="var(--line)" tickFormatter={(v: number) => `${NUM_2.format(v)}%`} width={60} />
+            <XAxis dataKey="quarter" tick={AXIS_TICK} stroke="none" />
+            <YAxis tick={AXIS_TICK} stroke="none" tickFormatter={(v: number) => `${NUM_2.format(v)}%`} width={60} />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelStyle={{ color: 'var(--white)', fontWeight: 700, marginBottom: 4 }}
@@ -300,9 +303,9 @@ function ShortPositionPctChart({ data }: { data: ShortPositionPctResponse | null
               height={20}
               wrapperStyle={{ fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
             />
-            <Bar dataKey="ticker_pct" name="Ticker" fill="var(--gold)" />
-            <Line type="monotone" dataKey="sector_pct" name="Sector Avg" stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
-            <Line type="monotone" dataKey="industry_pct" name="Industry Avg" stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
+            <Bar dataKey="ticker_pct" name={ticker} fill="var(--gold)" />
+            <Line type="monotone" dataKey="sector_pct" name={sectorLabel} stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="industry_pct" name={industryLabel} stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : (
@@ -339,14 +342,26 @@ function ShortVolumeChart({ data, ticker }: { data: ShortVolumeComparisonRespons
     }))
   })()
 
+  const sectorLabel = `${data?.sector_name ?? 'Sector'} Med`
+  const industryLabel = `${data?.industry_name ?? 'Industry'} Med`
+
   return (
     <ChartBox title="Daily Short Volume % (FINRA)">
       {merged.length > 0 ? (
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={merged} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--line-soft)" strokeDasharray="2 2" vertical={false} />
-            <XAxis dataKey="date" tick={AXIS_TICK} stroke="var(--line)" interval={Math.max(0, Math.floor(merged.length / 8))} />
-            <YAxis tick={AXIS_TICK} stroke="var(--line)" tickFormatter={(v: number) => `${NUM_0.format(v)}%`} width={48} />
+            <XAxis
+              dataKey="date"
+              tick={AXIS_TICK}
+              stroke="none"
+              interval={Math.max(0, Math.floor(merged.length / 7))}
+              tickFormatter={(v: string) => {
+                const d = new Date(v)
+                return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`
+              }}
+            />
+            <YAxis tick={AXIS_TICK} stroke="none" tickFormatter={(v: number) => `${NUM_0.format(v)}%`} width={48} />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelStyle={{ color: 'var(--white)', fontWeight: 700, marginBottom: 4 }}
@@ -358,9 +373,9 @@ function ShortVolumeChart({ data, ticker }: { data: ShortVolumeComparisonRespons
               height={20}
               wrapperStyle={{ fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
             />
-            <Line type="monotone" dataKey="ticker_pct" name={ticker} stroke="var(--white)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="sector_pct" name="Sector Median" stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
-            <Line type="monotone" dataKey="industry_pct" name="Industry Median" stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="ticker_pct" name={ticker} stroke="var(--white)" strokeWidth={2} dot={{ r: 2, fill: 'var(--white)' }} />
+            <Line type="monotone" dataKey="sector_pct" name={sectorLabel} stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="industry_pct" name={industryLabel} stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       ) : (
