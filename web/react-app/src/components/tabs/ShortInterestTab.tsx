@@ -10,7 +10,7 @@ import type {
   ShortPositionPctResponse,
   ShortVolumeComparisonResponse,
 } from '../../types/api'
-import { ExportBar, ColumnGroupHeader, FreshnessBadge, PageHeader, getTypeStyle } from '../common'
+import { ExportBar, ColumnGroupHeader, FreshnessBadge, PageHeader, getTypeStyle, fmtQuarter } from '../common'
 import {
   Line, LineChart, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
@@ -37,13 +37,6 @@ function fmtPct2(v: number | null): string {
   if (v == null) return '—'
   if (v === 0) return '—'
   return `${NUM_2.format(v)}%`
-}
-
-function fmtQuarter(v: string): string {
-  if (!v || v.length < 6) return v
-  const q = v.slice(-2)
-  const yr = v.slice(2, 4)
-  return `${q} '${yr}`
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────

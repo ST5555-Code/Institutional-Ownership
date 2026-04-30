@@ -10,6 +10,7 @@ import {
   FreshnessBadge,
   PageHeader,
   getTypeStyle,
+  fmtQuarter,
 } from '../common'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
@@ -186,7 +187,7 @@ export function FlowAnalysisTab() {
         {data && !loading && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              {data.quarter_from} → {data.quarter_to}
+              {fmtQuarter(data.quarter_from)} → {fmtQuarter(data.quarter_to)}
             </div>
 
             {/* 4 QoQ trend charts in 2×2 grid */}

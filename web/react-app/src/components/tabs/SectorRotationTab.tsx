@@ -17,6 +17,7 @@ import {
   FreshnessBadge,
   PageHeader,
   getTypeStyle,
+  fmtQuarter,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -40,13 +41,6 @@ function fmtBillionsCell(v: number | null | undefined): string {
   const abs = Math.abs(b)
   const s = abs >= 10 ? NUM_1.format(abs) : abs.toFixed(1)
   return v < 0 ? `($${s}B)` : `$${s}B`
-}
-
-function fmtQuarterLabel(q: string): string {
-  // "2025Q2" → "Q2 '25"
-  const m = /^(\d{4})Q(\d)$/.exec(q)
-  if (!m) return q
-  return `Q${m[2]} '${m[1].slice(2)}`
 }
 
 function SignedMm({ v }: { v: number | null }) {
@@ -418,7 +412,7 @@ export function SectorRotationTab() {
                   <div style={{ ...PANEL_TITLE, display: 'flex', justifyContent: 'space-between' }}>
                     <span>
                       {selectedSector}
-                      {moverPeriod && ` — ${fmtQuarterLabel(moverPeriod.to)}`}
+                      {moverPeriod && ` — ${fmtQuarter(moverPeriod.to)}`}
                     </span>
                     <span style={{ color: 'var(--text-mute)', textTransform: 'none', letterSpacing: '0.04em' }}>
                       {fundView === 'fund' ? 'fund' : 'parent'}
@@ -477,7 +471,7 @@ export function SectorRotationTab() {
               institution={moverDetail.institution}
               anchor={moverDetail.anchor}
               sector={selectedSector || ''}
-              periodLabel={moverPeriod ? fmtQuarterLabel(moverPeriod.to) : ''}
+              periodLabel={moverPeriod ? fmtQuarter(moverPeriod.to) : ''}
               data={moverDetailFetch.data}
               loading={moverDetailFetch.loading}
               error={moverDetailFetch.error}
@@ -626,7 +620,7 @@ function NetFlowsHeatmap({ data, loading, onCellHover }: {
                 <th style={{ ...TH, position: 'static' }} />
                 {data.quarters.map((q, i) => (
                   <th key={i} style={{ ...TH_C, position: 'static' }}>
-                    {q ? fmtQuarterLabel(q) : ''}
+                    {q ? fmtQuarter(q) : ''}
                   </th>
                 ))}
                 <th style={{ ...TH_R, position: 'static', color: 'var(--gold)' }}>Total Net</th>
@@ -666,7 +660,7 @@ function NetFlowsHeatmap({ data, loading, onCellHover }: {
                           onCellHover({
                             x: pos.x, y: pos.y,
                             title: r.label,
-                            periodLabel: data.quarters[i] ? fmtQuarterLabel(data.quarters[i]) : '',
+                            periodLabel: data.quarters[i] ? fmtQuarter(data.quarters[i]) : '',
                             inflow: c.inflow, outflow: c.outflow, net: c.net,
                           })
                         }}
@@ -798,7 +792,7 @@ function SectorHeatmap({
             <th style={{ ...TH_R, top: 26 }}>Rank</th>
             <th style={{ ...TH, top: 26 }}>Sector</th>
             {displayQuarters.map(q => (
-              <th key={q} style={{ ...TH_C, top: 26 }}>{fmtQuarterLabel(q)}</th>
+              <th key={q} style={{ ...TH_C, top: 26 }}>{fmtQuarter(q)}</th>
             ))}
             <th style={{
               ...TH_R, top: 26,
@@ -847,7 +841,7 @@ function SectorHeatmap({
                         onCellHover({
                           x: pos.x, y: pos.y,
                           title: s.sector,
-                          periodLabel: fmtQuarterLabel(q),
+                          periodLabel: fmtQuarter(q),
                           inflow: flow?.inflow ?? null,
                           outflow: flow?.outflow ?? null,
                           net: v,
@@ -905,7 +899,7 @@ function SectorHeatmap({
                     if (!pos) { onCellHover(null); return }
                     onCellHover({
                       x: pos.x, y: pos.y,
-                      title: 'Total', periodLabel: fmtQuarterLabel(q),
+                      title: 'Total', periodLabel: fmtQuarter(q),
                       inflow: cell.inflow, outflow: cell.outflow, net: cell.net,
                     })
                   }}

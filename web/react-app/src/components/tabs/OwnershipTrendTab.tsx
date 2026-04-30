@@ -16,6 +16,7 @@ import {
   ExportBar,
   FreshnessBadge,
   PageHeader,
+  fmtQuarter,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -102,8 +103,8 @@ const SUB_TABS: { id: SubView; label: string }[] = [
 ]
 
 // Quarters for the "from" selector on Cohort sub-view (exclude latest
-// since you can't cohort-compare latest to itself).
-const COHORT_FROM_QUARTERS = ['2025Q3', '2025Q2', '2025Q1']
+// since you can't cohort-compare latest to itself). Oldest → newest.
+const COHORT_FROM_QUARTERS = ['2025Q1', '2025Q2', '2025Q3']
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export function OwnershipTrendTab() {
   const [subView, setSubView] = useState<SubView>('quarterly')
   const [activeOnly, setActiveOnly] = useState(false)
   const [fundView, setFundView] = useState<'hierarchy' | 'fund'>('hierarchy')
-  const [cohortFrom, setCohortFrom] = useState('2025Q3')
+  const [cohortFrom, setCohortFrom] = useState(COHORT_FROM_QUARTERS[COHORT_FROM_QUARTERS.length - 1])
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const aoStr = activeOnly ? 'true' : 'false'
@@ -232,7 +233,7 @@ export function OwnershipTrendTab() {
                     backgroundColor: cohortFrom === q ? 'var(--header)' : 'transparent',
                     border: `1px solid ${cohortFrom === q ? 'var(--header)' : 'var(--line)'}`,
                   }}>
-                  {q}
+                  {fmtQuarter(q)}
                 </button>
               ))}
             </div>
@@ -287,7 +288,7 @@ function QuarterlySummaryView({ data }: { data: OwnershipTrendResponse }) {
         <tbody>
           {data.quarters.map((q: OwnershipTrendQuarter) => (
             <tr key={q.quarter}>
-              <td style={{ ...TD, fontWeight: 600 }}>{q.quarter}</td>
+              <td style={{ ...TD, fontWeight: 600 }}>{fmtQuarter(q.quarter)}</td>
               <td style={TD_R}>{NUM_0.format(q.holder_count)}</td>
               <td style={TD_R}>{fmtSharesMm(q.total_inst_shares)}</td>
               <td style={TD_R}>{fmtPct2(q.pct_so)}</td>
@@ -363,7 +364,7 @@ function HolderChangesView({ data }: { data: HolderMomentumRow[] }) {
             <th style={{ ...TH_R, width: 60 }}>Rank</th>
             <th style={TH}>Institution</th>
             <th style={TH}>Type</th>
-            {qKeys.map(q => <th key={q} style={TH_R}>{q}</th>)}
+            {qKeys.map(q => <th key={q} style={TH_R}>{fmtQuarter(q)}</th>)}
             <th style={TH_R}>Change</th>
             <th style={TH_R}>Chg %</th>
           </tr>
@@ -528,7 +529,7 @@ function CohortAnalysisView({ data }: { data: CohortAnalysisResponse }) {
 
       {/* Summary metrics */}
       <div style={{ display: 'flex', gap: 24, padding: 16, backgroundColor: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 0, marginTop: 16 }}>
-        <MetricTile label={`${s.from_quarter} → ${s.to_quarter}`} value="Cohort Analysis" color="var(--header)" />
+        <MetricTile label={`${fmtQuarter(s.from_quarter)} → ${fmtQuarter(s.to_quarter)}`} value="Cohort Analysis" color="var(--header)" />
         <MetricTile label="Retention Rate" value={`${NUM_2.format(s.retention_rate)}%`} color="var(--header)" />
         <MetricTile label="Economic Retention" value={`${NUM_2.format(s.econ_retention)}%`} color="var(--header)" />
         <MetricTile label="Net Holders" value={`${s.net_holders >= 0 ? '+' : ''}${s.net_holders}`} color={s.net_holders >= 0 ? 'var(--pos)' : 'var(--neg)'} />

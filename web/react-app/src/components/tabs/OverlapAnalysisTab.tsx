@@ -14,6 +14,7 @@ import {
   FreshnessBadge,
   PageHeader,
   getTypeStyle,
+  fmtQuarter,
 } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
@@ -29,13 +30,6 @@ function fmtValueMm(v: number | null): string {
 function fmtPct2(v: number | null): string {
   if (v == null || v === 0) return '—'
   return `${NUM_2.format(v)}%`
-}
-
-function fmtQuarter(q: string): string {
-  if (!q || q.length < 6) return q
-  const qNum = q.slice(-2)
-  const yr = q.slice(2, 4)
-  return `${qNum} '${yr}`
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
@@ -79,7 +73,7 @@ const TOTAL_LABEL: React.CSSProperties = {
 }
 const TOTAL_LABEL_R: React.CSSProperties = { ...TOTAL_LABEL, textAlign: 'right' }
 
-const QUARTERS = ['2025Q4', '2025Q3', '2025Q2', '2025Q1']
+const QUARTERS = ['2025Q1', '2025Q2', '2025Q3', '2025Q4']
 
 // ── Second ticker input with dropdown ──────────────────────────────────────
 

@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/useAppStore'
+import { fmtQuarter } from '../common'
 
 function fmt(n: number | null) {
   if (n == null) return '—'
@@ -33,7 +34,7 @@ export function CompanyCard() {
         fontSize: '11px',
         fontFamily: "'JetBrains Mono', monospace",
         letterSpacing: '0.06em',
-      }}>{company.latest_quarter}</span>
+      }}>{fmtQuarter(company.latest_quarter)}</span>
     </div>
   )
 }

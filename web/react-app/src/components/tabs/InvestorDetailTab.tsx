@@ -88,13 +88,6 @@ const BADGE: React.CSSProperties = {
 
 const FALLBACK_QUARTERS = ['2025Q1', '2025Q2', '2025Q3', '2025Q4']
 
-function quarterLabel(q: string): string {
-  const m = q.match(/^(\d{4})Q([1-4])$/)
-  if (!m) return q
-  const yy = m[1].slice(-2)
-  return `Q${m[2]} '${yy}`
-}
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function InvestorDetailTab() {
@@ -201,8 +194,6 @@ export function InvestorDetailTab() {
     URL.revokeObjectURL(u)
   }
 
-  const labels = quartersOldToNew.map(quarterLabel)
-
   return (
     <div
       style={{
@@ -245,12 +236,9 @@ export function InvestorDetailTab() {
         }}
       >
         <QuarterSelector
-          quarters={labels}
-          value={quarterLabel(quarter)}
-          onChange={(label) => {
-            const idx = labels.indexOf(label)
-            if (idx >= 0) setQuarter(quartersOldToNew[idx])
-          }}
+          quarters={quartersOldToNew}
+          value={quarter}
+          onChange={setQuarter}
         />
       </div>
 
