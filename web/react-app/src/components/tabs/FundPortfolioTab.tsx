@@ -5,7 +5,7 @@ import type {
   FundPortfolioManager,
   FundPortfolioResponse,
 } from '../../types/api'
-import { ExportBar, FreshnessBadge, TableFooter, getTypeStyle } from '../common'
+import { ExportBar, FreshnessBadge, PageHeader, TableFooter, getTypeStyle } from '../common'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ function fmtPct2(v: number | null): string {
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 10px', fontSize: 9, fontWeight: 700,
+  padding: '4px 8px', fontSize: 8, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
   textAlign: 'left', borderBottom: '1px solid var(--line)',
@@ -38,7 +38,7 @@ const TH: React.CSSProperties = {
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 13, color: 'var(--text)',
+  padding: '4px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -46,7 +46,7 @@ const TD_R: React.CSSProperties = {
   fontFamily: "'JetBrains Mono', monospace",
 }
 const BADGE: React.CSSProperties = {
-  display: 'inline-block', padding: '2px 8px', fontSize: 11,
+  display: 'inline-block', padding: '1px 6px', fontSize: 10,
   fontWeight: 600, borderRadius: 1,
 }
 const CENTER_MSG: React.CSSProperties = { padding: 40, fontSize: 14, textAlign: 'center' }
@@ -144,13 +144,18 @@ export function FundPortfolioTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Ownership"
+        title="Fund Portfolio"
+        description="Individual fund holdings for any active institutional holder. Select a manager to view positions."
+      />
       <style>{`
         @media print { .fp-controls { display:none!important } .fp-wrap { height:auto!important; overflow:visible!important } }
         .fp-ticker-link:hover { text-decoration: underline; }
       `}</style>
 
       {/* Controls bar */}
-      <div className="fp-controls" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="fp-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <select
           value={selectedIdx}
           onChange={onManagerChange}

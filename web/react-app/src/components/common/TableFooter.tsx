@@ -10,6 +10,10 @@ interface Props {
   totalColumns: number
   /** Row height in px for sticky-bottom offset stacking. Default 33. */
   rowHeightPx?: number
+  /** Empty cells inserted before the first (rank) cell. Use when the
+   *  host table has columns to the left of Rank (e.g. an expand
+   *  column). Default 0. */
+  leadingEmptyCols?: number
   /** Empty cells inserted between the type cell and the shares cell.
    *  Use when the host table has spacer columns between Type and
    *  Shares so the footer's number cells line up with the body.
@@ -55,8 +59,8 @@ function fmtPct(v: number | null): string {
 
 function cellStyle(bottomPx: number): React.CSSProperties {
   return {
-    padding: '7px 10px',
-    fontSize: 13,
+    padding: '4px 8px',
+    fontSize: 12,
     fontWeight: 600,
     color: 'var(--white)',
     backgroundColor: 'var(--header)',
@@ -82,12 +86,17 @@ export function TableFooter({
   rows,
   totalColumns,
   rowHeightPx = 33,
+  leadingEmptyCols = 0,
   skipBeforeNumbers = 0,
   skipAfterNumbers = 0,
 }: Props) {
   const fillerCount = Math.max(
     0,
-    totalColumns - NAMED_COL_COUNT - skipBeforeNumbers - skipAfterNumbers,
+    totalColumns -
+      NAMED_COL_COUNT -
+      leadingEmptyCols -
+      skipBeforeNumbers -
+      skipAfterNumbers,
   )
   return (
     <tfoot>
@@ -98,6 +107,9 @@ export function TableFooter({
         const bottomPx = (rows.length - 1 - i) * rowHeightPx
         return (
           <tr key={i}>
+            {Array.from({ length: leadingEmptyCols }, (_, j) => (
+              <td key={`le${j}`} style={cellStyle(bottomPx)} />
+            ))}
             <td style={cellStyle(bottomPx)} />
             <td style={cellStyle(bottomPx)}>{r.label}</td>
             <td style={cellStyle(bottomPx)} />

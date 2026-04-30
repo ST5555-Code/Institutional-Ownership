@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 29, 2026 (conv-17-doc-sync — PRs #202/#203 merged; #202 visual-only, #203 test fix, no pipeline or migration changes). Predecessor: conv-16-doc-sync / PR #201._
+_Last updated: April 30, 2026 (conv-19-doc-sync — PR #213 N-PORT quarter fix + data migration, PR #214 tab page headers). Predecessor: conv-18-doc-sync._
 
 ## Pipeline refresh via admin dashboard
 

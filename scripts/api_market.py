@@ -56,6 +56,32 @@ def api_sector_summary():
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
+@market_router.get('/fund_quarter_completeness')
+def api_fund_quarter_completeness():
+    """Per-quarter monthly filing completeness for fund_holdings_v2."""
+    try:
+        from queries import get_fund_quarter_completeness
+        return get_fund_quarter_completeness()
+    except Exception as e:
+        log.error("fund_quarter_completeness error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@market_router.get('/sector_monthly_flows')
+def api_sector_monthly_flows(request: Request):
+    """Monthly net active flows for one (sector, quarter) at fund level."""
+    try:
+        from queries import get_sector_monthly_flows
+        sector = (request.query_params.get('sector') or '').strip()
+        quarter = (request.query_params.get('quarter') or '').strip()
+        if not sector or not quarter:
+            return JSONResponse(status_code=400, content={'error': 'Missing required params: sector, quarter'})
+        return get_sector_monthly_flows(sector, quarter)
+    except Exception as e:
+        log.error("sector_monthly_flows error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
 @market_router.get('/sector_flow_movers')
 def api_sector_flow_movers(request: Request):
     """Top buyers/sellers for one sector in one quarter transition."""
@@ -117,6 +143,45 @@ def api_short_analysis(request: Request):
         rt = get_rollup_type(request)
         return short_interest_analysis(ticker, rollup_type=rt)
     except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@market_router.get('/short_position_pct')
+def api_short_position_pct(request: Request):
+    """Quarterly fund-level short positions as % of shares outstanding,
+    with sector and industry averages for overlay."""
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    if not ticker:
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
+    try:
+        from queries import get_short_position_pct
+        return get_short_position_pct(ticker)
+    except Exception as e:
+        log.error("short_position_pct error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@market_router.get('/short_volume_comparison')
+def api_short_volume_comparison(request: Request):
+    """Daily FINRA short volume % for a ticker plus sector and industry medians."""
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    if not ticker:
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
+    try:
+        from queries import get_short_volume_comparison
+        return get_short_volume_comparison(ticker)
+    except Exception as e:
+        log.error("short_volume_comparison error: %s", e)
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 

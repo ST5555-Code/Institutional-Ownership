@@ -96,7 +96,11 @@ from .market import (  # noqa: F401
     get_sector_flow_movers,
     get_sector_flow_mover_detail,
     get_sector_summary,
+    get_fund_quarter_completeness,
+    get_sector_monthly_flows,
     short_interest_analysis,
+    get_short_position_pct,
+    get_short_volume_comparison,
     get_market_summary,
 )
 
@@ -127,6 +131,7 @@ from .entities import (  # noqa: F401
     get_entity_filer_children,
     get_entity_fund_children,
     get_entity_sub_advisers,
+    get_institution_hierarchy,
     build_entity_graph,
     _eg_node_institution,
     _eg_node_filer,

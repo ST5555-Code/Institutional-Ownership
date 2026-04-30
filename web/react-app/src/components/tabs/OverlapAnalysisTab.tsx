@@ -12,6 +12,7 @@ import {
   ExportBar,
   ColumnGroupHeader,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -33,7 +34,7 @@ function fmtPct2(v: number | null): string {
 // ── Styles (Register-consistent first 3 cols) ─────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '8px 8px', fontSize: 9, fontWeight: 700,
+  padding: '4px 8px', fontSize: 8, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
   textAlign: 'left', borderBottom: '1px solid var(--line)',
@@ -41,7 +42,7 @@ const TH: React.CSSProperties = {
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 12, color: 'var(--text)',
+  padding: '4px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -208,10 +209,15 @@ export function OverlapAnalysisTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Targeting"
+        title="Overlap Analysis"
+        description="Pairwise holder overlap between securities. Identifies shared institutional ownership patterns."
+      />
       <style>{`@media print { .oa-controls { display:none!important } }`}</style>
 
       {/* Controls */}
-      <div className="oa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="oa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Second Ticker</span>
           <SecondTickerInput value={secondTicker || ''} onSelect={setSecondTicker} />

@@ -6,7 +6,7 @@ import { lazy, Suspense } from 'react'
 
 const TAB_MAP: Record<string, React.LazyExoticComponent<() => React.ReactElement>> = {
   'sector-rotation': lazy(() => import('../tabs/SectorRotationTab').then(m => ({ default: m.SectorRotationTab }))),
-  'entity-graph': lazy(() => import('../tabs/EntityGraphTab').then(m => ({ default: m.EntityGraphTab }))),
+  'investor-detail': lazy(() => import('../tabs/InvestorDetailTab').then(m => ({ default: m.InvestorDetailTab }))),
   'register': lazy(() => import('../tabs/RegisterTab').then(m => ({ default: m.RegisterTab }))),
   'ownership-trend': lazy(() => import('../tabs/OwnershipTrendTab').then(m => ({ default: m.OwnershipTrendTab }))),
   'conviction': lazy(() => import('../tabs/ConvictionTab').then(m => ({ default: m.ConvictionTab }))),

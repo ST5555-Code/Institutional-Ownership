@@ -226,6 +226,90 @@ def get_entity_fund_children(entity_id, top_n, con):
     return {'children': children, 'total_count': total_count}
 
 
+def get_institution_hierarchy(entity_id, quarter, con):
+    """3-level institution drill-down for the Investor Detail tab.
+
+    Returns the institution's 13F filer entities with per-filer AUM (computed
+    from holdings_v2 for the given quarter) and the fund series each filer
+    sponsors with NAV from fund_universe.
+    """
+    eid = int(entity_id)
+    inst = get_entity_by_id(eid, con)
+    if not inst:
+        return {'error': f'entity_id {eid} not found'}
+
+    filer_rows = con.execute("""
+        SELECT er.child_entity_id,
+               ec.display_name,
+               MIN(ei.identifier_value) AS cik
+        FROM entity_relationships er
+        JOIN entity_current ec ON ec.entity_id = er.child_entity_id
+        JOIN entity_identifiers ei
+          ON ei.entity_id = er.child_entity_id
+         AND ei.identifier_type = 'cik'
+         AND ei.valid_to = DATE '9999-12-31'
+        WHERE er.parent_entity_id = ?
+          AND er.relationship_type != 'sub_adviser'
+          AND er.valid_to = DATE '9999-12-31'
+        GROUP BY er.child_entity_id, ec.display_name
+        ORDER BY ec.display_name
+    """, [eid]).fetchall()
+
+    self_cik = get_entity_cik(eid, con)
+    seen_eids = {r[0] for r in filer_rows}
+    if self_cik and eid not in seen_eids:
+        filer_rows = list(filer_rows) + [(eid, inst['display_name'], self_cik)]
+
+    filers = []
+    for fid, fname, cik in filer_rows:
+        aum = compute_aum_by_cik(cik, quarter, con) if cik else None
+        funds_q = con.execute("""
+            SELECT ec.entity_id,
+                   ec.display_name AS fund_name,
+                   MIN(ei.identifier_value) AS series_id,
+                   MAX(fu.total_net_assets) AS nav
+            FROM entity_relationships er
+            JOIN entity_current ec ON ec.entity_id = er.child_entity_id
+            LEFT JOIN entity_identifiers ei
+              ON ei.entity_id = er.child_entity_id
+             AND ei.identifier_type = 'series_id'
+             AND ei.valid_to = DATE '9999-12-31'
+            LEFT JOIN fund_universe fu ON fu.series_id = ei.identifier_value
+            WHERE er.parent_entity_id = ?
+              AND er.relationship_type = 'fund_sponsor'
+              AND er.valid_to = DATE '9999-12-31'
+              AND ei.identifier_value IS NOT NULL
+            GROUP BY ec.entity_id, ec.display_name
+            ORDER BY MAX(fu.total_net_assets) DESC NULLS LAST, ec.display_name
+        """, [int(fid)]).fetchall()
+        funds = [
+            {
+                'entity_id': fr[0],
+                'fund_name': fr[1],
+                'series_id': fr[2],
+                'nav': float(fr[3]) if fr[3] is not None else None,
+            }
+            for fr in funds_q
+        ]
+        filers.append({
+            'entity_id': int(fid),
+            'name': fname,
+            'cik': cik,
+            'aum': aum,
+            'fund_count': len(funds),
+            'funds': funds,
+        })
+
+    filers.sort(key=lambda x: (x['aum'] or 0), reverse=True)
+
+    return {
+        'entity_id': eid,
+        'institution': inst['display_name'],
+        'quarter': quarter,
+        'filers': filers,
+    }
+
+
 def get_entity_sub_advisers(child_entity_id, quarter, con):
     """Return sub-adviser institutions pointing at the given fund entity.
 

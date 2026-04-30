@@ -12,7 +12,7 @@ export function Sidebar() {
     }}>
       <SidebarSection title="Market Snapshot & Trends">
         <SidebarItem id="sector-rotation" label="Sector Rotation" />
-        <SidebarItem id="entity-graph" label="Entity Graph" />
+        <SidebarItem id="investor-detail" label="Investor Detail" />
       </SidebarSection>
       <SidebarSection title="Ownership">
         <SidebarItem id="register" label="Register" />

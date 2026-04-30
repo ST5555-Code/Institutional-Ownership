@@ -15,6 +15,7 @@ import {
   ActiveOnlyToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
 } from '../common'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell,
@@ -40,7 +41,7 @@ function SignedMm({ v }: { v: number | null }) {
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '7px 8px', fontSize: 9, fontWeight: 700,
+  padding: '4px 8px', fontSize: 8, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.16em', fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
   textAlign: 'left', borderBottom: '1px solid var(--line)',
@@ -48,7 +49,7 @@ const TH: React.CSSProperties = {
 }
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TD: React.CSSProperties = {
-  padding: '5px 8px', fontSize: 12, color: 'var(--text)',
+  padding: '4px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -130,6 +131,11 @@ export function PeerRotationTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Flow & Rotation"
+        title="Peer Rotation"
+        description="Cross-name rotation across a peer group. Identifies capital shifting between related securities."
+      />
       <style>{`
         @media print {
           .pr-controls { display:none!important }
@@ -139,7 +145,7 @@ export function PeerRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="pr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="pr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {/* Period selector */}
         <div style={{ display: 'flex', gap: 4 }}>
           {([{ n: 1 as const, label: 'Last Quarter' }, { n: 2 as const, label: 'Last 2 Quarters' }, { n: 3 as const, label: 'Last 3 Quarters' }]).map(p => (

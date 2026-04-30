@@ -6,12 +6,16 @@ import type {
   SectorFlowMoversResponse,
   SectorFlowMoverDetailResponse,
   SectorSummaryResponse,
+  FundQuarterCompletenessResponse,
+  SectorMonthlyFlowsResponse,
+  SectorMonthlyFlowRow,
 } from '../../types/api'
 import {
   FundViewToggle,
   ActiveOnlyToggle,
   ExportBar,
   FreshnessBadge,
+  PageHeader,
   getTypeStyle,
 } from '../common'
 
@@ -55,7 +59,7 @@ function SignedMm({ v }: { v: number | null }) {
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '7px 8px', fontSize: 9, fontWeight: 700,
+  padding: '4px 8px', fontSize: 8, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.16em',
   fontFamily: "'Hanken Grotesk', sans-serif",
   color: 'var(--text-dim)', backgroundColor: 'var(--header)',
@@ -65,7 +69,7 @@ const TH: React.CSSProperties = {
 const TH_R: React.CSSProperties = { ...TH, textAlign: 'right' }
 const TH_C: React.CSSProperties = { ...TH, textAlign: 'center' }
 const TD: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 12, color: 'var(--text)',
+  padding: '4px 8px', fontSize: 12, color: 'var(--text)',
   borderBottom: '1px solid var(--line-soft)',
 }
 const TD_R: React.CSSProperties = {
@@ -125,7 +129,13 @@ export function SectorRotationTab() {
     x: number; y: number
     title: string; periodLabel: string
     inflow: number | null; outflow: number | null; net: number | null
+    sectorKey?: string  // populated only for sector-row × quarter cells in fund view
+    quarterKey?: string
   } | null>(null)
+  // Cache of monthly flows by `${sector}|${quarter}` — lazy-loaded on hover.
+  const [monthlyByKey, setMonthlyByKey] = useState<
+    Record<string, SectorMonthlyFlowsResponse | 'loading' | 'error'>
+  >({})
 
   const level = fundView === 'fund' ? 'fund' : 'parent'
   const ao = activeOnly ? '1' : '0'
@@ -134,13 +144,26 @@ export function SectorRotationTab() {
   const summary = useFetch<SectorSummaryResponse>('/api/v1/sector_summary')
   const parentStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=parent&active_only=0')
   const fundStatic = useFetch<SectorFlowsResponse>('/api/v1/sector_flows?level=fund&active_only=0')
+  // Fund-view partial-quarter filter — fetched once on mount.
+  const completeness = useFetch<FundQuarterCompletenessResponse>('/api/v1/fund_quarter_completeness')
 
   // Toggleable fetch (heatmap + drives movers).
   const { data, loading, error } = useFetch<SectorFlowsResponse>(
     `/api/v1/sector_flows?active_only=${ao}&level=${level}`,
   )
 
-  const periods = data?.periods ?? []
+  // Fund view: drop periods whose destination quarter is not fully filed.
+  // Institution view passes through unchanged.
+  const completeQuarterSet = useMemo(() => {
+    if (!completeness.data) return null
+    return new Set(completeness.data.filter(c => c.complete).map(c => c.quarter))
+  }, [completeness.data])
+
+  const periods = useMemo(() => {
+    const all = data?.periods ?? []
+    if (level !== 'fund' || !completeQuarterSet) return all
+    return all.filter(p => completeQuarterSet.has(p.to))
+  }, [data, level, completeQuarterSet])
 
   // Sectors ranked 1..N by sum of net flow across all periods (desc)
   const ranked = useMemo(() => {
@@ -253,6 +276,40 @@ export function SectorRotationTab() {
     }
   }, [parentStatic.data, fundStatic.data])
 
+  // Lazy-load monthly flows for the hovered (sector, quarter) cell in Fund view.
+  useEffect(() => {
+    if (!cellTooltip || level !== 'fund') return
+    const { sectorKey, quarterKey } = cellTooltip
+    if (!sectorKey || !quarterKey) return
+    const key = `${sectorKey}|${quarterKey}`
+    if (monthlyByKey[key]) return
+    setMonthlyByKey(prev => ({ ...prev, [key]: 'loading' }))
+    const ctrl = new AbortController()
+    fetch(
+      `/api/v1/sector_monthly_flows?sector=${enc(sectorKey)}&quarter=${enc(quarterKey)}`,
+      { signal: ctrl.signal },
+    )
+      .then(r => r.json())
+      .then((d: SectorMonthlyFlowsResponse) => {
+        setMonthlyByKey(prev => ({ ...prev, [key]: d }))
+      })
+      .catch(err => {
+        if (err?.name === 'AbortError') return
+        setMonthlyByKey(prev => ({ ...prev, [key]: 'error' }))
+      })
+    return () => ctrl.abort()
+  }, [cellTooltip, level, monthlyByKey])
+
+  const tooltipMonthly: SectorMonthlyFlowRow[] | 'loading' | null = (() => {
+    if (!cellTooltip || level !== 'fund') return null
+    const { sectorKey, quarterKey } = cellTooltip
+    if (!sectorKey || !quarterKey) return null
+    const v = monthlyByKey[`${sectorKey}|${quarterKey}`]
+    if (v === 'loading') return 'loading'
+    if (!v || v === 'error') return null
+    return v.months
+  })()
+
   // Mover detail fetch.
   const moverDetailUrl = moverDetail && selectedSector && moverPeriod
     ? `/api/v1/sector_flow_mover_detail?from=${enc(moverPeriod.from)}&to=${enc(moverPeriod.to)}&sector=${enc(selectedSector)}&institution=${enc(moverDetail.institution)}&active_only=${ao}&level=${level}&rollup_type=${rollupType}`
@@ -276,6 +333,11 @@ export function SectorRotationTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflow: 'hidden' }}>
+      <PageHeader
+        section="Market Snapshot"
+        title="Sector Rotation"
+        description="Net institutional flows by sector. Heatmap view with drill-down to top movers per sector."
+      />
       <style>{`
         @media print {
           .sr-controls { display:none!important }
@@ -285,7 +347,7 @@ export function SectorRotationTab() {
       `}</style>
 
       {/* Controls */}
-      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <div className="sr-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -326,6 +388,7 @@ export function SectorRotationTab() {
                   onSelectRow={(s) => { setSelectedSector(s); setSelectedPeriodTo(null) }}
                   onSelectCell={(s, q) => { setSelectedSector(s); setSelectedPeriodTo(q) }}
                   onCellHover={(t) => setCellTooltip(t)}
+                  fundView={level === 'fund'}
                 />
               )}
               <div style={{ ...FOOTNOTE, borderTop: '1px solid var(--line-soft)' }}>
@@ -417,7 +480,7 @@ export function SectorRotationTab() {
           )}
 
           {/* Heatmap cell hover tooltip — floats with cursor */}
-          {cellTooltip && <CellTooltip {...cellTooltip} />}
+          {cellTooltip && <CellTooltip {...cellTooltip} monthly={tooltipMonthly} />}
         </div>
       </div>
     </div>
@@ -520,6 +583,8 @@ function NetFlowsHeatmap({ data, loading, onCellHover }: {
     x: number; y: number
     title: string; periodLabel: string
     inflow: number | null; outflow: number | null; net: number | null
+    sectorKey?: string
+    quarterKey?: string
   } | null) => void
 }) {
   // Color intensity scale across the 4-column data cells (exclude total).
@@ -642,12 +707,15 @@ interface HeatmapProps {
     x: number; y: number
     title: string; periodLabel: string
     inflow: number | null; outflow: number | null; net: number | null
+    sectorKey?: string
+    quarterKey?: string
   } | null) => void
+  fundView: boolean
 }
 
 function SectorHeatmap({
   ranked, displayQuarters, periodByDest, selectedSector,
-  onSelectRow, onSelectCell, onCellHover,
+  onSelectRow, onSelectCell, onCellHover, fundView,
 }: HeatmapProps) {
   // Compute global max abs across all visible quarter cells for color intensity scaling.
   const globalMax = useMemo(() => {
@@ -777,6 +845,8 @@ function SectorHeatmap({
                           inflow: flow?.inflow ?? null,
                           outflow: flow?.outflow ?? null,
                           net: v,
+                          sectorKey: fundView ? s.sector : undefined,
+                          quarterKey: fundView ? q : undefined,
                         })
                       }}
                     />
@@ -921,10 +991,11 @@ function HeatCell({
   )
 }
 
-function CellTooltip({ x, y, title, periodLabel, inflow, outflow, net }: {
+function CellTooltip({ x, y, title, periodLabel, inflow, outflow, net, monthly }: {
   x: number; y: number
   title: string; periodLabel: string
   inflow: number | null; outflow: number | null; net: number | null
+  monthly?: SectorMonthlyFlowRow[] | 'loading' | null
 }) {
   const fmtBn = (v: number | null) => {
     if (v == null || !isFinite(v) || v === 0) return '—'
@@ -932,8 +1003,33 @@ function CellTooltip({ x, y, title, periodLabel, inflow, outflow, net }: {
     const s = abs >= 10 ? NUM_0.format(abs) : abs.toFixed(1)
     return v < 0 ? `($${s}B)` : `$${s}B`
   }
+  // Compact $ formatter for monthly rows: ranges between $M and $B.
+  const fmtMonthlyValue = (v: number) => {
+    if (!isFinite(v) || v === 0) return '—'
+    const abs = Math.abs(v)
+    let body: string
+    if (abs >= 1e9) {
+      const b = abs / 1e9
+      body = `$${b >= 10 ? NUM_0.format(b) : b.toFixed(1)}B`
+    } else {
+      const m = abs / 1e6
+      body = `$${NUM_0.format(m)}M`
+    }
+    return v < 0 ? `(${body})` : body
+  }
+  // 'YYYY-MM' → "Oct '25"
+  const fmtMonthLabel = (m: string) => {
+    const mm = /^(\d{4})-(\d{2})$/.exec(m)
+    if (!mm) return m
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const idx = parseInt(mm[2], 10) - 1
+    return `${names[idx] ?? mm[2]} '${mm[1].slice(2)}`
+  }
   // Position near cursor, clamp to viewport.
-  const W = 240, H = 110
+  const showMonthly = monthly !== undefined && monthly !== null
+  const monthlyRows = Array.isArray(monthly) ? monthly : null
+  const W = 240
+  const H = 110 + (showMonthly ? (monthlyRows ? monthlyRows.length * 16 + 20 : 28) : 0)
   const left = Math.min(Math.max(8, x + 14), window.innerWidth - W - 8)
   const top = Math.min(Math.max(8, y - H - 10), window.innerHeight - H - 8)
   const showInOut = inflow != null || outflow != null
@@ -965,6 +1061,30 @@ function CellTooltip({ x, y, title, periodLabel, inflow, outflow, net }: {
         <span style={{ color: 'var(--text-dim)' }}>Net</span>
         <span style={{ color: (net ?? 0) >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtBn(net)}</span>
       </div>
+      {showMonthly && (
+        <div style={{
+          marginTop: 6, paddingTop: 6,
+          borderTop: '1px solid var(--line-soft)',
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          {monthly === 'loading' && (
+            <div style={{ color: 'var(--text-mute)', fontFamily: "'Inter', sans-serif", fontSize: 10 }}>
+              Loading monthly detail…
+            </div>
+          )}
+          {monthlyRows && monthlyRows.map(m => (
+            <div key={m.month} style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-dim)' }}>{fmtMonthLabel(m.month)}</span>
+              <span style={{ color: m.net >= 0 ? 'var(--pos)' : 'var(--neg)' }}>{fmtMonthlyValue(m.net)}</span>
+            </div>
+          ))}
+          {monthlyRows && monthlyRows.length === 0 && (
+            <div style={{ color: 'var(--text-mute)', fontFamily: "'Inter', sans-serif", fontSize: 10 }}>
+              No monthly detail
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

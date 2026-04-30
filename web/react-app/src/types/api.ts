@@ -479,6 +479,9 @@ export interface CrowdingResponse {
 export interface ShortAnalysisSummary {
   short_funds: number
   short_shares: number
+  short_value: number
+  days_to_cover: number | null
+  si_pct_so: number | null
   avg_short_vol_pct: number | null
   cross_ref_count: number
   quarters_available: string[]
@@ -547,6 +550,32 @@ export interface ShortAnalysisResponse {
   short_only_funds: ShortOnlyFundRow[]
 }
 
+// /api/v1/short_position_pct?ticker=X
+export interface ShortPositionPctPoint {
+  quarter: string
+  pct: number
+}
+export interface ShortPositionPctResponse {
+  ticker_data: ShortPositionPctPoint[]
+  sector_avg: ShortPositionPctPoint[]
+  industry_avg: ShortPositionPctPoint[]
+  sector_name: string | null
+  industry_name: string | null
+}
+
+// /api/v1/short_volume_comparison?ticker=X
+export interface ShortVolumeComparisonPoint {
+  date: string
+  pct: number
+}
+export interface ShortVolumeComparisonResponse {
+  ticker_data: ShortVolumeComparisonPoint[]
+  sector_median: ShortVolumeComparisonPoint[]
+  industry_median: ShortVolumeComparisonPoint[]
+  sector_name: string | null
+  industry_name: string | null
+}
+
 // ── Sector Rotation — /api/sector_flows ───────────────────────────────────
 // NOTE: No /api/sector_rotation route. Real route is /api/sector_flows.
 // Returns all available quarter transitions, no quarter param.
@@ -577,6 +606,29 @@ export interface SectorFlowPeriod {
 export interface SectorFlowsResponse {
   periods: SectorFlowPeriod[]
   sectors: SectorFlowRow[]
+}
+
+// ── Fund Quarter Completeness — /api/v1/fund_quarter_completeness ─────────
+
+export interface FundQuarterCompletenessRow {
+  quarter: string
+  months_available: number
+  complete: boolean
+}
+
+export type FundQuarterCompletenessResponse = FundQuarterCompletenessRow[]
+
+// ── Sector Monthly Flows — /api/v1/sector_monthly_flows ───────────────────
+
+export interface SectorMonthlyFlowRow {
+  month: string  // 'YYYY-MM'
+  net: number
+}
+
+export interface SectorMonthlyFlowsResponse {
+  sector: string
+  quarter: string
+  months: SectorMonthlyFlowRow[]
 }
 
 // ── Sector Summary — /api/v1/sector_summary ───────────────────────────────
@@ -721,6 +773,31 @@ export interface MarketSummaryRow {
   filer_count: number
   fund_count: number
   nport_coverage_pct: number | null
+}
+
+// ── Institution Hierarchy — /api/v1/institution_hierarchy ─────────────────
+
+export interface InstitutionHierarchyFund {
+  entity_id: number
+  fund_name: string
+  series_id: string | null
+  nav: number | null
+}
+
+export interface InstitutionHierarchyFiler {
+  entity_id: number
+  name: string
+  cik: string | null
+  aum: number | null
+  fund_count: number
+  funds: InstitutionHierarchyFund[]
+}
+
+export interface InstitutionHierarchyResponse {
+  entity_id: number
+  institution: string
+  quarter: string
+  filers: InstitutionHierarchyFiler[]
 }
 
 // ── Entity Graph — /api/entity_search + /api/entity_children + /api/entity_graph
