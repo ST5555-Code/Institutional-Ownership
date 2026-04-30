@@ -12,7 +12,7 @@ import type {
 } from '../../types/api'
 import { ExportBar, ColumnGroupHeader, FreshnessBadge, PageHeader, getTypeStyle } from '../common'
 import {
-  ComposedChart, Bar, Line, LineChart, XAxis, YAxis, Tooltip,
+  Line, LineChart, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts'
 
@@ -288,7 +288,7 @@ function ShortPositionPctChart({ data, ticker }: { data: ShortPositionPctRespons
     <ChartBox title="Short Position % of SO (Fund Level, Quarterly)">
       {merged.length > 0 ? (
         <ResponsiveContainer width="100%" height={240}>
-          <ComposedChart data={merged} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <LineChart data={merged} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--line-soft)" strokeDasharray="2 2" vertical={false} />
             <XAxis dataKey="quarter" tick={AXIS_TICK} stroke="none" />
             <YAxis tick={AXIS_TICK} stroke="none" tickFormatter={(v: number) => `${NUM_2.format(v)}%`} width={60} />
@@ -303,10 +303,10 @@ function ShortPositionPctChart({ data, ticker }: { data: ShortPositionPctRespons
               height={20}
               wrapperStyle={{ fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
             />
-            <Bar dataKey="ticker_pct" name={ticker} fill="var(--gold)" />
-            <Line type="monotone" dataKey="sector_pct" name={sectorLabel} stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
-            <Line type="monotone" dataKey="industry_pct" name={industryLabel} stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
-          </ComposedChart>
+            <Line type="monotone" dataKey="ticker_pct" name={ticker} stroke="var(--gold)" strokeWidth={2} dot={{ r: 3, fill: '#c5a254' }} />
+            <Line type="monotone" dataKey="sector_pct" name={sectorLabel} stroke="var(--gold)" strokeDasharray="6 4" strokeWidth={1.5} dot={{ r: 2, fill: '#c5a254' }} />
+            <Line type="monotone" dataKey="industry_pct" name={industryLabel} stroke="var(--glacier-blue, #7aadde)" strokeDasharray="2 4" strokeWidth={1.5} dot={{ r: 2, fill: '#7aadde' }} />
+          </LineChart>
         </ResponsiveContainer>
       ) : (
         <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>No N-PORT short data available</div>
@@ -415,10 +415,10 @@ function TableBox({ title, accentBottom = 'var(--line)', children }: {
 function NportDetailTable({ rows }: { rows: NportDetailRow[] }) {
   return (
     <TableBox title="N-PORT Short Detail">
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', fontSize: 12 }}>
         <colgroup>
-          <col style={{ width: 28 }} /><col /><col style={{ width: 90 }} /><col style={{ width: 60 }} />
-          <col style={{ width: 72 }} /><col style={{ width: 76 }} /><col style={{ width: 72 }} /><col style={{ width: 56 }} />
+          <col style={{ width: 28 }} /><col style={{ minWidth: 250 }} /><col style={{ width: 180 }} /><col style={{ width: 80 }} />
+          <col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 70 }} />
         </colgroup>
         <thead><tr>
           <th style={TH}>#</th><th style={TH}>Fund</th><th style={TH}>Family</th><th style={TH}>Type</th>
@@ -430,8 +430,8 @@ function NportDetailTable({ rows }: { rows: NportDetailRow[] }) {
             return (
               <tr key={r.fund_name}>
                 <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
-                <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.fund_name}>{r.fund_name}</td>
-                <td style={{ ...TD, fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.family_name || ''}>{r.family_name || '—'}</td>
+                <td style={{ ...TD, fontWeight: 500 }} title={r.fund_name}>{r.fund_name}</td>
+                <td style={{ ...TD, fontSize: 11, color: 'var(--text-dim)' }} title={r.family_name || ''}>{r.family_name || '—'}</td>
                 <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                 <td style={{ ...TD_R, color: 'var(--neg)' }}>{fmtSharesMm(r.short_shares)}</td>
                 <td style={{ ...TD_R, color: 'var(--neg)' }}>{r.value_recomputed ? '~' : ''}{fmtValueMm(r.short_value)}</td>
@@ -452,21 +452,23 @@ function NportDetailTable({ rows }: { rows: NportDetailRow[] }) {
 function CrossRefTable({ rows }: { rows: CrossRefRow[] }) {
   return (
     <TableBox title="Long + Short — Same Institution" accentBottom="var(--gold)">
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', fontSize: 12 }}>
         <colgroup>
-          <col /><col style={{ width: 60 }} /><col style={{ width: 76 }} /><col style={{ width: 76 }} /><col style={{ width: 72 }} />
+          <col style={{ width: 28 }} /><col style={{ minWidth: 250 }} /><col style={{ width: 80 }} />
+          <col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 80 }} />
         </colgroup>
         <thead><tr>
-          <th style={TH}>Institution</th><th style={TH}>Type</th>
+          <th style={TH}>#</th><th style={TH}>Institution</th><th style={TH}>Type</th>
           <th style={TH_R}>Long ($MM)</th><th style={TH_R}>Short ($MM)</th><th style={TH_R}>Net Exp %</th>
         </tr></thead>
         <tbody>
-          {rows.map(r => {
+          {rows.map((r, i) => {
             const ts = getTypeStyle(r.type)
             const expColor = r.net_exposure_pct >= 80 ? 'var(--pos)' : r.net_exposure_pct >= 50 ? 'var(--gold)' : 'var(--neg)'
             return (
               <tr key={r.institution}>
-                <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.institution}>{r.institution}</td>
+                <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
+                <td style={{ ...TD, fontWeight: 500 }} title={r.institution}>{r.institution}</td>
                 <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                 <td style={{ ...TD_R, color: 'var(--pos)' }}>{fmtValueMm(r.long_value)}</td>
                 <td style={{ ...TD_R, color: 'var(--neg)' }}>{fmtValueMm(r.short_value)}</td>
@@ -474,7 +476,7 @@ function CrossRefTable({ rows }: { rows: CrossRefRow[] }) {
               </tr>
             )
           })}
-          {rows.length === 0 && <tr><td colSpan={5} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No cross-ref data</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={6} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No cross-ref data</td></tr>}
         </tbody>
       </table>
     </TableBox>
@@ -486,10 +488,10 @@ function CrossRefTable({ rows }: { rows: CrossRefRow[] }) {
 function ShortOnlyTable({ rows }: { rows: ShortOnlyFundRow[] }) {
   return (
     <TableBox title="Short-Only Funds (No 13F Long)">
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', fontSize: 12 }}>
         <colgroup>
-          <col style={{ width: 28 }} /><col /><col style={{ width: 90 }} /><col style={{ width: 60 }} />
-          <col style={{ width: 72 }} /><col style={{ width: 76 }} /><col style={{ width: 72 }} />
+          <col style={{ width: 28 }} /><col style={{ minWidth: 250 }} /><col style={{ width: 180 }} /><col style={{ width: 80 }} />
+          <col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 70 }} />
         </colgroup>
         <thead><tr>
           <th style={TH}>#</th><th style={TH}>Fund</th><th style={TH}>Family</th><th style={TH}>Type</th>
@@ -501,8 +503,8 @@ function ShortOnlyTable({ rows }: { rows: ShortOnlyFundRow[] }) {
             return (
               <tr key={r.fund_name}>
                 <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
-                <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.fund_name}>{r.fund_name}</td>
-                <td style={{ ...TD, fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }}>{r.family_name || '—'}</td>
+                <td style={{ ...TD, fontWeight: 500 }} title={r.fund_name}>{r.fund_name}</td>
+                <td style={{ ...TD, fontSize: 11, color: 'var(--text-dim)' }}>{r.family_name || '—'}</td>
                 <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                 <td style={{ ...TD_R, color: 'var(--neg)' }}>{fmtSharesMm(r.short_shares)}</td>
                 <td style={{ ...TD_R, color: 'var(--neg)' }}>{fmtValueMm(r.short_value)}</td>
@@ -530,26 +532,32 @@ function NportByFundTable({ rows }: { rows: NportByFundRow[] }) {
 
   return (
     <TableBox title="N-PORT By Fund — Short History">
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', fontSize: 12 }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', fontSize: 12 }}>
+        <colgroup>
+          <col style={{ width: 28 }} /><col style={{ minWidth: 250 }} /><col style={{ width: 80 }} />
+          {qKeys.map(q => <col key={q} style={{ width: 80 }} />)}
+        </colgroup>
         <thead>
           {qKeys.length > 0 && (
             <ColumnGroupHeader groups={[
-              { label: '', colSpan: 2 },
+              { label: '', colSpan: 3 },
               { label: 'Short Shares (MM)', colSpan: qKeys.length },
             ]} />
           )}
           <tr>
+            <th style={TH}>#</th>
             <th style={TH}>Fund</th>
-            <th style={{ ...TH, width: 60 }}>Type</th>
-            {qKeys.map(q => <th key={q} style={{ ...TH_R, fontWeight: q === latestQ ? 700 : 600, width: 72 }}>{q}</th>)}
+            <th style={TH}>Type</th>
+            {qKeys.map(q => <th key={q} style={{ ...TH_R, fontWeight: q === latestQ ? 700 : 600 }}>{q}</th>)}
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => {
+          {rows.map((r, i) => {
             const ts = getTypeStyle(r.type as string | null)
             return (
               <tr key={r.fund_name as string}>
-                <td style={{ ...TD, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 0 }} title={r.fund_name as string}>{r.fund_name as string}</td>
+                <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: 'var(--text-dim)', fontSize: 11 }}>{i + 1}</td>
+                <td style={{ ...TD, fontWeight: 500 }} title={r.fund_name as string}>{r.fund_name as string}</td>
                 <td style={TD}><span style={{ ...BADGE, backgroundColor: ts.bg, color: ts.color }}>{ts.label}</span></td>
                 {qKeys.map(q => {
                   const v = r[q] as number | null | undefined
@@ -561,7 +569,7 @@ function NportByFundTable({ rows }: { rows: NportByFundRow[] }) {
               </tr>
             )
           })}
-          {rows.length === 0 && <tr><td colSpan={2 + qKeys.length} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No history</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={3 + qKeys.length} style={{ ...TD, textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>No history</td></tr>}
         </tbody>
       </table>
     </TableBox>
