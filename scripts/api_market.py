@@ -146,6 +146,45 @@ def api_short_analysis(request: Request):
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
+@market_router.get('/short_position_pct')
+def api_short_position_pct(request: Request):
+    """Quarterly fund-level short positions as % of shares outstanding,
+    with sector and industry averages for overlay."""
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    if not ticker:
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
+    try:
+        from queries import get_short_position_pct
+        return get_short_position_pct(ticker)
+    except Exception as e:
+        log.error("short_position_pct error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@market_router.get('/short_volume_comparison')
+def api_short_volume_comparison(request: Request):
+    """Daily FINRA short volume % for a ticker plus sector and industry medians."""
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    if not ticker:
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        validate_ticker_current(con, ticker)
+    finally:
+        con.close()
+    try:
+        from queries import get_short_volume_comparison
+        return get_short_volume_comparison(ticker)
+    except Exception as e:
+        log.error("short_volume_comparison error: %s", e)
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
 @market_router.get('/crowding')
 def api_crowding(ticker: str = ''):
     """Crowding analysis: institutional concentration + short interest overlay."""

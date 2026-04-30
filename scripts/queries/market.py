@@ -834,11 +834,62 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
 
         # 8. Summary card data
         total_short_shares = sum(r.get(quarter, 0) for r in nport_by_fund)
-        total_short_funds = len([r for r in nport_by_fund if r.get(quarter, 0) > 0])
         avg_short_vol = sum(r.get('short_pct', 0) for r in short_volume[-20:]) / max(len(short_volume[-20:]), 1) if short_volume else 0
+
+        # Distinct series_id count using SEC payoff_profile = 'Short' (latest)
+        try:
+            short_funds_count_row = con.execute("""
+                SELECT COUNT(DISTINCT series_id)
+                FROM fund_holdings_v2
+                WHERE ticker = ? AND payoff_profile = 'Short' AND is_latest = TRUE
+            """, [ticker]).fetchone()
+            short_funds_count = int(short_funds_count_row[0]) if short_funds_count_row and short_funds_count_row[0] else 0
+        except Exception:
+            logger.debug("short_funds_count failed", exc_info=True)
+            short_funds_count = 0
+
+        # Market data for SI%SO + days-to-cover
+        so = None
+        avg_vol_30d = None
+        try:
+            md_row = con.execute(
+                "SELECT shares_outstanding, avg_volume_30d FROM market_data WHERE ticker = ?",
+                [ticker]
+            ).fetchone()
+            if md_row:
+                so = float(md_row[0]) if md_row[0] else None
+                avg_vol_30d = float(md_row[1]) if md_row[1] else None
+        except Exception:
+            logger.debug("market_data lookup failed", exc_info=True)
+
+        # SI % SO from latest short_interest report + days-to-cover proxy
+        si_pct_so = None
+        latest_short_volume = None
+        try:
+            si_row = con.execute("""
+                SELECT short_volume FROM short_interest
+                WHERE ticker = ? ORDER BY report_date DESC LIMIT 1
+            """, [ticker]).fetchone()
+            if si_row and si_row[0]:
+                latest_short_volume = float(si_row[0])
+                if so and so > 0:
+                    si_pct_so = round(latest_short_volume / so * 100, 2)
+        except Exception:
+            logger.debug("si_pct_so lookup failed", exc_info=True)
+
+        short_value_total = (total_short_shares * live_price) if (live_price and total_short_shares) else 0
+        days_to_cover = (
+            round(latest_short_volume / avg_vol_30d, 1)
+            if (latest_short_volume and avg_vol_30d and avg_vol_30d > 0)
+            else None
+        )
+
         result['summary'] = {
-            'short_funds': total_short_funds,
+            'short_funds': short_funds_count,
             'short_shares': total_short_shares,
+            'short_value': short_value_total,
+            'days_to_cover': days_to_cover,
+            'si_pct_so': si_pct_so,
             'avg_short_vol_pct': round(avg_short_vol, 1),
             'cross_ref_count': len(cross_ref),
             'quarters_available': [q.get('quarter') for q in nport_trend],
@@ -847,6 +898,134 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
         return clean_for_json(result)
     finally:
         pass
+
+
+def get_short_position_pct(ticker):
+    """Quarterly fund-level short positions as % of shares outstanding.
+
+    Returns the ticker's series alongside sector and industry averages
+    (averaged across tickers per quarter) for overlay on a bar chart.
+    """
+    con = get_db()
+    sector_name = None
+    industry_name = None
+    md = con.execute(
+        "SELECT sector, industry, shares_outstanding FROM market_data WHERE ticker = ?",
+        [ticker]
+    ).fetchone()
+    if md:
+        sector_name = md[0]
+        industry_name = md[1]
+        ticker_so = float(md[2]) if md[2] else None
+    else:
+        ticker_so = None
+
+    # Ticker's quarterly short shares
+    ticker_data = []
+    if ticker_so and ticker_so > 0:
+        rows = con.execute("""
+            SELECT quarter, SUM(ABS(shares_or_principal)) as short_shares
+            FROM fund_holdings_v2
+            WHERE ticker = ? AND payoff_profile = 'Short' AND is_latest = TRUE
+            GROUP BY quarter ORDER BY quarter
+        """, [ticker]).fetchall()
+        ticker_data = [
+            {'quarter': r[0], 'pct': round(float(r[1]) / ticker_so * 100, 4)}
+            for r in rows if r[1]
+        ]
+
+    def _peer_avg(filter_col, filter_val):
+        if not filter_val:
+            return []
+        try:
+            rows = con.execute(f"""
+                WITH per_ticker AS (
+                    SELECT fh.quarter, fh.ticker,
+                           SUM(ABS(fh.shares_or_principal)) AS short_shares,
+                           MAX(md.shares_outstanding) AS so
+                    FROM fund_holdings_v2 fh
+                    JOIN market_data md ON fh.ticker = md.ticker
+                    WHERE md.{filter_col} = ?
+                      AND fh.payoff_profile = 'Short'
+                      AND fh.is_latest = TRUE
+                      AND md.shares_outstanding IS NOT NULL
+                      AND md.shares_outstanding > 0
+                    GROUP BY fh.quarter, fh.ticker
+                )
+                SELECT quarter, AVG(short_shares / so) * 100 as pct
+                FROM per_ticker
+                WHERE short_shares > 0
+                GROUP BY quarter ORDER BY quarter
+            """, [filter_val]).fetchall()  # nosec B608
+            return [{'quarter': r[0], 'pct': round(float(r[1]), 4)} for r in rows if r[1]]
+        except Exception:
+            logger.debug("peer avg failed for %s=%s", filter_col, filter_val, exc_info=True)
+            return []
+
+    return clean_for_json({
+        'ticker_data': ticker_data,
+        'sector_avg': _peer_avg('sector', sector_name),
+        'industry_avg': _peer_avg('industry', industry_name),
+        'sector_name': sector_name,
+        'industry_name': industry_name,
+    })
+
+
+def get_short_volume_comparison(ticker):
+    """Daily FINRA short volume % for a ticker plus sector/industry medians.
+
+    Each series shares the same date axis from the short_interest table.
+    """
+    con = get_db()
+    sector_name = None
+    industry_name = None
+    md = con.execute(
+        "SELECT sector, industry FROM market_data WHERE ticker = ?",
+        [ticker]
+    ).fetchone()
+    if md:
+        sector_name = md[0]
+        industry_name = md[1]
+
+    ticker_rows = con.execute("""
+        SELECT report_date, short_pct
+        FROM short_interest
+        WHERE ticker = ? ORDER BY report_date
+    """, [ticker]).fetchall()
+    ticker_data = [
+        {'date': str(r[0]), 'pct': round(float(r[1]), 2)}
+        for r in ticker_rows if r[1] is not None
+    ]
+
+    def _peer_median(filter_col, filter_val):
+        if not filter_val:
+            return []
+        try:
+            rows = con.execute(f"""
+                SELECT si.report_date,
+                       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY si.short_pct) AS median_pct
+                FROM short_interest si
+                JOIN market_data md ON si.ticker = md.ticker
+                WHERE md.{filter_col} = ?
+                  AND si.short_pct IS NOT NULL
+                GROUP BY si.report_date
+                ORDER BY si.report_date
+            """, [filter_val]).fetchall()  # nosec B608
+            return [
+                {'date': str(r[0]), 'pct': round(float(r[1]), 2)}
+                for r in rows if r[1] is not None
+            ]
+        except Exception:
+            logger.debug("peer median failed for %s=%s", filter_col, filter_val, exc_info=True)
+            return []
+
+    return clean_for_json({
+        'ticker_data': ticker_data,
+        'sector_median': _peer_median('sector', sector_name),
+        'industry_median': _peer_median('industry', industry_name),
+        'sector_name': sector_name,
+        'industry_name': industry_name,
+    })
 
 
 # Map query number to function

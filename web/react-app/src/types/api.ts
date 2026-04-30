@@ -479,6 +479,9 @@ export interface CrowdingResponse {
 export interface ShortAnalysisSummary {
   short_funds: number
   short_shares: number
+  short_value: number
+  days_to_cover: number | null
+  si_pct_so: number | null
   avg_short_vol_pct: number | null
   cross_ref_count: number
   quarters_available: string[]
@@ -545,6 +548,32 @@ export interface ShortAnalysisResponse {
   short_volume: ShortVolumeRow[]
   cross_ref: CrossRefRow[]
   short_only_funds: ShortOnlyFundRow[]
+}
+
+// /api/v1/short_position_pct?ticker=X
+export interface ShortPositionPctPoint {
+  quarter: string
+  pct: number
+}
+export interface ShortPositionPctResponse {
+  ticker_data: ShortPositionPctPoint[]
+  sector_avg: ShortPositionPctPoint[]
+  industry_avg: ShortPositionPctPoint[]
+  sector_name: string | null
+  industry_name: string | null
+}
+
+// /api/v1/short_volume_comparison?ticker=X
+export interface ShortVolumeComparisonPoint {
+  date: string
+  pct: number
+}
+export interface ShortVolumeComparisonResponse {
+  ticker_data: ShortVolumeComparisonPoint[]
+  sector_median: ShortVolumeComparisonPoint[]
+  industry_median: ShortVolumeComparisonPoint[]
+  sector_name: string | null
+  industry_name: string | null
 }
 
 // ── Sector Rotation — /api/sector_flows ───────────────────────────────────
