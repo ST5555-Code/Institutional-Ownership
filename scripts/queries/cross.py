@@ -14,12 +14,20 @@ from .common import (
 
 
 
-def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=25, rollup_type='economic_control_v1', quarter=LQ):
+def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=25, rollup_type='economic_control_v1', quarter=LQ, level='parent'):
     """Shared logic for cross-ownership matrix.
 
     If anchor is set: rows = top holders of that ticker, ordered by anchor holding.
     If anchor is None: rows = top holders by total across all tickers.
+
+    level='parent' (default) rolls up to institutional parents from holdings_v2.
+    level='fund' returns individual fund series rows from fund_holdings_v2.
     """
+    if level == 'fund':
+        return _cross_ownership_fund_query(
+            con, tickers, anchor=anchor, active_only=active_only,
+            limit=limit, quarter=quarter,
+        )
     rn = _rollup_col(rollup_type)
     # Company names
     placeholders = ','.join(['?'] * len(tickers))
@@ -104,6 +112,150 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
         'tickers': tickers,
         'companies': companies,
         'investors': investors,
+    })
+
+
+def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, limit=25, quarter=LQ):
+    """Fund-series variant of _cross_ownership_query. Each row is a fund
+    series from fund_holdings_v2 instead of a rolled-up institutional parent.
+    """
+    placeholders = ','.join(['?'] * len(tickers))
+    names_df = con.execute(f"""
+        SELECT ticker, MODE(issuer_name) as name
+        FROM holdings_v2
+        WHERE ticker IN ({placeholders}) AND quarter = '{quarter}' AND is_latest = TRUE
+        GROUP BY ticker
+    """, tickers).fetchdf()
+    companies = {r['ticker']: r['name'] for _, r in names_df.iterrows()}
+
+    pivot_cols = ', '.join(
+        "SUM(CASE WHEN fh.ticker = '{}' THEN fh.market_value_usd END) AS \"{}\"".format(t, t)  # pylint: disable=duplicate-string-formatting-argument
+        for t in tickers
+    )
+    total_expr = ' + '.join('COALESCE("{}", 0)'.format(t) for t in tickers)
+    if anchor and anchor in tickers:
+        order_clause = 'COALESCE("{}", 0) DESC'.format(anchor)
+    else:
+        order_clause = '({}) DESC'.format(total_expr)
+
+    active_join = ""
+    active_where = ""
+    if active_only:
+        active_join = "LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id"
+        active_where = "AND COALESCE(fu.is_actively_managed, TRUE) = TRUE"
+
+    df = con.execute(f"""
+        WITH fund_pos AS (
+            SELECT
+                fh.fund_name AS investor,
+                fh.series_id,
+                MAX(fh.family_name) AS family_name,
+                fh.ticker,
+                SUM(fh.market_value_usd) AS holding_value
+            FROM fund_holdings_v2 fh
+            {active_join}
+            WHERE fh.ticker IN ({placeholders})
+              AND fh.quarter = '{quarter}'
+              AND fh.is_latest = TRUE
+              AND fh.market_value_usd > 0
+              {active_where}
+            GROUP BY fh.fund_name, fh.series_id, fh.ticker
+        ),
+        fund_totals AS (
+            SELECT
+                fh.fund_name AS investor,
+                fh.series_id,
+                SUM(fh.market_value_usd) AS total_portfolio
+            FROM fund_holdings_v2 fh
+            WHERE fh.quarter = '{quarter}' AND fh.is_latest = TRUE
+              AND fh.market_value_usd > 0
+            GROUP BY fh.fund_name, fh.series_id
+        )
+        SELECT
+            fp.investor,
+            MAX(fp.family_name) AS family_name,
+            ft.total_portfolio,
+            {pivot_cols}
+        FROM fund_pos fp
+        LEFT JOIN fund_totals ft ON ft.investor = fp.investor AND ft.series_id = fp.series_id
+        GROUP BY fp.investor, fp.series_id, ft.total_portfolio
+        ORDER BY {order_clause}
+        LIMIT {int(limit)}
+    """, tickers).fetchdf()
+
+    investors = []
+    for _, row in df.iterrows():
+        ticker_holdings = {}
+        total_across = 0
+        for t in tickers:
+            val = row[t]
+            if pd.notna(val) and val != 0:
+                ticker_holdings[t] = float(val)
+                total_across += float(val)
+            else:
+                ticker_holdings[t] = None
+        total_port = float(row['total_portfolio']) if pd.notna(row['total_portfolio']) and row['total_portfolio'] > 0 else None
+        pct = round(total_across / total_port * 100, 4) if total_port else None
+        investors.append({
+            'investor': row['investor'],
+            'type': row['family_name'] or 'fund',
+            'holdings': ticker_holdings,
+            'total_across': total_across if total_across > 0 else None,
+            'pct_of_portfolio': pct,
+        })
+
+    return clean_for_json({
+        'tickers': tickers,
+        'companies': companies,
+        'investors': investors,
+    })
+
+
+def get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con):
+    """Top 5 funds under one institutional parent that hold the anchor ticker.
+
+    Returns: { 'institution': str, 'anchor': str, 'funds': [...] }
+    """
+    rows = con.execute("""
+        SELECT
+            fh.fund_name,
+            fh.series_id,
+            fu.is_actively_managed AS is_active,
+            SUM(fh.market_value_usd) AS value,
+            SUM(fh.shares_or_principal) AS shares
+        FROM fund_holdings_v2 fh
+        LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id
+        WHERE fh.quarter = ?
+          AND fh.is_latest = TRUE
+          AND fh.ticker = ?
+          AND fh.market_value_usd > 0
+          AND (fh.dm_rollup_name = ? OR fh.family_name = ?)
+        GROUP BY fh.fund_name, fh.series_id, fu.is_actively_managed
+        ORDER BY value DESC
+        LIMIT 5
+    """, [quarter, anchor, institution, institution]).fetchall()
+
+    funds = []
+    for fund_name, series_id, is_active, value, shares in rows:
+        type_label = (
+            'active' if is_active is True
+            else 'passive' if is_active is False
+            else 'mixed'
+        )
+        funds.append({
+            'fund_name': fund_name,
+            'series_id': series_id,
+            'type': type_label,
+            'value': float(value) if value is not None else 0.0,
+            'shares': float(shares) if shares is not None else 0.0,
+        })
+
+    return clean_for_json({
+        'institution': institution,
+        'anchor': anchor,
+        'quarter': quarter,
+        'tickers': tickers,
+        'funds': funds,
     })
 
 

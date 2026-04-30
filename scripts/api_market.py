@@ -217,6 +217,56 @@ def api_crowding(ticker: str = ''):
         con.close()
 
 
+@market_router.get('/peer_tickers')
+def api_peer_tickers(request: Request):
+    """Return tickers sharing the same sector / industry as the given ticker.
+
+    Used by the Cross-Ownership tab to dynamically populate peer-group
+    options based on market_data classifications.
+    """
+    ticker = (request.query_params.get('ticker') or '').upper().strip()
+    if not ticker:
+        return JSONResponse(status_code=400, content={'error': 'Missing ticker parameter'})
+    con = get_db()
+    try:
+        if not has_table('market_data'):
+            return {'ticker': ticker, 'sector': None, 'industry': None,
+                    'sector_peers': [], 'industry_peers': []}
+        row = con.execute(
+            "SELECT sector, industry FROM market_data WHERE ticker = ?",
+            [ticker],
+        ).fetchone()
+        if not row:
+            return {'ticker': ticker, 'sector': None, 'industry': None,
+                    'sector_peers': [], 'industry_peers': []}
+        sector, industry = row[0], row[1]
+        sector_peers: list[str] = []
+        industry_peers: list[str] = []
+        if sector:
+            df = con.execute(
+                "SELECT ticker FROM market_data WHERE sector = ? AND ticker != ? "
+                "ORDER BY ticker",
+                [sector, ticker],
+            ).fetchdf()
+            sector_peers = [t for t in df['ticker'].tolist() if t]
+        if industry:
+            df = con.execute(
+                "SELECT ticker FROM market_data WHERE industry = ? AND ticker != ? "
+                "ORDER BY ticker",
+                [industry, ticker],
+            ).fetchdf()
+            industry_peers = [t for t in df['ticker'].tolist() if t]
+        return {
+            'ticker': ticker,
+            'sector': sector,
+            'industry': industry,
+            'sector_peers': sector_peers,
+            'industry_peers': industry_peers,
+        }
+    finally:
+        con.close()
+
+
 @market_router.get('/smart_money')
 def api_smart_money(ticker: str = ''):
     """Smart Money: net exposure view — long 13F vs short FINRA per manager type."""
