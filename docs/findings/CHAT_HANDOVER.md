@@ -1,5 +1,48 @@
 # Chat Handover
 
+## conv-18-doc-sync (2026-04-29)
+
+HEAD: **`922ef6a`** on `main` after 9 squash-merges this session (#204–#212), on top of the conv-17 base (#202–#203).
+
+### PRs landed (#204–#212)
+
+10 PRs merged across the dark-UI continuation arc:
+
+- **PR #204 `layout-header-fullwidth`** — full-width header above sidebar + content; two-line "SHAREHOLDER INTELLIGENCE" wordmark. Squash `d460526`.
+- **PR #205 `sector-rotation-redesign`** — new `/api/v1/sector_summary` endpoint, KPI cards row, grouped bar chart, ranked heatmap table, auto-select for top movers. Squash `7ef4cde`.
+- **PR #206 `sr-layout-polish`** — compact KPI tiles, outlier toggle, table restructure (4 quarter columns + boxed Total Net), movers panel gains dollar signs and footnote. Squash `ec72e5b`.
+- **PR #207 `sr-chart-movers-fix`** — broken-axis charts, new `type_breakdown` endpoint, mover-detail drill-down popup, fund-view movers fix. Squash `975c17c`.
+- **PR #208 `sr-chart-movers-fix v2`** — heatmap replaces bar chart, two-line wordmark, net flows redesign, KPI tiles for all categories. Squash `5e421d5`.
+- **PR #209 `sr-polish-v2`** — net-flows heatmap table replaces bar chart, sector totals row, movers panel beside heatmap, shorter KPI labels. Squash `48bd894`.
+- **PR #210 `investor-detail-redesign`** — Entity Graph renamed to Investor Detail; new 3-level hierarchy (institution → filer → fund); new `/api/v1/institution_hierarchy` endpoint; quarter selector + market-wide static view. Squash `f480e3e`.
+- **PR #211 `investor-detail-dedup`** — `GROUP BY` dedup on filer-level and fund-level hierarchy queries. Squash `c04bca4`.
+- **PR #212 `compact-density`** — tighter padding across all 12 tabs, expand triangle in dedicated first column, gold left border on leftmost edge only, child-row connectors. Squash `922ef6a`.
+
+### New endpoints
+
+- `/api/v1/sector_summary` — backs the redesigned Sector Rotation tab (KPI tiles + ranked heatmap).
+- `/api/v1/sector_flow_mover_detail` — backs the mover drill-down popup.
+- `/api/v1/institution_hierarchy` — backs the 3-level Investor Detail drill-down (institution → filer → fund).
+
+### Known issue discovered
+
+- **N-PORT quarter bucketing off by one.** Pipeline assigns `Q+1` instead of the calendar quarter for N-PORT periods. Manifests as `2026Q1` containing Oct–Dec 2025 and `2026Q2` containing Jan–Mar 2026 in the new Sector Rotation quarter columns and the Investor Detail hierarchy. Logged in `ROADMAP.md` "Known issues"; pipeline fix needed.
+
+### Process notes
+
+- **Git ops rule change.** Code now pushes the branch, opens the PR, waits for CI green, then merges via `gh pr merge --squash --delete-branch` and pulls `main`. Previously the operator merged manually from Terminal. Captured in `docs/PROCESS_RULES.md`.
+- **Session/branch naming rule added.** Always use short descriptive slugs (e.g. `sector-rotation-redesign`, `dark-ui-restyle`, `investor-detail-redesign`, `compact-density`). Claude must propose the short slug before writing any prompt for Code. Captured in `docs/SESSION_NAMING.md`.
+
+### Backlog state
+
+- **P0:** empty.
+- **P1:** `ui-audit-walkthrough` (PR #107) only.
+- **P2:** empty.
+- **P3 (2 items):** `D10 Admin UI for entity_identifiers_staging`; `Tier 4 unmatched classifications (427)`.
+- **Known issues:** N-PORT quarter bucketing off by one (pipeline).
+
+---
+
 ## conv-17-doc-sync (2026-04-29)
 
 HEAD: **`5f7781f`** on `main` after two squash-merges this session.

@@ -194,3 +194,26 @@ Read-only scripts that do not need `--dry-run`: `backup_db.py`, `benchmark.py`,
 8. Rebuild derived tables
 9. Print final status
 ```
+
+## 11. Git Ops — PR/Merge Workflow (Code sessions)
+
+Set 2026-04-29 (conv-18-doc-sync). Replaces the prior split where the operator did the merge step from Terminal.
+
+- **Code pushes the branch, opens the PR, waits for CI green, then merges** via:
+
+  ```
+  gh pr merge --squash --delete-branch
+  git checkout main && git pull --ff-only
+  ```
+
+  Then runs `./scripts/hygiene/cleanup_merged_worktree.sh <pr-number>` if a worktree was used.
+
+- **Session/branch naming.** Always use a short descriptive slug, not the legacy `<theme>-<seq>` pattern, for UI/feature/doc-sync work. Examples that landed in conv-18: `dark-ui-restyle`, `layout-header-fullwidth`, `sector-rotation-redesign`, `sr-layout-polish`, `sr-chart-movers-fix`, `investor-detail-redesign`, `investor-detail-dedup`, `compact-density`.
+
+  **Claude must propose the short slug before writing any prompt for Code.** Code does not invent the branch name.
+
+- **Doc-sync PRs are an exception** — they commit directly to main per session brief, not via PR.
+
+- **Never `--no-verify` / `--no-gpg-sign`** unless the user explicitly asks.
+
+- The `<theme>-<seq>` convention in `docs/SESSION_NAMING.md` (`int-NN`, `obs-NN`, `mig-NN`, `sec-NN`, `ops-NN`, `conv-NN`, `prog-NN`) still applies to remediation-program work that maps to a numbered item in that program. Feature/UI work uses short slugs.

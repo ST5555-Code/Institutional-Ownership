@@ -1,5 +1,18 @@
 # Session Naming Convention
 
+Two naming systems coexist:
+
+1. **Remediation-program work** — `<theme>-<seq>` (see below). Used when a session maps to a numbered remediation item.
+2. **Feature / UI / one-off work** — **short descriptive slug** (e.g. `dark-ui-restyle`, `sector-rotation-redesign`, `investor-detail-redesign`, `compact-density`). Set 2026-04-29 (conv-18-doc-sync).
+
+For short-slug work, **Claude must propose the slug before writing any prompt for Code.** Code does not invent the branch name. Slugs are kebab-case, ideally 2–4 words, and must be unambiguous about scope (`sr-chart-movers-fix` is fine; `fix` is not).
+
+Doc-sync sessions continue to use `conv-NN-doc-sync`.
+
+---
+
+## Remediation-program format
+
 Format: `<theme>-<seq>` or `<theme>-<seq>-<phase>` for multi-phase sessions.
 
 ## Theme prefixes
