@@ -41,6 +41,9 @@ def api_cross_ownership(request: Request):
     anchor = (request.query_params.get('anchor') or '').upper().strip()
     active_only = request.query_params.get('active_only', 'false').lower() == 'true'
     limit = int(request.query_params.get('limit', 25))
+    level = (request.query_params.get('level') or 'parent').strip().lower()
+    if level not in ('parent', 'fund'):
+        level = 'parent'
     rt = get_rollup_type(request)
     if not tickers_raw:
         return JSONResponse(status_code=400, content={'error': 'Missing tickers parameter'})
@@ -56,7 +59,7 @@ def api_cross_ownership(request: Request):
             validate_ticker_current(con, t)
         return _cross_ownership_query(con, tickers, anchor=anchor,
                                       active_only=active_only, limit=limit,
-                                      rollup_type=rt)
+                                      rollup_type=rt, level=level)
     finally:
         con.close()
 
@@ -67,6 +70,9 @@ def api_cross_ownership_top(request: Request):
     tickers_raw = (request.query_params.get('tickers') or '').upper().strip()
     active_only = request.query_params.get('active_only', 'false').lower() == 'true'
     limit = int(request.query_params.get('limit', 25))
+    level = (request.query_params.get('level') or 'parent').strip().lower()
+    if level not in ('parent', 'fund'):
+        level = 'parent'
     rt = get_rollup_type(request)
     if not tickers_raw:
         return JSONResponse(status_code=400, content={'error': 'Missing tickers parameter'})
@@ -80,7 +86,36 @@ def api_cross_ownership_top(request: Request):
             validate_ticker_current(con, t)
         return _cross_ownership_query(con, tickers, anchor=None,
                                       active_only=active_only, limit=limit,
-                                      rollup_type=rt)
+                                      rollup_type=rt, level=level)
+    finally:
+        con.close()
+
+
+@cross_router.get('/cross_ownership_fund_detail')
+def api_cross_ownership_fund_detail(request: Request):
+    """Drill-down: top 5 funds under an institution holding the anchor ticker."""
+    from config import QUARTERS as _QUARTERS, LATEST_QUARTER
+    tickers_raw = (request.query_params.get('tickers') or '').upper().strip()
+    institution = (request.query_params.get('institution') or '').strip()
+    anchor = (request.query_params.get('anchor') or '').upper().strip()
+    quarter = (request.query_params.get('quarter') or '').strip() or LATEST_QUARTER
+    if quarter not in _QUARTERS:
+        quarter = LATEST_QUARTER
+    if not institution or not anchor:
+        return JSONResponse(status_code=400, content={'error': 'Missing institution or anchor'})
+    tickers = [t.strip() for t in tickers_raw.split(',') if t.strip()][:10]
+    try:
+        con = get_db()
+    except Exception as e:
+        return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
+    try:
+        result = queries.get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("cross_ownership_fund_detail error: %s", e, exc_info=True)
+        return JSONResponse(status_code=500, content={'error': str(e)})
     finally:
         con.close()
 

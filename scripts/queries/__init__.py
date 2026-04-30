@@ -110,6 +110,7 @@ from .cross import (  # noqa: F401
     get_two_company_overlap,
     get_two_company_subject,
     get_overlap_institution_detail,
+    get_cross_ownership_fund_detail,
 )
 
 # --- trend ----------------------------------------------------------------
