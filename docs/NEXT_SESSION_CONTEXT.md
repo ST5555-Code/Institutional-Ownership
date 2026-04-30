@@ -4,19 +4,24 @@
 
 ## Last completed
 
-`conv-19` — N-PORT quarter bucketing fix + downstream rebuild, plus shared page-header rollout:
+`sr-fund-quarter-filter` (PR #215) — Two enhancements to the Sector Rotation tab's Fund view:
 
-- **N-PORT quarter fix** (PR #213) — Rewrote `quarter_label_for_month()` to the calendar convention (Jan–Mar→Q1, Apr–Jun→Q2, Jul–Sep→Q3, Oct–Dec→Q4); previously assigned `Q+1`. Migrated 14.6M `fund_holdings_v2` + 31K `fund_classes` + 22K `fund_holdings` rows. Rebuilt `parent_fund_map` (109K), `sector_flows_rollup` (321), `peer_rotation_flows` (17.5M, pruned 960K stale shifted rows). Cleared 3 stale `peer_rotation` manifest entries. Backup at `data/13f_pre_quarter_fix.duckdb`. Closes the N-PORT quarter bucketing Known Issue.
-- **Tab page headers** (PR #214) — New shared `PageHeader` component (gold section kicker, 24px light title, dim description) added to all 12 tabs.
+- **Partial-quarter filter.** New `GET /api/v1/fund_quarter_completeness` returns per-quarter `months_available` + `complete` flag (true iff 3 monthly N-PORT report-months filed) from `fund_holdings_v2`. Fetched once on tab mount; when `level='fund'`, periods whose destination quarter is incomplete are filtered out of the sector heatmap. Institution view + the static Net Flows heatmap unaffected.
+- **Monthly hover tooltip.** New `GET /api/v1/sector_monthly_flows?sector=&quarter=` computes monthly net flows from paired filers (funds present in both current and prior month). **Months are derived from the data, not the quarter label** — N-PORT report-months trail the filing quarter by one period (`quarter='2026Q1'` → report_months `2025-10/11/12`). Funds present in only one of the two months are excluded — most filers report only at quarter-end, so missing-month ≠ exit; treating it as exit produced spurious trillion-dollar swings. Heatmap tooltip lazy-fetches per `(sector, quarter)`, caches in component state (`monthlyByKey`), shows "Loading monthly detail…" while in-flight, renders abbreviated month labels in JetBrains Mono with green/red semantic colors per `docs/plans/DarkStyle.md`.
 
-Current HEAD: `e090ab7` on `main`.
+Earlier in `conv-19`:
 
-This sync (this commit, direct to main):
+- **PR #213** — N-PORT quarter bucketing fix + 14.6M-row migration + downstream rebuild. Backup at `data/13f_pre_quarter_fix.duckdb`. Closes the N-PORT quarter bucketing Known Issue.
+- **PR #214** — Shared `PageHeader` rollout to all 12 tabs.
 
-- **`ROADMAP.md`** — header date refreshed to `2026-04-30 (conv-19-doc-sync)`; "N-PORT quarter bucketing off by one" removed from Known Issues; 2 new COMPLETED rows for #213 and #214.
-- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten.
-- **`docs/findings/CHAT_HANDOVER.md`** — new conv-19 section prepended.
-- **`MAINTENANCE.md`** — last-updated stamp refreshed.
+Current HEAD: post-`#215` squash on `main`.
+
+Gotcha to remember: `fund_holdings_v2.report_month` trails `quarter` by one period (filing-quarter convention). Anything that wants per-month detail for a filing quarter must look up the actual `report_month` values from the data — do not derive months from the quarter label.
+
+This sync (direct to main, post-merge):
+
+- **`ROADMAP.md`** — new COMPLETED row for #215 (still under conv-19 sync header).
+- **`docs/NEXT_SESSION_CONTEXT.md`** — this file refreshed.
 
 ## Up next
 
