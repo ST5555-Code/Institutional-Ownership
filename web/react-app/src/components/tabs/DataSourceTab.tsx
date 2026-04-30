@@ -53,17 +53,25 @@ export function DataSourceTab() {
 
   return (
     <div style={WRAP}>
-      <PageHeader
-        section="Reference"
-        title="Data Source"
-        description="Filing coverage, data freshness, and pipeline status across all SEC data sources."
-      />
-      <div style={HEADER}>
-        {data && <div style={SUB}>Last updated: {fmtDate(data.last_modified)}</div>}
-        <div style={{ marginLeft: 'auto' }}>
+      {/* Header row: PageHeader (left) + FreshnessBadge (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Reference"
+            title="Data Source"
+            description="Filing coverage, data freshness, and pipeline status across all SEC data sources."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
           <FreshnessBadge tableName="holdings_v2" label="13F" />
         </div>
       </div>
+      <style>{`@media print { .no-print { display:none!important } }`}</style>
+      {data && (
+        <div style={HEADER}>
+          <div style={SUB}>Last updated: {fmtDate(data.last_modified)}</div>
+        </div>
+      )}
 
       <div style={BODY}>
         {loading && <div style={{ ...CENTER_MSG, color: 'var(--text-dim)' }}>Loading…</div>}

@@ -139,12 +139,21 @@ export function FlowAnalysisTab() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--panel)', borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-      <PageHeader
-        section="Flow & Rotation"
-        title="Flow Analysis"
-        description="Net institutional flows by period. Tracks buyers, sellers, new entries, and complete exits."
-      />
-      <style>{`@media print { .fa-controls { display:none!important } }`}</style>
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Flow & Rotation"
+            title="Flow Analysis"
+            description="Net institutional flows by period. Tracks buyers, sellers, new entries, and complete exits."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="investor_flows" label="flows" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
+        </div>
+      </div>
+      <style>{`@media print { .fa-controls { display:none!important } .no-print { display:none!important } }`}</style>
 
       {/* Controls */}
       <div className="fa-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, padding: '8px 12px', backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
@@ -168,10 +177,6 @@ export function FlowAnalysisTab() {
         <RollupToggle />
         <FundViewToggle value={fundView} onChange={setFundView} />
         <ActiveOnlyToggle value={activeOnly} onChange={setActiveOnly} label="Active Only" />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="investor_flows" label="flows" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!data} />
-        </div>
       </div>
 
       {/* Content */}

@@ -213,12 +213,21 @@ export function InvestorDetailTab() {
         overflow: 'hidden',
       }}
     >
-      <PageHeader
-        section="Market Snapshot"
-        title="Investor Detail"
-        description="Top 50 institutions by AUM with expandable hierarchy: parent, 13F filers, and fund series."
-      />
-      <style>{`@media print { .id-controls { display:none!important } }`}</style>
+      {/* Header row: PageHeader (left) + FreshnessBadge + ExportBar (right) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PageHeader
+            section="Market Snapshot"
+            title="Investor Detail"
+            description="Top 50 institutions by AUM with expandable hierarchy: parent, 13F filers, and fund series."
+          />
+        </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14 }}>
+          <FreshnessBadge tableName="summary_by_parent" label="register" />
+          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!market.data} />
+        </div>
+      </div>
+      <style>{`@media print { .id-controls { display:none!important } .no-print { display:none!important } }`}</style>
 
       <div
         className="id-controls"
@@ -241,10 +250,6 @@ export function InvestorDetailTab() {
             if (idx >= 0) setQuarter(quartersOldToNew[idx])
           }}
         />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FreshnessBadge tableName="summary_by_parent" label="register" />
-          <ExportBar onExcel={onExcel} onPrint={() => window.print()} disabled={!market.data} />
-        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
