@@ -99,6 +99,8 @@ from .market import (  # noqa: F401
     get_fund_quarter_completeness,
     get_sector_monthly_flows,
     short_interest_analysis,
+    get_short_position_pct,
+    get_short_volume_comparison,
     get_market_summary,
 )
 
