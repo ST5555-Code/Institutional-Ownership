@@ -297,7 +297,7 @@ def _fund_type_label(fund_strategy):
     """
     if fund_strategy in ('equity', 'balanced', 'multi_asset'):
         return 'active'
-    if fund_strategy == 'index':
+    if fund_strategy == 'passive':
         return 'passive'
     if fund_strategy == 'bond_or_other':
         return 'bond'

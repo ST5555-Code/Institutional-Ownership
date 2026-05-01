@@ -144,8 +144,9 @@ def classify_fund(metadata, holdings):
     is_actively_managed_flag = not is_passive_name
 
     # Exclusions (skip index AND ETF filters when --include-index is active)
+    # Note: 'index' was renamed to 'passive' in PR-1e (May 2026). The string 'index' is no longer used as a fund_strategy value.
     if not _include_index and INDEX_PATTERNS.search(series_name):
-        return False, "index", False
+        return False, "passive", False
     if not _include_index and EXCLUDE_PATTERNS.search(series_name):
         return False, "excluded", False
     if metadata.get("is_final") == "Y":
