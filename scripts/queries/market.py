@@ -10,7 +10,7 @@ from .common import (
     VALID_ROLLUP_TYPES,
     _rollup_col,
     get_db,
-    _classify_fund_type,
+    _fund_type_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -633,13 +633,13 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                        SUM(ABS(market_value_usd)) as short_value,
                        MAX(quarter) as quarter,
                        MAX(fund_aum_mm) as fund_aum_mm,
-                       MAX(is_active) as is_active
+                       MAX(fund_strategy) as fund_strategy
                 FROM (
                     SELECT fh.fund_name, fh.family_name,
                            fh.shares_or_principal, fh.market_value_usd,
                            fh.quarter, fh.series_id,
                            fu.total_net_assets / 1e6 as fund_aum_mm,
-                           CAST(fu.is_actively_managed AS INTEGER) as is_active
+                           fu.fund_strategy as fund_strategy
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.ticker = ? AND fh.shares_or_principal < 0
@@ -664,8 +664,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                 aum = r.get('fund_aum_mm')
                 val2 = r.get('short_value')
                 r['pct_of_nav'] = round(val2 / (aum * 1e6) * 100, 3) if aum and aum > 0 and val2 else None
-                # Name-based classification for consistent type display
-                r['type'] = _classify_fund_type(r.get('fund_name') or '')
+                r['type'] = _fund_type_label(r.get('fund_strategy'))
+                r.pop('fund_strategy', None)
         except Exception:
             logger.debug("optional enrichment failed: nport_detail", exc_info=True)
         result['nport_detail'] = nport_detail
@@ -676,7 +676,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
             fund_hist = con.execute("""
                 SELECT fh.fund_name, fh.quarter,
                        SUM(ABS(fh.shares_or_principal)) as short_shares,
-                       MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
+                       MAX(fu.fund_strategy) as fund_strategy
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                 WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.is_latest = TRUE
@@ -688,7 +688,8 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
             for _, r in fund_hist.iterrows():
                 fn = r['fund_name']
                 if fn not in funds_seen:
-                    funds_seen[fn] = {'fund_name': fn, 'type': _classify_fund_type(fn)}
+                    funds_seen[fn] = {'fund_name': fn,
+                                      'type': _fund_type_label(r.get('fund_strategy'))}
                 funds_seen[fn][r['quarter']] = float(r['short_shares'])
             nport_by_fund = list(funds_seen.values())
             nport_by_fund.sort(key=lambda x: x.get(quarter, 0), reverse=True)
@@ -786,13 +787,13 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                        SUM(short_shares) as short_shares,
                        SUM(short_value) as short_value,
                        MAX(fund_aum_mm) as fund_aum_mm,
-                       MAX(is_active) as is_active
+                       MAX(fund_strategy) as fund_strategy
                 FROM (
                     SELECT fh.fund_name, fh.family_name, fh.series_id,
                            SUM(ABS(fh.shares_or_principal)) as short_shares,
                            SUM(ABS(fh.market_value_usd)) as short_value,
                            MAX(fu.total_net_assets) / 1e6 as fund_aum_mm,
-                           MAX(CAST(fu.is_actively_managed AS INTEGER)) as is_active
+                           MAX(fu.fund_strategy) as fund_strategy
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.ticker = ? AND fh.shares_or_principal < 0 AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
@@ -823,7 +824,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
                     short_only.append({
                         'fund_name': r['fund_name'],
                         'family_name': r['family_name'],
-                        'type': _classify_fund_type(r['fund_name']),
+                        'type': _fund_type_label(r.get('fund_strategy')),
                         'short_shares': ss,
                         'short_value': sv,
                         'fund_aum_mm': float(r['fund_aum_mm'] or 0) if r['fund_aum_mm'] else None,

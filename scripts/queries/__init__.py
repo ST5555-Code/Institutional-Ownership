@@ -33,7 +33,7 @@ from .common import (  # noqa: F401
     # NPORT family-pattern helpers
     _FAMILY_PATTERNS_FALLBACK,
     get_nport_family_patterns,
-    _classify_fund_type,
+    _fund_type_label,
     match_nport_family,
     _get_subadviser_exclusions,
     get_nport_position,

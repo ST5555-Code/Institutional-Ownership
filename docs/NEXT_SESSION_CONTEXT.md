@@ -4,12 +4,15 @@
 
 ## Last completed
 
-`conv-22` — Cross-Ownership tab redesign (peer-driven dropdown, expandable rows with per-fund drill-down, fund-level toggle fixed) plus fix-up pass (sticky gold Group Total, fund-level 500 fix, per-ticker fund positions across the full peer group). Two PRs landed (`#228`–`#229`):
+**`classification-display-fix (PR-1d)`** — Fund-level display reads now go through canonical `fund_universe.fund_strategy` via the new `_fund_type_label()` utility in `scripts/queries/common.py`. Legacy `_classify_fund_type` name-keyword sweep deleted. 12 fund-level read sites migrated across `register.py`, `cross.py`, `fund.py`, `trend.py`, `market.py`. Confirmed bugs from PR-1c audit fixed: (a) Conviction `None → 'passive'` collapse, (b) Cross-Ownership level=fund family-name overload (`type='Vanguard'` no longer rendered), (c) Holder Momentum N-PORT children blank `type=None`, (d) `short_analysis` two-signal contract collapsed (`is_active` field dropped per D7). New validator `scripts/oneoff/validate_classification_display_fix.py` — 24/24 contract checks pass against the CI fixture DB. Full pytest: 364 passed.
 
-- **PR #228 `cross-ownership-polish`** — Cross-Ownership tab polish. Peer Group dropdown driven by the loaded ticker's classification (new `GET /api/v1/peer_tickers`); inline ticker input always visible; expandable investor rows with per-anchor fund drill-down (new `GET /api/v1/cross_ownership_fund_detail`); fund-level toggle now actually changes data (`/cross_ownership` + `/cross_ownership_top` accept `level=parent|fund`); Group Total footer restyled gold; page title appends current quarter via shared `fmtQuarter`. Squash `f46c88c`.
-- **PR #229 `cross-ownership-fix`** — Cross-Ownership tab fix-ups on top of #228. Fund-level 500 fixed (pivot reference bug in `_cross_ownership_fund_query`); `has_fund_detail` flag added to `/cross_ownership` parent rollup so the `▶` expand triangle only renders for investors that actually have N-PORT fund detail; `/cross_ownership_fund_detail` rewritten for per-peer-ticker positions (top 5 funds by total value across the peer group); sticky gold Group Total + % of Portfolio summary block at the top of the table; expanded child rows mirror the parent column structure (per-ticker columns populated from `positions[ticker].value`). Squash `f2194b8`.
+Branch: `classification-display-fix`. PR opened against `main`; awaiting CI green and user merge gate.
 
-Current HEAD: **`7203539`** on `main`.
+New roadmap item created: **`parent-level-display-canonical-reads`** — migrate the 18 parent-level display read sites from `manager_type` / `entity_type` to canonical `entity_classification_history.classification`. Includes the `query4` silent-drop fix (PR-1c bug 4). Sits at P2.
+
+Findings: `docs/findings/classification_display_fix_results.md`.
+
+Previous session HEAD on `main`: **`4fe72dc`** (PR-1c classification-display-audit, #236).
 
 This sync (direct to `main`):
 
@@ -48,7 +51,10 @@ This sync (direct to `main`):
 
 ## Reminders
 
-- **HEAD on main is `7203539`** after PRs #228 + #229 squash-merged and the #229 commit-hash doc tweak.
+- **HEAD on main is `4fe72dc`** (PR-1c classification-display-audit, #236) after the PR-1d branch was opened.
+- **PR-1d gotcha:** the canonical fund taxonomy is 7 values `{equity, balanced, multi_asset, bond_or_other, index, excluded, final_filing}`. The display label map collapses to 5 values `{active, passive, bond, excluded, unknown}`. `unknown` is now an honest expression of "no `fund_universe` row or value outside the canonical set" — earlier display layers silently rendered these as `passive` (Conviction) or `active` (name-sweep default). Some fixture rows display `unknown` as a result, which is correct.
+- **PR-1d gotcha:** `get_nport_children_batch` and `get_nport_children` in `scripts/queries/common.py` now SELECT and propagate `fund_strategy` in their child-dict shape. Any new consumer of those helpers can read `child['fund_strategy']` without re-querying.
+- **PR-1d gotcha:** `cross.py` `_cross_ownership_fund_query` no longer carries `family_name` in its response (`type` overload removed). The column stays in `fund_holdings_v2` for entity matching.
 - **Git ops** (rule from conv-18, reaffirmed each session). Code merges PRs autonomously after CI passes: pushes branch, opens PR, waits for CI green, then `gh pr merge --squash --delete-branch` and pulls main. Reflected in `docs/PROCESS_RULES.md` §11.
 - **Branch naming.** Always use a short descriptive slug (e.g. `cross-ownership-polish`, `cross-ownership-fix`). Claude must propose the short name before writing any prompt for Code. **Every Code prompt must start with the session/branch name on the first line.**
 - **Dark UI is production styling.** `docs/plans/DarkStyle.md` is the spec. Token palette + Hanken Grotesk / Inter / JetBrains Mono live in `web/react-app/src/styles/globals.css`.

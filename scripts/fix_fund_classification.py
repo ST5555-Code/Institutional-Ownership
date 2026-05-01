@@ -6,8 +6,10 @@ is_actively_managed=True for every fund that passes the index filter,
 regardless of whether the fund is actually passive. When the data
 was loaded with --include-index, all 6,671 funds were tagged as active.
 
-This script applies the same keyword-based classification used in
-queries._classify_fund_type() to update fund_universe in place.
+This script applies a keyword-based classification (PASSIVE_KEYWORDS /
+INDEX_COMBOS below) to update fund_universe.is_actively_managed in place.
+This is the legacy backfill flow; canonical classification now lives in
+fund_universe.fund_strategy (PR-1a/1b) and is read via _fund_type_label.
 
 Usage:
     python3 scripts/fix_fund_classification.py                # staging
