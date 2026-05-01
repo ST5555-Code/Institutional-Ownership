@@ -237,8 +237,17 @@ def step2_create_manager_entities(con, seed_map):
 # Step 2.6 — Create fund entities (one per fund_universe.series_id)
 # =============================================================================
 def step2_create_fund_entities(con):
+    # Active flag is derived from canonical fund_strategy (PR-3 dropped the
+    # standalone is_actively_managed column). Keep this ACTIVE list in sync
+    # with scripts/queries/common.ACTIVE_FUND_STRATEGIES.
     rows = con.execute(
-        """SELECT series_id, fund_name, family_name, is_actively_managed
+        """SELECT series_id, fund_name, family_name,
+                  CASE WHEN fund_strategy IN ('equity','balanced','multi_asset')
+                       THEN TRUE
+                       WHEN fund_strategy IS NULL
+                       THEN NULL
+                       ELSE FALSE
+                  END AS is_active
            FROM fund_universe
            WHERE series_id IS NOT NULL"""
     ).fetchall()
@@ -561,7 +570,9 @@ def step6_populate_classifications(con, seeds, seed_map, manager_rows, fund_rows
     Classification sources:
       - PARENT_SEEDS.strategy_type for seed entities
       - managers.strategy_type / is_activist for manager entities (non-absorbed)
-      - fund_universe.is_actively_managed → 'active'|'passive'|'unknown'
+      - fund_universe.fund_strategy → 'active'|'passive'|'unknown'
+        (active = equity|balanced|multi_asset; passive = everything else;
+        unknown if the fund has no canonical strategy)
       - canonical_name_fallback adviser entities → 'unknown'
     Exactly one active row per entity.
     """

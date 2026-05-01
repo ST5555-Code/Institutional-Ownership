@@ -11,6 +11,7 @@ from .common import (
     _quarter_to_date,
     _resolve_pct_of_so_denom,
     _fund_type_label,
+    ACTIVE_FUND_STRATEGIES,
 )
 
 
@@ -153,9 +154,17 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
     else:
         order_clause = '({}) DESC'.format(total_expr)
 
+    # Fund-level active filter — derived from canonical fund_strategy partition.
+    # Pre-PR-3 used `COALESCE(fu.is_actively_managed, TRUE) = TRUE`; that
+    # COALESCE was a SYN-leak hedge for NULL is_actively_managed which has
+    # not existed since PR-1a. The is_actively_managed column was dropped in
+    # PR-3, so the predicate is now an explicit IN-list against fund_strategy.
     active_where = ""
+    active_params = []
     if active_only:
-        active_where = "AND COALESCE(fu.is_actively_managed, TRUE) = TRUE"
+        active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+        active_where = f"AND fu.fund_strategy IN ({active_ph})"
+        active_params = list(ACTIVE_FUND_STRATEGIES)
 
     df = con.execute(f"""
         WITH fund_pos AS (
@@ -194,7 +203,7 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
         GROUP BY fp.investor, fp.series_id, ft.total_portfolio
         ORDER BY {order_clause}
         LIMIT {int(limit)}
-    """, tickers).fetchdf()
+    """, tickers + active_params).fetchdf()
 
     investors = []
     for _, row in df.iterrows():
@@ -384,7 +393,8 @@ def get_two_company_overlap(subject, second, quarter, con):
         })
 
     # --- 3c. Fund panel (top 50 by Subject $) ----------------------------
-    fund_rows = con.execute("""
+    active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+    fund_rows = con.execute(f"""
         WITH subj_funds AS (
             SELECT
                 fh.fund_name as holder,
@@ -420,13 +430,16 @@ def get_two_company_overlap(subject, second, quarter, con):
             s.subj_dollars,
             COALESCE(p.sec_shares, 0)  as sec_shares,
             COALESCE(p.sec_dollars, 0) as sec_dollars,
-            fu.is_actively_managed     as is_active
+            CASE WHEN fu.fund_strategy IN ({active_ph}) THEN TRUE
+                 WHEN fu.fund_strategy IS NULL THEN NULL
+                 ELSE FALSE
+            END                        as is_active
         FROM subj_funds s
         LEFT JOIN sec_funds p ON p.series_id = s.series_id
         LEFT JOIN fund_universe fu ON fu.series_id = s.series_id
         ORDER BY s.subj_dollars DESC
         LIMIT 50
-    """, [subject, quarter, second, quarter]).fetchall()
+    """, [subject, quarter, second, quarter] + list(ACTIVE_FUND_STRATEGIES)).fetchall()
 
     fund = []
     for r in fund_rows:
@@ -448,9 +461,10 @@ def get_two_company_overlap(subject, second, quarter, con):
             'sec_pct_so': (sec_shares_f / sec_denom * 100.0) if sec_denom else None,
             'sec_pct_of_so_source': sec_denom_source if sec_denom else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
-            # fund_universe.is_actively_managed — None if the fund isn't in
-            # fund_universe; the frontend treats None as "active" (included
-            # in active-only view) rather than silently dropping rows.
+            # is_active derived from fund_universe.fund_strategy IN
+            # ACTIVE_FUND_STRATEGIES. None when the fund is missing from
+            # fund_universe — frontend treats None as "active" (included in
+            # active-only view) rather than silently dropping rows.
             'is_active': bool(is_active) if is_active is not None else None,
         })
 
@@ -640,7 +654,8 @@ def get_two_company_subject(subject, quarter, con):
         })
 
     # --- Fund panel (top 50 fund series by NAV position in subject) ------
-    fund_rows = con.execute("""
+    active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+    fund_rows = con.execute(f"""
         WITH subj_funds AS (
             SELECT
                 fh.fund_name as holder,
@@ -661,12 +676,15 @@ def get_two_company_subject(subject, quarter, con):
             s.family_name,
             s.subj_shares,
             s.subj_dollars,
-            fu.is_actively_managed as is_active
+            CASE WHEN fu.fund_strategy IN ({active_ph}) THEN TRUE
+                 WHEN fu.fund_strategy IS NULL THEN NULL
+                 ELSE FALSE
+            END                        as is_active
         FROM subj_funds s
         LEFT JOIN fund_universe fu ON fu.series_id = s.series_id
         ORDER BY s.subj_dollars DESC
         LIMIT 50
-    """, [subject, quarter]).fetchall()
+    """, [subject, quarter] + list(ACTIVE_FUND_STRATEGIES)).fetchall()
 
     fund = []
     for r in fund_rows:

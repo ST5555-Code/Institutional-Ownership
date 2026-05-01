@@ -8,6 +8,7 @@ from .common import (
     get_cusip,
     get_nport_children_batch,
     _fund_type_label,
+    ACTIVE_FUND_STRATEGIES,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,12 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
 
         # Top 25 parents or funds by latest quarter value (same as Register)
         if level == 'fund':
-            active_filter = "AND fu.is_actively_managed = true" if active_only else ""
+            active_filter = ""
+            active_params = []
+            if active_only:
+                active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+                active_filter = f"AND fu.fund_strategy IN ({active_ph})"
+                active_params = list(ACTIVE_FUND_STRATEGIES)
             top_holders_df = con.execute(f"""
                 SELECT fh.fund_name as holder, SUM(fh.market_value_usd) as val,
                        MAX(fu.fund_strategy) as fund_strategy
@@ -97,7 +103,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
                 ORDER BY val DESC NULLS LAST LIMIT 25
-            """, [ticker]).fetchdf()
+            """, [ticker] + active_params).fetchdf()
         else:
             top_holders_df = con.execute(f"""
                 SELECT COALESCE({rn}, inst_parent_name, manager_name) as holder,
