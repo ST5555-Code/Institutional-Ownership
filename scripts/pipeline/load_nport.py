@@ -42,6 +42,19 @@ download + TSV parsing + amendment resolution); this module wraps those
 primitives in the framework pattern without modifying their internals.
 ``pipeline.nport_parsers`` stays the shared XML parsing library for the
 monthly XML top-up path.
+
+PR-2 lock semantics (``_apply_fund_strategy_lock`` + ``_upsert_fund_universe``):
+once a series_id has a non-NULL ``fund_strategy`` in prod ``fund_universe``
+the value is treated as canonical and is preserved on subsequent N-PORT
+loads. The classifier output is only written when (a) the series is new
+(no row in ``fund_universe`` yet) or (b) the existing row carries a NULL
+``fund_strategy`` (backfill case). Without this lock, every monthly top-up
+would re-classify from the per-filing fund name and silently overwrite
+hand-curated reclassifications like the QQQ / Target Date / leveraged ETF
+sweep done in PR-2. Same lock applies to ``fund_holdings_v2`` rows being
+inserted for the run — the staged ``fund_strategy`` is rewritten to the
+locked value before ``super().promote()`` runs so historical and new
+holdings stay consistent with the canonical fund-level value.
 """
 from __future__ import annotations
 
@@ -934,6 +947,12 @@ class LoadNPortPipeline(SourcePipeline):
 
         if not rows.empty:
             self._enrich_staging_entities(prod_con, series_touched)
+            # PR-2: lock prod's canonical fund_strategy before super().promote
+            # writes staged holdings rows. For series whose prod
+            # fund_universe row already carries a non-NULL fund_strategy,
+            # the staged value is rewritten to the prod value so the new
+            # holdings rows do not drift away from the canonical label.
+            self._apply_fund_strategy_lock(prod_con, series_touched)
 
         result = super().promote(run_id, prod_con)
 
@@ -1028,9 +1047,105 @@ class LoadNPortPipeline(SourcePipeline):
 
         return len(mapping_df)
 
+    def _apply_fund_strategy_lock(
+        self, prod_con: Any, series_touched: set[str],
+    ) -> int:
+        """PR-2 lock — preserve canonical ``fund_strategy``/``fund_category``
+        on subsequent N-PORT loads.
+
+        For each ``series_id`` in ``series_touched`` whose prod
+        ``fund_universe`` row carries a non-NULL ``fund_strategy``, rewrite
+        the staged ``fund_strategy``/``fund_category`` (in
+        ``stg_nport_fund_universe``) and the staged
+        ``fund_holdings_v2.fund_strategy`` to the prod values **before**
+        ``super().promote()`` inserts the new holdings rows. New series
+        (no row in prod) and series whose prod row carries NULL
+        ``fund_strategy`` (the backfill case) keep the classifier output.
+
+        Returns the number of locked series_ids; 0 when nothing matched.
+
+        Without this step:
+          * the next monthly top-up classifies from the per-filing fund
+            name and silently overwrites hand-curated reclassifications
+            (e.g. the QQQ / Target Date / leveraged-ETF sweep done in
+            PR-2);
+          * historical and new ``fund_holdings_v2`` rows for the same
+            series can drift apart when the classifier output for a new
+            filing differs from the canonical fund-level value.
+        """
+        if not series_touched:
+            return 0
+        sids = sorted(series_touched)
+        placeholders = ",".join("?" * len(sids))
+
+        try:
+            locked_df = prod_con.execute(
+                f"""
+                SELECT series_id, fund_strategy, fund_category
+                  FROM fund_universe
+                 WHERE series_id IN ({placeholders})
+                   AND fund_strategy IS NOT NULL
+                """,  # nosec B608
+                sids,
+            ).fetchdf()
+        except Exception as exc:  # pylint: disable=broad-except
+            # fund_universe may be absent in test fixtures; surface as a
+            # warning so tests without the table are not forced to seed it
+            # when they exercise unrelated promote paths.
+            self._logger.warning("_apply_fund_strategy_lock: %s", exc)
+            return 0
+
+        if locked_df.empty:
+            return 0
+
+        staging_con = duckdb.connect(self._staging_db_path)
+        try:
+            staging_con.register("lock_map", locked_df)
+            try:
+                staging_con.execute(
+                    """
+                    UPDATE fund_holdings_v2 AS fh
+                       SET fund_strategy = m.fund_strategy
+                      FROM lock_map m
+                     WHERE fh.series_id = m.series_id
+                    """
+                )
+                # stg_nport_fund_universe may not exist if the run was
+                # primed by the typed-staging path only; ignore absence.
+                try:
+                    staging_con.execute(
+                        """
+                        UPDATE stg_nport_fund_universe AS u
+                           SET fund_strategy = m.fund_strategy,
+                               fund_category = m.fund_category
+                          FROM lock_map m
+                         WHERE u.series_id = m.series_id
+                        """
+                    )
+                except duckdb.CatalogException:
+                    pass
+            finally:
+                staging_con.unregister("lock_map")
+            staging_con.execute("CHECKPOINT")
+        finally:
+            staging_con.close()
+
+        return len(locked_df)
+
     def _upsert_fund_universe(
         self, prod_con: Any, series_touched: set[str],
     ) -> int:
+        """Upsert ``fund_universe`` from staged ``stg_nport_fund_universe``.
+
+        PR-2 lock layer (defense-in-depth on top of
+        ``_apply_fund_strategy_lock``): if prod already has a row for the
+        ``series_id`` with a non-NULL ``fund_strategy``, the prod values
+        for ``fund_strategy`` and ``fund_category`` win. The staged value
+        is only honoured for new series (no prior row) or NULL-backfill
+        cases. ``_apply_fund_strategy_lock`` runs pre-promote and rewrites
+        staging in lock-step; this COALESCE is the safety net in case the
+        helper was bypassed (e.g. promote() called without the wrapper).
+        """
         if not series_touched:
             return 0
         staging_con = duckdb.connect(self._staging_db_path, read_only=True)
@@ -1052,12 +1167,42 @@ class LoadNPortPipeline(SourcePipeline):
         if df.empty:
             return 0
         sids = df["series_id"].tolist()
+
+        # Capture prod's current fund_strategy / fund_category for each
+        # touched series_id so we can preserve non-NULL canonical values
+        # across the DELETE+INSERT below. Done in one round-trip.
+        placeholders_p = ",".join("?" * len(sids))
+        try:
+            prior_df = prod_con.execute(
+                f"""
+                SELECT series_id,
+                       fund_strategy AS prior_fund_strategy,
+                       fund_category AS prior_fund_category
+                  FROM fund_universe
+                 WHERE series_id IN ({placeholders_p})
+                """,  # nosec B608
+                sids,
+            ).fetchdf()
+        except Exception as exc:  # pylint: disable=broad-except
+            self._logger.warning(
+                "_upsert_fund_universe prior-read failed: %s", exc,
+            )
+            prior_df = None
+
         prod_con.execute(
             f"DELETE FROM fund_universe WHERE series_id IN "
-            f"({','.join('?' * len(sids))})",
+            f"({placeholders_p})",
             sids,
         )
         prod_con.register("u_df", df)
+        if prior_df is None or prior_df.empty:
+            import pandas as pd  # noqa: WPS433 — stdlib-equivalent for DuckDB
+            prior_df = pd.DataFrame(
+                columns=[
+                    "series_id", "prior_fund_strategy", "prior_fund_category",
+                ],
+            )
+        prod_con.register("p_df", prior_df)
         try:
             prod_con.execute(
                 """
@@ -1067,15 +1212,24 @@ class LoadNPortPipeline(SourcePipeline):
                     total_holdings_count, equity_pct, top10_concentration,
                     last_updated, fund_strategy, best_index
                 )
-                SELECT fund_cik, fund_name, series_id, family_name,
-                       total_net_assets, fund_category, is_actively_managed,
-                       total_holdings_count, equity_pct, top10_concentration,
-                       last_updated, fund_strategy, best_index
-                  FROM u_df
+                SELECT u.fund_cik, u.fund_name, u.series_id, u.family_name,
+                       u.total_net_assets,
+                       COALESCE(p.prior_fund_category, u.fund_category)
+                           AS fund_category,
+                       u.is_actively_managed,
+                       u.total_holdings_count, u.equity_pct,
+                       u.top10_concentration, u.last_updated,
+                       COALESCE(p.prior_fund_strategy, u.fund_strategy)
+                           AS fund_strategy,
+                       u.best_index
+                  FROM u_df u
+                  LEFT JOIN p_df p
+                         ON u.series_id = p.series_id
                 """
             )
         finally:
             prod_con.unregister("u_df")
+            prod_con.unregister("p_df")
         return len(df)
 
     def _bulk_enrich_run(

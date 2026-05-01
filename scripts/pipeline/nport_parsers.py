@@ -34,11 +34,31 @@ from lxml import etree
 
 NS = {"n": "http://www.sec.gov/edgar/nport"}
 
-# Index fund name patterns (excluded from active fund universe)
+# Index fund name patterns (excluded from active fund universe).
+#
+# Patterns extended in PR-2 (May 2026) to catch QQQ, Target Date funds, and
+# leveraged/inverse ETFs that bypassed the original keyword set. The original
+# set relied on explicit tokens like INDEX, S&P 500, Russell, NASDAQ; ~12+
+# named passive funds (Invesco QQQ Trust, Vanguard Target Retirement variants)
+# and 95 leveraged/inverse ETFs (ProShares, Direxion) carried no such token
+# and were silently classified as 'equity' or 'balanced'. The PR-2 additions
+# (QQQ, Target Retirement|Date, \dX, ProShares|ProFund|Direxion, Inverse)
+# close that gap. See docs/findings/classifier_patterns_results.md.
+#
+# PR-2 dry-run note: a bare \bUltra\b pattern was rejected after the dry-run
+# revealed false positives (American Century Ultra Fund, Wasatch Ultra Growth
+# Fund, Bridgeway Ultra-Small Company Fund). Matching the issuer brand
+# \bProShares\b is unambiguous because ProShares Trust is exclusively a
+# passive / leveraged-ETF family; every ProShares Ultra <Sector> and
+# UltraPro <Sector> fund is captured by that single token.
 INDEX_PATTERNS = re.compile(
     r"\b(index|idx|s&p\s*500|russell\s*\d|nasdaq|dow\s*jones|"
     r"total\s*(stock|bond|market)|wilshire|msci|ftse|"
-    r"barclays|aggregate|broad\s*market)\b",
+    r"barclays|aggregate|broad\s*market|"
+    # PR-2 additions:
+    r"qqq|target\s*retirement|target\s*date|"
+    r"\d+(?:\.\d+)?x|proshares|profund|direxion|"
+    r"daily\s*inverse|inverse)\b",
     re.IGNORECASE,
 )
 
