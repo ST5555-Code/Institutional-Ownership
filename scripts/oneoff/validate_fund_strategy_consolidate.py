@@ -52,11 +52,14 @@ def _resolve_db_path() -> Path:
 DB_PATH = _resolve_db_path()
 SMOKE_BASE = os.environ.get("PR3_SMOKE_BASE_URL", "http://localhost:8001")
 
-# Pre-migration baselines (captured 2026-05-01 before Phase 5).
+# Baselines refreshed 2026-05-01 after fund-cleanup-batch Phase 4c
+# (AMG Pantheon + AIP Alternative Lending Fund P reclassified to
+# bond_or_other; -2 active, +2 passive in fund_universe; -78 active in
+# fund_holdings_v2 latest). Original PR-3 baselines were 5620/8003/5236150.
 PRE_FUND_UNIVERSE_ROWS = 13623
-PRE_ACTIVE_FUND_UNIVERSE = 5620
-PRE_PASSIVE_FUND_UNIVERSE = 8003
-PRE_ACTIVE_HOLDINGS_LATEST = 5236150
+PRE_ACTIVE_FUND_UNIVERSE = 5618
+PRE_PASSIVE_FUND_UNIVERSE = 8005
+PRE_ACTIVE_HOLDINGS_LATEST = 5236072
 
 
 def section(title: str) -> None:
@@ -103,7 +106,7 @@ def run_db_checks(con: duckdb.DuckDBPyConnection) -> bool:
     section("active-filter parity — fund_universe")
     n_active = con.execute(
         "SELECT COUNT(*) FROM fund_universe "
-        "WHERE fund_strategy IN ('equity','balanced','multi_asset')"
+        "WHERE fund_strategy IN ('active','balanced','multi_asset')"
     ).fetchone()[0]
     n_passive = con.execute(
         "SELECT COUNT(*) FROM fund_universe "
@@ -130,7 +133,7 @@ def run_db_checks(con: duckdb.DuckDBPyConnection) -> bool:
         "SELECT COUNT(*) FROM fund_holdings_v2 fh "
         "JOIN fund_universe fu USING (series_id) "
         "WHERE fh.is_latest=TRUE "
-        "  AND fu.fund_strategy IN ('equity','balanced','multi_asset')"
+        "  AND fu.fund_strategy IN ('active','balanced','multi_asset')"
     ).fetchone()[0]
     all_ok &= check(
         "active holdings count matches pre-migration baseline",
