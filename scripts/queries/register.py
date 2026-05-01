@@ -27,7 +27,7 @@ from .common import (
     _quarter_to_date,
     _resolve_pct_of_so_denom,
     get_cusip,
-    _classify_fund_type,
+    _fund_type_label,
     match_nport_family,
     get_nport_coverage,
     get_nport_children_batch,
@@ -161,7 +161,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             nport_by_parent = get_nport_children_batch(parent_names, ticker, quarter, con, limit=5)
             for kids in nport_by_parent.values():
                 for k in kids:
-                    k['type'] = _classify_fund_type(k.get('institution'))
+                    k['type'] = _fund_type_label(k.get('fund_strategy'))
 
         # Build results — prefer N-PORT children, supplement with 13F entities
         results = []
@@ -1205,7 +1205,8 @@ def query16(ticker, quarter=LQ):
                 SUM(fh.market_value_usd) as value,
                 SUM(fh.shares_or_principal) as shares,
                 AVG(fh.pct_of_nav) as pct_of_nav,
-                MAX(fu.total_net_assets) / 1e6 as aum_mm
+                MAX(fu.total_net_assets) / 1e6 as aum_mm,
+                MAX(fu.fund_strategy) as fund_strategy
             FROM fund_holdings_v2 fh
             LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
             WHERE fh.ticker = ? AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
@@ -1226,7 +1227,7 @@ def query16(ticker, quarter=LQ):
             aum = int(aum_val) if aum_val and aum_val > 0 else None
             pct_of_nav = round(float(r['pct_of_nav']), 2) if r['pct_of_nav'] else None
             pct_so = round(shares * 100.0 / denom, 2) if denom and shares else None
-            fund_type = _classify_fund_type(fund_name)
+            fund_type = _fund_type_label(r.get('fund_strategy'))
 
             results.append({
                 'rank': rank,
@@ -1248,8 +1249,10 @@ def query16(ticker, quarter=LQ):
                 fh.fund_name,
                 SUM(fh.market_value_usd) as total_value,
                 SUM(fh.shares_or_principal) as total_shares,
-                AVG(fh.pct_of_nav) as pct_of_nav
+                AVG(fh.pct_of_nav) as pct_of_nav,
+                MAX(fu.fund_strategy) as fund_strategy
             FROM fund_holdings_v2 fh
+            LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
             WHERE fh.ticker = ? AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
             GROUP BY fh.fund_name, fh.series_id
         """, [ticker]).fetchdf()
@@ -1265,7 +1268,7 @@ def query16(ticker, quarter=LQ):
         # By-type totals
         type_totals = {}
         for _, trow in all_df.iterrows():
-            t = _classify_fund_type(trow['fund_name'])
+            t = _fund_type_label(trow.get('fund_strategy'))
             if t not in type_totals:
                 type_totals[t] = {'value_live': 0, 'shares': 0, 'pct_so': 0,
                                   'pct_of_so_source': None, 'count': 0}

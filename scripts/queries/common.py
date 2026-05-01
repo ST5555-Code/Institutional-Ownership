@@ -289,35 +289,21 @@ def get_nport_family_patterns():
 
 
 
-def _classify_fund_type(fund_name):
-    """Classify a fund as passive or active based on fund name keywords."""
-    if not fund_name:
+def _fund_type_label(fund_strategy):
+    """Map canonical fund_strategy values to display labels.
+
+    Single source of truth for fund-level type display across all endpoints.
+    Returns one of: 'active', 'passive', 'bond', 'excluded', 'unknown'.
+    """
+    if fund_strategy in ('equity', 'balanced', 'multi_asset'):
         return 'active'
-    name_upper = fund_name.upper()
-
-    # Direct keyword matches → passive
-    PASSIVE_KEYWORDS = [
-        'INDEX', 'ETF', 'MSCI', 'FTSE', 'STOXX', 'NIKKEI',
-        'TOTAL STOCK', 'TOTAL MARKET', 'TOTAL BOND', 'TOTAL INTERNATIONAL',
-        'BROAD MARKET', 'TRACKER',
-        'NASDAQ', 'DOW JONES', 'WILSHIRE',
-    ]
-    if any(kw in name_upper for kw in PASSIVE_KEYWORDS):
+    if fund_strategy == 'index':
         return 'passive'
-
-    # Index number + known index name → passive
-    # Catches "S&P 500", "Russell 1000", "Russell 2000", "Russell 3000"
-    INDEX_COMBOS = [
-        ('S&P', '500'), ('S&P', '400'), ('S&P', '600'), ('S&P', '100'),
-        ('RUSSELL', '1000'), ('RUSSELL', '2000'), ('RUSSELL', '3000'),
-        ('BLOOMBERG', '500'), ('BLOOMBERG', 'AGGREGATE'),
-        ('ALL', 'CAP INDEX'), ('ALL', 'CAP EQUITY INDEX'),
-    ]
-    for prefix, suffix in INDEX_COMBOS:
-        if prefix in name_upper and suffix in name_upper:
-            return 'passive'
-
-    return 'active'
+    if fund_strategy == 'bond_or_other':
+        return 'bond'
+    if fund_strategy in ('excluded', 'final_filing'):
+        return 'excluded'
+    return 'unknown'
 
 
 def match_nport_family(inst_parent_name):
@@ -520,7 +506,8 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
                 MAX(fh.shares_or_principal) AS shares,
                 MAX(fh.pct_of_nav) AS pct_of_nav,
                 fh.series_id,
-                MAX(fu.total_net_assets) / 1e6 AS aum_mm
+                MAX(fu.total_net_assets) / 1e6 AS aum_mm,
+                MAX(fu.fund_strategy) AS fund_strategy
             FROM parent_patterns pp
             JOIN fund_holdings_v2 fh ON fh.family_name ILIKE pp.pattern
             LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
@@ -557,6 +544,7 @@ def get_nport_children_batch(inst_parent_names, ticker, quarter, con, limit=5):
             'aum': aum,
             'pct_aum': pct_aum,
             'source': 'N-PORT',
+            'fund_strategy': r.get('fund_strategy'),
         })
     return result
 
@@ -586,7 +574,8 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
                 MAX(fh.shares_or_principal) as shares,
                 MAX(fh.pct_of_nav) as pct_of_nav,
                 fh.series_id,
-                MAX(fu.total_net_assets) / 1e6 as aum_mm
+                MAX(fu.total_net_assets) / 1e6 as aum_mm,
+                MAX(fu.fund_strategy) as fund_strategy
             FROM fund_holdings_v2 fh
             LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
             WHERE EXISTS (SELECT 1 FROM UNNEST([{ph}]) t(p) WHERE fh.family_name ILIKE t.p)
@@ -612,7 +601,8 @@ def get_nport_children(inst_parent_name, ticker, quarter, con, limit=5):
             result.append({'institution': r.get('fund_name'), 'value_live': r.get('value'),
                            'shares': shares, 'pct_so': pct_so,
                            'pct_of_so_source': denom_source if pct_so is not None else None,
-                           'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT'})
+                           'aum': aum, 'pct_aum': pct_aum, 'source': 'N-PORT',
+                           'fund_strategy': r.get('fund_strategy')})
         return result
     except Exception as e:
         logger.error("[get_nport_children] %s", e, exc_info=True)

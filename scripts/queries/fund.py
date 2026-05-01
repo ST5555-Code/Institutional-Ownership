@@ -7,6 +7,7 @@ from .common import (
     get_db,
     get_cusip,
     get_nport_children_batch,
+    _fund_type_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
             active_filter = "AND fu.is_actively_managed = true" if active_only else ""
             top_holders_df = con.execute(f"""
                 SELECT fh.fund_name as holder, SUM(fh.market_value_usd) as val,
-                       MAX(fu.is_actively_managed) as is_active
+                       MAX(fu.fund_strategy) as fund_strategy
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                 WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {active_filter} AND fh.is_latest = TRUE
@@ -274,7 +275,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
 
             # Type
             if level == 'fund':
-                row_type = 'active' if h_row.get('is_active') else 'passive'
+                row_type = _fund_type_label(h_row.get('fund_strategy'))
             else:
                 row_type = h_row.get('mtype') or 'unknown'
 
@@ -333,15 +334,15 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                     GROUP BY fh.fund_name, fh.ticker, m.sector, m.industry
                 """, list(all_child_funds)).fetchdf()
 
-                # Also need is_actively_managed per fund for child type
+                # Also need fund_strategy per fund for child type label
                 fund_meta_df = con.execute(f"""
-                    SELECT DISTINCT fh.fund_name, COALESCE(MAX(CAST(fu.is_actively_managed AS INTEGER)), 0) as is_active
+                    SELECT DISTINCT fh.fund_name, MAX(fu.fund_strategy) as fund_strategy
                     FROM fund_holdings_v2 fh
                     LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                     WHERE fh.fund_name IN ({ph_funds}) AND fh.quarter = '{quarter}' AND fh.is_latest = TRUE
                     GROUP BY fh.fund_name
                 """, list(all_child_funds)).fetchdf()
-                fund_is_active = {r['fund_name']: bool(r['is_active']) for _, r in fund_meta_df.iterrows()}
+                fund_strategy_map = {r['fund_name']: r['fund_strategy'] for _, r in fund_meta_df.iterrows()}
 
                 # Build results with children interleaved under each parent
                 new_results = []
@@ -362,7 +363,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                             # Child has no portfolio data — show with just position
                             new_results.append({
                                 'institution': fund_name,
-                                'type': 'active' if fund_is_active.get(fund_name, False) else 'passive',
+                                'type': _fund_type_label(fund_strategy_map.get(fund_name)),
                                 'value': subj_val,
                                 'subject_sector_pct': None,
                                 'vs_spx': None,
@@ -382,7 +383,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                         else:
                             new_results.append({
                                 'institution': fund_name,
-                                'type': 'active' if fund_is_active.get(fund_name, False) else 'passive',
+                                'type': _fund_type_label(fund_strategy_map.get(fund_name)),
                                 'value': kid_metrics['value'],
                                 'subject_sector_pct': kid_metrics['subject_sector_pct'],
                                 'vs_spx': kid_metrics['vs_spx'],

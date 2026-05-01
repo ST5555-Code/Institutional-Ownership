@@ -18,7 +18,7 @@ from .common import (
     _quarter_to_date,
     _resolve_pct_of_so_denom,
     get_cusip,
-    _classify_fund_type,
+    _fund_type_label,
     match_nport_family,
     _build_excl_clause,
 )
@@ -42,7 +42,8 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             # SQL-level filter via fund_universe.is_actively_managed (N21: fixed)
             af = "AND fu.is_actively_managed = true" if active_only else ""
             top_funds = con.execute(f"""
-                SELECT fh.fund_name, SUM(fh.market_value_usd) as val
+                SELECT fh.fund_name, SUM(fh.market_value_usd) as val,
+                       MAX(fu.fund_strategy) as fund_strategy
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                 WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {af} AND fh.is_latest = TRUE
@@ -80,8 +81,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 last_s = qshares.get(qs[-1], 0)
                 chg = last_s - first_s
                 chg_pct = round(chg / first_s * 100, 1) if first_s > 0 else None
-                # Name-based classification (matches type rendering elsewhere)
-                fund_type = _classify_fund_type(fn)
+                fund_type = _fund_type_label(frow.get('fund_strategy'))
                 row = {
                     'rank': rank,
                     'institution': fn,
@@ -178,11 +178,13 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                            fh.fund_name,
                            fh.quarter,
                            MAX(fh.shares_or_principal) AS shares,
-                           fh.series_id
+                           fh.series_id,
+                           MAX(fu.fund_strategy) AS fund_strategy
                       FROM parent_fund_map pfm
                       JOIN fund_holdings_v2 fh
                         ON fh.series_id = pfm.series_id
                        AND fh.quarter   = pfm.quarter
+                      LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id
                      WHERE pfm.rollup_entity_id IN ({eid_ph})
                        AND pfm.rollup_type = ?
                        AND fh.ticker = ?
@@ -214,16 +216,18 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                     lph = ','.join(['?'] * len(like_patterns))
                     excl_clause, excl_params = _build_excl_clause(patterns)
                     fund_df = con.execute(f"""
-                        SELECT fund_name, quarter,
-                               MAX(shares_or_principal) as shares,
-                               series_id
+                        SELECT fh.fund_name, fh.quarter,
+                               MAX(fh.shares_or_principal) as shares,
+                               fh.series_id,
+                               MAX(fu.fund_strategy) as fund_strategy
                         FROM fund_holdings_v2 fh
-                        WHERE EXISTS (SELECT 1 FROM UNNEST([{lph}]) t(p) WHERE family_name ILIKE t.p)
-                          AND ticker = ?
-                          AND quarter IN ({q_placeholders})
+                        LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id
+                        WHERE EXISTS (SELECT 1 FROM UNNEST([{lph}]) t(p) WHERE fh.family_name ILIKE t.p)
+                          AND fh.ticker = ?
+                          AND fh.quarter IN ({q_placeholders})
                           {excl_clause}
                           AND fh.is_latest = TRUE
-                        GROUP BY fund_name, quarter, series_id
+                        GROUP BY fh.fund_name, fh.quarter, fh.series_id
                     """, like_patterns + [ticker] + excl_params).fetchdf()
                 if fund_df is None or fund_df.empty:
                     return []
@@ -247,9 +251,13 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 for fn in top_funds:
                     frows = fund_df[fund_df['fund_name'] == fn]
                     qmap = {}
+                    fund_strategy = None
                     for _, fr in frows.iterrows():
                         qmap[fr['quarter']] = float(fr['shares'] or 0)
-                    children.append({'fund_name': fn, 'quarters': qmap})
+                        if fund_strategy is None and pd.notna(fr.get('fund_strategy')):
+                            fund_strategy = fr['fund_strategy']
+                    children.append({'fund_name': fn, 'quarters': qmap,
+                                     'fund_strategy': fund_strategy})
                 # Sort by latest quarter shares desc
                 children.sort(key=lambda c: c['quarters'].get(qs[-1], 0), reverse=True)
                 return children
@@ -292,7 +300,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                     c_pct = round(c_chg / c_first * 100, 1) if c_first > 0 else None
                     crow = {
                         'institution': child['fund_name'],
-                        'type': None,
+                        'type': _fund_type_label(child.get('fund_strategy')),
                         'is_parent': False,
                         'child_count': 0,
                         'level': 1,

@@ -10,6 +10,7 @@ from .common import (
     _rollup_col,
     _quarter_to_date,
     _resolve_pct_of_so_denom,
+    _fund_type_label,
 )
 
 
@@ -152,10 +153,8 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
     else:
         order_clause = '({}) DESC'.format(total_expr)
 
-    active_join = ""
     active_where = ""
     if active_only:
-        active_join = "LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id"
         active_where = "AND COALESCE(fu.is_actively_managed, TRUE) = TRUE"
 
     df = con.execute(f"""
@@ -163,11 +162,10 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
             SELECT
                 fh.fund_name AS investor,
                 fh.series_id,
-                MAX(fh.family_name) AS family_name,
                 fh.ticker,
                 SUM(fh.market_value_usd) AS holding_value
             FROM fund_holdings_v2 fh
-            {active_join}
+            LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id
             WHERE fh.ticker IN ({placeholders})
               AND fh.quarter = '{quarter}'
               AND fh.is_latest = TRUE
@@ -187,10 +185,11 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
         )
         SELECT
             fp.investor,
-            MAX(fp.family_name) AS family_name,
+            MAX(fu.fund_strategy) AS fund_strategy,
             ft.total_portfolio,
             {pivot_cols}
         FROM fund_pos fp
+        LEFT JOIN fund_universe fu ON fu.series_id = fp.series_id
         LEFT JOIN fund_totals ft ON ft.investor = fp.investor AND ft.series_id = fp.series_id
         GROUP BY fp.investor, fp.series_id, ft.total_portfolio
         ORDER BY {order_clause}
@@ -212,7 +211,7 @@ def _cross_ownership_fund_query(con, tickers, anchor=None, active_only=False, li
         pct = round(total_across / total_port * 100, 4) if total_port else None
         investors.append({
             'investor': row['investor'],
-            'type': row['family_name'] or 'fund',
+            'type': _fund_type_label(row['fund_strategy'] if pd.notna(row['fund_strategy']) else None),
             'holdings': ticker_holdings,
             'total_across': total_across if total_across > 0 else None,
             'pct_of_portfolio': pct,
@@ -250,7 +249,7 @@ def get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con):
             fh.fund_name,
             fh.series_id,
             fh.ticker,
-            fu.is_actively_managed AS is_active,
+            fu.fund_strategy AS fund_strategy,
             SUM(fh.market_value_usd) AS value,
             SUM(fh.shares_or_principal) AS shares
         FROM fund_holdings_v2 fh
@@ -260,18 +259,18 @@ def get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con):
           AND (fh.dm_rollup_name = ? OR fh.family_name = ?)
           AND fh.ticker IN ({placeholders})
           AND fh.market_value_usd > 0
-        GROUP BY fh.fund_name, fh.series_id, fh.ticker, fu.is_actively_managed
+        GROUP BY fh.fund_name, fh.series_id, fh.ticker, fu.fund_strategy
     """, params).fetchall()
 
     # Group by (fund_name, series_id) → per-ticker positions
     funds_dict: dict = {}
-    for fund_name, series_id, ticker, is_active, value, shares in rows:
+    for fund_name, series_id, ticker, fund_strategy, value, shares in rows:
         key = (fund_name, series_id)
         if key not in funds_dict:
             funds_dict[key] = {
                 'fund_name': fund_name,
                 'series_id': series_id,
-                'is_active': is_active,
+                'fund_strategy': fund_strategy,
                 'positions': {},
                 'total_value': 0.0,
             }
@@ -288,12 +287,7 @@ def get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con):
 
     funds = []
     for f in sorted_funds:
-        is_active = f['is_active']
-        type_label = (
-            'active' if is_active is True
-            else 'passive' if is_active is False
-            else 'mixed'
-        )
+        type_label = _fund_type_label(f['fund_strategy'])
         funds.append({
             'fund_name': f['fund_name'],
             'series_id': f['series_id'],
@@ -530,7 +524,7 @@ def get_overlap_institution_detail(subject, second, institution, quarter, con):
             f.fund_name,
             f.series_id,
             f.family_name,
-            fu.is_actively_managed AS is_active,
+            fu.fund_strategy AS fund_strategy,
             COALESCE(sp.value, 0) AS value_a,
             COALESCE(xp.value, 0) AS value_b
         FROM inst_funds f
@@ -546,16 +540,12 @@ def get_overlap_institution_detail(subject, second, institution, quarter, con):
     ticker_a_only = []
     ticker_b_only = []
     for r in rows:
-        fund_name, series_id, family_name, is_active, value_a, value_b = r
+        fund_name, series_id, family_name, fund_strategy, value_a, value_b = r
         va = float(value_a) if value_a is not None else 0.0
         vb = float(value_b) if value_b is not None else 0.0
         if va <= 0 and vb <= 0:
             continue
-        type_label = (
-            'active' if is_active is True
-            else 'passive' if is_active is False
-            else 'mixed'
-        )
+        type_label = _fund_type_label(fund_strategy)
         if va > 0 and vb > 0:
             overlapping.append({
                 'fund_name': fund_name,
