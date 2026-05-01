@@ -1,0 +1,254 @@
+series_id,fund_name,family_name,current_fund_strategy,proposed_fund_strategy,total_net_assets,triggering_pattern
+S000101292,"Invesco QQQ Trust, Series 1","Invesco QQQ Trust, Series 1",equity,passive,407693673462.84,qqq
+S000002573,VANGUARD TARGET RETIREMENT 2035 FUND,VANGUARD CHESTER FUNDS,equity,passive,119365651112.19,target_retirement
+S000012761,VANGUARD TARGET RETIREMENT 2040 FUND,VANGUARD CHESTER FUNDS,equity,passive,109141754748.04,target_retirement
+S000002574,VANGUARD TARGET RETIREMENT 2045 FUND,VANGUARD CHESTER FUNDS,equity,passive,108994613592.05,target_retirement
+S000012760,VANGUARD TARGET RETIREMENT 2030 FUND,VANGUARD CHESTER FUNDS,equity,passive,108935139126.93,target_retirement
+S000012762,VANGUARD TARGET RETIREMENT 2050 FUND,VANGUARD CHESTER FUNDS,equity,passive,95999017635.83,target_retirement
+S000002572,VANGUARD TARGET RETIREMENT 2025 FUND,VANGUARD CHESTER FUNDS,equity,passive,76514313516.96,target_retirement
+S000029700,VANGUARD TARGET RETIREMENT 2055 FUND,VANGUARD CHESTER FUNDS,equity,passive,66885018922.69,target_retirement
+S000015560,American Funds 2035 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,55360456168.34,target_date
+S000015559,American Funds 2030 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,52776346490.63,target_date
+S000015561,American Funds 2040 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,52228943556.0,target_date
+S000015562,American Funds 2045 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,45763967353.14,target_date
+S000015563,American Funds 2050 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,41471102953.73,target_date
+S000035453,VANGUARD TARGET RETIREMENT 2060 FUND,VANGUARD CHESTER FUNDS,equity,passive,40109759469.36,target_retirement
+S000002569,VANGUARD TARGET RETIREMENT INCOME FUND,VANGUARD CHESTER FUNDS,equity,passive,36132702458.14,target_retirement
+S000012759,VANGUARD TARGET RETIREMENT 2020 FUND,VANGUARD CHESTER FUNDS,equity,passive,35224685897.5,target_retirement
+S000015558,American Funds 2025 Target Date Retirement Income Fund,American Funds Target Date Retirement Series,equity,passive,32379858236.21,target_date
+S000027236,American Funds 2055 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,30185413096.85,target_date
+S000024908,ProShares UltraPro QQQ,ProShares Trust,multi_asset,passive,27316016534.29,qqq
+S000047903,American Funds 2060 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,19476181741.22,target_date
+S000015557,American Funds 2020 Target Date Retirement Income Fund,American Funds Target Date Retirement Series,equity,passive,14874362199.07,target_date
+S000056748,VANGUARD TARGET RETIREMENT 2065 FUND,VANGUARD CHESTER FUNDS,equity,passive,13754603440.83,target_retirement
+S000027920,Direxion Daily Semiconductor Bull 3X Shares,Direxion Shares ETF Trust,multi_asset,passive,12059334515.01,leveraged_digit_x
+S000006827,ProShares Ultra QQQ,ProShares Trust,balanced,passive,9863934193.39,qqq
+S000067479,American Funds 2065 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,6447123854.74,target_date
+S000015556,American Funds 2015 Target Date Retirement Income Fund,American Funds Target Date Retirement Series,equity,passive,4680700593.57,target_date
+S000015555,American Funds 2010 Target Date Retirement Income Fund,American Funds Target Date Retirement Series,equity,passive,3879256693.26,target_date
+S000023809,Direxion Daily Technology Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,3860084552.56,leveraged_digit_x
+S000046038,State Street Target Retirement 2035 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,3521725695.83,target_retirement
+S000046037,State Street Target Retirement 2030 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,3344922513.44,target_retirement
+S000046039,State Street Target Retirement 2040 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,3311103583.29,target_retirement
+S000046040,State Street Target Retirement 2045 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,3091371243.69,target_retirement
+S000046023,State Street Target Retirement 2050 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,2682379788.5,target_retirement
+S000075611,VANGUARD TARGET RETIREMENT 2070 FUND,VANGUARD CHESTER FUNDS,equity,passive,2456912672.86,target_retirement
+S000022761,Direxion Daily Financial Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,2357126867.76,leveraged_digit_x
+S000046024,State Street Target Retirement 2055 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,2089907679.07,target_retirement
+S000046036,State Street Target Retirement 2025 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,1921553078.35,target_retirement
+S000014258,ProShares Ultra Semiconductors,ProShares Trust,multi_asset,passive,1662808962.21,proshares
+S000022786,Direxion Daily Small Cap Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,1583002536.67,leveraged_digit_x
+S000046025,State Street Target Retirement 2060 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,1520522741.09,target_retirement
+S000046033,State Street Target Retirement Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,1492648560.46,target_retirement
+S000003066,ULTRANASDAQ-100 PROFUND,ProFunds,balanced,passive,1171239557.32,profund
+S000046035,State Street Target Retirement 2020 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,897792889.97,target_retirement
+S000014260,ProShares Ultra Technology,ProShares Trust,balanced,passive,760943307.29,proshares
+S000024918,ProShares UltraPro Dow30,ProShares Trust,balanced,passive,753860087.79,proshares
+S000014252,ProShares Ultra Financials,ProShares Trust,balanced,passive,703158891.37,proshares
+S000029341,Direxion Daily Regional Banks Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,586876935.02,leveraged_digit_x
+S000049373,Direxion Daily S&P Biotech Bull 3X Shares,Direxion Shares ETF Trust,multi_asset,passive,576365747.91,leveraged_digit_x
+S000067189,American Funds IS 2010 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,561957989.49,target_date
+S000003096,SEMICONDUCTOR ULTRASECTOR PROFUND,ProFunds,balanced,passive,550855735.33,profund
+S000022763,Direxion Daily Homebuilders & Supplies Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,544080013.08,leveraged_digit_x
+S000067360,State Street Target Retirement 2065 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,524256090.26,target_retirement
+S000006826,ProShares Ultra Dow30,ProShares Trust,balanced,passive,509169011.19,proshares
+S000083553,American Funds 2070 Target Date Retirement Fund,American Funds Target Date Retirement Series,equity,passive,488734786.35,target_date
+S000057185,Direxion Daily Aerospace & Defense Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,483911644.14,leveraged_digit_x
+S000020962,ProShares Large Cap Core Plus,ProShares Trust,equity,passive,482800342.37,proshares
+S000024921,ProShares UltraPro Russell2000,ProShares Trust,multi_asset,passive,339486013.84,proshares
+S000003958,PROFUND VP ULTRANASDAQ-100,ProFunds,balanced,passive,303411105.78,profund
+S000014248,ProShares Ultra Russell2000,ProShares Trust,balanced,passive,282497219.34,proshares
+S000022760,Direxion Daily Energy Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,271222232.53,leveraged_digit_x
+S000039455,VOYA TARGET RETIREMENT 2035 FUND,Voya Separate Portfolios Trust,equity,passive,262190520.49,target_retirement
+S000049375,Direxion Daily S&P Oil & Gas Exp. & Prod. Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,259836177.49,leveraged_digit_x
+S000050929,DIMENSIONAL 2045 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,229789667.69,target_date
+S000039457,VOYA TARGET RETIREMENT 2045 FUND,Voya Separate Portfolios Trust,equity,passive,227333099.74,target_retirement
+S000050930,DIMENSIONAL 2050 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,200359004.61,target_date
+S000050940,DIMENSIONAL 2040 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,199837952.6,target_date
+S000039454,VOYA TARGET RETIREMENT 2030 FUND,Voya Separate Portfolios Trust,equity,passive,196849420.74,target_retirement
+S000050939,DIMENSIONAL 2035 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,191862314.86,target_date
+S000003107,BIOTECHNOLOGY ULTRASECTOR PROFUND,ProFunds,balanced,passive,177372784.88,profund
+S000003062,ULTRABULL PROFUND,ProFunds,balanced,passive,172211446.83,profund
+S000027486,Direxion Daily Healthcare Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,164922804.5,leveraged_digit_x
+S000039459,VOYA TARGET RETIREMENT 2055 FUND,Voya Separate Portfolios Trust,equity,passive,158255865.03,target_retirement
+S000050938,DIMENSIONAL 2030 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,155170612.16,target_date
+S000039453,VOYA TARGET RETIREMENT 2025 FUND,Voya Separate Portfolios Trust,equity,passive,152253031.53,target_retirement
+S000006825,ProShares Ultra MidCap400,ProShares Trust,balanced,passive,151570331.76,proshares
+S000039456,VOYA TARGET RETIREMENT 2040 FUND,Voya Separate Portfolios Trust,equity,passive,147182939.2,target_retirement
+S000050931,DIMENSIONAL 2055 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,144690769.89,target_date
+S000067190,American Funds IS 2015 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,137297674.41,target_date
+S000003094,PRECIOUS METALS ULTRASECTOR PROFUND,ProFunds,balanced,passive,133340586.53,profund
+S000039458,VOYA TARGET RETIREMENT 2050 FUND,Voya Separate Portfolios Trust,equity,passive,120492124.46,target_retirement
+S000050932,DIMENSIONAL 2060 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,119362219.09,target_date
+S000050937,DIMENSIONAL 2025 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,116171560.75,target_date
+S000071020,Direxion Daily NYSE FANG+ Bull 2X Shares,Direxion Shares ETF Trust,multi_asset,passive,111485797.2,leveraged_digit_x
+S000084217,Direxion Daily Magnificent 7 Bull 2X Shares,Direxion Shares ETF Trust,multi_asset,passive,108523545.8,leveraged_digit_x
+S000014255,ProShares Ultra Energy,ProShares Trust,balanced,passive,94371985.42,proshares
+S000003097,TECHNOLOGY ULTRASECTOR PROFUND,ProFunds,balanced,passive,93969391.24,profund
+S000014253,ProShares Ultra Health Care,ProShares Trust,balanced,passive,93291159.84,proshares
+S000003092,INTERNET ULTRASECTOR PROFUND,ProFunds,balanced,passive,83257457.49,profund
+S000022778,Direxion Daily Mid Cap Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,76180903.83,leveraged_digit_x
+S000085277,Direxion Daily Uranium Industry Bull 2X Shares,Direxion Shares ETF Trust,multi_asset,passive,76021667.15,leveraged_digit_x
+S000003978,PROFUND VP SEMICONDUCTOR,ProFunds,equity,passive,72682704.14,profund
+S000051229,VOYA TARGET RETIREMENT 2060 FUND,Voya Separate Portfolios Trust,equity,passive,68550677.57,target_retirement
+S000055695,PGIM Target Date 2030 Fund,Prudential Investment Portfolios 5,equity,passive,62004164.52,target_date
+S000014257,ProShares Ultra Real Estate,ProShares Trust,balanced,passive,58884531.98,proshares
+S000050936,DIMENSIONAL 2020 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,57902892.79,target_date
+S000087785,State Street Target Retirement 2070 Fund,STATE STREET INSTITUTIONAL INVESTMENT TRUST,equity,passive,57674388.62,target_retirement
+S000055696,PGIM Target Date 2035 Fund,Prudential Investment Portfolios 5,equity,passive,56497582.93,target_date
+S000012142,Russell 2000 2x Strategy Fund,Rydex Dynamic Funds,multi_asset,passive,54607215.29,leveraged_digit_x
+S000019111,Madison Target Retirement 2030 Fund,ULTRA SERIES FUND,equity,passive,54339131.49,target_retirement
+S000022762,Direxion Daily Real Estate Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,53663779.27,leveraged_digit_x
+S000003064,ULTRA SMALL CAP PROFUND,ProFunds,balanced,passive,53076726.56,profund
+S000003059,BULL PROFUND,ProFunds,balanced,passive,50834321.52,profund
+S000014313,ProShares Ultra Materials,ProShares Trust,balanced,passive,50076515.04,proshares
+S000027476,Direxion Daily Utilities Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,49928118.95,leveraged_digit_x
+S000055697,PGIM Target Date 2040 Fund,Prudential Investment Portfolios 5,equity,passive,49277313.82,target_date
+S000055694,PGIM Target Date 2025 Fund,Prudential Investment Portfolios 5,equity,passive,48706705.81,target_date
+S000003961,PROFUND VP BULL,ProFunds,balanced,passive,48188068.5,profund
+S000003979,PROFUND VP TECHNOLOGY,ProFunds,equity,passive,48029103.82,profund
+S000067428,Dimensional 2065 Target Date Retirement Income Fund,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,44556437.96,target_date
+S000003705,Dow 2x Strategy Fund,Rydex Dynamic Funds,equity,passive,43298063.19,leveraged_digit_x
+S000003065,ULTRA DOW 30 PROFUND,ProFunds,balanced,passive,42466713.8,profund
+S000003965,PROFUND VP BIOTECHNOLOGY,ProFunds,equity,passive,41177139.32,profund
+S000019112,Madison Target Retirement 2040 Fund,ULTRA SERIES FUND,equity,passive,40715899.11,target_retirement
+S000057187,Direxion Daily Industrials Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,40295672.32,leveraged_digit_x
+S000003987,PROFUND VP LARGE CAP GROWTH,ProFunds,equity,passive,39008777.29,profund
+S000067193,American Funds IS 2030 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,38730008.4,target_date
+S000003063,ULTRA MID CAP PROFUND,ProFunds,balanced,passive,38448971.34,profund
+S000003112,HEALTH CARE ULTRASECTOR PROFUND,ProFunds,balanced,passive,37873747.07,profund
+S000003970,PROFUND VP FINANCIALS,ProFunds,equity,passive,37022399.57,profund
+S000055698,PGIM Target Date 2045 Fund,Prudential Investment Portfolios 5,equity,passive,36915304.19,target_date
+S000008851,PROFUND VP EMERGING MARKETS,ProFunds,equity,passive,35855233.69,profund
+S000003100,COMMUNICATION SERVICES ULTRASECTOR PROFUND,ProFunds,balanced,passive,35811764.11,profund
+S000003971,PROFUND VP HEALTH CARE,ProFunds,equity,passive,34597766.55,profund
+S000030254,Madison Target Retirement 2050 Fund,ULTRA SERIES FUND,equity,passive,34393094.37,target_retirement
+S000003102,MATERIALS ULTRASECTOR PROFUND,ProFunds,balanced,passive,34266430.59,profund
+S000014254,ProShares Ultra Industrials,ProShares Trust,balanced,passive,33982291.1,proshares
+S000055693,PGIM Target Date 2020 Fund,Prudential Investment Portfolios 5,equity,passive,33505199.1,target_date
+S000024920,ProShares UltraPro MidCap400,ProShares Trust,balanced,passive,32863917.89,proshares
+S000067191,American Funds IS 2020 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,32721211.78,target_date
+S000027487,Direxion Daily Retail Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,32712980.51,leveraged_digit_x
+S000003981,PROFUND VP UTILITIES,ProFunds,equity,passive,32593705.23,profund
+S000083879,Direxion Daily AI and Big Data Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,31060588.16,leveraged_digit_x
+S000003969,PROFUND VP ENERGY,ProFunds,equity,passive,29637623.64,profund
+S000090187,ProShares Ultra QQQ Mega,ProShares Trust,balanced,passive,29169062.43,qqq
+S000055691,PGIM Target Date Income Fund,Prudential Investment Portfolios 5,equity,passive,28531625.01,target_date
+S000056591,Natixis Target Retirement 2050 Fund,Natixis Funds Trust IV,equity,passive,27103221.48,target_retirement
+S000003108,CONSUMER DISCRETIONARY ULTRASECTOR PROFUND,ProFunds,balanced,passive,26201477.86,profund
+S000056590,Natixis Target Retirement 2045 Fund,Natixis Funds Trust IV,equity,passive,26200468.17,target_retirement
+S000020739,ULTRACHINA PROFUND,ProFunds,balanced,passive,26187441.46,profund
+S000068488,VOYA TARGET RETIREMENT 2065 FUND,Voya Separate Portfolios Trust,equity,passive,26099976.1,target_retirement
+S000056589,Natixis Target Retirement 2040 Fund,Natixis Funds Trust IV,balanced,passive,26025507.01,target_retirement
+S000014259,ProShares Ultra SmallCap600,ProShares Trust,balanced,passive,24722715.91,proshares
+S000055699,PGIM Target Date 2050 Fund,Prudential Investment Portfolios 5,equity,passive,24303158.46,target_date
+S000067192,American Funds IS 2025 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,24018479.26,target_date
+S000027484,Direxion Daily Consumer Discretionary Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,23221555.04,leveraged_digit_x
+S000003955,PROFUND VP ULTRABULL,ProFunds,balanced,passive,22720995.18,profund
+S000056592,Natixis Target Retirement 2055 Fund,Natixis Funds Trust IV,equity,passive,22658104.48,target_retirement
+S000050935,DIMENSIONAL 2015 TARGET DATE RETIREMENT INCOME FUND,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,22186759.68,target_date
+S000067194,American Funds IS 2035 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,20891965.74,target_date
+S000003967,PROFUND VP CONSUMER DISCRETIONARY,ProFunds,equity,passive,19607860.63,profund
+S000003072,LARGE-CAP GROWTH PROFUND,ProFunds,equity,passive,19390469.26,profund
+S000003952,PROFUND VP ASIA 30,ProFunds,balanced,passive,19234427.64,profund
+S000080323,American Funds IS 2040 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,18936581.63,target_date
+S000003990,PROFUND VP SMALLCAP VALUE,ProFunds,equity,passive,18865024.62,profund
+S000056588,Natixis Target Retirement 2035 Fund,Natixis Funds Trust IV,balanced,passive,18413351.64,target_retirement
+S000056584,Natixis Target Retirement 2060 Fund,Natixis Funds Trust IV,equity,passive,18210086.2,target_retirement
+S000003110,ENERGY ULTRASECTOR PROFUND,ProFunds,balanced,passive,18138832.07,profund
+S000050532,Direxion Daily Pharmaceutical & Medical Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,17933256.35,leveraged_digit_x
+S000004473,OIL & GAS EQUIPMENT & SERVICES ULTRASECTOR PROFUND,ProFunds,balanced,passive,17926478.55,profund
+S000008839,ULTRAEMERGING MARKETS PROFUND,ProFunds,balanced,passive,17905444.72,profund
+S000003953,PROFUND VP EUROPE 30,ProFunds,equity,passive,17173720.8,profund
+S000056587,Natixis Target Retirement 2030 Fund,Natixis Funds Trust IV,balanced,passive,17024793.9,target_retirement
+S000014262,ProShares Ultra Utilities,ProShares Trust,balanced,passive,16860444.1,proshares
+S000003973,PROFUND VP INDUSTRIALS,ProFunds,equity,passive,16754430.88,profund
+S000080324,American Funds IS 2045 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,16574048.23,target_date
+S000012879,ULTRALATIN AMERICA PROFUND,ProFunds,balanced,passive,16352109.17,profund
+S000080310,Fidelity Sustainable Target Date 2040 Fund,Fidelity Aberdeen Street Trust,equity,passive,15689403.15,target_date
+S000003951,PROFUND VP SMALLCAP GROWTH,ProFunds,equity,passive,15617938.85,profund
+S000003986,PROFUND VP LARGE CAP VALUE,ProFunds,equity,passive,15508702.9,profund
+S000080300,Fidelity Sustainable Target Date 2050 Fund,Fidelity Aberdeen Street Trust,equity,passive,15174765.6,target_date
+S000003957,PROFUND VP ULTRA SMALL CAP,ProFunds,balanced,passive,14957855.34,profund
+S000003690,Inverse Government Long Bond Strategy Fund,Rydex Series Funds,multi_asset,passive,14728958.91,inverse
+S000057169,Direxion Daily Transportation Bull 3X Shares,Direxion Shares ETF Trust,balanced,passive,14420891.21,leveraged_digit_x
+S000014250,ProShares Ultra Consumer Staples,ProShares Trust,balanced,passive,14401655.54,proshares
+S000003980,PROFUND VP COMMUNICATION SERVICES,ProFunds,equity,passive,14235216.4,profund
+S000014261,ProShares Ultra Communication Services,ProShares Trust,balanced,passive,13813531.27,proshares
+S000003685,Mid-Cap 1.5x Strategy Fund,Rydex Series Funds,balanced,passive,13633719.3,leveraged_digit_x
+S000003989,PROFUND VP MIDCAP GROWTH,ProFunds,equity,passive,13594463.77,profund
+S000014251,ProShares Ultra Consumer Discretionary,ProShares Trust,equity,passive,13553940.76,proshares
+S000003974,PROFUND VP INTERNET,ProFunds,equity,passive,13264900.11,profund
+S000055689,PGIM Target Date 2055 Fund,Prudential Investment Portfolios 5,equity,passive,13152781.29,target_date
+S000055690,PGIM Target Date 2060 Fund,Prudential Investment Portfolios 5,equity,passive,12833884.72,target_date
+S000080311,Fidelity Sustainable Target Date 2045 Fund,Fidelity Aberdeen Street Trust,equity,passive,12831619.69,target_date
+S000080308,Fidelity Sustainable Target Date 2030 Fund,Fidelity Aberdeen Street Trust,equity,passive,12327063.01,target_date
+S000003966,PROFUND VP MATERIALS,ProFunds,equity,passive,11719377.87,profund
+S000080301,Fidelity Sustainable Target Date 2055 Fund,Fidelity Aberdeen Street Trust,equity,passive,11436898.36,target_date
+S000080325,American Funds IS 2050 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,11382619.13,target_date
+S000018291,Emerging Markets 2x Strategy Fund,Rydex Series Funds,multi_asset,passive,10983001.31,leveraged_digit_x
+S000019110,Madison Target Retirement 2020 Fund,ULTRA SERIES FUND,equity,passive,10965212.23,target_retirement
+S000003972,PROFUND VP SMALL CAP,ProFunds,multi_asset,passive,10824793.67,profund
+S000080309,Fidelity Sustainable Target Date 2035 Fund,Fidelity Aberdeen Street Trust,equity,passive,10799383.45,target_date
+S000003113,INDUSTRIALS ULTRASECTOR PROFUND,ProFunds,balanced,passive,10682142.87,profund
+S000003968,PROFUND VP CONSUMER STAPLES,ProFunds,equity,passive,10578498.73,profund
+S000003975,PROFUND VP PHARMACEUTICALS,ProFunds,equity,passive,10489702.19,profund
+S000003988,PROFUND VP MIDCAP VALUE,ProFunds,equity,passive,10294453.86,profund
+S000003099,UTILITIES ULTRASECTOR PROFUND,ProFunds,balanced,passive,10162462.22,profund
+S000003956,PROFUND VP ULTRAMID CAP,ProFunds,balanced,passive,9403832.86,profund
+S000080302,Fidelity Sustainable Target Date 2060 Fund,Fidelity Aberdeen Street Trust,equity,passive,9358063.62,target_date
+S000003068,MID-CAP PROFUND,ProFunds,balanced,passive,9286709.35,profund
+S000003074,MID-CAP GROWTH PROFUND,ProFunds,equity,passive,9136996.59,profund
+S000007044,Direxion Monthly Small Cap Bull 1.75X Fund,Direxion Funds,balanced,passive,8840583.23,leveraged_digit_x
+S000003091,BANKS ULTRASECTOR PROFUND,ProFunds,balanced,passive,8811690.3,profund
+S000003697,Russell 2000 1.5x Strategy Fund,Rydex Series Funds,balanced,passive,8443199.78,leveraged_digit_x
+S000070706,Direxion Daily Cloud Computing Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,8375666.09,leveraged_digit_x
+S000003109,CONSUMER STAPLES ULTRASECTOR PROFUND,ProFunds,balanced,passive,8359091.78,profund
+S000003111,FINANCIALS ULTRASECTOR PROFUND,ProFunds,balanced,passive,7566448.32,profund
+S000003069,SMALL-CAP PROFUND,ProFunds,multi_asset,passive,7507747.94,profund
+S000056586,Natixis Target Retirement 2025 Fund,Natixis Funds Trust IV,balanced,passive,7273917.86,target_retirement
+S000072081,Direxion Daily Travel & Vacation Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,7010726.52,leveraged_digit_x
+S000003753,Dow 2x Strategy Fund,Rydex Variable Trust,balanced,passive,6934257.91,leveraged_digit_x
+S000003075,SMALL-CAP VALUE PROFUND,ProFunds,equity,passive,6889182.42,profund
+S000080326,American Funds IS 2055 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,6714761.28,target_date
+S000085285,SP Funds 2040 Target Date Fund,SP Funds Trust,equity,passive,6531838.43,target_date
+S000080303,Fidelity Sustainable Target Date 2065 Fund,Fidelity Aberdeen Street Trust,equity,passive,6120563.86,target_date
+S000078170,Direxion Daily Crypto Industry Bull 2X Shares,Direxion Shares ETF Trust,balanced,passive,6097117.89,leveraged_digit_x
+S000003061,EUROPE 30 PROFUND,ProFunds,equity,passive,5672359.34,profund
+S000085284,SP Funds 2030 Target Date Fund,SP Funds Trust,equity,passive,5568385.92,target_date
+S000003071,LARGE-CAP VALUE PROFUND,ProFunds,equity,passive,5137661.22,profund
+S000075767,Direxion Daily Electric and Autonomous Vehicles Bull 2X Shares,Direxion Shares ETF Trust,multi_asset,passive,5053932.77,leveraged_digit_x
+S000003977,PROFUND VP REAL ESTATE,ProFunds,equity,passive,4983117.23,profund
+S000080306,Fidelity Sustainable Target Date 2020 Fund,Fidelity Aberdeen Street Trust,equity,passive,4811099.04,target_date
+S000085286,SP Funds 2050 Target Date Fund,SP Funds Trust,equity,passive,4622556.01,target_date
+S000080307,Fidelity Sustainable Target Date 2025 Fund,Fidelity Aberdeen Street Trust,equity,passive,4614676.4,target_date
+S000074738,Natixis Target Retirement 2065 Fund,Natixis Funds Trust IV,equity,passive,4556255.93,target_retirement
+S000003964,PROFUND VP BANKS,ProFunds,equity,passive,4486507.1,profund
+S000056585,Natixis Target Retirement 2020 Fund,Natixis Funds Trust IV,balanced,passive,4433281.24,target_retirement
+S000003093,PHARMACEUTICALS ULTRASECTOR PROFUND,ProFunds,balanced,passive,3783026.27,profund
+S000003060,SMALL-CAP GROWTH PROFUND,ProFunds,equity,passive,3778196.29,profund
+S000056583,Natixis Target Retirement 2015 Fund,Natixis Funds Trust IV,balanced,passive,3611378.49,target_retirement
+S000003727,Mid-Cap 1.5x Strategy Fund,Rydex Variable Trust,balanced,passive,3600494.26,leveraged_digit_x
+S000052787,Direxion Monthly High Yield Bull 1.2X Fund,Direxion Funds,equity,passive,3513582.11,leveraged_digit_x
+S000091945,Voya Target Retirement 2070 Fund,Voya Separate Portfolios Trust,equity,passive,3423479.97,target_retirement
+S000003095,REAL ESTATE ULTRASECTOR PROFUND,ProFunds,balanced,passive,2991376.19,profund
+S000003728,Russell 2000 1.5x Strategy Fund,Rydex Variable Trust,balanced,passive,2830890.12,leveraged_digit_x
+S000003749,Europe 1.25x Strategy Fund,Rydex Variable Trust,balanced,passive,2719555.77,leveraged_digit_x
+S000083881,Direxion Daily MSCI Emerging Markets ex China Bull 2X Shares,Direxion Shares ETF Trust,multi_asset,passive,2632849.02,leveraged_digit_x
+S000003073,MID-CAP VALUE PROFUND,ProFunds,equity,passive,2253573.22,profund
+S000003695,Europe 1.25x Strategy Fund,Rydex Series Funds,multi_asset,passive,2201465.06,leveraged_digit_x
+S000067274,PGIM Target Date 2065 Fund,Prudential Investment Portfolios 5,equity,passive,1988488.64,target_date
+S000085464,Fidelity Sustainable Target Date 2070 Fund,Fidelity Aberdeen Street Trust,equity,passive,1455975.85,target_date
+S000080305,Fidelity Sustainable Target Date 2015 Fund,Fidelity Aberdeen Street Trust,equity,passive,1449815.84,target_date
+S000080299,Fidelity Sustainable Target Date Retirement Fund,Fidelity Aberdeen Street Trust,equity,passive,1427229.77,target_date
+S000084732,American Funds IS 2070 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,1390074.71,target_date
+S000003735,Inverse Government Long Bond Strategy Fund,Rydex Variable Trust,multi_asset,passive,1334417.45,inverse
+S000080304,Fidelity Sustainable Target Date 2010 Fund,Fidelity Aberdeen Street Trust,equity,passive,1266557.32,target_date
+S000003772,Inverse Russell 2000 Strategy Fund,Rydex Series Funds,balanced,passive,1167563.97,inverse
+S000089405,Dimensional 2070 Target Date Retirement Income Fund,DFA INVESTMENT DIMENSIONS GROUP INC,equity,passive,864499.73,target_date
+S000080327,American Funds IS 2060 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,785109.21,target_date
+S000015882,Inverse High Yield Strategy Fund,Rydex Series Funds,balanced,passive,584905.63,inverse
+S000080328,American Funds IS 2065 Target Date Fund,AMERICAN FUNDS INSURANCE SERIES,equity,passive,340188.98,target_date
+S000003746,Inverse Russell 2000 Strategy Fund,Rydex Variable Trust,multi_asset,passive,202824.21,inverse
+S000003745,Inverse Mid-Cap Strategy Fund,Rydex Variable Trust,multi_asset,passive,111052.68,inverse
+S000089025,PGIM Target Date 2070 Fund,Prudential Investment Portfolios 5,equity,passive,76083.36,target_date
