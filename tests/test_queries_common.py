@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 def test_active_fund_strategies_value():
     from queries.common import ACTIVE_FUND_STRATEGIES
-    assert ACTIVE_FUND_STRATEGIES == ('equity', 'balanced', 'multi_asset')
+    assert ACTIVE_FUND_STRATEGIES == ('active', 'balanced', 'multi_asset')
 
 
 def test_passive_fund_strategies_value():
@@ -27,7 +27,7 @@ def test_passive_fund_strategies_value():
 def test_partitions_cover_all_canonical_values_with_no_overlap():
     from queries.common import ACTIVE_FUND_STRATEGIES, PASSIVE_FUND_STRATEGIES
     canonical = {
-        'equity', 'balanced', 'multi_asset',
+        'active', 'balanced', 'multi_asset',
         'passive', 'bond_or_other', 'excluded', 'final_filing',
     }
     active = set(ACTIVE_FUND_STRATEGIES)

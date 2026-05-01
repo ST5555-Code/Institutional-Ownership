@@ -290,15 +290,18 @@ def get_nport_family_patterns():
 
 
 # ---------------------------------------------------------------------------
-# Canonical fund_strategy partitions (PR-3)
+# Canonical fund_strategy partitions (PR-3, value rename PR-4)
 # ---------------------------------------------------------------------------
 # Single source of truth for the active/passive split at the fund layer.
 # Replaces six+ hardcoded inclusion lists across query files and the
 # now-dropped `fund_universe.is_actively_managed` boolean column. Together
 # these tuples cover all seven canonical fund_strategy values with no gap
 # and no overlap.
+#
+# PR-4 (May 2026): the dominant active-fund value was renamed `equity` →
+# `active` to align the value with the field's strategy semantics.
 
-ACTIVE_FUND_STRATEGIES = ('equity', 'balanced', 'multi_asset')
+ACTIVE_FUND_STRATEGIES = ('active', 'balanced', 'multi_asset')
 PASSIVE_FUND_STRATEGIES = ('passive', 'bond_or_other', 'excluded', 'final_filing')
 
 

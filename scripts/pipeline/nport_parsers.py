@@ -5,8 +5,8 @@ need to agree on:
 
   * ``parse_nport_xml``  — extract fund metadata + per-holding dicts
                            from an N-PORT XML blob.
-  * ``classify_fund``     — label a parsed fund (equity / balanced /
-                           index / excluded / ...).
+  * ``classify_fund``     — label a parsed fund (active / balanced /
+                           passive / excluded / ...).
 
 Plus the module-global filter-flag they respect:
 
@@ -41,7 +41,7 @@ NS = {"n": "http://www.sec.gov/edgar/nport"}
 # set relied on explicit tokens like INDEX, S&P 500, Russell, NASDAQ; ~12+
 # named passive funds (Invesco QQQ Trust, Vanguard Target Retirement variants)
 # and 95 leveraged/inverse ETFs (ProShares, Direxion) carried no such token
-# and were silently classified as 'equity' or 'balanced'. The PR-2 additions
+# and were silently classified as 'active' or 'balanced'. The PR-2 additions
 # (QQQ, Target Retirement|Date, \dX, ProShares|ProFund|Direxion, Inverse)
 # close that gap. See docs/findings/classifier_patterns_results.md.
 #
@@ -190,9 +190,13 @@ def classify_fund(metadata, holdings):
     equity_val_pct = equity_val / total_val if total_val > 0 else 0
 
     # Classify
+    # PR-4 (May 2026): the dominant equity-fund value is "active" (was "equity";
+    # the rename aligns the value with the field's strategy semantics — the
+    # column describes how the fund is managed, not the asset class). The
+    # string "equity" is no longer used as a fund_strategy value.
     if equity_val_pct >= 0.60:
         if equity_val_pct >= 0.90:
-            category = "equity"
+            category = "active"
         else:
             category = "balanced"
         return True, category, is_actively_managed_flag

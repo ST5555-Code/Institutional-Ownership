@@ -15,7 +15,7 @@ Schema::
     sector         VARCHAR NOT NULL
     entity         VARCHAR NOT NULL
     entity_type    VARCHAR              -- holdings_v2.entity_type (parent)
-                                          or fund_holdings_v2.fund_strategy (fund)
+                                          or fund_universe.fund_strategy (fund, JOIN'd in PR-4)
     ticker         VARCHAR NOT NULL
     active_flow    DOUBLE
     level          VARCHAR NOT NULL     -- 'parent' | 'fund'

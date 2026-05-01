@@ -122,7 +122,7 @@ _TARGET_TABLE_COLUMNS: list[tuple[str, str]] = [
     ("is_restricted",        "BOOLEAN"),
     ("payoff_profile",       "VARCHAR"),
     ("loaded_at",             "TIMESTAMP"),
-    ("fund_strategy",        "VARCHAR"),
+    ("fund_strategy_at_filing", "VARCHAR"),
     ("entity_id",            "BIGINT"),
     ("rollup_entity_id",     "BIGINT"),
     ("dm_entity_id",         "BIGINT"),
@@ -768,7 +768,7 @@ class LoadNPortPipeline(SourcePipeline):
                 issuer_name, ticker, asset_category,
                 shares_or_principal, market_value_usd, pct_of_nav,
                 fair_value_level, is_restricted, payoff_profile,
-                loaded_at, fund_strategy,
+                loaded_at, fund_strategy_at_filing,
                 entity_id, rollup_entity_id, dm_entity_id,
                 dm_rollup_entity_id, dm_rollup_name,
                 accession_number, is_latest, backfill_quality
@@ -779,7 +779,7 @@ class LoadNPortPipeline(SourcePipeline):
                 s.issuer_name, s.ticker, s.asset_category,
                 s.shares_or_principal, s.market_value_usd, s.pct_of_nav,
                 s.fair_value_level, s.is_restricted, s.payoff_profile,
-                NOW() AS loaded_at, s.fund_strategy,
+                NOW() AS loaded_at, s.fund_strategy AS fund_strategy_at_filing,
                 NULL AS entity_id, NULL AS rollup_entity_id,
                 NULL AS dm_entity_id, NULL AS dm_rollup_entity_id,
                 NULL AS dm_rollup_name,
@@ -1056,7 +1056,8 @@ class LoadNPortPipeline(SourcePipeline):
         For each ``series_id`` in ``series_touched`` whose prod
         ``fund_universe`` row carries a non-NULL ``fund_strategy``, rewrite
         the staged ``fund_strategy`` (in ``stg_nport_fund_universe``) and
-        the staged ``fund_holdings_v2.fund_strategy`` to the prod value
+        the staged ``fund_holdings_v2.fund_strategy_at_filing`` to the prod
+        value
         **before** ``super().promote()`` inserts the new holdings rows.
         New series (no row in prod) and series whose prod row carries NULL
         ``fund_strategy`` (the backfill case) keep the classifier output.
@@ -1107,7 +1108,7 @@ class LoadNPortPipeline(SourcePipeline):
                 staging_con.execute(
                     """
                     UPDATE fund_holdings_v2 AS fh
-                       SET fund_strategy = m.fund_strategy
+                       SET fund_strategy_at_filing = m.fund_strategy
                       FROM lock_map m
                      WHERE fh.series_id = m.series_id
                     """

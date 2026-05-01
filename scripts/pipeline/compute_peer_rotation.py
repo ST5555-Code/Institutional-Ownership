@@ -422,21 +422,30 @@ class ComputePeerRotationPipeline(SourcePipeline):
         self, staging_con: Any, alias: Optional[str],
         q_from: str, q_to: str,
     ) -> None:
+        # PR-4: read fund_strategy from fund_universe (the canonical, locked
+        # source) rather than fund_holdings_v2 (per-row, per-quarter snapshot
+        # that drifts when classify_fund recomputes). The JOIN replaces the
+        # MAX(fh.fund_strategy) aggregate; series_id with no fund_universe
+        # row falls back to NULL (LEFT JOIN), preserving the prior behaviour
+        # for orphan series (small set; covered by canonical-value-coverage-
+        # audit follow-up).
         staging_con.execute("DROP TABLE IF EXISTS f_agg_pair")
         staging_con.execute(f"""
             CREATE TEMP TABLE f_agg_pair AS
-            SELECT series_id,
-                   MAX(fund_name)        AS fund_name,
-                   MAX(fund_strategy)    AS fund_strategy,
-                   ticker,
-                   quarter,
-                   SUM(shares_or_principal) AS shares,
-                   SUM(market_value_usd)    AS market_value_usd
-              FROM {self._src(alias, 'fund_holdings_v2')}
-             WHERE ticker IS NOT NULL
-               AND quarter IN (?, ?)
-               AND is_latest = TRUE
-             GROUP BY series_id, ticker, quarter
+            SELECT fh.series_id,
+                   MAX(fh.fund_name)     AS fund_name,
+                   MAX(fu.fund_strategy) AS fund_strategy,
+                   fh.ticker,
+                   fh.quarter,
+                   SUM(fh.shares_or_principal) AS shares,
+                   SUM(fh.market_value_usd)    AS market_value_usd
+              FROM {self._src(alias, 'fund_holdings_v2')} fh
+              LEFT JOIN {self._src(alias, 'fund_universe')} fu
+                ON fh.series_id = fu.series_id
+             WHERE fh.ticker IS NOT NULL
+               AND fh.quarter IN (?, ?)
+               AND fh.is_latest = TRUE
+             GROUP BY fh.series_id, fh.ticker, fh.quarter
         """, [q_from, q_to])  # nosec B608 — identifier is from class constant
 
     def _insert_parent_flows(
