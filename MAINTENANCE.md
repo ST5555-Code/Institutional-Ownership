@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: May 1, 2026 (conv-23-doc-sync — fund-level classification consolidation closed, 8 PRs merged #233/#235/#236/#237/#238/#239/#240/#241). Predecessor: conv-22-doc-sync._
+_Last updated: May 1, 2026 (conv-24-doc-sync — fund-level cleanup arc closed: PR #242 fund-cleanup-batch + branch-cleanup chore + PR #243 saba-proshares-reclassify; 11 PRs total in the consolidation+cleanup arc). Predecessor: conv-23-doc-sync._
 
 ## Pipeline refresh via admin dashboard
 

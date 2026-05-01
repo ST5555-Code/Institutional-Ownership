@@ -1,5 +1,66 @@
 # Chat Handover
 
+## conv-24-doc-sync (2026-05-01)
+
+HEAD: **`f256e5e`** on `main` after the fund-level cleanup arc closed (PR #242 + branch-cleanup chore + PR #243). 11 PRs total in the consolidation+cleanup arc.
+
+### What landed since `conv-23-doc-sync`
+
+Three commits on top of the 8-PR consolidation arc (`#233`–`#241`):
+
+- **PR [#242](https://github.com/sergetismen/13f-ownership/pull/242) `fund-cleanup-batch` (`5af96e1`)** — Combined cleanup session covering 4 fund-level follow-ups surfaced during PR-1a → PR-4: `canonical-value-coverage-audit` (3 read-only audits, 8 SQL queries against prod) + `verify-blackrock-muni-trust-status` (12-fund EDGAR check) + `verify-proshares-short-classification` (51-fund mechanics review) + `review-active-bucket` (3,184 UNKNOWN orphans + 8 named CEFs + 2 reclassifications). 2 reclassifications applied: AMG Pantheon Credit Solutions (`balanced` → `bond_or_other`) + AIP Alternative Lending Fund P (`active` → `bond_or_other`). New scripts: `scripts/oneoff/audit_canonical_coverage.py`, `scripts/oneoff/audit_active_bucket.py`, `scripts/oneoff/reclassify_credit_funds.py`. Findings: `docs/findings/fund_cleanup_batch_results.md`. Closes 4 P2 items; surfaces 2 new P2/P3 items.
+- **branch-cleanup chore (`594a273`)** — Bulk prune of local branch sprawl after the consolidation arc closed. Pre-state: 80 local branches + 128 remote refs + 2 worktrees. Phase 1 audit categorised every branch using `git log <branch> --not main` + `gh pr list --state all` (242 PRs total: 239 MERGED, 3 CLOSED, 0 OPEN). Final categorisation: 5 MERGED / 71 SQUASH-MERGED / 2 UNMERGED / 1 WORKTREE-LOCKED / 1 main. Phase 2 deleted 5 MERGED via `git branch -d` and 71 SQUASH-MERGED via `git branch -D`. Post-state: 4 local branches (main + 1 active worktree + 2 closed-PR branches awaiting chat decision). Net delta: -76. Findings: `docs/findings/branch_cleanup_audit.md`.
+- **PR [#243](https://github.com/sergetismen/13f-ownership/pull/243) `saba-proshares-reclassify` (`f256e5e`)** — Two whitelisted reclassifications, single PR. **Phase 1 — audit (read-only):** Saba inventory in `fund_universe`: exactly 2 funds (sibling pair). ProShares short/inverse/bear inventory: 52 funds (within plan range 45–55, STOP gate PASS); split 29 `bond_or_other` / 10 `excluded` / 13 `passive`. Whitelist for Phase 2 = 1 series_id (Saba Fund II). Whitelist for Phase 3 = 39 series_ids (the 29 + 10 currently non-`passive`). **Phase 2 — Saba reclassification:** Single transaction; 1 row in `fund_universe`, 1,603 rows in `fund_holdings_v2`. Saba sibling pair now both `balanced`. **Phase 3 — ProShares reclassification:** Single transaction; 39 rows in `fund_universe`, 1,342 rows in `fund_holdings_v2`. All 52 ProShares short/inverse/bear funds now `passive` (39 reclassified + 13 already `passive`). **Phase 4 — validation:** `pytest tests/` 373/373 PASS; PR-3 + PR-4 validators `overall: PASS` against all 7 affected endpoints. New scripts: `scripts/oneoff/reclassify_saba_proshares.py`. Findings: `docs/findings/saba_proshares_reclassify_results.md`. Closes P2 `proshares-short-reclassify-execute`.
+
+### Reclassifications applied
+
+| Fund | From → To | Source PR |
+| --- | --- | --- |
+| AMG Pantheon Credit Solutions | `balanced` → `bond_or_other` | #242 |
+| AIP Alternative Lending Fund P | `active` → `bond_or_other` | #242 |
+| Saba Capital Income & Opportunities Fund II | `multi_asset` → `balanced` | #243 |
+| 39 ProShares short / inverse / leveraged-short funds | `bond_or_other` / `excluded` → `passive` | #243 |
+
+### Verifications confirmed (no UPDATE)
+
+- **12 BlackRock muni trusts on `final_filing`** — all confirmed terminated via merger Feb 2026: wave 1 (2026-02-09) Form 25-NSE delistings BFZ→MUC, MHN→MYN, BNY→MYN; wave 2 (2026-02-23) BusinessWire merger-completion press releases BKN→MQY, BTA→MUA, MUE→MHD, MVT→MYI, MVF→MYI, MYD→MQY, MQT→MQY, BFK→MHD, BLE→MHD. Post-merger NPORT-P (2026-03-26) and N-CSRS (2026-04-07) are residual administrative filings.
+- **51 ProShares short / inverse / bear funds** — verified `passive` end-to-end (39 reclassified by #243 + 12 already `passive`). N-PORT holdings shape is uniformly swap notionals + cash/T-bill collateral; Morningstar classifies as "passively managed Trading-Inverse" ETFs.
+
+### Branch cleanup detail
+
+- Pre-cleanup: 80 local branches + 128 remote refs + 2 worktrees + 242 PRs (239 MERGED / 3 CLOSED / 0 OPEN).
+- Post-cleanup: 4 local branches (`main`, `claude/competent-mclean-b334c6`, `claude/reverent-kirch-c1fcdf`, `ui-audit-01`).
+- Net delta: -76 local branches.
+- Remote refs unchanged at 128 — origin-side cleanup deferred to user `gh` workflow.
+- 2 unmerged branches (PR CLOSED, not MERGED): both flagged DELETE in `conv-24-doc-sync` chat decision.
+
+### Open follow-up status (8 items)
+
+- **fund-holdings-orphan-investigation (P2, NEW)** — *highest data-integrity impact.* 302 series / 160K holdings rows on the NULL arm of `cross.py` 3-way CASE.
+- **canonical-value-coverage-audit (P2, partially done in #242)** — Phase 1 (data-pull) covered; structured per-bucket count + AUM exposure + recommended treatment table is the still-open deliverable.
+- **fund-strategy-taxonomy-finalization (P2, architectural)** — `balanced` / `multi_asset` / `bond_or_other` / `excluded` / `final_filing` review.
+- **parent-level-display-canonical-reads (P2, institution-level)** — 18 read sites on `manager_type` / `entity_type` need migration.
+- **per-fund-deferred-decisions (P3, NEW)** — Eaton Vance Tax-Advantaged variants × 3, Calamos Global Total Return Fund (loader gap), N/A-cohort 96 holdings rows (loader gap).
+- **historical-fund-holdings-drift-audit (P3)** — 31,400 non-SYN drift rows.
+- **stage-b-turnover-deferred-funds (P3, demoted from P2)** — Vanguard Primecap / Windsor II / Equity Income (~$203B) + Bridgeway Ultra-Small. Trigger is itself a separate larger initiative.
+- **unmerged-branch-decisions (P3, both DELETE per chat)** — `claude/reverent-kirch-c1fcdf` + `ui-audit-01`.
+
+### Architectural state (unchanged from conv-23)
+
+- Single canonical column `fund_universe.fund_strategy`; pipeline lock + COALESCE in `load_nport.py`.
+- `compute_peer_rotation._materialize_fund_agg` JOINs `fund_universe` (PR-4); per-quarter drift class structurally impossible.
+- Display layer reads canonical via `_fund_type_label()` in `scripts/queries/common.py`.
+- Snapshot semantics intentional: `fund_holdings_v2.fund_strategy_at_filing` frozen at filing moment; `fund_universe.fund_strategy` is the single source of truth for filters.
+- Saba Fund I retains pre-existing snapshot drift (1,091 `active` + 1,094 `balanced` in `fund_holdings_v2`); intentionally preserved per `historical-fund-holdings-drift-audit`.
+
+### Git ops
+
+- **Doc-only commits (`conv-*` naming) push directly to `main`** — no PR.
+- **Code merges PRs autonomously after CI passes** (rule from conv-18, reaffirmed each session).
+- **Every Code prompt must start with the session/branch name on the first line.**
+
+---
+
 ## conv-23-doc-sync (2026-05-01)
 
 HEAD: **`414b824`** on `main` after the 8-PR fund-level classification consolidation arc closed (`#233`, `#235`, `#236`, `#237`, `#238`, `#239`, `#240`, `#241`).
