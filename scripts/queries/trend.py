@@ -428,7 +428,9 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
 
 
 _ACTIVE_PARENT_TYPES = ("active", "hedge_fund", "activist")
-_ACTIVE_FUND_TYPES = ("active", "equity", "mixed", "balanced", "multi_asset")
+# Fund-level active set on peer_rotation_flows.entity_type. After the PR-4
+# rebuild the only active values are the canonical fund_strategy ones.
+_ACTIVE_FUND_TYPES = ("active", "balanced", "multi_asset")
 
 
 def get_peer_rotation(ticker, active_only=False, level="parent", rollup_type='economic_control_v1'):

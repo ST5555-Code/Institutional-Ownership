@@ -242,7 +242,7 @@ def step2_create_fund_entities(con):
     # with scripts/queries/common.ACTIVE_FUND_STRATEGIES.
     rows = con.execute(
         """SELECT series_id, fund_name, family_name,
-                  CASE WHEN fund_strategy IN ('equity','balanced','multi_asset')
+                  CASE WHEN fund_strategy IN ('active','balanced','multi_asset')
                        THEN TRUE
                        WHEN fund_strategy IS NULL
                        THEN NULL

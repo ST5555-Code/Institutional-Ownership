@@ -941,10 +941,10 @@ def test_pr2_lock_new_series_writes_classifier_output(pipeline, tmp_dbs):
     _seed_staging(
         tmp_dbs["staging"],
         [{"series_id": "S000NEW", "report_month": "2026-01",
-          "accession_number": "A", "fund_strategy": "equity"}],
+          "accession_number": "A", "fund_strategy": "active"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000NEW",
-                       fund_strategy="equity")
+                       fund_strategy="active")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -972,12 +972,12 @@ def test_pr2_lock_new_series_writes_classifier_output(pipeline, tmp_dbs):
     finally:
         prod_con.close()
 
-    assert strategy == "equity"
+    assert strategy == "active"
 
 
 def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
     """Branch B: series_id already has fund_strategy='passive' in prod;
-    a re-classification arriving as 'equity' must be discarded — both at
+    a re-classification arriving as 'active' must be discarded — both at
     the staging-rewrite step and at the upsert COALESCE safety net."""
     # Seed prod with an existing row that has been hand-curated to passive.
     prod_con = duckdb.connect(tmp_dbs["prod"])
@@ -1001,14 +1001,14 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
     finally:
         prod_con.close()
 
-    # Staging carries the (wrong) classifier output 'equity'.
+    # Staging carries the (wrong) classifier output 'active'.
     _seed_staging(
         tmp_dbs["staging"],
         [{"series_id": "S000QQQ", "report_month": "2026-02",
-          "accession_number": "QQQ-1", "fund_strategy": "equity"}],
+          "accession_number": "QQQ-1", "fund_strategy": "active"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000QQQ",
-                       fund_strategy="equity")
+                       fund_strategy="active")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -1030,7 +1030,7 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
     staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
     try:
         h_strategy = staging_con.execute(
-            "SELECT DISTINCT fund_strategy FROM fund_holdings_v2 "
+            "SELECT DISTINCT fund_strategy_at_filing FROM fund_holdings_v2 "
             "WHERE series_id = 'S000QQQ'"
         ).fetchall()
         (u_strategy,) = staging_con.execute(
@@ -1046,10 +1046,10 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
 
     # Upsert step — even if the lock helper had been bypassed, the
     # COALESCE safety net inside _upsert_fund_universe still preserves
-    # the prod value. Re-seed staging back to 'equity' to simulate the
+    # the prod value. Re-seed staging back to 'active' to simulate the
     # bypass path, then call upsert directly.
     _seed_universe_row(tmp_dbs["staging"], "S000QQQ",
-                       fund_strategy="equity")
+                       fund_strategy="active")
 
     prod_con = duckdb.connect(tmp_dbs["prod"])
     try:
@@ -1094,10 +1094,10 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
     _seed_staging(
         tmp_dbs["staging"],
         [{"series_id": "S000NULL", "report_month": "2026-02",
-          "accession_number": "L-1", "fund_strategy": "equity"}],
+          "accession_number": "L-1", "fund_strategy": "active"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000NULL",
-                       fund_strategy="equity")
+                       fund_strategy="active")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -1119,12 +1119,12 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
     staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
     try:
         h_strategy = staging_con.execute(
-            "SELECT DISTINCT fund_strategy FROM fund_holdings_v2 "
+            "SELECT DISTINCT fund_strategy_at_filing FROM fund_holdings_v2 "
             "WHERE series_id = 'S000NULL'"
         ).fetchall()
     finally:
         staging_con.close()
-    assert h_strategy == [("equity",)]
+    assert h_strategy == [("active",)]
 
     # Upsert writes the classifier output (NULL prior + COALESCE → u value).
     prod_con = duckdb.connect(tmp_dbs["prod"])
@@ -1136,7 +1136,7 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
         ).fetchone()
     finally:
         prod_con.close()
-    assert strategy == "equity", (
+    assert strategy == "active", (
         f"NULL backfill case must accept classifier output; got {strategy}"
     )
 
