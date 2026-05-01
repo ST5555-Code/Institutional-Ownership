@@ -1,5 +1,76 @@
 # Chat Handover
 
+## conv-23-doc-sync (2026-05-01)
+
+HEAD: **`414b824`** on `main` after the 8-PR fund-level classification consolidation arc closed (`#233`, `#235`, `#236`, `#237`, `#238`, `#239`, `#240`, `#241`).
+
+### PRs landed (#233–#241; 8 PRs)
+
+The fund-level classification consolidation arc closed end-to-end across 8 PRs in `2026-04-30 → 2026-05-01`:
+
+- **PR #233 `fund-strategy-backfill` (PR-1a)** — Reconciled all legacy `fund_strategy` data so `fund_strategy = fund_category` everywhere and `is_actively_managed` is never NULL. Three phases: 333 legacy `{active,passive,mixed}` residuals in `fund_universe` → 0; 658 SYN funds with NULL `fund_strategy` → 0 (resolved via majority + most-recent quarter tiebreaker); 5,475,014 legacy holdings rows → 0 (orphan policy `equity` for 3,184 `series_id='UNKNOWN'` rows). Findings: `docs/findings/fund_strategy_backfill_results.md`.
+- **PR #235 `peer-rotation-rebuild` (PR-1b)** — Rebuilt `peer_rotation_flows` against post-PR-1a `fund_holdings_v2`. 17,490,106 rows upserted; fund-level fully canonical (5,065,200 rows); parent-level untouched (12,424,906 rows). Findings: `docs/findings/peer_rotation_rebuild_results.md`.
+- **PR #236 `classification-display-audit` (PR-1c)** — Read-only audit of every API endpoint and query module emitting a classification field. 27 of 40 user-facing FastAPI routes audited. Headline: display layer never read canonical source. Surfaced 6 confirmed display bugs + Decisions D1-D8 for PR-1d. Findings: `docs/findings/classification_display_audit.md`.
+- **PR #237 `classification-display-fix` (PR-1d)** — Wired API/queries display layer to canonical fund-level classification. New utility `_fund_type_label(fund_strategy)` in `scripts/queries/common.py`; canonical 5-value display map. 12 fund-level read sites migrated across 5 files (`register.py`, `cross.py`, `fund.py`, `trend.py`, `market.py`). New validator: `scripts/oneoff/validate_classification_display_fix.py` (24/24 PASS). Findings: `docs/findings/classification_display_fix_results.md`.
+- **PR #238 `index-to-passive` (PR-1e)** — Renamed `fund_strategy` value `'index'` → `'passive'` end-to-end (1,264 series + 3,055,575 holdings rows + classifier write path + display label utility). Findings: `docs/findings/index_to_passive_rename_results.md`.
+- **PR #239 `classifier-name-patterns` (PR-2)** — Extended `INDEX_PATTERNS` in `scripts/pipeline/nport_parsers.py` with 8 new alternations (`qqq`, `target_date`, `target_retirement`, `\d+x` leveraged, `proshares`, `profund`, `direxion`, `daily inverse`, `inverse`). Added pipeline write-path lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE in `load_nport.py`). Reclassified 253 series + 186,943 holdings rows. Findings: `docs/findings/classifier_patterns_results.md`.
+- **PR #240 `fund-strategy-consolidate` (PR-3)** — Dropped redundant `fund_universe.fund_category` and `fund_universe.is_actively_managed` columns end-to-end. New canonical constants `ACTIVE_FUND_STRATEGIES` / `PASSIVE_FUND_STRATEGIES` in `scripts/queries/common.py`; 9 sites migrated to derive `is_active` from these constants. Findings: `docs/findings/fund_strategy_consolidate_results.md`.
+- **PR #241 `fund-strategy-rename` (PR-4)** — Three changes bundled in 11 phases: (1) value rename `'equity'` → `'active'` (4,832 + 3,555,766 rows); (2) column rename `fund_holdings_v2.fund_strategy` → `fund_strategy_at_filing` via DuckDB CTAS+DROP+RENAME (14,568,775 rows preserved, all 6 indexes restored); (3) architectural fix in `compute_peer_rotation._materialize_fund_agg` — `LEFT JOIN fund_universe.fund_strategy` replaces the per-row, per-quarter `MAX(fh.fund_strategy)` aggregate, eliminating the original drift class permanently. peer_rotation_flows rebuild: 17,490,106 rows preserved; 3,108 fund-level rows reclassified `active → balanced` (canonical now wins over snapshot). Findings: `docs/findings/fund_strategy_rename_results.md`.
+
+### Key architectural changes
+
+- **Canonical reads.** Display layer reads `fund_universe.fund_strategy` (canonical, locked) via `_fund_type_label()`. Filters JOIN `fund_universe`. Snapshot value at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (intentional snapshot semantics; not used for filters).
+- **Pipeline lock.** `_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE in `scripts/pipeline/load_nport.py` together prevent `fund_universe.fund_strategy` overwrite once a series carries a non-NULL value. Three-branch semantics covered by 5 unit tests in `tests/pipeline/test_load_nport.py`.
+- **JOIN fix.** `compute_peer_rotation.py:_materialize_fund_agg` switched from per-row, per-quarter `MAX(fh.fund_strategy)` aggregate to `LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id`; emits `MAX(fu.fund_strategy)`. The per-quarter drift class is now structurally impossible.
+- **Constants module.** `ACTIVE_FUND_STRATEGIES = ('active','balanced','multi_asset')` and `PASSIVE_FUND_STRATEGIES = ('passive','bond_or_other','excluded','final_filing')` adjacent to `_fund_type_label` in `scripts/queries/common.py`.
+- **Schema cleanup.** `fund_universe.fund_category` and `fund_universe.is_actively_managed` columns dropped (PR-3). `fund_holdings_v2.fund_strategy` renamed to `fund_strategy_at_filing` (PR-4). Staging schemas (`stg_nport_holdings`, `stg_nport_fund_universe`) intentionally retain old names — prod write path renames at INSERT time; staging cleanup is a deferred PR.
+
+### Findings docs produced
+
+- `docs/findings/classification_consolidation_plan.md`
+- `docs/findings/fund_strategy_backfill_results.md` (PR-1a)
+- `docs/findings/peer_rotation_rebuild_results.md` (PR-1b)
+- `docs/findings/classification_display_audit.md` (PR-1c)
+- `docs/findings/classification_display_fix_results.md` (PR-1d)
+- `docs/findings/index_to_passive_rename_results.md` (PR-1e)
+- `docs/findings/classifier_patterns_results.md` (PR-2)
+- `docs/findings/fund_strategy_consolidate_results.md` (PR-3)
+- `docs/findings/fund_strategy_rename_results.md` (PR-4)
+
+### Roadmap follow-ups added (P2 unless otherwise noted)
+
+- **review-active-bucket** (renamed from `review-equity-bucket` per PR-4) — review the renamed `'active'` bucket for entries that need `bond_or_other` / `balanced` reclassification (AMG Pantheon Credit Solutions, AIP Alternative Lending, ASA Gold, NXG Cushing Midstream).
+- **parent-level-display-canonical-reads** — institution-level half of the consolidation sequence; 18 parent-level read sites currently on `manager_type` / `entity_type` need migration to `entity_classification_history.classification` / `entity_current.classification`. Includes fix for `query4` silent-drop bug at [register.py:746-750](scripts/queries/register.py:746).
+- **verify-blackrock-muni-trust-status** — verify whether 12 BlackRock muni trusts are actually liquidating (correct `final_filing`) or still trading (needs reclassification).
+- **verify-proshares-short-classification** — ProShares short funds may belong in a new `inverse_or_short` bucket or be flipped to `passive`.
+- **canonical-value-coverage-audit** — comprehensive audit of NULL `fund_strategy`, orphan series, edge cohorts, 3-way `CASE` NULL semantics in `cross.py`, and rows where `fund_holdings_v2.fund_strategy_at_filing` differs from `fund_universe.fund_strategy` (quantify the historical drift the PR-4 JOIN fix now papers over).
+- **fund-strategy-taxonomy-finalization** — review and finalize the five edge categories (`balanced` / `multi_asset` / `bond_or_other` / `excluded` / `final_filing`) in the canonical taxonomy.
+- **stage-b-turnover-deferred-funds** (position-turnover detection design) — Vanguard Primecap / Windsor II / Equity Income (~$203B AUM) and Bridgeway Ultra-Small Company Market are passive in behavior but won't match systemic INDEX_PATTERNS rules.
+
+### Canonical taxonomy (post-PR-4)
+
+`fund_universe.fund_strategy` ∈ `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. The display label utility collapses to 5 values: `{active, passive, bond, excluded, unknown}`.
+
+### Where institution-level work picks up
+
+The fund-level arc established the four-stage pattern: (1) backfill / reconcile data; (2) rebuild downstream tables; (3) audit display layer; (4) fix display + rename + lock. Institution-level needs the same shape but with different surface area:
+
+- **Taxonomy decisions partially captured (prior chat session, not yet executed):** `pension`, `endowment`, `sovereign_wealth_fund` kept separate; `private_equity` + `venture_capital` → `pe_vc`; `wealth_management` + `family_office` → `wealth_mgmt`; `hedge_fund` + `multi_strategy` → `hedge_fund`. `mixed` and `unknown` still need review.
+- **Data state to confront:** 1.4M+ parent-level rows in `holdings_v2.entity_type` carry legacy values.
+- **Prerequisites:** `family_office` and `multi_strategy` migration from `manager_type` to `entity_classification_history` is a precondition for some merges.
+
+### Known Issue closed
+
+- **fund_strategy classification drift** — RESOLVED 2026-05-01 by the PR-2 + PR-4 sequence. Pipeline lock prevents `fund_universe` overwrite (PR-2); `compute_peer_rotation._materialize_fund_agg` JOINs canonical instead of reading per-quarter snapshot (PR-4). Drift class structurally impossible.
+
+### Git ops
+
+- **Code merges PRs autonomously after CI passes** (rule from conv-18, reaffirmed each session).
+- **Doc-only commits (`conv-*` naming) push directly to `main`** — no PR.
+- **Every Code prompt must start with the session/branch name on the first line.**
+
+---
+
 ## conv-22-doc-sync (2026-04-30)
 
 HEAD: **`7203539`** on `main` after PRs `#228`–`#229` merged.

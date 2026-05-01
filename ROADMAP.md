@@ -1,12 +1,12 @@
 # 13F Institutional Ownership Database — Roadmap
 
-Single source of truth for forward work. Updated 2026-05-01 (fund-strategy-rename PR-4). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
+Single source of truth for forward work. Updated 2026-05-01 (conv-23-doc-sync — fund-level consolidation closed, 8 PRs merged). Discipline: items live here or do not exist. Workstream-specific plans live in `docs/plans/<slug>.md` while active, archive on completion.
 
 See `docs/findings/2026-04-25-backlog-collapse.md` for the closure rationale and KILL-list cataloguing this entry replaces.
 
 ---
 
-## Current backlog (verified 2026-05-01 fund-strategy-rename PR-4)
+## Current backlog (verified 2026-05-01 conv-23-doc-sync)
 
 ### P0 — Production blockers
 
@@ -85,6 +85,8 @@ _(none — see COMPLETED table)_
 ---
 
 ## COMPLETED
+
+> **Fund-level classification consolidation closed (2026-05-01).** 8 PRs merged across the fund-strategy arc (PR-1a → PR-1b → PR-1c → PR-1d → PR-1e → PR-2 → PR-3 → PR-4). Canonical taxonomy: `active`, `balanced`, `multi_asset`, `passive`, `bond_or_other`, `excluded`, `final_filing`. Pipeline write-path locked (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE in `load_nport.py`). Display layer reads canonical via `_fund_type_label` in `scripts/queries/common.py`. `peer_rotation_flows` JOINs canonical `fund_universe.fund_strategy` (no longer per-row `fund_holdings_v2.fund_strategy_at_filing`). Drift class structurally impossible. Institution-level consolidation (`parent-level-display-canonical-reads` + entity-taxonomy merges) is next.
 
 | Date | Item | Details |
 | --- | --- | --- |

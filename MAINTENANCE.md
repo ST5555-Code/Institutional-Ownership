@@ -1,6 +1,6 @@
 # 13F Ownership Database — Maintenance Guide
 
-_Last updated: April 30, 2026 (conv-22-doc-sync — Cross-Ownership tab redesign + fix-up, PRs #228-#229). Predecessor: conv-21-doc-sync._
+_Last updated: May 1, 2026 (conv-23-doc-sync — fund-level classification consolidation closed, 8 PRs merged #233/#235/#236/#237/#238/#239/#240/#241). Predecessor: conv-22-doc-sync._
 
 ## Pipeline refresh via admin dashboard
 
