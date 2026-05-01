@@ -22,6 +22,7 @@ from .common import (
     has_table,
     _quarter_to_date,
     _resolve_pct_of_so_denom,
+    ACTIVE_FUND_STRATEGIES,
 )
 
 logger = logging.getLogger(__name__)
@@ -214,23 +215,28 @@ def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only
         lq = quarter
 
         if level == 'fund':
-            # Fund-level from fund_holdings, filter via fund_universe.is_actively_managed
+            # Fund-level from fund_holdings, filter via canonical fund_strategy partition
             join_clause = "LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id"
-            active_filter = "AND fu.is_actively_managed = true" if active_only else ""
+            active_filter = ""
+            active_params = []
+            if active_only:
+                active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+                active_filter = f"AND fu.fund_strategy IN ({active_ph})"
+                active_params = list(ACTIVE_FUND_STRATEGIES)
             q1_df = con.execute(f"""
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
                 FROM fund_holdings_v2 fh {join_clause}
                 WHERE fh.ticker = ? AND fh.quarter = '{fq}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
-            """, [ticker]).fetchdf()
+            """, [ticker] + active_params).fetchdf()
             q4_df = con.execute(f"""
                 SELECT fh.fund_name as investor,
                        SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
                 FROM fund_holdings_v2 fh {join_clause}
                 WHERE fh.ticker = ? AND fh.quarter = '{lq}' {active_filter} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
-            """, [ticker]).fetchdf()
+            """, [ticker] + active_params).fetchdf()
         else:
             # Parent-level from holdings (13F)
             q1_df = con.execute(f"""
@@ -321,19 +327,24 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         con, ticker, _quarter_to_date(quarter_to))
 
     if level == 'fund':
-        # Filter via fund_universe.is_actively_managed
+        # Filter via canonical fund_strategy partition
         join_clause = "LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id"
-        af = "AND fu.is_actively_managed = true" if active_only else ""
+        af = ""
+        active_params = []
+        if active_only:
+            active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+            af = f"AND fu.fund_strategy IN ({active_ph})"
+            active_params = list(ACTIVE_FUND_STRATEGIES)
         from_df = con.execute(f"""
             SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
             FROM fund_holdings_v2 fh {join_clause}
             WHERE fh.ticker = ? AND fh.quarter = '{quarter_from}' {af} AND fh.is_latest = TRUE GROUP BY fh.fund_name
-        """, [ticker]).fetchdf()
+        """, [ticker] + active_params).fetchdf()
         to_df = con.execute(f"""
             SELECT fh.fund_name as entity, SUM(fh.shares_or_principal) as shares, SUM(fh.market_value_usd) as value
             FROM fund_holdings_v2 fh {join_clause}
             WHERE fh.ticker = ? AND fh.quarter = '{quarter_to}' {af} AND fh.is_latest = TRUE GROUP BY fh.fund_name
-        """, [ticker]).fetchdf()
+        """, [ticker] + active_params).fetchdf()
     else:
         from_df = con.execute(f"""
             SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,

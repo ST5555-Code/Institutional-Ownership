@@ -289,13 +289,26 @@ def get_nport_family_patterns():
 
 
 
+# ---------------------------------------------------------------------------
+# Canonical fund_strategy partitions (PR-3)
+# ---------------------------------------------------------------------------
+# Single source of truth for the active/passive split at the fund layer.
+# Replaces six+ hardcoded inclusion lists across query files and the
+# now-dropped `fund_universe.is_actively_managed` boolean column. Together
+# these tuples cover all seven canonical fund_strategy values with no gap
+# and no overlap.
+
+ACTIVE_FUND_STRATEGIES = ('equity', 'balanced', 'multi_asset')
+PASSIVE_FUND_STRATEGIES = ('passive', 'bond_or_other', 'excluded', 'final_filing')
+
+
 def _fund_type_label(fund_strategy):
     """Map canonical fund_strategy values to display labels.
 
     Single source of truth for fund-level type display across all endpoints.
     Returns one of: 'active', 'passive', 'bond', 'excluded', 'unknown'.
     """
-    if fund_strategy in ('equity', 'balanced', 'multi_asset'):
+    if fund_strategy in ACTIVE_FUND_STRATEGIES:
         return 'active'
     if fund_strategy == 'passive':
         return 'passive'

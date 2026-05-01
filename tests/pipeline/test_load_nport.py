@@ -128,8 +128,6 @@ CREATE TABLE fund_universe (
     series_id             VARCHAR PRIMARY KEY,
     family_name           VARCHAR,
     total_net_assets      DOUBLE,
-    fund_category         VARCHAR,
-    is_actively_managed   BOOLEAN,
     total_holdings_count  INTEGER,
     equity_pct            DOUBLE,
     top10_concentration   DOUBLE,
@@ -902,9 +900,14 @@ def test_inf52_pre_promote_enrichment_warns_when_entity_tables_missing(
 # ---------------------------------------------------------------------------
 
 def _seed_universe_row(staging_path: str, series_id: str,
-                       fund_strategy: str, fund_category: str) -> None:
+                       fund_strategy: str) -> None:
     """Seed stg_nport_fund_universe with one row carrying the classifier
-    output the pipeline would have produced for `series_id`."""
+    output the pipeline would have produced for `series_id`.
+
+    PR-3: ``fund_category`` and ``is_actively_managed`` were dropped from
+    prod ``fund_universe`` (both fully redundant with ``fund_strategy``).
+    Staging still has those columns; we leave them NULL so the staging
+    schema stays compatible without driving prod values."""
     con = duckdb.connect(staging_path)
     try:
         con.execute(_STG_UNIVERSE_DDL)
@@ -919,11 +922,11 @@ def _seed_universe_row(staging_path: str, series_id: str,
                 total_net_assets, fund_category, is_actively_managed,
                 total_holdings_count, equity_pct, top10_concentration,
                 last_updated, fund_strategy, best_index, manifest_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),?,?,NULL)
+            ) VALUES (?,?,?,?,?,NULL,NULL,?,?,?,NOW(),?,?,NULL)
             """,
             [
                 "0000000001", f"{series_id} Fund", series_id, "Family",
-                1_000_000.0, fund_category, True, 50, 0.95, 0.40,
+                1_000_000.0, 50, 0.95, 0.40,
                 fund_strategy, None,
             ],
         )
@@ -941,7 +944,7 @@ def test_pr2_lock_new_series_writes_classifier_output(pipeline, tmp_dbs):
           "accession_number": "A", "fund_strategy": "equity"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000NEW",
-                       fund_strategy="equity", fund_category="equity")
+                       fund_strategy="equity")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -962,14 +965,14 @@ def test_pr2_lock_new_series_writes_classifier_output(pipeline, tmp_dbs):
         )
         assert n_upserted == 1
 
-        row = prod_con.execute(
-            "SELECT fund_strategy, fund_category "
+        (strategy,) = prod_con.execute(
+            "SELECT fund_strategy "
             "FROM fund_universe WHERE series_id = 'S000NEW'"
         ).fetchone()
     finally:
         prod_con.close()
 
-    assert row == ("equity", "equity")
+    assert strategy == "equity"
 
 
 def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
@@ -983,14 +986,14 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
             """
             INSERT INTO fund_universe (
                 fund_cik, fund_name, series_id, family_name,
-                total_net_assets, fund_category, is_actively_managed,
+                total_net_assets,
                 total_holdings_count, equity_pct, top10_concentration,
                 last_updated, fund_strategy, best_index
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,NOW(),?,?)
             """,
             [
                 "0000000001", "Invesco QQQ Trust", "S000QQQ", "Invesco",
-                250_000_000_000.0, "passive", False, 100, 1.0, 0.50,
+                250_000_000_000.0, 100, 1.0, 0.50,
                 "passive", "NDX",
             ],
         )
@@ -1005,7 +1008,7 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
           "accession_number": "QQQ-1", "fund_strategy": "equity"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000QQQ",
-                       fund_strategy="equity", fund_category="equity")
+                       fund_strategy="equity")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -1030,8 +1033,8 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
             "SELECT DISTINCT fund_strategy FROM fund_holdings_v2 "
             "WHERE series_id = 'S000QQQ'"
         ).fetchall()
-        u_strategy, u_category = staging_con.execute(
-            "SELECT fund_strategy, fund_category "
+        (u_strategy,) = staging_con.execute(
+            "SELECT fund_strategy "
             "FROM stg_nport_fund_universe WHERE series_id = 'S000QQQ'"
         ).fetchone()
     finally:
@@ -1039,26 +1042,26 @@ def test_pr2_lock_existing_nonnull_strategy_preserves_value(pipeline, tmp_dbs):
     assert h_strategy == [("passive",)], (
         f"expected staged holdings rewritten to 'passive', got {h_strategy}"
     )
-    assert (u_strategy, u_category) == ("passive", "passive")
+    assert u_strategy == "passive"
 
     # Upsert step — even if the lock helper had been bypassed, the
     # COALESCE safety net inside _upsert_fund_universe still preserves
     # the prod value. Re-seed staging back to 'equity' to simulate the
     # bypass path, then call upsert directly.
     _seed_universe_row(tmp_dbs["staging"], "S000QQQ",
-                       fund_strategy="equity", fund_category="equity")
+                       fund_strategy="equity")
 
     prod_con = duckdb.connect(tmp_dbs["prod"])
     try:
         pipeline._upsert_fund_universe(prod_con, {"S000QQQ"})
-        row = prod_con.execute(
-            "SELECT fund_strategy, fund_category "
+        (strategy,) = prod_con.execute(
+            "SELECT fund_strategy "
             "FROM fund_universe WHERE series_id = 'S000QQQ'"
         ).fetchone()
     finally:
         prod_con.close()
-    assert row == ("passive", "passive"), (
-        f"upsert should have COALESCE'd to prod value 'passive'; got {row}"
+    assert strategy == "passive", (
+        f"upsert should have COALESCE'd to prod value 'passive'; got {strategy}"
     )
 
 
@@ -1073,14 +1076,14 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
             """
             INSERT INTO fund_universe (
                 fund_cik, fund_name, series_id, family_name,
-                total_net_assets, fund_category, is_actively_managed,
+                total_net_assets,
                 total_holdings_count, equity_pct, top10_concentration,
                 last_updated, fund_strategy, best_index
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,NOW(),?,?)
             """,
             [
                 "0000000001", "Legacy Fund", "S000NULL", "Family",
-                10_000_000.0, None, True, 30, 0.95, 0.30,
+                10_000_000.0, 30, 0.95, 0.30,
                 None, None,
             ],
         )
@@ -1094,7 +1097,7 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
           "accession_number": "L-1", "fund_strategy": "equity"}],
     )
     _seed_universe_row(tmp_dbs["staging"], "S000NULL",
-                       fund_strategy="equity", fund_category="equity")
+                       fund_strategy="equity")
 
     staging_con = duckdb.connect(tmp_dbs["staging"])
     try:
@@ -1127,14 +1130,14 @@ def test_pr2_lock_existing_null_strategy_writes_classifier_output(
     prod_con = duckdb.connect(tmp_dbs["prod"])
     try:
         pipeline._upsert_fund_universe(prod_con, {"S000NULL"})
-        row = prod_con.execute(
-            "SELECT fund_strategy, fund_category "
+        (strategy,) = prod_con.execute(
+            "SELECT fund_strategy "
             "FROM fund_universe WHERE series_id = 'S000NULL'"
         ).fetchone()
     finally:
         prod_con.close()
-    assert row == ("equity", "equity"), (
-        f"NULL backfill case must accept classifier output; got {row}"
+    assert strategy == "equity", (
+        f"NULL backfill case must accept classifier output; got {strategy}"
     )
 
 

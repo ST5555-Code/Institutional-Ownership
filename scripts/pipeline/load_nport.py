@@ -1050,16 +1050,15 @@ class LoadNPortPipeline(SourcePipeline):
     def _apply_fund_strategy_lock(
         self, prod_con: Any, series_touched: set[str],
     ) -> int:
-        """PR-2 lock — preserve canonical ``fund_strategy``/``fund_category``
-        on subsequent N-PORT loads.
+        """PR-2 lock — preserve canonical ``fund_strategy`` on subsequent
+        N-PORT loads.
 
         For each ``series_id`` in ``series_touched`` whose prod
         ``fund_universe`` row carries a non-NULL ``fund_strategy``, rewrite
-        the staged ``fund_strategy``/``fund_category`` (in
-        ``stg_nport_fund_universe``) and the staged
-        ``fund_holdings_v2.fund_strategy`` to the prod values **before**
-        ``super().promote()`` inserts the new holdings rows. New series
-        (no row in prod) and series whose prod row carries NULL
+        the staged ``fund_strategy`` (in ``stg_nport_fund_universe``) and
+        the staged ``fund_holdings_v2.fund_strategy`` to the prod value
+        **before** ``super().promote()`` inserts the new holdings rows.
+        New series (no row in prod) and series whose prod row carries NULL
         ``fund_strategy`` (the backfill case) keep the classifier output.
 
         Returns the number of locked series_ids; 0 when nothing matched.
@@ -1072,6 +1071,9 @@ class LoadNPortPipeline(SourcePipeline):
           * historical and new ``fund_holdings_v2`` rows for the same
             series can drift apart when the classifier output for a new
             filing differs from the canonical fund-level value.
+
+        PR-3 cleanup: ``fund_category`` was dropped from prod
+        ``fund_universe``; the lock now writes only ``fund_strategy``.
         """
         if not series_touched:
             return 0
@@ -1081,7 +1083,7 @@ class LoadNPortPipeline(SourcePipeline):
         try:
             locked_df = prod_con.execute(
                 f"""
-                SELECT series_id, fund_strategy, fund_category
+                SELECT series_id, fund_strategy
                   FROM fund_universe
                  WHERE series_id IN ({placeholders})
                    AND fund_strategy IS NOT NULL
@@ -1116,8 +1118,7 @@ class LoadNPortPipeline(SourcePipeline):
                     staging_con.execute(
                         """
                         UPDATE stg_nport_fund_universe AS u
-                           SET fund_strategy = m.fund_strategy,
-                               fund_category = m.fund_category
+                           SET fund_strategy = m.fund_strategy
                           FROM lock_map m
                          WHERE u.series_id = m.series_id
                         """
@@ -1139,12 +1140,17 @@ class LoadNPortPipeline(SourcePipeline):
 
         PR-2 lock layer (defense-in-depth on top of
         ``_apply_fund_strategy_lock``): if prod already has a row for the
-        ``series_id`` with a non-NULL ``fund_strategy``, the prod values
-        for ``fund_strategy`` and ``fund_category`` win. The staged value
-        is only honoured for new series (no prior row) or NULL-backfill
-        cases. ``_apply_fund_strategy_lock`` runs pre-promote and rewrites
-        staging in lock-step; this COALESCE is the safety net in case the
-        helper was bypassed (e.g. promote() called without the wrapper).
+        ``series_id`` with a non-NULL ``fund_strategy``, the prod value
+        wins. The staged value is only honoured for new series (no prior
+        row) or NULL-backfill cases. ``_apply_fund_strategy_lock`` runs
+        pre-promote and rewrites staging in lock-step; this COALESCE is
+        the safety net in case the helper was bypassed (e.g. promote()
+        called without the wrapper).
+
+        PR-3 cleanup: ``fund_category`` and ``is_actively_managed`` were
+        dropped from prod ``fund_universe`` (both fully redundant with
+        ``fund_strategy``). The upsert now reads/writes ``fund_strategy``
+        only.
         """
         if not series_touched:
             return 0
@@ -1154,7 +1160,7 @@ class LoadNPortPipeline(SourcePipeline):
             df = staging_con.execute(
                 f"""
                 SELECT fund_cik, fund_name, series_id, family_name,
-                       total_net_assets, fund_category, is_actively_managed,
+                       total_net_assets,
                        total_holdings_count, equity_pct, top10_concentration,
                        last_updated, fund_strategy, best_index
                   FROM stg_nport_fund_universe
@@ -1168,16 +1174,15 @@ class LoadNPortPipeline(SourcePipeline):
             return 0
         sids = df["series_id"].tolist()
 
-        # Capture prod's current fund_strategy / fund_category for each
-        # touched series_id so we can preserve non-NULL canonical values
-        # across the DELETE+INSERT below. Done in one round-trip.
+        # Capture prod's current fund_strategy for each touched series_id
+        # so we can preserve non-NULL canonical values across the
+        # DELETE+INSERT below. Done in one round-trip.
         placeholders_p = ",".join("?" * len(sids))
         try:
             prior_df = prod_con.execute(
                 f"""
                 SELECT series_id,
-                       fund_strategy AS prior_fund_strategy,
-                       fund_category AS prior_fund_category
+                       fund_strategy AS prior_fund_strategy
                   FROM fund_universe
                  WHERE series_id IN ({placeholders_p})
                 """,  # nosec B608
@@ -1198,9 +1203,7 @@ class LoadNPortPipeline(SourcePipeline):
         if prior_df is None or prior_df.empty:
             import pandas as pd  # noqa: WPS433 — stdlib-equivalent for DuckDB
             prior_df = pd.DataFrame(
-                columns=[
-                    "series_id", "prior_fund_strategy", "prior_fund_category",
-                ],
+                columns=["series_id", "prior_fund_strategy"],
             )
         prod_con.register("p_df", prior_df)
         try:
@@ -1208,15 +1211,12 @@ class LoadNPortPipeline(SourcePipeline):
                 """
                 INSERT INTO fund_universe (
                     fund_cik, fund_name, series_id, family_name,
-                    total_net_assets, fund_category, is_actively_managed,
+                    total_net_assets,
                     total_holdings_count, equity_pct, top10_concentration,
                     last_updated, fund_strategy, best_index
                 )
                 SELECT u.fund_cik, u.fund_name, u.series_id, u.family_name,
                        u.total_net_assets,
-                       COALESCE(p.prior_fund_category, u.fund_category)
-                           AS fund_category,
-                       u.is_actively_managed,
                        u.total_holdings_count, u.equity_pct,
                        u.top10_concentration, u.last_updated,
                        COALESCE(p.prior_fund_strategy, u.fund_strategy)

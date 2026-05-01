@@ -21,6 +21,8 @@ from .common import (
     _fund_type_label,
     match_nport_family,
     _build_excl_clause,
+    ACTIVE_FUND_STRATEGIES,
+    PASSIVE_FUND_STRATEGIES,
 )
 
 
@@ -39,8 +41,13 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
 
         # --- Fund-level branch ---
         if level == 'fund':
-            # SQL-level filter via fund_universe.is_actively_managed (N21: fixed)
-            af = "AND fu.is_actively_managed = true" if active_only else ""
+            # SQL-level filter via canonical fund_strategy partition (PR-3).
+            af = ""
+            active_params = []
+            if active_only:
+                active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+                af = f"AND fu.fund_strategy IN ({active_ph})"
+                active_params = list(ACTIVE_FUND_STRATEGIES)
             top_funds = con.execute(f"""
                 SELECT fh.fund_name, SUM(fh.market_value_usd) as val,
                        MAX(fu.fund_strategy) as fund_strategy
@@ -49,7 +56,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
                 WHERE fh.ticker = ? AND fh.quarter = '{quarter}' {af} AND fh.is_latest = TRUE
                 GROUP BY fh.fund_name
                 ORDER BY val DESC NULLS LAST LIMIT 25
-            """, [ticker]).fetchdf()
+            """, [ticker] + active_params).fetchdf()
 
             if top_funds.empty:
                 return []
@@ -338,23 +345,29 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
 
         if level == 'fund':
             # Fund-level: aggregate from fund_holdings joined to fund_universe.
-            # Uses fund_universe.is_actively_managed (N21: now reliable after
-            # classification backfill). Active/passive split at SQL level.
-            af = "AND fu.is_actively_managed = true" if active_only else ""
+            # Active/passive split derived from canonical fund_strategy
+            # partitions (PR-3 — replaces fund_universe.is_actively_managed).
+            active_ph = ','.join('?' * len(ACTIVE_FUND_STRATEGIES))
+            passive_ph = ','.join('?' * len(PASSIVE_FUND_STRATEGIES))
+            af = ""
+            af_params: list = []
+            if active_only:
+                af = f"AND fu.fund_strategy IN ({active_ph})"
+                af_params = list(ACTIVE_FUND_STRATEGIES)
             df = con.execute(f"""
                 SELECT fh.quarter,
                        SUM(fh.shares_or_principal) as total_inst_shares,
                        SUM(fh.market_value_usd) as total_inst_value,
                        COUNT(DISTINCT fh.fund_name) as holder_count,
-                       SUM(CASE WHEN fu.is_actively_managed = true
+                       SUM(CASE WHEN fu.fund_strategy IN ({active_ph})
                                 THEN fh.market_value_usd ELSE 0 END) as active_value,
-                       SUM(CASE WHEN fu.is_actively_managed = false
+                       SUM(CASE WHEN fu.fund_strategy IN ({passive_ph})
                                 THEN fh.market_value_usd ELSE 0 END) as passive_value
                 FROM fund_holdings_v2 fh
                 LEFT JOIN fund_universe fu ON fh.series_id = fu.series_id
                 WHERE fh.ticker = ? AND fh.market_value_usd > 0 {af} AND fh.is_latest = TRUE
                 GROUP BY fh.quarter ORDER BY fh.quarter
-            """, [ticker]).fetchdf()
+            """, list(ACTIVE_FUND_STRATEGIES) + list(PASSIVE_FUND_STRATEGIES) + [ticker] + af_params).fetchdf()
         else:
             df = con.execute(f"""
                 SELECT quarter,
