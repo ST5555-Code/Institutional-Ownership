@@ -191,7 +191,7 @@ export function OverlapAnalysisTab() {
   const fundRows = useMemo(() => {
     if (!data) return []
     let rows = data.fund
-    if (fundActiveOnly) rows = rows.filter(r => r.is_active !== false)
+    if (fundActiveOnly) rows = rows.filter(r => r.is_active === true)
     return rows
   }, [data, fundActiveOnly])
 
@@ -210,7 +210,7 @@ export function OverlapAnalysisTab() {
     [data]
   )
   const fundStatsActive = useMemo(
-    () => computeOverlapStats((data?.fund ?? []).filter(r => r.is_active !== false)),
+    () => computeOverlapStats((data?.fund ?? []).filter(r => r.is_active === true)),
     [data]
   )
 

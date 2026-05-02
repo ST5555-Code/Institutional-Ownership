@@ -1,0 +1,302 @@
+series_id,fund_name,fund_cik,derived_strategy,support_pct,row_count,aum_usd,source
+S000009238,Tax Exempt Bond Fund of America,0000050142,bond_or_other,1.000000,10606,48164858423.52,majority
+S000009229,American High-Income Municipal Bond Fund,0000925950,bond_or_other,1.000000,7418,26592802561.94,majority
+S000045538,Blackstone Alternative Multi-Strategy Fund,0001557794,multi_asset,1.000000,7152,2540851766.07,override
+S000009231,Bond Fund of America,0000013075,bond_or_other,1.000000,5801,101149751896.57,majority
+S000008396,VOYA INTERMEDIATE BOND FUND,0001066602,bond_or_other,1.000000,5016,21316654174.20,majority
+S000029560,AB Municipal Income Shares,0001274676,bond_or_other,1.000000,4654,34589457486.90,majority
+S000002536,MFS Municipal Income Fund,0000751656,bond_or_other,1.000000,4384,12649956485.44,majority
+S000062381,Advantage CoreAlpha Bond Master Portfolio,0001738077,bond_or_other,1.000000,4152,1570873539.85,majority
+S000008760,VOYA INTERMEDIATE BOND PORTFOLIO,0000002646,bond_or_other,1.000000,3905,1845505996.60,majority
+S000009237,Limited Term Tax Exempt Bond Fund of America,0000909427,bond_or_other,1.000000,3843,11891700568.97,majority
+S000047257,FlexShares Credit-Scored US Corporate Bond Index Fund,0001491978,passive,1.000000,3500,1536018829.54,majority
+S000027417,Global Opportunities Portfolio,0001475712,bond_or_other,1.000000,2964,24585991300.34,majority
+S000009236,Intermediate Bond Fund of America,0000826813,bond_or_other,1.000000,2849,28536743012.33,majority
+S000009240,Capital World Bond Fund,0000812303,bond_or_other,1.000000,2574,9864997061.99,majority
+S000001913,CCM Community Impact Bond Fund,0001078195,bond_or_other,1.000000,2574,3839409901.08,majority
+S000029761,Global Macro Absolute Return Advantage Portfolio,0001493214,bond_or_other,1.000000,2484,11643930914.34,majority
+S000005247,Global Macro Portfolio,0000918706,bond_or_other,1.000000,2461,6137825234.57,majority
+S000062125,FlexShares High Yield Value - Scored Bond Index Fund,0001491978,passive,1.000000,2146,2917334705.43,majority
+S000009981,AB HIGH INCOME FUND INC,0000915845,bond_or_other,1.000000,2135,6245251554.77,majority
+S000017994,Emerging Markets Local Income Portfolio,0001394395,bond_or_other,1.000000,2067,3002834052.54,majority
+S000010128,"AB GLOBAL BOND FUND, INC.",0000883676,bond_or_other,1.000000,1788,7406895027.37,majority
+S000048895,Virtus Newfleet Multi-Sector Bond ETF,0001559109,excluded,1.000000,1765,690965825.68,majority
+S000008394,VOYA GNMA INCOME FUND,0001066602,bond_or_other,1.000000,1609,2772632410.93,majority
+S000050613,FlexShares Credit-Scored US Long Corporate Bond Index Fund,0001491978,passive,1.000000,1600,82525446.61,majority
+S000001147,TCW METWEST TOTAL RETURN BOND FUND,0001028621,bond_or_other,1.000000,1552,33663672206.91,majority
+S000073362,FlexShares ESG & Climate Investment Grade Corporate Core Index Fund,0001491978,passive,1.000000,1474,77555072.92,majority
+S000013585,Short-Term Bond Fund of America,0001368040,bond_or_other,1.000000,1432,12596046447.45,majority
+S000010066,Series E (Total Return Bond Series),0000217087,bond_or_other,1.000000,1422,454328089.71,majority
+S000022423,Senior Debt Portfolio,0000933188,bond_or_other,1.000000,1349,13746830859.42,majority
+S000000714,Western Asset Core Plus Bond Fund,0000863520,bond_or_other,1.000000,1296,4214251155.53,majority
+S000072763,MassMutual Global Credit Income Opportunities Fund,0001859808,bond_or_other,1.000000,1078,281507133.40,majority
+S000011831,ELFUN INCOME FUND,0000717854,bond_or_other,1.000000,1059,134664651.84,majority
+S000009230,American High Income Trust,0000823620,bond_or_other,1.000000,1027,26300655375.68,majority
+S000084823,Stratified LargeCap Index ETF,0001547950,passive,1.000000,1012,242113018.28,majority
+S000000713,Western Asset Core Bond Fund,0000863520,bond_or_other,1.000000,1010,1947342244.06,majority
+S000069946,Humankind U.S. Stock ETF,0001821080,excluded,1.000000,998,162510100.38,majority
+S000010934,Federated Hermes Institutional High Yield Bond Fund,0000925723,bond_or_other,1.000000,986,11700322704.11,majority
+S000049584,Aspiriant Risk-Managed Municipal Bond Fund,0001534881,bond_or_other,1.000000,976,1215171243.75,majority
+S000011830,ELFUN TAX EXEMPT INCOME FUND,0000215740,bond_or_other,1.000000,964,1643298075.97,majority
+S000005235,HIGH INCOME OPPORTUNITIES PORTFOLIO,0000921370,bond_or_other,1.000000,962,3471339785.82,majority
+S000054054,Emerging Markets Core Fund,0001034106,bond_or_other,1.000000,945,1505857274.82,majority
+S000046193,FlexShares Disciplined Duration MBS Index Fund,0001491978,passive,1.000000,942,177083819.08,majority
+S000008266,SDIT Ultra Short Duration Bond Fund,0000701939,bond_or_other,1.000000,922,395161419.09,majority
+S000009768,AFL CIO Housing Investment Trust,0000225030,bond_or_other,1.000000,874,7388534378.77,majority
+S000006439,INTERMEDIATE-TERM MUNICIPAL FUND,0000701817,bond_or_other,1.000000,839,1532878329.25,majority
+S000008267,SDIT Short Duration Government Fund,0000701939,bond_or_other,1.000000,825,1347232063.33,majority
+S000002530,MFS California Municipal Bond Fund,0000751656,bond_or_other,1.000000,804,1459856944.95,majority
+S000005237,Core Bond Portfolio,0001104129,bond_or_other,1.000000,765,1712108688.75,majority
+S000017995,International Income Portfolio,0001394396,bond_or_other,1.000000,710,245867511.85,majority
+S000012064,Colorado BondShares A Tax Exempt Fund,0000810744,bond_or_other,1.000000,652,2761676242.56,majority
+S000085069,Palmer Square Credit Opportunities ETF,0002014487,excluded,1.000000,619,214418731.98,majority
+S000003467,Sit Tax-Free Income Fund,0000746601,bond_or_other,1.000000,616,245559625.76,majority
+S000065357,QRAFT AI-Enhanced U.S. Large Cap ETF,0001547950,excluded,1.000000,603,32953196.03,majority
+S000065273,Leader Capital High Quality Income Fund,0001766436,bond_or_other,1.000000,601,3751193731.12,majority
+S000011063,Bernstein Intermediate Duration Institutional Portfolio,0001166729,bond_or_other,1.000000,598,943728853.89,majority
+S000010055,Series P (High Yield Series),0000217087,bond_or_other,1.000000,581,56729462.82,majority
+S000028884,"Cohen & Steers Preferred Securities & Income Fund, Inc.",0001484750,bond_or_other,1.000000,581,14830779543.74,majority
+S000058704,AB Impact Municipal Income Shares,0001274676,bond_or_other,1.000000,571,1247595663.20,majority
+S000010876,AB Corporate Income Shares,0001274676,bond_or_other,1.000000,569,348747065.31,majority
+S000002523,MFS North Carolina Municipal Bond Fund,0000751656,bond_or_other,1.000000,567,1040376676.80,majority
+S000002534,MFS Massachusetts Municipal Bond Fund,0000751656,bond_or_other,1.000000,539,785911578.83,majority
+S000040553,Series F (Floating Rate Strategies Series),0000217087,bond_or_other,1.000000,537,97310047.95,majority
+S000008269,SDIT GNMA FUND,0000701939,bond_or_other,1.000000,532,21718479.24,majority
+S000035596,FlexShares Ultra-Short Income Fund,0001491978,bond_or_other,1.000000,524,2793161867.16,majority
+S000006430,SHORT DURATION MUNICIPAL FUND,0000701817,bond_or_other,1.000000,510,746439529.12,majority
+S000001146,TCW METWEST LOW DURATION BOND FUND,0001028621,bond_or_other,1.000000,508,1029781127.66,majority
+S000079831,Cyber Hornet S&P 500 and Bitcoin 75/25 Strategy ETF,0001345125,passive,1.000000,505,6088753.80,majority
+S000029838,AB Taxable Multi-Sector Income Shares,0001274676,bond_or_other,1.000000,500,955421778.93,majority
+S000051713,"Cohen & Steers Low Duration Preferred and Income Fund, Inc.",0001652200,bond_or_other,1.000000,500,3671495441.89,majority
+S000081361,CCM Affordable Housing MBS ETF,0000870355,excluded,1.000000,496,221172209.63,majority
+S000064832,Preferred Securities and Income SMA Shares,0001760077,bond_or_other,1.000000,492,869788587.16,majority
+S000001151,TCW METWEST ULTRA SHORT BOND FUND,0001028621,bond_or_other,1.000000,483,96580961.81,majority
+S000001152,TCW METWEST STRATEGIC INCOME FUND,0001028621,bond_or_other,1.000000,479,53466689.51,majority
+S000002524,MFS Pennsylvania Municipal Bond Fund,0000751656,bond_or_other,1.000000,468,364125402.16,majority
+S000002527,MFS Virginia Municipal Bond Fund,0000751656,bond_or_other,1.000000,468,701558601.26,majority
+S000009129,High Yield Bond Core Fund,0001034106,bond_or_other,1.000000,463,1046920104.31,majority
+S000083030,Federated Hermes Total Return Bond ETF,0001849998,excluded,1.000000,454,355271689.46,majority
+S000002533,MFS Maryland Municipal Bond Fund,0000751656,bond_or_other,1.000000,454,303928922.70,majority
+S000080680,TEXAS CAPITAL TEXAS EQUITY INDEX ETF,0001972459,passive,1.000000,436,65999811.77,majority
+S000009127,Mortgage Core Fund,0001034106,bond_or_other,1.000000,430,5558675471.15,majority
+S000055298,Destra Flaherty & Crumrine Preferred and Income Fund,0001492374,bond_or_other,1.000000,429,448787495.91,majority
+S000005797,Hawaii Municipal Bond Fund,0000925737,bond_or_other,1.000000,428,339078972.02,majority
+S000081302,American Beacon AHL Trend ETF,0001096012,excluded,1.000000,428,91193521.47,majority
+S000002525,MFS South Carolina Municipal Bond Fund,0000751656,bond_or_other,1.000000,426,439857888.60,majority
+S000009068,"Federated Hermes Sustainable High Yield Bond Fund, Inc.",0000225318,bond_or_other,1.000000,400,491744551.83,majority
+S000094625,Federated Hermes MDT Market Neutral ETF,0001849998,excluded,1.000000,397,26707352.29,majority
+S000051233,COMMUNITY DEVELOPMENT FUND,0001649227,bond_or_other,1.000000,390,607913213.62,majority
+S000059080,Virtus InfraCap U.S. Preferred Stock ETF,0001559109,excluded,1.000000,379,5036993133.11,majority
+S000002532,MFS Georgia Municipal Bond Fund,0000751656,bond_or_other,1.000000,375,225035532.25,majority
+S000002529,MFS Arkansas Municipal Bond Fund,0000751656,bond_or_other,1.000000,374,284027421.70,majority
+S000002522,MFS New York Municipal Bond Fund,0000751656,bond_or_other,1.000000,363,360778338.91,majority
+S000089355,Eventide US Market ETF,0001506213,excluded,1.000000,349,264261583.60,majority
+S000088672,Indexperts Gorilla Aggressive Growth ETF,0001484018,excluded,1.000000,344,84670598.24,majority
+S000011654,Sit U S Government Securities Fund Inc,0000809981,bond_or_other,1.000000,329,404323018.92,majority
+S000001149,TCW METWEST HIGH YIELD BOND FUND,0001028621,bond_or_other,1.000000,322,409448473.71,majority
+S000045497,Guggenheim Strategy Fund III,0001601445,bond_or_other,1.000000,318,252847752.40,majority
+S000074173,Federated Hermes Short Duration Corporate ETF,0001849998,excluded,1.000000,317,126613378.42,majority
+S000002521,MFS Alabama Municipal Bond Fund,0000751656,bond_or_other,1.000000,310,136032557.69,majority
+S000072765,MassMutual Global Floating Rate Fund,0001859808,bond_or_other,1.000000,303,124770445.01,majority
+S000009070,"Federated Hermes Municipal Bond Fund, Inc.",0000201801,bond_or_other,1.000000,302,428491018.78,majority
+S000085236,Rareview Total Return Bond ETF,0001719812,excluded,1.000000,301,92479784.95,majority
+S000035751,Arrow Dow Jones Global Yield ETF,0001532206,passive,1.000000,289,54136782.03,majority
+S000058304,Virtus WMC International Dividend ETF,0001559109,excluded,1.000000,287,26157800.21,majority
+S000045496,Guggenheim Strategy Fund II,0001601445,bond_or_other,1.000000,282,249030559.73,majority
+S000002528,MFS West Virginia Municipal Bond Fund,0000751656,bond_or_other,1.000000,274,170461040.34,majority
+S000088673,Indexperts Quality Earnings Focused ETF,0001484018,excluded,1.000000,268,72032911.43,majority
+S000002535,MFS Mississippi Municipal Bond Fund,0000751656,bond_or_other,1.000000,264,125474213.03,majority
+S000065469,Intermediate Bond Fund,0001768447,bond_or_other,1.000000,254,141678911.14,majority
+S000003468,Sit Minnesota Tax-Free Income Fund,0000746601,bond_or_other,1.000000,250,369773478.76,majority
+S000090015,Nomura National High-Yield Municipal Bond ETF,0001969995,excluded,1.000000,247,60205968.46,majority
+S000047353,Virtus LifeSci Biotech Clinical Trials ETF,0001559109,excluded,1.000000,238,61133577.31,majority
+S000030275,Bank Loan Core Fund,0001034106,bond_or_other,1.000000,235,718086550.68,majority
+S000073803,Miller Market Neutral Income Fund,0001414039,bond_or_other,1.000000,234,260352164.71,majority
+S000090721,E*TRADE No Fee Municipal Bond Index Fund,0002048903,passive,1.000000,225,50551252.06,majority
+S000047494,InfraCap REIT Preferred ETF,0001559109,excluded,1.000000,222,213938395.88,majority
+S000057345,UVA Unconstrained Medium-Term Fixed Income ETF,0001484018,excluded,1.000000,221,83816477.84,majority
+S000074231,Build Bond Innovation ETF,0001875710,excluded,1.000000,221,21889862.24,majority
+S000065272,Leader Capital Short Term High Yield Bond Fund,0001766436,bond_or_other,1.000000,215,497222880.51,majority
+S000072757,AltShares Event-Driven ETF,0001779306,excluded,1.000000,213,15261745.68,majority
+S000081097,Madison Aggregate Bond ETF,0001976877,passive,1.000000,206,63625637.26,majority
+S000082989,LG QRAFT AI-Powered U.S. Large Cap Core ETF,0001547950,excluded,1.000000,203,8973164.88,majority
+S000084450,Obra High Grade Structured Products ETF,0001484018,excluded,1.000000,203,59502264.44,majority
+S000093092,Rayliant-ChinaAMC Transformative China Tech ETF,0002061770,excluded,1.000000,201,20340716.60,majority
+S000084449,Obra Opportunistic Structured Products ETF,0001484018,excluded,1.000000,199,74666591.03,majority
+S000092393,Monopoly ETF,0001506213,excluded,1.000000,198,23814506.00,majority
+S000009085,Federated Hermes Short-Intermediate Municipal Fund,0000353101,bond_or_other,1.000000,197,386063439.23,majority
+S000045418,InfraCap MLP ETF,0001559109,excluded,1.000000,187,972064628.04,majority
+S000083462,TEXAS CAPITAL TEXAS SMALL CAP EQUITY INDEX ETF,0001972459,passive,1.000000,186,10644063.52,majority
+S000008395,Voya High Yield Bond Fund,0001066602,bond_or_other,1.000000,185,467090541.38,majority
+S000009040,Federated Hermes Government Income Fund,0000357052,bond_or_other,1.000000,183,381302198.54,majority
+S000064728,Virtus Real Asset Income ETF,0001559109,excluded,1.000000,182,32149674.23,majority
+S000044182,WBI BullBear Yield 3000 ETF,0001591939,excluded,1.000000,181,72683752.10,majority
+S000045498,Guggenheim Variable Insurance Strategy Fund III,0001601445,bond_or_other,1.000000,180,60362827.72,majority
+S000090723,E*TRADE No Fee U.S. Bond Index Fund,0002048903,passive,1.000000,173,48857146.28,majority
+S000088551,GMO U.S. Value ETF,0001981627,excluded,1.000000,167,66975435.69,majority
+S000039473,Sit Quality Income Fund,0000746601,bond_or_other,1.000000,166,129989127.66,majority
+S000003821,Viking Tax-Free Fund for Montana,0001082744,bond_or_other,1.000000,165,104769944.05,majority
+S000088549,GMO International Value ETF,0001981627,excluded,1.000000,164,231124964.16,majority
+S000084933,Genter Capital Municipal Quality Intermediate ETF,0001484018,excluded,1.000000,160,37203491.92,majority
+S000088674,Indexperts Yield Focused Fixed Income ETF,0001484018,excluded,1.000000,158,43610590.05,majority
+S000044181,WBI BullBear Value 3000 ETF,0001591939,excluded,1.000000,157,58059677.45,majority
+S000044183,WBI BullBear Quality 3000 ETF,0001591939,excluded,1.000000,148,65773152.20,majority
+S000067196,AltShares Merger Arbitrage ETF,0001779306,excluded,1.000000,144,94035925.46,majority
+S000089384,Obra Defensive High Yield ETF,0001484018,excluded,1.000000,141,5082416.83,majority
+S000093420,First Eagle High Yield Municipal Completion Fund,0002060415,bond_or_other,1.000000,140,32320092.51,majority
+S000006436,CALIFORNIA MUNICIPAL BOND FUND,0000701817,bond_or_other,1.000000,137,226969846.64,majority
+S000036290,Aspiriant Risk-Managed Equity Allocation Fund,0001534881,bond_or_other,1.000000,132,1316259643.01,majority
+S000088550,GMO Systematic Investment Grade Credit ETF,0001981627,excluded,1.000000,131,18985253.06,majority
+S000023593,Project and Trade Finance Core Fund,0001411674,bond_or_other,1.000000,129,1353934394.72,majority
+S000056193,abrdn Bloomberg All Commodity Longer Dated Strategy K-1 Free ETF,0001597934,excluded,1.000000,129,574603187.43,majority
+S000052299,ARK Israel Innovative Technology ETF,0001579982,excluded,1.000000,124,264114814.29,majority
+S000047354,Virtus LifeSci Biotech Products ETF,0001559109,excluded,1.000000,123,76461535.24,majority
+S000023539,Templeton Global Total Return Fund,0000795402,bond_or_other,1.000000,122,202496821.43,majority
+S000064727,Virtus Private Credit Strategy ETF,0001559109,excluded,1.000000,121,114012944.04,majority
+S000084713,Anydrus Advantage ETF,0001719812,excluded,1.000000,118,56253492.63,majority
+S000074338,Popular High Grade Fixed-Income Fund Inc.,0001862970,bond_or_other,1.000000,115,34157831.76,majority
+S000020099,Miller Convertible Bond Fund,0001414039,bond_or_other,1.000000,114,1022154086.36,majority
+S000006431,PENNSYLVANIA MUNICIPAL BOND FUND,0000701817,bond_or_other,1.000000,112,133981766.40,majority
+S000069718,Siren DIVCON Leaders Dividend ETF,0001796383,excluded,1.000000,112,132735150.53,majority
+S000008754,Templeton Global Bond Fund,0000795402,bond_or_other,1.000000,109,2916479542.58,majority
+S000084932,Genter Capital Taxable Quality Intermediate ETF,0001484018,excluded,1.000000,108,140444202.49,majority
+S000046813,Miller Intermediate Bond Fund,0001414039,bond_or_other,1.000000,107,357429258.97,majority
+S000094624,Federated Hermes Enhanced Income ETF,0001849998,excluded,1.000000,106,20231949.82,majority
+S000093218,Crossmark Large Cap Value ETF,0002062986,excluded,1.000000,103,22221628.99,majority
+S000045949,EUBEL BRADY & SUTTMAN INCOME FUND,0001606378,bond_or_other,1.000000,103,840632033.39,majority
+S000065358,QRAFT AI-Enhanced U.S. Large Cap Momentum ETF,0001547950,excluded,1.000000,102,59526540.84,majority
+S000056192,abrdn Bloomberg All Commodity Strategy K-1 Free ETF,0001597934,excluded,1.000000,101,3406140051.75,majority
+S000094833,Man Active High Yield ETF,0002065379,excluded,1.000000,101,18407488.37,majority
+S000083896,American Beacon GLG Natural Resources ETF,0001096012,excluded,1.000000,101,754143361.61,majority
+S000042978,ARK Next Generation Internet ETF,0001579982,excluded,1.000000,99,4340873064.58,majority
+S000078169,Federated Hermes U.S. Strategic Dividend ETF,0001849998,excluded,1.000000,99,1058268025.40,majority
+S000061584,Procure Space ETF,0001727398,excluded,1.000000,99,566385978.92,majority
+S000081095,Madison Short-Term Strategic Income ETF,0001976877,excluded,1.000000,98,61925647.98,majority
+S000040303,Templeton Sustainable Emerging Markets Bond Fund,0000795402,bond_or_other,1.000000,97,24498160.32,majority
+S000083143,Natixis Gateway Quality Income ETF,0001526787,excluded,1.000000,97,222176163.59,majority
+S000009108,Hawaiian Tax-Free Trust,0000750909,bond_or_other,1.000000,96,368508462.48,majority
+S000086526,Eventide High Dividend ETF,0001506213,excluded,1.000000,95,309367000.07,majority
+S000042977,ARK Innovation ETF,0001579982,excluded,1.000000,95,15073032926.78,majority
+S000088547,GMO Beyond China ETF,0001981627,excluded,1.000000,94,12287487.45,majority
+S000052298,The 3D Printing ETF,0001579982,excluded,1.000000,94,143848983.24,majority
+S000080449,Fundamentals First ETF,0001953487,excluded,1.000000,93,5703688.02,majority
+S000064752,ARK Fintech Innovation ETF,0001579982,excluded,1.000000,91,2256874017.88,majority
+S000048107,VY BrandyWineGLOBAL - Bond Portfolio,0001090682,bond_or_other,1.000000,89,457712026.96,majority
+S000009041,Federated Hermes Short-Intermediate Government Fund,0000357159,bond_or_other,1.000000,89,200972263.61,majority
+S000011440,NORTHEAST INVESTORS TRUST,0000072760,bond_or_other,1.000000,89,256314409.78,majority
+S000085351,FundX Future Fund Opportunities ETF,0001602508,excluded,1.000000,85,186851100.06,majority
+S000077078,Short Duration Inflation-Protected Income Portfolio,0001928846,bond_or_other,1.000000,84,856666537.89,majority
+S000006435,NEW JERSEY MUNICIPAL BOND FUND,0000701817,bond_or_other,1.000000,83,91134735.75,majority
+S000010534,CM ADVISORS FIXED INCOME FUND,0001208252,bond_or_other,1.000000,82,27809060.31,majority
+S000055344,Davis Select Worldwide ETF,0001670310,excluded,1.000000,80,1009073112.75,majority
+S000072935,Atlas U.S. Tactical Income Fund,0001866278,bond_or_other,1.000000,78,75304977.95,majority
+S000056657,Saba Closed-End Funds ETF,0001547950,excluded,1.000000,78,319449223.09,majority
+S000006434,NEW YORK MUNICIPAL BOND FUND,0000701817,bond_or_other,1.000000,77,110774427.12,majority
+S000083942,MassMutual Clinton Limited Term Municipal Fund,0001859808,bond_or_other,1.000000,77,113364166.89,majority
+S000086524,Palmer Square CLO Senior Debt ETF,0002014487,excluded,1.000000,75,71736129.94,majority
+S000042976,ARK Autonomous Technology & Robotics ETF,0001579982,excluded,1.000000,75,3876402869.73,majority
+S000046875,Renaissance International IPO ETF,0001026634,excluded,1.000000,74,10396360.31,majority
+S000070448,Strategy Shares Gold Enhanced Yield ETF,0001506213,excluded,1.000000,73,293269180.99,majority
+S000070063,The E-Valuator Moderate (50%-70%) RMS Fund,0001821505,bond_or_other,1.000000,73,153545651.42,majority
+S000070060,The E-Valuator Conservative (15%-30%) RMS Fund,0001821505,bond_or_other,1.000000,73,49668895.23,majority
+S000070061,The E-Valuator Conservative/Moderate (30%-50%) RMS Fund,0001821505,bond_or_other,1.000000,73,32938294.78,majority
+S000089486,Genter Capital Dividend Income ETF,0001484018,excluded,1.000000,72,11599624.76,majority
+S000006432,MASSACHUSETTS MUNICIPAL BOND FUND,0000701817,bond_or_other,1.000000,72,62334777.07,majority
+S000089487,Genter Capital International Dividend ETF,0001484018,excluded,1.000000,72,5838843.07,majority
+S000042975,ARK Genomic Revolution ETF,0001579982,excluded,1.000000,72,2577469882.76,majority
+S000002663,Series M,0001225290,bond_or_other,1.000000,71,322362731.79,majority
+S000070062,The E-Valuator Growth (70%-85%) RMS Fund,0001821505,bond_or_other,1.000000,71,269747917.51,majority
+S000070064,The E-Valuator Very Conservative (0%-15%) RMS Fund,0001821505,bond_or_other,1.000000,71,21425602.96,majority
+S000072878,Adaptive Core ETF,0001719812,excluded,1.000000,70,23697423.48,majority
+S000083940,MassMutual Clinton Municipal Credit Opportunities Fund,0001859808,bond_or_other,1.000000,69,103911038.26,majority
+S000071318,ARK Space Exploration & Innovation ETF,0001579982,excluded,1.000000,68,1355219585.04,majority
+S000094834,Man Active Income ETF,0002065379,excluded,1.000000,68,21209460.10,majority
+S000045948,EUBEL BRADY & SUTTMAN INCOME AND APPRECIATION FUND,0001606378,bond_or_other,1.000000,67,300498313.41,majority
+S000081094,Madison Covered Call ETF,0001976877,excluded,1.000000,66,35963795.31,majority
+S000055343,Davis Select Financial ETF,0001670310,excluded,1.000000,66,767729568.62,majority
+S000086506,TEXAS CAPITAL GOVERNMENT MONEY MARKET ETF,0001972459,excluded,1.000000,66,127663935.21,majority
+S000070059,The E-Valuator Aggressive Growth (85%-99%) RMS Fund,0001821505,bond_or_other,1.000000,64,231835510.53,majority
+S000091902,Dan IVES Wedbush AI Revolution ETF,0002055464,excluded,1.000000,62,2061388427.97,majority
+S000074352,"U.S. Monthly Income Fund for Puerto Rico Residents, Inc.",0001843749,bond_or_other,1.000000,62,69546083.02,majority
+S000094773,Nelson Select ETF,0001719812,excluded,1.000000,62,41284759.94,majority
+S000061340,Davis Select International ETF,0001670310,excluded,1.000000,61,535678120.27,majority
+S000093217,Crossmark Large Cap Growth ETF,0002062986,excluded,1.000000,60,42975666.88,majority
+S000079330,IDX Adaptive Opportunities Fund,0001643838,passive,1.000000,59,49217035.36,majority
+S000069719,Siren NexGen Economy ETF,0001796383,excluded,1.000000,59,44369889.12,majority
+S000083461,TEXAS CAPITAL TEXAS OIL INDEX ETF,0001972459,passive,1.000000,57,21076627.58,majority
+S000055342,Davis Select U.S. Equity ETF,0001670310,excluded,1.000000,56,1891069204.28,majority
+S000055583,WBI Power Factor High Dividend ETF,0001591939,excluded,1.000000,52,62635442.79,majority
+S000095116,AMG GW&K Muni Income ETF,0000879947,excluded,1.000000,51,10390098.61,majority
+S000059719,Strategy Shares NASDAQ 7HANDL Index ETF,0001506213,passive,1.000000,49,1276437303.32,majority
+S000000715,Western Asset Inflation Indexed Plus Bond Fund,0000863520,bond_or_other,1.000000,48,39752130.85,majority
+S000094339,WarCap Unconstrained Equity ETF,0001484018,excluded,1.000000,47,114256948.63,majority
+S000033316,FlexShares iBoxx 3-Year Target Duration TIPS Index Fund,0001491978,passive,1.000000,47,5040930527.63,majority
+S000074350,International Portfolio I,0001852344,active,1.000000,46,1740328.74,majority
+S000075052,Valkyrie Bitcoin Miners ETF,0001877493,excluded,1.000000,45,498185016.40,majority
+S000094783,GMO Ultra-Short Income ETF,0001981627,excluded,1.000000,45,7422789.64,majority
+S000070261,The SPAC and New Issue ETF,0001719812,excluded,1.000000,43,7499420.56,majority
+S000083941,MassMutual Clinton Municipal Fund,0001859808,bond_or_other,1.000000,43,62531083.77,majority
+S000069798,Rareview Dynamic Fixed Income ETF,0001719812,excluded,1.000000,42,60913200.47,majority
+S000074346,Large Cap Core Portfolio I,0001852344,active,1.000000,41,6124572.27,majority
+S000082813,FundX Conservative ETF,0001602508,excluded,1.000000,41,103506280.96,majority
+S000041784,Renaissance IPO ETF,0001026634,excluded,1.000000,41,139617592.70,majority
+S000074349,Small Cap Core Portfolio I,0001852344,active,1.000000,41,1718925.13,majority
+S000083162,Mohr Company NAV ETF,0001719812,excluded,1.000000,40,34034862.73,majority
+S000074347,Large Cap Growth Portfolio I,0001852344,active,1.000000,40,8009410.49,majority
+S000084308,North Shore Equity Rotation ETF,0001484018,excluded,1.000000,40,52392565.60,majority
+S000034352,FlexShares iBoxx 5-Year Target Duration TIPS Index Fund,0001491978,passive,1.000000,40,1858894517.41,majority
+S000055516,FlexShares Core Select Bond Fund,0001491978,bond_or_other,1.000000,39,328332774.89,majority
+S000081096,Madison Dividend Value ETF,0001976877,excluded,1.000000,38,61223856.38,majority
+S000074344,Popular Income Plus Fund Inc.,0001862971,bond_or_other,1.000000,38,16875647.56,majority
+S000094780,GMO Domestic Resilience ETF,0001981627,excluded,1.000000,38,29393749.05,majority
+S000082992,GMO U.S. Quality ETF,0001981627,excluded,1.000000,37,3028249851.66,majority
+S000073730,Goose Hollow Tactical Allocation ETF,0001719812,excluded,1.000000,37,37692902.72,majority
+S000049397,Virtus Reaves Utilities ETF,0001559109,excluded,1.000000,35,2654417390.32,majority
+S000074348,Mid Cap Core Portfolio I,0001852344,active,1.000000,34,3841832.19,majority
+S000088548,GMO International Quality ETF,0001981627,excluded,1.000000,34,252496682.15,majority
+S000094663,Prospera Income ETF,0002071107,excluded,1.000000,33,2130163.25,majority
+S000066772,Day Hagan Smart Sector ETF,0001506213,excluded,1.000000,32,1113771279.99,majority
+S000084270,Bancreek International Large Cap ETF,0001547950,excluded,1.000000,31,73258983.01,majority
+S000090213,American Beacon Ionic Inflation Protection ETF,0001096012,excluded,1.000000,31,20901194.43,majority
+S000082910,Langar Global Health Tech ETF,0001484018,excluded,1.000000,31,3997073.88,majority
+S000083459,Bancreek U.S. Large Cap ETF,0001547950,excluded,1.000000,31,96587066.21,majority
+S000072683,abrdn Bloomberg Industrial Metals Strategy K-1 Free ETF,0001597934,excluded,1.000000,29,22735279.18,majority
+S000074345,Large Cap Value Portfolio I,0001852344,active,1.000000,29,5255629.35,majority
+S000087726,Select STOXX Europe Aerospace & Defense ETF,0001484018,excluded,1.000000,28,2147350143.21,majority
+S000068960,Natixis Vaughan Nelson Select ETF,0001728860,excluded,1.000000,28,13549807.13,majority
+S000085894,Long Pond Real Estate Select ETF,0001547950,excluded,1.000000,27,92050385.92,majority
+S000076645,Day Hagan Smart Sector International ETF,0001506213,excluded,1.000000,27,72456453.46,majority
+S000074333,"Short Term Investment Fund for Puerto Rico Residents, Inc.",0001847310,bond_or_other,1.000000,27,135519630.09,majority
+S000089482,PLUS Korea Defense Industry Index ETF,0001547950,passive,1.000000,25,57370744.70,majority
+S000068387,ETC Cabana Target Beta ETF,0001547950,excluded,1.000000,24,116511295.29,majority
+S000068388,ETC Cabana Target Drawdown 10 ETF,0001547950,excluded,1.000000,23,242474619.05,majority
+S000091576,CoinShares Altcoins ETF,0001877493,excluded,1.000000,22,1613307.05,majority
+S000077553,FundX Aggressive ETF,0001602508,excluded,1.000000,21,27585960.00,majority
+S000035083,AZL MVP Global Balanced Index Strategy Fund,0001301708,passive,1.000000,20,802653371.00,majority
+S000072879,Mindful Conservative ETF,0001719812,excluded,1.000000,17,8067031.13,majority
+S000094781,GMO Dynamic Allocation ETF,0001981627,excluded,1.000000,17,18703767.47,majority
+S000073631,Day Hagan Smart Sector Fixed Income ETF,0001506213,excluded,1.000000,17,65348142.81,majority
+S000035081,AZL MVP Balanced Index Strategy Fund,0001301708,passive,1.000000,14,1319750274.22,majority
+S000035084,AZL MVP Moderate Index Strategy Fund,0001301708,passive,1.000000,14,590469698.49,majority
+S000075551,X-Square Municipal Income ETF,0001901443,excluded,1.000000,14,4478841.69,majority
+S000035082,AZL MVP Growth Index Strategy Fund,0001301708,passive,1.000000,14,3277699369.07,majority
+S000069799,Rareview Tax Advantaged Income ETF,0001719812,excluded,1.000000,14,17667998.94,majority
+S000072148,ETC Cabana Target Leading Sector Moderate ETF,0001547950,excluded,1.000000,14,216810769.40,majority
+S000059404,Aspiriant Risk-Managed Taxable Bond Fund,0001534881,bond_or_other,1.000000,11,373128529.97,majority
+S000077552,FundX ETF,0001602508,excluded,1.000000,11,173490363.98,majority
+S000074058,Valkyrie Bitcoin and Ether Strategy ETF,0001877493,excluded,1.000000,11,40692351.05,majority
+S000051603,Aspiriant Defensive Allocation Fund,0001534881,bond_or_other,1.000000,11,989520766.82,majority
+S000025338,AZL Balanced Index Strategy Fund,0001301708,passive,1.000000,10,648738498.81,majority
+S000082812,FundX Flexible ETF,0001602508,excluded,1.000000,10,32324512.90,majority
+S000095346,ARK DIET Q4 Buffer ETF,0001579982,excluded,1.000000,9,6865378.61,majority
+S000066847,Strategy Shares Newfound/Resolve Robust Momentum ETF,0001506213,excluded,1.000000,9,55658320.92,majority
+S000089262,Day Hagan Smart Buffer ETF,0001506213,excluded,1.000000,8,81874786.00,majority
+S000079362,Mohr Sector Nav ETF,0001719812,excluded,1.000000,7,23784640.91,majority
+S000075093,Rareview Systematic Equity ETF,0001719812,excluded,1.000000,6,96832389.82,majority
+S000095343,ARK DIET Q1 Buffer ETF,0001579982,excluded,1.000000,5,1467721.55,majority
+S000074070,IDX Risk-Managed Digital Assets Strategy Fund,0001643838,passive,1.000000,4,21433059.87,majority
+S000084822,Stratified LargeCap Hedged ETF,0001547950,excluded,1.000000,4,23511733.39,majority
+S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,0001719812,excluded,1.000000,4,-280829.84,majority
+S000081280,Valkyrie Bitcoin Futures Leveraged Strategy ETF,0001877493,excluded,1.000000,2,2969399.97,majority
+S000084371,DailyDelta Q100 Upside Option Strategy ETF,0001873280,excluded,1.000000,1,9912.99,majority
+S000084370,DailyDelta Q100 Downside Option Strategy ETF,0001873280,excluded,1.000000,1,27365.44,majority
