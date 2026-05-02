@@ -1,0 +1,506 @@
+{
+  "relationship_type_breakdown": [
+    {
+      "relationship_type": "fund_sponsor",
+      "control_type": "advisory",
+      "distinct_brands": 372,
+      "row_count": 6217,
+      "fund_aum_usd": 1668058640120171.2
+    },
+    {
+      "relationship_type": "sub_adviser",
+      "control_type": "advisory",
+      "distinct_brands": 191,
+      "row_count": 1729,
+      "fund_aum_usd": 571495415683367.8
+    },
+    {
+      "relationship_type": "wholly_owned",
+      "control_type": "control",
+      "distinct_brands": 83,
+      "row_count": 103,
+      "fund_aum_usd": 9835433872264.223
+    },
+    {
+      "relationship_type": "parent_brand",
+      "control_type": "control",
+      "distinct_brands": 2,
+      "row_count": 2,
+      "fund_aum_usd": 17066993992.120018
+    },
+    {
+      "relationship_type": "mutual_structure",
+      "control_type": "mutual",
+      "distinct_brands": 1,
+      "row_count": 1,
+      "fund_aum_usd": 146763766.54000002
+    }
+  ],
+  "brand_position_breakdown": [
+    {
+      "brand_position": "parent",
+      "relationship_type": "fund_sponsor",
+      "distinct_brands": 207,
+      "fund_aum_usd": 1663227251698592.5
+    },
+    {
+      "brand_position": "parent",
+      "relationship_type": "sub_adviser",
+      "distinct_brands": 157,
+      "fund_aum_usd": 571408305284851.5
+    },
+    {
+      "brand_position": "child",
+      "relationship_type": "wholly_owned",
+      "distinct_brands": 61,
+      "fund_aum_usd": 6079947665283.376
+    },
+    {
+      "brand_position": "child",
+      "relationship_type": "fund_sponsor",
+      "distinct_brands": 181,
+      "fund_aum_usd": 4831388421584.578
+    },
+    {
+      "brand_position": "parent",
+      "relationship_type": "wholly_owned",
+      "distinct_brands": 31,
+      "fund_aum_usd": 3755486206980.846
+    },
+    {
+      "brand_position": "child",
+      "relationship_type": "sub_adviser",
+      "distinct_brands": 34,
+      "fund_aum_usd": 87110398516.45001
+    },
+    {
+      "brand_position": "child",
+      "relationship_type": "parent_brand",
+      "distinct_brands": 1,
+      "fund_aum_usd": 9933936885.470003
+    },
+    {
+      "brand_position": "parent",
+      "relationship_type": "parent_brand",
+      "distinct_brands": 1,
+      "fund_aum_usd": 7133057106.650019
+    },
+    {
+      "brand_position": "parent",
+      "relationship_type": "mutual_structure",
+      "distinct_brands": 1,
+      "fund_aum_usd": 146763766.54000002
+    }
+  ],
+  "counterparty_hv2_resolution": {
+    "brands_with_relationship": 498,
+    "brands_with_counterparty_in_hv2": 86,
+    "pair_count": 8003,
+    "pairs_with_counterparty_in_hv2": 96
+  },
+  "ech_coverage": {
+    "total_invisible_brands": 1225,
+    "brands_with_open_ech": 1207,
+    "total_aum_usd": 27797705080058.188,
+    "aum_with_ech_usd": 27730038870354.754
+  },
+  "ech_classification_distribution": [
+    {
+      "classification": "active",
+      "distinct_brands": 429,
+      "fund_aum_usd": 14849264521605.297
+    },
+    {
+      "classification": "passive",
+      "distinct_brands": 32,
+      "fund_aum_usd": 6151892464264.021
+    },
+    {
+      "classification": "unknown",
+      "distinct_brands": 703,
+      "fund_aum_usd": 4731124782006.069
+    },
+    {
+      "classification": "private_equity",
+      "distinct_brands": 2,
+      "fund_aum_usd": 727518037635.4015
+    },
+    {
+      "classification": "mixed",
+      "distinct_brands": 13,
+      "fund_aum_usd": 645524570523.604
+    },
+    {
+      "classification": "hedge_fund",
+      "distinct_brands": 19,
+      "fund_aum_usd": 617335077870.6198
+    },
+    {
+      "classification": "strategic",
+      "distinct_brands": 8,
+      "fund_aum_usd": 7265061909.1900015
+    },
+    {
+      "classification": "quantitative",
+      "distinct_brands": 1,
+      "fund_aum_usd": 114354540.59000002
+    }
+  ],
+  "orphan_summary": {
+    "count": 723,
+    "fund_aum_usd": 943276427460.6315,
+    "fund_rows": 2272913
+  },
+  "orphan_entity_type_distribution": [
+    {
+      "brand_entity_type": "institution",
+      "brand_count": 692,
+      "fund_aum_usd": 906659380173.7512
+    },
+    {
+      "brand_entity_type": "fund",
+      "brand_count": 31,
+      "fund_aum_usd": 36617047286.87999
+    }
+  ],
+  "orphan_created_source_distribution": [
+    {
+      "created_source": "bootstrap_tier4",
+      "is_inferred": false,
+      "brand_count": 656,
+      "fund_aum_usd": 567439999969.9946
+    },
+    {
+      "created_source": "managers",
+      "is_inferred": true,
+      "brand_count": 3,
+      "fund_aum_usd": 144779882081.9048
+    },
+    {
+      "created_source": "ncen_adviser_map",
+      "is_inferred": true,
+      "brand_count": 16,
+      "fund_aum_usd": 125242405840.81993
+    },
+    {
+      "created_source": "int-21_series_triage",
+      "is_inferred": false,
+      "brand_count": 6,
+      "fund_aum_usd": 41170654855.65
+    },
+    {
+      "created_source": "fund_universe",
+      "is_inferred": true,
+      "brand_count": 31,
+      "fund_aum_usd": 36617047286.87999
+    },
+    {
+      "created_source": "manual_13dg_resolution",
+      "is_inferred": false,
+      "brand_count": 11,
+      "fund_aum_usd": 28026437425.380024
+    }
+  ],
+  "top25_invisible": [
+    {
+      "brand_eid": 18073,
+      "fund_rows": 183559,
+      "fund_aum_usd": 2714525923155.8604,
+      "brand_name": "J.P. Morgan Investment Management Inc.",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 14409,
+      "ech_class": "active",
+      "counterparty_name": "Small-Cap Equity Portfolio",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 1,
+      "fund_rows": 267751,
+      "fund_aum_usd": 2541531744497.1475,
+      "brand_name": "Vanguard Group",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 22662,
+      "ech_class": "passive",
+      "counterparty_name": "VANGUARD CORE BOND ETF",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 30,
+      "fund_rows": 289040,
+      "fund_aum_usd": 1716004441598.677,
+      "brand_name": "PIMCO",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 2322,
+      "ech_class": "active",
+      "counterparty_name": "PACIFIC INVESTMENT MANAGEMENT CO LLC",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 9904,
+      "fund_rows": 100015,
+      "fund_aum_usd": 1571051172686.835,
+      "brand_name": "TEACHERS ADVISORS, LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 16920,
+      "ech_class": "active",
+      "counterparty_name": "Nuveen Lifecycle 2010 Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 7586,
+      "fund_rows": 70554,
+      "fund_aum_usd": 1303293291270.13,
+      "brand_name": "BlackRock Fund Advisors",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 24830,
+      "ech_class": "passive",
+      "counterparty_name": "WEBs Consumer Discretionary XLY Defined Volatility ETF",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 1355,
+      "fund_rows": 92179,
+      "fund_aum_usd": 1162805887157.2085,
+      "brand_name": "FRANKLIN ADVISERS INC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 15674,
+      "ech_class": "active",
+      "counterparty_name": "Franklin Utilities Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 17924,
+      "fund_rows": 66552,
+      "fund_aum_usd": 1105544167794.2266,
+      "brand_name": "T. Rowe Price Associates, Inc.",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 17383,
+      "ech_class": "active",
+      "counterparty_name": "T. Rowe Price Emerging Europe Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 9935,
+      "fund_rows": 89257,
+      "fund_aum_usd": 757505442726.3694,
+      "brand_name": "Wellington Management Co LLP",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 12035,
+      "ech_class": "active",
+      "counterparty_name": "THE HARTFORD BALANCED INCOME FUND",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 2400,
+      "fund_rows": 160020,
+      "fund_aum_usd": 714590674827.1125,
+      "brand_name": "Fidelity Management & Research Co LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 15407,
+      "ech_class": "private_equity",
+      "counterparty_name": "Fidelity Advisor New Insights Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 3586,
+      "fund_rows": 213206,
+      "fund_aum_usd": 645067260899.9176,
+      "brand_name": "BLACKROCK ADVISORS LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 22139,
+      "ech_class": "passive",
+      "counterparty_name": "iShares U.S. Long Government Bond Index Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 7,
+      "fund_rows": 167803,
+      "fund_aum_usd": 510776426003.03986,
+      "brand_name": "Dimensional Fund Advisors",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 21215,
+      "ech_class": "passive",
+      "counterparty_name": "AZL MVP DFA Multi-Strategy Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 17970,
+      "fund_rows": 95262,
+      "fund_aum_usd": 426484088779.9999,
+      "brand_name": "BlackRock Investment Management, LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 15979,
+      "ech_class": "active",
+      "counterparty_name": "NVIT J.P. Morgan Large Cap Growth Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 11,
+      "fund_rows": 73539,
+      "fund_aum_usd": 415271298767.7489,
+      "brand_name": "Fidelity / FMR",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 21063,
+      "ech_class": "active",
+      "counterparty_name": "Fidelity Corporate Bond ETF",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 2322,
+      "fund_rows": 34561,
+      "fund_aum_usd": 327197856455.5493,
+      "brand_name": "PACIFIC INVESTMENT MANAGEMENT CO LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 18401,
+      "ech_class": "mixed",
+      "counterparty_name": "S000009709",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 18062,
+      "fund_rows": 1813,
+      "fund_aum_usd": 325909220676.6199,
+      "brand_name": "GQG Partners LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 12741,
+      "ech_class": "unknown",
+      "counterparty_name": "Nationwide Geneva Mid Cap Growth Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 3050,
+      "fund_rows": 59835,
+      "fund_aum_usd": 319030387997.23987,
+      "brand_name": "MELLON INVESTMENTS Corp",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 14808,
+      "ech_class": "active",
+      "counterparty_name": "Appreciation Portfolio",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 3,
+      "fund_rows": 60157,
+      "fund_aum_usd": 301895663194.67004,
+      "brand_name": "State Street / SSGA",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 21006,
+      "ech_class": "passive",
+      "counterparty_name": "State Street(R) SPDR(R) Portfolio High Yield Bond ETF",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 18983,
+      "fund_rows": 57650,
+      "fund_aum_usd": 300790894227.88,
+      "brand_name": "Jackson National Asset Management, LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 18984,
+      "ech_class": "unknown",
+      "counterparty_name": "S000084075",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 17930,
+      "fund_rows": 28716,
+      "fund_aum_usd": 275335717174.4099,
+      "brand_name": "Federated Advisory Services Company",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 17190,
+      "ech_class": "unknown",
+      "counterparty_name": "Federated Hermes Strategic Income Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 77,
+      "fund_rows": 37321,
+      "fund_aum_usd": 269398096404.48975,
+      "brand_name": "PGIM",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 21953,
+      "ech_class": "active",
+      "counterparty_name": "PGIM Active Aggregate Bond ETF",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 8994,
+      "fund_rows": 89362,
+      "fund_aum_usd": 265712107259.8896,
+      "brand_name": "MANULIFE FINANCIAL CORP",
+      "brand_entity_type": "institution",
+      "rel_type": "wholly_owned",
+      "counterparty_eid": 8179,
+      "ech_class": "unknown",
+      "counterparty_name": "MANUFACTURERS LIFE INSURANCE COMPANY, THE",
+      "cp_in_hv2": true
+    },
+    {
+      "brand_eid": 19555,
+      "fund_rows": 93317,
+      "fund_aum_usd": 262242184223.83972,
+      "brand_name": "WisdomTree Asset Management, Inc.",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 19566,
+      "ech_class": "unknown",
+      "counterparty_name": "S000079043",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 10538,
+      "fund_rows": 24328,
+      "fund_aum_usd": 257964490734.61154,
+      "brand_name": "MANULIFE INVESTMENT MANAGEMENT (US) LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "sub_adviser",
+      "counterparty_eid": 13467,
+      "ech_class": "active",
+      "counterparty_name": "U.S. Growth Trust",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 8,
+      "fund_rows": 24098,
+      "fund_aum_usd": 232682587118.0099,
+      "brand_name": "First Trust",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 21051,
+      "ech_class": "passive",
+      "counterparty_name": "First Trust Global Tactical Commodity Strategy Fund",
+      "cp_in_hv2": false
+    },
+    {
+      "brand_eid": 2232,
+      "fund_rows": 89117,
+      "fund_aum_usd": 222165052041.8202,
+      "brand_name": "SUNAMERICA ASSET MANAGEMENT, LLC",
+      "brand_entity_type": "institution",
+      "rel_type": "fund_sponsor",
+      "counterparty_eid": 12149,
+      "ech_class": "active",
+      "counterparty_name": "SA Large Cap Index Portfolio",
+      "cp_in_hv2": false
+    }
+  ]
+}

@@ -1,0 +1,258 @@
+eid,canonical_name,entity_type,is_inferred,created_source,fund_rows,fund_aum_usd,filer_rows,filer_aum_usd,ech_class,ech_is_activist,ech_source,ciks
+3241,"BlackRock, Inc.",institution,True,managers,,0.0,199623,21642696386420.0,passive,False,managers,0002012383
+2,BlackRock / iShares,institution,True,PARENT_SEEDS,944813,15738173764912.805,,0.0,passive,False,PARENT_SEEDS,0001306550|0001364742|0001137391|0000888410|0000882152|0000884216
+7586,BlackRock Fund Advisors,institution,True,managers,70554,1303293291270.1296,,0.0,passive,False,managers,0001006249
+3586,BLACKROCK ADVISORS LLC,institution,True,managers,213206,645067260899.9175,,0.0,passive,False,managers,0001086364
+17970,"BlackRock Investment Management, LLC",institution,True,ncen_adviser_map,95262,426484088779.99976,,0.0,active,False,dm13_classification_backfill,
+8453,BLACKROCK FINANCIAL MANAGEMENT INC/DE,institution,True,managers,5499,149536077450.2902,,0.0,passive,False,managers,0001086363
+18030,BlackRock International Limited,institution,True,ncen_adviser_map,10063,16321520168.660013,,0.0,active,False,dm13_classification_backfill,
+9160,BLACKROCK (SINGAPORE) LTD.,institution,True,managers,325,11792830001.409998,,0.0,passive,False,managers,0001559921
+17999,"BlackRock Advisors, LLC",institution,True,ncen_adviser_map,3694,7767237189.689998,,0.0,,,,
+26915,BlackRock Municipal 2030 Target Term Trust,institution,False,bootstrap_tier4,1118,4765819308.069999,,0.0,active,False,tier4_keyword_sweep,0001528437
+26729,"BlackRock MuniHoldings California Quality Fund, Inc.",institution,False,bootstrap_tier4,425,3677303434.449999,,0.0,unknown,False,bootstrap_tier4,0001051004
+26695,"BlackRock MuniYield Quality Fund, Inc.",institution,False,bootstrap_tier4,912,3038482976.039999,,0.0,unknown,False,bootstrap_tier4,0000890196
+26956,BlackRock Science & Technology Trust,institution,False,bootstrap_tier4,280,2998133659.689998,,0.0,unknown,False,bootstrap_tier4,0001616678
+26684,"BlackRock MuniYield Quality Fund III, Inc.",institution,False,bootstrap_tier4,605,2692484842.219997,,0.0,unknown,False,bootstrap_tier4,0000883412
+26726,"BlackRock MuniHoldings Fund, Inc.",institution,False,bootstrap_tier4,850,2289271362.060003,,0.0,unknown,False,bootstrap_tier4,0001034665
+26730,"BlackRock MuniHoldings New Jersey Quality Fund, Inc.",institution,False,bootstrap_tier4,485,2195824447.51,,0.0,unknown,False,bootstrap_tier4,0001053988
+26783,"BlackRock Corporate High Yield Fund, Inc.",institution,False,bootstrap_tier4,1235,1994220515.7499993,,0.0,unknown,False,bootstrap_tier4,0001222401
+26814,"BlackRock Enhanced Large Cap Core Fund, Inc",institution,False,bootstrap_tier4,279,1986850658.2999997,,0.0,unknown,False,bootstrap_tier4,0001278895
+26764,BlackRock Municipal Income Trust II,institution,False,bootstrap_tier4,686,1839624955.0599992,,0.0,active,False,tier4_keyword_sweep,0001176194
+26676,"BlackRock MuniYield Fund, Inc.",institution,False,bootstrap_tier4,558,1798018697.470001,,0.0,unknown,False,bootstrap_tier4,0000879361
+27041,BlackRock Capital Allocation Term Trust,institution,False,bootstrap_tier4,1322,1736767517.7900016,,0.0,unknown,False,bootstrap_tier4,0001809541
+27019,BlackRock Science and Technology Term Trust,institution,False,bootstrap_tier4,85,1728830341.3899999,,0.0,unknown,False,bootstrap_tier4,0001768666
+26846,BlackRock Enhanced Equity Dividend Trust,institution,False,bootstrap_tier4,321,1726568249.49,,0.0,unknown,False,bootstrap_tier4,0001332283
+27100,BlackRock ESG Capital Allocation Term Trust,institution,False,bootstrap_tier4,1323,1713353376.5299978,,0.0,unknown,False,bootstrap_tier4,0001864843
+26748,BlackRock Municipal Income Trust,institution,False,bootstrap_tier4,386,1628361844.6400018,,0.0,active,False,tier4_keyword_sweep,0001137393
+26654,"BlackRock MuniVest Fund, Inc.",institution,False,bootstrap_tier4,477,1449144075.39,,0.0,unknown,False,bootstrap_tier4,0000835948
+26751,BlackRock Core Bond Trust,institution,False,bootstrap_tier4,3533,1433859265.1399982,,0.0,unknown,False,bootstrap_tier4,0001160864
+26681,"BlackRock MuniYield New York Quality Fund, Inc.",institution,False,bootstrap_tier4,501,1411948820.7299988,,0.0,unknown,False,bootstrap_tier4,0000882150
+26710,"BlackRock MuniAssets Fund, Inc.",institution,False,bootstrap_tier4,1116,1246083440.4799993,,0.0,unknown,False,bootstrap_tier4,0000901243
+26857,BlackRock Credit Allocation Income Trust,institution,False,bootstrap_tier4,2001,1200288924.749997,,0.0,unknown,False,bootstrap_tier4,0001379384
+26696,"BlackRock MuniYield Michigan Quality Fund, Inc.",institution,False,bootstrap_tier4,290,1175736854.1,,0.0,unknown,False,bootstrap_tier4,0000890393
+26727,"BlackRock MuniHoldings New York Quality Fund, Inc.",institution,False,bootstrap_tier4,483,1152161737.6700003,,0.0,unknown,False,bootstrap_tier4,0001038186
+27028,BlackRock Health Sciences Term Trust,institution,False,bootstrap_tier4,174,1075875518.08,,0.0,unknown,False,bootstrap_tier4,0001785971
+26768,BlackRock Municipal Income Quality Trust,institution,False,bootstrap_tier4,468,1057158741.2400002,,0.0,active,False,tier4_keyword_sweep,0001181187
+26887,BlackRock Taxable Municipal Bond Trust,institution,False,bootstrap_tier4,280,1045134482.0199999,,0.0,active,False,tier4_keyword_sweep,0001493683
+18325,BlackRock Fund Advisors,institution,True,ncen_adviser_map,390,1035174698.5699996,,0.0,,,,
+27063,BlackRock Technology and Private Equity Term Trust,institution,False,bootstrap_tier4,86,920051635.7299997,,0.0,unknown,False,bootstrap_tier4,0001836057
+26747,BlackRock New York Municipal Income Trust,institution,False,bootstrap_tier4,482,913908425.4899997,,0.0,active,False,tier4_keyword_sweep,0001137390
+26901,BlackRock Resources & Commodities Strategy Trust,institution,False,bootstrap_tier4,48,882511375.49,,0.0,unknown,False,bootstrap_tier4,0001506289
+27049,BlackRock Private Investments Fund,institution,False,bootstrap_tier4,583,853864864.3199995,,0.0,unknown,False,bootstrap_tier4,0001816389
+26693,"BlackRock MuniYield Quality Fund II, Inc.",institution,False,bootstrap_tier4,637,836760943.8000001,,0.0,unknown,False,bootstrap_tier4,0000887394
+26704,"BlackRock MuniVest Fund II, Inc.",institution,False,bootstrap_tier4,481,827998250.0800008,,0.0,unknown,False,bootstrap_tier4,0000897269
+26738,"BlackRock MuniHoldings Quality Fund II, Inc.",institution,False,bootstrap_tier4,518,824859838.3000002,,0.0,unknown,False,bootstrap_tier4,0001071899
+26932,BlackRock Multi-Sector Income Trust,institution,False,bootstrap_tier4,1821,783769959.7899991,,0.0,unknown,False,bootstrap_tier4,0001562818
+26728,"BlackRock Debt Strategies Fund, Inc.",institution,False,bootstrap_tier4,1288,752502370.6999997,,0.0,unknown,False,bootstrap_tier4,0001051003
+26650,"BlackRock Income Trust, Inc.",institution,False,bootstrap_tier4,772,736035479.31,,0.0,unknown,False,bootstrap_tier4,0000832327
+26700,"BlackRock Investment Quality Municipal Trust, Inc.",institution,False,bootstrap_tier4,549,720930328.3400007,,0.0,active,False,tier4_keyword_sweep,0000894242
+26841,BlackRock Enhanced Global Dividend Trust,institution,False,bootstrap_tier4,173,717745115.6,,0.0,unknown,False,bootstrap_tier4,0001320375
+27010,BlackRock HPS Credit Strategies Fund,institution,False,bootstrap_tier4,588,601401004.5600002,,0.0,unknown,False,bootstrap_tier4,0001752019
+26917,"BlackRock Utilities, Infrastructure & Power Opportunities Trust",institution,False,bootstrap_tier4,49,589027132.7899997,,0.0,unknown,False,bootstrap_tier4,0001528988
+26837,BlackRock Health Sciences Trust,institution,False,bootstrap_tier4,158,570446275.5899999,,0.0,unknown,False,bootstrap_tier4,0001314966
+26868,BlackRock Enhanced International Dividend Trust,institution,False,bootstrap_tier4,127,568124234.7900002,,0.0,unknown,False,bootstrap_tier4,0001393299
+26802,"BlackRock Floating Rate Income Strategies Fund, Inc.",institution,False,bootstrap_tier4,471,555952705.32,,0.0,unknown,False,bootstrap_tier4,0001259708
+26796,BlackRock Ltd Duration Income Trust,institution,False,bootstrap_tier4,2106,545710625.5500007,,0.0,unknown,False,bootstrap_tier4,0001233681
+26697,BlackRock MuniYield Pennsylvania Quality Fund,institution,False,bootstrap_tier4,329,521820072.81000024,,0.0,unknown,False,bootstrap_tier4,0000891038
+27060,BlackRock 2037 Municipal Target Term Trust,institution,False,bootstrap_tier4,299,463277357.36,,0.0,active,False,tier4_keyword_sweep,0001832871
+26823,BlackRock Floating Rate Income Trust,institution,False,bootstrap_tier4,488,434109001.37,,0.0,unknown,False,bootstrap_tier4,0001287480
+26851,BlackRock Long-Term Municipal Advantage Trust,institution,False,bootstrap_tier4,776,432667652.1200002,,0.0,active,False,tier4_keyword_sweep,0001343793
+26794,"BlackRock Municipal Credit Alpha Portfolio, Inc.",institution,False,bootstrap_tier4,354,405136760.6000001,,0.0,active,False,tier4_keyword_sweep,0001232860
+27061,BlackRock Alpha Strategies Fund,institution,False,bootstrap_tier4,44,256393614.48,,0.0,unknown,False,bootstrap_tier4,0001833936
+18031,BlackRock (Singapore) Limited,institution,True,ncen_adviser_map,549,234444640.7,,0.0,,,,
+26756,BlackRock Virginia Municipal Bond Trust,institution,False,bootstrap_tier4,90,59615851.049999975,,0.0,active,False,tier4_keyword_sweep,0001169034
+12488,BlackRock Sustainable U.S. Value Equity Fund,fund,True,fund_universe,60,5312350.949999998,,0.0,active,False,fund_universe,
+14797,BlackRock Global Equity Absolute Return Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14798,BlackRock Advantage Small Cap Growth Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14799,BlackRock Exchange Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14800,"BlackRock Large Cap Focus Value Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14813,"BlackRock Advantage SMID Cap Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14814,BlackRock 60/40 Target Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14815,BlackRock 80/20 Target Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14816,BlackRock 40/60 Target Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14817,BlackRock 20/80 Target Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14863,Global Atlantic BlackRock Disciplined Growth Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14864,Global Atlantic BlackRock Disciplined Mid Cap Growth Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14865,Global Atlantic BlackRock Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14871,Global Atlantic BlackRock Disciplined International Core Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14872,Global Atlantic BlackRock Selects Managed Risk Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14874,Global Atlantic BlackRock Disciplined Core Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14875,Global Atlantic BlackRock Disciplined Value Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15066,Transamerica BlackRock iShares Tactical - Growth VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15067,Transamerica BlackRock iShares Tactical - Conservative VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15076,Transamerica BlackRock iShares Active Asset Allocation - Conservative VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15078,Transamerica BlackRock iShares Active Asset Allocation - Moderate VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15080,Transamerica BlackRock iShares Edge 100 VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15083,Transamerica BlackRock Real Estate Securities VP,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15087,Transamerica BlackRock Tactical Allocation VP,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15091,Transamerica BlackRock iShares Edge 40 VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15092,Transamerica BlackRock iShares Dynamic Allocation - Balanced VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15093,Transamerica BlackRock iShares Tactical - Balanced VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15095,Transamerica BlackRock iShares Dynamic Allocation - Moderate Growth VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15098,Transamerica BlackRock iShares Active Asset Allocation - Moderate Growth VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15101,Transamerica BlackRock iShares Edge 75 VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15103,Transamerica BlackRock iShares Edge 50 VP,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15199,AVIP BlackRock Advantage Large Cap Core Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15201,AVIP BlackRock Advantage International Equity Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15204,AVIP BlackRock Advantage Large Cap Growth Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15205,AVIP BlackRock Balanced Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15207,AVIP BlackRock Advantage Small Cap Growth Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15208,AVIP BlackRock Advantage Large Cap Value Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15220,"BlackRock Advantage Global Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15223,BlackRock International Select Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15224,BlackRock LifePath Dynamic 2035 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15225,BlackRock LifePath Dynamic Retirement Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15226,BlackRock LifePath Index 2055 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15228,BlackRock LifePath Index 2035 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15229,BlackRock LifePath Index 2050 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15231,BlackRock LifePath Dynamic 2030 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15233,BlackRock LifePath Index 2045 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15234,BlackRock Diversified Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15235,BlackRock LifePath Dynamic 2065 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15236,BlackRock LifePath Index 2065 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15237,BlackRock LifePath Dynamic 2055 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15238,BlackRock LifePath Dynamic 2040 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15239,BlackRock LifePath Index Retirement Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15240,BlackRock LifePath Index 2060 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15241,BlackRock LifePath Dynamic 2045 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15243,BlackRock LifePath Dynamic 2050 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15244,BlackRock LifePath Dynamic 2060 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15245,BlackRock LifePath Index 2030 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15246,BlackRock LifePath Dynamic 2070 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+15247,BlackRock LifePath Index 2070 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15248,BlackRock LifePath Index 2040 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+15249,BlackRock Advantage CoreAlpha Bond Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16005,NVIT BlackRock Equity Dividend Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16263,LVIP BlackRock Global Allocation Managed Risk Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16281,LVIP BlackRock Dividend Value Managed Volatility Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16305,LVIP BlackRock Equity Dividend Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16310,LVIP BlackRock Real Estate Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16321,LVIP BlackRock Global Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+1311,BlackRock Brasil Gestora de Investimentos Ltd.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001579408
+13390,JNL/BlackRock Global Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+2289,"BlackRock Capital Investment Advisors, LLC",institution,True,managers,,0.0,,0.0,passive,False,managers,0001717705
+3172,BlackRock Investment Management (Taiwan) Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001512561
+3177,BLACKROCK FUND MANAGEMENT CO. S.A.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001559920
+3562,BlackRock Asset Management North Asia Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001579409
+3609,BlackRock Asset Management Schweiz AG,institution,True,managers,,0.0,,0.0,passive,False,managers,0001654470
+4725,BlackRock Asset Management Canada Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001050459
+4732,BlackRock Asset Management Ireland Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001503309
+4962,BLACKROCK CAPITAL MANAGEMENT INC,institution,True,managers,,0.0,,0.0,passive,False,managers,0001173486
+5347,"BlackRock Investment Management, LLC",institution,True,managers,,0.0,,0.0,passive,False,managers,0001305227
+5351,BlackRock (Luxembourg) S.A.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001426606
+1474,BlackRock Fund Managers Ltd.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001388402
+6809,BlackRock Investment Management (Australia) Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001461626
+7126,"BlackRock International, Ltd.",institution,True,managers,,0.0,,0.0,passive,False,managers,0001426459
+8177,"BlackRock Institutional Trust Company, N.A.",institution,True,managers,,0.0,,0.0,passive,False,managers,0000913414
+1968,BlackRock Investment Management (UK) Ltd.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001388401
+9054,BlackRock (Netherlands) B.V.,institution,True,managers,,0.0,,0.0,passive,False,managers,0001388399
+10181,BlackRock Group LTD,institution,True,managers,,0.0,,0.0,passive,False,managers,0001003283
+1397,BlackRock Advisors (UK) Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001034551
+10413,BlackRock Asset Management Deutschland AG,institution,True,managers,,0.0,,0.0,passive,False,managers,0001415064
+11037,BlackRock Life Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001549649
+11925,"BlackRock Global Allocation Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,0000834237
+11915,"BlackRock Emerging Markets Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11916,BlackRock Equity Dividend Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11917,BlackRock Defensive Advantage Emerging Markets Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11923,BlackRock Advantage Emerging Markets Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11924,BlackRock Sustainable Emerging Markets Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11926,BlackRock Mid-Cap Value Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11927,BlackRock Natural Resources Trust,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+11928,BlackRock LifePath ESG Index 2055 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11929,BlackRock LifePath ESG Index 2030 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11930,BlackRock LifePath ESG Index 2065 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11931,BlackRock LifePath ESG Index 2050 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11932,BlackRock LifePath ESG Index 2070 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11933,BlackRock LifePath ESG Index 2035 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11934,BlackRock LifePath ESG Index 2040 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11935,BlackRock LifePath ESG Index 2060 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11936,BlackRock LifePath ESG Index Retirement Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11937,BlackRock LifePath ESG Index 2045 Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+11938,BlackRock Unconstrained Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12072,BlackRock GA Disciplined Volatility Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12073,BlackRock GA Dynamic Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12147,SA BlackRock VCP Global Multi Asset Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12148,SA BlackRock Multi-Factor 70/30 Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12282,BlackRock China A Opportunities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12283,BlackRock Emerging Markets ex-China Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12284,BlackRock Sustainable Aware Advantage International Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12285,BlackRock Sustainable Advantage Global Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12286,BlackRock Sustainable Aware Advantage Emerging Markets Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12287,BlackRock Tactical Opportunities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12487,BlackRock Real Estate Securities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+13153,BlackRock Global Tactical Strategies Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+13170,BlackRock Capital Appreciation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+13385,JNL/BlackRock Large Cap Select Growth Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+13388,JNL/BlackRock Global Natural Resources Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14110,BlackRock Global Allocation V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14094,BlackRock Advantage Large Cap Core Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14095,BlackRock Capital Appreciation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14096,BlackRock Global Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14097,BlackRock Balanced Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14098,BlackRock Capital Appreciation V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14099,BlackRock Basic Value V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14100,BlackRock Advantage Large Cap Value V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14101,BlackRock Equity Dividend V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14102,BlackRock Advantage Large Cap Core V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14103,BlackRock S&P 500 Index V.I. Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+14104,BlackRock Large Cap Focus Growth V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14105,BlackRock International V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14106,BlackRock Advantage SMID Cap V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+14107,BlackRock International Index V.I. Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+14108,BlackRock Small Cap Index V.I. Fund,fund,True,fund_universe,,0.0,,0.0,passive,False,fund_universe,
+14109,BlackRock Managed Volatility V.I. Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+10230,BlackRock Japan Co. Ltd,institution,True,managers,,0.0,,0.0,passive,False,managers,0001085635
+16715,BlackRock Advantage Large Cap Growth Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16716,BlackRock Advantage International Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16717,BlackRock Technology Opportunities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16718,BlackRock High Equity Income Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16719,BlackRock Infrastructure Sustainable Opportunities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16720,BlackRock Energy Opportunities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16721,BlackRock Health Sciences Opportunities Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16722,BlackRock SMID-Cap Growth Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16723,BlackRock Mid-Cap Growth Equity Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16724,BlackRock Commodity Strategies Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16725,BlackRock Advantage Small Cap Core Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16726,"BlackRock Large Cap Focus Growth Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16727,BlackRock Advantage Large Cap Value Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16728,BlackRock Advantage Large Cap Core Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16729,BlackRock International Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16730,"BlackRock Balanced Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16731,"BlackRock Capital Appreciation Fund, Inc.",fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+16732,BlackRock Global Dividend Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+17043,BlackRock Sustainable Advantage Large Cap Core Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+17452,BlackRock Event Driven Equity Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+20305,BlackRock National Municipal Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20306,BlackRock Short Duration Muni Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20340,"BlackRock Strategic Global Bond Fund, Inc.",fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20415,BlackRock California Municipal Opportunities Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20416,BlackRock New Jersey Municipal Bond Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20417,BlackRock New York Municipal Opportunities Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20418,BlackRock Pennsylvania Municipal Bond Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20419,BlackRock Strategic Municipal Opportunities Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20420,BlackRock Total Return Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20792,BlackRock Multi-Asset Income Portfolio,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21036,BlackRock Short Obligations Fund,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21048,BlackRock Global Equity Market Neutral Fund,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21176,BlackRock Dynamic High Income Portfolio,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21524,BlackRock Income Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21525,BlackRock Strategic Income Opportunities Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21526,BlackRock Floating Rate Income Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21527,BlackRock High Yield Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21528,BlackRock Low Duration Bond Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21529,BlackRock Core Bond Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21530,BlackRock Mortgage-Backed Securities Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21531,BlackRock Inflation Protected Bond Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21532,BlackRock Securitized Income Fund,fund,True,fund_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21533,BlackRock Systematic Multi-Strategy Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21534,BlackRock Credit Relative Value Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21535,BlackRock High Yield Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21536,BlackRock High Yield V.I. Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21537,BlackRock Total Return V.I. Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21945,BlackRock U.S. Carbon Transition Readiness ETF,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21946,BlackRock World ex U.S. Carbon Transition Readiness ETF,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22024,BlackRock Sustainable High Yield Bond Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22342,BlackRock Diversified Fixed Income Fund,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22423,BlackRock U.S. Insights Long/Short Equity Fund,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+18003,BlackRock Asset Management North Asia Limited,institution,True,ncen_adviser_map,,0.0,,0.0,,,,
+18699,"BlackRock Financial Management, Inc.",institution,True,ncen_adviser_map,,0.0,,0.0,,,,

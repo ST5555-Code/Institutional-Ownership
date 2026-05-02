@@ -1,0 +1,27 @@
+{
+  "mode_a": {
+    "cik_count": 1991,
+    "fund_rows": 14565240,
+    "fund_aum_usd": 161575864739650.88
+  },
+  "mode_a_distinct_brand_eids": 1163,
+  "mode_b": {
+    "distinct_ciks": 0,
+    "distinct_brand_eids": 0,
+    "distinct_filer_eids": 0,
+    "distinct_eid_pairs": 0,
+    "fund_rows": null,
+    "fund_aum_usd": 0.0
+  },
+  "mode_c": {
+    "cik_count": 9116,
+    "filer_rows": 12269806,
+    "filer_aum_usd": 243340766849959.0
+  },
+  "mode_b_prime_via_entity_identifiers": {
+    "distinct_eid_pairs": 0,
+    "distinct_brand_eids": 0,
+    "distinct_filer_eids": 0,
+    "shared_ciks": 0
+  }
+}

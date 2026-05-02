@@ -1,0 +1,52 @@
+{
+  "brand_eid_count": 1707,
+  "filer_eid_count": 9121,
+  "invisible_brand_count": 1225,
+  "invisible_brand_rows": 6929560,
+  "invisible_brand_aum_usd": 27797705080058.203,
+  "name_collision_norm_name_count": 973,
+  "invisible_with_open_relationship": 498,
+  "name_match_summary": {
+    "brands_named": 1225,
+    "exact_norm_match_brand_count": 58,
+    "prefix_norm_match_brand_count": 77
+  },
+  "cik_match_summary": {
+    "invisible_brands_with_any_cik": 791,
+    "invisible_brands_with_cik_match_to_filer": 0
+  },
+  "bridge_class_breakdown": [
+    {
+      "bridge_class": "BRAND_HAS_RELATIONSHIP",
+      "recommended_action": "BRIDGE",
+      "confidence": "HIGH",
+      "brand_count": 498,
+      "fund_aum_usd": 26852796437431.28,
+      "fund_rows": 4656280
+    },
+    {
+      "bridge_class": "BRAND_ORPHAN",
+      "recommended_action": "INVESTIGATE_FURTHER",
+      "confidence": "LOW",
+      "brand_count": 723,
+      "fund_aum_usd": 943276427460.6316,
+      "fund_rows": 2272913
+    },
+    {
+      "bridge_class": "BRAND_HAS_NAME_MATCH",
+      "recommended_action": "FILER_TO_BRAND",
+      "confidence": "MEDIUM",
+      "brand_count": 3,
+      "fund_aum_usd": 1622556310.9500003,
+      "fund_rows": 289
+    },
+    {
+      "bridge_class": "BRAND_HAS_NAME_MATCH",
+      "recommended_action": "FILER_TO_BRAND",
+      "confidence": "LOW",
+      "brand_count": 1,
+      "fund_aum_usd": 9658855.32,
+      "fund_rows": 78
+    }
+  ]
+}
