@@ -4,6 +4,18 @@
 
 ## Last completed
 
+**fund-unknown-attribution (PR #246, squash `1956ea8`) — read-only audit closing the orphan/unknown thread end-to-end.** Builds on PR #245.
+
+| Layer | Outcome |
+| --- | --- |
+| 1 — surface map | `_fund_type_label()` at [scripts/queries/common.py:308](scripts/queries/common.py:308) is the sole NULL→'unknown' path; `cross.py` 3-way CASE arms emit NULL for the same gap. Other 'unknown' literals are `manager_type` fallbacks, not fund_strategy. No surprise paths. |
+| 1 — master inventory | `fund_universe.fund_strategy IS NULL` count = 0. Display 'unknown' bucket comes entirely from holdings orphans: 1 series (literal `series_id='UNKNOWN'`), 3,184 rows / $10.025B / 8 distinct (cik, fund_name) pairs. Cohorts B/C/D from the brief are empty. |
+| 1 — Cohort A reattribution | All 8 pairs map to existing SYN_ series (6 HIGH, 1 MEDIUM, 1 LOW, 0 NONE). Stale-loader root cause: Apr-3 legacy loader wrote `'UNKNOWN'`; Apr-15 v2 loader (e868772) wrote SYN_ companions but did not flip `is_latest=FALSE` on legacy rows. 5 of 8 pairs have BOTH versions live; 3 (Adams 'N/A', Asa Gold, Calamos) have only the stale UNKNOWN version. |
+| 2 — three-lens validation | 296/301 PASS_ALL on PR #245 backfill cohort. 3 false positives, 1 known Blackstone override, 1 real reclass candidate: `S000090077` Rareview 2x Bull Cryptocurrency & Precious Metals ETF (currently `excluded`; classifier order says `passive` because `\dx` in INDEX_PATTERNS precedes ETF in EXCLUDE_PATTERNS; ~$0 net AUM). |
+| 2 — completeness gap noted | All 301 orphan_backfill `fund_universe` rows have `total_net_assets=NULL`. Backfill flow populated `fund_strategy` only. |
+
+**Output:** `docs/findings/fund_unknown_attribution.md` + `scripts/oneoff/audit_unknown_*.py` (3 helpers, all read-only — verified via grep). pytest tests/ 373/373 PASS unchanged.
+
 **fund-orphan-backfill (PR #245, squash `9392a36`) closed the 302-series orphan exposure surfaced by PR #244.** Single PR, branch `fund-orphan-backfill`, backup carried over from PR-4 (`data/backups/13f_backup_20260501_103837`).
 
 | Phase | Outcome |
@@ -22,7 +34,7 @@
 - **`ROADMAP.md`** — `fund-holdings-orphan-investigation` removed from P2 backlog; new top entry in COMPLETED table dated 2026-05-01 with PR #245 details.
 - **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten.
 
-Branch HEAD on `main`: **`9392a36`** (PR #245 fund-orphan-backfill).
+Branch HEAD on `main`: **`1956ea8`** (PR #246 fund-unknown-attribution audit; doc + helpers only, no DB writes).
 
 ## Up next
 
@@ -77,7 +89,7 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Reminders
 
-- **HEAD on main is `9392a36`** (PR #245 fund-orphan-backfill).
+- **HEAD on main is `1956ea8`** (PR #246 fund-unknown-attribution audit). Prior commit `9392a36` (PR #245 fund-orphan-backfill).
 - **Canonical fund taxonomy values:** `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. `active` is dominant (was `equity` pre-PR-4). Display label utility `_fund_type_label()` in `scripts/queries/common.py` collapses to 5 values `{active, passive, bond, excluded, unknown}`.
 - **Column rename (PR-4):** prod column is `fund_holdings_v2.fund_strategy_at_filing` (was `fund_strategy` pre-2026-05-01). Staging schema (`stg_nport_holdings.fund_strategy`) intentionally retains the old name — prod write path renames at INSERT time (`s.fund_strategy AS fund_strategy_at_filing`).
 - **JOIN rule (PR-4):** for any active/passive filter, **always JOIN `fund_universe`** — the canonical, locked column. The per-row, per-quarter snapshot in `fund_strategy_at_filing` is preserved intentionally for snapshot semantics but is NOT the source of truth for filters.
@@ -89,6 +101,7 @@ This thread gates the Admin Refresh System (the original project goal).
 - **PR #245 gotcha — orphan-backfill stamp:** the 301 backfilled `fund_universe` rows carry `strategy_source='orphan_backfill_2026Q2'`. Any future analysis of `fund_strategy` provenance can filter on this tag to isolate the cohort.
 - **PR #245 gotcha — 3-way semantics:** `cross.py` `is_active` is tri-state (TRUE / FALSE / null). Frontend `OverlapAnalysisTab.tsx` now uses strict `=== true` at both L194 (row filter) and L213 (KPI subset). Other fund-level read sites (`get_two_company_subject`, `get_overlap_institution_detail`) that emit `is_active` follow the same convention. Don't reintroduce `!== false` truthy coercion — it silently rolls null into active.
 - **PR #245 gotcha — UNKNOWN_literal residual:** `series_id='UNKNOWN'` is the literal sentinel where multiple historic fund_names funnel (Calamos Global Total Return + Eaton Vance Tax-Advantaged + 6 more). 1 series / 3,184 rows / $10.0B. Left orphan by design — resolution requires source-side rework (loader gap), not another `fund_universe` backfill.
+- **PR #246 gotcha — UNKNOWN_literal is solvable in-place.** Audit found all 8 (cik, fund_name) pairs map to existing SYN_ series with strategies already set. The orphan state isn't a `fund_universe` gap — it's stale holdings rows that need either (A1) `series_id` rewrite to SYN_ for the 3 stale-only pairs (1,858 rows / $5.07B: Adams 'N/A', Asa Gold, Calamos), or (A2) `is_latest=FALSE` flip for the 5 stale-redundant pairs (1,326 rows / $4.96B: Eaton Vance Tax-Adv, AIP, AMG Pantheon, NXG, Saba). Plus B1 reclass Rareview 2x Bull → 'passive' (1 row, ~$0 AUM) and B2 backfill `total_net_assets`/`equity_pct` for the 301 orphan_backfill funds (NULL across the board today). All 5 actions queued; none in #246.
 - **#243 ProShares mechanics:** all 51 ProShares short / inverse / bear ETFs now `passive` end-to-end. The N-PORT holdings shape is uniformly swap notionals + cash/T-bill collateral (across both equity-tracking inverse like SQQQ/SH and treasury-tracking inverse like TBF). Morningstar classifies all three as "passively managed Trading-Inverse" ETFs.
 - **#242 12 BlackRock muni trusts:** all confirmed merged Feb 2026 via Form 25-NSE delistings + BusinessWire merger-completion press releases. Post-merger NPORT-P (2026-03-26) and N-CSRS (2026-04-07) filings are residual administrative; trusts correctly carry `final_filing`.
 - **Cross-Ownership tab (conv-22).** Peer dropdown reads `/api/v1/peer_tickers` (sector + industry from `market_data`). Investor row expand fires `/api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` and is gated by `has_fund_detail` on the parent rollup. Fund-level toggle pulls from `fund_holdings_v2` (pivot now references the outer `fund_pos` aggregation, not `fh.ticker` / `fh.holding_value`).
