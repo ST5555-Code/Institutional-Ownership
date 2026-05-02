@@ -18,7 +18,7 @@ _(none — see COMPLETED table)_
 
 ### P2 — Next sprint
 
-- **cef-residual-cleanup** — Surfaced 2026-05-02 (PR #247 BRANCH 2 deferral); reframed 2026-05-02 by PR #249 (cef-scoping). PR-A landed 2026-05-02 (`cef-residual-cleanup-adx` — flipped 96 ADX byte-identical duplicates). Residual: 350 rows / $1.752B from ASA Gold (CIK `0001230869`) — to be cleared by PR-B `cef-asa-period-backfill` (M, re-run v2 loader against 3 ASA periods, then flip 350 UNKNOWN rows). Full spec at [§ cef-residual-cleanup](#cef-residual-cleanup).
+- **cef-residual-cleanup** — Surfaced 2026-05-02 (PR #247 BRANCH 2 deferral); reframed 2026-05-02 by PR #249 (cef-scoping); PR-B reframed 2026-05-02 by `cef-asa-prep-investigation` (commit `79350a5`). PR-A landed 2026-05-02 (`cef-residual-cleanup-adx` — flipped 96 ADX byte-identical duplicates). Residual: 350 rows / $1.752B from ASA Gold (CIK `0001230869`) — to be cleared by PR-B `cef-asa-flip-and-relabel` (S, flip 350 ASA UNKNOWN rows to `is_latest=FALSE` and relabel to `series_id='SYN_0001230869'`; v2 loader rerun unnecessary because UNKNOWN rows are byte-identical to ASA's N-PORT filings). Full spec at [§ cef-residual-cleanup](#cef-residual-cleanup).
 - **fund-structure-column** — Surfaced 2026-05-02 (PR #249 cef-scoping). Add `fund_structure` enum column to `fund_universe` ({`open_end`, `closed_end`, `etf`, `bdc`, `interval`}) — orthogonal to `fund_strategy`. Currently structure is inferred indirectly via `series_id` prefix (SYN_ = CEF-or-open-end ambiguous, real SEC series_id = open-end), which is fragile. Lets `cross.py` and display layer make structure-aware decisions (e.g., NAV premium/discount only for `closed_end`). Workstream: investigation PR (schema design + downstream impact) → backfill PR (populate from SEC form-type signals) → display integration PR. Blockers: must follow `cef-residual-cleanup` (depends on clean SYN_ state); source-of-truth question (SEC form-type vs prospectus vs holdings shape); interaction with `fund-strategy-taxonomy-finalization`. Full spec at [§ fund-structure-column](#fund-structure-column).
 - **parent-level-display-canonical-reads** — Migrate the 18 parent-level display read sites from `holdings_v2.manager_type` and `holdings_v2.entity_type` (legacy/derived) to canonical `entity_classification_history.classification` / `entity_current.classification`. Includes fix for `query4` silent-drop bug ([register.py:746-750](scripts/queries/register.py:746)) where rows with disagreeing `manager_type` and `entity_type` fall to "Other/Unknown". Tracked as the institution-level half of the consolidation sequence (separate from fund-level, which closed with PR-1d on 2026-05-01). Decision D4 from the PR-1c audit applies: always read canonical when migrated; precedence rule for managers without an `entity_classification_history` row to be defined as part of this work. Surfaced 2026-05-01 (PR-1d follow-up).
 - **fund-strategy-taxonomy-finalization** — Surfaced 2026-05-01 (PR-4 follow-up). Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy. Several values were inherited from the original classifier and carry vague labels or arbitrary boundaries that do not survive scrutiny: (1) **`balanced`** (60-90% equity composition) — vague label, boundary with `multi_asset` is arbitrary; decide keep as composition-based bucket / rename to `active_equity_heavy` / merge into `active`; (2) **`multi_asset`** (30-60% equity composition) — boundaries with `balanced` (60%) and `bond_or_other` (30%) are both arbitrary thresholds; decide keep distinct / merge with `balanced` / rename; (3) **`bond_or_other`** — heterogeneous bucket; the `saba-proshares-reclassify` 2026-05-01 PR moved 39 ProShares short / inverse / leveraged-short funds out of this bucket to `passive` (closing the bucket's largest miscategorisation); residual is bond funds + niche cases. Could still split into `bond` and `inverse_or_short` if a richer taxonomy is preferred — but the urgency is gone now that ProShares is corrected; (4) **`excluded`** — combines money markets, fund-of-funds, and ETF wrappers that skip classification; should split into specific reasons; (5) **`final_filing`** — status flag, not a strategy; 12+ funds (the 12 BlackRock muni trusts, all confirmed merged Feb 2026 by the `fund-cleanup-batch` 2026-05-01 audit, plus other final-filing rows); decide whether this belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean. Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Trigger: orphan/NULL data is now on the table (`fund-cleanup-batch` 2026-05-01 audit closed `canonical-value-coverage-audit`); residual orphan disposition tracked under `fund-holdings-orphan-investigation` and `historical-fund-holdings-drift-audit`. The merge/split decisions can now be staged.
@@ -28,7 +28,9 @@ _(none — see COMPLETED table)_
 ### P3 — Quick wins / low priority
 
 - **v2-loader-is-latest-watchpoint** — Surfaced 2026-05-02 (PR #247 close-out; Open Question #4 in PR #246 attribution doc). Watchpoint, not a code change. After Q1 2026 13F cycle (~2026-05-15) re-run `audit_unknown_inventory.py`; expected residual = 446 rows (the deferred CEF cohort). Residual > 446 ⇒ Apr-15 v2 loader bug recurred ⇒ open `v2-loader-is-latest-fix` PR. Residual = 446 ⇒ close Open Question #4 as resolved-by-evidence. Full spec at [§ v2-loader-is-latest-watchpoint](#v2-loader-is-latest-watchpoint).
-- **retired-loader-residue-watchpoint** — Surfaced 2026-05-02 (PR #249 cef-scoping). Watchpoint, not a code change. PR #249 found that 446 UNKNOWN rows in `fund_holdings_v2` came from `scripts/retired/fetch_nport.py`, the only literal-`UNKNOWN` write site in the repo. Loader is retired. After PR-B (`cef-asa-period-backfill`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post-Stage 5 DROP): re-run `audit_unknown_inventory.py`. Expected residual: 0. Residual > 0 ⇒ either retired-loader residue not fully cleaned (re-run cleanup) or a new write site introduced the literal-`UNKNOWN` pattern (grep `pipeline/`, then targeted fix PR). Full spec at [§ retired-loader-residue-watchpoint](#retired-loader-residue-watchpoint).
+- **retired-loader-residue-watchpoint** — Surfaced 2026-05-02 (PR #249 cef-scoping). Watchpoint, not a code change. PR #249 found that 446 UNKNOWN rows in `fund_holdings_v2` came from `scripts/retired/fetch_nport.py`, the only literal-`UNKNOWN` write site in the repo. Loader is retired. After PR-B (`cef-asa-flip-and-relabel`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post-Stage 5 DROP): re-run `audit_unknown_inventory.py`. Expected residual: 0. Residual > 0 ⇒ either retired-loader residue not fully cleaned (re-run cleanup) or a new write site introduced the literal-`UNKNOWN` pattern (grep `pipeline/`, then targeted fix PR). Full spec at [§ retired-loader-residue-watchpoint](#retired-loader-residue-watchpoint).
+- **asa-2025-11-syn-source-investigation** — Surfaced 2026-05-02 (`cef_asa_prep_investigation.md`, commit `79350a5`). ASA's existing 2025-11 `SYN_0001230869` row sources from accession `0001049169-26-000039` — Donnelley filing agent, not ASA's own NPORT-P. Out of scope for PR-B (`cef-asa-flip-and-relabel`). Investigate whether `SYN_` rows should source canonical NPORT-P filings only, or whether filing-agent surrogates are acceptable in the canonical path; if unacceptable, scope a separate cleanup PR. Full spec at [§ asa-2025-11-syn-source-investigation](#asa-2025-11-syn-source-investigation).
+- **ingestion-manifest-coverage-watchpoint** — Surfaced 2026-05-02 (`cef_asa_prep_investigation.md`, commit `79350a5`). Watchpoint, not a code change. ASA's UNKNOWN-side accessions are not registered in `ingestion_manifest` — the legacy synth path wrote `fund_holdings_v2` rows without manifest entries. After PR-B (`cef-asa-flip-and-relabel`) closes: audit `ingestion_manifest` for any other CIKs with `fund_holdings_v2` rows but no manifest entry. Should be empty if PR-B logic is correct. Full spec at [§ ingestion-manifest-coverage-watchpoint](#ingestion-manifest-coverage-watchpoint).
 - **stage-b-turnover-deferred-funds** — Three Vanguard funds and similar individual cases are passive in behavior but their names do not match systemic INDEX_PATTERNS rules: Vanguard Primecap (~$76B), Vanguard Windsor II (~$65B), Vanguard Equity Income (~$62B). These will be flagged for reclassification by Stage B (position turnover detection) which validates passive behavior via holdings stability rather than name regex. Total ~$203B AUM affected. Adjacent case: Bridgeway Ultra-Small Company Market (~$0.13B) — passive Bridgeway-internal index tracker that the PR-2 sweep deliberately did not catch (the `\bUltra\b` pattern was rejected because of false positives on actively-managed Ultra-named funds, and `\bBridgeway\b` is mixed-purpose). Surfaced 2026-05-01 (PR-2 follow-up); demoted from P2 → P3 in `conv-24-doc-sync` because the trigger (Stage B turnover detection design) is itself a separate, larger initiative not yet on this roadmap. Trigger: Stage B turnover detection design.
 - **per-fund-deferred-decisions** — Five named funds surfaced for chat decision but deliberately not reclassified by PR #242 (`fund-cleanup-batch`) or PR #243 (`saba-proshares-reclassify`); each needs its own per-fund review or a loader-gap fix before any UPDATE: (1) Eaton Vance Tax-Advantaged Dividend Income + 2 NEW global variants — all currently `balanced`, decision is whether prospectus-level review supports `balanced` vs `bond_or_other`; (2) Calamos Global Total Return Fund (1,412 orphan holdings rows in `fund_holdings_v2`, no `fund_universe` row at all — loader gap, not a classification call); (3) the 96-row N/A cohort (rows where `fund_name` is literally `'N/A'` in `fund_holdings_v2`, also no `fund_universe` row — loader gap). Surfaced 2026-05-01 fund-cleanup-batch §4d. Trigger: next per-fund review session, or whenever the loader gap for Calamos/N/A is investigated as part of `fund-holdings-orphan-investigation`.
 - **historical-fund-holdings-drift-audit** — Surfaced 2026-05-01 (fund-cleanup-batch §1g). 31,400 non-SYN holdings rows where `fund_holdings_v2.fund_strategy_at_filing` disagrees with `fund_universe.fund_strategy` (40,843 total minus the 9,405 documented SYN drifters from PR-1a §2.3). Same shape as the SYN drift cohort but a larger non-SYN cohort. Drift is harmless at runtime — PR-4's JOIN architectural fix in `compute_peer_rotation.py:421-449` serves canonical via `LEFT JOIN fund_universe`; the snapshot column is preserved by design as `fund_strategy_at_filing` (snapshot semantics, intentional). Audit characterizes the historical drift class for future remediation. See `docs/findings/fund_cleanup_batch_results.md` §1g.
@@ -99,12 +101,16 @@ Decision per PR #249: keep `SYN_<cik>` as canonical CEF identifier (Option C —
 ### Workstream sequence (revised, ~1–2 sessions)
 
 - ~~**PR-A `cef-residual-cleanup-adx`** (S) — flip 96 ADX byte-identical duplicates to `is_latest=FALSE`.~~ **Landed 2026-05-02.** Single-period cohort (2025-09-30); 96/96 byte-identical to `SYN_0000002230` companions; 0 mismatches; 0 orphans. Global `series_id='UNKNOWN' AND is_latest=TRUE` 446 → 350.
-- **PR-B `cef-asa-period-backfill`** (M) — re-run v2 loader against 3 ASA periods (2024Q4 / 2025Q1 / 2025Q3) to populate `SYN_0001230869` companions, then flip 350 UNKNOWN rows to `is_latest=FALSE`. Closes the workstream.
+- **PR-B `cef-asa-flip-and-relabel`** (S) — flip 350 ASA UNKNOWN rows to `is_latest=FALSE` and relabel to `series_id='SYN_0001230869'`. Per `cef_asa_prep_investigation.md` (commit `79350a5`): ASA UNKNOWN rows are byte-identical to ASA's N-PORT filings ($0.00 delta on every period and every spot-checked row), so a v2 loader rerun is unnecessary. Same shape as PR #250 (ADX), not the "fetch+load+flip" originally scoped in PR #249. Closes the workstream.
 
 ### Out of scope
 
 - N-CSR / NSAR holdings parsing (resolved by PR #249: not needed).
 - BDC (Form 10-K), interval funds — separate workstreams.
+
+### Revision history
+
+- **2026-05-02** — PR-B reframed from `cef-asa-period-backfill` (M, fetch+load+flip) to `cef-asa-flip-and-relabel` (S, flip+relabel) per `docs/findings/cef_asa_prep_investigation.md` (commit `79350a5`). Investigation found ASA UNKNOWN rows are byte-identical ($0.00 delta) to the corresponding NPORT-P filings already on EDGAR, so the data is already in `fund_holdings_v2` — only the `series_id` label is wrong. v2 loader rerun would create rows under `1230869_<accession>` (CEFs report `series_id=None`), inconsistent with the existing 2025-11 `SYN_0001230869` row.
 
 ---
 
@@ -114,11 +120,39 @@ Decision per PR #249: keep `SYN_<cik>` as canonical CEF identifier (Option C —
 
 **Problem.** PR #249 found that 446 UNKNOWN rows in `fund_holdings_v2` came from `scripts/retired/fetch_nport.py`, the only literal-`UNKNOWN` write site in the repo. Loader is retired. Watchpoint confirms no future write site reintroduces the pattern.
 
-**Watchpoint.** After PR-B (`cef-asa-period-backfill`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post–Stage 5 DROP):
+**Watchpoint.** After PR-B (`cef-asa-flip-and-relabel`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post–Stage 5 DROP):
 
 1. Run `audit_unknown_inventory.py`.
 2. Expected residual: **0**.
 3. **If residual > 0:** either retired-loader residue not fully cleaned (re-run the cleanup) or a new write site introduced the pattern (grep for literal-`'UNKNOWN'` across `pipeline/`, then open targeted fix PR).
+
+**No code change until the watchpoint check runs.**
+
+---
+
+## asa-2025-11-syn-source-investigation
+
+**Status:** Open · **Priority:** P3 · **Surfaced:** `docs/findings/cef_asa_prep_investigation.md` (commit `79350a5`)
+
+**Problem.** ASA's existing 2025-11 `SYN_0001230869` row sources from accession `0001049169-26-000039` — Donnelley Financial Solutions (filing agent), not ASA's own NPORT-P. Out of scope for PR-B (`cef-asa-flip-and-relabel`).
+
+**Investigation.** Should `SYN_` rows source canonical NPORT-P filings only, or are filing-agent surrogates acceptable in the canonical path? If unacceptable, scope a separate cleanup PR to re-source the 2025-11 row from ASA's own NPORT-P (or document why no such filing exists for that period).
+
+**Trigger:** Next CEF data-quality pass after PR-B closes.
+
+---
+
+## ingestion-manifest-coverage-watchpoint
+
+**Status:** Watch · **Priority:** P3 · **Surfaced:** `docs/findings/cef_asa_prep_investigation.md` (commit `79350a5`)
+
+**Problem.** ASA UNKNOWN-side accessions are not registered in `ingestion_manifest` — the legacy synth path wrote `fund_holdings_v2` rows without manifest entries. The 3 ASA accessions covering the UNKNOWN periods (`0001752724-25-018310`, `0001752724-25-075250`, `0001230869-25-000013`) all return 0 rows from `SELECT ... FROM ingestion_manifest WHERE accession_number IN (...)`.
+
+**Watchpoint.** After PR-B (`cef-asa-flip-and-relabel`) closes:
+
+1. Audit `ingestion_manifest` for any other CIKs with `fund_holdings_v2` rows but no manifest entry — i.e. `SELECT DISTINCT fund_cik, accession_number FROM fund_holdings_v2 LEFT JOIN ingestion_manifest USING (accession_number) WHERE ingestion_manifest.manifest_id IS NULL AND accession_number NOT LIKE 'BACKFILL_MIG015_%'`.
+2. Expected residual: **0** if PR-B logic is correct.
+3. **If residual > 0:** another legacy synth path exists; scope investigation PR.
 
 **No code change until the watchpoint check runs.**
 
