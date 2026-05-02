@@ -430,6 +430,11 @@ def get_two_company_overlap(subject, second, quarter, con):
             s.subj_dollars,
             COALESCE(p.sec_shares, 0)  as sec_shares,
             COALESCE(p.sec_dollars, 0) as sec_dollars,
+            -- 3-way classification (PR #244 audit / fund-orphan-backfill).
+            -- NULL arm = unknown (fund missing from fund_universe). Surfaces
+            -- as is_active=NULL → frontend excludes from active-only view
+            -- via strict equality (OverlapAnalysisTab.tsx). Prior behavior
+            -- silently rolled NULL into the active set.
             CASE WHEN fu.fund_strategy IN ({active_ph}) THEN TRUE
                  WHEN fu.fund_strategy IS NULL THEN NULL
                  ELSE FALSE
@@ -461,10 +466,11 @@ def get_two_company_overlap(subject, second, quarter, con):
             'sec_pct_so': (sec_shares_f / sec_denom * 100.0) if sec_denom else None,
             'sec_pct_of_so_source': sec_denom_source if sec_denom else None,
             'is_overlap': bool(subj_dollars_f > 0 and sec_dollars_f > 0),
-            # is_active derived from fund_universe.fund_strategy IN
-            # ACTIVE_FUND_STRATEGIES. None when the fund is missing from
-            # fund_universe — frontend treats None as "active" (included in
-            # active-only view) rather than silently dropping rows.
+            # is_active is tri-state (TRUE / FALSE / None). None = unknown:
+            # the series is not in fund_universe (orphan). After the
+            # fund-orphan-backfill PR only the UNKNOWN_literal cohort is
+            # left orphan by design. Frontend (OverlapAnalysisTab.tsx)
+            # excludes unknown from active-only via strict === true.
             'is_active': bool(is_active) if is_active is not None else None,
         })
 
@@ -676,6 +682,9 @@ def get_two_company_subject(subject, quarter, con):
             s.family_name,
             s.subj_shares,
             s.subj_dollars,
+            -- 3-way classification (PR #244 audit / fund-orphan-backfill).
+            -- NULL arm = unknown; frontend excludes from active-only view
+            -- via strict === true equality.
             CASE WHEN fu.fund_strategy IN ({active_ph}) THEN TRUE
                  WHEN fu.fund_strategy IS NULL THEN NULL
                  ELSE FALSE
