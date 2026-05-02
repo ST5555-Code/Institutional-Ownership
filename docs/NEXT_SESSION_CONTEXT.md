@@ -4,6 +4,24 @@
 
 ## Last completed
 
+**fund-stale-unknown-cleanup ([#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247), squash `0296107`) — flipped `is_latest=FALSE` on the BRANCH 1 portion of the stale-loader artifact surfaced by PR #246.** Builds on PR #246.
+
+| Phase | Outcome |
+| --- | --- |
+| 1 — re-validate cohort | 8 (cik, fund_name) pairs / 3,184 rows / $10.025B at `series_id='UNKNOWN' AND is_latest=TRUE`; matches PR #246 audit (drift gate 0%). |
+| 2 — dry-run manifest | New `scripts/oneoff/cleanup_stale_unknown.py` per-pair branch classifier. BRANCH 1 (live SYN_ companion → FLIP) = 6 pairs / 2,738 rows / $5.283B; BRANCH 2 (no SYN_ companion → HOLD) = 2 pairs / 446 rows / $4.741B (Adams ADX, ASA Gold ASA); BRANCH 3 = 0. **Calamos shifted from #246's HOLD into FLIP** — the v2 loader has since written `SYN_0001285650` (1,459 is_latest=TRUE rows). Phase 2 dry-run committed in pre-decision SHA `940576c`. Chat decision: BRANCH 1 only; BRANCH 2 deferred to new P2 `cef-attribution-path` workstream. |
+| 3 — execute is_latest flip | Single transaction. `--confirm --accept-deferred-holds` (new opt-in flag for the BRANCH 2 deferral). Pre-flip 3,184 → post-flip 446 (Δ -2,738 == expected). All gates honored. |
+| 4 — peer_rotation_flows rebuild | Run ID `peer_rotation_empty_20260502_095212` (parse 46.7s + promote 193.1s, ~4 min). Total 17,490,106 → 17,489,751 (Δ -355, 0.002%, well within ±0.5%). Snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_095212.duckdb`. |
+| 5 — validation | `pytest tests/` 373/373 PASS in 56.46s. `audit_unknown_inventory.py` re-run: residual 1 series / 446 rows / $4.74B (= 2 deferred BRANCH 2 pairs, expected). `audit_orphan_inventory.py` re-run: same 446 / $4.74B. `cd web/react-app && npm run build`: 0 errors, 1.41s. Per-pair `is_latest=TRUE` spot-checks: 6/6 FLIP pairs return SYN_-only; 2/2 HOLD pairs preserved as UNKNOWN. |
+
+**Spot-check semantics (Phase 4):** `peer_rotation_flows.entity` is keyed on `fund_name`, not `series_id`. Same-fund_name pairs (Eaton Vance 242→121 rows, NXG 121→66 rows) cleanly de-duped from prior double-counting; case-different Calamos UNKNOWN-side entity (`'Calamos Global Total Return Fund'`) vanished while SYN_-side entity (`'CALAMOS GLOBAL TOTAL RETURN FUND'`, uppercase) unchanged at 127 rows / $47.6M.
+
+**Architecture / safety:** UPDATE-only on `is_latest` flag. No INSERT, no `fund_universe` touched, no `series_id` rewrite, no synthesized SYN_ rows. PR-2 pipeline lock not on critical path. No write-path module modified. Apr-15 v2 loader bug surfaced in results doc but not patched (out of scope per brief).
+
+**Output:** `scripts/oneoff/cleanup_stale_unknown.py`, `data/working/stale_unknown_cleanup_manifest.csv`, `docs/findings/fund_stale_unknown_cleanup_dryrun.md`, `docs/findings/fund_stale_unknown_cleanup_results.md`. ROADMAP.md adds COMPLETED entry + new P2 `cef-attribution-path` workstream.
+
+---
+
 **fund-unknown-attribution (PR #246, squash `1956ea8`) — read-only audit closing the orphan/unknown thread end-to-end.** Builds on PR #245.
 
 | Layer | Outcome |
@@ -31,10 +49,10 @@
 
 **This sync (direct to `main`):**
 
-- **`ROADMAP.md`** — `fund-holdings-orphan-investigation` removed from P2 backlog; new top entry in COMPLETED table dated 2026-05-01 with PR #245 details.
-- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten.
+- **`ROADMAP.md`** — squash SHA `0296107` patched into the 2026-05-02 fund-stale-unknown-cleanup row.
+- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten with PR #247 added at the top, PR #246 demoted below the divider.
 
-Branch HEAD on `main`: **`1956ea8`** (PR #246 fund-unknown-attribution audit; doc + helpers only, no DB writes).
+Branch HEAD on `main`: **`0296107`** (PR #247 fund-stale-unknown-cleanup; flipped 2,738 rows is_latest=FALSE + peer_rotation_flows rebuild). Prior commit `dfa392e` (post-#246 doc-sync), then `1956ea8` (PR #246 fund-unknown-attribution audit).
 
 ## Up next
 
@@ -44,7 +62,7 @@ Two threads still queued; the user picks which to drive next session.
 
 Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy: `balanced` (60-90% equity, vague label, arbitrary boundary), `multi_asset` (30-60% equity, arbitrary boundaries on both sides), `bond_or_other` (heterogeneous bucket; the largest miscategorisation cohort — 39 ProShares short funds — was moved out by #243), `excluded` (combines money markets / fund-of-funds / ETF wrappers — should split into specific reasons), `final_filing` (status flag, not a strategy — decide whether it belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean).
 
-Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Triggers now satisfied: orphan/NULL data is on the table; `canonical-value-coverage-audit` data-pull (PR #242 §1a–§1h) feeds this directly; orphan cohort backfilled (PR #245) — only the 1-series UNKNOWN_literal residual remains.
+Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Triggers now satisfied: orphan/NULL data is on the table; `canonical-value-coverage-audit` data-pull (PR #242 §1a–§1h) feeds this directly; orphan cohort backfilled (PR #245); BRANCH 1 of the stale-loader artifact flipped (PR #247) — only the 2-pair / 446-row CEF residual under `cef-attribution-path` remains.
 
 ### 2. Major sequence — institution-level consolidation scoping
 
@@ -69,11 +87,11 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Critical context for next session
 
-**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244 — only the 1-series UNKNOWN_literal residual (3,184 rows / $10.0B) remains, by design. 12 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
+**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244; PR #247 flipped `is_latest=FALSE` on 6 of the 8 UNKNOWN-literal stale pairs (2,738 rows / $5.28B). Residual: 1 series / **446 rows / $4.74B** (2 closed-end-fund pairs Adams ADX + ASA Gold ASA, deferred to `cef-attribution-path`). 13 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
 
 **Snapshot vs canonical semantics are intentional.** Per-row, per-quarter classification at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (snapshot, frozen by design). Canonical (locked, never-overwritten-without-analyst-approval) lives in `fund_universe.fund_strategy`. Anything that filters or buckets by active/passive **always JOINs `fund_universe`** — never reads `_at_filing`.
 
-**Active-only views now exclude unknowns.** PR #245 tightened `OverlapAnalysisTab.tsx` from `r.is_active !== false` to `r.is_active === true` at both the row filter (L194) and the active-KPI tile (L213). Any fund with `is_active=null` (orphan from `fund_universe`) is excluded from active-only views. After PR #245 the only `is_active=null` source is the 1-series UNKNOWN_literal residual.
+**Active-only views now exclude unknowns.** PR #245 tightened `OverlapAnalysisTab.tsx` from `r.is_active !== false` to `r.is_active === true` at both the row filter (L194) and the active-KPI tile (L213). Any fund with `is_active=null` (orphan from `fund_universe`) is excluded from active-only views. After PR #247 the only `is_active=null` source is the 446-row / $4.74B `cef-attribution-path` residual (Adams ADX + ASA Gold ASA).
 
 **Institution-level should follow the same architectural pattern.** Canonical column on `entity_classification_history` / `entity_current`, constants module, shared label utility, JOIN-based query layer. The four-stage pattern (backfill → rebuild → audit → fix+rename+lock) is the template.
 
@@ -89,7 +107,7 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Reminders
 
-- **HEAD on main is `1956ea8`** (PR #246 fund-unknown-attribution audit). Prior commit `9392a36` (PR #245 fund-orphan-backfill).
+- **HEAD on main is `0296107`** (PR #247 fund-stale-unknown-cleanup — 2,738 rows flipped is_latest=FALSE + peer_rotation_flows rebuild). Prior commit `dfa392e` (post-#246 doc-sync), then `1956ea8` (PR #246 fund-unknown-attribution audit).
 - **Canonical fund taxonomy values:** `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. `active` is dominant (was `equity` pre-PR-4). Display label utility `_fund_type_label()` in `scripts/queries/common.py` collapses to 5 values `{active, passive, bond, excluded, unknown}`.
 - **Column rename (PR-4):** prod column is `fund_holdings_v2.fund_strategy_at_filing` (was `fund_strategy` pre-2026-05-01). Staging schema (`stg_nport_holdings.fund_strategy`) intentionally retains the old name — prod write path renames at INSERT time (`s.fund_strategy AS fund_strategy_at_filing`).
 - **JOIN rule (PR-4):** for any active/passive filter, **always JOIN `fund_universe`** — the canonical, locked column. The per-row, per-quarter snapshot in `fund_strategy_at_filing` is preserved intentionally for snapshot semantics but is NOT the source of truth for filters.
