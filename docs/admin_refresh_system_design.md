@@ -171,9 +171,9 @@ Step   Action                    DB written        Reversible without rollback?
 8      cleanup staging           13f_staging       yes
 ```
 
-**Step 1 — Fetch.** `fetch()` writes raw source data into staging DB only. Staging DB path: `data/13f_staging.duckdb`. Manifest row created with `status='fetching'`. EDGAR rate limits respected per PROCESS_RULES §4.
+**Step 1 — Fetch.** `fetch()` writes raw source data into staging DB only. Staging DB path: `data/13f_staging.duckdb`. Manifest row created with `fetch_status='fetching'`. EDGAR rate limits respected per PROCESS_RULES §4.
 
-**Step 2 — Parse.** `parse()` transforms raw staging tables into typed staging tables matching the target schema. Manifest row updated to `status='parsing'`.
+**Step 2 — Parse.** `parse()` transforms raw staging tables into typed staging tables matching the target schema. Manifest row updated to `fetch_status='parsing'`.
 
 **Step 3 — Validate.** Validation runs read-only queries against staging. Three severity levels: BLOCK (refuse to promote), FLAG (record, continue), WARN (log only). Entity gate check runs here — unresolved CIKs / series_ids are queued into `pending_entity_resolution` on prod but do not block promote (they are post-facto resolvable).
 
@@ -186,9 +186,9 @@ Step   Action                    DB written        Reversible without rollback?
 - `scd_type2` — UPDATE `valid_to=now()` on superseded rows, INSERT staged rows.
 - `direct_write` — UPSERT staged rows on natural key.
 
-Every row mutation recorded in `ingestion_impacts` with `run_id`, action, rowkey, prior_accession. Manifest row updated to `status='complete'`.
+Every row mutation recorded in `ingestion_impacts` with `run_id`, action, rowkey, prior_accession. Manifest row updated to `fetch_status='complete'`.
 
-**Step 7 — Verify.** Re-run validation gates against prod (not staging). This catches the rare case where promote writes differ from staging intent. If verify fails, manifest row flagged `status='verify_failed'` and alert surfaced in admin UI.
+**Step 7 — Verify.** Re-run validation gates against prod (not staging). This catches the rare case where promote writes differ from staging intent. If verify fails, the run is flagged for manual review and an alert surfaced in admin UI. _Note (CP-2 reconcile, 2026-05-02): the `'verify_failed'` status value is **not** part of the live `fetch_status` enum and is not currently emitted by any pipeline — Step 7 verify-after-promote is conceptual until a Step-7 implementation lands. Today, post-promote validation failures surface via the impacts log and admin run-detail view, not via a manifest column flip._
 
 **Step 8 — Cleanup.** Drop staging tables for this run unless `--keep-staging` flag was passed. Prune snapshots older than 14 days. Refresh `13f_readonly.duckdb` snapshot for app reads.
 
@@ -607,18 +607,24 @@ UPDATE beneficial_ownership_v2 SET backfill_quality = 'direct';
 UPDATE beneficial_ownership_v2 SET loaded_at = <manifest lookup or epoch>;
 ```
 
-**`fund_holdings_v2`** (medium — join to `ingestion_manifest` by `(series_id, report_month)`):
+**`fund_holdings_v2`** (medium — join to `ingestion_manifest` via `accession_number`):
 ```sql
 -- Populate accession_number from ingestion_manifest where available.
+-- CP-2 reconcile (2026-05-02): live ingestion_manifest does not carry
+-- (series_id, report_month) directly; the join needs an indirect resolution
+-- through accession_number, which is what is loaded into fund_holdings_v2
+-- by load_nport.py at promote time. The original (series_id, report_month)
+-- predicate below is conceptual; the working backfill SQL must drive the
+-- join from accession_number once available.
 UPDATE fund_holdings_v2 f
   SET accession_number = m.accession_number,
-      loaded_at = m.completed_at,
+      loaded_at = m.fetch_completed_at,
       backfill_quality = 'direct',
       is_latest = TRUE
-  FROM (SELECT series_id, report_month, accession_number, completed_at
+  FROM (SELECT accession_number, fetch_completed_at
         FROM ingestion_manifest
-        WHERE pipeline_name = 'nport' AND status = 'complete') m
-  WHERE f.series_id = m.series_id AND f.report_month = m.report_month;
+        WHERE source_type = 'NPORT' AND fetch_status = 'complete') m
+  WHERE f.accession_number = m.accession_number;
 
 -- Rows without a manifest match (pre-control-plane data) get inferred backfill.
 UPDATE fund_holdings_v2
@@ -815,11 +821,11 @@ If the probe fails, the refresh button still works. Probe is informational. A fa
 ### Per-card fields
 
 - **Pipeline name** from `PIPELINE_CADENCE.display_name`.
-- **Last run** — `MAX(completed_at)` from `ingestion_manifest` filtered by `pipeline_name`.
+- **Last run** — `MAX(fetch_completed_at)` from `ingestion_manifest` filtered by `source_type`. _(CP-2 reconcile, 2026-05-02: `admin_bp.py` already serializes this as `pipeline_name` / `completed_at` in the API response — see Schema mapping appendix.)_
 - **Age** — today minus last run.
 - **Status** — green/yellow/red from `stale_threshold_days`.
 - **New?** — count from cached probe; dash when zero or no probe.
-- **Rows added last run** — from `ingestion_manifest.row_counts_json`.
+- **Rows added last run** — `SUM(rows_promoted)` from `ingestion_impacts` aggregated by `manifest_id` and joined back to the run's manifest row. _(CP-2 reconcile, 2026-05-02: original design referenced a `row_counts_json` column on `ingestion_manifest`; that column never existed and no writer populates it. `ingestion_impacts.rows_promoted` is the canonical source — populated per target-table by every v1.2 `SourcePipeline` subclass at promote time.)_
 - **Refresh button** — launches `POST /admin/refresh/{pipeline}`.
 
 ### Refresh click flow
@@ -892,7 +898,7 @@ Same pipeline cannot run twice simultaneously. 409 Conflict returned. Different 
 - Prometheus metrics export deferred.
 
 ### Multi-user (future)
-- Add `requested_by` to `ingestion_manifest`.
+- Add `requested_by` to `ingestion_manifest` — **deferred until multi-user auth ships**. No admin endpoint reads this field today; no writer populates it. Adding the column ahead of the auth-role feature it depends on would be premature schema growth (CP-2 reconcile, 2026-05-02).
 - Admin vs analyst roles.
 - Request queue for concurrent triggers on the same pipeline.
 
@@ -988,3 +994,91 @@ Hand this doc to Claude Code plus Codex for review. Reviewer targets:
 9. Is the rollback design (impacts reversal plus snapshot fallback) sufficient, or do we need additional guarantees?
 
 After review, incorporate feedback into v3.3, then write Claude Code prompts phase-by-phase starting with phase 2 (base class).
+
+---
+
+## Appendix A — Schema mapping (CP-2 reconcile, 2026-05-02)
+
+This appendix is the canonical reference for `ingestion_manifest` field names used throughout this document. It was added by the `ingestion-manifest-reconcile` PR (CP-2 in `docs/decisions/inst_eid_bridge_decisions.md`) to close the §9 G4 BLOCKER. **Live schema is canonical.** Where this design document referenced fields under different names, the references have been rewritten in place to use the live names. The translation table below records what changed and why.
+
+### A.1 Live `ingestion_manifest` DDL (authoritative)
+
+Defined in `scripts/migrations/001_pipeline_control_plane.py`. 26 columns:
+
+```sql
+CREATE TABLE ingestion_manifest (
+    manifest_id          BIGINT PRIMARY KEY DEFAULT nextval('manifest_id_seq'),
+    source_type          VARCHAR NOT NULL,         -- '13F' | 'NPORT' | '13DG' | 'ADV' | 'NCEN' | 'MARKET' | 'FINRA_SHORT'
+    object_type          VARCHAR NOT NULL,         -- 'ZIP' | 'XML' | 'PDF' | 'HTML' | 'CSV' | 'JSON'
+    object_key           VARCHAR NOT NULL UNIQUE,  -- accession_number OR sha256(source_url + run_id)
+    source_url           VARCHAR,
+    accession_number     VARCHAR,
+    report_period        DATE,
+    filing_date          DATE,
+    accepted_at          TIMESTAMP,
+    run_id               VARCHAR NOT NULL,
+    discovered_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fetch_started_at     TIMESTAMP,
+    fetch_completed_at   TIMESTAMP,
+    fetch_status         VARCHAR NOT NULL DEFAULT 'pending',
+    http_code            INTEGER,
+    source_bytes         BIGINT,
+    source_checksum      VARCHAR,
+    local_path           VARCHAR,
+    retry_count          INTEGER NOT NULL DEFAULT 0,
+    error_message        VARCHAR,
+    parser_version       VARCHAR,
+    schema_version       VARCHAR,
+    is_amendment         BOOLEAN NOT NULL DEFAULT FALSE,
+    prior_accession      VARCHAR,
+    superseded_by_manifest_id BIGINT,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### A.2 Field-name translation table
+
+| Design field (pre-rewrite) | Live column | Action taken |
+|---|---|---|
+| `pipeline_name` | `source_type` | RENAME — design narrative + Migration 008 SQL rewritten in place. |
+| `status` | `fetch_status` | RENAME — design narrative rewritten in place. |
+| `completed_at` | `fetch_completed_at` | RENAME — design narrative + Migration 008 SQL rewritten in place. |
+| `row_counts_json` | _(none — use `ingestion_impacts.rows_promoted` aggregate)_ | DROP_FROM_DESIGN — admin dashboard "Rows added last run" card now reads `SUM(rows_promoted)` aggregated by `manifest_id`. Already populated. |
+| `requested_by` | _(none — deferred until multi-user auth ships)_ | DROP_FROM_DESIGN. Future work, scoped under §11 Multi-user. |
+
+### A.3 API field translation (already implemented)
+
+`scripts/admin_bp.py` translates the live column names to the API field names referenced throughout this document. No code change is needed to consume the live schema:
+
+| Live column | API field name | Implemented in |
+|---|---|---|
+| `source_type` | `pipeline_name` | `admin_bp.py:1363`, `:1393`, `:1563` |
+| `fetch_status` | `status` | `admin_bp.py:1272`, `:1359` |
+| `fetch_completed_at` | `completed_at` | `admin_bp.py:1274`, `:1360`, `:1395`, `:1565` |
+
+### A.4 `fetch_status` enum reconciliation
+
+The migration 001 schema comment enumerates the original design enum:
+
+```
+'pending' | 'fetching' | 'complete' | 'failed' | 'skipped'
+```
+
+The values actually present in production data (audit 2026-05-02) include three additional values written by live pipelines:
+
+```
+'pending_approval'   -- admin diff-review gate (Step 4)
+'rolled_back'        -- post-rollback flag from /admin/rollback/{run_id}
+'parsing'            -- transient Step-2 in-flight state
+```
+
+Migration 001's schema comment should be updated in a future migration; **this is not a column change, just a comment update**, and is out of scope for the CP-2 reconcile PR.
+
+`'verify_failed'` (referenced narratively at §2a Step 7) is **not** a live enum value and is not currently emitted by any pipeline. Step 7 verify-after-promote is conceptual; today, post-promote validation surfaces via the impacts log and admin run-detail view rather than a manifest-column flip.
+
+### A.5 Out-of-scope observations from the audit
+
+The following were surfaced during the CP-2 audit but are **not** in scope for this PR. Logging here for future maintainers:
+
+1. **Inconsistent `source_type` values for the same pipeline.** Direct manifest writes from `load_nport.py:876` use `'NPORT'` (uppercase short code; 21,253 rows in prod). Calls routed through `SourcePipeline.run()` at `base.py:341` use `self.name`, which for the N-PORT pipeline is `'nport_holdings'` (1 row in prod). The same split exists for 13F (`'13F'` vs `'13f_holdings'`). `admin_bp.py:1346` queries `WHERE source_type = ?` with `name` taken from `PIPELINE_CADENCE.keys()` (the snake_case form), which means the "last run" lookup misses the 21,253 short-code rows for N-PORT. A follow-up cleanup PR should normalize on a single value per pipeline; flagging for ROADMAP. Out of scope for CP-2.
+2. **Migration 008 SQL still references columns that don't exist on `ingestion_manifest`** (`series_id`, `report_month`). The rewrite above changes the join key from `(series_id, report_month)` to `accession_number`, which is structurally sound but the working backfill SQL still needs verification before migration 008 ships. Out of scope for CP-2.
