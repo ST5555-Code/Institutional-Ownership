@@ -581,3 +581,6 @@ Output artifacts:
 - ROADMAP item: `inst-eid-bridge-fix` (CP-4 in PR #252 sequencing). This
   doc is the CP-1 deliverable. CP-4 prompt awaits chat resolution of
   Open Questions #1–#3.
+- **`docs/decisions/inst_eid_bridge_decisions.md`** — chat decisions
+  locking the seven §9 open questions and CP-4 split (added 2026-05-02
+  post-PR #254 review).
