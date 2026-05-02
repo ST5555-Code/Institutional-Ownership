@@ -126,6 +126,8 @@ continue to display under the `unknown` fund_strategy bucket. This is
 the **expected residual** — the audit re-runs above show exactly this
 count, and that count is *not* a regression.
 
+> **See also:** [ROADMAP.md § cef-attribution-path](../../ROADMAP.md#cef-attribution-path) — full 5-PR workstream spec (scoping → fetch → parse → load → display); [ROADMAP.md § v2-loader-is-latest-watchpoint](../../ROADMAP.md#v2-loader-is-latest-watchpoint) — post-Q1-cycle residual check that closes Open Question #4.
+
 ---
 
 ## Out-of-scope / surfaced for follow-up
