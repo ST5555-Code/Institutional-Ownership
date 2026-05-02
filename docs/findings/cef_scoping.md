@@ -254,6 +254,8 @@ Defensive watchpoint: assert zero `fund_holdings_v2` rows with `is_latest=TRUE A
 
 6. **Wording fix for ROADMAP NSAR mention.** Phase 4 confirmed NSAR was operational/census, not holdings. The cef-attribution-path entry says "CEFs report on NSAR-A / NSAR-B (semiannual) and N-CSR" — should be corrected to "CEFs report on N-PORT (monthly), with N-CSR semiannual shareholder reports as supplemental disclosure." Suggest folding into the close-out doc-sync after PR-3.
 
+> **Resolution (2026-05-02 cef-roadmap-correction commit):** all open questions surfaced here landed as three new ROADMAP entries — [`cef-residual-cleanup`](../../ROADMAP.md#cef-residual-cleanup) (renamed from `cef-attribution-path`, rescoped to 2 cleanup PRs), [`retired-loader-residue-watchpoint`](../../ROADMAP.md#retired-loader-residue-watchpoint) (P3, defensive monitor for the literal-`UNKNOWN` write pattern), and [`fund-structure-column`](../../ROADMAP.md#fund-structure-column) (P2, orthogonal `fund_universe.fund_structure` enum).
+
 ---
 
 ## 9. Helper Scripts (read-only, verified zero writes)

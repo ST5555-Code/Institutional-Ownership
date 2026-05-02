@@ -18,7 +18,8 @@ _(none — see COMPLETED table)_
 
 ### P2 — Next sprint
 
-- **cef-attribution-path** — Surfaced 2026-05-02 (PR #247 BRANCH 2 deferral). Full spec at [§ cef-attribution-path](#cef-attribution-path) below — 5-PR workstream (scoping → fetch → parse → load → display) for closed-end funds that file on N-CSR / NSAR, not N-PORT. Seed cohort: Adams ADX + ASA Gold ASA (446 rows / $4.741B), the residual currently sitting in the `unknown` display bucket.
+- **cef-residual-cleanup** — Surfaced 2026-05-02 (PR #247 BRANCH 2 deferral); reframed 2026-05-02 by PR #249 (cef-scoping). The 446 rows / $4.741B `series_id='UNKNOWN'` residual from 2 CEF CIKs (Adams ADX `0000002230`, ASA Gold ASA `0001230869`) is migration-015 residue from retired loader `scripts/retired/fetch_nport.py`, NOT a CEF architecture gap — CEFs file N-PORT under Rule 30b1-9 and the `SYN_<cik>` namespace already correctly loads 436 of 438 CEFs in `fund_holdings_v2` ($625.94B AUM). Original 4-PR follow-on arc (cef-fetch-pipeline, cef-parser, cef-holdings-load, display integration) DROPPED. Rescoped to 2 small cleanup PRs, ~1–2 sessions: PR-A `cef-residual-cleanup-adx` (S, flip 96 ADX byte-identical duplicates) + PR-B `cef-asa-period-backfill` (M, re-run v2 loader against 3 ASA periods, then flip 350 UNKNOWN rows). Full spec at [§ cef-residual-cleanup](#cef-residual-cleanup).
+- **fund-structure-column** — Surfaced 2026-05-02 (PR #249 cef-scoping). Add `fund_structure` enum column to `fund_universe` ({`open_end`, `closed_end`, `etf`, `bdc`, `interval`}) — orthogonal to `fund_strategy`. Currently structure is inferred indirectly via `series_id` prefix (SYN_ = CEF-or-open-end ambiguous, real SEC series_id = open-end), which is fragile. Lets `cross.py` and display layer make structure-aware decisions (e.g., NAV premium/discount only for `closed_end`). Workstream: investigation PR (schema design + downstream impact) → backfill PR (populate from SEC form-type signals) → display integration PR. Blockers: must follow `cef-residual-cleanup` (depends on clean SYN_ state); source-of-truth question (SEC form-type vs prospectus vs holdings shape); interaction with `fund-strategy-taxonomy-finalization`. Full spec at [§ fund-structure-column](#fund-structure-column).
 - **parent-level-display-canonical-reads** — Migrate the 18 parent-level display read sites from `holdings_v2.manager_type` and `holdings_v2.entity_type` (legacy/derived) to canonical `entity_classification_history.classification` / `entity_current.classification`. Includes fix for `query4` silent-drop bug ([register.py:746-750](scripts/queries/register.py:746)) where rows with disagreeing `manager_type` and `entity_type` fall to "Other/Unknown". Tracked as the institution-level half of the consolidation sequence (separate from fund-level, which closed with PR-1d on 2026-05-01). Decision D4 from the PR-1c audit applies: always read canonical when migrated; precedence rule for managers without an `entity_classification_history` row to be defined as part of this work. Surfaced 2026-05-01 (PR-1d follow-up).
 - **fund-strategy-taxonomy-finalization** — Surfaced 2026-05-01 (PR-4 follow-up). Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy. Several values were inherited from the original classifier and carry vague labels or arbitrary boundaries that do not survive scrutiny: (1) **`balanced`** (60-90% equity composition) — vague label, boundary with `multi_asset` is arbitrary; decide keep as composition-based bucket / rename to `active_equity_heavy` / merge into `active`; (2) **`multi_asset`** (30-60% equity composition) — boundaries with `balanced` (60%) and `bond_or_other` (30%) are both arbitrary thresholds; decide keep distinct / merge with `balanced` / rename; (3) **`bond_or_other`** — heterogeneous bucket; the `saba-proshares-reclassify` 2026-05-01 PR moved 39 ProShares short / inverse / leveraged-short funds out of this bucket to `passive` (closing the bucket's largest miscategorisation); residual is bond funds + niche cases. Could still split into `bond` and `inverse_or_short` if a richer taxonomy is preferred — but the urgency is gone now that ProShares is corrected; (4) **`excluded`** — combines money markets, fund-of-funds, and ETF wrappers that skip classification; should split into specific reasons; (5) **`final_filing`** — status flag, not a strategy; 12+ funds (the 12 BlackRock muni trusts, all confirmed merged Feb 2026 by the `fund-cleanup-batch` 2026-05-01 audit, plus other final-filing rows); decide whether this belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean. Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Trigger: orphan/NULL data is now on the table (`fund-cleanup-batch` 2026-05-01 audit closed `canonical-value-coverage-audit`); residual orphan disposition tracked under `fund-holdings-orphan-investigation` and `historical-fund-holdings-drift-audit`. The merge/split decisions can now be staged.
 - **canonical-value-coverage-audit** — broader audit of NULL `fund_strategy`, orphan series, edge cohorts (UNKNOWN orphans / SYN drifters / BlackRock muni trusts), 3-way `CASE` NULL semantics in `cross.py`, and rows where `fund_holdings_v2.fund_strategy_at_filing` differs from `fund_universe.fund_strategy`. **Status (2026-05-01 conv-24):** Phase 1 (data-pull / row-count + AUM exposure across canonical buckets) was executed inside `fund-cleanup-batch` (PR #242); see `docs/findings/fund_cleanup_batch_results.md` §1a–§1h. The structured per-bucket count + AUM exposure + recommended treatment table is the still-open deliverable; the SYN drift cohort + 301-series orphan cohort + 3-way CASE NULL semantics review remain to be characterized end-to-end. Trigger: next architectural session that picks up `fund-strategy-taxonomy-finalization`.
@@ -27,6 +28,7 @@ _(none — see COMPLETED table)_
 ### P3 — Quick wins / low priority
 
 - **v2-loader-is-latest-watchpoint** — Surfaced 2026-05-02 (PR #247 close-out; Open Question #4 in PR #246 attribution doc). Watchpoint, not a code change. After Q1 2026 13F cycle (~2026-05-15) re-run `audit_unknown_inventory.py`; expected residual = 446 rows (the deferred CEF cohort). Residual > 446 ⇒ Apr-15 v2 loader bug recurred ⇒ open `v2-loader-is-latest-fix` PR. Residual = 446 ⇒ close Open Question #4 as resolved-by-evidence. Full spec at [§ v2-loader-is-latest-watchpoint](#v2-loader-is-latest-watchpoint).
+- **retired-loader-residue-watchpoint** — Surfaced 2026-05-02 (PR #249 cef-scoping). Watchpoint, not a code change. PR #249 found that 446 UNKNOWN rows in `fund_holdings_v2` came from `scripts/retired/fetch_nport.py`, the only literal-`UNKNOWN` write site in the repo. Loader is retired. After PR-B (`cef-asa-period-backfill`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post-Stage 5 DROP): re-run `audit_unknown_inventory.py`. Expected residual: 0. Residual > 0 ⇒ either retired-loader residue not fully cleaned (re-run cleanup) or a new write site introduced the literal-`UNKNOWN` pattern (grep `pipeline/`, then targeted fix PR). Full spec at [§ retired-loader-residue-watchpoint](#retired-loader-residue-watchpoint).
 - **stage-b-turnover-deferred-funds** — Three Vanguard funds and similar individual cases are passive in behavior but their names do not match systemic INDEX_PATTERNS rules: Vanguard Primecap (~$76B), Vanguard Windsor II (~$65B), Vanguard Equity Income (~$62B). These will be flagged for reclassification by Stage B (position turnover detection) which validates passive behavior via holdings stability rather than name regex. Total ~$203B AUM affected. Adjacent case: Bridgeway Ultra-Small Company Market (~$0.13B) — passive Bridgeway-internal index tracker that the PR-2 sweep deliberately did not catch (the `\bUltra\b` pattern was rejected because of false positives on actively-managed Ultra-named funds, and `\bBridgeway\b` is mixed-purpose). Surfaced 2026-05-01 (PR-2 follow-up); demoted from P2 → P3 in `conv-24-doc-sync` because the trigger (Stage B turnover detection design) is itself a separate, larger initiative not yet on this roadmap. Trigger: Stage B turnover detection design.
 - **per-fund-deferred-decisions** — Five named funds surfaced for chat decision but deliberately not reclassified by PR #242 (`fund-cleanup-batch`) or PR #243 (`saba-proshares-reclassify`); each needs its own per-fund review or a loader-gap fix before any UPDATE: (1) Eaton Vance Tax-Advantaged Dividend Income + 2 NEW global variants — all currently `balanced`, decision is whether prospectus-level review supports `balanced` vs `bond_or_other`; (2) Calamos Global Total Return Fund (1,412 orphan holdings rows in `fund_holdings_v2`, no `fund_universe` row at all — loader gap, not a classification call); (3) the 96-row N/A cohort (rows where `fund_name` is literally `'N/A'` in `fund_holdings_v2`, also no `fund_universe` row — loader gap). Surfaced 2026-05-01 fund-cleanup-batch §4d. Trigger: next per-fund review session, or whenever the loader gap for Calamos/N/A is investigated as part of `fund-holdings-orphan-investigation`.
 - **historical-fund-holdings-drift-audit** — Surfaced 2026-05-01 (fund-cleanup-batch §1g). 31,400 non-SYN holdings rows where `fund_holdings_v2.fund_strategy_at_filing` disagrees with `fund_universe.fund_strategy` (40,843 total minus the 9,405 documented SYN drifters from PR-1a §2.3). Same shape as the SYN drift cohort but a larger non-SYN cohort. Drift is harmless at runtime — PR-4's JOIN architectural fix in `compute_peer_rotation.py:421-449` serves canonical via `LEFT JOIN fund_universe`; the snapshot column is preserved by design as `fund_strategy_at_filing` (snapshot semantics, intentional). Audit characterizes the historical drift class for future remediation. See `docs/findings/fund_cleanup_batch_results.md` §1g.
@@ -86,41 +88,39 @@ _(none — see COMPLETED table)_
 
 ---
 
-## cef-attribution-path
+## cef-residual-cleanup
 
-**Status:** Open · **Priority:** P2 · **Surfaced:** PR [#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247) (`fund-stale-unknown-cleanup` BRANCH 2 holdouts)
+**Status:** Open · **Priority:** P2 · **Surfaced:** PR [#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247) (BRANCH 2 holdouts) · **Reframed:** PR [#249](https://github.com/ST5555-Code/Institutional-Ownership/pull/249) (cef-scoping)
 
-**Problem.** Closed-end funds (CEFs) currently land in `fund_holdings_v2` under `series_id='UNKNOWN'` with no `SYN_*` companion. The `SYN_*` pattern assumes N-PORT-shaped open-end fund schema. CEFs report on **NSAR-A / NSAR-B (semiannual)** and **N-CSR (certified shareholder reports)**, not N-PORT. Two known seed pairs:
+**Problem.** 446 rows / $4.741B in `fund_holdings_v2` under `series_id='UNKNOWN'` from 2 CEF CIKs (Adams Diversified Equity Fund `0000002230`, ASA Gold & Precious Metals `0001230869`). Per PR #249 scoping: this is migration-015 residue from the retired loader `scripts/retired/fetch_nport.py`, NOT a CEF architecture gap. CEFs file N-PORT under Rule 30b1-9 and the `SYN_<cik>` namespace already correctly loads 436 of 438 CEFs in `fund_holdings_v2` ($625.94B AUM).
 
-- Adams Diversified Equity Fund (NYSE: **ADX**, CIK `0000002230`) — 96 rows / $2.989B AUM
-- ASA Gold & Precious Metals Ltd (NYSE: **ASA**, CIK `0001230869`) — 350 rows / $1.752B AUM
+Decision per PR #249: keep `SYN_<cik>` as canonical CEF identifier (Option C — status quo). Skip historical N-CSR backfill (Parser Option D). Net new modern data over N-PORT = 0; ~3–5 weeks effort if ever pursued. Original 4-PR follow-on arc (cef-fetch-pipeline, cef-parser, cef-holdings-load, display integration) DROPPED.
 
-**Total seed exposure:** 446 rows / $4.741B in the `unknown` bucket post-PR #247.
+### Workstream sequence (revised, ~1–2 sessions)
 
-### Scoping questions for cef-scoping investigation PR (read-only)
+- **PR-A `cef-residual-cleanup-adx`** (S) — flip 96 ADX byte-identical duplicates to `is_latest=FALSE`.
+- **PR-B `cef-asa-period-backfill`** (M) — re-run v2 loader against 3 ASA periods to populate `SYN_0001230869` companions, then flip 350 UNKNOWN rows to `is_latest=FALSE`. Closes the workstream.
 
-1. **Full CEF inventory in `fund_holdings_v2`** — sweep N-2 / closed-end registrants vs current rows.
-2. **By design or by accident** — trace the load path that wrote ADX, ASA.
-3. **Canonical CEF series identifier** — CIK, new `CEF_<cik>` namespace, or separate `cef_holdings` table.
-4. **Schema fit** — NSAR / N-CSR vs N-PORT delta.
-5. **Holdings disclosure parsing** — pre-2020 PDF vs post-2020 XML.
+### Out of scope
 
-### Workstream sequence
+- N-CSR / NSAR holdings parsing (resolved by PR #249: not needed).
+- BDC (Form 10-K), interval funds — separate workstreams.
 
-- **PR-1 `cef-scoping`** — read-only audit, decision doc.
-- **PR-2 `cef-fetch-pipeline`** — NSAR-A / NSAR-B / N-CSR fetcher via `edgartools`.
-- **PR-3 `cef-parser`** — extract holdings from N-CSR schedules.
-- **PR-4 `cef-holdings-load`** — populate canonical table per PR-1 decision. Backfill ADX + ASA + full CEF universe.
-- **PR-5** — `cross.py` + display layer integration.
+---
 
-### Blockers / open questions
+## retired-loader-residue-watchpoint
 
-- `edgartools` NSAR / N-CSR coverage — verify before PR-2.
-- N-CSR PDF parsing for pre-2020 filings — may need OCR.
-- CEF universe size — ~500 active CEFs per SEC.
-- Stage 5 DROP (May 9+) interaction — confirm no schema collisions.
+**Status:** Watch · **Priority:** P3 · **Surfaced:** PR [#249](https://github.com/ST5555-Code/Institutional-Ownership/pull/249) (cef-scoping)
 
-**Out of scope:** BDC (Form 10-K), interval funds (N-PORT) — separate workstreams.
+**Problem.** PR #249 found that 446 UNKNOWN rows in `fund_holdings_v2` came from `scripts/retired/fetch_nport.py`, the only literal-`UNKNOWN` write site in the repo. Loader is retired. Watchpoint confirms no future write site reintroduces the pattern.
+
+**Watchpoint.** After PR-B (`cef-asa-period-backfill`) lands AND after Q1 2026 13F cycle runs (~2026-05-15, post–Stage 5 DROP):
+
+1. Run `audit_unknown_inventory.py`.
+2. Expected residual: **0**.
+3. **If residual > 0:** either retired-loader residue not fully cleaned (re-run the cleanup) or a new write site introduced the pattern (grep for literal-`'UNKNOWN'` across `pipeline/`, then open targeted fix PR).
+
+**No code change until the watchpoint check runs.**
 
 ---
 
@@ -138,6 +138,30 @@ _(none — see COMPLETED table)_
 4. **If residual = 446** — close Open Question #4 as resolved-by-evidence.
 
 **No code change until the watchpoint check runs.**
+
+---
+
+## fund-structure-column
+
+**Status:** Open · **Priority:** P2 · **Surfaced:** PR [#249](https://github.com/ST5555-Code/Institutional-Ownership/pull/249) (cef-scoping)
+
+**Problem.** `fund_universe.fund_strategy` describes investment style (active, passive, etc.) but does not capture fund structure. CEFs trade at premium/discount to NAV; open-end funds do not. ETFs, BDCs, and interval funds each behave differently in display layer. Currently structure is inferred indirectly via `series_id` prefix (`SYN_` = CEF-or-open-end ambiguous, real SEC `series_id` = open-end), which is fragile.
+
+**Proposal.** Add `fund_structure` enum column to `fund_universe`: `{open_end, closed_end, etf, bdc, interval}`. Orthogonal to `fund_strategy`. Lets `cross.py` and display layer make structure-aware decisions (e.g., show NAV premium/discount only for `closed_end`).
+
+### Workstream shape (estimated)
+
+- **Investigation PR** — schema design, migration plan, downstream query impact analysis.
+- **Backfill PR** — populate `fund_structure` for all existing `fund_universe` rows from SEC form-type signals.
+- **Display integration PR** — surface in relevant tabs.
+
+### Blockers
+
+- Must follow `cef-residual-cleanup` (depends on clean `SYN_` state).
+- Source-of-truth question: SEC form-type, fund prospectus, or derived from holdings shape?
+- Interaction with `fund-strategy-taxonomy-finalization` (separate P2 workstream).
+
+**Out of scope:** `nav_per_share` enrichment (deferred — no current analytic depends on it).
 
 ---
 
