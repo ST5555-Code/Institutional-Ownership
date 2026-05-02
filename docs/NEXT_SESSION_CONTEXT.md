@@ -4,6 +4,22 @@
 
 ## Last completed
 
+**fund-universe-value-corrections ([#248](https://github.com/ST5555-Code/Institutional-Ownership/pull/248), squash `8253713`) — closes the cleanup arc opened by PRs #244 → #245 → #246 → #247.** Two value corrections to `fund_universe` plus a forward-looking guard on the original backfill script. Builds on PR #246's audit findings B1 + B2.
+
+| Phase | Outcome |
+| --- | --- |
+| 1 — re-validate (read-only) | Rareview `S000090077` confirmed at `fund_strategy='excluded'`. 301 rows tagged `strategy_source='orphan_backfill_2026Q2'` confirmed all NULL on `total_net_assets` (no drift from PR #245). Canonical N-PORT TotalNetAssets is not persisted at series level in prod — reconstructs exactly from `fund_holdings_v2` via `NAV = MEDIAN(market_value_usd * 100.0 / pct_of_nav)` on the most-recent quarter's `is_latest=TRUE` rows. Validated against 10 funds with existing TNA: ratio = 1.000000…. **Key finding:** `pct_of_nav` is stored on the percent scale (0–100), not fraction. |
+| 2 — dry-run manifest | New `scripts/oneoff/correct_fund_universe_values.py --dry-run`. Block A (1 row) + Block B (300 rows after de-dup fix) = 301 entries. 300/300 canonical, 0 fallback, 0 NULL-residual. Total Block B NAV = $450.1B. NAV/SUM(mv) median = 1.004; outliers reflect option-strategy ETFs where N-PORT shows only MMF collateral rows (reconstruction correct in spot-checks). |
+| 3 — execute | Block A flipped Rareview `excluded → passive`, `strategy_source → 'unknown_cleanup_2026Q2'`, `total_net_assets → $4,555,216`; Block B populated TNA on 300 rows. **Mid-flight bug + correction:** initial `--confirm` had Block A's `strategy_source` re-overwritten by Block B (Block B's manifest filter included Rareview because at dry-run time it was tagged `orphan_backfill_2026Q2` with NULL TNA). Corrected via one-shot UPDATE (1 row, single tx). Script patched so a hypothetical replay would not reproduce the bug: `derive_block_b_manifest` excludes Block A's series_id; new `derive_block_a_nav` lets Block A's UPDATE set TNA in the same statement. |
+| 4 — pipeline guard | `scripts/oneoff/backfill_orphan_fund_universe.py` patched to derive `total_net_assets` during manifest construction (canonical-first via `pct_of_nav`, `SUM(mv)` fallback, NULL-residual surfaced) and write it on INSERT. Forward-looking only — existing 301-row cohort already corrected. |
+| 5 — validation | `pytest tests/` 373/373 PASS in 58.17s. Final cohort counts: 300 `orphan_backfill_2026Q2` + 1 `unknown_cleanup_2026Q2` = 301, all with TNA, NULL-residual = 0. 5 random spot-checks plausible. `cd web/react-app && npm run build` 0 errors, 2.32s. |
+
+**Architecture / safety:** No `--reset`, no pipeline write-path module modified. Single-transaction Phase 3 with hard guards (Phase 1 drift gate, post-update residual NULL check, ROLLBACK on constraint violation). PR-2 pipeline lock not on critical path; corrections are explicit manual overrides tagged with `strategy_source`.
+
+**Output:** `scripts/oneoff/correct_fund_universe_values.py` (new); `scripts/oneoff/backfill_orphan_fund_universe.py` (forward-looking patch); `data/working/fund_universe_corrections_manifest.csv`; `docs/findings/fund_universe_corrections_dryrun.md`; `docs/findings/fund_universe_corrections_results.md`.
+
+---
+
 **fund-stale-unknown-cleanup ([#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247), squash `0296107`) — flipped `is_latest=FALSE` on the BRANCH 1 portion of the stale-loader artifact surfaced by PR #246.** Builds on PR #246.
 
 | Phase | Outcome |
@@ -49,10 +65,10 @@
 
 **This sync (direct to `main`):**
 
-- **`ROADMAP.md`** — squash SHA `0296107` patched into the 2026-05-02 fund-stale-unknown-cleanup row.
-- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten with PR #247 added at the top, PR #246 demoted below the divider.
+- **`ROADMAP.md`** — new 2026-05-02 row for fund-universe-value-corrections (PR #248, squash `8253713`) added above the existing fund-stale-unknown-cleanup row.
+- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten with PR #248 added at the top, PR #247 demoted below the divider.
 
-Branch HEAD on `main`: **`0296107`** (PR #247 fund-stale-unknown-cleanup; flipped 2,738 rows is_latest=FALSE + peer_rotation_flows rebuild). Prior commit `dfa392e` (post-#246 doc-sync), then `1956ea8` (PR #246 fund-unknown-attribution audit).
+Branch HEAD on `main`: **`8253713`** (PR #248 fund-universe-value-corrections; Rareview reclass + 301-row TNA backfill + pipeline guard). Prior commit `ab376f1` (post-#247 close-out), then `0296107` (PR #247 fund-stale-unknown-cleanup).
 
 ## Up next
 
@@ -87,7 +103,7 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Critical context for next session
 
-**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244; PR #247 flipped `is_latest=FALSE` on 6 of the 8 UNKNOWN-literal stale pairs (2,738 rows / $5.28B). Residual: 1 series / **446 rows / $4.74B** (2 closed-end-fund pairs Adams ADX + ASA Gold ASA, deferred to `cef-attribution-path`). 13 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
+**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244; PR #247 flipped `is_latest=FALSE` on 6 of the 8 UNKNOWN-literal stale pairs (2,738 rows / $5.28B); PR #248 closed B1 (Rareview reclass) + B2 (TNA backfill on all 301 orphan_backfill rows). Residual: 1 series / **446 rows / $4.74B** (2 closed-end-fund pairs Adams ADX + ASA Gold ASA, deferred to `cef-attribution-path`). 14 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
 
 **Snapshot vs canonical semantics are intentional.** Per-row, per-quarter classification at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (snapshot, frozen by design). Canonical (locked, never-overwritten-without-analyst-approval) lives in `fund_universe.fund_strategy`. Anything that filters or buckets by active/passive **always JOINs `fund_universe`** — never reads `_at_filing`.
 
@@ -107,7 +123,10 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Reminders
 
-- **HEAD on main is `0296107`** (PR #247 fund-stale-unknown-cleanup — 2,738 rows flipped is_latest=FALSE + peer_rotation_flows rebuild). Prior commit `dfa392e` (post-#246 doc-sync), then `1956ea8` (PR #246 fund-unknown-attribution audit).
+- **HEAD on main is `8253713`** (PR #248 fund-universe-value-corrections — 1 row Rareview reclass + 300 rows TNA backfill via canonical N-PORT derivation + pipeline guard). Prior commit `ab376f1` (post-#247 close-out), then `0296107` (PR #247 fund-stale-unknown-cleanup).
+- **PR #248 gotcha — `pct_of_nav` percent-scale convention.** `fund_holdings_v2.pct_of_nav` is stored on the percent scale (0–100), not fraction (0–1). Future code deriving NAV from holdings should use `market_value_usd * 100.0 / pct_of_nav`. Validated against 10 funds with existing `total_net_assets` (ratio = 1.000000…). MEDIAN over the most-recent quarter's `is_latest=TRUE` rows reconstructs N-PORT TotalNetAssets exactly.
+- **PR #248 gotcha — `unknown_cleanup_2026Q2` provenance tag.** Rareview `S000090077` carries `strategy_source='unknown_cleanup_2026Q2'` (the only row in this cohort). All other 300 backfilled rows still carry `strategy_source='orphan_backfill_2026Q2'` (PR #245 tag, retained).
+- **PR #248 gotcha — manifest overlap pattern.** When a script has multiple correction blocks targeting the same source filter, the second block's UPDATE can silently overwrite the first block's writes if the row qualifies for both filters. The fix is to exclude Block A's keys from Block B's manifest at derivation time. Documented in `docs/findings/fund_universe_corrections_results.md`.
 - **Canonical fund taxonomy values:** `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. `active` is dominant (was `equity` pre-PR-4). Display label utility `_fund_type_label()` in `scripts/queries/common.py` collapses to 5 values `{active, passive, bond, excluded, unknown}`.
 - **Column rename (PR-4):** prod column is `fund_holdings_v2.fund_strategy_at_filing` (was `fund_strategy` pre-2026-05-01). Staging schema (`stg_nport_holdings.fund_strategy`) intentionally retains the old name — prod write path renames at INSERT time (`s.fund_strategy AS fund_strategy_at_filing`).
 - **JOIN rule (PR-4):** for any active/passive filter, **always JOIN `fund_universe`** — the canonical, locked column. The per-row, per-quarter snapshot in `fund_strategy_at_filing` is preserved intentionally for snapshot semantics but is NOT the source of truth for filters.
