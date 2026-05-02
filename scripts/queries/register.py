@@ -743,10 +743,14 @@ def query4(ticker, quarter=LQ):
     try:
         df = con.execute(f"""
             SELECT
+                -- COALESCE(entity_type, manager_type): entity_type is the canonical
+                -- post-migration source (parent-level-display-canonical-reads);
+                -- manager_type is the legacy fallback. Disagreement convention:
+                -- when both columns are non-NULL but disagree, entity_type wins.
                 CASE
-                    WHEN entity_type = 'passive' THEN 'Passive (Index)'
-                    WHEN entity_type = 'activist' THEN 'Activist'
-                    WHEN manager_type IN ('active', 'hedge_fund', 'quantitative') THEN 'Active'
+                    WHEN COALESCE(entity_type, manager_type) = 'passive' THEN 'Passive (Index)'
+                    WHEN COALESCE(entity_type, manager_type) = 'activist' THEN 'Activist'
+                    WHEN COALESCE(entity_type, manager_type) IN ('active', 'hedge_fund', 'quantitative') THEN 'Active'
                     ELSE 'Other/Unknown'
                 END as category,
                 COUNT(DISTINCT cik) as num_holders,
