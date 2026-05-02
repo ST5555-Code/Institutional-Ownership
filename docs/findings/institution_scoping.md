@@ -779,6 +779,8 @@ re-architectures.
     total touch points if Datasette + React are included. Update
     ROADMAP to the chosen number once CP-5 scope locks.
 
+**Open questions surfaced into ROADMAP (added 2026-05-02 post-merge):** Q5 → `drop-multi-strategy-bucket` (P3); Q7 → `register-active-universe-consistency` (P2); Q10 → `deprecated-fund-rollup-targets-cleanup` (P3, bundled into CP-4); plus `classification-join-utility-resolution` (P3, deferred to CP-5).
+
 ---
 
 ## 13. Verification
