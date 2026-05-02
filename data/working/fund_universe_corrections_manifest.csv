@@ -1,0 +1,303 @@
+block,series_id,fund_name,current_value,proposed_value,source,new_strategy_source,support_quarter,support_row_count,support_sum_mv,support_implied_nav
+A,S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,excluded,passive,manual_override,unknown_cleanup_2026Q2,,0,,
+B,S000000713,Western Asset Core Bond Fund,,1869626398.87,canonical_nport,orphan_backfill_2026Q2,2025Q4,1010,1947342244.06,1869626398.87
+B,S000000714,Western Asset Core Plus Bond Fund,,3952570949.28,canonical_nport,orphan_backfill_2026Q2,2025Q4,1296,4214251155.53,3952570949.28
+B,S000000715,Western Asset Inflation Indexed Plus Bond Fund,,40282134.22,canonical_nport,orphan_backfill_2026Q2,2025Q4,48,39752130.85,40282134.22
+B,S000001146,TCW METWEST LOW DURATION BOND FUND,,878483370.97,canonical_nport,orphan_backfill_2026Q2,2025Q4,508,1029781127.66,878483370.97
+B,S000001147,TCW METWEST TOTAL RETURN BOND FUND,,31064468922.50,canonical_nport,orphan_backfill_2026Q2,2025Q4,1552,33663672206.91,31064468922.50
+B,S000001149,TCW METWEST HIGH YIELD BOND FUND,,419552606.17,canonical_nport,orphan_backfill_2026Q2,2025Q4,322,409448473.71,419552606.17
+B,S000001151,TCW METWEST ULTRA SHORT BOND FUND,,40338152.26,canonical_nport,orphan_backfill_2026Q2,2025Q4,246,46991373.43,40338152.26
+B,S000001152,TCW METWEST STRATEGIC INCOME FUND,,48703621.71,canonical_nport,orphan_backfill_2026Q2,2025Q4,479,53466689.51,48703621.71
+B,S000001913,CCM Community Impact Bond Fund,,3839941072.54,canonical_nport,orphan_backfill_2026Q2,2025Q4,2574,3839409901.08,3839941072.54
+B,S000002521,MFS Alabama Municipal Bond Fund,,69550332.40,canonical_nport,orphan_backfill_2026Q2,2025Q4,157,68695246.22,69550332.40
+B,S000002522,MFS New York Municipal Bond Fund,,188260473.90,canonical_nport,orphan_backfill_2026Q2,2025Q4,181,181699991.23,188260473.90
+B,S000002523,MFS North Carolina Municipal Bond Fund,,529635467.58,canonical_nport,orphan_backfill_2026Q2,2025Q4,288,526052626.21,529635467.58
+B,S000002524,MFS Pennsylvania Municipal Bond Fund,,186221090.31,canonical_nport,orphan_backfill_2026Q2,2025Q4,233,185900313.64,186221090.31
+B,S000002525,MFS South Carolina Municipal Bond Fund,,224195606.83,canonical_nport,orphan_backfill_2026Q2,2025Q4,214,222019600.40,224195606.83
+B,S000002527,MFS Virginia Municipal Bond Fund,,349475705.37,canonical_nport,orphan_backfill_2026Q2,2025Q4,234,346734354.49,349475705.37
+B,S000002528,MFS West Virginia Municipal Bond Fund,,85602523.86,canonical_nport,orphan_backfill_2026Q2,2025Q4,138,84769187.23,85602523.86
+B,S000002529,MFS Arkansas Municipal Bond Fund,,140176538.33,canonical_nport,orphan_backfill_2026Q2,2025Q4,187,141316608.65,140176538.33
+B,S000002530,MFS California Municipal Bond Fund,,747698468.21,canonical_nport,orphan_backfill_2026Q2,2025Q4,409,744738620.55,747698468.21
+B,S000002532,MFS Georgia Municipal Bond Fund,,117505652.74,canonical_nport,orphan_backfill_2026Q2,2025Q4,189,117207637.38,117505652.74
+B,S000002533,MFS Maryland Municipal Bond Fund,,155248398.45,canonical_nport,orphan_backfill_2026Q2,2025Q4,230,153827380.39,155248398.45
+B,S000002534,MFS Massachusetts Municipal Bond Fund,,401013442.72,canonical_nport,orphan_backfill_2026Q2,2025Q4,270,396330549.25,401013442.72
+B,S000002535,MFS Mississippi Municipal Bond Fund,,63199951.29,canonical_nport,orphan_backfill_2026Q2,2025Q4,131,62902256.41,63199951.29
+B,S000002536,MFS Municipal Income Fund,,6646707088.97,canonical_nport,orphan_backfill_2026Q2,2025Q4,2252,6598422222.65,6646707088.97
+B,S000002663,Series M,,325475842.19,canonical_nport,orphan_backfill_2026Q2,2025Q4,71,322362731.79,325475842.19
+B,S000003467,Sit Tax-Free Income Fund,,126555913.02,canonical_nport,orphan_backfill_2026Q2,2025Q4,304,121864688.66,126555913.02
+B,S000003468,Sit Minnesota Tax-Free Income Fund,,377473440.08,canonical_nport,orphan_backfill_2026Q2,2025Q4,250,369773478.76,377473440.08
+B,S000003821,Viking Tax-Free Fund for Montana,,52504390.24,canonical_nport,orphan_backfill_2026Q2,2026Q1,79,50959864.40,52504390.24
+B,S000005235,HIGH INCOME OPPORTUNITIES PORTFOLIO,,1787449537.67,canonical_nport,orphan_backfill_2026Q2,2026Q1,494,1774286635.97,1787449537.67
+B,S000005237,Core Bond Portfolio,,758978659.07,canonical_nport,orphan_backfill_2026Q2,2025Q4,386,841249533.55,758978659.07
+B,S000005247,Global Macro Portfolio,,3455023263.17,canonical_nport,orphan_backfill_2026Q2,2026Q1,1284,3308213578.90,3455023263.17
+B,S000005797,Hawaii Municipal Bond Fund,,170512712.55,canonical_nport,orphan_backfill_2026Q2,2025Q4,210,168118767.88,170512712.55
+B,S000006430,SHORT DURATION MUNICIPAL FUND,,751652130.89,canonical_nport,orphan_backfill_2026Q2,2025Q4,510,746439529.12,751652130.89
+B,S000006431,PENNSYLVANIA MUNICIPAL BOND FUND,,135511165.55,canonical_nport,orphan_backfill_2026Q2,2025Q4,112,133981766.40,135511165.55
+B,S000006432,MASSACHUSETTS MUNICIPAL BOND FUND,,61350387.21,canonical_nport,orphan_backfill_2026Q2,2025Q4,72,62334777.07,61350387.21
+B,S000006434,NEW YORK MUNICIPAL BOND FUND,,111082425.94,canonical_nport,orphan_backfill_2026Q2,2025Q4,77,110774427.12,111082425.94
+B,S000006435,NEW JERSEY MUNICIPAL BOND FUND,,92422513.81,canonical_nport,orphan_backfill_2026Q2,2025Q4,83,91134735.75,92422513.81
+B,S000006436,CALIFORNIA MUNICIPAL BOND FUND,,229020645.41,canonical_nport,orphan_backfill_2026Q2,2025Q4,137,226969846.64,229020645.41
+B,S000006439,INTERMEDIATE-TERM MUNICIPAL FUND,,1552305921.44,canonical_nport,orphan_backfill_2026Q2,2025Q4,839,1532878329.25,1552305921.44
+B,S000008266,SDIT Ultra Short Duration Bond Fund,,193259997.29,canonical_nport,orphan_backfill_2026Q2,2026Q1,460,192153392.79,193259997.29
+B,S000008267,SDIT Short Duration Government Fund,,592863611.94,canonical_nport,orphan_backfill_2026Q2,2026Q1,415,684635628.06,592863611.94
+B,S000008269,SDIT GNMA FUND,,11170336.63,canonical_nport,orphan_backfill_2026Q2,2026Q1,266,10959865.75,11170336.63
+B,S000008394,VOYA GNMA INCOME FUND,,1071888177.05,canonical_nport,orphan_backfill_2026Q2,2025Q4,799,1318189905.19,1071888177.05
+B,S000008395,Voya High Yield Bond Fund,,215349770.60,canonical_nport,orphan_backfill_2026Q2,2025Q4,93,211699191.51,215349770.60
+B,S000008396,VOYA INTERMEDIATE BOND FUND,,9887176416.03,canonical_nport,orphan_backfill_2026Q2,2025Q4,2482,10686178490.87,9887176416.03
+B,S000008754,Templeton Global Bond Fund,,3007992557.93,canonical_nport,orphan_backfill_2026Q2,2025Q4,109,2916479542.58,3007992557.93
+B,S000008760,VOYA INTERMEDIATE BOND PORTFOLIO,,918997739.47,canonical_nport,orphan_backfill_2026Q2,2025Q4,1941,922450078.65,918997739.47
+B,S000009040,Federated Hermes Government Income Fund,,150115639.06,canonical_nport,orphan_backfill_2026Q2,2026Q1,94,191547146.19,150115639.06
+B,S000009041,Federated Hermes Short-Intermediate Government Fund,,97833270.58,canonical_nport,orphan_backfill_2026Q2,2026Q1,45,97324943.86,97833270.58
+B,S000009068,"Federated Hermes Sustainable High Yield Bond Fund, Inc.",,499223247.58,canonical_nport,orphan_backfill_2026Q2,2025Q4,400,491744551.83,499223247.58
+B,S000009070,"Federated Hermes Municipal Bond Fund, Inc.",,213912959.77,canonical_nport,orphan_backfill_2026Q2,2025Q4,151,211909794.97,213912959.77
+B,S000009085,Federated Hermes Short-Intermediate Municipal Fund,,388930339.37,canonical_nport,orphan_backfill_2026Q2,2025Q4,197,386063439.23,388930339.37
+B,S000009108,Hawaiian Tax-Free Trust,,374790375.84,canonical_nport,orphan_backfill_2026Q2,2025Q4,96,368508462.48,374790375.84
+B,S000009127,Mortgage Core Fund,,4732244434.06,canonical_nport,orphan_backfill_2026Q2,2025Q4,430,5558675471.15,4732244434.06
+B,S000009129,High Yield Bond Core Fund,,1058205531.96,canonical_nport,orphan_backfill_2026Q2,2025Q4,463,1046920104.31,1058205531.96
+B,S000009229,American High-Income Municipal Bond Fund,,13868777725.64,canonical_nport,orphan_backfill_2026Q2,2026Q1,3769,13735366410.81,13868777725.64
+B,S000009230,American High Income Trust,,26560590499.87,canonical_nport,orphan_backfill_2026Q2,2025Q4,1027,26300655375.68,26560590499.87
+B,S000009231,Bond Fund of America,,98590260930.78,canonical_nport,orphan_backfill_2026Q2,2025Q4,5801,101149751896.57,98590260930.78
+B,S000009236,Intermediate Bond Fund of America,,27417977015.30,canonical_nport,orphan_backfill_2026Q2,2025Q4,2849,28536743012.33,27417977015.30
+B,S000009237,Limited Term Tax Exempt Bond Fund of America,,6044718583.59,canonical_nport,orphan_backfill_2026Q2,2026Q1,1923,6057180459.61,6044718583.59
+B,S000009238,Tax Exempt Bond Fund of America,,24356812816.11,canonical_nport,orphan_backfill_2026Q2,2026Q1,5288,24410567788.31,24356812816.11
+B,S000009240,Capital World Bond Fund,,9852458428.38,canonical_nport,orphan_backfill_2026Q2,2025Q4,2574,9864997061.99,9852458428.38
+B,S000009768,AFL CIO Housing Investment Trust,,7302528948.72,canonical_nport,orphan_backfill_2026Q2,2025Q4,874,7388534378.77,7302528948.72
+B,S000009981,AB HIGH INCOME FUND INC,,3139473236.85,canonical_nport,orphan_backfill_2026Q2,2026Q1,1080,3128953942.86,3139473236.85
+B,S000010055,Series P (High Yield Series),,28099690.45,canonical_nport,orphan_backfill_2026Q2,2025Q4,281,27588923.89,28099690.45
+B,S000010066,Series E (Total Return Bond Series),,190224945.65,canonical_nport,orphan_backfill_2026Q2,2025Q4,737,231161895.73,190224945.65
+B,S000010128,"AB GLOBAL BOND FUND, INC.",,6599351269.09,canonical_nport,orphan_backfill_2026Q2,2025Q4,1788,7406895027.37,6599351269.09
+B,S000010534,CM ADVISORS FIXED INCOME FUND,,28170657.92,canonical_nport,orphan_backfill_2026Q2,2025Q4,82,27809060.31,28170657.92
+B,S000010876,AB Corporate Income Shares,,173560747.77,canonical_nport,orphan_backfill_2026Q2,2026Q1,276,169107634.75,173560747.77
+B,S000010934,Federated Hermes Institutional High Yield Bond Fund,,5368437113.80,canonical_nport,orphan_backfill_2026Q2,2026Q1,461,5335744164.39,5368437113.80
+B,S000011063,Bernstein Intermediate Duration Institutional Portfolio,,853418009.53,canonical_nport,orphan_backfill_2026Q2,2025Q3,598,943728853.89,853418009.53
+B,S000011440,NORTHEAST INVESTORS TRUST,,128210225.23,canonical_nport,orphan_backfill_2026Q2,2025Q4,40,126033776.74,128210225.23
+B,S000011654,Sit U S Government Securities Fund Inc,,200935959.28,canonical_nport,orphan_backfill_2026Q2,2025Q4,164,200699564.41,200935959.28
+B,S000011830,ELFUN TAX EXEMPT INCOME FUND,,812291642.75,canonical_nport,orphan_backfill_2026Q2,2025Q4,477,804371110.77,812291642.75
+B,S000011831,ELFUN INCOME FUND,,118688486.89,canonical_nport,orphan_backfill_2026Q2,2025Q4,1059,134664651.84,118688486.89
+B,S000012064,Colorado BondShares A Tax Exempt Fund,,1948524337.98,canonical_nport,orphan_backfill_2026Q2,2025Q4,331,1405662549.23,1948524337.98
+B,S000013585,Short-Term Bond Fund of America,,12452710619.93,canonical_nport,orphan_backfill_2026Q2,2025Q4,1432,12596046447.45,12452710619.93
+B,S000017994,Emerging Markets Local Income Portfolio,,1760387722.95,canonical_nport,orphan_backfill_2026Q2,2026Q1,1069,1667453116.93,1760387722.95
+B,S000017995,International Income Portfolio,,211898949.25,canonical_nport,orphan_backfill_2026Q2,2026Q1,367,207085644.93,211898949.25
+B,S000020099,Miller Convertible Bond Fund,,481728935.98,canonical_nport,orphan_backfill_2026Q2,2026Q1,57,480643678.78,481728935.98
+B,S000022423,Senior Debt Portfolio,,5089783892.58,canonical_nport,orphan_backfill_2026Q2,2026Q1,674,6642128147.80,5089783892.58
+B,S000023539,Templeton Global Total Return Fund,,209199748.99,canonical_nport,orphan_backfill_2026Q2,2025Q4,122,202496821.43,209199748.99
+B,S000023593,Project and Trade Finance Core Fund,,1400034010.98,canonical_nport,orphan_backfill_2026Q2,2025Q4,129,1353934394.72,1400034010.98
+B,S000025338,AZL Balanced Index Strategy Fund,,321308472.57,canonical_nport,orphan_backfill_2026Q2,2025Q4,5,321416393.79,321308472.57
+B,S000027417,Global Opportunities Portfolio,,11289167799.86,canonical_nport,orphan_backfill_2026Q2,2026Q1,1481,13635639484.47,11289167799.86
+B,S000028884,"Cohen & Steers Preferred Securities & Income Fund, Inc.",,7221886729.82,canonical_nport,orphan_backfill_2026Q2,2025Q4,291,7125807582.77,7221886729.82
+B,S000029560,AB Municipal Income Shares,,17667131462.37,canonical_nport,orphan_backfill_2026Q2,2026Q1,2296,17655936507.48,17667131462.37
+B,S000029761,Global Macro Absolute Return Advantage Portfolio,,6902275035.19,canonical_nport,orphan_backfill_2026Q2,2026Q1,1294,6178000934.71,6902275035.19
+B,S000029838,AB Taxable Multi-Sector Income Shares,,491682127.55,canonical_nport,orphan_backfill_2026Q2,2026Q1,256,488218356.07,491682127.55
+B,S000030275,Bank Loan Core Fund,,630452062.78,canonical_nport,orphan_backfill_2026Q2,2025Q4,235,718086550.68,630452062.78
+B,S000033316,FlexShares iBoxx 3-Year Target Duration TIPS Index Fund,,2517238139.95,canonical_nport,orphan_backfill_2026Q2,2026Q1,24,2503533904.66,2517238139.95
+B,S000034352,FlexShares iBoxx 5-Year Target Duration TIPS Index Fund,,970796311.69,canonical_nport,orphan_backfill_2026Q2,2026Q1,20,966347117.91,970796311.69
+B,S000035081,AZL MVP Balanced Index Strategy Fund,,681298830.51,canonical_nport,orphan_backfill_2026Q2,2025Q4,7,647303637.25,681298830.51
+B,S000035082,AZL MVP Growth Index Strategy Fund,,1697876834.07,canonical_nport,orphan_backfill_2026Q2,2025Q4,7,1613523905.56,1697876834.07
+B,S000035083,AZL MVP Global Balanced Index Strategy Fund,,414348017.48,canonical_nport,orphan_backfill_2026Q2,2025Q4,10,393749172.23,414348017.48
+B,S000035084,AZL MVP Moderate Index Strategy Fund,,305091447.92,canonical_nport,orphan_backfill_2026Q2,2025Q4,7,289906083.41,305091447.92
+B,S000035596,FlexShares Ultra-Short Income Fund,,1397469149.76,canonical_nport,orphan_backfill_2026Q2,2026Q1,256,1401383139.07,1397469149.76
+B,S000035751,Arrow Dow Jones Global Yield ETF,,26742592.48,canonical_nport,orphan_backfill_2026Q2,2026Q1,144,26664368.66,26742592.48
+B,S000036290,Aspiriant Risk-Managed Equity Allocation Fund,,1298016845.49,canonical_nport,orphan_backfill_2026Q2,2025Q4,132,1316259643.01,1298016845.49
+B,S000039473,Sit Quality Income Fund,,135385748.07,canonical_nport,orphan_backfill_2026Q2,2025Q4,166,129989127.66,135385748.07
+B,S000040303,Templeton Sustainable Emerging Markets Bond Fund,,25267275.36,canonical_nport,orphan_backfill_2026Q2,2025Q4,97,24498160.32,25267275.36
+B,S000040553,Series F (Floating Rate Strategies Series),,47111913.46,canonical_nport,orphan_backfill_2026Q2,2025Q4,270,47804080.23,47111913.46
+B,S000041784,Renaissance IPO ETF,,139223300.21,canonical_nport,orphan_backfill_2026Q2,2025Q4,41,139617592.70,139223300.21
+B,S000042975,ARK Genomic Revolution ETF,,1272728586.08,canonical_nport,orphan_backfill_2026Q2,2026Q1,35,1269542930.16,1272728586.08
+B,S000042976,ARK Autonomous Technology & Robotics ETF,,2049567759.94,canonical_nport,orphan_backfill_2026Q2,2026Q1,38,2057158449.35,2049567759.94
+B,S000042977,ARK Innovation ETF,,6676811932.04,canonical_nport,orphan_backfill_2026Q2,2026Q1,47,6676976927.34,6676811932.04
+B,S000042978,ARK Next Generation Internet ETF,,1833877700.71,canonical_nport,orphan_backfill_2026Q2,2026Q1,49,1835040261.28,1833877700.71
+B,S000044181,WBI BullBear Value 3000 ETF,,24388036.36,canonical_nport,orphan_backfill_2026Q2,2025Q4,87,27278904.83,24388036.36
+B,S000044182,WBI BullBear Yield 3000 ETF,,29297991.18,canonical_nport,orphan_backfill_2026Q2,2025Q4,99,34950721.75,29297991.18
+B,S000044183,WBI BullBear Quality 3000 ETF,,29485306.03,canonical_nport,orphan_backfill_2026Q2,2025Q4,88,32144762.18,29485306.03
+B,S000045418,InfraCap MLP ETF,,405139337.02,canonical_nport,orphan_backfill_2026Q2,2026Q1,76,504644637.40,405139337.02
+B,S000045496,Guggenheim Strategy Fund II,,127239041.55,canonical_nport,orphan_backfill_2026Q2,2025Q4,147,123304633.24,127239041.55
+B,S000045497,Guggenheim Strategy Fund III,,128761531.77,canonical_nport,orphan_backfill_2026Q2,2025Q4,167,125881332.04,128761531.77
+B,S000045498,Guggenheim Variable Insurance Strategy Fund III,,31115457.67,canonical_nport,orphan_backfill_2026Q2,2025Q4,98,29658151.38,31115457.67
+B,S000045538,Blackstone Alternative Multi-Strategy Fund,,3766023292.17,canonical_nport,orphan_backfill_2026Q2,2025Q4,7152,2540851766.07,3766023292.17
+B,S000045948,EUBEL BRADY & SUTTMAN INCOME AND APPRECIATION FUND,,153500528.17,canonical_nport,orphan_backfill_2026Q2,2026Q1,33,152753387.19,153500528.17
+B,S000045949,EUBEL BRADY & SUTTMAN INCOME FUND,,430921432.38,canonical_nport,orphan_backfill_2026Q2,2026Q1,52,426362021.74,430921432.38
+B,S000046193,FlexShares Disciplined Duration MBS Index Fund,,91640789.19,canonical_nport,orphan_backfill_2026Q2,2026Q1,475,88947877.02,91640789.19
+B,S000046813,Miller Intermediate Bond Fund,,175143976.96,canonical_nport,orphan_backfill_2026Q2,2026Q1,55,174099906.73,175143976.96
+B,S000046875,Renaissance International IPO ETF,,5099195.90,canonical_nport,orphan_backfill_2026Q2,2025Q4,38,5117954.15,5099195.90
+B,S000047257,FlexShares Credit-Scored US Corporate Bond Index Fund,,654587954.57,canonical_nport,orphan_backfill_2026Q2,2026Q1,1697,766464894.91,654587954.57
+B,S000047353,Virtus LifeSci Biotech Clinical Trials ETF,,36751983.27,canonical_nport,orphan_backfill_2026Q2,2026Q1,127,37837143.19,36751983.27
+B,S000047354,Virtus LifeSci Biotech Products ETF,,44873076.05,canonical_nport,orphan_backfill_2026Q2,2026Q1,66,46460166.26,44873076.05
+B,S000047494,InfraCap REIT Preferred ETF,,107184857.39,canonical_nport,orphan_backfill_2026Q2,2026Q1,111,107101515.57,107184857.39
+B,S000048107,VY BrandyWineGLOBAL - Bond Portfolio,,231895668.05,canonical_nport,orphan_backfill_2026Q2,2025Q4,44,229573008.08,231895668.05
+B,S000048895,Virtus Newfleet Multi-Sector Bond ETF,,373962678.86,canonical_nport,orphan_backfill_2026Q2,2026Q1,914,363386082.23,373962678.86
+B,S000049397,Virtus Reaves Utilities ETF,,1408421389.49,canonical_nport,orphan_backfill_2026Q2,2026Q1,18,1382980640.65,1408421389.49
+B,S000049584,Aspiriant Risk-Managed Municipal Bond Fund,,1228568011.59,canonical_nport,orphan_backfill_2026Q2,2025Q4,976,1215171243.75,1228568011.59
+B,S000050613,FlexShares Credit-Scored US Long Corporate Bond Index Fund,,36225526.98,canonical_nport,orphan_backfill_2026Q2,2026Q1,775,35545039.02,36225526.98
+B,S000051233,COMMUNITY DEVELOPMENT FUND,,326439999.04,canonical_nport,orphan_backfill_2026Q2,2025Q4,197,299633756.17,326439999.04
+B,S000051603,Aspiriant Defensive Allocation Fund,,998312070.12,canonical_nport,orphan_backfill_2026Q2,2025Q4,11,989520766.82,998312070.12
+B,S000051713,"Cohen & Steers Low Duration Preferred and Income Fund, Inc.",,1904263149.09,canonical_nport,orphan_backfill_2026Q2,2026Q1,250,1885300981.34,1904263149.09
+B,S000052298,The 3D Printing ETF,,68325306.88,canonical_nport,orphan_backfill_2026Q2,2026Q1,45,68126374.62,68325306.88
+B,S000052299,ARK Israel Innovative Technology ETF,,141434239.05,canonical_nport,orphan_backfill_2026Q2,2026Q1,65,139355809.29,141434239.05
+B,S000054054,Emerging Markets Core Fund,,774629181.05,canonical_nport,orphan_backfill_2026Q2,2026Q1,480,775856689.75,774629181.05
+B,S000055298,Destra Flaherty & Crumrine Preferred and Income Fund,,228689024.93,canonical_nport,orphan_backfill_2026Q2,2025Q4,217,226988016.60,228689024.93
+B,S000055342,Davis Select U.S. Equity ETF,,1035154064.69,canonical_nport,orphan_backfill_2026Q2,2026Q1,28,1034959274.20,1035154064.69
+B,S000055343,Davis Select Financial ETF,,465784680.59,canonical_nport,orphan_backfill_2026Q2,2026Q1,34,464973372.70,465784680.59
+B,S000055344,Davis Select Worldwide ETF,,528040525.37,canonical_nport,orphan_backfill_2026Q2,2026Q1,41,527280040.52,528040525.37
+B,S000055516,FlexShares Core Select Bond Fund,,150123182.32,canonical_nport,orphan_backfill_2026Q2,2026Q1,20,164368445.45,150123182.32
+B,S000055583,WBI Power Factor High Dividend ETF,,55680658.01,canonical_nport,orphan_backfill_2026Q2,2025Q4,52,62635442.79,55680658.01
+B,S000056192,abrdn Bloomberg All Commodity Strategy K-1 Free ETF,,1769104928.29,canonical_nport,orphan_backfill_2026Q2,2025Q4,56,1687277831.93,1769104928.29
+B,S000056193,abrdn Bloomberg All Commodity Longer Dated Strategy K-1 Free ETF,,290830564.81,canonical_nport,orphan_backfill_2026Q2,2025Q4,64,280907171.78,290830564.81
+B,S000056657,Saba Closed-End Funds ETF,,348362980.43,canonical_nport,orphan_backfill_2026Q2,2025Q4,78,319449223.09,348362980.43
+B,S000057345,UVA Unconstrained Medium-Term Fixed Income ETF,,51949381.31,canonical_nport,orphan_backfill_2026Q2,2025Q4,130,51537477.00,51949381.31
+B,S000058304,Virtus WMC International Dividend ETF,,12970348.64,canonical_nport,orphan_backfill_2026Q2,2026Q1,143,12802290.08,12970348.64
+B,S000058704,AB Impact Municipal Income Shares,,623709488.06,canonical_nport,orphan_backfill_2026Q2,2026Q1,279,617776010.92,623709488.06
+B,S000059080,Virtus InfraCap U.S. Preferred Stock ETF,,2174057400.88,canonical_nport,orphan_backfill_2026Q2,2026Q1,193,2711972523.94,2174057400.88
+B,S000059404,Aspiriant Risk-Managed Taxable Bond Fund,,374305525.42,canonical_nport,orphan_backfill_2026Q2,2025Q4,11,373128529.97,374305525.42
+B,S000059719,Strategy Shares NASDAQ 7HANDL Index ETF,,641761828.01,canonical_nport,orphan_backfill_2026Q2,2026Q1,24,614185376.18,641761828.01
+B,S000061340,Davis Select International ETF,,275844242.79,canonical_nport,orphan_backfill_2026Q2,2026Q1,32,275037400.53,275844242.79
+B,S000061584,Procure Space ETF,,366888083.65,canonical_nport,orphan_backfill_2026Q2,2026Q1,51,396285032.99,366888083.65
+B,S000062125,FlexShares High Yield Value - Scored Bond Index Fund,,1181071270.78,canonical_nport,orphan_backfill_2026Q2,2026Q1,1031,1414040677.15,1181071270.78
+B,S000062381,Advantage CoreAlpha Bond Master Portfolio,,722536293.58,canonical_nport,orphan_backfill_2026Q2,2025Q4,2059,771938816.56,722536293.58
+B,S000064727,Virtus Private Credit Strategy ETF,,44211904.82,canonical_nport,orphan_backfill_2026Q2,2026Q1,60,52326236.00,44211904.82
+B,S000064728,Virtus Real Asset Income ETF,,16141618.93,canonical_nport,orphan_backfill_2026Q2,2026Q1,92,16057074.60,16141618.93
+B,S000064752,ARK Fintech Innovation ETF,,963409300.42,canonical_nport,orphan_backfill_2026Q2,2026Q1,44,974023424.37,963409300.42
+B,S000064832,Preferred Securities and Income SMA Shares,,433239744.27,canonical_nport,orphan_backfill_2026Q2,2026Q1,251,429266191.80,433239744.27
+B,S000065272,Leader Capital Short Term High Yield Bond Fund,,181506964.29,canonical_nport,orphan_backfill_2026Q2,2026Q1,74,180201116.29,181506964.29
+B,S000065273,Leader Capital High Quality Income Fund,,1240536398.89,canonical_nport,orphan_backfill_2026Q2,2026Q1,180,1295291731.56,1240536398.89
+B,S000065357,QRAFT AI-Enhanced U.S. Large Cap ETF,,17344255.08,canonical_nport,orphan_backfill_2026Q2,2026Q1,301,17346776.94,17344255.08
+B,S000065358,QRAFT AI-Enhanced U.S. Large Cap Momentum ETF,,26640949.37,canonical_nport,orphan_backfill_2026Q2,2026Q1,51,26648425.27,26640949.37
+B,S000065469,Intermediate Bond Fund,,142234071.18,canonical_nport,orphan_backfill_2026Q2,2025Q4,254,141678911.14,142234071.18
+B,S000066772,Day Hagan Smart Sector ETF,,565000237.79,canonical_nport,orphan_backfill_2026Q2,2026Q1,16,554037725.02,565000237.79
+B,S000066847,Strategy Shares Newfound/Resolve Robust Momentum ETF,,26348970.93,canonical_nport,orphan_backfill_2026Q2,2026Q1,4,26249828.00,26348970.93
+B,S000067196,AltShares Merger Arbitrage ETF,,98248322.97,canonical_nport,orphan_backfill_2026Q2,2025Q4,144,94035925.46,98248322.97
+B,S000068387,ETC Cabana Target Beta ETF,,55062305.24,canonical_nport,orphan_backfill_2026Q2,2026Q1,12,55086342.17,55062305.24
+B,S000068388,ETC Cabana Target Drawdown 10 ETF,,116203144.32,canonical_nport,orphan_backfill_2026Q2,2026Q1,11,116271483.85,116203144.32
+B,S000068960,Natixis Vaughan Nelson Select ETF,,13457370.65,canonical_nport,orphan_backfill_2026Q2,2025Q4,28,13549807.13,13457370.65
+B,S000069718,Siren DIVCON Leaders Dividend ETF,,69939244.71,canonical_nport,orphan_backfill_2026Q2,2025Q4,53,69911737.10,69939244.71
+B,S000069719,Siren NexGen Economy ETF,,36957636.94,canonical_nport,orphan_backfill_2026Q2,2025Q4,59,44369889.12,36957636.94
+B,S000069798,Rareview Dynamic Fixed Income ETF,,63098063.39,canonical_nport,orphan_backfill_2026Q2,2025Q4,42,60913200.47,63098063.39
+B,S000069799,Rareview Tax Advantaged Income ETF,,17991144.47,canonical_nport,orphan_backfill_2026Q2,2025Q4,14,17667998.94,17991144.47
+B,S000069946,Humankind U.S. Stock ETF,,162717558.25,canonical_nport,orphan_backfill_2026Q2,2025Q3,998,162510100.38,162717558.25
+B,S000070059,The E-Valuator Aggressive Growth (85%-99%) RMS Fund,,231992769.62,canonical_nport,orphan_backfill_2026Q2,2025Q4,64,231835510.53,231992769.62
+B,S000070060,The E-Valuator Conservative (15%-30%) RMS Fund,,49466235.15,canonical_nport,orphan_backfill_2026Q2,2025Q4,73,49668895.23,49466235.15
+B,S000070061,The E-Valuator Conservative/Moderate (30%-50%) RMS Fund,,32968336.49,canonical_nport,orphan_backfill_2026Q2,2025Q4,73,32938294.78,32968336.49
+B,S000070062,The E-Valuator Growth (70%-85%) RMS Fund,,269724722.86,canonical_nport,orphan_backfill_2026Q2,2025Q4,71,269747917.51,269724722.86
+B,S000070063,The E-Valuator Moderate (50%-70%) RMS Fund,,153566332.07,canonical_nport,orphan_backfill_2026Q2,2025Q4,73,153545651.42,153566332.07
+B,S000070064,The E-Valuator Very Conservative (0%-15%) RMS Fund,,21448757.92,canonical_nport,orphan_backfill_2026Q2,2025Q4,71,21425602.96,21448757.92
+B,S000070261,The SPAC and New Issue ETF,,7620185.46,canonical_nport,orphan_backfill_2026Q2,2025Q4,43,7499420.56,7620185.46
+B,S000070448,Strategy Shares Gold Enhanced Yield ETF,,172863204.54,canonical_nport,orphan_backfill_2026Q2,2026Q1,37,174311987.31,172863204.54
+B,S000071318,ARK Space Exploration & Innovation ETF,,821020815.41,canonical_nport,orphan_backfill_2026Q2,2026Q1,34,824044392.20,821020815.41
+B,S000072148,ETC Cabana Target Leading Sector Moderate ETF,,104025702.56,canonical_nport,orphan_backfill_2026Q2,2026Q1,8,104086565.29,104025702.56
+B,S000072683,abrdn Bloomberg Industrial Metals Strategy K-1 Free ETF,,23214433.06,canonical_nport,orphan_backfill_2026Q2,2025Q3,29,22735279.18,23214433.06
+B,S000072757,AltShares Event-Driven ETF,,8958132.03,canonical_nport,orphan_backfill_2026Q2,2025Q4,126,8941972.49,8958132.03
+B,S000072763,MassMutual Global Credit Income Opportunities Fund,,131915285.76,canonical_nport,orphan_backfill_2026Q2,2025Q4,543,133601714.75,131915285.76
+B,S000072765,MassMutual Global Floating Rate Fund,,128122014.16,canonical_nport,orphan_backfill_2026Q2,2025Q4,303,124770445.01,128122014.16
+B,S000072878,Adaptive Core ETF,,12022707.77,canonical_nport,orphan_backfill_2026Q2,2025Q4,35,11872021.85,12022707.77
+B,S000072879,Mindful Conservative ETF,,8148668.19,canonical_nport,orphan_backfill_2026Q2,2025Q4,17,8067031.13,8148668.19
+B,S000072935,Atlas U.S. Tactical Income Fund,,77593279.10,canonical_nport,orphan_backfill_2026Q2,2025Q4,78,75304977.95,77593279.10
+B,S000073362,FlexShares ESG & Climate Investment Grade Corporate Core Index Fund,,39357700.52,canonical_nport,orphan_backfill_2026Q2,2026Q1,717,37173991.12,39357700.52
+B,S000073631,Day Hagan Smart Sector Fixed Income ETF,,30287365.63,canonical_nport,orphan_backfill_2026Q2,2026Q1,9,30063227.85,30287365.63
+B,S000073730,Goose Hollow Tactical Allocation ETF,,41065755.71,canonical_nport,orphan_backfill_2026Q2,2025Q4,37,37692902.72,41065755.71
+B,S000073803,Miller Market Neutral Income Fund,,141155173.20,canonical_nport,orphan_backfill_2026Q2,2026Q1,118,142163251.88,141155173.20
+B,S000074058,Valkyrie Bitcoin and Ether Strategy ETF,,24549973.10,canonical_nport,orphan_backfill_2026Q2,2025Q4,5,16875287.94,24549973.10
+B,S000074070,IDX Risk-Managed Digital Assets Strategy Fund,,4327322.17,canonical_nport,orphan_backfill_2026Q2,2025Q4,1,4256168.06,4327322.17
+B,S000074173,Federated Hermes Short Duration Corporate ETF,,64680564.62,canonical_nport,orphan_backfill_2026Q2,2026Q1,165,64050742.86,64680564.62
+B,S000074231,Build Bond Innovation ETF,,11355658.07,canonical_nport,orphan_backfill_2026Q2,2025Q4,113,11271085.97,11355658.07
+B,S000074333,"Short Term Investment Fund for Puerto Rico Residents, Inc.",,70025376.82,canonical_nport,orphan_backfill_2026Q2,2025Q4,16,70059671.90,70025376.82
+B,S000074338,Popular High Grade Fixed-Income Fund Inc.,,34393728.03,canonical_nport,orphan_backfill_2026Q2,2025Q4,115,34157831.76,34393728.03
+B,S000074344,Popular Income Plus Fund Inc.,,16969533.35,canonical_nport,orphan_backfill_2026Q2,2025Q4,38,16875647.56,16969533.35
+B,S000074345,Large Cap Value Portfolio I,,6511106.12,canonical_nport,orphan_backfill_2026Q2,2025Q4,29,5255629.35,6511106.12
+B,S000074346,Large Cap Core Portfolio I,,7611704.27,canonical_nport,orphan_backfill_2026Q2,2025Q4,41,6124572.27,7611704.27
+B,S000074347,Large Cap Growth Portfolio I,,9678056.12,canonical_nport,orphan_backfill_2026Q2,2025Q4,40,8009410.49,9678056.12
+B,S000074348,Mid Cap Core Portfolio I,,4690480.22,canonical_nport,orphan_backfill_2026Q2,2025Q4,34,3841832.19,4690480.22
+B,S000074349,Small Cap Core Portfolio I,,2445645.64,canonical_nport,orphan_backfill_2026Q2,2025Q4,41,1718925.13,2445645.64
+B,S000074350,International Portfolio I,,2247143.20,canonical_nport,orphan_backfill_2026Q2,2025Q4,46,1740328.74,2247143.20
+B,S000074352,"U.S. Monthly Income Fund for Puerto Rico Residents, Inc.",,61983508.59,canonical_nport,orphan_backfill_2026Q2,2025Q4,62,69546083.02,61983508.59
+B,S000075052,Valkyrie Bitcoin Miners ETF,,228424699.35,canonical_nport,orphan_backfill_2026Q2,2025Q4,23,226361772.48,228424699.35
+B,S000075093,Rareview Systematic Equity ETF,,58996261.87,canonical_nport,orphan_backfill_2026Q2,2025Q4,6,96832389.82,58996261.87
+B,S000075551,X-Square Municipal Income ETF,,4571857.63,canonical_nport,orphan_backfill_2026Q2,2025Q4,14,4478841.69,4571857.63
+B,S000076645,Day Hagan Smart Sector International ETF,,36227036.73,canonical_nport,orphan_backfill_2026Q2,2026Q1,13,35610446.88,36227036.73
+B,S000077078,Short Duration Inflation-Protected Income Portfolio,,420456043.29,canonical_nport,orphan_backfill_2026Q2,2026Q1,42,417936427.08,420456043.29
+B,S000077552,FundX ETF,,172741655.35,canonical_nport,orphan_backfill_2026Q2,2025Q4,11,173490363.98,172741655.35
+B,S000077553,FundX Aggressive ETF,,27423025.67,canonical_nport,orphan_backfill_2026Q2,2025Q4,21,27585960.00,27423025.67
+B,S000078169,Federated Hermes U.S. Strategic Dividend ETF,,592272231.93,canonical_nport,orphan_backfill_2026Q2,2026Q1,49,589769065.03,592272231.93
+B,S000079330,IDX Adaptive Opportunities Fund,,31191605.02,canonical_nport,orphan_backfill_2026Q2,2025Q4,29,25032558.26,31191605.02
+B,S000079362,Mohr Sector Nav ETF,,24449933.55,canonical_nport,orphan_backfill_2026Q2,2025Q4,7,23784640.91,24449933.55
+B,S000079831,Cyber Hornet S&P 500 and Bitcoin 75/25 Strategy ETF,,8098430.81,canonical_nport,orphan_backfill_2026Q2,2025Q4,505,6088753.80,8098430.81
+B,S000080449,Fundamentals First ETF,,5705119.51,canonical_nport,orphan_backfill_2026Q2,2025Q4,93,5703688.02,5705119.51
+B,S000080680,TEXAS CAPITAL TEXAS EQUITY INDEX ETF,,31407434.47,canonical_nport,orphan_backfill_2026Q2,2025Q4,218,31394317.44,31407434.47
+B,S000081094,Madison Covered Call ETF,,36006183.63,canonical_nport,orphan_backfill_2026Q2,2025Q4,66,35963795.31,36006183.63
+B,S000081095,Madison Short-Term Strategic Income ETF,,62570433.86,canonical_nport,orphan_backfill_2026Q2,2025Q4,98,61925647.98,62570433.86
+B,S000081096,Madison Dividend Value ETF,,61239179.99,canonical_nport,orphan_backfill_2026Q2,2025Q4,38,61223856.38,61239179.99
+B,S000081097,Madison Aggregate Bond ETF,,64118235.00,canonical_nport,orphan_backfill_2026Q2,2025Q4,206,63625637.26,64118235.00
+B,S000081280,Valkyrie Bitcoin Futures Leveraged Strategy ETF,,15100667.28,canonical_nport,orphan_backfill_2026Q2,2025Q3,2,2969399.97,15100667.28
+B,S000081302,American Beacon AHL Trend ETF,,50049992.78,canonical_nport,orphan_backfill_2026Q2,2026Q1,259,44685708.16,50049992.78
+B,S000081361,CCM Affordable Housing MBS ETF,,112570855.32,canonical_nport,orphan_backfill_2026Q2,2025Q4,256,112691397.03,112570855.32
+B,S000082812,FundX Flexible ETF,,27573056.48,canonical_nport,orphan_backfill_2026Q2,2025Q4,10,32324512.90,27573056.48
+B,S000082813,FundX Conservative ETF,,50077392.33,canonical_nport,orphan_backfill_2026Q2,2025Q4,20,51458654.29,50077392.33
+B,S000082910,Langar Global Health Tech ETF,,3994552.17,canonical_nport,orphan_backfill_2026Q2,2025Q4,31,3997073.88,3994552.17
+B,S000082989,LG QRAFT AI-Powered U.S. Large Cap Core ETF,,1994327.45,canonical_nport,orphan_backfill_2026Q2,2026Q1,101,1993577.06,1994327.45
+B,S000082992,GMO U.S. Quality ETF,,3029370033.66,canonical_nport,orphan_backfill_2026Q2,2025Q4,37,3028249851.66,3029370033.66
+B,S000083030,Federated Hermes Total Return Bond ETF,,355560477.42,canonical_nport,orphan_backfill_2026Q2,2025Q4,454,355271689.46,355560477.42
+B,S000083143,Natixis Gateway Quality Income ETF,,222033101.25,canonical_nport,orphan_backfill_2026Q2,2025Q4,97,222176163.59,222033101.25
+B,S000083162,Mohr Company NAV ETF,,34876922.21,canonical_nport,orphan_backfill_2026Q2,2025Q4,40,34034862.73,34876922.21
+B,S000083459,Bancreek U.S. Large Cap ETF,,96610000.56,canonical_nport,orphan_backfill_2026Q2,2025Q4,31,96587066.21,96610000.56
+B,S000083461,TEXAS CAPITAL TEXAS OIL INDEX ETF,,10000012.19,canonical_nport,orphan_backfill_2026Q2,2025Q4,28,9986966.48,10000012.19
+B,S000083462,TEXAS CAPITAL TEXAS SMALL CAP EQUITY INDEX ETF,,10642169.00,canonical_nport,orphan_backfill_2026Q2,2025Q3,186,10644063.52,10642169.00
+B,S000083896,American Beacon GLG Natural Resources ETF,,487537858.10,canonical_nport,orphan_backfill_2026Q2,2026Q1,52,472989742.01,487537858.10
+B,S000083940,MassMutual Clinton Municipal Credit Opportunities Fund,,55665608.23,canonical_nport,orphan_backfill_2026Q2,2025Q4,36,55247705.61,55665608.23
+B,S000083941,MassMutual Clinton Municipal Fund,,63228158.31,canonical_nport,orphan_backfill_2026Q2,2025Q4,43,62531083.77,63228158.31
+B,S000083942,MassMutual Clinton Limited Term Municipal Fund,,58923669.24,canonical_nport,orphan_backfill_2026Q2,2025Q4,40,58453294.47,58923669.24
+B,S000084270,Bancreek International Large Cap ETF,,73347684.34,canonical_nport,orphan_backfill_2026Q2,2025Q4,31,73258983.01,73347684.34
+B,S000084308,North Shore Equity Rotation ETF,,52367942.00,canonical_nport,orphan_backfill_2026Q2,2025Q4,40,52392565.60,52367942.00
+B,S000084370,DailyDelta Q100 Downside Option Strategy ETF,,85829.04,canonical_nport,orphan_backfill_2026Q2,2025Q4,1,27365.44,85829.04
+B,S000084371,DailyDelta Q100 Upside Option Strategy ETF,,392343.85,canonical_nport,orphan_backfill_2026Q2,2025Q4,1,9912.99,392343.85
+B,S000084449,Obra Opportunistic Structured Products ETF,,37011763.82,canonical_nport,orphan_backfill_2026Q2,2025Q4,98,36677454.16,37011763.82
+B,S000084450,Obra High Grade Structured Products ETF,,29505002.94,canonical_nport,orphan_backfill_2026Q2,2025Q4,103,29290647.89,29505002.94
+B,S000084713,Anydrus Advantage ETF,,57168179.90,canonical_nport,orphan_backfill_2026Q2,2025Q4,118,56253492.63,57168179.90
+B,S000084822,Stratified LargeCap Hedged ETF,,23203380.62,canonical_nport,orphan_backfill_2026Q2,2025Q4,4,23511733.39,23203380.62
+B,S000084823,Stratified LargeCap Index ETF,,115765462.49,canonical_nport,orphan_backfill_2026Q2,2025Q4,506,115699984.03,115765462.49
+B,S000084932,Genter Capital Taxable Quality Intermediate ETF,,80811342.66,canonical_nport,orphan_backfill_2026Q2,2026Q1,55,79873289.36,80811342.66
+B,S000084933,Genter Capital Municipal Quality Intermediate ETF,,19601308.28,canonical_nport,orphan_backfill_2026Q2,2026Q1,81,19651144.51,19601308.28
+B,S000085069,Palmer Square Credit Opportunities ETF,,118306281.88,canonical_nport,orphan_backfill_2026Q2,2025Q4,320,118641203.42,118306281.88
+B,S000085236,Rareview Total Return Bond ETF,,52992573.74,canonical_nport,orphan_backfill_2026Q2,2025Q4,156,52246300.31,52992573.74
+B,S000085351,FundX Future Fund Opportunities ETF,,183269602.72,canonical_nport,orphan_backfill_2026Q2,2025Q4,85,186851100.06,183269602.72
+B,S000085894,Long Pond Real Estate Select ETF,,92025760.99,canonical_nport,orphan_backfill_2026Q2,2025Q4,27,92050385.92,92025760.99
+B,S000086506,TEXAS CAPITAL GOVERNMENT MONEY MARKET ETF,,70149217.95,canonical_nport,orphan_backfill_2026Q2,2025Q4,36,70067665.23,70149217.95
+B,S000086524,Palmer Square CLO Senior Debt ETF,,71682401.39,canonical_nport,orphan_backfill_2026Q2,2025Q4,75,71736129.94,71682401.39
+B,S000086526,Eventide High Dividend ETF,,161375257.50,canonical_nport,orphan_backfill_2026Q2,2026Q1,46,160203051.77,161375257.50
+B,S000087726,Select STOXX Europe Aerospace & Defense ETF,,1113911337.82,canonical_nport,orphan_backfill_2026Q2,2025Q4,14,1010961152.91,1113911337.82
+B,S000088547,GMO Beyond China ETF,,12211030.88,canonical_nport,orphan_backfill_2026Q2,2025Q4,94,12287487.45,12211030.88
+B,S000088548,GMO International Quality ETF,,252431202.95,canonical_nport,orphan_backfill_2026Q2,2025Q4,34,252496682.15,252431202.95
+B,S000088549,GMO International Value ETF,,231324039.28,canonical_nport,orphan_backfill_2026Q2,2025Q4,164,231124964.16,231324039.28
+B,S000088550,GMO Systematic Investment Grade Credit ETF,,19242466.93,canonical_nport,orphan_backfill_2026Q2,2025Q4,131,18985253.06,19242466.93
+B,S000088551,GMO U.S. Value ETF,,67035117.54,canonical_nport,orphan_backfill_2026Q2,2025Q4,167,66975435.69,67035117.54
+B,S000088672,Indexperts Gorilla Aggressive Growth ETF,,41869841.71,canonical_nport,orphan_backfill_2026Q2,2026Q1,172,42383247.51,41869841.71
+B,S000088673,Indexperts Quality Earnings Focused ETF,,37325766.86,canonical_nport,orphan_backfill_2026Q2,2026Q1,134,37335723.41,37325766.86
+B,S000088674,Indexperts Yield Focused Fixed Income ETF,,22811886.79,canonical_nport,orphan_backfill_2026Q2,2026Q1,79,22825124.49,22811886.79
+B,S000089262,Day Hagan Smart Buffer ETF,,41391159.77,canonical_nport,orphan_backfill_2026Q2,2026Q1,4,41281812.00,41391159.77
+B,S000089355,Eventide US Market ETF,,138081962.89,canonical_nport,orphan_backfill_2026Q2,2026Q1,200,137403155.48,138081962.89
+B,S000089384,Obra Defensive High Yield ETF,,5135575.27,canonical_nport,orphan_backfill_2026Q2,2025Q4,141,5082416.83,5135575.27
+B,S000089482,PLUS Korea Defense Industry Index ETF,,57349455.71,canonical_nport,orphan_backfill_2026Q2,2025Q4,25,57370744.70,57349455.71
+B,S000089486,Genter Capital Dividend Income ETF,,8838884.48,canonical_nport,orphan_backfill_2026Q2,2026Q1,33,8821962.73,8838884.48
+B,S000089487,Genter Capital International Dividend ETF,,3853834.65,canonical_nport,orphan_backfill_2026Q2,2026Q1,36,3843771.34,3853834.65
+B,S000090015,Nomura National High-Yield Municipal Bond ETF,,32170924.12,canonical_nport,orphan_backfill_2026Q2,2025Q4,132,31584246.03,32170924.12
+B,S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,,4555216.40,canonical_nport,orphan_backfill_2026Q2,2025Q4,4,-280829.84,4555216.40
+B,S000090213,American Beacon Ionic Inflation Protection ETF,,10451166.75,canonical_nport,orphan_backfill_2026Q2,2026Q1,16,10415314.78,10451166.75
+B,S000090721,E*TRADE No Fee Municipal Bond Index Fund,,27607521.13,canonical_nport,orphan_backfill_2026Q2,2026Q1,123,28896354.56,27607521.13
+B,S000090723,E*TRADE No Fee U.S. Bond Index Fund,,28663731.30,canonical_nport,orphan_backfill_2026Q2,2026Q1,94,28488457.00,28663731.30
+B,S000091576,CoinShares Altcoins ETF,,1751636.99,canonical_nport,orphan_backfill_2026Q2,2025Q4,22,1613307.05,1751636.99
+B,S000091902,Dan IVES Wedbush AI Revolution ETF,,1034487643.80,canonical_nport,orphan_backfill_2026Q2,2026Q1,31,1035098027.13,1034487643.80
+B,S000092393,Monopoly ETF,,12704860.73,canonical_nport,orphan_backfill_2026Q2,2026Q1,99,12666444.83,12704860.73
+B,S000093092,Rayliant-ChinaAMC Transformative China Tech ETF,,13983954.95,canonical_nport,orphan_backfill_2026Q2,2025Q4,102,14006744.43,13983954.95
+B,S000093217,Crossmark Large Cap Growth ETF,,23056793.96,canonical_nport,orphan_backfill_2026Q2,2026Q1,29,23036438.52,23056793.96
+B,S000093218,Crossmark Large Cap Value ETF,,13090703.96,canonical_nport,orphan_backfill_2026Q2,2026Q1,53,13063144.76,13090703.96
+B,S000093420,First Eagle High Yield Municipal Completion Fund,,15253087.86,canonical_nport,orphan_backfill_2026Q2,2026Q1,72,15904081.22,15253087.86
+B,S000094339,WarCap Unconstrained Equity ETF,,60672551.66,canonical_nport,orphan_backfill_2026Q2,2026Q1,22,63114347.55,60672551.66
+B,S000094624,Federated Hermes Enhanced Income ETF,,14090835.04,canonical_nport,orphan_backfill_2026Q2,2026Q1,55,14101357.92,14090835.04
+B,S000094625,Federated Hermes MDT Market Neutral ETF,,26682628.38,canonical_nport,orphan_backfill_2026Q2,2025Q4,397,26707352.29,26682628.38
+B,S000094663,Prospera Income ETF,,2154444.05,canonical_nport,orphan_backfill_2026Q2,2025Q4,33,2130163.25,2154444.05
+B,S000094773,Nelson Select ETF,,41690149.85,canonical_nport,orphan_backfill_2026Q2,2025Q4,62,41284759.94,41690149.85
+B,S000094780,GMO Domestic Resilience ETF,,29394413.74,canonical_nport,orphan_backfill_2026Q2,2025Q4,38,29393749.05,29394413.74
+B,S000094781,GMO Dynamic Allocation ETF,,18701033.38,canonical_nport,orphan_backfill_2026Q2,2025Q4,17,18703767.47,18701033.38
+B,S000094783,GMO Ultra-Short Income ETF,,7494034.55,canonical_nport,orphan_backfill_2026Q2,2025Q4,45,7422789.64,7494034.55
+B,S000094833,Man Active High Yield ETF,,19877493.32,canonical_nport,orphan_backfill_2026Q2,2025Q4,101,18407488.37,19877493.32
+B,S000094834,Man Active Income ETF,,21374874.06,canonical_nport,orphan_backfill_2026Q2,2025Q4,68,21209460.10,21374874.06
+B,S000095116,AMG GW&K Muni Income ETF,,10471486.19,canonical_nport,orphan_backfill_2026Q2,2025Q4,51,10390098.61,10471486.19
+B,S000095343,ARK DIET Q1 Buffer ETF,,1467733.66,canonical_nport,orphan_backfill_2026Q2,2026Q1,5,1467721.55,1467733.66
+B,S000095346,ARK DIET Q4 Buffer ETF,,2768353.09,canonical_nport,orphan_backfill_2026Q2,2026Q1,5,2768529.91,2768353.09
