@@ -1,0 +1,9 @@
+fund_cik,fund_name,unknown_row_count,unknown_aum_usd,branch,syn_series_id,syn_fund_strategy,syn_matched_name,syn_latest_rows,syn_old_rows
+0000002230,N/A,96,2988710095.76,HOLD_NO_MATCH,,,,0,0
+0001253327,Eaton Vance Tax-Advantaged Dividend Income Fund,157,2864088426.62,FLIP,SYN_0001253327,balanced,Eaton Vance Tax-Advantaged Dividend Income Fund,311,0
+0001230869,Asa Gold & Precious Metals Ltd,350,1752484930.87,HOLD_NO_MATCH,,,,0,0
+0001709406,AIP Alternative Lending Fund P,2,1018135937.25,FLIP,SYN_0001709406,bond_or_other,AIP Alternative Lending Fund P,1,0
+0001995940,AMG Pantheon Credit Solutions Fund,33,688770581.69,FLIP,SYN_0001995940,bond_or_other,AMG Pantheon Credit Solutions Fund,77,0
+0001285650,Calamos Global Total Return Fund,1412,325262413.29,FLIP,SYN_0001285650,balanced,CALAMOS GLOBAL TOTAL RETURN FUND,1459,0
+0001400897,NXG Cushing Midstream Energy Fund,43,257780523.36,FLIP,SYN_0001400897,active,NXG Cushing Midstream Energy Fund,46,0
+0000826020,Saba Capital Income & Opportunities Fund,1091,129421196.72,FLIP,SYN_0000826020,balanced,Saba Capital Income & Opportunities Fund,2185,0
