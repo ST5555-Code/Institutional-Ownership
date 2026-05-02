@@ -1,0 +1,275 @@
+{
+  "2024-11": {
+    "accession": "0001752724-25-018310",
+    "url": "https://www.sec.gov/Archives/edgar/data/1230869/000175272425018310/primary_doc.xml",
+    "report_period": "2024-11-30",
+    "series_id_in_filing": null,
+    "net_assets": 444153651.52,
+    "holdings_count": 108,
+    "total_mv_sum": 439912633.43000007,
+    "top10": [
+      {
+        "cusip": "N/A",
+        "isin": "CA36270K1021",
+        "name": "G Mining Ventures Corp",
+        "ticker": "",
+        "val_usd": "50996861.27000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "68634K106",
+        "isin": "CA68634K1066",
+        "name": "Orla Mining Ltd",
+        "ticker": "",
+        "val_usd": "29574000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "",
+        "name": "Americas Gold & Silver Corp.",
+        "ticker": "",
+        "val_usd": "29313238.81000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "CA13000C2058",
+        "name": "Calibre Mining Corp",
+        "ticker": "",
+        "val_usd": "26732566.69000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000EMR4",
+        "name": "Emerald Resources NL",
+        "ticker": "",
+        "val_usd": "25972602.88000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "",
+        "name": "San Cristobal Mining Inc",
+        "ticker": "",
+        "val_usd": "25833320.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "011532108",
+        "isin": "CA0115321089",
+        "name": "Alamos Gold Inc",
+        "ticker": "",
+        "val_usd": "18820000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000WGX6",
+        "name": "Westgold Resources Ltd",
+        "ticker": "",
+        "val_usd": "17613201.28000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "60934N682",
+        "isin": "",
+        "name": "Federated Hermes U.S. Treasury Cash Reserves - Institutional Shares",
+        "ticker": "UTIXX",
+        "val_usd": "17378817.59000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000PDI8",
+        "name": "Predictive Discovery Ltd",
+        "ticker": "",
+        "val_usd": "16968234.65000000",
+        "pct_of_nav": null
+      }
+    ]
+  },
+  "2025-02": {
+    "accession": "0001752724-25-075250",
+    "url": "https://www.sec.gov/Archives/edgar/data/1230869/000175272425075250/primary_doc.xml",
+    "report_period": "2025-02-28",
+    "series_id_in_filing": null,
+    "net_assets": 523572250.7,
+    "holdings_count": 112,
+    "total_mv_sum": 521336911.35999995,
+    "top10": [
+      {
+        "cusip": "N/A",
+        "isin": "CA36270K1021",
+        "name": "G Mining Ventures Corp",
+        "ticker": "",
+        "val_usd": "70395311.51000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "68634K106",
+        "isin": "CA68634K1066",
+        "name": "Orla Mining Ltd",
+        "ticker": "",
+        "val_usd": "43462000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "",
+        "name": "Americas Gold & Silver Corp.",
+        "ticker": "",
+        "val_usd": "32149300.16000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "",
+        "name": "San Cristobal Mining Inc",
+        "ticker": "",
+        "val_usd": "30999984.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "CA13000C2058",
+        "name": "Calibre Mining Corp",
+        "ticker": "",
+        "val_usd": "29491411.92000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "011532108",
+        "isin": "CA0115321089",
+        "name": "Alamos Gold Inc",
+        "ticker": "",
+        "val_usd": "22860000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000PDI8",
+        "name": "Predictive Discovery Ltd",
+        "ticker": "",
+        "val_usd": "22401491.66000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000EMR4",
+        "name": "Emerald Resources NL",
+        "ticker": "",
+        "val_usd": "22226303.73000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "CA76125Y6001",
+        "name": "Robex Resources Inc",
+        "ticker": "",
+        "val_usd": "16671159.50000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "008474108",
+        "isin": "CA0084741085",
+        "name": "Agnico Eagle Mines Ltd",
+        "ticker": "",
+        "val_usd": "15886200.00000000",
+        "pct_of_nav": null
+      }
+    ]
+  },
+  "2025-08": {
+    "accession": "0001230869-25-000013",
+    "url": "https://www.sec.gov/Archives/edgar/data/1230869/000123086925000013/primary_doc.xml",
+    "report_period": "2025-08-31",
+    "series_id_in_filing": null,
+    "net_assets": 791627594.31,
+    "holdings_count": 130,
+    "total_mv_sum": 791235386.0799999,
+    "top10": [
+      {
+        "cusip": "N/A",
+        "isin": "CA36270K1021",
+        "name": "G Mining Ventures Corp",
+        "ticker": "",
+        "val_usd": "94452979.94000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "03062D803",
+        "isin": "CA03062D8035",
+        "name": "Americas Gold & Silver Corp",
+        "ticker": "",
+        "val_usd": "75944262.58000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "68634K106",
+        "isin": "CA68634K1066",
+        "name": "Orla Mining Ltd",
+        "ticker": "",
+        "val_usd": "68572000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "CA29446Y5020",
+        "name": "Equinox Gold Corp",
+        "ticker": "",
+        "val_usd": "42850693.56000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000PDI8",
+        "name": "Predictive Discovery Ltd",
+        "ticker": "",
+        "val_usd": "32313624.34000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "",
+        "name": "San Cristobal Mining Inc",
+        "ticker": "",
+        "val_usd": "30999984.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "011532108",
+        "isin": "CA0115321089",
+        "name": "Alamos Gold Inc",
+        "ticker": "",
+        "val_usd": "30450000.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "008474108",
+        "isin": "CA0084741085",
+        "name": "Agnico Eagle Mines Ltd",
+        "ticker": "",
+        "val_usd": "23788050.00000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "CA76125Y6001",
+        "name": "Robex Resources Inc",
+        "ticker": "",
+        "val_usd": "21644882.95000000",
+        "pct_of_nav": null
+      },
+      {
+        "cusip": "N/A",
+        "isin": "AU000000WGX6",
+        "name": "Westgold Resources Ltd",
+        "ticker": "",
+        "val_usd": "21331137.87000000",
+        "pct_of_nav": null
+      }
+    ]
+  }
+}
