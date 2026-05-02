@@ -52,8 +52,12 @@ read-only re-validation 2026-05-02 and confirmed in chat:
    both for display; without closure/re-point, brand display would
    stay anchored at the brand_eid. F closes the 2 open rollup rows
    per brand. G re-points open brand aliases to filer entity_id with
-   pre-flight demotion of incoming `is_preferred=TRUE` rows where the
-   filer already has a same-`alias_type` preferred alias open.
+   filer-side demotion: when the brand has an incoming
+   `is_preferred=TRUE` alias of the same `alias_type` as a filer-side
+   preferred open row, the FILER's existing preferred is demoted to
+   `FALSE` so the incoming brand-side trade name wins. Rationale:
+   the brand-side label is the canonical user-facing display
+   (e.g. `PIMCO` over `PACIFIC INVESTMENT MANAGEMENT CO LLC`).
 
 Schema sentinels: `valid_to = DATE '9999-12-31'` for open SCD rows
 (NOT `IS NULL`); `CURRENT_DATE` for closure (DATE type, not TIMESTAMP).

@@ -206,19 +206,22 @@ def capture_preimage(con: duckdb.DuckDBPyConnection, p: AliasPair) -> None:
         [p.brand_eid, OPEN_DATE],
     ).fetchone()[0]
 
+    # Demotion direction: filer-side preferred is demoted when brand has an
+    # incoming preferred of the same alias_type (per chat decision — incoming
+    # trade name wins over filer's legal name).
     p.ea_demote_count = con.execute(
         """
         SELECT COUNT(*)
-        FROM entity_aliases b
-        WHERE b.entity_id = ? AND b.valid_to = ? AND b.is_preferred = TRUE
+        FROM entity_aliases f
+        WHERE f.entity_id = ? AND f.valid_to = ? AND f.is_preferred = TRUE
           AND EXISTS (
-              SELECT 1 FROM entity_aliases f
-              WHERE f.entity_id = ? AND f.valid_to = ?
-                AND f.alias_type = b.alias_type
-                AND f.is_preferred = TRUE
+              SELECT 1 FROM entity_aliases b
+              WHERE b.entity_id = ? AND b.valid_to = ?
+                AND b.alias_type = f.alias_type
+                AND b.is_preferred = TRUE
           )
         """,
-        [p.brand_eid, OPEN_DATE, p.filer_eid, OPEN_DATE],
+        [p.filer_eid, OPEN_DATE, p.brand_eid, OPEN_DATE],
     ).fetchone()[0]
 
 
@@ -337,8 +340,12 @@ def write_dryrun_doc(pairs: list[AliasPair]) -> None:
     lines.append("   both for display; without closure/re-point, brand display would")
     lines.append("   stay anchored at the brand_eid. F closes the 2 open rollup rows")
     lines.append("   per brand. G re-points open brand aliases to filer entity_id with")
-    lines.append("   pre-flight demotion of incoming `is_preferred=TRUE` rows where the")
-    lines.append("   filer already has a same-`alias_type` preferred alias open.")
+    lines.append("   filer-side demotion: when the brand has an incoming")
+    lines.append("   `is_preferred=TRUE` alias of the same `alias_type` as a filer-side")
+    lines.append("   preferred open row, the FILER's existing preferred is demoted to")
+    lines.append("   `FALSE` so the incoming brand-side trade name wins. Rationale:")
+    lines.append("   the brand-side label is the canonical user-facing display")
+    lines.append("   (e.g. `PIMCO` over `PACIFIC INVESTMENT MANAGEMENT CO LLC`).")
     lines.append("")
     lines.append("Schema sentinels: `valid_to = DATE '9999-12-31'` for open SCD rows")
     lines.append("(NOT `IS NULL`); `CURRENT_DATE` for closure (DATE type, not TIMESTAMP).")
@@ -430,16 +437,39 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     )
     stats["op_b_rows"] = con.execute("SELECT changes()").fetchone()[0]
 
-    # Op B' — close brand<->filer alias-bridge / self-loop rows
-    con.execute(
+    # Op B' — capture subsumed-row metadata BEFORE closing, then close.
+    # Type-agnostic match on (parent, child) tuple to handle both shapes:
+    # Vanguard parent=4375 child=1 wholly_owned (orphan_scan)
+    # PIMCO    parent=30 child=2322 fund_sponsor (parent_bridge)
+    subsumed = con.execute(
         """
-        UPDATE entity_relationships
-        SET valid_to = ?, last_refreshed_at = NOW()
+        SELECT relationship_id, parent_entity_id, child_entity_id,
+               relationship_type, source
+        FROM entity_relationships
         WHERE valid_to = ?
           AND ( (parent_entity_id = ? AND child_entity_id = ?)
              OR (parent_entity_id = ? AND child_entity_id = ?) )
         """,
-        [today, OPEN_DATE, p.filer_eid, p.brand_eid, p.brand_eid, p.filer_eid],
+        [OPEN_DATE, p.filer_eid, p.brand_eid, p.brand_eid, p.filer_eid],
+    ).fetchall()
+    if len(subsumed) != 1:
+        raise RuntimeError(
+            f"[{p.label}] Op B' expected exactly 1 subsumed row, got {len(subsumed)}"
+        )
+    sub_rel_id, sub_parent, sub_child, sub_type, sub_source = subsumed[0]
+    stats["subsumed_relationship_id"] = int(sub_rel_id)
+    stats["subsumed_type"] = sub_type
+    stats["subsumed_parent"] = int(sub_parent)
+    stats["subsumed_child"] = int(sub_child)
+    stats["subsumed_source"] = sub_source
+
+    con.execute(
+        """
+        UPDATE entity_relationships
+        SET valid_to = ?, last_refreshed_at = NOW()
+        WHERE relationship_id = ?
+        """,
+        [today, sub_rel_id],
     )
     stats["op_b_prime_rows"] = con.execute("SELECT changes()").fetchone()[0]
 
@@ -454,7 +484,14 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     )
     stats["op_c_rows"] = con.execute("SELECT changes()").fetchone()[0]
 
-    # Op E — insert audit row (parent_brand / merge)
+    # Op E — insert audit row (parent_brand / merge). entity_relationships
+    # has no `notes` column, so the subsumed-row reference is encoded into
+    # the `source` field as a structured suffix:
+    #   CP-4a-merge:inst-eid-bridge-fix-aliases|subsumes:<type>/<p>-><c>/<orig_src>
+    audit_source = (
+        f"CP-4a-merge:inst-eid-bridge-fix-aliases|"
+        f"subsumes:{sub_type}/{sub_parent}->{sub_child}/{sub_source}"
+    )
     next_id = con.execute(
         "SELECT COALESCE(MAX(relationship_id), 0) + 1 FROM entity_relationships"
     ).fetchone()[0]
@@ -466,12 +503,12 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
              confidence, source, is_inferred, valid_from, valid_to,
              created_at, last_refreshed_at)
         VALUES (?, ?, ?, 'parent_brand', 'merge', FALSE, NULL,
-                'high', 'CP-4a-merge:inst-eid-bridge-fix-aliases',
-                FALSE, ?, ?, NOW(), NOW())
+                'high', ?, FALSE, ?, ?, NOW(), NOW())
         """,
-        [next_id, p.filer_eid, p.brand_eid, today, OPEN_DATE],
+        [next_id, p.filer_eid, p.brand_eid, audit_source, today, OPEN_DATE],
     )
     stats["op_e_relationship_id"] = int(next_id)
+    stats["op_e_source"] = audit_source
 
     # Op F — close entity_rollup_history
     con.execute(
@@ -484,8 +521,12 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     )
     stats["op_f_rows"] = con.execute("SELECT changes()").fetchone()[0]
 
-    # Op G — entity_aliases re-point with preferred-conflict demotion
-    # Pass 1: demote incoming preferred where filer already has a same alias_type preferred open row
+    # Op G — entity_aliases re-point with preferred-conflict demotion.
+    # Pass 1: demote the FILER's existing preferred where the brand has an
+    # incoming preferred of the same alias_type. Rationale: brand-side trade
+    # name is the canonical user-facing display (e.g. 'PIMCO' over 'PACIFIC
+    # INVESTMENT MANAGEMENT CO LLC'), so the incoming preferred wins and the
+    # filer's prior preferred is demoted. Confirmed in chat 2026-05-02.
     con.execute(
         """
         UPDATE entity_aliases
@@ -496,7 +537,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
               WHERE entity_id = ? AND valid_to = ? AND is_preferred = TRUE
           )
         """,
-        [p.brand_eid, OPEN_DATE, p.filer_eid, OPEN_DATE],
+        [p.filer_eid, OPEN_DATE, p.brand_eid, OPEN_DATE],
     )
     stats["op_g_demoted"] = con.execute("SELECT changes()").fetchone()[0]
 
