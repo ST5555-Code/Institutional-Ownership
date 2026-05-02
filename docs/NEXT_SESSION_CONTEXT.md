@@ -4,54 +4,39 @@
 
 ## Last completed
 
-**Fund-level cleanup arc closed 2026-05-01.** Three commits on top of the 8-PR consolidation arc, bringing the consolidation+cleanup sequence to 11 PRs total:
+**fund-orphan-backfill (PR #245, squash `9392a36`) closed the 302-series orphan exposure surfaced by PR #244.** Single PR, branch `fund-orphan-backfill`, backup carried over from PR-4 (`data/backups/13f_backup_20260501_103837`).
 
-| Commit / PR | Branch | Headline |
-| --- | --- | --- |
-| #242 (`5af96e1`) | `fund-cleanup-batch` | 4 fund-level follow-ups (canonical-coverage audit + 12 BlackRock muni verification + 51 ProShares mechanics review + active-bucket audit) + 2 reclassifications (AMG Pantheon Credit Solutions + AIP Alternative Lending Fund P → `bond_or_other`). |
-| `594a273` (chore) | `branch-cleanup` | Direct-to-main chore. Local branch sprawl 80 → 4. 76 branches deleted (5 traditional-merge + 71 squash-merged). 2 closed-PR branches retained, both flagged DELETE in chat. |
-| #243 (`f256e5e`) | `saba-proshares-reclassify` | 1 Saba sibling aligned (`multi_asset` → `balanced`) + 39 ProShares short / inverse / leveraged-short funds promoted to `passive`. Closes `proshares-short-reclassify-execute`. |
+| Phase | Outcome |
+| --- | --- |
+| 1 — re-validate | 302 series / 160,934 rows / $658.5B against current `data/13f.duckdb` (matches PR #244 audit). S9digit 301 / 157,750 rows / $648.5B; UNKNOWN_literal 1 / 3,184 / $10.0B. |
+| 2 — dry-run manifest | 301 entries (300 majority-vote, all 100% support_pct + 1 manual override S000045538 Blackstone Alternative Multi-Strategy Fund → `multi_asset`). 0 SKIP-list matches in S9-digit cohort (Calamos / Eaton Vance both live under `series_id='UNKNOWN'`). Manifest at `data/working/orphan_backfill_manifest.csv`. |
+| 3 — backfill | Single transaction. Pre-INSERT collision check passed (0 manifest series_ids existed in `fund_universe`). 301 INSERTs tagged `strategy_source='orphan_backfill_2026Q2'`. `fund_universe` 13,623 → 13,924. |
+| 4 — peer_rotation rebuild | Run ID `peer_rotation_empty_20260501_235841` (parse 69.7s + promote 222.9s; ~5 min). Total 17,490,106 → 17,490,106 (Δ +0). Snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260501_235841.duckdb`. |
+| 5 — display layer | `cross.py` both 3-way `CASE` blocks now carry comment block tying NULL = unknown to PR #244 + this PR (behavior unchanged at SQL level). `_fund_type_label()` verified (already returns `'unknown'` for unmapped). `OverlapAnalysisTab.tsx` row filter (L194) AND active-KPI subset (L213) tightened to `r.is_active === true`. |
+| 6 — validation | `pytest tests/` 373/373 PASS. Audit re-run: residual = 1 series / 3,184 rows / $10.0B (UNKNOWN_literal only, by design). PR-1d display contract validator: PASS. `npm run build`: 0 errors. 5 spot-checks all canonical + tagged. Blackstone override ✓. |
 
-**Reclassifications applied:**
+**Insert distribution (Phase 3):** bond_or_other 133 series / 119,701 rows / $558.7B; excluded 136 / 17,619 / $66.9B; passive 25 / 13,047 / $20.3B; multi_asset 1 / 7,152 / $2.5B; active 6 / 231 / $0.03B.
 
-- AMG Pantheon Credit Solutions (`balanced` → `bond_or_other`) — credit fund.
-- AIP Alternative Lending Fund P (`active` → `bond_or_other`) — sibling of Fund A which was already `bond_or_other`.
-- Saba Capital Income & Opportunities Fund II (`multi_asset` → `balanced`) — sibling pair now both `balanced`.
-- 39 ProShares short / inverse / leveraged-short funds (`bond_or_other` / `excluded` → `passive`) — track named indexes per prospectus; classifier already lists `proshares` in `INDEX_PATTERNS` post-PR-2.
+**This sync (direct to `main`):**
 
-**Verifications confirmed (no UPDATE warranted):**
-
-- 12 BlackRock muni trusts on `final_filing` — all terminated via merger Feb 2026 (Form 25-NSE wave 2026-02-09 + BusinessWire merger-completion press releases 2026-02-23). Post-merger residual NPORT-P / N-CSRS filings are administrative.
-- 51 ProShares short / inverse / leveraged-short funds — all 51 (the 39 reclassified + 12 already `passive`) confirmed `passive` post-#243.
-
-**This sync (`conv-24-doc-sync`, direct to `main`):**
-
-- **`ROADMAP.md`** — header bumped to `conv-24-doc-sync`; `stage-b-turnover-deferred-funds` demoted P2 → P3; `canonical-value-coverage-audit` added back to P2 with note that PR #242 covered the data-pull portion; new P3 `per-fund-deferred-decisions` (Eaton Vance Tax-Advantaged variants × 3, Calamos Global Total Return Fund loader gap, N/A-cohort 96 rows); `unmerged-branch-decisions` updated to flag both DELETE per chat; new closing summary added at top of COMPLETED.
+- **`ROADMAP.md`** — `fund-holdings-orphan-investigation` removed from P2 backlog; new top entry in COMPLETED table dated 2026-05-01 with PR #245 details.
 - **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten.
-- **`docs/findings/CHAT_HANDOVER.md`** — new conv-24 section at top.
-- **`MAINTENANCE.md`** — last-updated bumped to conv-24.
 
-Branch HEAD on `main`: **`f256e5e`** (PR #243 merged).
+Branch HEAD on `main`: **`9392a36`** (PR #245 fund-orphan-backfill).
 
 ## Up next
 
-Three threads available; the user picks which to drive next session.
+Two threads still queued; the user picks which to drive next session.
 
-### 1. Highest data-integrity impact — `fund-holdings-orphan-investigation`
-
-302 series_ids in `fund_holdings_v2` are not in `fund_universe` (160,934 holdings rows). Includes Tax Exempt Bond Fund of America (10,606 rows), American High-Income Municipal Bond Fund (7,418), Blackstone Alternative Multi-Strategy Fund (7,152), Bond Fund of America (5,801), VOYA INTERMEDIATE BOND FUND (5,016), and 296 more. Currently flow into the NULL arm of `cross.py` 3-way `CASE` and are treated as `active` by the front-end (None → "active"). Real data integrity exposure: ~160K holdings rows showing up in active-only views today.
-
-Required outputs: root cause (pipeline gap vs PR-1a backfill miss vs series_id renames), per-cohort breakdown (NULL `series_id` UNKNOWN sentinel vs real-looking ids), and decision on whether to backfill `fund_universe` or rewrite `cross.py` NULL semantics. See `docs/findings/fund_cleanup_batch_results.md` §1b + §1h.
-
-### 2. Architectural — `fund-strategy-taxonomy-finalization`
+### 1. Architectural — `fund-strategy-taxonomy-finalization`
 
 Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy: `balanced` (60-90% equity, vague label, arbitrary boundary), `multi_asset` (30-60% equity, arbitrary boundaries on both sides), `bond_or_other` (heterogeneous bucket; the largest miscategorisation cohort — 39 ProShares short funds — was moved out by #243), `excluded` (combines money markets / fund-of-funds / ETF wrappers — should split into specific reasons), `final_filing` (status flag, not a strategy — decide whether it belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean).
 
-Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Trigger satisfied: orphan/NULL data is now on the table; the `canonical-value-coverage-audit` data-pull (PR #242 §1a–§1h) feeds this directly.
+Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Triggers now satisfied: orphan/NULL data is on the table; `canonical-value-coverage-audit` data-pull (PR #242 §1a–§1h) feeds this directly; orphan cohort backfilled (PR #245) — only the 1-series UNKNOWN_literal residual remains.
 
-### 3. Major sequence — institution-level consolidation scoping
+### 2. Major sequence — institution-level consolidation scoping
 
-Mirrors the four-stage pattern the fund-level arc established: backfill → rebuild → audit → fix + rename + lock. Different surface area though:
+Mirrors the four-stage pattern the fund-level arc established: backfill → rebuild → audit → fix + rename + lock. Different surface area:
 
 - **Taxonomy decisions partially captured** (prior chat session, not yet executed): keep `pension`, `endowment`, `sovereign_wealth_fund` separate; merge `private_equity` + `venture_capital` → `pe_vc`; merge `wealth_management` + `family_office` → `wealth_mgmt`; merge `hedge_fund` + `multi_strategy` → `hedge_fund`. `mixed` and `unknown` still need review.
 - **Data state to confront:** 1.4M+ parent-level rows in `holdings_v2.entity_type` carry legacy values (`active` / `passive` / `mixed` from old fund-level taxonomy). Canonical reads should hit `entity_classification_history.classification` / `entity_current.classification` instead.
@@ -62,22 +47,21 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ### Smaller items still open
 
-- **per-fund-deferred-decisions** (P3) — Eaton Vance Tax-Advantaged Dividend Income + 2 NEW global variants (all `balanced`); Calamos Global Total Return Fund (loader gap, 1,412 orphan holdings rows, no `fund_universe` row); 96-row N/A cohort (loader gap).
+- **per-fund-deferred-decisions** (P3) — Eaton Vance Tax-Advantaged Dividend Income + 2 NEW global variants (all `balanced`); Calamos Global Total Return Fund (loader gap, 1,412 holdings rows under `series_id='UNKNOWN'`); 96-row N/A cohort. **Note:** Calamos / Eaton Vance Tax-Advantaged were the SKIP-list patterns in PR #245 — they currently funnel into the literal `series_id='UNKNOWN'` sentinel (UNKNOWN_literal cohort, intentionally left orphan by PR #245). Resolution requires source-side rework (loader gap), not another `fund_universe` backfill.
 - **unmerged-branch-decisions** (P3, both DELETE per chat) — `claude/reverent-kirch-c1fcdf` (PR #172 CLOSED, work shipped via #173) + `ui-audit-01` (PR #107 CLOSED, triage doc already on main).
 - **stage-b-turnover-deferred-funds** (P3) — Vanguard Primecap / Windsor II / Equity Income (~$203B AUM) + Bridgeway Ultra-Small Company Market. Trigger: Stage B turnover detection design.
 - **historical-fund-holdings-drift-audit** (P3) — 31,400 non-SYN drift rows. Snapshot semantics intentional; characterise the cohort for completeness.
 - **canonical-value-coverage-audit** (P2, partially done in #242) — structured per-bucket count + AUM exposure + recommended treatment table is the still-open deliverable.
-- **review-active-bucket** (CLOSED by #242 + #243) — confirmed addressed; 8 remaining named CEFs in the `active` bucket reviewed and reclassified where warranted (AMG Pantheon, AIP Lending P) or surfaced for chat (Eaton Vance variants).
 - **Stage 5 cleanup DROP** — authorized on or after **2026-05-09** per `MAINTENANCE.md`.
 - **Q1 2026 13F cycle** — first live cycle expected ~2026-05-15 (45-day reporting window for period ending 2026-03-31). First live exercise of the locked `fund_universe` write path under a real cycle.
 
 ## Critical context for next session
 
-**Fund-level data architecture is solid and locked.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer (`compute_peer_rotation._materialize_fund_agg` reads `fund_universe`, not the per-row snapshot). Display layer reads canonical via `_fund_type_label()` in `scripts/queries/common.py`. 11 PRs validated end-to-end.
+**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244 — only the 1-series UNKNOWN_literal residual (3,184 rows / $10.0B) remains, by design. 12 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
 
-**Snapshot vs canonical semantics are intentional.** Per-row, per-quarter classification at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (snapshot, frozen by design). Canonical (locked, never-overwritten-without-analyst-approval) lives in `fund_universe.fund_strategy`. Anything that filters or buckets by active/passive **always JOINs `fund_universe`** — never reads `_at_filing`. Saba Fund I retains pre-existing snapshot drift in `fund_holdings_v2` (1,091 `active` + 1,094 `balanced`) which is intentionally preserved (canonical is correct as `balanced`; snapshot at filing moment frozen by design).
+**Snapshot vs canonical semantics are intentional.** Per-row, per-quarter classification at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (snapshot, frozen by design). Canonical (locked, never-overwritten-without-analyst-approval) lives in `fund_universe.fund_strategy`. Anything that filters or buckets by active/passive **always JOINs `fund_universe`** — never reads `_at_filing`.
 
-**The 301-series orphan finding from PR #242 is the most consequential open item for data integrity.** 160,934 holdings rows currently treated as active by the front-end NULL-arm fallback. Real production exposure on the active-only views.
+**Active-only views now exclude unknowns.** PR #245 tightened `OverlapAnalysisTab.tsx` from `r.is_active !== false` to `r.is_active === true` at both the row filter (L194) and the active-KPI tile (L213). Any fund with `is_active=null` (orphan from `fund_universe`) is excluded from active-only views. After PR #245 the only `is_active=null` source is the 1-series UNKNOWN_literal residual.
 
 **Institution-level should follow the same architectural pattern.** Canonical column on `entity_classification_history` / `entity_current`, constants module, shared label utility, JOIN-based query layer. The four-stage pattern (backfill → rebuild → audit → fix+rename+lock) is the template.
 
@@ -93,7 +77,7 @@ This thread gates the Admin Refresh System (the original project goal).
 
 ## Reminders
 
-- **HEAD on main is `f256e5e`** (PR #243 saba-proshares-reclassify) after the fund-level cleanup arc closed.
+- **HEAD on main is `9392a36`** (PR #245 fund-orphan-backfill).
 - **Canonical fund taxonomy values:** `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. `active` is dominant (was `equity` pre-PR-4). Display label utility `_fund_type_label()` in `scripts/queries/common.py` collapses to 5 values `{active, passive, bond, excluded, unknown}`.
 - **Column rename (PR-4):** prod column is `fund_holdings_v2.fund_strategy_at_filing` (was `fund_strategy` pre-2026-05-01). Staging schema (`stg_nport_holdings.fund_strategy`) intentionally retains the old name — prod write path renames at INSERT time (`s.fund_strategy AS fund_strategy_at_filing`).
 - **JOIN rule (PR-4):** for any active/passive filter, **always JOIN `fund_universe`** — the canonical, locked column. The per-row, per-quarter snapshot in `fund_strategy_at_filing` is preserved intentionally for snapshot semantics but is NOT the source of truth for filters.
@@ -102,6 +86,9 @@ This thread gates the Admin Refresh System (the original project goal).
 - **Display layer (PR-1d):** `_fund_type_label(fund_strategy)` is the single fund-level type emitter. Map: `active|balanced|multi_asset → 'active'`, `passive → 'passive'`, `bond_or_other → 'bond'`, `excluded|final_filing → 'excluded'`, NULL/unknown → `'unknown'`.
 - **PR-1d gotcha:** `get_nport_children_batch` and `get_nport_children` in `scripts/queries/common.py` SELECT and propagate `fund_strategy` in their child-dict shape. Any new consumer can read `child['fund_strategy']` without re-querying.
 - **PR-1d gotcha:** `cross.py` `_cross_ownership_fund_query` no longer carries `family_name` in its response (`type` overload removed). The column stays in `fund_holdings_v2` for entity matching.
+- **PR #245 gotcha — orphan-backfill stamp:** the 301 backfilled `fund_universe` rows carry `strategy_source='orphan_backfill_2026Q2'`. Any future analysis of `fund_strategy` provenance can filter on this tag to isolate the cohort.
+- **PR #245 gotcha — 3-way semantics:** `cross.py` `is_active` is tri-state (TRUE / FALSE / null). Frontend `OverlapAnalysisTab.tsx` now uses strict `=== true` at both L194 (row filter) and L213 (KPI subset). Other fund-level read sites (`get_two_company_subject`, `get_overlap_institution_detail`) that emit `is_active` follow the same convention. Don't reintroduce `!== false` truthy coercion — it silently rolls null into active.
+- **PR #245 gotcha — UNKNOWN_literal residual:** `series_id='UNKNOWN'` is the literal sentinel where multiple historic fund_names funnel (Calamos Global Total Return + Eaton Vance Tax-Advantaged + 6 more). 1 series / 3,184 rows / $10.0B. Left orphan by design — resolution requires source-side rework (loader gap), not another `fund_universe` backfill.
 - **#243 ProShares mechanics:** all 51 ProShares short / inverse / bear ETFs now `passive` end-to-end. The N-PORT holdings shape is uniformly swap notionals + cash/T-bill collateral (across both equity-tracking inverse like SQQQ/SH and treasury-tracking inverse like TBF). Morningstar classifies all three as "passively managed Trading-Inverse" ETFs.
 - **#242 12 BlackRock muni trusts:** all confirmed merged Feb 2026 via Form 25-NSE delistings + BusinessWire merger-completion press releases. Post-merger NPORT-P (2026-03-26) and N-CSRS (2026-04-07) filings are residual administrative; trusts correctly carry `final_filing`.
 - **Cross-Ownership tab (conv-22).** Peer dropdown reads `/api/v1/peer_tickers` (sector + industry from `market_data`). Investor row expand fires `/api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` and is gated by `has_fund_detail` on the parent rollup. Fund-level toggle pulls from `fund_holdings_v2` (pivot now references the outer `fund_pos` aggregation, not `fh.ticker` / `fh.holding_value`).
