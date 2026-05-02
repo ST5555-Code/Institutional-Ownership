@@ -1,0 +1,74 @@
+eid,canonical_name,entity_type,is_inferred,created_source,fund_rows,fund_aum_usd,filer_rows,filer_aum_usd,ech_class,ech_is_activist,ech_source,ciks
+30,PIMCO,institution,True,PARENT_SEEDS,289040,1716004441598.6726,,0.0,active,False,manual_l4,
+26773,PIMCO Corporate & Income Opportunity Fund,institution,False,bootstrap_tier4,1777,5188638462.329995,,0.0,unknown,False,bootstrap_tier4,0001190935
+26992,PIMCO Flexible Municipal Income Fund,institution,False,bootstrap_tier4,1143,4429098611.820001,,0.0,active,False,tier4_keyword_sweep,0001723701
+27037,PIMCO Dynamic Income Opportunities Fund,institution,False,bootstrap_tier4,1439,3841591655.6900005,,0.0,unknown,False,bootstrap_tier4,0001798618
+26760,PIMCO Municipal Income Fund II,institution,False,bootstrap_tier4,746,3541468532.8400016,,0.0,active,False,tier4_keyword_sweep,0001170299
+27014,PIMCO Dynamic Income Strategy Fund,institution,False,bootstrap_tier4,871,2269314766.9100018,,0.0,unknown,False,bootstrap_tier4,0001756908
+26782,PIMCO High Income Fund,institution,False,bootstrap_tier4,1052,1964211766.320001,,0.0,active,False,tier4_keyword_sweep,0001219360
+25830,PIMCO CALIFORNIA MUNICIPAL INCOME FUND,institution,False,manual_13dg_resolution,563,1904046581.2400007,,0.0,strategic,False,manual_13dg_resolution,0001140411
+26752,PIMCO Corporate & Income Strategy Fund,institution,False,bootstrap_tier4,1167,1805802220.030001,,0.0,unknown,False,bootstrap_tier4,0001160990
+26829,PIMCO Income Strategy Fund II,institution,False,bootstrap_tier4,1154,1580460887.01,,0.0,unknown,False,bootstrap_tier4,0001296250
+27115,PIMCO Access Income Fund,institution,False,bootstrap_tier4,993,1516579453.860001,,0.0,active,False,tier4_keyword_sweep,0001886878
+26718,"PIMCO Strategic Income Fund, Inc.",institution,False,bootstrap_tier4,1465,1053090144.7700002,,0.0,active,False,tier4_keyword_sweep,0000916183
+27119,PIMCO Flexible Real Estate Income Fund,institution,False,bootstrap_tier4,190,1005966541.0999999,,0.0,active,False,tier4_keyword_sweep,0001896329
+26797,PIMCO Income Strategy Fund,institution,False,bootstrap_tier4,878,880600227.6500006,,0.0,unknown,False,bootstrap_tier4,0001244183
+26761,PIMCO New York Municipal Income Fund II,institution,False,bootstrap_tier4,311,613734773.58,,0.0,active,False,tier4_keyword_sweep,0001170311
+26839,PIMCO Global StocksPLUS & Income Fund,institution,False,bootstrap_tier4,939,303806543.06999975,,0.0,active,False,tier4_keyword_sweep,0001318025
+27128,PIMCO California Flexible Municipal Income Fund,institution,False,bootstrap_tier4,415,289830500.2900002,,0.0,active,False,tier4_keyword_sweep,0001911795
+27085,PIMCO Flexible Emerging Markets Income Fund,institution,False,bootstrap_tier4,928,106732586.64999986,,0.0,active,False,tier4_keyword_sweep,0001851077
+12941,PIMCO RAE International Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+22818,PIMCO Mortgage-Backed Securities Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+26558,PIMCO Dynamic Income Fund,institution,False,int-21_series_triage,,0.0,,0.0,active,False,int-21_series_triage,0001510599
+26477,PIMCO CALIFORNIA MUNICIPAL INCOME FUND II,institution,False,manual_13dg_resolution,,0.0,,0.0,strategic,False,manual_13dg_resolution,0001170300
+26203,PIMCO MUNICIPAL INCOME FUND III,institution,False,manual_13dg_resolution,,0.0,,0.0,strategic,False,manual_13dg_resolution,0001181506
+12172,SA PIMCO RAE  International Value Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12929,PIMCO REALPATH Blend 2060 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12930,PIMCO REALPATH Blend 2025 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12931,PIMCO REALPATH Blend 2030 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12932,PIMCO REALPATH Blend 2035 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12933,PIMCO REALPATH Blend 2040 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12934,PIMCO REALPATH Blend 2045 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12935,PIMCO REALPATH Blend 2050 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12936,PIMCO REALPATH Blend 2055 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12937,PIMCO REALPATH Blend Income Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12938,PIMCO Dividend and Income Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12939,PIMCO RAE Emerging Markets Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12940,PIMCO RAE Global ex-US Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+26016,PIMCO CALIFORNIA MUNICIPAL INCOME FUND III,institution,False,manual_13dg_resolution,,0.0,,0.0,strategic,False,manual_13dg_resolution,0001181504
+12942,PIMCO RAE US Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12943,PIMCO RAE US Small Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12944,PIMCO REALPATH Blend 2065 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12945,PIMCO All Asset Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12946,PIMCO Global Core Asset Allocation Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12947,PIMCO Preferred and Capital Securities Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12948,PIMCO Emerging Markets Full Spectrum Bond Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12949,PIMCO All Asset All Authority Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12950,PIMCO RealEstateRealReturn Strategy Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12951,PIMCO All Asset Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12952,PIMCO Global Managed Asset Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12953,PIMCO Balanced Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+12954,PIMCO Global Diversified Allocation Portfolio,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+17404,PIMCO REALPATH Blend 2070 Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+17405,PIMCO All Asset: Multi-Real Fund,fund,True,fund_universe,,0.0,,0.0,active,False,fund_universe,
+20604,SA PIMCO Global Bond Opportunities Portfolio,fund,True,ncen_adviser_map,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20823,PIMCO Broad U.S. TIPS Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20824,PIMCO 1-5 Year U.S. TIPS Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20825,PIMCO 15+ Year U.S. TIPS Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20839,PIMCO 25+ Year Zero Coupon U.S. Treasury Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20840,PIMCO Enhanced Short Maturity Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20841,PIMCO Ultra Short Government Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20842,PIMCO Short Term Municipal Bond Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20843,PIMCO Intermediate Municipal Bond Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20861,PIMCO StocksPLUS Global Portfolio,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20887,PIMCO 0-5 Year High Yield Corporate Bond Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20888,PIMCO Investment Grade Corporate Bond Index Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+20964,PIMCO Active Bond Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21027,PIMCO Enhanced Low Duration Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21171,PIMCO Senior Loan Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+21724,PIMCO Enhanced Short Maturity Active ESG Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22030,PIMCO Municipal Income Opportunities Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22319,PIMCO Preferred and Capital Securities Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22373,PIMCO Commodity Strategy Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+22420,PIMCO Multisector Bond Active Exchange-Traded Fund,fund,True,family_name_alias_match,,0.0,,0.0,passive,False,stg_nport_fund_universe,
+26582,PIMCO Flexible Credit Income Fund,institution,False,int-21_series_triage,,0.0,,0.0,active,False,int-21_series_triage,0001688554

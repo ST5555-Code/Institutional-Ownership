@@ -1,0 +1,51 @@
+brand_eid,fund_rows,fund_aum,brand_name,brand_entity_type,brand_is_inferred,brand_created_source
+2489,58111,129950951713.90532,"Voya Financial, Inc.",institution,true,managers
+18338,11530,57773867704.929985,BlueCove Limited,institution,true,ncen_adviser_map
+18096,54203,52289286629.440025,Dimensional Fund Advisors LP,institution,true,ncen_adviser_map
+4911,9895,13419747618.869982,STATE FARM INVESTMENT MANAGEMENT CORP,institution,true,managers
+26566,81,12256804050.0,Ironwood Institutional Multi-Strategy Fund LLC,institution,false,int-21_series_triage
+26529,1217488,10594995903.20002,Stone Ridge Trust V,institution,false,manual_13dg_resolution
+25151,1634,9259546807.57001,CALAMOS STRATEGIC TOTAL RETURN FUND,institution,false,manual_13dg_resolution
+15525,45,8969496197.729998,Pioneer Fund,fund,true,fund_universe
+26584,139,8695440553.470001,Reaves Utility Income Fund,institution,false,int-21_series_triage
+17999,3694,7767237189.689998,"BlackRock Advisors, LLC",institution,true,ncen_adviser_map
+15025,41,7464590263.210001,Pioneer Fundamental Growth Fund,fund,true,fund_universe
+26595,1323,6476436593.280001,Gabelli Dividend & Income Trust,institution,false,int-21_series_triage
+26597,2,6368442887.0,Ironwood Multi-Strategy Fund LLC,institution,false,int-21_series_triage
+26971,1495,5331181804.329996,First Trust Alternative Opportunities Fund,institution,false,bootstrap_tier4
+26773,1777,5188638462.329995,PIMCO Corporate & Income Opportunity Fund,institution,false,bootstrap_tier4
+26995,422,5181159633.310002,Variant Alternative Income Fund,institution,false,bootstrap_tier4
+27004,515,5080206940.639999,John Hancock GA Mortgage Trust,institution,false,bootstrap_tier4
+26849,130,4989144812.440001,Eaton Vance Tax-Managed Diversified Equity Income Fund,institution,false,bootstrap_tier4
+26811,360,4940414172.700005,Eaton Vance Tax-Advantaged Global Dividend Income Fund,institution,false,bootstrap_tier4
+27178,566,4854609161.410001,Franklin Lexington Private Markets Fund,institution,false,bootstrap_tier4
+26749,411,4805920234.030001,COHEN & STEERS QUALITY INCOME REALTY FUND INC,institution,false,bootstrap_tier4
+26915,1118,4765819308.069999,BlackRock Municipal 2030 Target Term Trust,institution,false,bootstrap_tier4
+26812,917,4554645025.69,Nuveen Floating Rate Income Fund,institution,false,bootstrap_tier4
+26992,1143,4429098611.820001,PIMCO Flexible Municipal Income Fund,institution,false,bootstrap_tier4
+12667,530,4334675178.84,Pioneer Multi-Asset Income Fund,fund,true,fund_universe
+26622,1327,4168732527.810001,Gabelli Equity Trust Inc,institution,false,bootstrap_tier4
+26635,914,4024286179.8199973,"Nuveen Municipal Value Fund, Inc.",institution,false,bootstrap_tier4
+27051,212,4017945244.27291,NB Private Markets Access Fund LLC,institution,false,bootstrap_tier4
+26806,1774,3982732986.250004,Nuveen Municipal High Income Opportunity Fund,institution,false,bootstrap_tier4
+26955,776,3958471057.365996,Pomona Investment Fund,institution,false,bootstrap_tier4
+27037,1439,3841591655.6900005,PIMCO Dynamic Income Opportunities Fund,institution,false,bootstrap_tier4
+26589,42,3812364632.439998,Bluerock Private Real Estate Fund,institution,false,int-21_series_triage
+27031,400,3811276010.6899996,Keystone Private Income Fund,institution,false,bootstrap_tier4
+26936,456,3710678774.0699987,First Trust Intermediate Duration Preferred & Income Fund,institution,false,bootstrap_tier4
+26729,425,3677303434.449999,"BlackRock MuniHoldings California Quality Fund, Inc.",institution,false,bootstrap_tier4
+26872,411,3637354709.83,SEI Structured Credit Fund LP,institution,false,bootstrap_tier4
+26844,337,3608427385.13,Eaton Vance Tax-Managed Buy-Write Opportunities Fund,institution,false,bootstrap_tier4
+26592,138,3561166139.460001,APOLLO DIVERSIFIED REAL ESTATE FUND,institution,false,int-21_series_triage
+26760,746,3541468532.8400016,PIMCO Municipal Income Fund II,institution,false,bootstrap_tier4
+27034,563,3528907969.009998,Cohen & Steers Tax-Advantaged Preferred Securities & Income Fund,institution,false,bootstrap_tier4
+26929,4,3518972098.0199995,CPG Carlyle Commitments Fund LLC,institution,false,bootstrap_tier4
+26830,437,3368334425.329998,Nuveen S&P 500 Buy-Write Income Fund,institution,false,bootstrap_tier4
+27153,476,3094479185.9900045,KKR US Direct Lending Fund-U Inc.,institution,false,bootstrap_tier4
+27136,215,3067661015.9200015,JPMorgan Private Markets Fund,institution,false,bootstrap_tier4
+26695,912,3038482976.039999,"BlackRock MuniYield Quality Fund, Inc.",institution,false,bootstrap_tier4
+26951,481,3006846696.0800004,Nuveen Nasdaq 100 Dynamic Overwrite Fund,institution,false,bootstrap_tier4
+26956,280,2998133659.689998,BlackRock Science & Technology Trust,institution,false,bootstrap_tier4
+27175,1863,2966455871.4000025,StepStone Private Credit Income Fund,institution,false,bootstrap_tier4
+26983,503956,2938985552.3700047,AIP Alternative Lending Fund A,institution,false,bootstrap_tier4
+26742,341,2927042464.84,Nuveen California Quality Municipal Income Fund,institution,false,bootstrap_tier4
