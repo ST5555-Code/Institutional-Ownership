@@ -329,14 +329,30 @@ def load_manifest_csv(path: Path) -> list[dict]:
     return out
 
 
-def execute_flip(con: duckdb.DuckDBPyConnection, manifest: list[dict]) -> dict:
+def execute_flip(
+    con: duckdb.DuckDBPyConnection,
+    manifest: list[dict],
+    accept_deferred_holds: bool = False,
+) -> dict:
     flip_rows = [r for r in manifest if r["branch"] == "FLIP"]
     hold = [r for r in manifest if r["branch"] != "FLIP"]
-    if hold:
+
+    # SYN_INACTIVE is a different problem — never accept silently.
+    syn_inactive = [r for r in hold if r["branch"] == "HOLD_SYN_INACTIVE"]
+    if syn_inactive:
         raise SystemExit(
-            f"ABORT: manifest contains {len(hold)} HOLD pair(s). "
-            f"Refusing to run --confirm until cleanup_stale_unknown.py is "
-            f"re-run --dry-run with all pairs in BRANCH 1."
+            f"ABORT: manifest contains {len(syn_inactive)} HOLD_SYN_INACTIVE "
+            f"pair(s). The SYN_ side is also stale; this is a separate "
+            f"data-integrity problem and cannot be silently deferred."
+        )
+
+    no_match = [r for r in hold if r["branch"] == "HOLD_NO_MATCH"]
+    if no_match and not accept_deferred_holds:
+        raise SystemExit(
+            f"ABORT: manifest contains {len(no_match)} HOLD_NO_MATCH "
+            f"pair(s). Re-run with --accept-deferred-holds to skip them and "
+            f"flip BRANCH 1 only, or re-run --dry-run with an all-BRANCH-1 "
+            f"manifest."
         )
     if not flip_rows:
         raise SystemExit("ABORT: no BRANCH 1 (FLIP) pairs in manifest.")
@@ -408,6 +424,15 @@ def main() -> None:
                      help="Build manifest CSV + dryrun MD; no DB writes.")
     grp.add_argument("--confirm", action="store_true",
                      help="Read manifest CSV + execute is_latest flip in single transaction.")
+    parser.add_argument(
+        "--accept-deferred-holds",
+        action="store_true",
+        help=(
+            "With --confirm: skip HOLD_NO_MATCH pairs and proceed with "
+            "BRANCH 1 only. Use when HOLD pairs are explicitly deferred to "
+            "another workstream (e.g. cef-attribution-path)."
+        ),
+    )
     args = parser.parse_args()
 
     if args.dry_run:
@@ -446,7 +471,7 @@ def main() -> None:
                 f"[confirm] cohort OK: pairs={cohort['pair_count']}, "
                 f"rows={cohort['row_count']:,}, aum=${cohort['aum_usd']:,.2f}"
             )
-            stats = execute_flip(con, manifest)
+            stats = execute_flip(con, manifest, accept_deferred_holds=args.accept_deferred_holds)
         finally:
             con.close()
         print(
