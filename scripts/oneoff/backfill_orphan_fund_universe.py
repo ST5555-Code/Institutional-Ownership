@@ -8,6 +8,19 @@ matching row in ``fund_universe``. Read-only with respect to existing
 fund_universe rows — INSERT-only, no UPDATE path. Safe alongside
 PR-2 pipeline lock.
 
+PR #248 forward-looking patch: now also derives ``total_net_assets``
+per series during manifest construction and writes it on INSERT.
+
+  Canonical: NAV = MEDIAN(market_value_usd * 100.0 / pct_of_nav) on the
+             most-recent quarter's is_latest=TRUE rows. ``pct_of_nav`` is
+             stored on the percent scale (0–100); validated against funds
+             with existing ``total_net_assets`` (ratio = 1.000000…).
+  Fallback : NAV = SUM(market_value_usd) when no row has usable
+             pct_of_nav. ``strategy_source`` suffixed
+             ``|aum_summed_fallback`` for those rows.
+  Null-res : NAV stays NULL when neither path resolves; surfaced in
+             the dryrun manifest's ``nav_source`` column for review.
+
 Cohort scope (per PR #244 audit):
   * S9digit (``S\\d{9}``)        — backfill candidates (~301 series).
   * UNKNOWN_literal (``UNKNOWN``) — left orphan by design (1 series,
@@ -172,6 +185,26 @@ def derive_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
             FROM orphan
             WHERE regexp_matches(series_id, '^S[0-9]{{9}}$')
         ),
+        nav_per_q AS (
+            SELECT series_id, quarter,
+                   MEDIAN(CASE WHEN pct_of_nav IS NOT NULL AND pct_of_nav > 0
+                               THEN market_value_usd * 100.0 / pct_of_nav END)
+                                                            AS implied_nav,
+                   SUM(market_value_usd)                    AS sum_mv
+            FROM s9
+            GROUP BY series_id, quarter
+        ),
+        nav_ranked AS (
+            SELECT *,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY series_id ORDER BY quarter DESC
+                   ) AS rn
+            FROM nav_per_q
+        ),
+        nav_pick AS (
+            SELECT series_id, implied_nav, sum_mv
+            FROM nav_ranked WHERE rn = 1
+        ),
         agg AS (
             SELECT
                 series_id,
@@ -223,16 +256,33 @@ def derive_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
             agg.aum_usd,
             winners.derived_strategy,
             COALESCE(winners.winning_weight / NULLIF(totals.total_weight, 0), 0.0)
-                AS support_pct
+                AS support_pct,
+            nav_pick.implied_nav,
+            nav_pick.sum_mv
         FROM agg
-        LEFT JOIN winners USING (series_id)
-        LEFT JOIN totals  USING (series_id)
+        LEFT JOIN winners  USING (series_id)
+        LEFT JOIN totals   USING (series_id)
+        LEFT JOIN nav_pick USING (series_id)
         ORDER BY agg.row_count DESC
         """
     ).fetchall()
 
     manifest: list[dict] = []
-    for series_id, fund_name, fund_cik, row_count, aum_usd, derived, support in rows:
+    for (series_id, fund_name, fund_cik, row_count, aum_usd, derived,
+         support, implied_nav, sum_mv) in rows:
+        # Canonical N-PORT TotalNetAssets reconstruction.
+        # pct_of_nav is on percent scale (0–100); validated against funds
+        # with existing total_net_assets at ratio = 1.000000…
+        # See PR #248 / docs/findings/fund_universe_corrections_results.md.
+        if implied_nav is not None and float(implied_nav) > 0:
+            total_net_assets = float(implied_nav)
+            nav_source = "canonical_nport"
+        elif sum_mv is not None and float(sum_mv) > 0:
+            total_net_assets = float(sum_mv)
+            nav_source = "aum_summed_fallback"
+        else:
+            total_net_assets = None
+            nav_source = "null_residual"
         # Fallbacks
         if not fund_name:
             fund_name = series_id
@@ -256,6 +306,8 @@ def derive_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
                 "derived_strategy": "",
                 "support_pct": 0.0,
                 "source": "skip",
+                "total_net_assets": total_net_assets,
+                "nav_source": nav_source,
             })
             continue
 
@@ -271,6 +323,8 @@ def derive_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
                 "derived_strategy": override_strategy,
                 "support_pct": float(support or 0.0),
                 "source": "override",
+                "total_net_assets": total_net_assets,
+                "nav_source": nav_source,
             })
             continue
 
@@ -290,6 +344,8 @@ def derive_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
             "derived_strategy": derived,
             "support_pct": float(support or 0.0),
             "source": "majority",
+            "total_net_assets": total_net_assets,
+            "nav_source": nav_source,
         })
 
     return manifest
@@ -313,10 +369,13 @@ def write_manifest_csv(manifest: list[dict], path: Path) -> None:
                 "row_count",
                 "aum_usd",
                 "source",
+                "total_net_assets",
+                "nav_source",
             ],
         )
         writer.writeheader()
         for r in manifest:
+            tna = r.get("total_net_assets")
             writer.writerow({
                 "series_id": r["series_id"],
                 "fund_name": r["fund_name"],
@@ -326,6 +385,10 @@ def write_manifest_csv(manifest: list[dict], path: Path) -> None:
                 "row_count": r["row_count"],
                 "aum_usd": f"{r['aum_usd']:.2f}",
                 "source": r["source"],
+                "total_net_assets": (
+                    f"{tna:.2f}" if tna is not None else ""
+                ),
+                "nav_source": r.get("nav_source", ""),
             })
 
 
@@ -433,6 +496,11 @@ def load_manifest_csv(path: Path) -> list[dict]:
             row["row_count"] = int(row["row_count"])
             row["aum_usd"] = float(row["aum_usd"])
             row["support_pct"] = float(row["support_pct"])
+            tna_str = row.get("total_net_assets") or ""
+            row["total_net_assets"] = (
+                float(tna_str) if tna_str else None
+            )
+            row["nav_source"] = row.get("nav_source", "") or ""
             out.append(row)
     return out
 
@@ -474,6 +542,13 @@ def execute_backfill(con: duckdb.DuckDBPyConnection, manifest: list[dict]) -> di
     con.execute("BEGIN")
     try:
         for r in inserts:
+            tna = r.get("total_net_assets")
+            nav_source = r.get("nav_source") or "null_residual"
+            row_source_tag = (
+                STRATEGY_SOURCE_TAG + "|aum_summed_fallback"
+                if nav_source == "aum_summed_fallback"
+                else STRATEGY_SOURCE_TAG
+            )
             con.execute(
                 """
                 INSERT INTO fund_universe (
@@ -485,7 +560,7 @@ def execute_backfill(con: duckdb.DuckDBPyConnection, manifest: list[dict]) -> di
                     strategy_source, strategy_fetched_at
                 ) VALUES (
                     ?, ?, ?, NULL,
-                    NULL, NULL,
+                    ?, NULL,
                     NULL, NULL,
                     ?, ?,
                     NULL, NULL,
@@ -496,9 +571,10 @@ def execute_backfill(con: duckdb.DuckDBPyConnection, manifest: list[dict]) -> di
                     r["fund_cik"] or None,
                     r["fund_name"],
                     r["series_id"],
+                    tna,
                     now,
                     r["derived_strategy"],
-                    STRATEGY_SOURCE_TAG,
+                    row_source_tag,
                     now,
                 ],
             )

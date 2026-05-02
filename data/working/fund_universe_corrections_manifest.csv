@@ -1,5 +1,5 @@
 block,series_id,fund_name,current_value,proposed_value,source,new_strategy_source,support_quarter,support_row_count,support_sum_mv,support_implied_nav
-A,S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,excluded,passive,manual_override,unknown_cleanup_2026Q2,,0,,
+A,S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,excluded,passive,manual_override,unknown_cleanup_2026Q2,2025Q4,4,-280829.84,4555216.40
 B,S000000713,Western Asset Core Bond Fund,,1869626398.87,canonical_nport,orphan_backfill_2026Q2,2025Q4,1010,1947342244.06,1869626398.87
 B,S000000714,Western Asset Core Plus Bond Fund,,3952570949.28,canonical_nport,orphan_backfill_2026Q2,2025Q4,1296,4214251155.53,3952570949.28
 B,S000000715,Western Asset Inflation Indexed Plus Bond Fund,,40282134.22,canonical_nport,orphan_backfill_2026Q2,2025Q4,48,39752130.85,40282134.22
@@ -277,7 +277,6 @@ B,S000089482,PLUS Korea Defense Industry Index ETF,,57349455.71,canonical_nport,
 B,S000089486,Genter Capital Dividend Income ETF,,8838884.48,canonical_nport,orphan_backfill_2026Q2,2026Q1,33,8821962.73,8838884.48
 B,S000089487,Genter Capital International Dividend ETF,,3853834.65,canonical_nport,orphan_backfill_2026Q2,2026Q1,36,3843771.34,3853834.65
 B,S000090015,Nomura National High-Yield Municipal Bond ETF,,32170924.12,canonical_nport,orphan_backfill_2026Q2,2025Q4,132,31584246.03,32170924.12
-B,S000090077,Rareview 2x Bull Cryptocurrency & Precious Metals ETF,,4555216.40,canonical_nport,orphan_backfill_2026Q2,2025Q4,4,-280829.84,4555216.40
 B,S000090213,American Beacon Ionic Inflation Protection ETF,,10451166.75,canonical_nport,orphan_backfill_2026Q2,2026Q1,16,10415314.78,10451166.75
 B,S000090721,E*TRADE No Fee Municipal Bond Index Fund,,27607521.13,canonical_nport,orphan_backfill_2026Q2,2026Q1,123,28896354.56,27607521.13
 B,S000090723,E*TRADE No Fee U.S. Bond Index Fund,,28663731.30,canonical_nport,orphan_backfill_2026Q2,2026Q1,94,28488457.00,28663731.30

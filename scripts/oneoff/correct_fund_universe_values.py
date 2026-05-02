@@ -200,12 +200,17 @@ def derive_block_b_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
     NULL-residual: series with no usable holdings at all (no canonical
     AND no fallback). Surfaced for chat decision; --confirm refuses
     to run if any present.
+
+    Block A's series_id is excluded so its strategy_source flip is
+    not silently overwritten by Block B's UPDATE.
     """
     rows = con.execute(
         f"""
         WITH bf AS (
             SELECT series_id, fund_name
-            FROM fund_universe WHERE strategy_source = '{BACKFILL_SOURCE_TAG}'
+            FROM fund_universe
+            WHERE strategy_source = '{BACKFILL_SOURCE_TAG}'
+              AND series_id <> '{RAREVIEW_SERIES_ID}'
         ),
         per_q AS (
             SELECT
@@ -277,7 +282,40 @@ def derive_block_b_manifest(con: duckdb.DuckDBPyConnection) -> list[dict]:
     return manifest
 
 
-def build_block_a_entry(b_a: dict) -> dict:
+def derive_block_a_nav(con: duckdb.DuckDBPyConnection) -> float | None:
+    """Apply the same canonical NAV derivation as Block B to Rareview,
+    so Block A's UPDATE populates total_net_assets in one shot."""
+    row = con.execute(
+        """
+        WITH per_q AS (
+          SELECT quarter,
+                 MEDIAN(CASE WHEN pct_of_nav IS NOT NULL AND pct_of_nav > 0
+                             THEN market_value_usd * 100.0 / pct_of_nav END)
+                                                            AS implied_nav,
+                 SUM(market_value_usd)                       AS sum_mv
+          FROM fund_holdings_v2
+          WHERE series_id = ? AND is_latest = TRUE
+          GROUP BY quarter
+        ),
+        ranked AS (
+          SELECT *, ROW_NUMBER() OVER (ORDER BY quarter DESC) AS rn
+          FROM per_q
+        )
+        SELECT implied_nav, sum_mv FROM ranked WHERE rn = 1
+        """,
+        [RAREVIEW_SERIES_ID],
+    ).fetchone()
+    if row is None:
+        return None
+    implied, sum_mv = row
+    if implied is not None and implied > 0:
+        return float(implied)
+    if sum_mv is not None and sum_mv > 0:
+        return float(sum_mv)
+    return None
+
+
+def build_block_a_entry(b_a: dict, nav: float | None) -> dict:
     return {
         "block": "A",
         "series_id": b_a["series_id"],
@@ -289,7 +327,9 @@ def build_block_a_entry(b_a: dict) -> dict:
         "support_quarter": "",
         "support_row_count": 0,
         "support_sum_mv": "",
-        "support_implied_nav": "",
+        "support_implied_nav": (
+            f"{nav:.2f}" if nav is not None else ""
+        ),
     }
 
 
@@ -492,10 +532,11 @@ def execute_corrections(
         raise SystemExit(
             f"ABORT: expected 1 Block A row, got {len(a_rows)}."
         )
-    if len(b_eligible) != EXPECTED_BACKFILL_ROW_COUNT:
+    expected_b = EXPECTED_BACKFILL_ROW_COUNT - 1  # Rareview is in Block A
+    if len(b_eligible) != expected_b:
         raise SystemExit(
-            f"ABORT: expected {EXPECTED_BACKFILL_ROW_COUNT} Block B "
-            f"eligible rows, got {len(b_eligible)}."
+            f"ABORT: expected {expected_b} Block B eligible rows, "
+            f"got {len(b_eligible)}."
         )
 
     pre_a = con.execute(
@@ -517,24 +558,35 @@ def execute_corrections(
     now = datetime.utcnow()
     con.execute("BEGIN")
     try:
-        # Block A
-        con.execute(
+        # Block A — single-row UPDATE setting strategy + NAV in one shot
+        a_row = a_rows[0]
+        try:
+            a_nav = (
+                float(a_row["support_implied_nav"])
+                if a_row.get("support_implied_nav")
+                else None
+            )
+        except (TypeError, ValueError):
+            a_nav = None
+        a_returned = con.execute(
             """
             UPDATE fund_universe
-            SET fund_strategy=?, strategy_source=?,
+            SET fund_strategy=?, strategy_source=?, total_net_assets=?,
                 strategy_fetched_at=?, last_updated=?
             WHERE series_id=? AND fund_strategy=?
+            RETURNING series_id
             """,
             [
                 RAREVIEW_NEW_STRATEGY,
                 RAREVIEW_NEW_SOURCE,
+                a_nav,
                 now,
                 now,
                 RAREVIEW_SERIES_ID,
                 RAREVIEW_EXPECTED_CURRENT_STRATEGY,
             ],
-        )
-        a_changes = con.execute("SELECT changes()").fetchone()[0]
+        ).fetchall()
+        a_changes = len(a_returned)
         if a_changes != 1:
             raise SystemExit(
                 f"ABORT: Block A UPDATE affected {a_changes} rows "
@@ -546,15 +598,16 @@ def execute_corrections(
         for r in b_eligible:
             new_tna = float(r["proposed_value"])
             new_source = r["new_strategy_source"]
-            con.execute(
+            b_returned = con.execute(
                 """
                 UPDATE fund_universe
                 SET total_net_assets=?, strategy_source=?, last_updated=?
                 WHERE series_id=? AND total_net_assets IS NULL
+                RETURNING series_id
                 """,
                 [new_tna, new_source, now, r["series_id"]],
-            )
-            b_changes_total += con.execute("SELECT changes()").fetchone()[0]
+            ).fetchall()
+            b_changes_total += len(b_returned)
 
         if b_changes_total != len(b_eligible):
             raise SystemExit(
@@ -635,11 +688,12 @@ def main() -> None:
                 f"[dry-run] Block B OK: {block_b_inv['total']} rows, "
                 f"{block_b_inv['null_tna']} NULL on total_net_assets"
             )
+            block_a_nav = derive_block_a_nav(con)
             block_b_manifest = derive_block_b_manifest(con)
         finally:
             con.close()
 
-        manifest = [build_block_a_entry(block_a_inv)] + block_b_manifest
+        manifest = [build_block_a_entry(block_a_inv, block_a_nav)] + block_b_manifest
         write_manifest_csv(manifest, MANIFEST_CSV)
         write_dryrun_doc(manifest, block_a_inv, block_b_inv, DRYRUN_DOC)
 
