@@ -667,12 +667,163 @@ def write_results_doc(pairs: list[AliasPair]) -> None:
 # ---------------------------------------------------------------------------
 
 
+def execute_op_h(con: duckdb.DuckDBPyConnection) -> dict:
+    """Op H — entity_rollup_history AT-side residual cleanup.
+
+    Op F (in execute_pair) closed FROM-side rows where entity_id=brand_eid.
+    Op H closes the parallel AT-side rows where rollup_entity_id=brand_eid
+    (i.e., other entities that were rolling up TO the deprecated brand) and
+    re-points them to the filer eid. Two branches per pair:
+
+      Branch 1 (general fund-tier re-point): for each open ERH row where
+        rollup_entity_id IN (brand_eids) AND NOT (entity_id=filer AND
+        rollup_entity_id=brand) — close + insert at filer with same
+        rule_applied/confidence/source/routing_confidence/review_due_date.
+
+      Branch 2 (filer self-rollup recreate): for each open ERH row where
+        entity_id=filer AND rollup_entity_id=brand — close + insert fresh
+        self-rollup (rollup_entity_id=filer, rule_applied='self',
+        confidence='exact', source='CP-4a-merge:inst-eid-bridge-fix-aliases',
+        routing_confidence='high', review_due_date=NULL).
+
+    Idempotent: a re-run after success finds zero matching rows and is
+    a no-op.
+
+    PK is (entity_id, rollup_type, valid_from, valid_to). Pre-flight
+    collision check (run separately) confirmed no fund_eid already has
+    an open row at the filer eid for either pair.
+    """
+    today = date.today()
+    stats: dict = {"branches": {}}
+
+    def _affected(cur) -> int:
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+
+    BRAND_TO_FILER = [(1, 4375), (30, 2322)]
+
+    for brand_eid, filer_eid in BRAND_TO_FILER:
+        per_pair: dict = {}
+
+        # Branch 1 — general AT-side re-point (excludes filer self-rollup case)
+        rows = con.execute(
+            """
+            SELECT entity_id, rollup_type, rule_applied, confidence,
+                   source, routing_confidence, review_due_date
+            FROM entity_rollup_history
+            WHERE rollup_entity_id = ? AND valid_to = ?
+              AND NOT (entity_id = ? AND rollup_entity_id = ?)
+            """,
+            [brand_eid, OPEN_DATE, filer_eid, brand_eid],
+        ).fetchall()
+        per_pair["branch_1_count"] = len(rows)
+
+        cur = con.execute(
+            """
+            UPDATE entity_rollup_history
+            SET valid_to = ?
+            WHERE rollup_entity_id = ? AND valid_to = ?
+              AND NOT (entity_id = ? AND rollup_entity_id = ?)
+            """,
+            [today, brand_eid, OPEN_DATE, filer_eid, brand_eid],
+        )
+        per_pair["branch_1_closed"] = _affected(cur)
+
+        for entity_id, rollup_type, rule_applied, confidence, source, routing_conf, review_due in rows:
+            con.execute(
+                """
+                INSERT INTO entity_rollup_history
+                    (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                     confidence, valid_from, valid_to, computed_at, source,
+                     routing_confidence, review_due_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+                """,
+                [entity_id, filer_eid, rollup_type, rule_applied, confidence,
+                 today, OPEN_DATE, source, routing_conf, review_due],
+            )
+        per_pair["branch_1_inserted"] = len(rows)
+
+        # Branch 2 — filer self-rollup recreate
+        filer_self = con.execute(
+            """
+            SELECT entity_id, rollup_type
+            FROM entity_rollup_history
+            WHERE entity_id = ? AND rollup_entity_id = ? AND valid_to = ?
+            """,
+            [filer_eid, brand_eid, OPEN_DATE],
+        ).fetchall()
+        per_pair["branch_2_count"] = len(filer_self)
+
+        cur = con.execute(
+            """
+            UPDATE entity_rollup_history
+            SET valid_to = ?
+            WHERE entity_id = ? AND rollup_entity_id = ? AND valid_to = ?
+            """,
+            [today, filer_eid, brand_eid, OPEN_DATE],
+        )
+        per_pair["branch_2_closed"] = _affected(cur)
+
+        for entity_id, rollup_type in filer_self:
+            con.execute(
+                """
+                INSERT INTO entity_rollup_history
+                    (entity_id, rollup_entity_id, rollup_type, rule_applied,
+                     confidence, valid_from, valid_to, computed_at, source,
+                     routing_confidence, review_due_date)
+                VALUES (?, ?, ?, 'self', 'exact', ?, ?, NOW(),
+                        'CP-4a-merge:inst-eid-bridge-fix-aliases', 'high', NULL)
+                """,
+                [entity_id, filer_eid, rollup_type, today, OPEN_DATE],
+            )
+        per_pair["branch_2_inserted"] = len(filer_self)
+
+        stats["branches"][f"{brand_eid}->{filer_eid}"] = per_pair
+
+    # Hard sanity checks
+    leftover = con.execute(
+        """
+        SELECT COUNT(*) FROM entity_rollup_history
+        WHERE rollup_entity_id IN (1, 30) AND valid_to = ?
+        """,
+        [OPEN_DATE],
+    ).fetchone()[0]
+    if leftover != 0:
+        raise RuntimeError(
+            f"Op H sanity-check failed: {leftover} ERH rows still rolling up to brand"
+        )
+    stats["leftover_at_brand"] = leftover
+
+    for filer_eid in (2322, 4375):
+        for rollup_type in ("economic_control_v1", "decision_maker_v1"):
+            row = con.execute(
+                """
+                SELECT rollup_entity_id FROM entity_rollup_history
+                WHERE entity_id = ? AND rollup_type = ? AND valid_to = ?
+                """,
+                [filer_eid, rollup_type, OPEN_DATE],
+            ).fetchone()
+            if row is None or int(row[0]) != filer_eid:
+                raise RuntimeError(
+                    f"Op H sanity-check failed: filer {filer_eid} {rollup_type} "
+                    f"self-rollup missing or wrong (got {row})"
+                )
+
+    return stats
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", default=str(DEFAULT_DB), help="Path to 13f.duckdb")
     grp = ap.add_mutually_exclusive_group(required=True)
     grp.add_argument("--dry-run", action="store_true", help="Read-only manifest + findings doc emit")
-    grp.add_argument("--confirm", action="store_true", help="Execute merges in a single transaction")
+    grp.add_argument("--confirm", action="store_true", help="Execute merges (Ops A-G) in a single transaction")
+    grp.add_argument(
+        "--op-h",
+        action="store_true",
+        help="Execute Op H — entity_rollup_history AT-side residual cleanup. "
+        "Idempotent against already-merged state. Single-transaction.",
+    )
     args = ap.parse_args()
 
     db_path = Path(args.db)
@@ -698,6 +849,27 @@ def main() -> int:
                 f"er_repoint={p.er_repoint_count} er_close={p.er_close_bridge_count} "
                 f"ech={p.ech_close_count} erh={p.erh_close_count} "
                 f"ea={p.ea_repoint_count}({p.ea_demote_count} demote)"
+            )
+        return 0
+
+    # --op-h path: AT-side entity_rollup_history residual cleanup.
+    if args.op_h:
+        con = duckdb.connect(str(db_path), read_only=False)
+        try:
+            con.execute("BEGIN")
+            try:
+                stats = execute_op_h(con)
+                con.execute("COMMIT")
+            except Exception:
+                con.execute("ROLLBACK")
+                raise
+        finally:
+            con.close()
+        print("[op-h] DONE — AT-side entity_rollup_history cleanup")
+        for pair_label, branches in stats["branches"].items():
+            print(
+                f"[op-h] {pair_label}: branch_1={branches['branch_1_inserted']} "
+                f"branch_2={branches['branch_2_inserted']}"
             )
         return 0
 

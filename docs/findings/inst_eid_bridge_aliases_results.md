@@ -143,6 +143,79 @@ rows, untouched) and `VANGUARD GROUP INC` (267,751 newly re-pointed
 rows, set to filer canonical_name per Op A). Either could be
 canonicalized later via a one-shot UPDATE; not in scope here.
 
+## Op H — entity_rollup_history AT-side residual cleanup (chat-authorized scope extension)
+
+After Phase 5 surfaced the AT-side residual (see "Out-of-scope discoveries"
+below for original framing), the user authorized **Option B** in chat:
+extend PR #256 scope rather than open a follow-up PR. Op H added in the
+same PR and run as a separate `--op-h` mode.
+
+### Op H scope
+
+For each pair, two branches:
+
+- **Branch 1 — general fund-tier AT-side re-point** (excludes filer
+  self-rollup case): for each open `entity_rollup_history` row where
+  `rollup_entity_id IN (1, 30) AND NOT (entity_id=filer AND
+  rollup_entity_id=brand)` — close (`valid_to=CURRENT_DATE`) and insert
+  a new row at filer with the same `rule_applied`, `confidence`,
+  `source`, `routing_confidence`, `review_due_date` (preserving
+  fund-side rollup attribution metadata).
+- **Branch 2 — filer self-rollup recreate**: for each open row where
+  `entity_id=filer AND rollup_entity_id=brand` — close and insert
+  fresh (`rollup_entity_id=filer`, `rule_applied='self'`,
+  `confidence='exact'`, `source='CP-4a-merge:inst-eid-bridge-fix-aliases'`,
+  `routing_confidence='high'`, `review_due_date=NULL`).
+
+PK is `(entity_id, rollup_type, valid_from, valid_to)`. Pre-flight
+collision check confirmed no fund_eid already had an open row at the
+filer eid for either pair, so the new rows insert cleanly.
+
+### Op H execution stats (single transaction, both pairs)
+
+| Pair | Branch 1 (close + insert) | Branch 2 (filer self-rollup recreate) | Total |
+|---|---:|---:|---:|
+| 1 → 4375 (Vanguard) | 114 (57 fund_eids × 2 rollup_types) | 0 | 114 |
+| 30 → 2322 (PIMCO) | 323 (162 fund_eids × 2 minus 1 absent rollup_type) | 2 (filer 2322 self-rollup) | 325 |
+| **Total** | **437** | **2** | **439** |
+
+Pre-image drift gate (5%): clean (114 + 325 matches the discovery
+count).
+
+### Op H sanity checks
+
+| check | result |
+|---|---|
+| `entity_rollup_history` rows with `rollup_entity_id IN (1, 30)` open | **0** ✓ |
+| filer 2322 `economic_control_v1` self-rollup | (2322, 2322, source=`CP-4a-merge:inst-eid-bridge-fix-aliases`) ✓ |
+| filer 2322 `decision_maker_v1` self-rollup | (2322, 2322, source=`CP-4a-merge:inst-eid-bridge-fix-aliases`) ✓ |
+| filer 4375 `economic_control_v1` self-rollup | (4375, 4375, source=`self`) — unchanged ✓ |
+| filer 4375 `decision_maker_v1` self-rollup | (4375, 4375, source=`self`) — unchanged ✓ |
+| `entity_current.rollup_entity_id` for eid=2322 | **2322** (was 30 pre-Op-H) ✓ |
+| `entity_current.rollup_entity_id` for eid=4375 | **4375** (unchanged) ✓ |
+| Spot-check fund eid=20322 (Vanguard intermediate-term bond): rollup_entity_id post-Op-H | **4375** ✓ |
+| `peer_rotation_flows` row count (Op H is ERH-only, should not affect peer_rotation) | 17,489,564 — unchanged ✓ |
+| `pytest tests/` post-Op-H | **373/373** in 54.57s ✓ |
+| `phase1b` helper post-Op-H: `invisible_brand_count` | 1,223 — unchanged from post-Phase-3 (Op H affects routing-layer only, does not affect invisible-brand calculation which keys off fund_holdings_v2 / holdings_v2) ✓ |
+
+### Op F vs Op H — distinction for CP-4b precedent
+
+Future merge work (CP-4b AUTHOR_NEW_BRIDGE, ~25 brands) will not need Op H
+in the same shape because it doesn't deprecate any brand_eid — it just
+inserts new `entity_relationships` rows. But the lesson generalizes:
+
+- **Op F (FROM-side)**: closes `entity_rollup_history` rows where
+  `entity_id = deprecated_eid`. Required when the brand IS the entity
+  whose rollup state needs invalidation.
+- **Op H (AT-side)**: closes + re-points rows where `rollup_entity_id =
+  deprecated_eid`. Required when OTHER entities were rolling up TO the
+  deprecated eid — the parallel rollup-history layer for the
+  `entity_relationships` edges that Op B re-pointed must be propagated
+  too, otherwise `entity_current.rollup_entity_id` stays stale.
+
+Both are needed for any future BRAND_TO_FILER merge. Codified as standard
+op shape in the `inst_eid_bridge_decisions.md` Op F clarification.
+
 ## Out-of-scope discoveries surfaced for chat decision
 
 Per ROADMAP discipline ("flag duplicate ROADMAP items; do not silently
@@ -150,31 +223,16 @@ create"), the following were noticed during validation and are
 **surfaced here for chat decision** rather than added to ROADMAP by
 this PR (except item B, which the user explicitly authorized):
 
-### A. `entity_rollup_history` AT-side residual — CP-4a scope gap
+### A. `entity_rollup_history` AT-side residual — RESOLVED via Op H (Option B authorized in chat)
 
-Op F as designed closed `entity_rollup_history` rows where
-`entity_id = brand_eid`. It did NOT close rows where
-`rollup_entity_id = brand_eid` (the AT-side / target-side). Post-merge
-counts:
-
-- 114 rows / 57 distinct fund_eids still rolling up TO `eid=1`
-  (`alias_match` source — these mirror the closed brand-side
-  fund_sponsor `entity_relationships` from Op B but were not propagated
-  to the parallel rollup_history layer).
-- 325 rows / 163 distinct entity_ids still rolling up TO `eid=30`
-  (`alias_match` source for ~162 fund_eids, plus filer 2322's own
-  self-rollup-to-30 `manual` row).
-- Filer eid=2322's `entity_current.rollup_entity_id` therefore
-  reads as **30** (deprecated brand) instead of **2322** (self).
-
-This is genuinely a CP-4a scope gap, not a separate workstream. The
-fix is mechanical: re-point `entity_rollup_history` rows where
-`rollup_entity_id IN (1, 30)` to the filer eid (close the open row
-+ insert a new open row at filer), and re-create filer 2322's
-self-rollup. Scope: ~3 SQL statement pairs across both rollup_types.
-**For chat decision:** ship a corrective Op H supplement before
-PR #256 merges, or open a follow-up PR
-`inst-eid-bridge-aliases-rollup-residual` (P2)?
+Phase 5 surfaced 114 rows / 57 fund_eids still rolling up TO `eid=1`
+plus 325 rows / 163 entity_ids still rolling up TO `eid=30` (incl
+filer 2322's own self-rollup-to-30). User authorized **Option B** —
+extend PR #256 scope rather than open a follow-up. **Op H added and
+executed in this PR.** See "Op H — entity_rollup_history AT-side
+residual cleanup" section above for execution stats and sanity
+checks. `entity_current.rollup_entity_id` for eid=2322 now correctly
+reads `2322` (self).
 
 ### B. `source-type-value-canonicalization` — new P3 entry (added in this commit per chat)
 

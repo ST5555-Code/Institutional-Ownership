@@ -103,6 +103,21 @@ CP-4a (BRAND_TO_FILER alias merges, 2 brands, S):
   re-pointed; AUM conservation Δ = $0.000000B per pair.
   See `docs/findings/inst_eid_bridge_aliases_results.md`.
 
+  **Op F clarification (added post-execution per chat 2026-05-02):**
+  Op F as originally specified closed `entity_rollup_history` rows
+  where `entity_id = brand_eid` (FROM-side). Phase 5 surfaced an
+  AT-side residual: rows where `rollup_entity_id = brand_eid` (other
+  entities rolling up TO the deprecated brand) were not closed,
+  leaving `entity_current.rollup_entity_id` stale for filer 2322
+  and 220 fund_eids. Resolved in the same PR via **Op H** —
+  general fund-tier AT-side re-point (close + insert at filer
+  preserving `rule_applied`/`confidence`/`source`) plus
+  filer-self-rollup recreate (`rule_applied='self'`,
+  `source='CP-4a-merge:inst-eid-bridge-fix-aliases'`). Standard
+  op shape for any future BRAND_TO_FILER merge: BOTH Op F
+  (FROM-side) AND Op H (AT-side) are required to fully invalidate
+  the brand_eid's rollup-history footprint.
+
 CP-4b (AUTHOR_NEW_BRIDGE, top-25 by AUM, M):
   86 TRUE_BRIDGE_ENCODED brands need no `entity_relationships`
   write, only CP-5 read traversal.
