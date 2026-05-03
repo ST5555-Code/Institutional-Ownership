@@ -72,7 +72,7 @@ sessions** (5 critical-path + 6 type-merge parallel + 3 cleanup).
 
 ## 2. Phase 1A — Institution-level current state
 
-Detail: `docs/findings/institution_scoping_partial_1a_5.md` (foreground) and
+Detail: `docs/findings/_archive/institution_scoping_partial_1a_5.md` (foreground) and
 `docs/findings/institution_scoping_phase_1A_5.md` (background, parallel run).
 
 ### 2.1 Distribution audit (holdings_v2, is_latest=TRUE)
@@ -160,7 +160,7 @@ shape.
 
 ## 3. Phase 1B — Fund-to-institution rollup completeness
 
-Detail: `docs/findings/institution_scoping_partial_1b_1.5.md` (foreground)
+Detail: `docs/findings/_archive/institution_scoping_partial_1b_1.5.md` (foreground)
 and `docs/findings/institution_scoping_phase_1B_15.md` (background).
 
 Baseline: `fund_holdings_v2 is_latest=TRUE` = 14,565,870 rows / $161.59T.
@@ -303,7 +303,7 @@ PR.
 
 ## 5. Phase 2 — Type-merge decisions audit
 
-Detail: `docs/findings/institution_scoping_partial_2_3.md`.
+Detail: `docs/findings/_archive/institution_scoping_partial_2_3.md`.
 
 ### 5.1 PE + VC merge
 
@@ -444,7 +444,7 @@ entity_ids, different classification values).
 
 ## 7. Phase 4 — query4 silent-drop bug
 
-Detail: `docs/findings/institution_scoping_partial_4_6.md`.
+Detail: `docs/findings/_archive/institution_scoping_partial_4_6.md`.
 
 ### 7.1 Confirmed location
 
@@ -594,7 +594,7 @@ Migration complexity: **MEDIUM**. Small data footprint (20 CIKs / $297B),
 
 ## 9. Phase 6 — Admin Refresh System dependency map
 
-Detail: `docs/findings/institution_scoping_partial_4_6.md` §Phase 6.
+Detail: `docs/findings/_archive/institution_scoping_partial_4_6.md` §Phase 6.
 
 13 dependencies extracted from `docs/admin_refresh_system_design.md`
 (990 lines). 13 gaps identified. **3 BLOCKERS** (G1, G2, G4):
@@ -799,12 +799,12 @@ ls scripts/oneoff/institution_scoping_*.py
 ## 14. Cross-references
 
 Phase partials (each agent's full data tables + samples):
-- `docs/findings/institution_scoping_partial_1a_5.md` — Phase 1A + 5 (foreground agent)
+- `docs/findings/_archive/institution_scoping_partial_1a_5.md` — Phase 1A + 5 (foreground agent)
 - `docs/findings/institution_scoping_phase_1A_5.md` — Phase 1A + 5 (parallel background agent — duplicate run, retained for triangulation)
-- `docs/findings/institution_scoping_partial_1b_1.5.md` — Phase 1B + 1.5 (foreground agent)
+- `docs/findings/_archive/institution_scoping_partial_1b_1.5.md` — Phase 1B + 1.5 (foreground agent)
 - `docs/findings/institution_scoping_phase_1B_15.md` — Phase 1B + 1.5 (parallel background agent — duplicate run)
-- `docs/findings/institution_scoping_partial_2_3.md` — Phase 2 + 3
-- `docs/findings/institution_scoping_partial_4_6.md` — Phase 4 + 6
+- `docs/findings/_archive/institution_scoping_partial_2_3.md` — Phase 2 + 3
+- `docs/findings/_archive/institution_scoping_partial_4_6.md` — Phase 4 + 6
 
 ROADMAP item: `parent-level-display-canonical-reads` (P2, surfaced
 2026-05-01 PR-1d follow-up). This investigation produces the manifest +
