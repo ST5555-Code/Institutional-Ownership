@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import db  # noqa: E402
+from queries.common import classify_fund_strategy  # noqa: E402
 
 # ---- logging
 LOG_DIR = ROOT / "logs"
@@ -237,17 +238,15 @@ def step2_create_manager_entities(con, seed_map):
 # Step 2.6 — Create fund entities (one per fund_universe.series_id)
 # =============================================================================
 def step2_create_fund_entities(con):
-    # Active flag is derived from canonical fund_strategy (PR-3 dropped the
-    # standalone is_actively_managed column). Keep this ACTIVE list in sync
-    # with scripts/queries/common.ACTIVE_FUND_STRATEGIES.
+    # Fund classification ('active'/'passive'/'unknown') is derived from the
+    # canonical fund_universe.fund_strategy via classify_fund_strategy() in
+    # scripts/queries/common.py — the single source of truth for the
+    # fund-side mapping shared with reader paths
+    # (queries.entities.get_entity_by_id, search_entity_parents). Per D4
+    # precedence (docs/decisions/d4-classification-precedence.md), fund-typed
+    # entities do not carry ECH rows — readers resolve from fund_universe.
     rows = con.execute(
-        """SELECT series_id, fund_name, family_name,
-                  CASE WHEN fund_strategy IN ('active','balanced','multi_asset')
-                       THEN TRUE
-                       WHEN fund_strategy IS NULL
-                       THEN NULL
-                       ELSE FALSE
-                  END AS is_active
+        """SELECT series_id, fund_name, family_name, fund_strategy
            FROM fund_universe
            WHERE series_id IS NOT NULL"""
     ).fetchall()
@@ -256,7 +255,7 @@ def step2_create_fund_entities(con):
     fund_entity_rows = []
     con.execute("BEGIN TRANSACTION")
     try:
-        for series_id, fname, _family, active in rows:
+        for series_id, fname, _family, fund_strategy in rows:
             eid = next_entity_id(con)
             con.execute(
                 """INSERT INTO entities
@@ -265,7 +264,10 @@ def step2_create_fund_entities(con):
                 [eid, fname or series_id],
             )
             series_to_entity[series_id] = eid
-            fund_entity_rows.append((eid, series_id, fname, _family, active))
+            classification = classify_fund_strategy(fund_strategy)
+            fund_entity_rows.append(
+                (eid, series_id, fname, _family, classification)
+            )
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")

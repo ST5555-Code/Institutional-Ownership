@@ -1,6 +1,33 @@
 """Entity graph queries (parents, filers, funds, sub-advisers, edges)."""
 
+from queries.common import classify_fund_strategy
 
+
+def _resolve_fund_classification(entity_id, con):
+    """Resolve a fund-typed entity's classification from fund_universe.
+
+    Joins entity_identifiers (series_id, valid_to=open) → fund_universe
+    and runs classify_fund_strategy on the result. Returns 'unknown' for
+    every gap-state (no series_id, no fund_universe row, NULL strategy).
+    Per D4 precedence (docs/decisions/d4-classification-precedence.md),
+    fund-typed entities do not carry ECH rows — this is the canonical
+    read path.
+    """
+    row = con.execute(
+        """
+        SELECT fu.fund_strategy
+        FROM entity_identifiers ei
+        JOIN fund_universe fu ON fu.series_id = ei.identifier_value
+        WHERE ei.entity_id = ?
+          AND ei.identifier_type = 'series_id'
+          AND ei.valid_to = DATE '9999-12-31'
+        LIMIT 1
+        """,
+        [int(entity_id)],
+    ).fetchone()
+    if row is None:
+        return 'unknown'
+    return classify_fund_strategy(row[0])
 
 
 def search_entity_parents(q, con):
@@ -8,6 +35,10 @@ def search_entity_parents(q, con):
 
     Returns entities where entity_id = rollup_entity_id (self-rollup = canonical
     parent). The caller is responsible for ensuring `q` is at least 2 chars.
+
+    Fund-typed results have classification resolved from
+    fund_universe.fund_strategy via classify_fund_strategy (D4 precedence:
+    fund-typed entities do not carry ECH).
     """
     like = '%' + q + '%'
     rows = con.execute("""
@@ -23,14 +54,24 @@ def search_entity_parents(q, con):
             'entity_id': r[0],
             'display_name': r[1],
             'entity_type': r[2],
-            'classification': r[3],
+            'classification': (
+                _resolve_fund_classification(r[0], con)
+                if r[2] == 'fund'
+                else r[3]
+            ),
         }
         for r in rows
     ]
 
 
 def get_entity_by_id(entity_id, con):
-    """Fetch a single entity's core row for node-resolve logic."""
+    """Fetch a single entity's core row for node-resolve logic.
+
+    Fund-typed entities have classification resolved from
+    fund_universe.fund_strategy via classify_fund_strategy (D4 precedence:
+    fund-typed entities do not carry ECH). All gap states (no series_id,
+    no fund_universe row, NULL fund_strategy) resolve to 'unknown'.
+    """
     row = con.execute("""
         SELECT entity_id, display_name, entity_type, classification, rollup_entity_id
         FROM entity_current
@@ -38,11 +79,16 @@ def get_entity_by_id(entity_id, con):
     """, [int(entity_id)]).fetchone()
     if not row:
         return None
+    classification = (
+        _resolve_fund_classification(row[0], con)
+        if row[2] == 'fund'
+        else row[3]
+    )
     return {
         'entity_id': row[0],
         'display_name': row[1],
         'entity_type': row[2],
-        'classification': row[3],
+        'classification': classification,
         'rollup_entity_id': row[4],
     }
 
