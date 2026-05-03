@@ -1,0 +1,134 @@
+entity_id,canonical_name,current_classification,new_classification,derived_via,source_string,confidence,signal_C_matched_keyword,signal_D_value,institution_aum_usd,fund_rollup_aum_usd
+1143,Global Media & Entertainment Investments Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,0.0
+2463,TOCQUEVILLE TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,0.0
+5835,RPD Opportunity Fund LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,0.0
+6604,Malta Opportunity Fund LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,0.0
+7206,Desjardins Trust Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust Inc),,0.0,0.0
+8021,1922 Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,0.0
+8778,State Farm Insurance Companies Employee Retirement Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,0.0
+10249,Westwood Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,0.0
+18157,Segall Bryant and Hamill LLC,unknown,active,adv_strategy,wave1_adv_strategy,exact,active,,0.0,13247313449.990004
+19962,Twin Oak ETF Company,unknown,passive,name_pattern_passive,wave1_name_pattern_passive,high,ETF,,0.0,241453326.32000008
+20103,Oriental Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1498672111.6799998
+26615,John Hancock Investors Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,430460733.4400007
+26616,John Hancock Income Securities Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,471787694.90999943
+26622,Gabelli Equity Trust Inc,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust Inc),,0.0,4168732527.810001
+26625,"ROYCE SMALL-CAP TRUST, INC.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,"Trust (Trust, Inc.)",,0.0,2164992671.6300006
+26628,MFS MULTIMARKET INCOME TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,738699908.8200012
+26633,High Income Securities Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Income,,0.0,263662384.19
+26634,MFS GOVERNMENT MARKETS INCOME TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,210057512.08000004
+26641,SPROTT FOCUS TRUST INC.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust Inc),,0.0,568184968.4100001
+26643,MFS INTERMEDIATE INCOME TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,612418129.1799997
+26644,Putnam Premier Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,884123518.3700004
+26648,Putnam Master Intermediate Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,400126087.1399996
+26650,"BlackRock Income Trust, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,736035479.31
+26652,Franklin Universal Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,564886969.4799999
+26661,Invesco High Income Trust II,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,101367479.78999996
+26665,MFS CHARTER INCOME TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,745641024.9999989
+26676,"BlackRock MuniYield Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,1798018697.470001
+26680,Flaherty & Crumrine Preferred and Income Opportunity Fund Incorporated,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,428871612.8699998
+26681,"BlackRock MuniYield New York Quality Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,1411948820.7299988
+26684,"BlackRock MuniYield Quality Fund III, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,2692484842.219997
+26693,"BlackRock MuniYield Quality Fund II, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,836760943.8000001
+26695,"BlackRock MuniYield Quality Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,3038482976.039999
+26696,"BlackRock MuniYield Michigan Quality Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,1175736854.1
+26697,BlackRock MuniYield Pennsylvania Quality Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,MuniYield,,0.0,521820072.81000024
+26716,Western Asset High Income Opportunity Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Income,,0.0,380455973.15999985
+26717,"ROYCE MICRO-CAP TRUST, INC.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,"Trust (Trust, Inc.)",,0.0,651359832.0599998
+26723,Gabelli Multimedia Trust Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust Inc),,0.0,433936003.58
+26731,BNY Mellon High Yield Strategies Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,547340136.5100001
+26733,BEXIL INVESTMENT TRUST,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,651949216.67
+26734,Invesco Senior Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,1697625062.2199988
+26735,CREDIT SUISSE HIGH YIELD CREDIT FUND,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,634864008.2399999
+26737,Eaton Vance Senior Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,324816696.4199998
+26744,Gabelli Utility Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,649764759.3999999
+26751,BlackRock Core Bond Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1433859265.1399982
+26769,Skybridge Opportunity Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,2918766506.9899993
+26773,PIMCO Corporate & Income Opportunity Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,5188638462.329995
+26783,"BlackRock Corporate High Yield Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,1994220515.7499993
+26795,Franklin Limited Duration Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,389385929.9400003
+26796,BlackRock Ltd Duration Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,545710625.5500007
+26800,Eaton Vance Senior Floating-Rate Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1085257719.1099997
+26820,Gabelli Global Utility & Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,269685667.44000006
+26821,VOYA GLOBAL EQUITY DIVIDEND & PREMIUM OPPORTUNITY FUND,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,969837920.2299995
+26823,BlackRock Floating Rate Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,434109001.37
+26826,Eaton Vance Floating-Rate Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,1052071729.2900004
+26836,"GAMCO Global Gold, Natural Resources & Income Trust",unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,1803097886.7199984
+26837,BlackRock Health Sciences Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,570446275.5899999
+26841,BlackRock Enhanced Global Dividend Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,717745115.6
+26846,BlackRock Enhanced Equity Dividend Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1726568249.49
+26847,VOYA GLOBAL ADVANTAGE & PREMIUM OPPORTUNITY FUND,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,159545110.54999992
+26857,BlackRock Credit Allocation Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,1200288924.749997
+26863,ALLSPRING GLOBAL DIVIDEND OPPORTUNITY FUND,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,660752538.2000002
+26867,Gabelli Healthcare & WellnessRx Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,431975202.46
+26868,BlackRock Enhanced International Dividend Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,568124234.7900002
+26874,"GAMCO Natural Resources, Gold & Income Trust",unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,315111652.6400005
+26879,Western Asset Global Corporate Opportunity Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,264521011.82
+26882,Western Asset Mortgage Opportunity Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,132176266.57000002
+26886,Neuberger High Yield Strategies Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,660531070.3700004
+26893,Western Asset High Yield Opportunity Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,303589953.36999995
+26901,BlackRock Resources & Commodities Strategy Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,882511375.49
+26904,"ROYCE GLOBAL TRUST, INC.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,"Trust (Trust, Inc.)",,0.0,100103521.16
+26908,ClearBridge Energy Midstream Opportunity Fund Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,2764419301.829999
+26911,Barings Global Short Duration High Yield Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,859526942.38
+26917,"BlackRock Utilities, Infrastructure & Power Opportunities Trust",unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,589027132.7899997
+26918,"PGIM High Yield Bond Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,942206901.1299996
+26924,"PGIM Global High Yield Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,1281023891.109998
+26932,BlackRock Multi-Sector Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,783769959.7899991
+26941,Gabelli Global Small & Mid Cap Value Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,336496458.98000014
+26948,iDirect Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,2409020334.299999
+26956,BlackRock Science & Technology Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,2998133659.689998
+26966,NB Crossroads Private Markets Fund IV (TE) - Client LLC,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,206591461.4944852
+26967,NB Crossroads Private Markets Fund IV Holdings LLC,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,609277453.0268261
+26968,NB Crossroads Private Markets Fund IV (TI) - Client LLC,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,399663859.85340947
+26977,NB Crossroads Private Markets Fund V (TE) LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,208599748.98
+26978,NB Crossroads Private Markets Fund V Holdings LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,722621568.204026
+26979,XAI Octagon Floating Rate & Alternative Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,1400253409.9700005
+26985,NB Crossroads Private Markets Fund V (TI) LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,414279930.4222
+26986,NB Crossroads Private Markets Fund V (TE) Advisory LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,51340911.64
+26988,NB Crossroads Private Markets Fund V (TI) Advisory LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,30471797.89276
+26990,Calamos Long/Short Equity & Dynamic Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,370139771.67999953
+26993,"Tax-Exempt Private Credit Fund, Inc.",unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,59504678.05
+26994,Flat Rock Opportunity Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,923601002.76
+26998,FLOWSTONE OPPORTUNITY FUND,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,695710049.707216
+27001,NB Crossroads Private Markets Fund VI LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,684426059.2499001
+27002,NB Crossroads Private Markets Fund VI Advisory LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,134138901.26
+27003,John Hancock GA Senior Loan Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,2367451814.360001
+27004,John Hancock GA Mortgage Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,5080206940.639999
+27005,NB Crossroads Private Markets Fund VI Holdings LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,814134917.1775895
+27006,Angel Oak Financial Strategies Income Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1089230501.2300005
+27019,BlackRock Science and Technology Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1728830341.39
+27028,BlackRock Health Sciences Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1075875518.08
+27035,Franklin BSP Private Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,435038440.8600001
+27038,KKR Real Estate Select Trust Inc.,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust Inc),,0.0,2785208533.8999987
+27041,BlackRock Capital Allocation Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1736767517.7900016
+27043,First Trust High Yield Opportunities 2027 Term Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,2115639898.6699984
+27046,PGIM Short Duration High Yield Opportunities Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Yield,,0.0,862444580.17
+27051,NB Private Markets Access Fund LLC,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,4017945244.27291
+27054,Thornburg Income Builder Opportunities Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,690519568.4599999
+27063,BlackRock Technology and Private Equity Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,920051635.7299995
+27086,NB Crossroads Private Markets Fund VII LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,770301004.4079
+27087,NB Crossroads Private Markets Fund VII Holdings LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,828919154.4201688
+27092,FS MVP Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,1933885067.25
+27095,Invesco Dynamic Credit Opportunity Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,588823767.21
+27100,BlackRock ESG Capital Allocation Term Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Trust (Trust),,0.0,1713353376.5299978
+27116,NB Crossroads Private Markets Fund VII Advisory LP,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,90146508.69846
+27117,Bluerock High Income Institutional Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,High Income,,0.0,207760485.0000001
+27130,First Trust Private Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,787704066.7399997
+27136,JPMorgan Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,3067661015.9200015
+27140,Felicitas Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,242810207.49999997
+27150,Apollo S3 Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,410072046.41
+27155,Manulife Private Credit Plus Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,422614168.66
+27160,Eagle Point Enhanced Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,219811181.10000017
+27178,Franklin Lexington Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,4854609161.410001
+27182,Eagle Point Defensive Income Trust,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Income Trust,,0.0,324592342.4300002
+27186,Principal Private Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,119692778.65000004
+27192,Sardis Credit Opportunity Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Opportunity Fund,,0.0,17807973.479999993
+27194,First Trust Enhanced Private Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,117533545.58
+27213,Coller Private Credit Secondaries,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,444203252.34
+27227,iDirect Private Credit Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,558833905.03
+27244,Carlyle AlpInvest Private Markets Secondaries Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,613723591.0300001
+27245,StepStone Private Credit Co-Investment Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Credit,,0.0,198788643.7799999
+27247,TPG Private Markets Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,176905786.95000002
+27248,Morgan Stanley Private Markets & Alternative Fund,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Markets,,0.0,1059610724.2799996
+27258,EP Private Capital Fund I,unknown,active,name_pattern_active,wave1_name_pattern_active,high,Private Capital,,0.0,139877537.71078897
