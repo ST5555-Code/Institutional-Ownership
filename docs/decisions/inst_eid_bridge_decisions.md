@@ -118,12 +118,64 @@ CP-4a (BRAND_TO_FILER alias merges, 2 brands, S):
   (FROM-side) AND Op H (AT-side) are required to fully invalidate
   the brand_eid's rollup-history footprint.
 
-CP-4b (AUTHOR_NEW_BRIDGE, top-25 by AUM, M):
-  86 TRUE_BRIDGE_ENCODED brands need no `entity_relationships`
-  write, only CP-5 read traversal.
-  ~25 hv2-counterparty-discoverable AUTHOR_NEW_BRIDGE writes via
-  staging→sync→promote per `staging_workflow_live.md`.
-  Pre-cycle eligible.
+CP-4b (AUTHOR_NEW_BRIDGE, originally top-25 by AUM, split into 3 sub-PRs per chat 2026-05-02):
+  86 (now 191 per current-state requery) TRUE_BRIDGE_ENCODED brands
+  need no `entity_relationships` write, only CP-5 read traversal.
+
+  **Path-B split per chat 2026-05-02.** Phase 0 of the original
+  CP-4b prompt surfaced two contradictions: (1) the Phase 0.3
+  filter (`counterparty NOT in hv2`) selects a different cohort
+  than the spec's cited examples — the §4.3 list (Wellington
+  9935→11220, Dimensional 7→5026, Franklin 28→4805, T. Rowe Price
+  13→4627, etc.) is exactly the TRUE_BRIDGE_ENCODED cohort that
+  needs no writes; (2) investigation numbers have drifted post-
+  CP-4a — invisible brands 1,225 → 1,337; brands with ≥1 hv2-
+  counterparty rel 86 → 191; unbridged AUM ~$26.0T → $24.6T. Per-
+  brand discovery for the unbridged-cohort brands needs ADV cross-
+  ref + parent-corp lookup that the original prompt did not supply.
+  Resolution:
+
+  - **CP-4b-blackrock** (S, pre-cycle): 5 mechanically-discoverable
+    BlackRock sub-brand `wholly_owned` bridges to filer eid=3241
+    via direct prod write (single transaction). Pairings come
+    direct from investigation §7.3 with the eid=2 fund_sponsor
+    pre-existing-bridge note layered in. **Shipped 2026-05-02**
+    ([#258](https://github.com/ST5555-Code/Institutional-Ownership/pull/258)).
+    5 new entity_relationships rows (relationship_id 20815–20819);
+    $2,540.70B fund AUM bridged; TRUE_BRIDGE_ENCODED 191 → 196 (Δ
+    +5, not +6 — eid=2 pre-existing per CP-4a discovery); Total
+    BlackRock bridges to 3241 = 6 (5 new + 1 pre-existing).
+    `peer_rotation_flows` Δ 0 (BRIDGE preserves brand-side
+    attribution). pytest 373/373; npm build clean. See
+    `docs/findings/inst_eid_bridge_blackrock_5_way_results.md`.
+
+  - **CP-4b-discovery** (S, pre-cycle, read-only): per-brand filer
+    pairings for top-20 AUTHOR_NEW_BRIDGE candidates by AUM,
+    derived from `adv_managers` ADV cross-ref + parent-corp lookup.
+    Confidence-tiered manifest. **Pending — separate session.**
+    Manifest must derive from current state (direct query against
+    `entity_relationships` + `holdings_v2`), not from
+    `data/working/inst_eid_bridge/eid_inventory.csv` snapshots
+    (single-rel-per-brand structure undercounts existing bridges).
+
+  - **CP-4b-author-top20** (M, pre-cycle, execution): apply
+    CP-4b-discovery manifest pairings as new entity_relationships
+    rows. **Pending — depends on CP-4b-discovery.**
+
+  Same shape as PR #249 (cef-scoping) → PR #251 (cef-asa-flip-and-
+  relabel) precedent.
+
+  **Staging-workflow note (added 2026-05-02 per CP-4b-blackrock
+  results):** `docs/staging_workflow_live.md` does not exist as
+  a file. CP-4a (PR #256) and CP-4b-blackrock (PR #258) both wrote
+  direct to prod `entity_relationships` in single transactions.
+  The `entity_relationships_staging` table has a different schema
+  (id auto-seq, owner_name, ownership_pct, conflict_reason,
+  review_status default 'pending', reviewer, reviewed_at,
+  resolution) — it is a human-review queue, not a parallel write
+  twin. Direct-prod-write is the live precedent for entity-layer
+  oneoff PRs until a staging twin is built as its own
+  architectural workstream.
 
 CP-4c (AUTHOR_NEW_BRIDGE, next-75 of top-100, M):
   Manual pairing list + `adv_managers` cross-ref.
@@ -131,8 +183,8 @@ CP-4c (AUTHOR_NEW_BRIDGE, next-75 of top-100, M):
   to surface any new fund-tier rollup targets.
 
 CP-5 (`parent-level-display-canonical-reads`):
-  Depends on CP-4a + CP-4b minimum (~$24T of $27.8T bridged).
-  CP-4c parallelizable.
+  Depends on CP-4a + CP-4b-blackrock + CP-4b-author-top20 minimum
+  (~$24T of $27.8T bridged). CP-4c parallelizable.
 
 CP-2 (`ingestion-manifest-reconcile`):
   No eid-layer dependency on CP-1 per investigation §8.2. Can
