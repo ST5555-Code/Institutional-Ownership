@@ -963,6 +963,27 @@ def api_admin_running():
 # ---------------------------------------------------------------------------
 
 
+def _validate_no_fund_reclassify_targets(con, entity_ids):
+    """Return entity_ids whose entity_type='fund'. Empty list means all
+    targets are reclassifiable via ECH.
+
+    Per D4 precedence (docs/decisions/d4-classification-precedence.md), fund
+    classification flows from fund_universe.fund_strategy at read time, not
+    from entity_classification_history. The /entity_override CSV reclassify
+    handler must reject fund-typed targets to keep the close-rows PR durable.
+    Refs: docs/findings/fund-typed-ech-audit.md §7.
+    """
+    if not entity_ids:
+        return []
+    placeholders = ','.join(['?'] * len(entity_ids))
+    rows = con.execute(
+        f"SELECT entity_id FROM entities "
+        f"WHERE entity_type = 'fund' AND entity_id IN ({placeholders})",
+        list(entity_ids),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 @admin_router.post('/entity_override')
 def api_admin_entity_override(request: Request, body: bytes = Body(default=b''), target: str = 'staging'):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     target = (target or 'staging').lower()
@@ -1039,6 +1060,22 @@ def api_admin_entity_override(request: Request, body: bytes = Body(default=b''),
                     continue
 
                 if action == 'reclassify':
+                    fund_targets = _validate_no_fund_reclassify_targets(
+                        con, [entity_id],
+                    )
+                    if fund_targets:
+                        return JSONResponse(
+                            status_code=400,
+                            content={
+                                'error': (
+                                    'fund-typed entities are classified via '
+                                    'fund_universe.fund_strategy, not '
+                                    'entity_classification_history'
+                                ),
+                                'fund_entity_ids': fund_targets,
+                                'row': row_num,
+                            },
+                        )
                     con.execute("BEGIN TRANSACTION")
                     try:
                         con.execute(
