@@ -46,6 +46,64 @@ Capital Management" anomaly (investigation §4.3) is the prototype
 of fuzzy-match failure. False-positive risk at $27T scale is
 unacceptable.
 
+### BLOCKER 2 — addendum (cp-4b-blocker2-corroboration-probe, 2026-05-03)
+
+The four-signal corroboration probe (X1 normalized name equality, X2
+entity_aliases cross-link, X3 CIK reuse, X4 N-CEN cross-link) was tested
+against the 19 LOW LOW residual cohort ($11.44T) from cp-4b-discovery.
+Result: 6 brands surfaced corroborating signals; 2 of 6 were false
+positives driven by suffix-stripping normalization collapsing unrelated
+sub-entities onto the same stem (Transamerica AM → Transamerica Financial
+Advisors LLC; PIMCO → unrelated "PACIFIC"-stem firms).
+
+BLOCKER 2 strict rule REMAINS in force. Multi-signal corroboration is
+NOT sufficient to author bridges at-scale.
+
+CARVE-OUT (4 manually-verified brands, split into 3 PRs per chat
+decision 2026-05-03):
+
+  - **cp-4b-author-first-trust** (this PR, [#TBD](https://github.com/ST5555-Code/Institutional-Ownership/pulls)):
+    brand eid 8 (First Trust) → filer eid 136 (FIRST TRUST ADVISORS LP)
+    via `wholly_owned` / `control`. $232.7B fund AUM bridged. BRIDGE
+    shape per PR #267 (cp-4b-author-trowe) precedent. `confidence='medium'`,
+    `source='CP-4b-author-first-trust|...|signals=X1+X2|public_record_verified=...'`.
+    Single INSERT into entity_relationships, no SCD closure, no
+    fund_holdings_v2 re-point, no recompute.
+
+  - **cp-4b-merge-fmr-ssga** (next): two-pair MERGE following PR #256
+    (CP-4a Vanguard/PIMCO) precedent. Re-points `fund_holdings_v2`
+    from brand eids 11 (Fidelity / FMR) and 3 (State Street / SSGA)
+    to filer eids 10443 (FMR LLC) and 7984 (State Street Corp)
+    respectively. Closes brand-side `entity_relationships`,
+    `entity_aliases` re-point with filer-side preferred-conflict
+    demotion, and runs both Op F (FROM-side `entity_rollup_history`
+    close) and Op H (AT-side `entity_rollup_history` re-point with
+    filer-self-rollup recreate). ~$717.2B combined.
+
+  - **Equitable IM** (brand eid 2562 → candidate eid 9526):
+    DEFERRED to `cp-4c-manual-sourcing`. Methodology there resolves
+    the public-parent-vs-operating-IA question correctly via 10-K
+    Item 1 subsidiary lists. Eid 9526 is Equitable Holdings Inc. —
+    the public parent — and may not be the correct operating-filer
+    counterparty under the operating-AM rollup policy.
+
+DEFER: the remaining 15 brands (Bucket C residual + Bucket D, ~$10.27T)
+to a manual-sourcing arc (`cp-4c-manual-sourcing`) using 10-K subsidiary
+schedules, ADV Schedule A/B parsing, or curated public-record mapping.
+Includes Equitable IM. The strict-ADV cross-ref methodology cannot
+author them without unacceptable false-positive risk at the $11T scale.
+
+Failure modes the probe exposed (do not propose for general adoption):
+
+  - X1 alone (any single-token stem) — collides on common business
+    namespace words.
+  - X4 sub-probe 4c (multi-adviser registrant) — pattern indicator,
+    no candidate filer; not a corroboration signal.
+  - 2-signal corroboration without manual verification — Transamerica
+    proves this fails on aggressive suffix-stripping.
+
+Cross-ref: [docs/findings/cp-4b-blocker2-corroboration-probe.md](../findings/cp-4b-blocker2-corroboration-probe.md).
+
 ## BLOCKER 3 — PIMCO 13F gap: split into two items
 
 Two distinct issues, two distinct treatments:

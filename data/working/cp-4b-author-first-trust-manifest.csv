@@ -1,0 +1,2 @@
+pair,parent_entity_id,child_entity_id,parent_canonical_name,child_canonical_name,relationship_type,control_type,source,confidence,fund_aum_billions,prepared_relationship_id
+1,136,8,FIRST TRUST ADVISORS LP,First Trust,wholly_owned,control,CP-4b-author-first-trust|pair=1|pairing_source=cp-4b-corroboration-probe-bucket-B|confidence=MEDIUM|signals=X1+X2|public_record_verified=cp-4b-blocker2-corroboration-probe.md_§7,medium,232.6826,20821
