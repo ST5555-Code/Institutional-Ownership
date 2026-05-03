@@ -322,6 +322,42 @@ def _fund_type_label(fund_strategy):
     return 'unknown'
 
 
+def classify_fund_strategy(strategy):
+    """Map fund_universe.fund_strategy to ECH-shape classification.
+
+    Returns one of: 'active', 'passive', 'unknown'.
+
+    Pure function. No DB access. Encodes the canonical fund-side
+    classification mapping derived from the historical
+    build_entities.step6 ECH writer (active = equity|balanced|multi_asset;
+    passive = bond_or_other|excluded|final_filing|passive; unknown if no
+    canonical strategy) and reconciled with the ACTIVE_FUND_STRATEGIES /
+    PASSIVE_FUND_STRATEGIES tuple constants above.
+
+    Used by queries.entities.get_entity_by_id and search_entity_parents to
+    surface fund classification when the entity is fund-typed (ECH does
+    not carry fund-typed rows per D4 decision —
+    docs/decisions/d4-classification-precedence.md). Also used by
+    build_entities.step2_create_fund_entities to derive the entity-write
+    classification field, replacing the prior inline mapping.
+
+    Raises ValueError on any non-canonical fund_strategy value to surface
+    upstream pipeline drift early. None / empty string are treated as
+    "no canonical strategy" → 'unknown'.
+    """
+    if strategy is None or strategy == '':
+        return 'unknown'
+    if strategy in ACTIVE_FUND_STRATEGIES:
+        return 'active'
+    if strategy in PASSIVE_FUND_STRATEGIES:
+        return 'passive'
+    raise ValueError(
+        f"classify_fund_strategy: non-canonical fund_strategy {strategy!r} "
+        f"(expected one of {ACTIVE_FUND_STRATEGIES + PASSIVE_FUND_STRATEGIES} "
+        f"or None)"
+    )
+
+
 def match_nport_family(inst_parent_name):
     """Return list of search patterns for N-PORT family_name matching."""
     if not inst_parent_name:
