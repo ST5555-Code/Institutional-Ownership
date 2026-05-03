@@ -410,6 +410,12 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     today = date.today()
     stats: dict = {}
 
+    # DuckDB UPDATE/INSERT/DELETE return a single-row result with the
+    # affected count in column 0 (no SQLite-style changes() function).
+    def _affected(cur) -> int:
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+
     # Op A — fund_holdings_v2 re-point
     cur = con.execute(
         """
@@ -422,10 +428,10 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [p.filer_eid, p.filer_eid, p.filer_canonical_name, p.brand_eid, p.brand_eid],
     )
-    stats["op_a_rows"] = cur.fetchall()[0][0] if cur.description else con.execute("SELECT changes()").fetchone()[0]
+    stats["op_a_rows"] = _affected(cur)
 
     # Op B — re-point parent fund_sponsor edges (excludes self-loop case)
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_relationships
         SET parent_entity_id = ?, last_refreshed_at = NOW()
@@ -435,7 +441,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [p.filer_eid, p.brand_eid, p.filer_eid, OPEN_DATE],
     )
-    stats["op_b_rows"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_b_rows"] = _affected(cur)
 
     # Op B' — capture subsumed-row metadata BEFORE closing, then close.
     # Type-agnostic match on (parent, child) tuple to handle both shapes:
@@ -463,7 +469,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     stats["subsumed_child"] = int(sub_child)
     stats["subsumed_source"] = sub_source
 
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_relationships
         SET valid_to = ?, last_refreshed_at = NOW()
@@ -471,10 +477,10 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [today, sub_rel_id],
     )
-    stats["op_b_prime_rows"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_b_prime_rows"] = _affected(cur)
 
     # Op C — close entity_classification_history
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_classification_history
         SET valid_to = ?
@@ -482,7 +488,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [today, p.brand_eid, OPEN_DATE],
     )
-    stats["op_c_rows"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_c_rows"] = _affected(cur)
 
     # Op E — insert audit row (parent_brand / merge). entity_relationships
     # has no `notes` column, so the subsumed-row reference is encoded into
@@ -511,7 +517,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     stats["op_e_source"] = audit_source
 
     # Op F — close entity_rollup_history
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_rollup_history
         SET valid_to = ?
@@ -519,7 +525,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [today, p.brand_eid, OPEN_DATE],
     )
-    stats["op_f_rows"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_f_rows"] = _affected(cur)
 
     # Op G — entity_aliases re-point with preferred-conflict demotion.
     # Pass 1: demote the FILER's existing preferred where the brand has an
@@ -527,7 +533,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
     # name is the canonical user-facing display (e.g. 'PIMCO' over 'PACIFIC
     # INVESTMENT MANAGEMENT CO LLC'), so the incoming preferred wins and the
     # filer's prior preferred is demoted. Confirmed in chat 2026-05-02.
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_aliases
         SET is_preferred = FALSE
@@ -539,10 +545,10 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [p.filer_eid, OPEN_DATE, p.brand_eid, OPEN_DATE],
     )
-    stats["op_g_demoted"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_g_demoted"] = _affected(cur)
 
     # Pass 2: re-point entity_id
-    con.execute(
+    cur = con.execute(
         """
         UPDATE entity_aliases
         SET entity_id = ?
@@ -550,7 +556,7 @@ def execute_pair(con: duckdb.DuckDBPyConnection, p: AliasPair) -> dict:
         """,
         [p.filer_eid, p.brand_eid, OPEN_DATE],
     )
-    stats["op_g_repointed"] = con.execute("SELECT changes()").fetchone()[0]
+    stats["op_g_repointed"] = _affected(cur)
 
     # Sanity checks
     leftover = con.execute(

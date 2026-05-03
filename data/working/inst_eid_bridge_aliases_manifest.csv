@@ -1,3 +1,3 @@
 brand_eid,brand_label,filer_eid,filer_canonical_name,entity_id_correction,fh_brand_rows,fh_brand_aum_usd,fh_filer_rows_pre,fh_filer_aum_pre_usd,fh_filer_aum_post_expected_usd,er_repoint_count,er_close_bridge_count,ech_close_count,erh_close_count,ea_repoint_count,ea_demote_count,audit_op_e_relationship_type,audit_op_e_control_type,audit_op_e_source
-1,Vanguard,4375,VANGUARD GROUP INC,1->4375,267751,2541531744497.15,569793,38729795980472.78,41271327724969.93,57,1,1,2,0,0,parent_brand,merge,CP-4a-merge:inst-eid-bridge-fix-aliases
-30,PIMCO,2322,PACIFIC INVESTMENT MANAGEMENT CO LLC,30->2322,289132,1717001111566.40,34561,327197856455.55,2044198968021.94,25,1,1,2,2,1,parent_brand,merge,CP-4a-merge:inst-eid-bridge-fix-aliases
+1,Vanguard,4375,VANGUARD GROUP INC,1->4375,267751,2541531744497.15,569793,38729795980472.84,41271327724969.99,57,1,1,2,0,0,parent_brand,merge,CP-4a-merge:inst-eid-bridge-fix-aliases
+30,PIMCO,2322,PACIFIC INVESTMENT MANAGEMENT CO LLC,30->2322,289132,1717001111566.39,34561,327197856455.55,2044198968021.94,25,1,1,2,2,1,parent_brand,merge,CP-4a-merge:inst-eid-bridge-fix-aliases

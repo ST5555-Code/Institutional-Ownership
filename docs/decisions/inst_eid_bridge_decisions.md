@@ -74,13 +74,34 @@ Two distinct issues, two distinct treatments:
 
 ## Sequencing post-decisions
 
-CP-4a (BRAND_TO_FILER alias merges, ~5 brands, S):
+CP-4a (BRAND_TO_FILER alias merges, 2 brands, S):
   Vanguard `eid=1` → `4375`
   PIMCO `eid=30` → `2322`
-  Plus 3 small alias-pairs surfaced during CP-4a Phase 1
-  re-validation.
-  Pattern: PR #251 ASA fix shape applied 5×.
+  ~~Plus 3 small alias-pairs surfaced during CP-4a Phase 1
+  re-validation.~~ Phase 1 discovery returned zero qualifying
+  candidates: only 4 `BRAND_HAS_NAME_MATCH` rows exist in
+  `data/working/inst_eid_bridge/eid_inventory.csv`, all
+  MEDIUM/LOW confidence with brand_name significantly
+  different from filer_name (Aperio/Ascent, Altaba/Alphabet,
+  Oaktree/Olstein, Robinson/Revelation) — exactly the
+  Calvert → "Stanley Capital Management" false-positive
+  prototype rejected by BLOCKER 2 above. Per prompt
+  instruction, no synthesis from lower-confidence tiers.
+  Pattern: PR #251 ASA fix shape, **adapted** — Phase 1
+  re-validation surfaced 5 schema corrections to the
+  original op shape (entities has no valid_to; OP A reduced
+  to (rollup_entity_id, dm_rollup_entity_id, dm_rollup_name)
+  scope; OP A WHERE uses OR on both rollup columns; OP B
+  re-points fund_sponsor edges rather than closing them;
+  OPs F + G added for entity_rollup_history close +
+  entity_aliases re-point with filer-side preferred-conflict
+  demotion). See `docs/findings/inst_eid_bridge_aliases_dryrun.md`.
   Pre-cycle eligible. Pre-flight: backup, app-off.
+  **Shipped 2026-05-02** ([#256](https://github.com/ST5555-Code/Institutional-Ownership/pull/256)).
+  Vanguard 267,751 rows / $2,541.53B + PIMCO 289,132 rows /
+  $1,717.00B = 556,883 fund_holdings_v2 rows / ~$4.26T
+  re-pointed; AUM conservation Δ = $0.000000B per pair.
+  See `docs/findings/inst_eid_bridge_aliases_results.md`.
 
 CP-4b (AUTHOR_NEW_BRIDGE, top-25 by AUM, M):
   86 TRUE_BRIDGE_ENCODED brands need no `entity_relationships`
