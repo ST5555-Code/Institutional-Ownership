@@ -656,7 +656,18 @@ def update_classification_from_sic(
     Update entity_classification_history if current classification is 'unknown'
     and SIC code maps to a known classification. SCD Type 2: closes old row,
     inserts new row. Returns True if updated.
+
+    Fund-typed entities are skipped: classification flows from
+    fund_universe.fund_strategy per D4 precedence
+    (docs/decisions/d4-classification-precedence.md).
     """
+    target_type = con.execute(
+        "SELECT entity_type FROM entities WHERE entity_id = ?",
+        [entity_id],
+    ).fetchone()
+    if target_type and target_type[0] == "fund":
+        return False
+
     new_cls = classify_from_sic(sic_code)
     if new_cls == "unknown":
         return False

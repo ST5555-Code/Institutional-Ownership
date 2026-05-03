@@ -585,6 +585,18 @@ def step6_populate_classifications(con, seeds, seed_map, manager_rows, fund_rows
         nonlocal added
         if entity_id in classified:
             return False
+        # D4 precedence: fund-typed entities get classification from
+        # fund_universe.fund_strategy at read time, not from ECH. This guard
+        # is the choke point that prevents any caller in step 6 from stamping
+        # a fund-typed ECH row even if upstream loops slip through.
+        # Refs: docs/findings/fund-typed-ech-audit.md §7,
+        #       docs/decisions/d4-classification-precedence.md.
+        et = con.execute(
+            "SELECT entity_type FROM entities WHERE entity_id = ?",
+            [entity_id],
+        ).fetchone()
+        if et and et[0] == 'fund':
+            return False
         try:
             con.execute(
                 """INSERT INTO entity_classification_history
@@ -616,26 +628,27 @@ def step6_populate_classifications(con, seeds, seed_map, manager_rows, fund_rows
                 continue
             _insert_cls(entity_id, strat or "unknown", activist, "fuzzy_match", "managers")
 
-        # Fund classifications
-        for (entity_id, _sid, _fn, _family, active) in fund_rows:
-            if entity_id in classified:
-                continue
-            if active is True:
-                cls = "active"
-            elif active is False:
-                cls = "passive"
-            else:
-                cls = "unknown"
-            _insert_cls(entity_id, cls, False, "exact", "fund_universe")
+        # Fund classifications: intentional no-op.
+        # Per D4 precedence (docs/decisions/d4-classification-precedence.md),
+        # fund classification is derived from fund_universe.fund_strategy at
+        # read time via classify_fund_strategy (queries/common.py). Stamping
+        # ECH for fund-typed entities is no longer the source of truth.
+        # The fund_rows iterator is preserved for future use but the body
+        # writes nothing. Existing fund-typed rows close in PR-C.
+        for _ in fund_rows:
+            pass
 
-        # Anything else (ncen-only advisers) → unknown
+        # Anything else (ncen-only advisers) → unknown.
+        # Funds are excluded: classification flows from fund_universe at
+        # read time, not from a default_unknown ECH row (D4 precedence).
         remaining = con.execute(
             """SELECT e.entity_id
                FROM entities e
                LEFT JOIN entity_classification_history ech
                  ON e.entity_id = ech.entity_id
                  AND ech.valid_to = DATE '9999-12-31'
-               WHERE ech.entity_id IS NULL"""
+               WHERE ech.entity_id IS NULL
+                 AND e.entity_type != 'fund'"""
         ).fetchall()
         for (eid,) in remaining:
             _insert_cls(eid, "unknown", False, "low", "default_unknown")
@@ -798,6 +811,19 @@ def replay_persistent_overrides(con):
 
         try:
             if action == "reclassify" and field == "classification":
+                # D4 precedence: refuse to stamp ECH for fund-typed targets.
+                target_type = con.execute(
+                    "SELECT entity_type FROM entities WHERE entity_id = ?",
+                    [entity_id],
+                ).fetchone()
+                if target_type and target_type[0] == 'fund':
+                    logger.warning(
+                        "[step 8] override %d: skipped reclassify on fund eid %d "
+                        "(fund classification flows from fund_universe.fund_strategy)",
+                        oid, entity_id,
+                    )
+                    skipped += 1
+                    continue
                 con.execute("""
                     UPDATE entity_classification_history SET valid_to = CURRENT_DATE
                     WHERE entity_id = ? AND valid_to = DATE '9999-12-31'

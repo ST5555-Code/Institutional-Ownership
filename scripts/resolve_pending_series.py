@@ -678,27 +678,12 @@ def wire_fund_entity(
                 [fund_eid, display_name, fund_eid],
             )
 
-        # Classification row
-        classification = "unknown"
-        if p.is_actively_managed is True:
-            classification = "active"
-        elif p.is_actively_managed is False:
-            classification = "passive"
-        existing_cls = con.execute(
-            """SELECT 1 FROM entity_classification_history
-               WHERE entity_id=? AND valid_to = DATE '9999-12-31'""",
-            [fund_eid],
-        ).fetchone()
-        if not existing_cls:
-            con.execute(
-                """INSERT INTO entity_classification_history
-                     (entity_id, classification, is_activist, confidence,
-                      source, is_inferred, valid_from, valid_to)
-                   VALUES (?, ?, FALSE, 'exact',
-                           'stg_nport_fund_universe', TRUE,
-                           DATE '2000-01-01', DATE '9999-12-31')""",
-                [fund_eid, classification],
-            )
+        # Classification row: intentionally omitted for fund-typed entities.
+        # Per D4 precedence (docs/decisions/d4-classification-precedence.md),
+        # fund classification is derived at read time from
+        # fund_universe.fund_strategy via classify_fund_strategy
+        # (queries/common.py), not stamped into entity_classification_history.
+        # Refs: docs/findings/fund-typed-ech-audit.md §7.
 
     # Relationship: fund_sponsor, primary, control
     inserted = insert_relationship_idempotent(

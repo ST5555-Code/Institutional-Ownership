@@ -55,7 +55,16 @@ SEC_RATE_LIMIT = 0.2  # 5 req/s = 200ms between requests
 
 
 def get_unresolved_ciks(con) -> list[tuple]:
-    """Return list of (cik, entity_id, canonical_name) for unresolved entities."""
+    """Return list of (cik, entity_id, canonical_name) for unresolved entities.
+
+    Fund-typed entities are excluded: fund classification flows from
+    fund_universe.fund_strategy at read time (D4 precedence,
+    docs/decisions/d4-classification-precedence.md). After PR-C closes
+    fund-typed open ECH rows, the INNER JOIN drops them naturally; this
+    explicit filter prevents fund eids from re-entering the long-tail worker
+    queue if any new fund-typed ECH rows ever leak in. Refs:
+    docs/findings/fund-typed-ech-audit.md §6 risk #4.
+    """
     return con.execute("""
         SELECT ei.identifier_value AS cik, e.entity_id, e.canonical_name
         FROM entity_identifiers ei
@@ -72,6 +81,7 @@ def get_unresolved_ciks(con) -> list[tuple]:
           AND erh.rule_applied = 'self'
           AND ech.classification = 'unknown'
           AND e.created_source != 'PARENT_SEEDS'
+          AND e.entity_type != 'fund'
         ORDER BY ei.identifier_value
     """).fetchall()
 
