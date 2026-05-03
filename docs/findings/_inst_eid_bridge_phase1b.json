@@ -1,15 +1,15 @@
 {
-  "brand_eid_count": 1707,
+  "brand_eid_count": 1705,
   "filer_eid_count": 9121,
-  "invisible_brand_count": 1225,
-  "invisible_brand_rows": 6929560,
-  "invisible_brand_aum_usd": 27797705080058.203,
+  "invisible_brand_count": 1223,
+  "invisible_brand_rows": 6661809,
+  "invisible_brand_aum_usd": 25256173335561.047,
   "name_collision_norm_name_count": 973,
-  "invisible_with_open_relationship": 498,
+  "invisible_with_open_relationship": 496,
   "name_match_summary": {
-    "brands_named": 1225,
+    "brands_named": 1223,
     "exact_norm_match_brand_count": 58,
-    "prefix_norm_match_brand_count": 77
+    "prefix_norm_match_brand_count": 76
   },
   "cik_match_summary": {
     "invisible_brands_with_any_cik": 791,
@@ -20,16 +20,16 @@
       "bridge_class": "BRAND_HAS_RELATIONSHIP",
       "recommended_action": "BRIDGE",
       "confidence": "HIGH",
-      "brand_count": 498,
-      "fund_aum_usd": 26852796437431.28,
-      "fund_rows": 4656280
+      "brand_count": 496,
+      "fund_aum_usd": 24311264692934.14,
+      "fund_rows": 4388529
     },
     {
       "bridge_class": "BRAND_ORPHAN",
       "recommended_action": "INVESTIGATE_FURTHER",
       "confidence": "LOW",
       "brand_count": 723,
-      "fund_aum_usd": 943276427460.6316,
+      "fund_aum_usd": 943276427460.632,
       "fund_rows": 2272913
     },
     {
