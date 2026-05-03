@@ -1,6 +1,65 @@
 # Chat Handover
 
+## conv-25 — institution-consolidation arc (2026-05-02)
+
+**HEAD on main:** b65363a
+
+**Today's arc:** 12 PRs landed (#247–#258) closing orphan/unknown remediation end-to-end and advancing institution-level critical path through CP-1 + CP-2 + CP-3 + CP-4a + CP-4b-blackrock. Plus 4 in-arc direct-to-main commits (7aa535c, c53337c, 6b31fe7, 4ee2b97) and 2 close-out commits (sync-audit 7f21574, sync-audit-resolution b65363a).
+
+**Critical-path state:** 4 of 5 PRs landed. invisible_brand_aum reduced from $27.80T to $22.72T at relationship layer; CP-5 is what makes the reduction visible at user-facing display. AUM conservation exact across PR #251 ($1.752B), PR #256 ($4.26T), PR #258 ($2.54T). pytest 373/373 throughout. End-of-day sync-audit confirmed 0 broken refs, 0 unpushed commits.
+
+**BLOCKER state:** 2 of 4 fully closed (G1 query4 fix, G4 ingestion_manifest schema). 1 partially closed (G14 cross-tier eid bridge — finishes with CP-4b-author-top20 + CP-5). 1 open pending D4 chat decision (G2 entity-classification pipeline precedence rule).
+
+**Op F + Op H pattern locked** for any future BRAND_TO_FILER merge: FROM-side closure (Op F on `entity_rollup_history` `WHERE entity_id=brand`) plus AT-side closure (Op H `WHERE rollup_entity_id=brand`). Captured in `docs/decisions/inst_eid_bridge_decisions.md`.
+
+### Three forward threads available — user will choose
+
+1. **Critical path next step:** `CP-4b-discovery`. Read-only investigation enumerating top-20 AUTHOR_NEW_BRIDGE candidates by AUM. Per-brand filer pairing via `adv_managers` ADV cross-ref + parent-corp lookup. Manifest deliverable with HIGH / MEDIUM / LOW confidence per pair. Must derive from current state, NOT `eid_inventory.csv` snapshot from PR #254 — numbers drifted (1,225 → 1,337 invisible brands at CP-4b execution time). Output: per-pair pairings for chat review, then `CP-4b-author-top20` execution PR follows. Pattern matches PR #249 (`cef-scoping`) → PR #251 (`cef-asa-flip-and-relabel`) precedent.
+2. **Major BLOCKER decision:** D4 from `institution_scoping.md` §9 G2. Precedence rule for institutions without an `entity_classification_history` row. ECH coverage 99.9% (10 of 9,121 uncovered). Design-blocked without chat decision: out-of-band classification pipeline vs in-pipeline backfill on first-write. Closes G2 — last open BLOCKER for Admin Refresh System launch.
+3. **Architectural P2 surfaced today:** `register-active-universe-consistency`. Register tab uses 4 different definitions of "active" across read sites (`register.py:1018` excludes activists; `register.py:472`, `1354`, `market.py:373/498` include them). Same tab, four predicates. Pre-requisite for activist-as-flag refactor and gates internal consistency in CP-5 read sweep.
+
+### Smaller deferred items (not urgent)
+
+- `pimco-13f-ingestion-gap` (P2) — PIMCO's $1.72T 13F invisibility persists post-CP-4a. Separate workstream from CP-4b/CP-5. CIK `0001163368` absent from `holdings_v2.cik` entirely.
+- `inst-eid-bridge-orphan-triage` (P3) — 723 BRAND_ORPHAN brands / $943B long tail. Defer unless triggering display gap surfaces post-CP-5.
+- `source-type-value-canonicalization` (P3) — `'NPORT'` vs `'nport_holdings'` inconsistency in `ingestion_manifest`. Affects `admin_bp.py:1346`.
+- `drop-multi-strategy-bucket` (P3) — 2 CIKs / $11.7B (Adams + Diversified Mgmt Inc), neither is multi-strategy. Reclassify Adams to `closed_end` pending `fund-structure-column` workstream.
+- `classification-join-utility-resolution` (P3) — utility at `scripts/queries_helpers.py:171` with zero callers. Decision rides on CP-5: adopt or delete.
+- `deprecated-fund-rollup-targets-cleanup` (P3) — 19 deprecated entities, $68.7B exposed. Bundled into CP-4 per `institution_scoping.md` §10.
+- `fund-structure-column` (P2) — orthogonal column on `fund_universe` (`open_end` / `closed_end` / `etf` / `bdc` / `interval`). Surfaced by PR #249 `cef-scoping`.
+- `repo-branch-hygiene` (P3) — 15 stale `claude/*` local + ~120 remote branches. Defer unless impeding workflow.
+- `v2-loader-is-latest-watchpoint` (P3) — fires after Q1 2026 cycle (~May 15). Run `audit_unknown_inventory.py`.
+- `retired-loader-residue-watchpoint` (P3) — same window, same audit, different signal.
+- Migration 008/015 join-key — surfaced PR #255 §A.5 as candidate P3, awaits chat decision on whether to fold into existing tracker or stand alone.
+
+### Process rules in force
+
+- Code is the executor; chat does planning + decisions + prompt generation.
+- Self-contained prompts — single paste per Code session.
+- Every prompt starts with `CODE PROMPT — <branch-slug>` on first line; chat marks `CODE SESSION OPEN — <branch-slug>` and `CODE SESSION CLOSED — <branch-slug>` boundaries.
+- Re-validation discipline: every write-path prompt includes Phase 1 re-validation confirming current state vs preconditions. ABORT on >5% drift.
+- Discovery-phase hard rule: Claude does not extrapolate or assume facts about repo state, schema, data shape, or prior PR contents. Every state claim comes from Code — investigation, dry-run, or direct read.
+- Recommendation discipline: internal expert challenge (performance, data integrity, architecture, ops/resilience) before delivering any technical recommendation. Final only; not the debate.
+- Code prompt hygiene: enumerate columns by category for write ops (no "copy all other columns"); specify worktree-relative absolute paths for Write tool calls.
+- Worktree merge hygiene: when worktree is alive while parent holds main, `gh pr merge --squash --delete-branch` fails on local cleanup. Code does manual `git pull` + remote branch delete up front.
+- Backup before destructive PRs: `backup_db.py` is run manually by user, never auto-run. Use `ulimit -n 65536` first to avoid macOS file descriptor limit.
+- App must be off (`lsof -ti:8001` empty) for write PRs and most read-only audits that touch prod DB.
+- Direct-to-main commit pattern for doc-only / decision-locking / sync-audit work — no PR.
+- `staging_workflow_live.md` does not exist as a file. Entity writes follow direct-prod-write precedent until a staging twin is built as its own workstream.
+- All remediation tracking in `ROADMAP.md` at repo root.
+
+### Cycle timing
+
+- Stage 5 DROP: on/after May 9.
+- Q1 2026 13F cycle: expected ~May 15.
+- Pre-cycle eligible: `CP-4b-discovery`, `CP-4b-author-top20`.
+- Post-cycle: CP-5 (per `institution_scoping.md` §11.3 — defer past Q1 to avoid scope creep during cycle).
+
+---
+
 ## conv-24-doc-sync (2026-05-01)
+
+> **Status: superseded by conv-25 (2026-05-02). Retained for historical reference. See conv-25 above for current state.**
 
 HEAD: **`f256e5e`** on `main` after the fund-level cleanup arc closed (PR #242 + branch-cleanup chore + PR #243). 11 PRs total in the consolidation+cleanup arc.
 

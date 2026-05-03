@@ -31,6 +31,11 @@
 4. **CEF holdings duplicate-ISIN rows are real.** ASA reports the same security in multiple `<invstOrSec>` elements at distinct `fairValLevel` values (e.g. 2025-02 `CA7660871004` Ridgeline Minerals appears 3× with $1,850,699 / $62,208 / $50,112). Verification anchor must rank-zip within (period, key) groups, not assume 1-to-1 match by (period, isin).
 5. **`parse_nport_xml` parser key is `val_usd`, not `value_usd`.** Carried over from `cef_asa_prep_investigation.md` finding (commit `79350a5`); reaffirmed when building this session's verification.
 6. **Pre-flight backup gate is timestamp-based.** A backup taken at 13:18 was stale relative to a DB modified at 13:41. Always check backup mtime > DB mtime AND covers latest commit before any --confirm.
+7. **DuckDB does not have SQLite's `SELECT changes()` function.** Use `cursor.fetchone()` pattern instead. Surfaced in CP-4a Phase 3.
+8. **`entity_relationships` has no `notes` column.** Use `source` field with structured suffix for audit trail (e.g., `'CP-X-author:branch-slug|subsumes:type/parent->child/source'`).
+9. **`entities` table is a flat registry — no `valid_to`.** SCD lives on satellite tables (`entity_identifiers`, `entity_relationships`, `entity_classification_history`, `entity_rollup_history`, `entity_aliases`) using `valid_to = DATE '9999-12-31'` sentinel, not `IS NULL`.
+10. **`pct_of_nav` is on percent scale (0–100), not fraction.** Use `market_value_usd * 100.0 / pct_of_nav` for NAV derivation.
+11. **macOS file descriptor limit (256) blocks `EXPORT DATABASE`** on the 12M-row schema. Run `ulimit -n 65536` before `backup_db.py`.
 
 ## Open follow-ups (already in ROADMAP)
 
