@@ -1,0 +1,61 @@
+top_parent_entity_id,top_parent_canonical_name,ticker,set_A_13F_aum_b,set_A_filers,set_B_fund_aum_b,set_B_funds,ratio_B_over_A,classification
+4375,Vanguard Group,AAPL,387.7495,7,704.546,54,1.817,fund_extends_13F
+4375,Vanguard Group,NEE,17.3432,7,31.3933,46,1.81,fund_extends_13F
+4375,Vanguard Group,AVDX,0.0,0,0.0,0,,neither
+10443,Fidelity / FMR,AAPL,83.569,6,296.2779,221,3.545,fund_extends_13F
+10443,Fidelity / FMR,NEE,2.5664,6,11.4796,116,4.473,fund_extends_13F
+10443,Fidelity / FMR,AVDX,0.0,0,0.0,0,,neither
+3241,"BlackRock, Inc.",AAPL,314.3866,35,20.9214,83,0.067,13F_dominant
+3241,"BlackRock, Inc.",NEE,14.1935,23,0.915,49,0.064,13F_dominant
+3241,"BlackRock, Inc.",AVDX,0.0,0,0.0,0,,neither
+7984,State Street / SSGA,AAPL,164.2188,1,55.1356,59,0.336,13F_dominant
+7984,State Street / SSGA,NEE,9.5198,1,7.4158,50,0.779,13F_dominant
+7984,State Street / SSGA,AVDX,0.0,0,0.0,0,,neither
+5026,Dimensional Fund Advisors,AAPL,15.6524,5,22.6757,39,1.449,fund_extends_13F
+5026,Dimensional Fund Advisors,NEE,0.3756,5,0.5209,20,1.387,fund_extends_13F
+5026,Dimensional Fund Advisors,AVDX,0.0,0,0.0,0,,neither
+2920,Morgan Stanley Investment Management,AAPL,62.6591,24,2.5876,47,0.041,13F_dominant
+2920,Morgan Stanley Investment Management,NEE,5.272,23,0.2018,36,0.038,13F_dominant
+2920,Morgan Stanley Investment Management,AVDX,0.0,0,0.0,0,,neither
+3616,T. Rowe Price,AAPL,0.0553,2,56.5634,66,1022.414,fund_extends_13F
+3616,T. Rowe Price,NEE,0.0015,3,1.3487,35,914.756,fund_extends_13F
+3616,T. Rowe Price,AVDX,0.0,0,0.0,0,,neither
+7859,"GEODE CAPITAL MANAGEMENT, LLC",AAPL,97.0316,2,0.1985,4,0.002,13F_dominant
+7859,"GEODE CAPITAL MANAGEMENT, LLC",NEE,3.7818,2,0.0006,1,0.0,13F_dominant
+7859,"GEODE CAPITAL MANAGEMENT, LLC",AVDX,0.0,0,0.0,0,,neither
+11220,Wellington Management,AAPL,21.0162,9,18.1094,18,0.862,13F_covers_fund
+11220,Wellington Management,NEE,0.3604,3,1.4367,6,3.987,fund_extends_13F
+11220,Wellington Management,AVDX,0.0,0,0.0,0,,neither
+10178,Ameriprise Financial,AAPL,12.3769,8,11.2065,51,0.905,13F_covers_fund
+10178,Ameriprise Financial,NEE,0.5934,7,0.615,15,1.036,13F_covers_fund
+10178,Ameriprise Financial,AVDX,0.0,0,0.0,0,,neither
+4435,Northern Trust,AAPL,43.6799,12,3.2387,24,0.074,13F_dominant
+4435,Northern Trust,NEE,1.7726,9,0.3109,18,0.175,13F_dominant
+4435,Northern Trust,AVDX,0.0,0,0.0,0,,neither
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,AAPL,27.1285,1,0.0,0,0.0,13F_only
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,NEE,1.3825,3,0.0,0,0.0,13F_only
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,AVDX,0.0,0,0.0,0,,neither
+4805,Franklin Templeton,AAPL,12.9158,19,2.6228,23,0.203,13F_dominant
+4805,Franklin Templeton,NEE,3.7151,14,0.052,17,0.014,13F_dominant
+4805,Franklin Templeton,AVDX,0.0,0,0.0,0,,neither
+15,Dodge & Cox,AAPL,0.0086,1,0.0,0,0.0,13F_only
+15,Dodge & Cox,NEE,0.0019,1,0.0,0,0.0,13F_only
+15,Dodge & Cox,AVDX,0.0,0,0.0,0,,neither
+7316,PRINCIPAL FINANCIAL GROUP INC,AAPL,5.7074,4,4.1304,22,0.724,13F_dominant
+7316,PRINCIPAL FINANCIAL GROUP INC,NEE,0.389,4,0.5161,16,1.327,fund_extends_13F
+7316,PRINCIPAL FINANCIAL GROUP INC,AVDX,0.0,0,0.0,0,,neither
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",AAPL,28.6719,13,0.1206,9,0.004,13F_dominant
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",NEE,1.0493,13,0.0211,8,0.02,13F_dominant
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",AVDX,0.0,0,0.0,0,,neither
+18762,AllianceBernstein Holding L.P.,AAPL,11.06,1,2.0103,53,0.182,13F_dominant
+18762,AllianceBernstein Holding L.P.,NEE,0.5097,1,0.1146,22,0.225,13F_dominant
+18762,AllianceBernstein Holding L.P.,AVDX,0.0,0,0.0,0,,neither
+136,First Trust Portfolios,AAPL,1.1726,1,1.4938,48,1.274,fund_extends_13F
+136,First Trust Portfolios,NEE,0.0817,1,0.3061,36,3.746,fund_extends_13F
+136,First Trust Portfolios,AVDX,0.0,0,0.0,0,,neither
+9130,VICTORY CAPITAL MANAGEMENT INC,AAPL,6.0502,1,7.7138,64,1.275,fund_extends_13F
+9130,VICTORY CAPITAL MANAGEMENT INC,NEE,0.075,1,0.1744,22,2.327,fund_extends_13F
+9130,VICTORY CAPITAL MANAGEMENT INC,AVDX,0.0,0,0.0,0,,neither
+8994,MANULIFE FINANCIAL CORP,AAPL,3.4119,1,4.8946,31,1.435,fund_extends_13F
+8994,MANULIFE FINANCIAL CORP,NEE,0.1421,1,0.1465,16,1.031,13F_covers_fund
+8994,MANULIFE FINANCIAL CORP,AVDX,0.0,0,0.0,0,,neither
