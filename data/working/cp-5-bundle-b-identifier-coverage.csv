@@ -1,0 +1,11 @@
+tier,n,cik_pct,crd_pct,lei_pct,figi_pct,series_pct
+T7_fund,13221,0.0,0.0,0.0,0.0,100.0
+T1+T3_top_active,6780,99.9,71.0,0.0,0.0,0.0
+T1+T5_top_brand,2961,87.3,26.7,0.0,0.0,0.0
+T1_top_low_filer,2142,100.0,54.2,0.0,0.0,0.0
+T1_top_quiet,1804,94.6,0.0,0.0,0.0,0.0
+T3_active_subsidiary,157,99.4,86.6,0.0,0.0,0.0
+T5_brand_subsidiary,123,69.9,82.9,0.0,0.0,0.0
+T2_mid,32,56.2,81.2,0.0,0.0,0.0
+subsidiary_low_filer,29,100.0,86.2,0.0,0.0,0.0
+T4_op_AM_or_quiet_sub,10,0.0,0.0,0.0,0.0,0.0
