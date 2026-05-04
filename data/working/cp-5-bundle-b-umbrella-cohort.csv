@@ -1,0 +1,24 @@
+family,entity_id,display_name,top_parent_entity_id,top_parent_name,is_self_top_parent,n_inst_children,h13f_rows,h13f_aum_b,alias_summary
+Capital Group,12,Capital Group / American Funds,12,Capital Group / American Funds,True,0,0,0.0,brand:1;filing:3
+Capital Group,6657,Capital World Investors,6657,Capital World Investors,True,0,2274,2772.49,brand:1
+Capital Group,7125,Capital Research Global Investors,7125,Capital Research Global Investors,True,0,1754,2034.06,brand:1
+Capital Group,7136,Capital International Investors,7136,Capital International Investors,True,0,1786,2346.46,brand:1
+Wellington Management,9935,Wellington Management Co LLP,9935,Wellington Management Co LLP,True,2,0,0.0,brand:1
+Wellington Management,11220,Wellington Management,11220,Wellington Management,True,0,22707,1693.08,brand:2
+Janus Henderson,51,Janus Henderson,51,Janus Henderson,True,0,0,0.0,brand:1;filing:2
+Janus Henderson,1399,JANUS HENDERSON GROUP PLC,1399,JANUS HENDERSON GROUP PLC,True,1,17562,828.81,brand:1
+Janus Henderson,9192,JANUS HENDERSON INVESTORS US LLC,9192,JANUS HENDERSON INVESTORS US LLC,True,0,0,0.0,brand:1
+Janus Henderson,11231,JANUS HENDERSON INVESTORS UK Ltd,1399,JANUS HENDERSON GROUP PLC,False,0,0,0.0,brand:1
+Invesco,4,Invesco,4,Invesco,True,0,0,0.0,brand:1;filing:1
+Invesco,569,Invesco Ltd.,569,Invesco Ltd.,True,0,97136,2402.84,brand:1
+Invesco,9297,"Invesco Advisers, Inc.",9297,"Invesco Advisers, Inc.",True,0,0,0.0,brand:1
+Federated Hermes,4635,"FEDERATED HERMES, INC.",4635,"FEDERATED HERMES, INC.",True,6,16289,215.96,brand:1
+Federated Hermes,18926,Federated Hermes (UK) LLP,18926,Federated Hermes (UK) LLP,True,0,0,0.0,brand:1
+AllianceBernstein,57,AllianceBernstein,57,AllianceBernstein,True,0,0,0.0,brand:1;filing:3
+AllianceBernstein,8497,ALLIANCEBERNSTEIN L.P.,18762,AllianceBernstein Holding L.P.,False,0,13000,1217.23,brand:1;legal_name:1
+AllianceBernstein,17917,AllianceBernstein L.P.,17917,AllianceBernstein L.P.,True,0,0,0.0,(none)
+AllianceBernstein,18762,AllianceBernstein Holding L.P.,18762,AllianceBernstein Holding L.P.,True,1,0,0.0,brand:1
+Eaton Vance,19,Eaton Vance,2920,Morgan Stanley Investment Management,False,0,0,0.0,brand:1;filing:1
+Eaton Vance,5282,Eaton Vance Trust Co,5282,Eaton Vance Trust Co,True,0,0,0.0,brand:1
+Eaton Vance,8459,EATON VANCE MANAGEMENT,8459,EATON VANCE MANAGEMENT,True,0,0,0.0,brand:1
+Eaton Vance,17940,Eaton Vance Management,2920,Morgan Stanley Investment Management,False,0,0,0.0,brand:1

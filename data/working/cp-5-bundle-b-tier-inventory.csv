@@ -1,0 +1,12 @@
+tier,label,n,aum_exposure_b
+T1,top parent (no inst parent),13687,
+T2,mid-level holding (has parent + children),32,
+T3,operating IA reporting (>=100 holdings_v2 rows),6947,238227.8
+T4,"operating IA non-reporting (0 holdings, fund-tier>0 as TP)",373,12176.1
+T5,"brand (alias_type='brand', 0 holdings_v2 rows)",3103,
+T6a,sub-adviser (distinct adviser_crd),429,
+T6b,sub-adviser resolved to entity (via crd),358,
+T7,fund series (entity_type='fund'),13221,
+T8,share class (not broken out — placeholder),0,
+T9a,holdings_v2 latest rows,12270984,
+T9b,fund_holdings_v2 latest rows,14565870,

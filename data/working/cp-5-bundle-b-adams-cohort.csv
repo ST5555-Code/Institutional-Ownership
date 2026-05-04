@@ -1,0 +1,15 @@
+entity_id,entity_type,display_name,cik,series_id,n_aliases,n_relationships,n_rows,aum_b,n_quarters
+2961,institution,"ADAMS DIVERSIFIED EQUITY FUND, INC.",0000002230,,1,3,291.0,8.826038721018751,3.0
+6471,institution,"ADAMS NATURAL RESOURCES FUND, INC.",0000216851,,1,3,175.0,1.9650053281455853,3.0
+824,institution,ADAMS STREET PARTNERS LLC,0001193586,,1,0,0.0,0.0,0.0
+27097,institution,ADAMS STREET PRIVATE EQUITY NAVIGATOR FUND LLC,0001862281,,1,0,318.0,0.5594973528899999,1.0
+1571,institution,ADAMSBROWN WEALTH CONSULTANTS LLC,0001911244,,1,0,0.0,0.0,0.0
+4909,institution,"Adams Asset Advisors, LLC",0001386929,,1,1,0.0,0.0,0.0
+19509,institution,"Adams Asset Advisors, LLC",,,1,2,0.0,0.0,0.0
+20213,fund,"Adams Diversified Equity Fund, Inc.",,2230_0001104659-25-124101,1,1,0.0,0.0,0.0
+20214,fund,"Adams Diversified Equity Fund, Inc.",,2230_0001104659-25-124108,1,1,0.0,0.0,0.0
+20215,fund,"Adams Diversified Equity Fund, Inc.",,2230_0001104659-26-019620,1,1,0.0,0.0,0.0
+20210,fund,"Adams Natural Resources Fund, Inc.",,216851_0001104659-25-124104,1,1,0.0,0.0,0.0
+20211,fund,"Adams Natural Resources Fund, Inc.",,216851_0001104659-25-124111,1,1,0.0,0.0,0.0
+20212,fund,"Adams Natural Resources Fund, Inc.",,216851_0001104659-26-019628,1,1,0.0,0.0,0.0
+11012,institution,Adams Wealth Management,0001803084,,1,0,0.0,0.0,0.0
