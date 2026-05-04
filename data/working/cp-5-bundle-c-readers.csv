@@ -1,0 +1,28 @@
+feature,site,function,current_source,target_view_under_R5,work_size_S_M_L
+Register top-25,scripts/queries/register.py:47-100,query1,holdings_v2,R5 unified,M
+Register N-PORT cov,scripts/queries/register.py:104-115,summary_by_parent lookup,summary_by_parent (NAME),summary_by_parent rebuild keyed by tp_eid,M
+Register holders,scripts/queries/register.py:119-140,query2,holdings_v2,R5 unified,S
+Register active/passive,scripts/queries/register.py:225-310,query3/4/5,holdings_v2,R5 unified + manager_type imputation,M
+Register flows,scripts/queries/register.py:455-475,query12,holdings_v2,R5 unified,S
+Register drill,scripts/queries/register.py:560-660,query14,holdings_v2 + summary_by_parent,R5 + tp_to_filer hierarchy,M
+Register manager AUM,scripts/queries/register.py:775-1135,query16,holdings_v2 + manager_aum,R5 unified,S
+Cross overlap multi-ticker,scripts/queries/cross.py:55-95,_cross_ownership_query,holdings_v2,R5 unified,M
+Cross fund-side,scripts/queries/cross.py:330-360,_cross_ownership_fund_query,fund_holdings_v2,Already fund-side; integrate w/ R5,S
+Cross pairwise,scripts/queries/cross.py:620-650,get_two_company_overlap,holdings_v2,R5 unified,S
+Top Holders / Crowding count,scripts/queries/market.py:130-145,get_market_summary,holdings_v2,R5 distinct(tp_eid),S
+Sector flow movers,scripts/queries/market.py:710-730,get_sector_flow_movers,holdings_v2,R5 unified,S
+Inst hierarchy / drill,scripts/queries/market.py:1040-1130,institution-hierarchy,holdings_v2 + ER,Multi-hop ER + R5,M
+Conviction Fund Portfolio,scripts/queries/fund.py:100-200,portfolio_context,holdings_v2 + fund_holdings_v2 bridge,R5 + View 2 fund-tier integration,L
+Flows entry+peer,scripts/queries/flows.py:240-285,flow_analysis,holdings_v2,R5 unified deltas,M
+Flows cohort by manager_type,scripts/queries/flows.py:340-430,cohort_analysis,holdings_v2,R5 + manager_type imputation,M
+Flows ownership trend,scripts/queries/flows.py:500-540,ownership_trend_summary helpers,shares_history (pre-agg),shares_history rebuild keyed by tp_eid,L
+Flows peer rotation,scripts/queries/flows.py:600-625,peer_rotation_detail,holdings_v2,R5 unified,S
+Trend holder momentum,scripts/queries/trend.py:108-160,holder_momentum,holdings_v2,R5 unified (fixes None-eid fallback),M
+Trend fund children,scripts/queries/trend.py:170-205,holder_momentum (fund),fund_holdings_v2 + parent_fund_map,View 2 template,S
+Trend distinct holders,scripts/queries/trend.py:370-380,ownership_trend_summary,holdings_v2,R5 distinct(tp_eid),S
+Entity descendants,scripts/queries/entities.py:120-170,get_entity_descendants,ER walk (multi-hop),Align with R5 control_type set,M
+Entity AUM subtree,scripts/queries/entities.py:230-330,compute_aum_for_subtree,holdings_v2 + ER (single-hop per call),Multi-hop ER + R5 unified,L
+Entity hierarchy search,scripts/queries/entities.py:360-400,search_entity_parents,entity_current.rollup_entity_id,Extend to top_parent_entity_id,S
+NPORT family bridge,scripts/queries/common.py:258-380,match_nport_family,fund_holdings_v2 (REGEX NAME),RETIRE — replace with entity-keyed lookup,L
+NPORT children dispatch,scripts/queries/common.py:488-820,get_nport_children*,fund_holdings_v2 + N-CEN,Entity-keyed lookup,M
+Rollup-join helper,scripts/queries_helpers.py:155-170,build_rollup_join,ec.rollup_entity_id,New build_top_parent_join helper,M
