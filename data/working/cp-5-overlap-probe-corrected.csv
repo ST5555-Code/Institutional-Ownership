@@ -1,0 +1,61 @@
+top_parent_entity_id,top_parent_canonical_name,ticker,set_A_13F_aum_b,set_A_filers,set_B_fund_aum_b,set_B_funds,ratio_B_over_A,classification
+4375,Vanguard Group,AAPL,387.7495,7,352.273,27,0.909,13F_covers_fund
+4375,Vanguard Group,NEE,17.3432,7,15.6966,23,0.905,13F_covers_fund
+4375,Vanguard Group,AVDX,0.0,0,0.0,0,,neither
+3241,"BlackRock, Inc.",AAPL,314.3866,35,12.4206,55,0.04,13F_dominant
+3241,"BlackRock, Inc.",NEE,14.1935,23,0.5402,31,0.038,13F_dominant
+3241,"BlackRock, Inc.",AVDX,0.0,0,0.0,0,,neither
+10443,Fidelity / FMR,AAPL,83.569,6,148.1107,111,1.772,fund_extends_13F
+10443,Fidelity / FMR,NEE,2.5664,6,5.7415,59,2.237,fund_extends_13F
+10443,Fidelity / FMR,AVDX,0.0,0,0.0,0,,neither
+7984,State Street / SSGA,AAPL,164.2188,1,27.5445,28,0.168,13F_dominant
+7984,State Street / SSGA,NEE,9.5198,1,3.7056,24,0.389,13F_dominant
+7984,State Street / SSGA,AVDX,0.0,0,0.0,0,,neither
+2920,Morgan Stanley Investment Management,AAPL,62.6591,24,1.3249,24,0.021,13F_dominant
+2920,Morgan Stanley Investment Management,NEE,5.272,23,0.1022,18,0.019,13F_dominant
+2920,Morgan Stanley Investment Management,AVDX,0.0,0,0.0,0,,neither
+7859,"GEODE CAPITAL MANAGEMENT, LLC",AAPL,97.0316,2,0.1985,4,0.002,13F_dominant
+7859,"GEODE CAPITAL MANAGEMENT, LLC",NEE,3.7818,2,0.0006,1,0.0,13F_dominant
+7859,"GEODE CAPITAL MANAGEMENT, LLC",AVDX,0.0,0,0.0,0,,neither
+5026,Dimensional Fund Advisors,AAPL,15.6524,5,11.4879,22,0.734,13F_dominant
+5026,Dimensional Fund Advisors,NEE,0.3756,5,0.2639,12,0.703,13F_dominant
+5026,Dimensional Fund Advisors,AVDX,0.0,0,0.0,0,,neither
+3616,T. Rowe Price,AAPL,0.0553,2,29.2117,38,528.017,fund_extends_13F
+3616,T. Rowe Price,NEE,0.0015,3,0.697,20,472.703,fund_extends_13F
+3616,T. Rowe Price,AVDX,0.0,0,0.0,0,,neither
+11220,Wellington Management,AAPL,21.0162,9,9.0547,9,0.431,13F_dominant
+11220,Wellington Management,NEE,0.3604,3,0.7184,3,1.994,fund_extends_13F
+11220,Wellington Management,AVDX,0.0,0,0.0,0,,neither
+4435,Northern Trust,AAPL,43.6799,12,1.6193,12,0.037,13F_dominant
+4435,Northern Trust,NEE,1.7726,9,0.1554,9,0.088,13F_dominant
+4435,Northern Trust,AVDX,0.0,0,0.0,0,,neither
+10178,Ameriprise Financial,AAPL,12.3769,8,5.1528,22,0.416,13F_dominant
+10178,Ameriprise Financial,NEE,0.5934,7,0.3055,7,0.515,13F_dominant
+10178,Ameriprise Financial,AVDX,0.0,0,0.0,0,,neither
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,AAPL,27.1285,1,0.0,0,0.0,13F_only
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,NEE,1.3825,3,0.0,0,0.0,13F_only
+5687,CHARLES SCHWAB INVESTMENT MANAGEMENT INC,AVDX,0.0,0,0.0,0,,neither
+4805,Franklin Templeton,AAPL,12.9158,19,0.7771,9,0.06,13F_dominant
+4805,Franklin Templeton,NEE,3.7151,14,0.0209,8,0.006,13F_dominant
+4805,Franklin Templeton,AVDX,0.0,0,0.0,0,,neither
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",AAPL,28.6719,13,0.0406,3,0.001,13F_dominant
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",NEE,1.0493,13,0.0093,3,0.009,13F_dominant
+3583,"UBS AM, a distinct business unit of UBS ASSET MANAGEMENT AMERICAS LLC",AVDX,0.0,0,0.0,0,,neither
+18762,AllianceBernstein Holding L.P.,AAPL,11.06,1,1.1595,33,0.105,13F_dominant
+18762,AllianceBernstein Holding L.P.,NEE,0.5097,1,0.0682,15,0.134,13F_dominant
+18762,AllianceBernstein Holding L.P.,AVDX,0.0,0,0.0,0,,neither
+15,Dodge & Cox,AAPL,0.0086,1,0.0,0,0.0,13F_only
+15,Dodge & Cox,NEE,0.0019,1,0.0,0,0.0,13F_only
+15,Dodge & Cox,AVDX,0.0,0,0.0,0,,neither
+7316,PRINCIPAL FINANCIAL GROUP INC,AAPL,5.7074,4,2.0652,11,0.362,13F_dominant
+7316,PRINCIPAL FINANCIAL GROUP INC,NEE,0.389,4,0.258,8,0.663,13F_dominant
+7316,PRINCIPAL FINANCIAL GROUP INC,AVDX,0.0,0,0.0,0,,neither
+5047,Massachusetts Financial Services,AAPL,7.312,8,0.7891,9,0.108,13F_dominant
+5047,Massachusetts Financial Services,NEE,0.5215,5,0.0057,3,0.011,13F_dominant
+5047,Massachusetts Financial Services,AVDX,0.0,0,0.0,0,,neither
+4723,Raymond James Financial,AAPL,8.1829,11,0.076,3,0.009,13F_dominant
+4723,Raymond James Financial,NEE,1.0341,6,0.008,2,0.008,13F_dominant
+4723,Raymond James Financial,AVDX,0.0,0,0.0,0,,neither
+9130,VICTORY CAPITAL MANAGEMENT INC,AAPL,6.0502,1,4.003,34,0.662,13F_dominant
+9130,VICTORY CAPITAL MANAGEMENT INC,NEE,0.075,1,0.1092,12,1.456,fund_extends_13F
+9130,VICTORY CAPITAL MANAGEMENT INC,AVDX,0.0,0,0.0,0,,neither
