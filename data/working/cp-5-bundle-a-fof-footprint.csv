@@ -1,0 +1,2598 @@
+outer_top_parent,outer_family,family_match,n_rows,aum_b
+2.0,"BlackRock Bond Fund, Inc.",extra_family,6,0.027530836859999998
+2.0,BlackRock ETF Trust,extra_family,502,15.77257934166
+2.0,BlackRock ETF Trust,unknown_match,2,9.45083e-05
+2.0,BlackRock ETF Trust II,extra_family,10,0.27803662722000005
+2.0,BlackRock Funds,extra_family,68,1.8281052300899998
+2.0,BlackRock Funds,unknown_match,1,0.0037845838500000003
+2.0,BlackRock Funds II,extra_family,34,2.02658906924
+2.0,BlackRock Funds II,intra_family,8,0.73586173734
+2.0,BlackRock Funds III,extra_family,68,0.10965520251
+2.0,BlackRock Funds IV,extra_family,45,0.12130186499
+2.0,BlackRock Funds V,extra_family,24,0.18544852263999997
+2.0,"BlackRock Index Funds, Inc.",extra_family,27,0.78865823636
+2.0,"BlackRock Index Funds, Inc.",intra_family,1,3.18366839193
+2.0,"BlackRock Municipal Bond Fund, Inc.",extra_family,2,0.126549
+2.0,BlackRock Municipal Series Trust,extra_family,1,0.01158
+2.0,"BlackRock Strategic Global Bond Fund, Inc.",extra_family,25,0.03302532322
+2.0,"BlackRock Variable Series Funds II, Inc.",extra_family,2,0.00015709492999999998
+2.0,Index Funds,unknown_match,50,0.03578879177
+2.0,iShares Trust,extra_family,7098,519.14438747591
+2.0,iShares Trust,intra_family,17,9.7510966153
+2.0,iShares Trust,unknown_match,32,2.52379696905
+2.0,iShares U.S. ETF Trust,extra_family,34,0.18639385616
+2.0,iShares U.S. ETF Trust,intra_family,5,1.1439054178699999
+2.0,"iShares, Inc.",extra_family,504,5.792285328939999
+2.0,"iShares, Inc.",unknown_match,2,0.01007266725
+4.0,AIM Counselor Series Trust (Invesco Counselor Series Trust),extra_family,323,11.4392990538
+4.0,AIM Counselor Series Trust (Invesco Counselor Series Trust),unknown_match,3,0.0214006113
+4.0,AIM Equity Funds (Invesco Equity Funds),extra_family,115,10.08881873584
+4.0,AIM Funds Group (Invesco Funds Group),extra_family,21,0.20829208299
+4.0,AIM Growth Series (Invesco Growth Series),extra_family,152,6.71987760584
+4.0,AIM International Mutual Funds (Invesco International Mutual Funds),extra_family,65,3.74479618721
+4.0,AIM Investment Funds (Invesco Investment Funds),extra_family,84,6.09549766357
+4.0,AIM Investment Securities Funds (Invesco Investment Securities Funds),extra_family,21,0.13436107124
+4.0,AIM Sector Funds (Invesco Sector Funds),extra_family,64,5.365242805830001
+4.0,AIM Tax-Exempt Funds (Invesco Tax-Exempt Funds),extra_family,8,0.10060154499
+4.0,AIM Variable Insurance Funds (Invesco Variable Insurance Funds),extra_family,290,2.6006225512000003
+4.0,AIM Variable Insurance Funds (Invesco Variable Insurance Funds),unknown_match,1,0.0009290603
+4.0,Invesco Actively Managed Exchange-Traded Fund Trust,extra_family,318,0.25110567332
+4.0,Invesco Actively Managed Exchange-Traded Fund Trust,intra_family,8,0.01876981295
+4.0,Invesco Actively Managed Exchange-Traded Fund Trust,unknown_match,4,0.0010511145
+4.0,Invesco Exchange-Traded Fund Trust,extra_family,1182,30.397616417370003
+4.0,Invesco Exchange-Traded Fund Trust,intra_family,8,0.19026867113999998
+4.0,Invesco Exchange-Traded Fund Trust,unknown_match,10,0.4967905455
+4.0,Invesco Exchange-Traded Fund Trust II,extra_family,1547,37.63940693743
+4.0,Invesco Exchange-Traded Fund Trust II,intra_family,9,0.04396714866
+4.0,Invesco Exchange-Traded Fund Trust II,unknown_match,6,0.0358822485
+4.0,Invesco Exchange-Traded Self-Indexed Fund Trust,extra_family,420,1.35842581755
+4.0,Invesco Exchange-Traded Self-Indexed Fund Trust,intra_family,3,0.00334425625
+4.0,Invesco Exchange-Traded Self-Indexed Fund Trust,unknown_match,2,0.00648129555
+4.0,Invesco India Exchange-Traded Fund Trust,extra_family,2,0.00131118578
+4.0,"Invesco QQQ Trust, Series 1",extra_family,18,110.8614018469
+5.0,SCHWAB ANNUITY PORTFOLIOS,extra_family,83,0.89305098788
+5.0,SCHWAB ANNUITY PORTFOLIOS,intra_family,28,0.43481764334999995
+5.0,SCHWAB ANNUITY PORTFOLIOS,unknown_match,1,0.0045979119
+5.0,SCHWAB CAPITAL TRUST,extra_family,1532,52.570831674759994
+5.0,SCHWAB CAPITAL TRUST,intra_family,335,18.072824024029998
+5.0,SCHWAB CAPITAL TRUST,unknown_match,5,0.272098962
+5.0,SCHWAB INVESTMENTS,extra_family,147,5.3686470129499995
+5.0,SCHWAB INVESTMENTS,unknown_match,1,0.0285645735
+5.0,SCHWAB STRATEGIC TRUST,extra_family,1716,78.60403328377
+5.0,SCHWAB STRATEGIC TRUST,unknown_match,6,0.25957338345
+9.0,College Retirement Equities Fund,extra_family,663,52.348581302899994
+9.0,College Retirement Equities Fund,unknown_match,4,0.0676622625
+9.0,NuShares ETF Trust,extra_family,195,1.596862746220002
+9.0,NuShares ETF Trust,unknown_match,3,0.030897405
+9.0,"Nuveen Investment Funds, Inc.",extra_family,91,1.29387138145
+9.0,Nuveen Investment Trust,extra_family,66,0.36905089027
+9.0,Nuveen Investment Trust II,extra_family,68,1.91095683025
+9.0,Nuveen Investment Trust III,extra_family,4,0.22011362818000002
+9.0,Nuveen Investment Trust V,extra_family,8,0.00271605329
+9.0,Nuveen Managed Accounts Portfolio Trust,extra_family,1,0.00017765
+9.0,Nuveen Municipal Trust,intra_family,3,0.05610975
+9.0,TIAA Separate Account VA-1,extra_family,309,0.35968295693999996
+9.0,TIAA Separate Account VA-1,unknown_match,1,0.0017727873
+12.0,AMCAP Fund,extra_family,40,19.59069674577
+12.0,AMERICAN FUNDS COLLEGE TARGET DATE SERIES,extra_family,55,9.18968530713
+12.0,AMERICAN FUNDS INSURANCE SERIES,unknown_match,458,37.882539457620005
+12.0,AMERICAN FUNDS PORTFOLIO SERIES,unknown_match,39,52.7844713346
+12.0,American Balanced Fund,unknown_match,43,50.8573346058
+12.0,American Funds Developing World Growth & Income Fund,extra_family,5,0.09742914341000002
+12.0,American Funds Fundamental Investors,extra_family,34,31.26489466539
+12.0,American Funds Fundamental Investors,unknown_match,1,0.19442031680000002
+12.0,American Funds Global Balanced Fund,unknown_match,29,3.05212911368
+12.0,American Funds Global Insight Fund,extra_family,23,3.29697679826
+12.0,American Funds International Vantage Fund,extra_family,1,0.057740542990000004
+12.0,American Funds Multi-Sector Income Fund,extra_family,1,0.00039113058
+12.0,American Funds Retirement Income Portfolio Series,unknown_match,12,2.01261521303
+12.0,American Funds Strategic Bond Fund,unknown_match,1,0.00037366008
+12.0,American Funds Target Date Retirement Series,extra_family,146,199.96310061331
+12.0,American Funds U.S. Small & Mid Cap Equity Fund,extra_family,23,0.022495278940000002
+12.0,American Mutual Fund,extra_family,39,26.85889351037
+12.0,Capital Group Conservative Equity ETF,extra_family,23,0.31890482244
+12.0,Capital Group Core Balanced ETF,extra_family,18,0.76387318514
+12.0,Capital Group Core Balanced ETF,intra_family,2,1.5568375603200002
+12.0,Capital Group Core Equity ETF,extra_family,21,2.2158625961499996
+12.0,Capital Group Dividend Growers ETF,extra_family,13,0.69196712876
+12.0,Capital Group Dividend Value ETF,extra_family,18,6.8357215485
+12.0,Capital Group Equity ETF Trust I,unknown_match,40,0.22579028981
+12.0,Capital Group Fixed Income ETF Trust,extra_family,7,0.85083601471
+12.0,Capital Group Global Equity ETF,unknown_match,16,0.32250328286
+12.0,Capital Group Global Growth Equity ETF,unknown_match,14,1.4645186205999998
+12.0,Capital Group Growth ETF,unknown_match,21,6.064025925950001
+12.0,Capital Group International Core Equity ETF,extra_family,12,0.08176640662
+12.0,Capital Group International Equity ETF,unknown_match,4,0.09903179209
+12.0,Capital Group International Focus Equity ETF,extra_family,6,0.5872940246
+12.0,Capital Group New Geography Equity ETF,extra_family,19,0.20436639352000002
+12.0,Capital Group U.S. Equity Fund,unknown_match,19,0.10252907160000001
+12.0,Capital Income Builder,extra_family,32,14.42943090899
+12.0,Capital World Growth & Income Fund,extra_family,47,20.667733628589996
+12.0,EUPAC Fund,extra_family,13,3.24135130075
+12.0,Growth Fund of America,unknown_match,50,89.11157358078
+12.0,Income Fund of America,unknown_match,36,12.5172019297
+12.0,International Growth & Income Fund,unknown_match,10,0.13821048604999997
+12.0,Investment Co of America,unknown_match,51,42.14098609485
+12.0,New Economy Fund,extra_family,33,6.84846285331
+12.0,New Perspective Fund,extra_family,34,26.636824580219997
+12.0,New World Fund Inc,extra_family,27,4.769491351389999
+12.0,SMALLCAP World Fund Inc,extra_family,35,4.060560355620001
+12.0,Washington Mutual Investors Fund,extra_family,42,46.440344602340005
+12.0,Washington Mutual Investors Fund,unknown_match,1,1.1339410905
+13.0,"T. ROWE PRICE HIGH YIELD FUND, INC.",extra_family,1,0.0
+13.0,"T. ROWE PRICE INSTITUTIONAL INCOME FUNDS, INC.",extra_family,1,0.0
+13.0,"T. ROWE PRICE MULTI-STRATEGY TOTAL RETURN FUND, INC.",extra_family,14,0.004636906950000001
+13.0,"T. Rowe Price Exchange-Traded Funds, Inc.",extra_family,421,3.41159014326
+13.0,"T. Rowe Price Exchange-Traded Funds, Inc.",unknown_match,3,0.0029991533
+15.0,Dodge & Cox Funds,extra_family,51,37.59654880731
+15.0,Dodge & Cox Funds,intra_family,1,0.21531904419
+16.0,Putnam ETF Trust,extra_family,70,2.4238296131199992
+16.0,Putnam Focused International Equity Fund,extra_family,1,0.03967800144
+16.0,Putnam Funds Trust,extra_family,35,1.92016647746
+16.0,Putnam High Yield Fund,extra_family,1,0.00121973275
+16.0,Putnam Variable Trust,extra_family,41,0.9638084652000002
+17.0,MASSACHUSETTS INVESTORS TRUST,extra_family,13,1.6315794590900004
+17.0,MFS Massachusetts Investors Growth Stock Fund,extra_family,7,1.4345123848299999
+17.0,MFS SERIES TRUST I,extra_family,105,19.91548528954
+17.0,MFS SERIES TRUST I,intra_family,7,0.47933948484
+17.0,MFS SERIES TRUST IV,extra_family,24,0.22759043034
+17.0,MFS SERIES TRUST IV,intra_family,3,0.026564220609999998
+17.0,MFS SERIES TRUST IX,intra_family,1,0.03899819765
+17.0,MFS SERIES TRUST VII,extra_family,24,0.18323086081
+17.0,MFS SERIES TRUST VII,intra_family,1,0.0015882425
+17.0,MFS SERIES TRUST X,extra_family,69,5.4161505299099995
+17.0,MFS SERIES TRUST X,intra_family,100,65.42385145819999
+17.0,MFS SERIES TRUST XI,extra_family,37,1.9831412823199996
+17.0,MFS SERIES TRUST XI,intra_family,2,0.10859936593
+17.0,MFS SERIES TRUST XII,intra_family,269,5.03495351396
+17.0,MFS SERIES TRUST XIII,extra_family,22,0.54905323161
+17.0,MFS SERIES TRUST XIII,intra_family,2,0.050898187510000005
+17.0,MFS SERIES TRUST XV,intra_family,1,0.04054495753
+17.0,MFS Series Trust II,extra_family,15,9.8250771211
+17.0,MFS Series Trust IV,extra_family,8,0.9904993085999999
+17.0,MFS Series Trust V,extra_family,33,2.54252161324
+17.0,MFS Series Trust VI,extra_family,27,0.7273625668000001
+17.0,MFS Series Trust VII,extra_family,11,0.00058399364
+17.0,MFS Series Trust VIII,extra_family,7,0.12080992523
+17.0,MFS Series Trust X,extra_family,17,0.35478583103
+17.0,MFS Series Trust XIII,extra_family,11,0.061995898599999995
+17.0,MFS Series Trust XV,extra_family,56,0.018195022760000002
+17.0,MFS VARIABLE INSURANCE TRUST,extra_family,111,1.8087793330900002
+17.0,MFS VARIABLE INSURANCE TRUST,intra_family,10,0.11314972045000002
+17.0,MFS VARIABLE INSURANCE TRUST II,extra_family,137,0.59785270262
+17.0,MFS VARIABLE INSURANCE TRUST II,intra_family,16,0.08961504189
+17.0,MFS VARIABLE INSURANCE TRUST III,extra_family,52,0.08139631748000001
+17.0,MFS VARIABLE INSURANCE TRUST III,intra_family,60,1.4359198300099998
+18.0,American Century California Tax Free & Municipal Funds,intra_family,2,0.01851381069
+18.0,American Century Government Income Trust,extra_family,2,0.068465514
+18.0,American Century Investment Trust,extra_family,5,0.04671114454
+18.0,American Century Municipal Trust,extra_family,2,0.018660088
+20.0,"Comstock Funds, Inc.",extra_family,9,0.0007966758300000001
+20.0,"GAMCO Global Series Funds, Inc",extra_family,47,0.07224952362999999
+20.0,"Gabelli 787 Fund, Inc.",extra_family,22,0.0038706719200000002
+20.0,Gabelli Asset Fund,extra_family,80,0.306888586
+20.0,Gabelli Asset Fund,intra_family,7,0.00470298552
+20.0,Gabelli Asset Fund,unknown_match,1,0.00038424
+20.0,Gabelli Dividend Growth Fund,extra_family,9,0.003440647
+20.0,Gabelli ETFs Trust,extra_family,70,0.029131818530000006
+20.0,Gabelli Equity Series Funds Inc,extra_family,90,0.29195465976999996
+20.0,"Gabelli Gold Fund, Inc.",extra_family,3,0.07474409468
+20.0,Gabelli Growth Fund,extra_family,12,0.410322376
+20.0,Gabelli Innovations Trust,extra_family,8,0.00198691075
+20.0,"Gabelli International Growth Fund, Inc",extra_family,1,0.00026289224
+20.0,Gabelli Investor Funds Inc,extra_family,28,0.016070487739999997
+20.0,"Gabelli SRI Fund, Inc.",extra_family,26,0.00475087327
+20.0,Gabelli Utilities Fund,extra_family,25,0.29246613851
+20.0,Gabelli Value 25 Fund Inc,extra_family,13,0.049824508
+20.0,"Keeley Funds, Inc.",extra_family,24,0.05097793606999999
+20.0,Teton Westwood Funds,extra_family,12,0.01311944351
+21.0,J.P. Morgan Exchange-Traded Fund Trust,extra_family,1018,25.848822631259996
+21.0,J.P. Morgan Exchange-Traded Fund Trust,intra_family,10,0.17944984222
+21.0,J.P. Morgan Exchange-Traded Fund Trust,unknown_match,15,0.8095248411
+21.0,Quantitative Master Series LLC,extra_family,193,0.49849694820000007
+22.0,Columbia Funds Variable Series Trust II,extra_family,13,0.6665384682399998
+22.0,"EMPOWER FUNDS, INC.",extra_family,102,0.18629427634000004
+22.0,"EMPOWER FUNDS, INC.",unknown_match,1,0.00134964298
+22.0,EQ Advisors Trust,unknown_match,4,0.0091005707
+22.0,Eaton Vance Special Investment Trust,intra_family,2,1.08264461661
+22.0,Forethought Variable Insurance Trust,extra_family,14,0.05413386402
+22.0,GOLDMAN SACHS TRUST,extra_family,8,0.04168731669
+22.0,GOLDMAN SACHS TRUST,intra_family,16,0.6566052648299999
+22.0,GPS Funds I,extra_family,200,0.20440392457999998
+22.0,Greater India Portfolio,extra_family,4,0.014293516820000001
+22.0,JNL Series Trust,extra_family,7,0.32963176277999995
+22.0,PACIFIC SELECT FUND,intra_family,35,6.220501656310001
+22.0,Penn Series Funds Inc,extra_family,11,0.01336950719
+22.0,Penn Series Funds Inc,intra_family,4,0.04028501986
+22.0,Penn Series Funds Inc,unknown_match,1,0.0014125623000000001
+22.0,SEASONS SERIES TRUST,extra_family,39,0.08144281949000001
+22.0,TRANSAMERICA SERIES TRUST,extra_family,16,0.061452779330000006
+22.0,VALIC Co I,intra_family,10,1.02879335789
+25.0,DEUTSCHE DWS ASSET ALLOCATION TRUST,extra_family,88,0.08032976693999999
+25.0,DEUTSCHE DWS EQUITY 500 INDEX PORTFOLIO,extra_family,81,0.5277929984599999
+25.0,DEUTSCHE DWS EQUITY 500 INDEX PORTFOLIO,unknown_match,1,0.0027817375
+25.0,DEUTSCHE DWS INCOME TRUST,extra_family,10,0.02614875846
+25.0,DEUTSCHE DWS INSTITUTIONAL FUNDS,intra_family,2,1.92969029256
+25.0,"DEUTSCHE DWS INTERNATIONAL FUND, INC.",extra_family,21,0.08189999701999999
+25.0,"DEUTSCHE DWS INTERNATIONAL FUND, INC.",intra_family,2,0.00263582838
+25.0,DEUTSCHE DWS INVESTMENT TRUST,extra_family,92,2.21217713102
+25.0,DEUTSCHE DWS INVESTMENTS VIT FUNDS,extra_family,273,0.27174438514
+25.0,DEUTSCHE DWS INVESTMENTS VIT FUNDS,unknown_match,1,0.0012214029
+25.0,DEUTSCHE DWS MARKET TRUST,extra_family,20,0.37202859926
+25.0,DEUTSCHE DWS MUNICIPAL TRUST,extra_family,2,0.00501316704
+25.0,DEUTSCHE DWS PORTFOLIO TRUST,extra_family,6,0.010905788010000002
+25.0,DEUTSCHE DWS SECURITIES TRUST,extra_family,10,0.53956245622
+25.0,DEUTSCHE DWS STATE TAX-FREE INCOME SERIES,extra_family,1,0.00465599272
+25.0,DEUTSCHE DWS VARIABLE SERIES I,extra_family,42,0.2202975451
+25.0,DEUTSCHE DWS VARIABLE SERIES I,intra_family,1,0.00027329191
+25.0,DEUTSCHE DWS VARIABLE SERIES II,extra_family,56,0.06053520646999999
+25.0,DEUTSCHE DWS VARIABLE SERIES II,intra_family,2,0.00088185463
+26.0,BNY MELLON FUNDS TRUST,extra_family,21,0.05570873743000001
+26.0,"BNY MELLON INDEX FUNDS, INC.",extra_family,186,0.8386967886299999
+26.0,"BNY MELLON INDEX FUNDS, INC.",unknown_match,1,0.0039438855
+26.0,BNY MELLON INVESTMENT PORTFOLIOS,extra_family,77,0.06880645179999999
+26.0,"BNY MELLON MIDCAP INDEX FUND, INC.",extra_family,45,0.14167151034
+26.0,"BNY MELLON STOCK INDEX FUND, INC.",extra_family,82,0.9142245276900001
+26.0,"BNY MELLON STOCK INDEX FUND, INC.",unknown_match,1,0.004716385900000001
+26.0,BNY MELLON VARIABLE INVESTMENT FUND,extra_family,8,0.04418827859999999
+26.0,"BNY Mellon Advantage Funds, Inc.",extra_family,19,3.40106825471
+26.0,BNY Mellon ETF Trust,extra_family,280,1.4805419979700003
+26.0,BNY Mellon ETF Trust,unknown_match,1,0.0072915345
+26.0,BNY Mellon ETF Trust II,extra_family,26,0.21301847864999998
+26.0,BNY Mellon Investment Funds I,extra_family,26,0.06588558238000002
+26.0,BNY Mellon Investment Funds III,extra_family,9,0.03115766929
+26.0,"BNY Mellon Investment Funds IV, Inc.",extra_family,84,0.4323035397400001
+26.0,"BNY Mellon Investment Funds IV, Inc.",unknown_match,1,0.0023811165
+26.0,EQ Advisors Trust,unknown_match,32,0.32734048332
+26.0,HC Capital Trust,unknown_match,203,0.58557608016
+26.0,JNL Series Trust,extra_family,156,9.588655991440001
+26.0,JNL Series Trust,unknown_match,1,0.006027124599999999
+26.0,SIX CIRCLES TRUST,extra_family,139,1.0757373213399999
+26.0,SIX CIRCLES TRUST,unknown_match,1,0.00027233009999999997
+26.0,WisdomTree Digital Trust,extra_family,114,0.006765165930000001
+26.0,WisdomTree Digital Trust,intra_family,31,0.0019310552000000004
+26.0,WisdomTree Digital Trust,unknown_match,1,2.28943e-05
+26.0,WisdomTree Trust,extra_family,371,0.98262680579
+26.0,WisdomTree Trust,intra_family,6,0.00369538799
+26.0,WisdomTree Trust,unknown_match,1,0.0015984384
+29.0,Legg Mason ETF Investment Trust,extra_family,87,0.38927417558000005
+29.0,Legg Mason Partners Income Trust,extra_family,14,0.00991133423
+29.0,Legg Mason Partners Institutional Trust,extra_family,3,5.231317999999999e-05
+29.0,Legg Mason Partners Variable Income Trust,extra_family,6,9.57138e-06
+31.0,AQR Funds,extra_family,1800,1.01741086692
+31.0,AQR Funds,unknown_match,12,0.044404055199999994
+51.0,CLAYTON STREET TRUST,extra_family,23,0.79762047704
+51.0,JANUS ASPEN SERIES,extra_family,97,2.9190312616100003
+51.0,JANUS ASPEN SERIES,intra_family,1,0.00777981553
+51.0,JANUS ASPEN SERIES,unknown_match,3,0.023765724299999996
+51.0,JANUS INVESTMENT FUND,extra_family,218,28.57905950013
+51.0,JANUS INVESTMENT FUND,intra_family,47,0.45331800436999997
+51.0,JANUS INVESTMENT FUND,unknown_match,6,0.5267144309
+51.0,Janus Detroit Street Trust,extra_family,36,0.09774220984
+51.0,Janus Detroit Street Trust,intra_family,2,0.0070156896000000005
+52.0,Columbia ETF Trust I,extra_family,253,1.14568785079
+52.0,Columbia ETF Trust I,intra_family,2,0.0015361492
+52.0,Columbia ETF Trust II,extra_family,22,0.25638522887000004
+53.0,Hartford Funds Exchange-Traded Trust,extra_family,23,0.09126533921
+53.0,Lattice Strategies Trust,extra_family,229,0.25758096382
+53.0,Lattice Strategies Trust,intra_family,1,1.225728e-05
+53.0,Lattice Strategies Trust,unknown_match,3,0.000802863
+55.0,NEUBERGER BERMAN ADVISERS MANAGEMENT TRUST,extra_family,17,0.27634428925000004
+55.0,NEUBERGER BERMAN ALTERNATIVE FUNDS,extra_family,28,1.85775761231
+55.0,NEUBERGER BERMAN EQUITY FUNDS,extra_family,131,5.663570731040001
+55.0,NEUBERGER BERMAN EQUITY FUNDS,unknown_match,1,0.18707048115
+55.0,NEUBERGER BERMAN INCOME FUNDS,extra_family,7,0.23982745645999998
+55.0,NEUBERGER BERMAN INCOME FUNDS,intra_family,1,0.0322525315
+55.0,Neuberger Berman ETF Trust,extra_family,76,0.22472395988000002
+55.0,Neuberger Berman ETF Trust,unknown_match,1,0.0040793055
+56.0,LORD ABBETT BOND DEBENTURE FUND INC,extra_family,5,0.11047468194
+56.0,LORD ABBETT BOND DEBENTURE FUND INC,intra_family,1,0.32013159318
+57.0,"AB Active ETFs, Inc.",unknown_match,83,0.4822394831
+58.0,Catholic Responsible Investments Funds,extra_family,6,0.00200399315
+58.0,"EMPOWER FUNDS, INC.",extra_family,12,0.27044466082999996
+58.0,"EMPOWER FUNDS, INC.",intra_family,17,1.272637394
+58.0,JNL Series Trust,extra_family,12,0.31246034528999994
+58.0,JNL Series Trust,intra_family,6,0.3854199797
+58.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,30,0.049785031029999996
+59.0,Artisan Partners Funds Inc.,extra_family,62,1.8696647209600004
+61.0,WASATCH FUNDS TRUST,extra_family,66,0.95105805848
+63.0,CALAMOS ADVISORS TRUST/IL,extra_family,24,0.0080133985
+63.0,CALAMOS INVESTMENT TRUST/IL,extra_family,259,3.7942601420599997
+63.0,CALAMOS INVESTMENT TRUST/IL,intra_family,1,0.33782698135
+63.0,CALAMOS INVESTMENT TRUST/IL,unknown_match,3,0.056805471
+63.0,Calamos ETF Trust,extra_family,64,0.047489079829999996
+63.0,Calamos ETF Trust,intra_family,24,0.08795126144
+66.0,Touchstone ETF Trust,extra_family,7,0.0169119496
+67.0,ALGER FUNDS,extra_family,68,0.9898307100799999
+67.0,ALGER FUNDS II,extra_family,48,0.9584447268500002
+67.0,ALGER INSTITUTIONAL FUNDS,extra_family,36,1.82072159996
+67.0,ALGER PORTFOLIOS,extra_family,83,0.32808844796
+67.0,ALGER PORTFOLIOS,intra_family,2,0.023202977
+67.0,Alger ETF Trust,extra_family,33,0.16010300736
+68.0,Natixis ETF Trust II,extra_family,6,0.24653083880999999
+72.0,WILLIAM BLAIR FUNDS,extra_family,126,1.5562653467700003
+73.0,ADVISORS' INNER CIRCLE III,extra_family,320,0.22544603022
+73.0,ADVISORS' INNER CIRCLE III,unknown_match,3,0.015161748300000001
+73.0,Baird Funds Inc,extra_family,16,0.18030871394
+74.0,Harbor ETF Trust,extra_family,299,0.74728894092
+74.0,Harbor ETF Trust,unknown_match,1,0.001420578
+75.0,Calvert Fund,extra_family,1,0.002040125
+75.0,Calvert Fund,intra_family,3,0.01446375
+83.0,CREDIT SUISSE OPPORTUNITY FUNDS,extra_family,2,2.0699999999999997e-09
+87.0,Delaware Group Equity Funds IV,extra_family,8,0.09940439256
+87.0,Delaware Group Government Fund,extra_family,1,0.00017845257
+87.0,Delaware Group Income Funds,extra_family,1,0.005225
+87.0,Delaware VIP Trust,extra_family,36,0.45122614893
+87.0,Delaware VIP Trust,unknown_match,1,0.0120929934
+87.0,IVY FUNDS,extra_family,67,2.7203284554700002
+87.0,Ivy Variable Insurance Portfolios,extra_family,126,1.3215805226
+87.0,Nomura ETF Trust,extra_family,8,0.034055475489999994
+136.0,First Trust Exchange-Traded AlphaDEX Fund,extra_family,558,2.44231511366
+136.0,First Trust Exchange-Traded AlphaDEX Fund,intra_family,49,0.10879303027
+136.0,First Trust Exchange-Traded AlphaDEX Fund,unknown_match,4,0.0080357895
+136.0,First Trust Exchange-Traded AlphaDEX Fund II,extra_family,47,0.07364722859999999
+136.0,First Trust Exchange-Traded AlphaDEX Fund II,intra_family,2,3.230425e-05
+136.0,First Trust Exchange-Traded Fund,extra_family,282,8.807191309650001
+136.0,First Trust Exchange-Traded Fund,intra_family,22,0.06494634532999999
+136.0,First Trust Exchange-Traded Fund,unknown_match,2,0.17654723310000003
+136.0,First Trust Exchange-Traded Fund II,extra_family,89,2.8104181044499996
+136.0,First Trust Exchange-Traded Fund II,intra_family,6,0.009601336719999999
+136.0,First Trust Exchange-Traded Fund II,unknown_match,1,0.0001975634
+136.0,First Trust Exchange-Traded Fund III,extra_family,118,0.38073892873000004
+136.0,First Trust Exchange-Traded Fund III,intra_family,5,-0.0016817696600000002
+136.0,First Trust Exchange-Traded Fund IV,extra_family,107,1.9679792804599998
+136.0,First Trust Exchange-Traded Fund IV,intra_family,20,0.0733072166
+136.0,First Trust Exchange-Traded Fund VI,extra_family,400,9.601343071610001
+136.0,First Trust Exchange-Traded Fund VI,intra_family,52,4.27461600628
+136.0,First Trust Exchange-Traded Fund VIII,extra_family,341,12.62257063634
+136.0,First Trust Exchange-Traded Fund VIII,intra_family,21,0.16645248096999996
+136.0,First Trust Series Fund,extra_family,5,0.0010855771400000002
+136.0,First Trust Variable Insurance Trust,extra_family,61,0.07485739717
+136.0,First Trust Variable Insurance Trust,intra_family,8,0.00834557953
+194.0,LoCorr Investment Trust,extra_family,65,0.008004554189999999
+194.0,LoCorr Investment Trust,unknown_match,1,3.3621e-05
+194.0,"RBB Fund, Inc.",extra_family,7,0.02882903499
+195.0,Guggenheim Funds Trust,extra_family,14,0.23460040944
+195.0,Guggenheim Funds Trust,intra_family,11,0.57655062212
+195.0,Guggenheim Variable Funds Trust,extra_family,3,0.00166895955
+195.0,Guggenheim Variable Funds Trust,intra_family,2,0.02870122119
+195.0,GuideStone Funds,extra_family,31,0.12159969429999999
+223.0,Monteagle Funds,extra_family,9,0.004393044
+224.0,Managed Portfolio Series,extra_family,132,2.44351107063
+229.0,Aristotle Fund Series Trust,extra_family,6,0.21105316681
+252.0,WASATCH FUNDS TRUST,extra_family,9,0.00056436557
+257.0,The Jensen Quality Growth Fund Inc.,extra_family,4,0.910081125
+285.0,Virtus Investment Trust,extra_family,54,0.28469321207000003
+285.0,Virtus Strategy Trust,extra_family,3,0.00026307494
+287.0,1290 Funds,extra_family,33,0.04572474132
+287.0,EQ Advisors Trust,unknown_match,79,0.66920399451
+294.0,Exchange Place Advisors Trust,extra_family,1,0.00709109555
+294.0,Exchange Place Advisors Trust,intra_family,2,0.01167115047
+297.0,Franklin Templeton Variable Insurance Products Trust,extra_family,1,0.01516751157
+297.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,82,0.08306968128
+297.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,2,0.00256617675
+297.0,Templeton Institutional Funds,extra_family,1,0.00105304725
+299.0,Nationwide Mutual Funds,extra_family,2,0.0048582528
+300.0,Schwartz Investment Trust,extra_family,26,0.4943895886100001
+304.0,"MFG Funds, Inc.",extra_family,15,0.01919533761
+311.0,JNL Series Trust,extra_family,19,0.09120929469
+312.0,The Tocqueville Trust,extra_family,12,0.11043465
+313.0,Cullen Funds Trust,extra_family,42,0.45721773128000004
+326.0,Nationwide Mutual Funds,extra_family,33,0.21238729261000003
+326.0,Optimum Fund Trust,extra_family,13,0.06261175465999999
+326.0,"Principal Funds, Inc",extra_family,187,0.16211304802
+326.0,Wilshire Mutual Funds Inc,extra_family,29,0.05759531916
+332.0,Northern Lights Fund Trust IV,extra_family,7,0.010035221320000001
+333.0,Two Roads Shared Trust,extra_family,4,0.15936640132
+379.0,Columbia Funds Variable Series Trust II,extra_family,24,0.5782677550499999
+379.0,HARBOR FUNDS,extra_family,4,0.10356629680000001
+379.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,extra_family,33,0.0017959944400000002
+393.0,Meridian Fund Inc,extra_family,30,0.15375155618999997
+491.0,Advisor Managed Portfolios,extra_family,48,0.43436110428999997
+564.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,245,2.53350203756
+564.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,1,0.0018279018799999998
+564.0,NORTHWESTERN MUTUAL SERIES FUND INC,unknown_match,1,0.010891923199999999
+568.0,MONETTA TRUST,extra_family,18,0.053820787
+597.0,Two Roads Shared Trust,extra_family,17,0.08790568523
+601.0,HARBOR FUNDS,extra_family,2,0.0050470800899999994
+627.0,Brighthouse Funds Trust I,extra_family,15,2.56377629327
+627.0,Brighthouse Funds Trust II,intra_family,34,0.30368576858000007
+676.0,ETFis Series Trust I,extra_family,74,0.31431768059000004
+676.0,Virtus Asset Trust,intra_family,2,0.01328901176
+676.0,Virtus ETF Trust II,extra_family,31,0.049959569
+676.0,Virtus ETF Trust II,intra_family,1,0.0005994
+676.0,Virtus Event Opportunities Trust,extra_family,15,0.00273948121
+676.0,Virtus Managed Account Completion Shares (MACS) Trust,extra_family,1,0.000490035
+676.0,Virtus Opportunities Trust,extra_family,4,0.00402273745
+676.0,Virtus Opportunities Trust,intra_family,8,0.09554947616
+686.0,Dunham Funds,extra_family,27,0.020847048049999997
+756.0,Teton Westwood Funds,extra_family,17,0.01339796375
+816.0,RiverPark Funds Trust,extra_family,14,0.01067212028
+834.0,MML SERIES INVESTMENT FUND,extra_family,15,0.11653344421
+834.0,Perpetual Americas Funds Trust,extra_family,19,0.54990829802
+834.0,TRANSAMERICA SERIES TRUST,extra_family,6,0.023010833300000002
+854.0,RUSSELL INVESTMENT CO,extra_family,31,0.09271062664
+864.0,Brighthouse Funds Trust I,extra_family,47,0.13802313025999996
+864.0,Brighthouse Funds Trust I,unknown_match,1,0.0025331022000000003
+864.0,Brighthouse Funds Trust II,extra_family,62,0.92926708937
+864.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,77,0.53841964641
+877.0,STATE STREET INSTITUTIONAL FUNDS,extra_family,23,0.08372031032999999
+877.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,extra_family,11,0.00888059444
+877.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,intra_family,1,0.0009804357
+893.0,EQ Advisors Trust,unknown_match,18,0.0014256342400000002
+901.0,First Eagle Funds,extra_family,62,9.981983505210001
+901.0,First Eagle Variable Funds,extra_family,2,0.00575457743
+901.0,RBB Fund Trust,extra_family,9,0.10246684037
+912.0,Aristotle Fund Series Trust,extra_family,33,0.02660065152
+947.0,Johnson Mutual Funds Trust,extra_family,17,0.13882584492000002
+953.0,ADVISORS' INNER CIRCLE FUND II,extra_family,121,1.3325309091000002
+953.0,JNL Series Trust,intra_family,5,0.43244277005000004
+968.0,Virtus Asset Trust,extra_family,12,0.04651497046999999
+968.0,Virtus Investment Trust,extra_family,10,0.3742103523999999
+1000.0,Absolute Shares Trust,extra_family,63,0.030371075520000002
+1001.0,JNL Series Trust,intra_family,6,0.65153131862
+1001.0,Merger Fund,extra_family,26,0.29125927176
+1001.0,Merger Fund,intra_family,1,0.00228598752
+1001.0,Merger Fund VL,extra_family,23,0.0019530980299999998
+1001.0,Virtus Event Opportunities Trust,extra_family,29,0.01009802004
+1013.0,Advanced Series Trust,extra_family,103,4.811604690999999
+1013.0,Advanced Series Trust,intra_family,2,0.037311459449999994
+1013.0,Advanced Series Trust,unknown_match,1,0.0103448615
+1013.0,EQ Advisors Trust,unknown_match,3,0.00158284782
+1013.0,Franklin Templeton Variable Insurance Products Trust,extra_family,16,0.01629191188
+1013.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,1,0.27641255094
+1013.0,Legg Mason Partners Investment Trust,extra_family,17,2.90417279874
+1013.0,Legg Mason Partners Variable Equity Trust,extra_family,68,3.7824463134
+1013.0,MORGAN STANLEY PATHWAY FUNDS,extra_family,13,0.15166864415999998
+1013.0,PACIFIC SELECT FUND,extra_family,16,0.23179856126999998
+1013.0,VALIC Co I,extra_family,20,0.12954530864000002
+1022.0,Thrive Series Trust,extra_family,22,0.0016871691
+1029.0,Pear Tree Funds,extra_family,3,0.0032479959499999997
+1057.0,Valkyrie ETF Trust II,extra_family,1,0.010870525119999998
+1076.0,ADVISORS' INNER CIRCLE III,extra_family,1,0.02919380063
+1079.0,USCF ETF Trust,extra_family,5,0.10596141450999999
+1083.0,Hennessy Funds Trust,extra_family,5,0.13227425714
+1083.0,Touchstone Funds Group Trust,extra_family,4,0.39839267458000005
+1083.0,Touchstone Strategic Trust,extra_family,22,0.12978503861
+1100.0,"Calvert Impact Fund, Inc.",extra_family,36,0.29057762282
+1100.0,Calvert Management Series,extra_family,17,0.02159625255
+1100.0,Calvert Management Series,intra_family,1,0.00603925
+1100.0,Calvert Social Investment Fund,extra_family,26,0.52953442615
+1100.0,Calvert Social Investment Fund,intra_family,62,1.00400241924
+1100.0,"Calvert Variable Series, Inc.",extra_family,14,0.051841578039999996
+1100.0,"Calvert Variable Series, Inc.",intra_family,1,0.001015
+1100.0,"Calvert Variable Trust, Inc.",extra_family,370,0.45908586048
+1100.0,"Calvert Variable Trust, Inc.",unknown_match,1,0.0007612755
+1107.0,Advisors Preferred Trust,extra_family,52,0.3165311940099999
+1107.0,North Country Funds,extra_family,20,0.049497474
+1238.0,Columbia Funds Variable Series Trust II,extra_family,12,0.06451056
+1238.0,TCW ETF Trust,extra_family,106,0.45145857043
+1238.0,TCW ETF Trust,intra_family,9,0.21716215040000003
+1238.0,TCW ETF Trust,unknown_match,1,0.001404261
+1238.0,TCW FUNDS INC,extra_family,38,0.37165578199
+1238.0,TCW FUNDS INC,intra_family,27,0.20782476742000003
+1238.0,TCW Metropolitan West Funds,intra_family,11,3.9605727722
+1287.0,Diamond Hill Funds,extra_family,79,2.6080290252000005
+1290.0,American Pension Investors Trust,extra_family,27,0.026207365219999997
+1298.0,EIP Investment Trust,extra_family,10,0.01231892072
+1298.0,First Trust Variable Insurance Trust,extra_family,8,0.00249694394
+1298.0,First Trust Variable Insurance Trust,unknown_match,1,0.0003208404
+1324.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,11,0.0133079802
+1324.0,SEI INSTITUTIONAL MANAGED TRUST,unknown_match,1,0.04388170146
+1355.0,Brighthouse Funds Trust I,intra_family,69,5.111729456100002
+1355.0,"EMPOWER FUNDS, INC.",extra_family,2,0.070171364
+1355.0,"EMPOWER FUNDS, INC.",intra_family,18,1.3197679394000001
+1355.0,EQ Advisors Trust,unknown_match,8,0.013793776280000001
+1355.0,Franklin Custodian Funds,extra_family,53,16.23884096214
+1355.0,Franklin Fund Allocator Series,extra_family,60,0.695540991
+1355.0,Franklin Gold and Precious Metals Fund,extra_family,6,0.03571510654
+1355.0,Franklin Investors Securities Trust,extra_family,29,1.62325094
+1355.0,Franklin Managed Trust,extra_family,10,5.739218125
+1355.0,Franklin Real Estate Securities Trust,extra_family,6,0.02653661357
+1355.0,Franklin Strategic Series,extra_family,55,1.88645160117
+1355.0,Franklin Templeton Variable Insurance Products Trust,extra_family,50,0.7733766827099999
+1355.0,George Putnam Balanced Fund,extra_family,23,0.3603765065
+1355.0,JNL Series Trust,extra_family,19,0.25368829551
+1355.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,64,0.25793773747000004
+1355.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,3,0.12173425416999999
+1355.0,Putnam Asset Allocation Funds,extra_family,155,0.51098308919
+1355.0,Putnam Asset Allocation Funds,unknown_match,2,0.00100888875
+1355.0,Putnam Funds Trust,extra_family,1,0.004450961190000001
+1355.0,Putnam Global Health Care Fund,extra_family,4,0.30107519580000003
+1355.0,Putnam Investment Funds,extra_family,50,3.06343983162
+1355.0,Putnam Large Cap Value Fund,extra_family,15,11.090150548059999
+1355.0,Putnam Variable Trust,extra_family,82,0.14414258023999998
+1355.0,Templeton Global Investment Trust,extra_family,2,0.01034287392
+1355.0,Venerable Variable Insurance Trust,extra_family,72,0.25312567863999996
+1355.0,Venerable Variable Insurance Trust,intra_family,4,1.00910376957
+1399.0,JANUS INVESTMENT FUND,intra_family,2,0.28402491240000005
+1407.0,JNL Series Trust,extra_family,6,0.00585708796
+1491.0,Dunham Funds,extra_family,5,0.0205146016
+1492.0,GLENMEDE FUND INC,extra_family,157,0.5804010003399999
+1492.0,GLENMEDE FUND INC,unknown_match,1,-0.00013986
+1526.0,Mutual Fund & Variable Insurance Trust,extra_family,12,0.026188244
+1531.0,ARK ETF Trust,extra_family,43,3.4654882008200003
+1531.0,ARK ETF Trust,intra_family,3,0.21350240820000002
+1531.0,ARK ETF Trust,unknown_match,1,8.30835e-05
+1588.0,PACE SELECT ADVISORS TRUST,extra_family,23,0.03553621062
+1589.0,Advanced Series Trust,extra_family,365,7.61957957813
+1589.0,Advanced Series Trust,intra_family,7,0.10606102727
+1589.0,Advanced Series Trust,unknown_match,4,0.0130796897
+1589.0,Bridge Builder Trust,extra_family,32,1.86926140467
+1589.0,Dunham Funds,extra_family,5,0.00632034172
+1589.0,Prudential Investment Portfolios 12,extra_family,69,0.10414063373
+1589.0,Prudential Investment Portfolios 16,extra_family,26,0.2164372137
+1589.0,Prudential Investment Portfolios 18,extra_family,4,0.10140162885999998
+1589.0,Prudential Investment Portfolios 2,extra_family,92,0.007188037040000001
+1589.0,Prudential Investment Portfolios 2,intra_family,1,7.696737e-05
+1589.0,Prudential Investment Portfolios 3,extra_family,64,0.63867843426
+1589.0,Prudential Investment Portfolios 3,unknown_match,1,0.000843045
+1589.0,Prudential Investment Portfolios 5,extra_family,43,0.28810543179000003
+1589.0,Prudential Investment Portfolios 5,unknown_match,1,0.0021553425
+1589.0,Prudential Investment Portfolios 7,extra_family,24,0.28990316046000003
+1589.0,Prudential Investment Portfolios 7,unknown_match,1,0.0125634351
+1589.0,Prudential Investment Portfolios 8,extra_family,82,0.24891824111000002
+1589.0,Prudential Investment Portfolios 8,intra_family,1,0.000575688
+1589.0,Prudential Investment Portfolios 8,unknown_match,1,0.0012628688
+1589.0,Prudential Investment Portfolios 9,extra_family,53,0.52378227113
+1589.0,"Prudential Investment Portfolios, Inc.",extra_family,119,3.0620209750999994
+1589.0,"Prudential Investment Portfolios, Inc.",unknown_match,1,0.0093330295
+1589.0,"Prudential Investment Portfolios, Inc. 10",extra_family,36,0.21947215428000003
+1589.0,"Prudential Jennison Blend Fund, Inc.",extra_family,44,0.2869508926000001
+1589.0,"Prudential Jennison Blend Fund, Inc.",unknown_match,1,0.0072563808
+1589.0,"Prudential Jennison Mid-Cap Growth Fund, Inc.",extra_family,6,0.23868530366
+1589.0,"Prudential Jennison Natural Resources Fund, Inc.",extra_family,4,0.034029438620000005
+1589.0,"Prudential Jennison Small Co Fund, Inc.",extra_family,11,0.29394434224
+1589.0,"Prudential Sector Funds, Inc.",extra_family,14,0.71703347161
+1589.0,Prudential Series Fund,extra_family,472,9.748847817060001
+1589.0,Prudential Series Fund,intra_family,5,0.031094099620000003
+1589.0,Prudential Series Fund,unknown_match,5,0.0533662931
+1589.0,"Prudential World Fund, Inc.",extra_family,33,1.67555999497
+1589.0,Prudentials Gibraltar Fund,extra_family,13,0.04489166079000001
+1589.0,SIX CIRCLES TRUST,extra_family,33,1.8968563738700002
+1589.0,Target Portfolio Trust,unknown_match,47,0.18509249566
+1590.0,HC Capital Trust,unknown_match,160,0.44455052394000005
+1592.0,ADVISORS' INNER CIRCLE FUND,extra_family,5,0.34566605664000005
+1596.0,Professionally Managed Portfolios,extra_family,73,3.3315781703000003
+1621.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.00394360547
+1621.0,PACIFIC SELECT FUND,intra_family,35,0.9163541108799999
+1638.0,FMI Funds Inc,extra_family,15,0.53173761429
+1642.0,TRANSAMERICA SERIES TRUST,intra_family,1,0.18353103109
+1648.0,Investment House Funds,extra_family,6,0.05954816415
+1684.0,Firsthand Funds,extra_family,5,0.006753285
+1699.0,"Thrivent Series Fund, Inc.",extra_family,1377,5.503304138020005
+1699.0,"Thrivent Series Fund, Inc.",unknown_match,2,0.0033841938
+1714.0,"RBB Fund, Inc.",extra_family,18,0.05527777636
+1888.0,"EMPOWER FUNDS, INC.",extra_family,2,0.035119151
+1888.0,"EMPOWER FUNDS, INC.",intra_family,19,1.125548596
+1888.0,Virtus Equity Trust,extra_family,10,0.053888839669999994
+1888.0,Virtus Equity Trust,intra_family,6,0.07872180851999999
+1888.0,Virtus Variable Insurance Trust,intra_family,5,0.039101512240000004
+1921.0,ADVISORS' INNER CIRCLE FUND,extra_family,52,0.72529547585
+1977.0,Direxion Funds,extra_family,33,0.06961672338
+2111.0,ADVISORS' INNER CIRCLE FUND,extra_family,9,0.09663666105
+2232.0,SEASONS SERIES TRUST,extra_family,1,0.0028610494700000003
+2232.0,SUNAMERICA SERIES TRUST,extra_family,1292,17.560546539
+2232.0,SUNAMERICA SERIES TRUST,intra_family,12,1.42486315839
+2232.0,SUNAMERICA SERIES TRUST,unknown_match,7,0.027699939
+2232.0,VALIC Co I,extra_family,6,0.013163085580000001
+2257.0,"Calvert World Values Fund, Inc.",extra_family,21,0.0327275089
+2257.0,Eaton Vance Growth Trust,extra_family,138,2.0585528385900003
+2257.0,Eaton Vance Growth Trust,intra_family,4,0.06095392681
+2257.0,Eaton Vance Growth Trust,unknown_match,1,0.0044189322000000005
+2257.0,Global Macro Capital Opportunities Portfolio,extra_family,20,0.19500485646
+2273.0,Tortoise Capital Series Trust,extra_family,30,0.26865894592000006
+2322.0,Bridge Builder Trust,extra_family,131,6.1794434668200005
+2322.0,Bridge Builder Trust,unknown_match,1,0.013824635
+2322.0,Brighthouse Funds Trust I,extra_family,22,1.3798796348200002
+2322.0,GuideStone Funds,extra_family,17,0.12951564068
+2322.0,JNL Series Trust,extra_family,107,0.04029180145
+2322.0,MORGAN STANLEY PATHWAY FUNDS,extra_family,35,0.06334381076
+2322.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,38,0.56839167168
+2322.0,Optimum Fund Trust,extra_family,31,0.63561646024
+2322.0,PACE SELECT ADVISORS TRUST,extra_family,91,0.01635068741
+2322.0,PACE SELECT ADVISORS TRUST,unknown_match,2,0.0005303025
+2322.0,PIMCO ETF Trust,extra_family,1,1.7624720000000002e-05
+2322.0,PIMCO ETF Trust,intra_family,5,0.30144988668
+2322.0,PIMCO Equity Series,extra_family,341,3.49164294953
+2322.0,PIMCO Equity Series,intra_family,70,1.29103892098
+2322.0,PIMCO Equity Series,unknown_match,3,0.0283798063
+2322.0,PIMCO Equity Series VIT,extra_family,1,0.00770190472
+2322.0,PIMCO Funds,extra_family,80,2.0274214614
+2322.0,PIMCO Funds,intra_family,65,11.865468639439998
+2322.0,PIMCO Variable Insurance Trust,extra_family,1,0.000369303
+2322.0,PIMCO Variable Insurance Trust,intra_family,44,0.490923284
+2322.0,SIX CIRCLES TRUST,extra_family,91,9.339926970480002
+2322.0,SIX CIRCLES TRUST,unknown_match,1,0.0066716872
+2324.0,Amana Mutual Funds Trust,extra_family,21,2.19949727821
+2324.0,SATURNA INVESTMENT TRUST,extra_family,37,0.051283735149999995
+2326.0,MATTHEW 25 FUND,extra_family,6,0.09977768
+2359.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,71,0.052180308759999995
+2369.0,EQ Advisors Trust,unknown_match,89,0.11680197247
+2369.0,HARBOR FUNDS,extra_family,12,0.28480771702999996
+2373.0,NEW YORK LIFE INVESTMENTS FUNDS TRUST,extra_family,104,1.11685528681
+2373.0,NEW YORK LIFE INVESTMENTS FUNDS TRUST,intra_family,1,0.0037903966
+2373.0,NEW YORK LIFE INVESTMENTS FUNDS TRUST,unknown_match,1,0.00333333
+2396.0,NORTHERN LIGHTS FUND TRUST III,extra_family,126,6.523374707540001
+2396.0,NORTHERN LIGHTS FUND TRUST III,intra_family,2,0.06160238742
+2399.0,MASSMUTUAL PREMIER FUNDS,extra_family,10,0.046561690659999995
+2400.0,Fidelity Advisor Series I,extra_family,11,0.12362420982000001
+2400.0,Fidelity Advisor Series I,intra_family,2,0.18244507122999998
+2400.0,Fidelity Central Investment Portfolios LLC,extra_family,1,0.000257176
+2400.0,Fidelity Central Investment Portfolios LLC,intra_family,1,0.03466725632
+2400.0,Fidelity Salem Street Trust,extra_family,3,0.03567469796
+2400.0,Fidelity Salem Street Trust,intra_family,1,0.16343436268
+2400.0,Fidelity Summer Street Trust,extra_family,16,0.6106099178500001
+2400.0,Fidelity Summer Street Trust,intra_family,3,0.42075428833000006
+2401.0,Williamsburg Investment Trust,extra_family,55,1.0174811070099998
+2416.0,MARSICO INVESTMENT FUND,extra_family,39,0.80733102847
+2465.0,Meeder Funds,extra_family,398,0.73800583375
+2465.0,Meeder Funds,unknown_match,1,4.1626e-05
+2489.0,VALIC Co I,extra_family,44,0.17768550539
+2489.0,Virtus Investment Trust,extra_family,20,0.38116928599
+2489.0,Virtus Investment Trust,unknown_match,1,0.01240775
+2489.0,Voya Funds Trust,intra_family,1,0.10012905
+2489.0,Voya Investors Trust,extra_family,167,1.9070506122500002
+2489.0,Voya Investors Trust,unknown_match,2,0.0098551156
+2489.0,Voya Partners Inc,extra_family,37,1.9947566774499998
+2489.0,Voya Partners Inc,intra_family,62,7.78204988122
+2489.0,Voya Separate Portfolios Trust,extra_family,6,0.0027935166699999993
+2489.0,Voya Separate Portfolios Trust,intra_family,5,0.0006217883000000001
+2489.0,Voya VARIABLE PORTFOLIOS INC,extra_family,847,1.47724264538
+2489.0,Voya VARIABLE PORTFOLIOS INC,intra_family,2,0.00052843206
+2489.0,Voya VARIABLE PORTFOLIOS INC,unknown_match,3,0.0035396509000000004
+2489.0,Wilshire Mutual Funds Inc,extra_family,26,0.0014965424099999999
+2489.0,WisdomTree Digital Trust,extra_family,21,0.00061128478
+2489.0,WisdomTree Trust,extra_family,193,0.6642872469699999
+2489.0,WisdomTree Trust,intra_family,2,5.57766e-06
+2489.0,WisdomTree Trust,unknown_match,2,0.0024842412000000004
+2628.0,BNY MELLON FUNDS TRUST,extra_family,64,0.062408868369999995
+2628.0,BNY MELLON FUNDS TRUST,intra_family,12,0.20117816890999995
+2628.0,BNY MELLON INVESTMENT PORTFOLIOS,extra_family,31,0.057285207760000005
+2628.0,BNY MELLON OPPORTUNITY FUNDS,extra_family,2,0.06149881654
+2628.0,"BNY MELLON RESEARCH GROWTH FUND, INC.",extra_family,7,0.31242717371000006
+2628.0,BNY MELLON STOCK FUNDS,extra_family,3,0.00327885542
+2628.0,"BNY MELLON SUSTAINABLE U.S. EQUITY PORTFOLIO, INC.",extra_family,12,0.08083976859
+2628.0,BNY MELLON VARIABLE INVESTMENT FUND,extra_family,27,0.02749069022
+2628.0,"BNY Mellon Advantage Funds, Inc.",extra_family,44,0.3489085569599999
+2628.0,"BNY Mellon Investment Funds V, Inc.",extra_family,29,0.058247615270000004
+2628.0,BNY Mellon Investment Funds VI,extra_family,28,0.049016959639999996
+2628.0,"BNY Mellon Large Cap Securities Fund, Inc.",extra_family,12,0.6816144614499999
+2628.0,"BNY Mellon Strategic Funds, Inc.",extra_family,29,0.27761495579
+2628.0,"BNY Mellon Sustainable U.S. Equity Fund, Inc.",extra_family,12,0.13079792488999997
+2674.0,The Cutler Trust,extra_family,7,0.04671679824000001
+2691.0,EntrepreneurShares Series Trust,extra_family,6,0.21140760555999996
+2756.0,Needham Funds Inc,extra_family,14,0.08765240356000001
+2807.0,Managed Portfolio Series,extra_family,66,0.06418211836000001
+2920.0,Brighthouse Funds Trust I,extra_family,56,0.036917733980000006
+2920.0,Calvert Management Series,extra_family,7,0.00238061173
+2920.0,"Calvert Responsible Index Series, Inc.",extra_family,385,2.27008374882
+2920.0,E Trade Trust,extra_family,388,0.030786965559999997
+2920.0,E Trade Trust,intra_family,2,4.0726800000000005e-05
+2920.0,E Trade Trust,unknown_match,2,0.000154845
+2920.0,Eaton Vance Floating Rate Portfolio/MA,extra_family,1,0.0017257694199999999
+2920.0,Eaton Vance Floating Rate Portfolio/MA,intra_family,1,0.028568925
+2920.0,Eaton Vance Growth Trust,extra_family,6,0.09616378392
+2920.0,Eaton Vance Municipals Trust,extra_family,2,0.00344550225
+2920.0,Eaton Vance Mutual Funds Trust,extra_family,134,29.984035770219993
+2920.0,Eaton Vance Mutual Funds Trust,intra_family,15,5.48606709482
+2920.0,Eaton Vance Series Trust,extra_family,1,1.62224661306
+2920.0,Eaton Vance Series Trust II,extra_family,38,0.19431934183000002
+2920.0,Eaton Vance Special Investment Trust,extra_family,49,1.8642456485299996
+2920.0,Eaton Vance Special Investment Trust,intra_family,1,0.014810715
+2920.0,Eaton Vance Special Investment Trust,unknown_match,2,0.043614602100000004
+2920.0,Eaton Vance Variable Trust,extra_family,2,0.00298239998
+2920.0,MORGAN STANLEY INSTITUTIONAL FUND INC,extra_family,108,2.8756190809600004
+2920.0,MORGAN STANLEY INSTITUTIONAL FUND TRUST,extra_family,119,0.26245196133000004
+2920.0,MORGAN STANLEY INSTITUTIONAL FUND TRUST,unknown_match,1,0.000284978
+2920.0,MORGAN STANLEY VARIABLE INSURANCE FUND INC.,extra_family,129,0.24816362737999997
+2920.0,MORGAN STANLEY VARIABLE INSURANCE FUND INC.,unknown_match,1,4.0985599999999996e-05
+2920.0,Morgan Stanley ETF Trust,extra_family,334,0.2647950805
+2920.0,Morgan Stanley ETF Trust,intra_family,2,0.0006298764400000001
+2920.0,Morgan Stanley ETF Trust,unknown_match,2,0.0006991567
+2920.0,Morgan Stanley Europe Opportunity Fund Inc.,extra_family,1,0.0053263984000000006
+2920.0,Morgan Stanley Insight Fund,extra_family,6,0.31842210416000005
+2920.0,Penn Series Funds Inc,extra_family,6,0.00687185924
+2920.0,SEASONS SERIES TRUST,extra_family,84,0.14448443913000003
+2920.0,SEASONS SERIES TRUST,unknown_match,1,0.001655434
+2920.0,Stock Portfolio,unknown_match,7,0.14473866624999998
+2920.0,TRANSAMERICA SERIES TRUST,extra_family,113,0.09074586865999999
+2920.0,TRANSAMERICA SERIES TRUST,unknown_match,1,0.00042794729999999997
+2920.0,Tax-Managed Growth Portfolio,extra_family,30,2.32388904107
+2920.0,Tax-Managed Multi-Cap Growth Portfolio,extra_family,6,0.05384862880999999
+2920.0,Tax-Managed Small-Cap Portfolio,extra_family,9,0.02418802143
+2920.0,Tax-Managed Value Portfolio,extra_family,12,0.23376131078
+2920.0,Tax-Managed Value Portfolio,unknown_match,1,0.025596711
+2920.0,VALIC Co I,extra_family,59,0.21412119733
+2920.0,VALIC Co I,unknown_match,1,0.00036078885
+2920.0,Voya Investors Trust,extra_family,3,0.00812303098
+2921.0,Touchstone Funds Group Trust,extra_family,23,0.64839542734
+2921.0,Touchstone Funds Group Trust,unknown_match,1,0.025699252
+2921.0,Touchstone Strategic Trust,extra_family,35,1.6219582347400003
+2921.0,Touchstone Variable Series Trust,extra_family,36,0.08657609822
+2923.0,"EMPOWER FUNDS, INC.",extra_family,2,0.0092263675
+2923.0,"EMPOWER FUNDS, INC.",intra_family,18,0.13676174439
+2944.0,EA Series Trust,unknown_match,1958,3.70461391491
+2984.0,"HARTFORD MUTUAL FUNDS, INC",extra_family,41,0.5716826084500001
+2997.0,NORTHERN LIGHTS FUND TRUST III,extra_family,56,0.01166440517
+2997.0,NORTHERN LIGHTS FUND TRUST III,intra_family,1,3.155229e-05
+3006.0,Asset Management Fund,unknown_match,14,0.185177747
+3008.0,Advanced Series Trust,extra_family,111,1.28048637384
+3008.0,Advanced Series Trust,intra_family,2,0.00703853239
+3008.0,Advanced Series Trust,unknown_match,1,0.00193721
+3008.0,"EMPOWER FUNDS, INC.",extra_family,2,0.00677851138
+3008.0,"EMPOWER FUNDS, INC.",intra_family,19,0.38496957656
+3008.0,HOTCHKIS & WILEY FUNDS/DE/,extra_family,150,0.41980023669
+3008.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,24,0.29907833622
+3031.0,REX ETF Trust,extra_family,5,0.00197084645
+3040.0,SCM Trust,extra_family,29,0.06326344371
+3042.0,RBB Fund Trust,extra_family,1,5.535876e-05
+3052.0,Brighthouse Funds Trust I,extra_family,5,0.07291676334000001
+3100.0,ALGER FUNDS,extra_family,11,0.06097458039
+3100.0,ALGER FUNDS II,extra_family,14,0.020609269429999997
+3100.0,Alger Global Equity Fund,extra_family,2,0.0012830092000000002
+3169.0,NexPoint Funds I,extra_family,16,0.08140867493
+3200.0,Cantor Select Portfolios Trust,extra_family,9,0.1483493119
+3241.0,AuguStar Variable Insurance Products Fund Inc,extra_family,64,0.07702723640999999
+3241.0,AuguStar Variable Insurance Products Fund Inc,unknown_match,1,0.0012835217
+3241.0,"BlackRock Advantage Global Fund, Inc.",extra_family,25,0.09399293392
+3241.0,"BlackRock Advantage SMID Cap Fund, Inc.",extra_family,67,0.07367278031000002
+3241.0,"BlackRock Balanced Fund, Inc.",extra_family,48,0.17036270821
+3241.0,"BlackRock Capital Appreciation Fund, Inc.",extra_family,10,0.934782842
+3241.0,"BlackRock Emerging Markets Fund, Inc.",extra_family,1,0.00909890625
+3241.0,BlackRock Equity Dividend Fund,extra_family,19,4.06388246513
+3241.0,BlackRock Funds,extra_family,994,5.89648639658
+3241.0,BlackRock Funds,intra_family,1,0.01106306977
+3241.0,BlackRock Funds,unknown_match,2,0.006417576
+3241.0,BlackRock Funds II,extra_family,161,2.90515356577
+3241.0,BlackRock Funds II,intra_family,7,0.45657550761000004
+3241.0,BlackRock Funds III,extra_family,192,117.0974272048
+3241.0,BlackRock Funds III,intra_family,30,0.7871143117099999
+3241.0,BlackRock Funds VI,extra_family,1,0.72260427589
+3241.0,"BlackRock Global Allocation Fund, Inc.",extra_family,55,2.2909255790299996
+3241.0,BlackRock International Select Equity Fund,extra_family,1,0.00227151142
+3241.0,"BlackRock Large Cap Focus Growth Fund, Inc.",extra_family,10,0.44178187440999994
+3241.0,"BlackRock Large Cap Focus Value Fund, Inc.",extra_family,11,0.47098272698000004
+3241.0,"BlackRock Large Cap Series Funds, Inc.",extra_family,79,1.8070264146800001
+3241.0,"BlackRock Large Cap Series Funds, Inc.",unknown_match,1,0.0056077977
+3241.0,"BlackRock Mid-Cap Value Series, Inc.",extra_family,16,0.19464187814
+3241.0,BlackRock Natural Resources Trust,extra_family,3,0.00513443694
+3241.0,"BlackRock Series Fund, Inc.",extra_family,138,0.18859044758
+3241.0,"BlackRock Series Fund, Inc.",unknown_match,1,0.0014685973
+3241.0,"BlackRock Series, Inc.",extra_family,5,0.12595066237
+3241.0,BlackRock Unconstrained Equity Fund,extra_family,2,0.09222496754
+3241.0,"BlackRock Variable Series Funds, Inc.",extra_family,571,1.74012633849
+3241.0,"BlackRock Variable Series Funds, Inc.",intra_family,1,0.00813779502
+3241.0,"BlackRock Variable Series Funds, Inc.",unknown_match,4,0.006816417599999999
+3241.0,Bridge Builder Trust,extra_family,207,1.1741554605900002
+3241.0,Brighthouse Funds Trust I,extra_family,14,3.05639796671
+3241.0,Brighthouse Funds Trust II,extra_family,11,0.47511261087
+3241.0,Columbia Funds Variable Series Trust II,extra_family,9,0.01040098725
+3241.0,EQ Advisors Trust,unknown_match,594,3.32864408057
+3241.0,Forethought Variable Insurance Trust,extra_family,128,0.40083966745
+3241.0,Forethought Variable Insurance Trust,unknown_match,1,0.0001858761
+3241.0,HOMESTEAD FUNDS INC,extra_family,1,0.29803686588
+3241.0,JNL Series Trust,extra_family,272,1.77244188471
+3241.0,JNL Series Trust,unknown_match,1,0.0017161118999999999
+3241.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,205,1.52154877749
+3241.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.00376881828
+3241.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,unknown_match,1,0.0004205827
+3241.0,MML Series Investment Fund II,extra_family,8,0.6843627637599999
+3241.0,Master Investment Portfolio,extra_family,551,26.47909922789
+3241.0,Master Investment Portfolio,unknown_match,3,0.131397272
+3241.0,Morningstar Funds Trust,extra_family,47,0.11982543309
+3241.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,22,0.6657208217500001
+3241.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,10,0.021550871810000004
+3241.0,Nationwide Variable Insurance Trust,extra_family,78,0.54233480741
+3241.0,Nationwide Variable Insurance Trust,unknown_match,1,0.0041230553
+3241.0,Old Westbury Funds Inc,extra_family,23,0.8882951842100001
+3241.0,PACIFIC SELECT FUND,extra_family,26,0.48848129740999996
+3241.0,PACIFIC SELECT FUND,intra_family,71,8.08455963644
+3241.0,"Principal Funds, Inc",extra_family,15,3.2144898392500085
+3241.0,"Principal Funds, Inc",intra_family,5,0.34661594180000105
+3241.0,SIX CIRCLES TRUST,extra_family,101,7.444501975730001
+3241.0,SIX CIRCLES TRUST,unknown_match,1,0.0158550232
+3241.0,TRANSAMERICA FUNDS,extra_family,216,1.56465349121
+3241.0,TRANSAMERICA FUNDS,intra_family,58,1.7301598410900003
+3241.0,TRANSAMERICA FUNDS,unknown_match,4,0.0103434795
+3241.0,TRANSAMERICA SERIES TRUST,extra_family,8,0.045447300329999996
+3241.0,TRANSAMERICA SERIES TRUST,intra_family,26,0.7459706042300001
+3241.0,VALIC Co I,extra_family,118,0.46233592829000003
+3241.0,VALIC Co I,intra_family,10,0.10765719748000001
+3241.0,VALIC Co I,unknown_match,1,0.0029805942
+3241.0,WEBs ETF Trust,extra_family,12,0.00440664467
+3356.0,ADVISORS' INNER CIRCLE FUND,extra_family,5,0.0014107013999999998
+3372.0,ADVISORS' INNER CIRCLE III,extra_family,6,0.4748551247000001
+3375.0,Abacus FCF ETF Trust,extra_family,34,0.09707954603
+3404.0,John Hancock Investment Trust,extra_family,21,0.009126975689999999
+3442.0,Matthews International Funds,extra_family,71,0.16984138378
+3449.0,Cambria ETF Trust,extra_family,124,0.3557350246999999
+3449.0,Cambria ETF Trust,intra_family,22,0.10505745861
+3505.0,RMB Investors Trust,extra_family,31,0.10412477166000002
+3512.0,Fidelity Advisor Series VIII,extra_family,2,0.41595732896000004
+3512.0,Fidelity Investment Trust,extra_family,24,0.21241861807999998
+3512.0,Fidelity Investment Trust,unknown_match,1,0.0012225015
+3512.0,Variable Insurance Products Fund II,extra_family,3,0.03495799502
+3512.0,Variable Insurance Products Fund V,extra_family,4,0.006197128460000001
+3512.0,Variable Insurance Products Fund V,intra_family,12,0.02380844453
+3549.0,Nationwide Mutual Funds,extra_family,16,0.057181589
+3549.0,Nationwide Variable Insurance Trust,extra_family,17,0.011478480170000001
+3583.0,PACE SELECT ADVISORS TRUST,extra_family,2,0.0017237066000000002
+3583.0,UBS FUNDS,extra_family,119,0.30193246239
+3583.0,UBS FUNDS,intra_family,1,0.00830614671
+3583.0,UBS FUNDS,unknown_match,1,2.20938e-05
+3583.0,UBS INVESTMENT TRUST,extra_family,85,0.04947777730999999
+3583.0,UBS INVESTMENT TRUST,unknown_match,1,7.690635000000001e-05
+3599.0,UNDISCOVERED MANAGERS FUNDS,extra_family,9,0.9316301976
+3616.0,"EMPOWER FUNDS, INC.",extra_family,2,0.039783869
+3616.0,"EMPOWER FUNDS, INC.",intra_family,19,0.8491394
+3616.0,Fidelity Rutland Square Trust II,extra_family,4,3.1616885692299994
+3616.0,Fidelity Rutland Square Trust II,intra_family,33,72.89810888522
+3616.0,HOMESTEAD FUNDS INC,extra_family,8,0.07919376815000001
+3616.0,JNL Series Trust,extra_family,31,3.08597071316
+3616.0,John Hancock Funds II,extra_family,62,1.8859510563400004
+3616.0,John Hancock Funds II,unknown_match,1,0.00142577835
+3616.0,John Hancock Variable Insurance Trust,extra_family,58,1.0687333946500002
+3616.0,John Hancock Variable Insurance Trust,intra_family,4,0.41963224372
+3616.0,John Hancock Variable Insurance Trust,unknown_match,1,0.0018453126000000002
+3616.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,95,0.73205565737
+3616.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.002842572
+3616.0,MASSMUTUAL SELECT FUNDS,extra_family,18,0.68441576728
+3616.0,MML SERIES INVESTMENT FUND,extra_family,8,0.051088232889999995
+3616.0,MML SERIES INVESTMENT FUND,intra_family,20,0.12085867906999999
+3616.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,38,0.4298472565200001
+3616.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,11,0.0144249384
+3616.0,PACIFIC SELECT FUND,extra_family,19,0.16027076600999998
+3616.0,PACIFIC SELECT FUND,intra_family,1,0.12589508043
+3616.0,Penn Series Funds Inc,extra_family,15,0.05123729297
+3616.0,"Principal Variable Contract Funds, Inc",extra_family,4,0.040837784589999995
+3616.0,"Principal Variable Contract Funds, Inc",intra_family,5,0.01743975664
+3616.0,SEASONS SERIES TRUST,extra_family,104,0.01292494461
+3616.0,"T. ROWE PRICE BLUE CHIP GROWTH FUND, INC.",extra_family,15,15.50269269549
+3616.0,"T. ROWE PRICE CAPITAL APPRECIATION FUND, INC.",extra_family,21,8.98144995981
+3616.0,"T. ROWE PRICE COMMUNICATIONS & TECHNOLOGY FUND, INC.",extra_family,12,3.753128890290001
+3616.0,"T. ROWE PRICE DIVERSIFIED MID-CAP GROWTH FUND, INC.",extra_family,22,0.30177489021
+3616.0,"T. ROWE PRICE DIVIDEND GROWTH FUND, INC.",extra_family,19,4.99486961229
+3616.0,"T. ROWE PRICE EQUITY INCOME FUND, INC.",extra_family,25,3.8334014886
+3616.0,"T. ROWE PRICE EQUITY INCOME FUND, INC.",unknown_match,1,0.036823
+3616.0,"T. ROWE PRICE EQUITY SERIES, INC.",extra_family,126,1.0153085300400002
+3616.0,"T. ROWE PRICE EQUITY SERIES, INC.",intra_family,1,0.0083710949
+3616.0,"T. ROWE PRICE EQUITY SERIES, INC.",unknown_match,1,0.0017828736000000001
+3616.0,"T. ROWE PRICE FINANCIAL SERVICES FUND, INC.",extra_family,26,0.7995475055
+3616.0,"T. ROWE PRICE GLOBAL ALLOCATION FUND, INC.",extra_family,66,0.12515632388999998
+3616.0,"T. ROWE PRICE GLOBAL ALLOCATION FUND, INC.",intra_family,1,0.025234984199999998
+3616.0,"T. ROWE PRICE GLOBAL FUNDS, INC.",extra_family,16,0.10679630037
+3616.0,"T. ROWE PRICE GLOBAL REAL ESTATE FUND, INC.",extra_family,5,0.00223681805
+3616.0,"T. ROWE PRICE GLOBAL TECHNOLOGY FUND, INC.",extra_family,11,0.87455934801
+3616.0,"T. ROWE PRICE GROWTH STOCK FUND, INC.",extra_family,15,10.718230859959998
+3616.0,"T. ROWE PRICE HEALTH SCIENCES FUND, INC.",extra_family,5,0.6739849971599999
+3616.0,"T. ROWE PRICE INDEX TRUST, INC.",extra_family,657,11.488183645709999
+3616.0,"T. ROWE PRICE INDEX TRUST, INC.",intra_family,1,0.01465651604
+3616.0,"T. ROWE PRICE INDEX TRUST, INC.",unknown_match,2,0.059190571
+3616.0,"T. ROWE PRICE INTEGRATED EQUITY FUNDS, INC.",extra_family,98,0.5993832711899999
+3616.0,"T. ROWE PRICE INTERNATIONAL FUNDS, INC.",extra_family,102,6.38552465639
+3616.0,"T. ROWE PRICE INTERNATIONAL FUNDS, INC.",unknown_match,1,0.0030036361
+3616.0,"T. ROWE PRICE INTERNATIONAL INDEX FUND, INC.",extra_family,27,0.10085447306
+3616.0,"T. ROWE PRICE INTERNATIONAL SERIES, INC.",extra_family,3,0.026723245559999997
+3616.0,"T. ROWE PRICE MID-CAP GROWTH FUND, INC.",extra_family,12,3.3813329947799997
+3616.0,"T. ROWE PRICE MID-CAP VALUE FUND, INC.",extra_family,15,1.6844159489900004
+3616.0,"T. ROWE PRICE NEW ERA FUND, INC.",extra_family,8,0.22918546519
+3616.0,"T. ROWE PRICE NEW HORIZONS FUND, INC.",extra_family,20,1.3624872694600003
+3616.0,"T. ROWE PRICE REAL ASSETS FUND, INC.",extra_family,25,0.9118848201900001
+3616.0,"T. ROWE PRICE REAL ESTATE FUND, INC.",extra_family,7,0.026992991830000004
+3616.0,"T. ROWE PRICE SCIENCE & TECHNOLOGY FUND, INC.",extra_family,18,3.29857504146
+3616.0,"T. ROWE PRICE SMALL-CAP STOCK FUND, INC.",extra_family,22,1.04793204692
+3616.0,"T. ROWE PRICE SMALL-CAP VALUE FUND, INC.",extra_family,32,1.62636136365
+3616.0,"T. ROWE PRICE SPECTRUM FUND, INC.",extra_family,7,2.12667773957
+3616.0,"T. ROWE PRICE SPECTRUM FUND, INC.",intra_family,3,0.77088761941
+3616.0,"T. ROWE PRICE SPECTRUM FUNDS II, INC.",extra_family,165,1.54055314445
+3616.0,"T. ROWE PRICE SPECTRUM FUNDS II, INC.",intra_family,3,0.34232763723
+3616.0,"T. ROWE PRICE TAX-EFFICIENT FUNDS, INC.",extra_family,45,0.31590175290999994
+3616.0,"T. ROWE PRICE U.S. LARGE-CAP CORE FUND, INC.",extra_family,11,3.1227458699000006
+3616.0,"T. ROWE PRICE VALUE FUND, INC.",extra_family,21,7.681533561420001
+3616.0,"T. Rowe Price All-Cap Opportunities Fund, Inc.",extra_family,14,3.08728680905
+3616.0,"T. Rowe Price Balanced Fund, Inc.",extra_family,64,0.5577830700699999
+3616.0,"T. Rowe Price Balanced Fund, Inc.",intra_family,1,0.20976124341
+3616.0,"T. Rowe Price Balanced Fund, Inc.",unknown_match,1,0.00070444
+3616.0,"T. Rowe Price Equity Funds, Inc.",extra_family,138,6.905074222350001
+3616.0,"T. Rowe Price Equity Funds, Inc.",unknown_match,1,0.00323402
+3616.0,"T. Rowe Price U.S. Equity Research Fund, Inc.",extra_family,58,4.25147617262
+3616.0,"T. Rowe Price U.S. Equity Research Fund, Inc.",unknown_match,1,0.0168194656
+3616.0,Voya Investors Trust,extra_family,32,0.94214592163
+3616.0,Voya Investors Trust,unknown_match,1,0.0006331955
+3616.0,Voya Partners Inc,extra_family,22,0.062124923090000006
+3630.0,AMG Funds I,extra_family,14,0.09619177215
+3630.0,AMG Funds IV,extra_family,26,0.09177385186
+3630.0,JNL Series Trust,extra_family,61,0.44627825601
+3630.0,"RBB Fund, Inc.",extra_family,2,0.016569934600000003
+3633.0,Hennessy Funds Trust,extra_family,7,0.057245816369999994
+3634.0,Grandeur Peak Global Trust,extra_family,41,0.14486469215
+3657.0,FORUM FUNDS II,extra_family,45,0.01588031174
+3657.0,FORUM FUNDS II,unknown_match,2,0.00051232
+3681.0,Goldman Sachs Trust II,extra_family,8,0.12779293733
+3681.0,Goldman Sachs Trust II,intra_family,1,0.05538736941
+3681.0,John Hancock Funds II,extra_family,5,0.05718075775999999
+3681.0,John Hancock Investment Trust,extra_family,14,0.4827956527700001
+3681.0,RUSSELL INVESTMENT CO,extra_family,4,0.01348243108
+3682.0,AZZAD FUNDS,extra_family,3,0.0016232508899999998
+3693.0,Sequoia Fund Inc,extra_family,10,1.09730189528
+3700.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,2,0.01906072611
+3703.0,Clipper Funds Trust,extra_family,10,0.65287335979
+3703.0,DAVIS NEW YORK VENTURE FUND INC,extra_family,38,2.7449914255999994
+3703.0,DAVIS SERIES INC ,extra_family,34,0.8332996428099998
+3703.0,DAVIS VARIABLE ACCOUNT FUND INC,extra_family,18,0.0766167129
+3703.0,Davis Fundamental ETF Trust,extra_family,32,0.66915972786
+3703.0,SELECTED AMERICAN SHARES INC,extra_family,10,0.8130932879200001
+3704.0,Advisers Investment Trust,unknown_match,88,2.74937311983
+3704.0,GREEN CENTURY FUNDS,extra_family,43,0.18475099183
+3704.0,GREEN CENTURY FUNDS,unknown_match,1,0.0023794515
+3704.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,25,0.17292109707000003
+3704.0,NORTHWESTERN MUTUAL SERIES FUND INC,unknown_match,1,0.0016547936
+3704.0,Northern Funds,extra_family,3,4.147932e-05
+3717.0,Franklin Templeton Variable Insurance Products Trust,extra_family,61,0.05474547242
+3717.0,Legg Mason Partners Investment Trust,extra_family,7,0.33691568044
+3717.0,M FUND INC,unknown_match,42,0.062108332759999996
+3717.0,MML Series Investment Fund II,extra_family,40,0.29005402916
+3717.0,MML Series Investment Fund II,unknown_match,1,0.00810106
+3717.0,RUSSELL INVESTMENT CO,extra_family,11,0.054039757720000005
+3717.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,35,0.31206639496
+3726.0,Advisor Managed Portfolios,extra_family,87,0.28998055237
+3726.0,Advisor Managed Portfolios,unknown_match,1,0.0015736228999999999
+3738.0,ETF Series Solutions,extra_family,470,5.206413422870001
+3738.0,ETF Series Solutions,unknown_match,1,0.000352314
+3738.0,EXCHANGE TRADED CONCEPTS TRUST,extra_family,387,2.45370551078
+3738.0,EXCHANGE TRADED CONCEPTS TRUST,unknown_match,1,3.6344699999999997e-06
+3738.0,Exchange Listed Funds Trust,extra_family,276,0.62265630364
+3738.0,Exchange Listed Funds Trust,intra_family,1,0.0230700382
+3738.0,Exchange Listed Funds Trust,unknown_match,3,0.0072838456999999995
+3738.0,Horizon Funds,extra_family,299,3.1377126861099995
+3738.0,Horizon Funds,unknown_match,2,0.00188549595
+3738.0,RBB Fund Trust,extra_family,19,0.11794427113
+3738.0,Tortoise Capital Series Trust,extra_family,4,0.68469654802
+3756.0,2023 ETF Series Trust,extra_family,13,0.007715702570000001
+3809.0,IMPAX FUNDS SERIES TRUST I,extra_family,57,0.55667313061
+3809.0,IMPAX FUNDS SERIES TRUST III,extra_family,13,0.09956543943000001
+3827.0,Simplify Exchange Traded Funds,extra_family,64,1.08944616727
+3827.0,Simplify Exchange Traded Funds,intra_family,9,0.26059951829
+3827.0,Simplify Exchange Traded Funds,unknown_match,2,0.0007103636999999999
+3940.0,EQ Advisors Trust,unknown_match,4,0.038179608049999994
+3940.0,Emerging Markets Equities Fund Inc,extra_family,2,0.00632026658
+3953.0,AMERICAN BEACON FUNDS,extra_family,14,0.41243139878
+4072.0,Dunham Funds,extra_family,23,0.06922547851000001
+4072.0,TRANSAMERICA SERIES TRUST,intra_family,21,0.68964272348
+4151.0,SARATOGA ADVANTAGE TRUST,extra_family,10,0.0059608681
+4151.0,Zacks Trust,extra_family,114,0.17898331933
+4163.0,"Caldwell & Orkin Funds, Inc.",extra_family,21,0.01827320384
+4163.0,"Caldwell & Orkin Funds, Inc.",unknown_match,2,-0.006558587
+4173.0,Datum One Series Trust,extra_family,8,0.029328647410000006
+4236.0,Cavanal Hill Funds,extra_family,19,0.02442602804
+4281.0,SIT LARGE CAP GROWTH FUND INC,extra_family,17,0.061805546
+4281.0,SIT MID CAP GROWTH FUND INC,extra_family,4,0.011050634
+4281.0,SIT MUTUAL FUNDS II INC,extra_family,13,0.0057193322
+4281.0,SIT MUTUAL FUNDS INC,extra_family,97,0.0993339481
+4282.0,Longleaf Partners Funds Trust,extra_family,5,0.13757228474000002
+4313.0,John Hancock Bond Trust,extra_family,1,1.1e-10
+4313.0,John Hancock California Tax-Free Income Fund,extra_family,1,0.00198135
+4313.0,John Hancock Exchange-Traded Fund Trust,extra_family,346,0.9154009907799999
+4313.0,John Hancock Exchange-Traded Fund Trust,unknown_match,1,0.001590741
+4313.0,John Hancock Municipal Securities Trust,extra_family,3,0.00311202688
+4314.0,MADISON FUNDS,extra_family,76,0.5891002621
+4314.0,MADISON FUNDS,intra_family,10,0.14987998629000002
+4314.0,Madison ETFs Trust,extra_family,17,0.02595879804
+4314.0,TRANSAMERICA SERIES TRUST,extra_family,6,0.04409116261
+4314.0,ULTRA SERIES FUND,extra_family,146,0.54689137006
+4323.0,HARDING LOEVNER FUNDS INC,extra_family,34,1.68142747434
+4323.0,HOMESTEAD FUNDS INC,extra_family,5,0.01205820967
+4323.0,Morningstar Funds Trust,extra_family,87,0.48778266908
+4324.0,"DEUTSCHE DWS GLOBAL/INTERNATIONAL FUND, INC.",extra_family,17,0.18474706305
+4324.0,"DEUTSCHE DWS GLOBAL/INTERNATIONAL FUND, INC.",intra_family,2,0.0191466429
+4324.0,DEUTSCHE DWS SECURITIES TRUST,extra_family,16,0.06732614143000001
+4324.0,DEUTSCHE DWS VARIABLE SERIES II,extra_family,4,0.14631132398
+4324.0,RUSSELL INVESTMENT CO,extra_family,81,0.03160230066
+4324.0,RUSSELL INVESTMENT FUNDS,extra_family,3,0.00568695276
+4325.0,SCM Trust,extra_family,31,0.058400607390000005
+4325.0,SHELTON FUNDS,extra_family,252,0.96012802369
+4325.0,SHELTON FUNDS,unknown_match,1,0.00050840775
+4342.0,Bitwise Funds Trust,extra_family,4,0.06170118854000001
+4342.0,Innovator ETFs Trust,extra_family,338,0.50187590418
+4342.0,Innovator ETFs Trust,intra_family,24,0.9674829630699999
+4342.0,Innovator ETFs Trust,unknown_match,2,0.006837489
+4367.0,Capitol Series Trust,extra_family,116,1.5890165617000003
+4367.0,Capitol Series Trust,unknown_match,2,0.00545152899
+4367.0,Sterling Capital Funds,extra_family,90,0.18566288572999998
+4375.0,VANGUARD ADMIRAL FUNDS,extra_family,384,9.91086277006
+4375.0,VANGUARD ADMIRAL FUNDS,unknown_match,1,0.02103225225
+4375.0,VANGUARD CHESTER FUNDS,intra_family,52,807.8847525821
+4375.0,VANGUARD EXPLORER FUND,extra_family,49,1.9238013169000001
+4375.0,VANGUARD EXPLORER FUND,intra_family,1,0.26771323603
+4375.0,VANGUARD FENWAY FUNDS,extra_family,40,11.664106526250002
+4375.0,VANGUARD FIXED INCOME SECURITIES FUNDS,extra_family,23,0.83413355711
+4375.0,VANGUARD INDEX FUNDS,extra_family,1303,1202.28808283499
+4375.0,VANGUARD INDEX FUNDS,intra_family,3,0.00421953413
+4375.0,VANGUARD INDEX FUNDS,unknown_match,4,5.6993834096999985
+4375.0,VANGUARD INSTITUTIONAL INDEX FUNDS,extra_family,430,102.68125642507002
+4375.0,VANGUARD INSTITUTIONAL INDEX FUNDS,intra_family,1,6.443576e-05
+4375.0,VANGUARD INSTITUTIONAL INDEX FUNDS,unknown_match,2,0.5288770617
+4375.0,VANGUARD INTERNATIONAL EQUITY INDEX FUNDS,extra_family,328,14.13271361184
+4375.0,VANGUARD INTERNATIONAL EQUITY INDEX FUNDS,unknown_match,1,0.063064206
+4375.0,VANGUARD MONTGOMERY FUNDS,extra_family,51,-0.009175912789999997
+4375.0,VANGUARD SCOTTSDALE FUNDS,extra_family,1134,20.90817699692
+4375.0,VANGUARD SCOTTSDALE FUNDS,intra_family,5,1.5221597644099998
+4375.0,VANGUARD SCOTTSDALE FUNDS,unknown_match,4,0.08296440255
+4375.0,VANGUARD SPECIALIZED FUNDS,extra_family,76,34.12843786931
+4375.0,VANGUARD SPECIALIZED FUNDS,intra_family,1,9.28625669857
+4375.0,VANGUARD STAR FUNDS,extra_family,47,8.614314560890001
+4375.0,VANGUARD STAR FUNDS,intra_family,26,87.36408838143998
+4375.0,VANGUARD TAX-MANAGED FUNDS,extra_family,347,15.58636156364
+4375.0,VANGUARD TAX-MANAGED FUNDS,intra_family,1,0.01765179
+4375.0,VANGUARD TAX-MANAGED FUNDS,unknown_match,2,0.030447978100000002
+4375.0,VANGUARD TRUSTEES' EQUITY FUND,intra_family,6,3.00817674023
+4375.0,VANGUARD VALLEY FORGE FUNDS,extra_family,359,9.85676032777
+4375.0,VANGUARD VALLEY FORGE FUNDS,intra_family,1,7.39743e-05
+4375.0,VANGUARD VALLEY FORGE FUNDS,unknown_match,1,0.0485434407
+4375.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,162,4.54706518342
+4375.0,VANGUARD VARIABLE INSURANCE FUNDS,intra_family,14,9.352695294069997
+4375.0,VANGUARD VARIABLE INSURANCE FUNDS,unknown_match,1,0.019212960600000002
+4375.0,VANGUARD WELLINGTON FUND,extra_family,372,0.56408012564
+4375.0,VANGUARD WELLINGTON FUND,unknown_match,4,0.0071658825
+4375.0,VANGUARD WHITEHALL FUNDS,extra_family,141,24.661117486880002
+4375.0,VANGUARD WHITEHALL FUNDS,unknown_match,1,0.347803848
+4375.0,VANGUARD WORLD FUND,extra_family,682,75.20482709364
+4375.0,VANGUARD WORLD FUND,intra_family,1,0.0003728932
+4375.0,VANGUARD WORLD FUND,unknown_match,3,0.17387940765
+4380.0,ETF Series Solutions,extra_family,23,0.004852631950000001
+4392.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,6,0.01482069009
+4401.0,Total Fund Solution,extra_family,6,0.014442560390000001
+4435.0,FlexShares Trust,extra_family,497,1.84041285654
+4435.0,FlexShares Trust,unknown_match,2,0.005215446
+4435.0,Northern Funds,extra_family,879,6.94695370384
+4435.0,Northern Funds,intra_family,11,0.04424420835
+4435.0,Northern Funds,unknown_match,4,0.033596985
+4450.0,abrdn Funds,extra_family,21,0.12237757423000001
+4559.0,Kurv ETF Trust,extra_family,11,0.025567998120000004
+4559.0,Kurv ETF Trust,intra_family,2,0.00101408895
+4595.0,COHEN & STEERS GLOBAL INFRASTRUCTURE FUND INC,extra_family,6,0.20258875960999997
+4595.0,"COHEN & STEERS GLOBAL REALTY SHARES, INC",extra_family,9,0.15240438809
+4595.0,COHEN & STEERS INSTITUTIONAL REALTY SHARES INC,extra_family,6,0.5922939889
+4595.0,COHEN & STEERS REAL ESTATE SECURITIES FUND INC,extra_family,5,0.49123150830999995
+4595.0,COHEN & STEERS REALTY SHARES INC,extra_family,6,0.5406262484800001
+4595.0,Cohen & Steers ETF Trust,extra_family,11,0.02112809628
+4595.0,"Cohen & Steers Future of Energy Fund, INC",extra_family,2,0.011151567449999998
+4595.0,"Cohen & Steers International Realty Fund, Inc.",extra_family,4,0.025478942390000002
+4595.0,"Cohen & Steers Real Assets Fund, Inc.",extra_family,18,0.16642603913999998
+4595.0,JNL Series Trust,extra_family,6,0.10884662047
+4595.0,Penn Series Funds Inc,extra_family,4,0.018868818830000002
+4595.0,RUSSELL INVESTMENT CO,extra_family,267,0.59278090946
+4595.0,RUSSELL INVESTMENT FUNDS,extra_family,21,0.08443782424
+4598.0,LITMAN GREGORY FUNDS TRUST,extra_family,2,0.005516574769999999
+4635.0,"Calvert World Values Fund, Inc.",extra_family,3,0.23428221813
+4635.0,EQ Advisors Trust,unknown_match,5,0.0172001803
+4635.0,Federated Hermes Core Trust,extra_family,3,0.0532485607
+4635.0,Federated Hermes ETF Trust,extra_family,177,0.26169780208
+4635.0,Federated Hermes ETF Trust,intra_family,4,0.0797229728
+4635.0,Federated Hermes ETF Trust,unknown_match,1,-1.0246399999999999e-05
+4635.0,Federated Hermes High Yield Trust,extra_family,1,0.0006982264000000001
+4635.0,Federated Hermes High Yield Trust,intra_family,1,0.00814264497
+4635.0,Federated Hermes Index Trust,extra_family,119,0.09581514476000003
+4635.0,Federated Hermes Index Trust,intra_family,1,0.00034095984
+4635.0,Federated Hermes Index Trust,unknown_match,1,0.000378954
+4635.0,Federated Hermes Institutional Trust,extra_family,1,0.00255635254
+4635.0,Federated Hermes Institutional Trust,intra_family,3,0.05768520796
+4635.0,"Federated Hermes Investment Series Funds, Inc.",intra_family,1,0.1439706664
+4636.0,Brighthouse Funds Trust I,extra_family,100,0.08447258666999999
+4636.0,Brighthouse Funds Trust I,unknown_match,1,0.00031475659999999995
+4636.0,Brighthouse Funds Trust II,extra_family,25,0.6056675674800001
+4636.0,Legg Mason Global Asset Management Trust,extra_family,20,0.01061680891
+4636.0,Legg Mason Partners Investment Trust,extra_family,114,4.10329291194
+4636.0,Legg Mason Partners Variable Equity Trust,extra_family,88,1.61780949367
+4636.0,Morningstar Funds Trust,extra_family,3,0.32380340740999997
+4636.0,Western Asset Funds Inc,extra_family,9,0.00014931298
+4692.0,GOEHRING & ROZENCWAJG INVESTMENT FUNDS,extra_family,7,0.05533860168
+4721.0,BNY MELLON FUNDS TRUST,extra_family,79,0.07246746811
+4721.0,BNY MELLON FUNDS TRUST,unknown_match,1,0.000581529
+4721.0,"BNY Mellon Investment Funds II, Inc.",extra_family,1,0.002366875
+4721.0,Brinker Capital Destinations Trust,extra_family,8,0.08590879762
+4721.0,JNL Series Trust,extra_family,19,0.7878243789300002
+4721.0,WisdomTree Trust,extra_family,71,0.8460885358999999
+4723.0,Carillon Series Trust,extra_family,87,0.78333194249
+4723.0,Pear Tree Funds,extra_family,13,0.11938837682
+4749.0,ADVISORS' INNER CIRCLE FUND,extra_family,134,0.3524487404
+4749.0,ADVISORS' INNER CIRCLE FUND,unknown_match,1,0.00051615
+4749.0,"EMPOWER FUNDS, INC.",extra_family,1,0.03451594713
+4749.0,"EMPOWER FUNDS, INC.",intra_family,5,0.6647433335
+4749.0,HARBOR FUNDS,extra_family,16,0.04744102248
+4749.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,11,0.0075663968500000005
+4749.0,Touchstone Strategic Trust,extra_family,3,0.00584866601
+4796.0,ETF Series Solutions,extra_family,10,0.0010329646699999999
+4805.0,Franklin Alternative Strategies Funds,extra_family,24,-0.00591899232
+4805.0,Franklin Alternative Strategies Funds,unknown_match,1,0.00217557225
+4805.0,Franklin High Income Trust,extra_family,2,0.00015009688000000001
+4805.0,Franklin Mutual Series Funds,extra_family,36,3.97782377811
+4805.0,Franklin Templeton ETF Trust,extra_family,648,1.9318706135499997
+4805.0,Franklin Templeton ETF Trust,intra_family,3,0.008865106130000001
+4805.0,Franklin Templeton ETF Trust,unknown_match,3,0.0037862049
+4805.0,Franklin Templeton Variable Insurance Products Trust,extra_family,29,0.62962682773
+4805.0,Franklin Value Investors Trust,extra_family,22,0.5511333464
+4805.0,Legg Mason Global Asset Management Trust,extra_family,21,0.74232027204
+4805.0,Legg Mason Partners Investment Trust,extra_family,32,3.53267180346
+4805.0,Putnam Funds Trust,extra_family,72,0.20694320861
+4805.0,Putnam Funds Trust,unknown_match,1,1.3591950000000001e-05
+4805.0,ROYCE CAPITAL FUND,extra_family,20,0.023019128990000002
+4805.0,ROYCE FUND,extra_family,81,0.5489696485900001
+4830.0,BARON INVESTMENT FUNDS TRUST (f/k/a BARON ASSET FUND),extra_family,40,1.6925111127999999
+4830.0,BARON SELECT FUNDS,extra_family,40,4.67476055825
+4830.0,BARON SELECT FUNDS,intra_family,18,0.55917774461
+4830.0,JNL Series Trust,extra_family,41,0.04566270564
+4830.0,Voya Partners Inc,extra_family,2,0.01714574951
+4911.0,Advisers Investment Trust,unknown_match,82,0.51255263462
+4945.0,Managed Portfolio Series,extra_family,12,0.07931741573000001
+5000.0,Brookfield Investment Funds,extra_family,10,0.029537167719999997
+5016.0,Brown Advisory Funds,extra_family,5,0.00263035296
+5017.0,BBH Trust,extra_family,9,0.17363706331999998
+5022.0,ProFunds,extra_family,2105,0.6996352048599999
+5022.0,ProFunds,unknown_match,9,0.0015395076999999999
+5022.0,ProShares Trust,extra_family,2137,12.39111450331
+5022.0,ProShares Trust,unknown_match,13,0.038811039
+5022.0,TRANSAMERICA SERIES TRUST,extra_family,17,0.03564104184
+5026.0,Allianz Variable Insurance Products Trust,extra_family,264,0.17749348019
+5026.0,Allianz Variable Insurance Products Trust,unknown_match,1,0.0011977081
+5026.0,Brighthouse Funds Trust II,intra_family,38,3.098598629890001
+5026.0,DFA INVESTMENT DIMENSIONS GROUP INC,extra_family,5087,100.83678539146001
+5026.0,DFA INVESTMENT DIMENSIONS GROUP INC,intra_family,152,16.09772109084
+5026.0,DFA INVESTMENT DIMENSIONS GROUP INC,unknown_match,7,0.1562767335
+5026.0,DFA INVESTMENT TRUST CO,extra_family,448,11.59147684897
+5026.0,DFA INVESTMENT TRUST CO,intra_family,9,1.35424812937
+5026.0,DIMENSIONAL EMERGING MARKETS VALUE FUND,extra_family,112,0.606610435
+5026.0,DIMENSIONAL INVESTMENT GROUP INC,extra_family,112,18.594467378079997
+5026.0,DIMENSIONAL INVESTMENT GROUP INC,intra_family,4,18.926323433740002
+5026.0,DIMENSIONAL INVESTMENT GROUP INC,unknown_match,1,0.020706606
+5026.0,Dimensional ETF Trust,extra_family,2703,28.472410760909998
+5026.0,Dimensional ETF Trust,unknown_match,8,0.1414349235
+5026.0,John Hancock Variable Insurance Trust,extra_family,20,0.73214920359
+5026.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,243,1.25052064865
+5026.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.0009731780400000001
+5026.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,unknown_match,1,0.0017462107
+5026.0,M FUND INC,unknown_match,78,0.09440191082000002
+5026.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,14,0.16985580037000003
+5026.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,unknown_match,1,0.0025073261000000003
+5026.0,SA FUNDS INVESTMENT TRUST,unknown_match,433,0.7715451494500001
+5026.0,Symmetry Panoramic Trust,extra_family,100,0.14841495471000002
+5026.0,Symmetry Panoramic Trust,unknown_match,2,0.00762985669
+5046.0,NEW YORK LIFE INVESTMENTS FUNDS,extra_family,9,3.46090708854
+5046.0,New York Life Investments Active ETF Trust,extra_family,18,0.12253359705
+5047.0,Brighthouse Funds Trust II,extra_family,28,0.9837794643800001
+5047.0,EQ Advisors Trust,unknown_match,36,1.1803398520599997
+5047.0,Fidelity Rutland Square Trust II,extra_family,10,1.21839287482
+5047.0,Fidelity Rutland Square Trust II,intra_family,4,0.5788662156800001
+5047.0,Goldman Sachs Trust II,extra_family,59,0.05740564496
+5047.0,Goldman Sachs Trust II,intra_family,1,0.02634883228
+5047.0,Guardian Variable Products Trust,extra_family,29,0.04986911764000001
+5047.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,26,0.04680052949
+5047.0,MASSMUTUAL SELECT FUNDS,extra_family,20,0.41539103858
+5047.0,MFS Active Exchange Traded Funds Trust,extra_family,79,0.17586308489
+5047.0,MFS SERIES TRUST X,intra_family,2,0.21093876834
+5047.0,MML SERIES INVESTMENT FUND,extra_family,14,0.0118713177
+5047.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,39,0.42868980535999995
+5047.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,11,0.04505846691999999
+5047.0,PACIFIC SELECT FUND,extra_family,22,0.43136927306
+5047.0,VALIC Co I,extra_family,16,0.77723277647
+5048.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,23,0.10918943000999999
+5050.0,abrdn Funds,extra_family,8,0.03952671255
+5052.0,ARBITRAGE FUNDS,extra_family,5,-0.00335879263
+5052.0,Morningstar Funds Trust,extra_family,3,0.06274850885
+5057.0,RUSSELL INVESTMENT CO,extra_family,117,0.06372959226000001
+5058.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,14,0.8188705324400001
+5058.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,13,1.1049233682600001
+5058.0,abrdn Funds,extra_family,17,0.15456921584
+5061.0,Forethought Variable Insurance Trust,extra_family,25,0.07807687745
+5061.0,Wilshire Mutual Funds Inc,extra_family,270,0.09147227343
+5061.0,Wilshire Mutual Funds Inc,unknown_match,1,0.0003640674
+5099.0,MoA Funds Corp,extra_family,435,2.34554351427
+5099.0,MoA Funds Corp,intra_family,125,10.592123125909998
+5099.0,MoA Funds Corp,unknown_match,3,0.009134505500000003
+5099.0,Total Fund Solution,extra_family,26,0.019021772120000002
+5100.0,Oak Associates Funds,extra_family,37,0.6072886256300001
+5100.0,SARATOGA ADVANTAGE TRUST,extra_family,3,0.0028414008199999998
+5127.0,Advanced Series Trust,extra_family,226,3.39763566319
+5127.0,Advanced Series Trust,intra_family,4,0.04877399256
+5127.0,Advanced Series Trust,unknown_match,1,0.011316988699999999
+5127.0,"EMPOWER FUNDS, INC.",extra_family,2,0.068467474
+5127.0,"EMPOWER FUNDS, INC.",intra_family,29,2.68967655305
+5127.0,Guardian Variable Products Trust,extra_family,25,0.026935324890000004
+5127.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,14,0.02940732575
+5127.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,13,0.02272524031
+5127.0,Nationwide Variable Insurance Trust,extra_family,24,0.16110763338999998
+5127.0,Nationwide Variable Insurance Trust,unknown_match,1,0.0051272025
+5127.0,PACIFIC SELECT FUND,extra_family,7,0.02831913905
+5127.0,PFM Multi-Manager Series Trust,extra_family,7,0.5479505347299999
+5127.0,Putnam Asset Allocation Funds,extra_family,85,0.38284101038
+5127.0,Putnam Asset Allocation Funds,unknown_match,1,0.000762076
+5127.0,Putnam Funds Trust,extra_family,10,0.31268160744
+5127.0,SEASONS SERIES TRUST,extra_family,35,0.41830102709999994
+5147.0,Putnam Asset Allocation Funds,extra_family,85,0.07401190894
+5147.0,Putnam Asset Allocation Funds,unknown_match,1,0.00013944710000000002
+5147.0,Putnam Variable Trust,extra_family,51,0.016543299129999998
+5147.0,Putnam Variable Trust,unknown_match,1,6.0517800000000005e-05
+5167.0,"RBB Fund, Inc.",extra_family,14,0.02205736828
+5225.0,Ultimus Managers Trust,extra_family,6,0.21657372793999996
+5233.0,Amplify ETF Trust,extra_family,230,3.30594593713
+5233.0,Amplify ETF Trust,intra_family,6,0.37312855038
+5382.0,NEW YORK LIFE INVESTMENTS FUNDS,extra_family,1,0.0144578
+5382.0,NEW YORK LIFE INVESTMENTS FUNDS TRUST,extra_family,94,0.7587546372999999
+5382.0,NEW YORK LIFE INVESTMENTS FUNDS TRUST,unknown_match,1,0.0027770535
+5382.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,118,2.17098945925
+5382.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,intra_family,1,0.00186241784
+5382.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,unknown_match,1,0.0083367272
+5448.0,Cantor Select Portfolios Trust,extra_family,26,0.03803792194
+5448.0,SARATOGA ADVANTAGE TRUST,extra_family,10,0.0030133245300000004
+5448.0,SARATOGA ADVANTAGE TRUST,intra_family,10,0.0024038281899999995
+5486.0,HEARTLAND GROUP INC.,extra_family,32,0.25539027385
+5634.0,"Thompson IM Funds, Inc.",extra_family,25,0.06904312468000001
+5640.0,Krane Shares Trust,extra_family,73,0.91499679434
+5649.0,X-SQUARE BALANCED FUND,extra_family,13,0.014214970060000002
+5673.0,"Manning & Napier Fund, Inc.",extra_family,83,0.31513101564999996
+5673.0,"Manning & Napier Fund, Inc.",unknown_match,1,0.0005346315
+5675.0,Brighthouse Funds Trust II,extra_family,2,0.03300052077000001
+5675.0,M FUND INC,unknown_match,15,0.02359190604
+5675.0,MASSMUTUAL SELECT FUNDS,extra_family,40,0.14527301926
+5675.0,MASSMUTUAL SELECT FUNDS,unknown_match,1,0.00405053
+5675.0,VANGUARD SCOTTSDALE FUNDS,extra_family,30,0.17733805353000004
+5675.0,VANGUARD SCOTTSDALE FUNDS,intra_family,1,0.01117953655
+5686.0,GREEN CENTURY FUNDS,extra_family,7,0.03969670055
+5686.0,John Hancock Investment Trust,extra_family,11,0.022360908860000004
+5686.0,Perpetual Americas Funds Trust,extra_family,3,0.00062153343
+5687.0,Strategic Trust,unknown_match,7,0.047158293260000005
+5688.0,PACE SELECT ADVISORS TRUST,extra_family,4,0.0029071658899999997
+5693.0,Nuveen Investment Trust V,extra_family,12,0.026506805
+5697.0,NEIMAN FUNDS,extra_family,50,0.68860689
+5699.0,ANCORA TRUST,extra_family,20,0.027818614349999996
+5706.0,Aristotle Fund Series Trust,extra_family,20,0.16012202182000002
+5706.0,PFM Multi-Manager Series Trust,extra_family,43,1.03571689505
+5718.0,First Trust Variable Insurance Trust,extra_family,8,0.03041427158
+5718.0,First Trust Variable Insurance Trust,unknown_match,1,0.0039072405
+5719.0,Wall Street EWM Funds Trust,extra_family,10,0.17294846785000004
+5726.0,GuideStone Funds,extra_family,30,0.26638412807
+5726.0,PAYDEN & RYGEL INVESTMENT GROUP,extra_family,17,0.35000582
+5726.0,PAYDEN & RYGEL INVESTMENT GROUP,intra_family,11,0.08540637114
+5728.0,ALGER FUNDS,extra_family,14,0.00468205835
+5728.0,ALGER FUNDS II,extra_family,1,0.00035078125
+5731.0,Mutual Fund & Variable Insurance Trust,extra_family,2,0.023405312940000002
+5731.0,Strategy Shares,extra_family,50,0.054757341450000004
+5732.0,GuideStone Funds,extra_family,303,1.83548654876
+5732.0,GuideStone Funds,unknown_match,3,0.009249137099999999
+5801.0,Columbia Funds Variable Series Trust II,extra_family,6,0.07853741036
+5836.0,GraniteShares ETF Trust,extra_family,31,0.0781172919
+5836.0,GraniteShares ETF Trust,unknown_match,15,0.00473259487
+5918.0,RBB Fund Trust,extra_family,228,0.15095382245000002
+5918.0,RBB Fund Trust,unknown_match,1,0.0003471969
+5971.0,Brinker Capital Destinations Trust,extra_family,7,0.09105572897
+6007.0,Listed Funds Trust,extra_family,14,0.7384279660799999
+6007.0,Roundhill ETF Trust,extra_family,22,0.12645650116999999
+6007.0,Roundhill ETF Trust,intra_family,25,0.70110571089
+6043.0,Advisors Preferred Trust,extra_family,11,0.015569429190000001
+6053.0,ALLSPRING EXCHANGE-TRADED FUNDS TRUST,extra_family,52,0.10862861036000002
+6053.0,ALLSPRING EXCHANGE-TRADED FUNDS TRUST,unknown_match,1,0.001113552
+6053.0,ALLSPRING FUNDS TRUST,extra_family,458,6.47597451842
+6053.0,ALLSPRING FUNDS TRUST,intra_family,93,8.576179614299997
+6053.0,ALLSPRING FUNDS TRUST,unknown_match,4,0.012737832199999998
+6053.0,ALLSPRING MASTER TRUST,extra_family,32,0.12417381233
+6053.0,Allspring VARIABLE TRUST,extra_family,115,0.08988469334999998
+6053.0,Allspring VARIABLE TRUST,unknown_match,1,6.0677900000000004e-05
+6053.0,Brighthouse Funds Trust I,extra_family,12,0.62344521805
+6053.0,Catholic Responsible Investments Funds,extra_family,5,0.09168881648
+6053.0,Guardian Variable Products Trust,extra_family,8,0.015675399370000002
+6053.0,John Hancock Variable Insurance Trust,extra_family,11,0.03835463736
+6053.0,Nationwide Variable Insurance Trust,extra_family,8,0.05636067626
+6053.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,29,0.24424569510000005
+6053.0,Venerable Variable Insurance Trust,intra_family,3,0.38088733457
+6063.0,Northern Lights Variable Trust,extra_family,61,0.47434537170999996
+6075.0,Brinker Capital Destinations Trust,extra_family,69,0.23969284638
+6075.0,IVY FUNDS,extra_family,1,0.00828852718
+6075.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,22,0.27366771293000003
+6075.0,PACIFIC SELECT FUND,extra_family,8,0.11123298056
+6075.0,Penn Series Funds Inc,extra_family,15,0.01188680599
+6075.0,Securian Funds Trust,extra_family,7,0.24144099549
+6075.0,Voya Mutual Funds,extra_family,8,0.02106096517
+6079.0,Touchstone Strategic Trust,extra_family,7,0.037427919729999995
+6164.0,Centaur Mutual Funds Trust,extra_family,10,0.045138678009999995
+6207.0,Texas Capital Funds Trust,extra_family,24,0.0059832533599999994
+6207.0,Texas Capital Funds Trust,intra_family,2,0.00058579173
+6218.0,JNL Series Trust,extra_family,19,0.12641877067
+6290.0,NEW YORK LIFE INVESTMENTS FUNDS,extra_family,13,0.26396257843
+6290.0,NEW YORK LIFE INVESTMENTS FUNDS,unknown_match,1,0.011651337
+6290.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,27,0.17006117483000002
+6309.0,PRIMECAP Odyssey Funds,extra_family,67,2.39707604183
+6309.0,VANGUARD CHESTER FUNDS,extra_family,29,18.75582858199
+6309.0,VANGUARD HORIZON FUNDS,extra_family,25,4.772049358500001
+6309.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,26,0.60039317521
+6313.0,INVESTMENT MANAGERS SERIES TRUST II,extra_family,194,0.32957725203000005
+6313.0,INVESTMENT MANAGERS SERIES TRUST II,unknown_match,1,3.76235e-05
+6313.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,extra_family,9,0.0013952868499999998
+6314.0,JNL Series Trust,extra_family,140,4.807966906419999
+6314.0,JNL Series Trust,unknown_match,1,0.010915778099999999
+6322.0,AGF Investments Trust,extra_family,57,-0.0066717756
+6348.0,Catholic Responsible Investments Funds,extra_family,68,0.06091566323
+6348.0,Columbia Funds Variable Series Trust II,extra_family,18,0.42899902129999995
+6348.0,PACIFIC SELECT FUND,extra_family,8,0.01359755452
+6348.0,Principal Exchange-Traded Funds,extra_family,94,1.3920743138200002
+6348.0,"Principal Funds, Inc",extra_family,8,0.049030453259999995
+6350.0,Templeton Global Smaller Companies Fund,extra_family,6,0.061173573120000005
+6361.0,Mercer Funds,extra_family,14,0.019701707360000004
+6390.0,Waycross Independent Trust,extra_family,22,0.046876509450000006
+6402.0,LKCM Funds,extra_family,27,0.14764556762
+6408.0,AMG Funds I,extra_family,2,0.00753722486
+6410.0,Old Westbury Funds Inc,extra_family,4,0.47681725379
+6429.0,YCG Funds,extra_family,4,0.052421599619999995
+6690.0,EQ Advisors Trust,unknown_match,82,0.4195213569899999
+6690.0,HARRIS ASSOCIATES INVESTMENT TRUST,extra_family,41,10.102511642869999
+6690.0,Harris Oakmark ETF Trust,extra_family,20,0.25622050020000003
+6690.0,LITMAN GREGORY FUNDS TRUST,extra_family,6,0.005904849320000001
+6690.0,Morningstar Funds Trust,extra_family,15,0.20288311954
+6690.0,Natixis Funds Trust I,extra_family,26,0.53153076028
+6690.0,Natixis Funds Trust II,extra_family,9,0.20335801821
+6699.0,Parnassus Funds,extra_family,40,2.43232103232
+6699.0,Parnassus Funds II,extra_family,20,4.2151940028600015
+6708.0,GPS Funds II,extra_family,174,1.8041091760899999
+6785.0,ALPS ETF TRUST,extra_family,217,4.34599528683
+6785.0,ALPS ETF TRUST,unknown_match,1,0.0025893525
+6785.0,ALPS VARIABLE INVESTMENT TRUST,extra_family,35,0.08268357085999997
+6785.0,FINANCIAL INVESTORS TRUST,extra_family,15,0.07927733921
+6789.0,AMG Funds I,extra_family,2,0.0025302147400000003
+6829.0,Direxion Funds,extra_family,4,0.34706315233999996
+6829.0,Direxion Shares ETF Trust,extra_family,515,7.971152021870001
+6829.0,Direxion Shares ETF Trust,unknown_match,5,0.0151888791
+6938.0,Brighthouse Funds Trust II,extra_family,117,0.015256244409999998
+6938.0,HARBOR FUNDS,extra_family,18,9.054368694879999
+6939.0,Prudential Investment Portfolios 3,extra_family,5,0.012805496800000002
+6941.0,Fairholme Funds Inc,extra_family,2,0.163408614
+6943.0,Dunham Funds,extra_family,7,0.005932922279999999
+6943.0,"RBB Fund, Inc.",extra_family,10,0.006264980769999999
+6949.0,AMG Funds IV,extra_family,9,0.07101590081
+6968.0,"EMPOWER FUNDS, INC.",extra_family,2,0.043471783
+6968.0,"EMPOWER FUNDS, INC.",intra_family,18,0.6839020498099999
+6987.0,Brown Advisory Funds,extra_family,47,1.0436549921299998
+6987.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,1,0.04121751237
+6987.0,"Principal Funds, Inc",extra_family,8,0.721613355050003
+6989.0,ALLSPRING FUNDS TRUST,extra_family,9,0.14364070863
+6990.0,AMERICAN BEACON FUNDS,extra_family,31,0.11205072255
+6990.0,RUSSELL INVESTMENT CO,extra_family,20,0.11093798455
+7003.0,JNL Series Trust,intra_family,12,0.8664739265
+7003.0,PACE SELECT ADVISORS TRUST,extra_family,27,0.21362832960999997
+7003.0,PACE SELECT ADVISORS TRUST,unknown_match,1,0.0065662605
+7003.0,Virtus Equity Trust,extra_family,35,0.80555292861
+7003.0,Virtus Investment Trust,extra_family,4,0.01144051729
+7003.0,Virtus Opportunities Trust,extra_family,6,0.04921539459
+7003.0,Virtus Variable Insurance Trust,extra_family,29,0.08075169688
+7003.0,Virtus Variable Insurance Trust,intra_family,5,0.00812174812
+7004.0,ETF Series Solutions,extra_family,10,0.0022054118199999998
+7023.0,NORTHERN LIGHTS FUND TRUST III,extra_family,65,0.9408134892000001
+7029.0,Fidelity Greenwood Street Trust,extra_family,103,0.24522076421000003
+7029.0,Fidelity Greenwood Street Trust,unknown_match,3,0.0030532095
+7029.0,PACIFIC SELECT FUND,intra_family,36,1.37139109709
+7034.0,Franklin Templeton Variable Insurance Products Trust,extra_family,19,0.08895093543
+7034.0,Templeton Funds,extra_family,6,0.35612423815999994
+7034.0,"Templeton Growth Fund, Inc.",extra_family,5,1.0772117398399998
+7036.0,Virtus Investment Trust,extra_family,21,0.01804614571
+7036.0,Virtus Strategy Trust,extra_family,31,0.00518659992
+7036.0,Virtus Strategy Trust,intra_family,6,0.09796937778999999
+7048.0,Professionally Managed Portfolios,extra_family,21,0.21440412282
+7050.0,FINANCIAL INVESTORS TRUST,extra_family,10,0.37702788328000003
+7050.0,Goldman Sachs Trust,extra_family,12,0.05262481147
+7057.0,First Trust Variable Insurance Trust,extra_family,5,0.00981702005
+7057.0,First Trust Variable Insurance Trust,intra_family,15,0.04366624625
+7064.0,ADVISORS' INNER CIRCLE FUND,extra_family,4,0.14407715408000002
+7064.0,Old Westbury Funds Inc,extra_family,126,5.66779208687
+7064.0,Old Westbury Funds Inc,intra_family,2,0.00080931326
+7064.0,Old Westbury Funds Inc,unknown_match,1,0.0001093905
+7064.0,RUSSELL INVESTMENT CO,extra_family,3,0.0419320742
+7064.0,TRANSAMERICA SERIES TRUST,intra_family,22,2.9999942169900002
+7064.0,Touchstone Funds Group Trust,extra_family,8,0.47206338939
+7067.0,RIVERNORTH FUNDS,extra_family,37,0.1192564401
+7070.0,Northern Lights Fund Trust IV,extra_family,369,5.01045657333
+7070.0,Northern Lights Fund Trust IV,unknown_match,7,0.03427308407
+7107.0,Themes ETF Trust,extra_family,90,0.03312138762
+7191.0,PFS FUNDS,extra_family,26,0.07655857268999999
+7191.0,PFS Funds,extra_family,22,2.53349416749
+7191.0,PFS Funds,unknown_match,1,0.01368800928
+7238.0,Tema ETF Trust,extra_family,108,0.2765217736200001
+7238.0,Tema ETF Trust,unknown_match,1,0.00149838345
+7316.0,PACIFIC SELECT FUND,intra_family,1,0.13320975981
+7316.0,"Principal Funds, Inc",extra_family,938,30.65101631954006
+7316.0,"Principal Funds, Inc",intra_family,18,4.288691677960014
+7316.0,"Principal Funds, Inc",unknown_match,3,0.017653662
+7316.0,"Principal Variable Contract Funds, Inc",extra_family,381,2.557492104620001
+7316.0,"Principal Variable Contract Funds, Inc",intra_family,19,0.57063890973
+7316.0,"Principal Variable Contract Funds, Inc",unknown_match,3,0.0036315482999999997
+7319.0,Hussman Investment Trust,extra_family,40,0.03537718551999999
+7369.0,Fidelity Advisor Series VIII,extra_family,10,0.04399345568
+7369.0,Fidelity Investment Trust,extra_family,7,0.13254604016
+7558.0,ADVISORS' INNER CIRCLE FUND,extra_family,28,0.15614797497
+7558.0,"BNY MELLON APPRECIATION FUND, INC.",extra_family,9,0.47796295305000003
+7558.0,BNY MELLON VARIABLE INVESTMENT FUND,extra_family,17,0.06706207197
+7558.0,"BNY Mellon Worldwide Growth Fund, Inc.",extra_family,10,0.24294216635000002
+7585.0,U.S. GLOBAL INVESTORS FUNDS,unknown_match,11,0.011186517310000001
+7620.0,RiverPark Funds Trust,extra_family,22,0.03024367361
+7623.0,Goldman Sachs Trust II,extra_family,7,6.67911537166
+7623.0,Goldman Sachs Trust II,intra_family,1,1.7330496865999998
+7623.0,JNL Series Trust,extra_family,2,0.028001243079999998
+7623.0,JNL Series Trust,intra_family,5,0.054969919199999995
+7623.0,Nationwide Mutual Funds,extra_family,5,0.02606302968
+7623.0,PACE SELECT ADVISORS TRUST,extra_family,22,0.14478895563000002
+7639.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,71,0.36638075244
+7639.0,SEI INSTITUTIONAL INVESTMENTS TRUST,unknown_match,1,0.0023479663500000003
+7646.0,Columbia Funds Variable Series Trust II,extra_family,12,0.54742945905
+7646.0,Total Fund Solution,extra_family,10,0.00689351896
+7731.0,RiverPark Funds Trust,extra_family,5,0.00956593568
+7734.0,John Hancock Capital Series,extra_family,6,0.37656639743000003
+7734.0,Virtus Asset Trust,extra_family,1,0.00409550728
+7734.0,Virtus Equity Trust,extra_family,5,0.025204484109999998
+7734.0,Virtus Opportunities Trust,extra_family,2,0.02575846248
+7734.0,Virtus Variable Insurance Trust,extra_family,1,0.00131103689
+7734.0,Voya Mutual Funds,extra_family,8,0.01492743265
+7816.0,HOMESTEAD FUNDS INC,extra_family,20,0.41622650688
+7821.0,INTEGRITY FUNDS,extra_family,13,0.04283266
+7822.0,RMB Investors Trust,extra_family,5,0.024063918919999996
+7823.0,Thrivent Core Funds,extra_family,17,0.13187427835
+7823.0,Thrivent ETF Trust,extra_family,27,0.13388681917
+7823.0,Thrivent Mutual Funds,extra_family,1016,4.293603232630005
+7825.0,FundVantage Trust,extra_family,393,2.65824398136
+7825.0,FundVantage Trust,unknown_match,2,4.9631e-06
+7856.0,Russell Investments Exchange Traded Funds,extra_family,141,0.0820490726
+7858.0,Miller Investment Trust,extra_family,3,-0.002697079
+7859.0,AuguStar Variable Insurance Products Fund Inc,extra_family,128,0.14543141252
+7859.0,AuguStar Variable Insurance Products Fund Inc,unknown_match,2,0.0023605144
+7859.0,Fidelity Concord Street Trust,extra_family,148,3.183235657509999
+7859.0,Fidelity Concord Street Trust,intra_family,1,0.0023432808
+7886.0,JNL Series Trust,extra_family,7,0.24218667156
+7907.0,World Funds Trust,extra_family,32,0.24455706007
+7916.0,OBERWEIS FUNDS,extra_family,21,0.219636915
+7922.0,"RBB Fund, Inc.",extra_family,87,0.16522472778
+7922.0,"RBB Fund, Inc.",unknown_match,2,0.0007711281000000001
+7984.0,ELFUN DIVERSIFIED FUND,extra_family,83,0.06974407965000001
+7984.0,ELFUN DIVERSIFIED FUND,unknown_match,1,0.0001191144
+7984.0,ELFUN INTERNATIONAL EQUITY FUND,extra_family,3,0.00675288876
+7984.0,ELFUN TRUSTS,extra_family,11,1.20593776481
+7984.0,SELECT SECTOR SPDR TRUST,extra_family,93,88.92742657628
+7984.0,SELECT SECTOR SPDR TRUST,unknown_match,1,0.4553332055
+7984.0,SPDR INDEX SHARES FUNDS,extra_family,1196,5.94737042711
+7984.0,SPDR INDEX SHARES FUNDS,unknown_match,2,0.0016743258
+7984.0,SPDR SERIES TRUST,extra_family,2099,68.40341070876
+7984.0,SPDR SERIES TRUST,unknown_match,9,0.26484142250000003
+7984.0,SSGA Active Trust,extra_family,118,2.2698539701100002
+7984.0,SSGA FUNDS,extra_family,88,0.46958464545000006
+7984.0,SSGA FUNDS,unknown_match,1,0.0025238014500000004
+7984.0,STATE STREET INSTITUTIONAL INVESTMENT TRUST,extra_family,916,12.8572545768
+7984.0,STATE STREET INSTITUTIONAL INVESTMENT TRUST,intra_family,74,44.85698283457
+7984.0,STATE STREET INSTITUTIONAL INVESTMENT TRUST,unknown_match,2,0.030892896
+7984.0,STATE STREET MASTER FUNDS,extra_family,27,0.24208040940999997
+7984.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,extra_family,104,0.06155941541999999
+7984.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,intra_family,1,0.00013197723
+7984.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,unknown_match,1,0.0002918623
+7996.0,Baillie Gifford Funds,extra_family,51,0.79168977321
+7996.0,Brighthouse Funds Trust II,extra_family,5,0.16757422394
+7996.0,VANGUARD HORIZON FUNDS,extra_family,2,0.10007670158
+7996.0,VANGUARD HORIZON FUNDS,intra_family,1,0.1423054106
+7996.0,VANGUARD TRUSTEES' EQUITY FUND,extra_family,1,0.005885627
+7996.0,VANGUARD VALLEY FORGE FUNDS,extra_family,2,0.015687083
+7996.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,21,0.09619807585
+7996.0,VANGUARD WHITEHALL FUNDS,extra_family,1,0.0091070196
+8000.0,Clearwater Investment Trust,extra_family,102,0.038361058239999996
+8005.0,GLOBAL X FUNDS,unknown_match,1269,11.73402502911
+8201.0,Aspiriant Trust,extra_family,16,0.06892908206000001
+8367.0,NEW COVENANT FUNDS,intra_family,2,0.07824634906
+8367.0,SEI CATHOLIC VALUES TRUST,extra_family,117,0.06588697341000001
+8367.0,Securian Funds Trust,extra_family,4,0.08381984021000001
+8367.0,Securian Funds Trust,intra_family,1,0.30443675558
+8386.0,1290 Funds,extra_family,52,0.00671017416
+8386.0,1290 Funds,unknown_match,1,2.51415e-05
+8386.0,Brighthouse Funds Trust I,extra_family,16,0.40299902293
+8386.0,Brighthouse Funds Trust II,extra_family,36,0.60781723784
+8386.0,"EMPOWER FUNDS, INC.",extra_family,4,0.046089201
+8386.0,"EMPOWER FUNDS, INC.",intra_family,55,4.05348060425
+8386.0,EQ Advisors Trust,unknown_match,3,0.03100907849
+8386.0,Gateway Trust,extra_family,94,2.2525866513199997
+8386.0,Goldman Sachs Trust II,extra_family,7,0.02854941
+8386.0,Goldman Sachs Trust II,intra_family,2,0.02080109636
+8386.0,GuideStone Funds,extra_family,15,0.014463151819999999
+8386.0,JNL Series Trust,extra_family,3,0.06138816994
+8386.0,JNL Series Trust,intra_family,4,0.06194798802
+8386.0,LOOMIS SAYLES FUNDS I,extra_family,33,0.02572098379
+8386.0,LOOMIS SAYLES FUNDS II,extra_family,51,8.50913997598
+8386.0,MML SERIES INVESTMENT FUND,extra_family,3,0.03512182845
+8386.0,MML SERIES INVESTMENT FUND,intra_family,20,0.8637758319600001
+8386.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,14,0.12636996298000003
+8386.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,13,0.16343081694
+8386.0,Nationwide Mutual Funds,extra_family,10,0.060041009719999996
+8386.0,Nationwide Variable Insurance Trust,extra_family,5,0.017518174049999998
+8386.0,Natixis ETF Trust,extra_family,20,0.05100933672
+8386.0,Natixis ETF Trust II,extra_family,10,0.005236812140000001
+8386.0,Natixis Funds Trust I,extra_family,7,0.15089987459
+8386.0,Natixis Funds Trust II,extra_family,39,0.35097074695999997
+8386.0,Natixis Funds Trust IV,extra_family,4,0.00286261746
+8386.0,Northern Lights Fund Trust,extra_family,7,0.0017082425
+8386.0,"Principal Funds, Inc",extra_family,3,0.01566319896
+8386.0,SARATOGA ADVANTAGE TRUST,extra_family,16,0.00851253491
+8390.0,DBX ETF Trust,extra_family,1084,2.86818297818
+8390.0,DBX ETF Trust,unknown_match,6,0.01035620565
+8473.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,8,0.20075820159
+8473.0,New York Life Investments ETF Trust,extra_family,180,0.9632094860599999
+8473.0,New York Life Investments ETF Trust,intra_family,1,0.00085017682
+8498.0,Mercer Funds,extra_family,59,0.28144366982
+8498.0,NEW COVENANT FUNDS,extra_family,171,0.13097422744
+8498.0,NEW COVENANT FUNDS,intra_family,2,8.171469999999999e-05
+8498.0,NEW COVENANT FUNDS,unknown_match,1,0.000206529
+8513.0,Praxis Mutual Funds,intra_family,5,0.12489269087999999
+8513.0,"RBB Fund, Inc.",extra_family,15,0.03401164801
+8531.0,Monteagle Funds,extra_family,9,0.00125946357
+8547.0,Aristotle Fund Series Trust,extra_family,19,0.15746117925
+8547.0,HARBOR FUNDS,extra_family,11,0.32521440678999997
+8548.0,"Nicholas Equity Income Fund, Inc.",extra_family,20,0.14083062561
+8548.0,"Nicholas Fund, Inc.",extra_family,15,1.0421375763199998
+8548.0,"Nicholas II, Inc.",extra_family,10,0.13926857896
+8548.0,"Nicholas Limited Edition, Inc.",extra_family,4,0.025891847799999996
+8553.0,CALAMOS GLOBAL TOTAL RETURN FUND,extra_family,25,0.029090982619999997
+8553.0,Calamos Antetokounmpo Sustainable Equities Trust,extra_family,8,0.0008470934199999999
+8592.0,Ivy Variable Insurance Portfolios,extra_family,29,0.19170097708
+8592.0,Securian Funds Trust,extra_family,191,0.7205254309
+8592.0,Securian Funds Trust,unknown_match,1,0.0023126445
+8594.0,AMERICAN BEACON FUNDS,extra_family,31,0.11256082021
+8612.0,Virtus Asset Trust,extra_family,8,0.1273554096
+8612.0,Virtus Investment Trust,extra_family,9,0.505328868
+8618.0,ADVISORS' INNER CIRCLE III,extra_family,63,0.68703268384
+8618.0,ADVISORS' INNER CIRCLE III,unknown_match,1,0.001428092
+8646.0,ADVISORS' INNER CIRCLE III,extra_family,117,1.3564371167700002
+8646.0,ETF Series Solutions,extra_family,17,0.011192357150000002
+8646.0,Hennessy Funds Trust,extra_family,8,0.01056348847
+8646.0,Listed Funds Trust,extra_family,197,1.6132084031899998
+8646.0,Listed Funds Trust,unknown_match,1,0.0024610032000000003
+8646.0,Managed Portfolio Series,extra_family,5,0.034030543229999995
+8646.0,Praxis Mutual Funds,intra_family,10,0.12947603255
+8646.0,SCM Trust,extra_family,4,0.00357277911
+8650.0,Commonwealth International Series Trust,extra_family,17,0.00559690557
+8652.0,Principal Exchange-Traded Funds,extra_family,8,0.05951935054
+8654.0,COLUMBIA FUNDS SERIES TRUST I,extra_family,20,0.008755208640000001
+8654.0,COLUMBIA FUNDS SERIES TRUST I,intra_family,2,0.29180191940999994
+8654.0,Columbia Funds Series Trust II,extra_family,3,0.0133472822
+8654.0,Columbia Funds Series Trust II,intra_family,3,0.030429944
+8654.0,SEASONS SERIES TRUST,extra_family,35,0.18921652736000005
+8654.0,VALIC Co I,extra_family,11,0.07612583401
+8654.0,Voya Partners Inc,extra_family,27,0.023053770100000006
+8660.0,Virtus Alternative Solutions Trust,extra_family,5,0.00972164448
+8705.0,"Principal Funds, Inc",extra_family,3,0.051182622649999995
+8705.0,Teton Westwood Funds,extra_family,32,0.01717422299
+8726.0,Pacer Funds Trust,extra_family,625,6.102966764939999
+8726.0,Pacer Funds Trust,intra_family,22,0.66066918972
+8726.0,Pacer Funds Trust,unknown_match,4,0.0071713215
+8876.0,Trust for Professional Managers,extra_family,422,2.87705470264
+8876.0,Trust for Professional Managers,unknown_match,4,0.011911306600000001
+8968.0,AMG Funds,extra_family,63,1.21515348289
+8968.0,AMG Funds I,extra_family,9,0.006456619780000001
+8968.0,AMG Funds III,extra_family,1,0.00053259228
+8968.0,AMG Funds IV,extra_family,8,0.0038383730400000002
+8968.0,RBB Fund Trust,extra_family,10,0.009108373389999999
+8968.0,Third Avenue Trust,extra_family,8,0.08864443744999999
+8968.0,Third Avenue Variable Series Trust,extra_family,1,0.00143203727
+8968.0,"Tweedy, Browne Fund Inc.",extra_family,16,0.24329980789
+8977.0,AIM ETF Products Trust,extra_family,11,0.054644503840000004
+8977.0,ETF Series Solutions,extra_family,5,0.1505276744
+8994.0,John Hancock Funds II,extra_family,499,7.687640706870001
+8994.0,John Hancock Funds II,intra_family,391,26.23639561607
+8994.0,John Hancock Funds II,unknown_match,1,0.007850297400000001
+8994.0,John Hancock Investment Trust,extra_family,77,3.8247578155599995
+8994.0,John Hancock Investment Trust II,extra_family,36,0.27843576168000006
+8994.0,John Hancock Variable Insurance Trust,extra_family,1005,4.54304954925
+8994.0,John Hancock Variable Insurance Trust,intra_family,58,9.072965813109999
+8994.0,John Hancock Variable Insurance Trust,unknown_match,2,0.018792858200000002
+8994.0,Mercer Funds,extra_family,39,0.13359969012
+8996.0,Brinker Capital Destinations Trust,extra_family,40,0.02801577729
+8996.0,Brinker Capital Destinations Trust,unknown_match,1,0.0003733485
+8996.0,MML SERIES INVESTMENT FUND,extra_family,3,0.026800969469999998
+8998.0,Brinker Capital Destinations Trust,extra_family,69,1.1377681283500003
+8998.0,Brinker Capital Destinations Trust,unknown_match,1,0.00147963
+9000.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,35,0.29034253561
+9003.0,AdvisorShares Trust,extra_family,85,0.34176107793
+9003.0,AdvisorShares Trust,intra_family,2,0.019165800719999997
+9013.0,ETF Opportunities Trust,extra_family,349,1.36207064472
+9013.0,ETF Opportunities Trust,unknown_match,1,0.0001450215
+9013.0,SP Funds Trust,unknown_match,13,0.01058733076
+9013.0,Tidal Trust I,extra_family,569,1.31809191784
+9013.0,Tidal Trust I,unknown_match,4,0.0063317222999999985
+9013.0,Tidal Trust II,extra_family,368,2.89988604253
+9013.0,Tidal Trust II,unknown_match,1,0.00015088785
+9013.0,Tidal Trust III,extra_family,425,1.8879549562300002
+9013.0,Tidal Trust III,unknown_match,3,0.00170455255
+9129.0,Hennessy Funds Trust,extra_family,1,0.034274658
+9130.0,Columbia Funds Variable Series Trust II,extra_family,13,0.24673676142
+9130.0,"EMPOWER FUNDS, INC.",extra_family,21,0.46405459796000004
+9130.0,"EMPOWER FUNDS, INC.",unknown_match,1,0.01195578761
+9130.0,Nationwide Mutual Funds,extra_family,3,0.00667561469
+9130.0,Nationwide Variable Insurance Trust,extra_family,32,0.56811044653
+9130.0,"Principal Funds, Inc",extra_family,3,0.00087863351
+9130.0,TIMOTHY PLAN,extra_family,42,0.12408687676
+9130.0,TIMOTHY PLAN,intra_family,18,0.17944008978999998
+9130.0,Victory Portfolios,extra_family,257,4.19139561692
+9130.0,Victory Portfolios,unknown_match,1,0.0004005702
+9130.0,Victory Portfolios II,extra_family,510,1.9358438092899999
+9130.0,Victory Portfolios II,unknown_match,2,0.0019197591
+9130.0,Victory Portfolios III,extra_family,928,10.47169988089
+9130.0,Victory Portfolios III,intra_family,1,0.00036994607
+9130.0,Victory Portfolios III,unknown_match,7,0.04648276515
+9130.0,Victory Portfolios IV,extra_family,146,6.155727429290001
+9130.0,Victory Portfolios IV,intra_family,13,0.25865846787
+9130.0,Victory Portfolios IV,unknown_match,3,0.0620677329
+9130.0,Victory Variable Insurance Funds II,extra_family,43,0.09171278755999998
+9130.0,Victory Variable Insurance Funds II,intra_family,1,0.00063733174
+9130.0,Victory Variable Insurance Funds II,unknown_match,1,0.0022004144
+9130.0,Voya Equity Trust,extra_family,39,0.021543437039999995
+9130.0,Voya Mutual Funds,extra_family,28,0.030047318799999997
+9131.0,"RBB Fund, Inc.",extra_family,8,0.022619328660000004
+9179.0,LITMAN GREGORY FUNDS TRUST,extra_family,9,0.02016015965
+9181.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,44,0.98003982217
+9191.0,Rydex Dynamic Funds,extra_family,295,0.43053592544
+9191.0,Rydex Dynamic Funds,unknown_match,2,0.0012667111999999999
+9191.0,Rydex Series Funds,extra_family,1125,1.02411749559
+9191.0,Rydex Series Funds,unknown_match,3,0.0009164124
+9191.0,Rydex Variable Trust,extra_family,939,0.15635218647999996
+9191.0,Rydex Variable Trust,unknown_match,3,0.00031123440000000005
+9192.0,EQ Advisors Trust,unknown_match,1,0.04656476081
+9192.0,Guardian Variable Products Trust,extra_family,6,0.00350239674
+9192.0,Penn Series Funds Inc,extra_family,13,0.6676302459799998
+9192.0,Penn Series Funds Inc,intra_family,3,0.0489975645
+9192.0,TRANSAMERICA SERIES TRUST,extra_family,9,0.01345664443
+9195.0,Putnam Sustainable Leaders Fund,extra_family,11,1.4025277004
+9195.0,Putnam Variable Trust,extra_family,24,0.24068934905
+9197.0,ALPS SERIES TRUST,extra_family,10,0.024355617
+9232.0,American Beacon Institutional Funds Trust,extra_family,34,0.07064696502
+9232.0,Bridge Builder Trust,extra_family,227,1.16576599197
+9232.0,Bridge Builder Trust,unknown_match,1,0.015057725199999998
+9232.0,Catholic Responsible Investments Funds,extra_family,75,0.15639149329000002
+9232.0,First Trust Series Fund,extra_family,3,0.0981766505
+9232.0,Goldman Sachs Trust II,extra_family,72,0.8151523796199999
+9232.0,Goldman Sachs Trust II,intra_family,2,0.14209236594
+9232.0,INVESTMENT MANAGERS SERIES TRUST,extra_family,53,1.2794684915399996
+9232.0,JNL Series Trust,extra_family,42,0.35478413935
+9232.0,JNL Series Trust,intra_family,10,0.46216783121
+9232.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,50,0.032386318830000003
+9233.0,Valued Advisers Trust,extra_family,58,0.07399936766999998
+9245.0,TRANSAMERICA SERIES TRUST,extra_family,15,1.6645969519399997
+9246.0,Clearwater Investment Trust,extra_family,23,0.06801068187
+9246.0,Harbor Funds II,extra_family,33,0.04778629776
+9246.0,JNL Series Trust,extra_family,1,0.00722840783
+9246.0,Symmetry Panoramic Trust,extra_family,135,0.21035203062000007
+9246.0,Symmetry Panoramic Trust,unknown_match,14,0.10822976050000002
+9246.0,TIFF INVESTMENT PROGRAM,extra_family,142,0.28485528447
+9246.0,TIFF INVESTMENT PROGRAM,unknown_match,1,0.0011940258
+9256.0,Tactical Investment Series Trust,extra_family,49,0.07506888979
+9267.0,Connors Funds,extra_family,16,0.0196984753
+9281.0,AMG Funds,extra_family,12,0.0296079861
+9283.0,ADVISER MANAGED TRUST,extra_family,137,0.06957698915999999
+9283.0,ADVISER MANAGED TRUST,unknown_match,1,0.000426573
+9283.0,Brighthouse Funds Trust I,extra_family,5,0.2404562826
+9283.0,Domini Investment Trust,extra_family,48,0.23758262003000002
+9283.0,EQ Advisors Trust,unknown_match,76,0.57759099667
+9283.0,John Hancock Variable Insurance Trust,extra_family,12,0.04703838143
+9283.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,20,0.09283869313
+9283.0,Penn Series Funds Inc,extra_family,25,0.05560613878
+9283.0,Penn Series Funds Inc,unknown_match,1,0.0023014375
+9283.0,TRANSAMERICA SERIES TRUST,extra_family,4,0.006723743119999999
+9297.0,AIM Investment Funds (Invesco Investment Funds),extra_family,1,0.000356748
+9297.0,Brighthouse Funds Trust I,extra_family,35,0.6695823885200001
+9297.0,EQ Advisors Trust,unknown_match,280,1.7327300978100002
+9297.0,JNL Series Trust,extra_family,69,0.30446423329
+9297.0,JNL Series Trust,unknown_match,2,0.009339113299999998
+9297.0,MASSMUTUAL PREMIER FUNDS,extra_family,8,0.04596320206
+9297.0,MASSMUTUAL SELECT FUNDS,extra_family,16,0.04733921912999999
+9297.0,MML SERIES INVESTMENT FUND,extra_family,28,0.11431801964000002
+9297.0,MML SERIES INVESTMENT FUND,intra_family,20,0.19846034532999998
+9297.0,MML SERIES INVESTMENT FUND,unknown_match,1,0.0010363273
+9297.0,MML Series Investment Fund II,extra_family,8,0.01139011716
+9297.0,Nationwide Mutual Funds,extra_family,10,0.08899264348000001
+9297.0,PACIFIC SELECT FUND,extra_family,8,0.029744169810000002
+9297.0,Voya Investors Trust,extra_family,16,0.03452255968
+9297.0,Voya Partners Inc,extra_family,28,0.10937278494
+9349.0,Advisor Managed Portfolios,extra_family,12,0.12577397836
+9355.0,Matrix Advisors Funds Trust,extra_family,9,0.0207213465
+9359.0,BERKSHIRE FUNDS,extra_family,25,0.09354932200000002
+9487.0,Monteagle Funds,extra_family,8,0.0026134031500000005
+9523.0,Advanced Series Trust,extra_family,61,1.1198089609000004
+9523.0,Advanced Series Trust,intra_family,1,0.005722783519999999
+9523.0,Advanced Series Trust,unknown_match,1,0.0028854822999999996
+9523.0,Dunham Funds,extra_family,19,0.00840909393
+9523.0,Guardian Variable Products Trust,extra_family,20,0.022138118370000005
+9523.0,John Hancock Funds II,extra_family,8,0.01028636169
+9523.0,John Hancock Funds III,extra_family,28,5.924266256999999
+9523.0,John Hancock Funds III,unknown_match,1,0.1765561987
+9523.0,John Hancock Investment Trust,extra_family,4,0.18307723392000003
+9523.0,PACIFIC SELECT FUND,extra_family,13,0.038147727959999995
+9523.0,PACIFIC SELECT FUND,unknown_match,1,0.003075521
+9523.0,"RBB Fund, Inc.",extra_family,131,0.55844486988
+9523.0,"RBB Fund, Inc.",unknown_match,1,0.0031650318
+9571.0,John Hancock Funds III,extra_family,23,0.27578154378
+9571.0,NEW YORK LIFE INVESTMENTS FUNDS,extra_family,22,0.13958139781
+9571.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,27,0.26275527074
+9668.0,EQ Advisors Trust,unknown_match,688,6.741628853799999
+9722.0,Exchange Place Advisors Trust,extra_family,132,0.5875279990900001
+9722.0,Exchange Place Advisors Trust,intra_family,10,0.09560377876000001
+9722.0,Exchange Place Advisors Trust,unknown_match,1,0.0001144715
+9722.0,NORTHERN LIGHTS FUND TRUST II,extra_family,30,0.06753833175
+9722.0,Valued Advisers Trust,extra_family,7,0.1908995626
+9730.0,Papp Investment Trust,extra_family,3,0.0086582625
+9823.0,STATE STREET INSTITUTIONAL FUNDS,extra_family,33,0.040885704030000004
+9823.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,extra_family,410,0.15166944173000002
+9823.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,intra_family,7,0.28559615140000005
+9823.0,STATE STREET VARIABLE INSURANCE SERIES FUNDS INC,unknown_match,1,0.0005398572
+9839.0,ADVISORS' INNER CIRCLE FUND,extra_family,4,0.01193203217
+9845.0,Total Fund Solution,extra_family,1,0.00087461925
+9857.0,Hennessy Funds Trust,extra_family,4,0.011053931
+9858.0,ADVISER MANAGED TRUST,extra_family,4,0.04574617753
+9858.0,SEI ASSET ALLOCATION TRUST,extra_family,3,0.0048908658499999995
+9858.0,SEI ASSET ALLOCATION TRUST,intra_family,37,0.18048731847
+9858.0,SEI EXCHANGE TRADED FUNDS,extra_family,77,0.5845266728699999
+9858.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,513,1.6522006075999998
+9858.0,SEI INSTITUTIONAL INVESTMENTS TRUST,intra_family,2,0.00154935846
+9858.0,SEI INSTITUTIONAL INVESTMENTS TRUST,unknown_match,2,0.00951419295
+9858.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,301,0.5868118135799999
+9858.0,SEI INSTITUTIONAL MANAGED TRUST,intra_family,1,0.00016404
+9858.0,SEI INSTITUTIONAL MANAGED TRUST,unknown_match,2,0.0031704602999999996
+9868.0,INTEGRITY FUNDS,extra_family,7,0.001794985
+9868.0,SARATOGA ADVANTAGE TRUST,extra_family,5,0.00040892566000000005
+9870.0,John Hancock Funds II,extra_family,17,0.03799684283000001
+9904.0,Catholic Responsible Investments Funds,extra_family,61,1.0371095124699998
+9904.0,Catholic Responsible Investments Funds,unknown_match,1,0.0089875035
+9904.0,TIAA-CREF Funds,extra_family,1541,147.0811075475
+9904.0,TIAA-CREF Funds,unknown_match,4,0.132348852
+9904.0,TIAA-CREF Life Funds,extra_family,426,0.48628313945
+9904.0,TIAA-CREF Life Funds,unknown_match,1,0.0011903435
+9914.0,Guardian Variable Products Trust,extra_family,1,0.0065103481
+9935.0,Brighthouse Funds Trust I,extra_family,14,0.08584822968
+9935.0,Brighthouse Funds Trust II,intra_family,79,16.81773269056
+9935.0,Brown Advisory Funds,extra_family,9,0.82263154872
+9935.0,Columbia Funds Variable Series Trust II,extra_family,1,0.0058972425
+9935.0,Domini Investment Trust,extra_family,6,0.02200143546
+9935.0,"EMPOWER FUNDS, INC.",extra_family,31,0.15420757919
+9935.0,Goldman Sachs Trust II,extra_family,21,0.11818979331999999
+9935.0,Goldman Sachs Trust II,intra_family,1,0.049545021659999994
+9935.0,Guardian Variable Products Trust,extra_family,65,0.34086933239
+9935.0,"HARTFORD MUTUAL FUNDS, INC",extra_family,161,12.933115519970002
+9935.0,"HARTFORD MUTUAL FUNDS, INC",intra_family,52,2.43290843921
+9935.0,HARTFORD SERIES FUND INC,extra_family,105,3.0085974674899996
+9935.0,HARTFORD SERIES FUND INC,unknown_match,1,0.0110027124
+9935.0,HC Capital Trust,unknown_match,94,0.0234948388
+9935.0,John Hancock Funds II,extra_family,6,0.02071230755
+9935.0,John Hancock Funds III,extra_family,14,1.4317901785900002
+9935.0,John Hancock Investment Trust,extra_family,4,0.07788674193
+9935.0,John Hancock Variable Insurance Trust,extra_family,340,1.28877620125
+9935.0,John Hancock Variable Insurance Trust,intra_family,7,6.18584121242
+9935.0,John Hancock Variable Insurance Trust,unknown_match,1,0.0051813163
+9935.0,MASSMUTUAL SELECT FUNDS,extra_family,6,0.01968226445
+9935.0,MML SERIES INVESTMENT FUND,extra_family,19,0.11427316036999999
+9935.0,MML SERIES INVESTMENT FUND,intra_family,20,0.26231614334
+9935.0,NEW YORK LIFE INVESTMENTS FUNDS,extra_family,7,0.12146140276
+9935.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,22,0.12525643002000003
+9935.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,unknown_match,1,0.0024450472
+9935.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,12,0.07287793015
+9935.0,NORTHWESTERN MUTUAL SERIES FUND INC,intra_family,1,0.00805065506
+9935.0,Nationwide Mutual Funds,extra_family,20,0.22989703610000004
+9935.0,PACIFIC SELECT FUND,extra_family,8,0.06662092682
+9935.0,RUSSELL INVESTMENT CO,extra_family,54,0.13055593261999998
+9935.0,SEASONS SERIES TRUST,extra_family,160,0.4697628079399999
+9935.0,SEASONS SERIES TRUST,unknown_match,1,0.0001211957
+9935.0,SEI INSTITUTIONAL INTERNATIONAL TRUST,extra_family,7,0.0406488765
+9935.0,SUNAMERICA SERIES TRUST,extra_family,13,0.060803003009999995
+9935.0,VALIC Co I,extra_family,86,0.20715954923000002
+9949.0,Virtus Asset Trust,extra_family,20,0.12866739894
+9951.0,ALPS SERIES TRUST,extra_family,12,0.14891552525
+9953.0,"RBB Fund, Inc.",extra_family,22,11.02118331345
+9955.0,Aegis Funds,extra_family,7,0.05387572281999999
+9970.0,ARCHER INVESTMENT SERIES TRUST,extra_family,49,0.030810303090000005
+9970.0,ARCHER INVESTMENT SERIES TRUST,unknown_match,1,0.00026065575
+9981.0,Smead Funds Trust,extra_family,5,0.66702161688
+9982.0,GoodHaven Funds Trust,extra_family,6,0.09916834438
+10046.0,Perpetual Americas Funds Trust,extra_family,14,0.019831753950000003
+10046.0,Perpetual Americas Funds Trust,intra_family,1,0.02311636984
+10046.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,73,0.016572330030000002
+10133.0,Old Westbury Funds Inc,extra_family,103,0.9168086395599999
+10133.0,Old Westbury Funds Inc,intra_family,2,0.013878308270000002
+10133.0,SEI INSTITUTIONAL INTERNATIONAL TRUST,extra_family,1,0.02158257169
+10178.0,COLUMBIA ACORN TRUST,extra_family,14,0.34241349615
+10178.0,COLUMBIA ACORN TRUST,intra_family,11,1.2874805703299999
+10178.0,COLUMBIA FUNDS SERIES TRUST,extra_family,269,3.1348809770400003
+10178.0,COLUMBIA FUNDS SERIES TRUST,intra_family,3,0.01610798583
+10178.0,COLUMBIA FUNDS SERIES TRUST,unknown_match,1,0.00482307765
+10178.0,COLUMBIA FUNDS SERIES TRUST I,extra_family,284,23.99466766262
+10178.0,COLUMBIA FUNDS SERIES TRUST I,intra_family,2,0.00318580137
+10178.0,COLUMBIA FUNDS SERIES TRUST I,unknown_match,1,0.016556101099999998
+10178.0,COLUMBIA FUNDS VARIABLE INSURANCE TRUST,extra_family,115,6.00062686526
+10178.0,COLUMBIA FUNDS VARIABLE INSURANCE TRUST,intra_family,86,7.46734800699
+10178.0,COLUMBIA FUNDS VARIABLE SERIES TRUST,extra_family,11,0.0657220594
+10178.0,Columbia Funds Series Trust,intra_family,32,2.07267622161
+10178.0,Columbia Funds Series Trust I,extra_family,87,1.7837898624200001
+10178.0,Columbia Funds Series Trust I,intra_family,1,0.013937072
+10178.0,Columbia Funds Series Trust I,unknown_match,1,0.000697302
+10178.0,Columbia Funds Series Trust II,extra_family,279,11.47697561401
+10178.0,Columbia Funds Series Trust II,intra_family,68,3.4289166185999997
+10178.0,Columbia Funds Series Trust II,unknown_match,2,0.06637689
+10178.0,Columbia Funds Variable Series Trust II,extra_family,252,11.957713862060002
+10178.0,Columbia Funds Variable Series Trust II,intra_family,92,15.451436964640001
+10178.0,Columbia Funds Variable Series Trust II,unknown_match,1,0.0035295646
+10179.0,ADVISORS' INNER CIRCLE FUND,extra_family,4,1.3875564947999999
+10226.0,Unified Series Trust,extra_family,141,0.23475087308999998
+10226.0,Unified Series Trust,unknown_match,1,0.0003595845
+10443.0,Allianz Variable Insurance Products Trust,extra_family,38,0.1703096018
+10443.0,AuguStar Variable Insurance Products Fund Inc,extra_family,15,0.030206135680000003
+10443.0,FIDELITY COVINGTON TRUST,extra_family,263,6.4690320669400005
+10443.0,FIDELITY COVINGTON TRUST,intra_family,2,0.01311020544
+10443.0,FIDELITY COVINGTON TRUST,unknown_match,1,0.0216934515
+10443.0,Fidelity Aberdeen Street Trust,intra_family,1961,471.9558179864401
+10443.0,Fidelity Advisor Series I,extra_family,180,12.32820366278
+10443.0,Fidelity Advisor Series I,unknown_match,2,0.105701046
+10443.0,Fidelity Advisor Series II,extra_family,10,0.37549533188
+10443.0,Fidelity Advisor Series II,intra_family,2,3.3939378694299998
+10443.0,Fidelity Advisor Series VII,extra_family,59,2.76957370883
+10443.0,Fidelity Advisor Series VII,unknown_match,1,0.034299
+10443.0,Fidelity Advisor Series VIII,extra_family,7,0.07894621095
+10443.0,Fidelity Capital Trust,extra_family,106,5.47299576159
+10443.0,Fidelity Capital Trust,intra_family,1,8.59000076149
+10443.0,Fidelity Central Investment Portfolios LLC,extra_family,72,4.96937430495
+10443.0,Fidelity Central Investment Portfolios LLC,intra_family,1,0.01858256737
+10443.0,Fidelity Central Investment Portfolios LLC,unknown_match,1,0.086552496
+10443.0,Fidelity Charles Street Trust,extra_family,1,0.00045451131
+10443.0,Fidelity Charles Street Trust,intra_family,173,38.7165207955
+10443.0,Fidelity Commonwealth Trust,extra_family,94,2.2294914807500006
+10443.0,Fidelity Concord Street Trust,extra_family,2020,280.39265623542997
+10443.0,Fidelity Concord Street Trust,intra_family,17,0.71782807423
+10443.0,Fidelity Concord Street Trust,unknown_match,13,4.643916919699999
+10443.0,Fidelity Contrafund,extra_family,180,88.02896820157
+10443.0,Fidelity Contrafund,unknown_match,4,0.685573816
+10443.0,Fidelity Covington Trust,extra_family,696,8.94782316315
+10443.0,Fidelity Covington Trust,intra_family,8,0.11937441981000001
+10443.0,Fidelity Covington Trust,unknown_match,12,0.10858458391000002
+10443.0,Fidelity Destiny Portfolios,extra_family,73,2.74602441997
+10443.0,Fidelity Destiny Portfolios,unknown_match,1,0.01663439
+10443.0,Fidelity Devonshire Trust,extra_family,227,11.88833194145
+10443.0,Fidelity Devonshire Trust,intra_family,1,0.036474972
+10443.0,Fidelity Devonshire Trust,unknown_match,4,0.143260695
+10443.0,Fidelity Financial Trust,extra_family,32,1.90955289461
+10443.0,Fidelity Financial Trust,intra_family,2,0.07949953
+10443.0,Fidelity Financial Trust,unknown_match,1,0.062333715
+10443.0,Fidelity Greenwood Street Trust,extra_family,81,0.16820063304
+10443.0,Fidelity Greenwood Street Trust,intra_family,11,0.00955558216
+10443.0,Fidelity Hastings Street Trust,extra_family,89,13.025122623439998
+10443.0,Fidelity Hastings Street Trust,unknown_match,1,0.072028548
+10443.0,Fidelity Income Fund,extra_family,1,0.00348803556
+10443.0,Fidelity Income Fund,intra_family,236,0.5446376943399999
+10443.0,Fidelity Investment Trust,extra_family,77,3.0388400114799996
+10443.0,Fidelity Magellan Fund,extra_family,18,6.208102809230001
+10443.0,Fidelity Merrimack Street Trust,extra_family,1,6.9000000000000006e-09
+10443.0,Fidelity Mt. Vernon Street Trust,extra_family,187,25.63919003685
+10443.0,Fidelity Mt. Vernon Street Trust,unknown_match,3,0.03634539045
+10443.0,Fidelity Puritan Trust,extra_family,308,19.43680588975
+10443.0,Fidelity Puritan Trust,intra_family,10,33.48032498645
+10443.0,Fidelity Puritan Trust,unknown_match,4,0.23850693979999998
+10443.0,Fidelity Rutland Square Trust II,extra_family,475,69.8696591978
+10443.0,Fidelity Rutland Square Trust II,intra_family,72,131.91349480483
+10443.0,Fidelity Rutland Square Trust II,unknown_match,5,2.2902745118400003
+10443.0,Fidelity Salem Street Trust,extra_family,1776,43.84630175341
+10443.0,Fidelity Salem Street Trust,intra_family,19,1.2991656821200002
+10443.0,Fidelity Salem Street Trust,unknown_match,13,0.74511379525
+10443.0,Fidelity School Street Trust,extra_family,34,0.34535988044
+10443.0,Fidelity School Street Trust,intra_family,1,0.05269118835
+10443.0,Fidelity School Street Trust,unknown_match,1,7.97364e-05
+10443.0,Fidelity Securities Fund,extra_family,284,47.786583582510005
+10443.0,Fidelity Select Portfolios,extra_family,161,16.32647819918
+10443.0,Fidelity Select Portfolios,intra_family,2,0.006859811
+10443.0,Fidelity Select Portfolios,unknown_match,5,0.27720188689999997
+10443.0,Fidelity Summer Street Trust,extra_family,233,0.46131995869
+10443.0,Fidelity Summer Street Trust,intra_family,2,4.141944e-05
+10443.0,Fidelity Summer Street Trust,unknown_match,2,0.00035102415
+10443.0,Fidelity Trend Fund,extra_family,20,1.0020254589200002
+10443.0,Guardian Variable Products Trust,extra_family,43,0.05493417446
+10443.0,JNL Series Trust,extra_family,72,0.06663394822999999
+10443.0,JNL Series Trust,unknown_match,1,8.8055e-05
+10443.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,36,0.17015648168
+10443.0,MML SERIES INVESTMENT FUND,extra_family,12,0.051091084009999996
+10443.0,PACIFIC SELECT FUND,extra_family,28,0.34628101011999995
+10443.0,Variable Insurance Products Fund,extra_family,122,5.821263190560001
+10443.0,Variable Insurance Products Fund,unknown_match,2,0.06395231879999999
+10443.0,Variable Insurance Products Fund II,extra_family,670,14.01377103282
+10443.0,Variable Insurance Products Fund II,unknown_match,5,0.13102497016
+10443.0,Variable Insurance Products Fund III,extra_family,166,7.101448704890001
+10443.0,Variable Insurance Products Fund III,unknown_match,1,0.021218328
+10443.0,Variable Insurance Products Fund IV,extra_family,68,1.09174706016
+10443.0,Variable Insurance Products Fund IV,unknown_match,2,0.025391152
+10443.0,Variable Insurance Products Fund V,extra_family,321,10.86149334833
+10443.0,Variable Insurance Products Fund V,intra_family,327,11.09729939079
+10443.0,Variable Insurance Products Fund VI,extra_family,59,0.00412456152
+10466.0,TRANSAMERICA SERIES TRUST,extra_family,9,0.11777199927000001
+10491.0,JNL Series Trust,extra_family,20,0.20804798356999998
+10501.0,NORTHERN LIGHTS FUND TRUST III,extra_family,111,0.5372824001900001
+10501.0,NORTHERN LIGHTS FUND TRUST III,intra_family,1,0.00018248424
+10501.0,NORTHERN LIGHTS FUND TRUST III,unknown_match,1,0.0005573081
+10507.0,Brinker Capital Destinations Trust,extra_family,31,0.16655620246999997
+10507.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,50,0.29768584340000004
+10507.0,Touchstone Funds Group Trust,extra_family,17,0.07175102812
+10509.0,ALLSPRING MASTER TRUST,extra_family,45,0.09404192823
+10509.0,"EMPOWER FUNDS, INC.",extra_family,33,0.51016854908
+10509.0,"EMPOWER FUNDS, INC.",unknown_match,1,0.00214133752
+10509.0,Optimum Fund Trust,extra_family,29,0.07145304965
+10513.0,ALPS VARIABLE INVESTMENT TRUST,extra_family,58,0.73364665026
+10513.0,Fortune V Separate Account,extra_family,58,0.13926183627000002
+10513.0,Morningstar Funds Trust,extra_family,59,-0.00416810499
+10521.0,GUINNESS ATKINSON FUNDS,extra_family,11,0.006283770759999999
+10536.0,ADVISORS' INNER CIRCLE FUND,extra_family,20,0.0863804119
+10550.0,Manager Directed Portfolios,extra_family,46,0.6440560795799999
+10551.0,NORTHERN LIGHTS FUND TRUST III,extra_family,23,0.025303390420000002
+10557.0,New Age Alpha Funds Trust,extra_family,140,0.17451270118
+10557.0,New Age Alpha Funds Trust,intra_family,1,0.000721968
+10557.0,New Age Alpha Funds Trust,unknown_match,1,0.0002281425
+10557.0,New Age Alpha Variable Funds Trust,extra_family,174,0.2124171274
+10557.0,New Age Alpha Variable Funds Trust,intra_family,1,0.0017136327
+10583.0,VANGUARD WHITEHALL FUNDS,extra_family,14,0.65873663143
+10602.0,Wilshire Mutual Funds Inc,extra_family,52,0.03395138541
+10620.0,Angel Oak Funds Trust,extra_family,7,0.044426829189999996
+10620.0,Angel Oak Funds Trust,intra_family,3,0.02453402868
+10637.0,MANOR INVESTMENT FUNDS INC,extra_family,11,0.00584951318
+10638.0,"Bridgeway Funds, Inc.",extra_family,155,0.22665266566000003
+10645.0,Buffalo Funds,extra_family,72,0.27183241182
+10677.0,HARBOR FUNDS,extra_family,18,0.15954453728999998
+10697.0,Brighthouse Funds Trust I,extra_family,6,0.10026786073999999
+10697.0,New York Life Investments Active ETF Trust,extra_family,9,0.0005770205800000001
+10697.0,Voya Investors Trust,extra_family,9,0.01361484841
+10744.0,EQ Advisors Trust,unknown_match,31,0.249123656
+10744.0,Perpetual Americas Funds Trust,extra_family,26,0.13375805417999997
+10744.0,"Principal Funds, Inc",extra_family,5,0.489445612790002
+10744.0,RUSSELL INVESTMENT CO,extra_family,69,0.44590688579000004
+10744.0,Touchstone Strategic Trust,extra_family,27,0.65633846207
+10744.0,Venerable Variable Insurance Trust,extra_family,20,0.024266517329999997
+10861.0,Williamsburg Investment Trust,extra_family,17,0.026212024619999996
+10876.0,Valued Advisers Trust,extra_family,105,0.22719494592000003
+10909.0,1290 Funds,extra_family,12,0.013892687
+10909.0,EQ Advisors Trust,unknown_match,118,0.011069002639999999
+10914.0,PGIM ETF Trust,extra_family,49,0.06416987021
+10914.0,PGIM ETF Trust,intra_family,13,0.23756119287999997
+10914.0,PGIM ETF Trust,unknown_match,1,0.0007035124499999999
+10914.0,PGIM Rock ETF Trust,intra_family,4,0.015084070940000001
+10914.0,"Prudential Global Total Return Fund, Inc.",extra_family,6,0.00854588031
+10914.0,Prudential Investment Portfolios 4,extra_family,2,0.070517532
+10914.0,Prudential Investment Portfolios 8,extra_family,2,5.272780000000001e-06
+10914.0,"Prudential Investment Portfolios, Inc. 14",extra_family,7,0.01586575037
+10914.0,"Prudential Investment Portfolios, Inc. 15",extra_family,10,0.24971840179000002
+10914.0,"Prudential Investment Portfolios, Inc. 17",extra_family,12,0.37383059539999997
+10914.0,"Prudential National Muni Fund, Inc.",extra_family,2,0.021284749199999998
+11038.0,Horizon Funds,extra_family,191,0.54064235147
+11038.0,Horizon Funds,unknown_match,3,0.0013767441
+11164.0,"Calvert Variable Trust, Inc.",extra_family,21,0.133766785
+11164.0,Clearwater Investment Trust,extra_family,115,0.37592921551
+11164.0,Clearwater Investment Trust,unknown_match,1,0.0020471987
+11164.0,Eaton Vance Mutual Funds Trust,extra_family,2,6.0467269122
+11164.0,GuideStone Funds,extra_family,79,0.07548826221
+11164.0,GuideStone Funds,intra_family,87,11.752803652559997
+11164.0,HC Capital Trust,unknown_match,11,0.00645235467
+11164.0,NEW COVENANT FUNDS,intra_family,2,0.3655011843
+11164.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,181,0.6199800809299999
+11164.0,SEI INSTITUTIONAL MANAGED TRUST,unknown_match,1,0.0008354018
+11164.0,Wilmington Funds,extra_family,45,0.2523088269
+11197.0,INVESTMENT MANAGERS SERIES TRUST,extra_family,6,0.019497728810000003
+11220.0,VANGUARD FENWAY FUNDS,extra_family,28,2.8748828048000004
+11220.0,VANGUARD HORIZON FUNDS,extra_family,62,1.0226565426
+11220.0,VANGUARD HORIZON FUNDS,intra_family,1,0.0696054255
+11220.0,VANGUARD QUANTITATIVE FUNDS,extra_family,97,4.563946838440001
+11220.0,VANGUARD QUANTITATIVE FUNDS,intra_family,2,0.05340353965
+11220.0,VANGUARD QUANTITATIVE FUNDS,unknown_match,1,0.01956422
+11220.0,VANGUARD SPECIALIZED FUNDS,extra_family,26,11.801106399199998
+11220.0,VANGUARD TRUSTEES' EQUITY FUND,extra_family,4,0.011124897830000003
+11220.0,VANGUARD TRUSTEES' EQUITY FUND,intra_family,1,0.0022851578700000003
+11220.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,23,0.66723727994
+11220.0,VANGUARD VARIABLE INSURANCE FUNDS,intra_family,7,1.3801408661099999
+11220.0,VANGUARD WELLESLEY INCOME FUND,extra_family,35,3.2983492207499996
+11220.0,VANGUARD WELLINGTON FUND,extra_family,21,21.5707029025
+11220.0,VANGUARD WHITEHALL FUNDS,extra_family,21,0.5521461554300001
+11220.0,VANGUARD WINDSOR FUNDS,extra_family,20,4.622228238940001
+17915.0,Voya Equity Trust,extra_family,178,1.06706691579
+17915.0,Voya Equity Trust,unknown_match,3,0.0393440499
+17915.0,Voya Investors Trust,extra_family,77,0.9079280267000001
+17915.0,Voya Investors Trust,intra_family,41,0.74360836269
+17915.0,Voya Investors Trust,unknown_match,1,0.0113022595
+17915.0,Voya Mutual Funds,extra_family,55,0.02200555753
+17915.0,Voya Partners Inc,extra_family,68,0.55044917452
+17915.0,Voya Partners Inc,intra_family,137,1.92776499587
+17915.0,Voya Partners Inc,unknown_match,1,0.0218062604
+17915.0,Voya Separate Portfolios Trust,extra_family,65,1.09733966729
+17915.0,Voya Separate Portfolios Trust,intra_family,45,0.36805017241
+17915.0,Voya VARIABLE PORTFOLIOS INC,extra_family,49,0.060790745900000005
+17915.0,Voya Variable Funds,extra_family,10,0.49317348309000003
+17915.0,Voya Variable Funds,unknown_match,1,0.0542313134
+17915.0,Voya Variable Products Trust,extra_family,12,0.10279828556000001
+17916.0,LORD ABBETT AFFILIATED FUND INC,extra_family,18,2.1319149083099997
+17916.0,"LORD ABBETT DEVELOPING GROWTH FUND, INC.",extra_family,3,0.06578483121999999
+17916.0,LORD ABBETT INVESTMENT TRUST,extra_family,2,0.06190720542
+17916.0,LORD ABBETT INVESTMENT TRUST,intra_family,23,2.8035514236899997
+17916.0,LORD ABBETT MID CAP STOCK FUND INC,extra_family,7,0.12117659339000002
+17916.0,LORD ABBETT RESEARCH FUND INC,extra_family,21,1.3622983741599999
+17916.0,LORD ABBETT SECURITIES TRUST,extra_family,84,2.6404813575099997
+17916.0,LORD ABBETT SECURITIES TRUST,intra_family,6,0.61359318768
+17916.0,LORD ABBETT SERIES FUND INC,extra_family,57,0.27468213109999995
+17916.0,LORD ABBETT SERIES FUND INC,intra_family,1,0.015366316060000001
+17916.0,LORD ABBETT TRUST I,extra_family,11,0.00170414192
+17923.0,AMERICAN GROWTH FUND INC,unknown_match,8,0.00383549042
+17930.0,Federated Hermes Adviser Series,extra_family,95,0.5854364347400002
+17930.0,Federated Hermes Adviser Series,intra_family,1,0.13934864901
+17930.0,Federated Hermes Adviser Series,unknown_match,1,0.003840489
+17930.0,Federated Hermes Equity Funds,extra_family,114,3.5700059096000003
+17930.0,Federated Hermes Equity Funds,unknown_match,1,-9.606e-05
+17930.0,"Federated Hermes Fixed Income Securities, Inc.",extra_family,2,0.116075121
+17930.0,"Federated Hermes Fixed Income Securities, Inc.",intra_family,2,0.27251352905000004
+17930.0,Federated Hermes Income Securities Trust,intra_family,4,0.35414142243
+17930.0,Federated Hermes Insurance Series,extra_family,51,0.02334228306
+17930.0,Federated Hermes Insurance Series,intra_family,5,0.030860398589999997
+17930.0,Federated Hermes MDT Series,extra_family,33,0.9648382468400002
+17930.0,Federated Hermes Managed Pool Series,extra_family,3,0.06741161031000001
+17930.0,Federated Hermes Managed Pool Series,intra_family,1,1.04775038641
+17930.0,"Federated Hermes Strategic Dividend Growth Fund, Inc. f/k/a Federated Hermes Equity Income Fund, Inc.",extra_family,14,0.18107263071000002
+17930.0,"Federated Hermes Total Return Series, Inc.",extra_family,1,0.37842687697000005
+17930.0,"Federated Hermes Total Return Series, Inc.",intra_family,7,4.95268702059
+17930.0,"Federated Hermes World Investment Series, Inc.",extra_family,4,0.00929955197
+17931.0,AZZAD FUNDS,extra_family,4,0.009477796440000002
+17931.0,Federated Hermes Global Allocation Fund,extra_family,71,0.05713720645999999
+17931.0,Federated Hermes Global Allocation Fund,intra_family,4,0.017519824759999997
+17931.0,Federated Hermes Global Allocation Fund,unknown_match,1,0.00089483205
+17931.0,Federated Hermes Income Securities Trust,extra_family,48,0.32525517043
+17931.0,Federated Hermes Income Securities Trust,intra_family,3,0.19875305783000002
+17931.0,Federated Hermes Insurance Series,extra_family,20,0.016266735390000002
+17931.0,Federated Hermes MDT Series,extra_family,30,0.6443673039099999
+17931.0,Federated Hermes MDT Series,unknown_match,1,0.0026664975
+17931.0,Federated Hermes Managed Pool Series,intra_family,1,0.08589945735
+17931.0,"Federated Hermes World Investment Series, Inc.",extra_family,5,0.08816672622
+17931.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,1,0.16206082088999998
+17935.0,Delaware Group Equity Funds II,extra_family,7,0.4660337695
+17935.0,Delaware Group Equity Funds IV,extra_family,21,0.51010133007
+17935.0,Delaware Group Equity Funds IV,unknown_match,1,0.0201913317
+17935.0,Delaware Group Equity Funds V,extra_family,25,0.9109051778099999
+17935.0,Delaware Group Global & International Funds,extra_family,3,0.050083426019999995
+17935.0,Delaware VIP Trust,extra_family,34,0.02158536468
+17935.0,Ivy Variable Insurance Portfolios,extra_family,20,0.37605011181
+17935.0,Optimum Fund Trust,extra_family,27,0.0764022842
+17941.0,GOLDMAN SACHS TRUST,extra_family,613,6.35083693455
+17941.0,GOLDMAN SACHS TRUST,intra_family,102,8.65460953905
+17941.0,GOLDMAN SACHS TRUST,unknown_match,3,0.0134713456
+17941.0,GOLDMAN SACHS VARIABLE INSURANCE TRUST,extra_family,9,0.011616595
+17941.0,GOLDMAN SACHS VARIABLE INSURANCE TRUST,intra_family,3,0.0034453287699999996
+17941.0,Goldman Sachs ETF Trust,extra_family,1178,7.35283569418
+17941.0,Goldman Sachs ETF Trust,intra_family,6,0.023705695920000002
+17941.0,Goldman Sachs ETF Trust,unknown_match,8,0.025444752049999998
+17941.0,Goldman Sachs ETF Trust II,extra_family,232,0.59197864876
+17941.0,Goldman Sachs ETF Trust II,intra_family,1,0.00839174036
+17941.0,Goldman Sachs ETF Trust II,unknown_match,1,0.0030896739
+17941.0,Goldman Sachs Trust,extra_family,448,4.45816945455
+17941.0,Goldman Sachs Trust,intra_family,11,5.192904310019999
+17941.0,Goldman Sachs Trust,unknown_match,3,0.02301461235
+17941.0,Goldman Sachs Trust II,extra_family,3,0.13373826964
+17941.0,Goldman Sachs Trust II,intra_family,2,0.32796292438999997
+17941.0,Goldman Sachs Variable Insurance Trust,extra_family,133,0.42596759584000005
+17941.0,Goldman Sachs Variable Insurance Trust,unknown_match,1,0.0047056592
+17956.0,Bridge Builder Trust,extra_family,22,0.17884470556
+17956.0,John Hancock Capital Series,extra_family,7,0.13914264962
+17956.0,RUSSELL INVESTMENT CO,extra_family,71,2.613571002010001
+17956.0,RUSSELL INVESTMENT FUNDS,extra_family,89,0.016485684730000002
+17956.0,VANGUARD HORIZON FUNDS,extra_family,44,0.9194372126899999
+17956.0,VANGUARD TRUSTEES' EQUITY FUND,extra_family,3,0.23015559529
+17956.0,VANGUARD WINDSOR FUNDS,extra_family,33,13.223313241549999
+17957.0,"Bruce Fund, Inc.",extra_family,5,0.070442
+17960.0,Columbia Funds Variable Series Trust II,extra_family,20,0.254989048
+17960.0,Columbia Funds Variable Series Trust II,unknown_match,1,0.01191144
+17960.0,Guardian Variable Products Trust,extra_family,5,0.00889364189
+17960.0,"HARTFORD MUTUAL FUNDS II, INC",extra_family,152,3.9897201231799992
+17960.0,"HARTFORD MUTUAL FUNDS II, INC",unknown_match,1,8.2251e-05
+17960.0,"HARTFORD MUTUAL FUNDS, INC",extra_family,24,0.062084558090000005
+17960.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,540,2.31354024492
+17960.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,4,0.00754272144
+17960.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,unknown_match,1,0.0009311416
+17960.0,Lincoln Funds Trust,extra_family,28,0.00561961086
+17960.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,7,0.40437002556000007
+17960.0,RUSSELL INVESTMENT CO,extra_family,87,0.73896771591
+17960.0,RUSSELL INVESTMENT CO,unknown_match,1,0.0020198115
+17960.0,VANGUARD WHITEHALL FUNDS,extra_family,4,0.02023636768
+17967.0,BNY Mellon Investment Funds III,extra_family,27,0.5784884078200001
+17969.0,MASSMUTUAL PREMIER FUNDS,extra_family,2,0.027276669
+17969.0,MASSMUTUAL SELECT FUNDS,extra_family,83,0.63000461416
+17969.0,MASSMUTUAL SELECT FUNDS,unknown_match,1,0.0032268155
+17969.0,MML SERIES INVESTMENT FUND,extra_family,158,0.3834626553599999
+17969.0,MML SERIES INVESTMENT FUND,unknown_match,1,0.0009884574
+17969.0,MML Series Investment Fund II,extra_family,42,0.35486082049
+17978.0,"EMPOWER FUNDS, INC.",extra_family,2,0.033757183
+17978.0,"EMPOWER FUNDS, INC.",intra_family,18,0.57321752438
+17978.0,JNL Series Trust,extra_family,55,1.5640883465900002
+17978.0,JNL Series Trust,unknown_match,1,0.0111532064
+17978.0,Penn Series Funds Inc,extra_family,6,0.01057039739
+17978.0,Penn Series Funds Inc,intra_family,3,0.01048669401
+17984.0,DEUTSCHE DWS SECURITIES TRUST,extra_family,9,0.01786564761
+17984.0,RUSSELL INVESTMENT FUNDS,extra_family,3,0.01745486403
+17985.0,DEUTSCHE DWS SECURITIES TRUST,extra_family,6,0.06977061968
+17985.0,RUSSELL INVESTMENT FUNDS,extra_family,32,0.03326288182
+17986.0,"DEUTSCHE DWS INTERNATIONAL FUND, INC.",extra_family,2,0.00437024782
+17987.0,Steward Funds Inc,extra_family,316,0.3722996008199999
+17987.0,Steward Funds Inc,unknown_match,3,0.0003681315
+17992.0,VALUE LINE ASSET ALLOCATION FUND INC,extra_family,3,0.03330959675
+17992.0,VALUE LINE CAPITAL APPRECIATION FUND INC,extra_family,13,0.120497615
+17992.0,"Value Line Larger Companies Focused Fund, Inc.",extra_family,8,0.15341642
+17992.0,"Value Line Mid Cap Focused Fund, Inc.",extra_family,3,0.09915058656
+17992.0,"Value Line Select Growth Fund, Inc.",extra_family,2,0.026315192050000002
+17992.0,"Value Line Small Cap Opportunities Fund, Inc.",extra_family,5,0.0607196562
+18000.0,AIM Counselor Series Trust (Invesco Counselor Series Trust),extra_family,5,0.43912838192
+18000.0,AIM Growth Series (Invesco Growth Series),extra_family,20,1.9592254371200002
+18000.0,AIM International Mutual Funds (Invesco International Mutual Funds),extra_family,11,0.0013973326499999998
+18000.0,AIM Investment Funds (Invesco Investment Funds),extra_family,4,0.26174992680000003
+18000.0,AIM Sector Funds (Invesco Sector Funds),extra_family,12,0.54765123487
+18012.0,JNL Series Trust,extra_family,2,0.22560508363
+18015.0,JNL Series Trust,extra_family,5,0.69494696904
+18022.0,AuguStar Variable Insurance Products Fund Inc,extra_family,263,4.454787549719999
+18022.0,AuguStar Variable Insurance Products Fund Inc,intra_family,54,1.9557515578999998
+18022.0,AuguStar Variable Insurance Products Fund Inc,unknown_match,2,0.0038516858
+18027.0,FORUM FUNDS,extra_family,32,0.08185913447
+18028.0,FORUM FUNDS,extra_family,74,0.32750534664000003
+18028.0,Pear Tree Funds,extra_family,7,0.039390575
+18029.0,ADVISORS' INNER CIRCLE FUND,extra_family,9,0.01864448249
+18037.0,Brookfield Investment Funds,extra_family,5,0.25363451371
+18037.0,RUSSELL INVESTMENT CO,extra_family,50,0.04253085533999999
+18037.0,RUSSELL INVESTMENT CO,unknown_match,1,0.0004234095
+18037.0,Venerable Variable Insurance Trust,intra_family,4,2.18530404781
+18041.0,RUSSELL INVESTMENT CO,extra_family,83,0.15212605391
+18041.0,RUSSELL INVESTMENT FUNDS,extra_family,84,0.14691957358
+18041.0,RUSSELL INVESTMENT FUNDS,unknown_match,1,0.000369831
+18042.0,RUSSELL INVESTMENT CO,extra_family,99,0.06848113455000002
+18051.0,Nationwide Mutual Funds,extra_family,532,1.9460139225300002
+18051.0,Nationwide Mutual Funds,unknown_match,2,0.0118965915
+18051.0,Nationwide Variable Insurance Trust,extra_family,447,2.08290490089
+18051.0,Nationwide Variable Insurance Trust,unknown_match,1,0.0082789311
+18056.0,Nationwide Mutual Funds,extra_family,26,0.01202226385
+18056.0,Nationwide Variable Insurance Trust,extra_family,93,0.6769287762299999
+18056.0,Nationwide Variable Insurance Trust,unknown_match,1,0.0033257572999999996
+18058.0,Brinker Capital Destinations Trust,extra_family,245,0.0809432546
+18058.0,Brinker Capital Destinations Trust,intra_family,1,0.00016901520999999998
+18058.0,DoubleLine ETF Trust,extra_family,100,0.09008712711
+18058.0,DoubleLine ETF Trust,unknown_match,1,4.30669e-05
+18058.0,DoubleLine Funds Trust,intra_family,6,0.66161714076
+18058.0,EQ Advisors Trust,unknown_match,9,0.00660033176
+18058.0,JNL Series Trust,extra_family,41,1.2722986899499997
+18058.0,JNL Series Trust,unknown_match,1,0.0163969617
+18058.0,Nationwide Variable Insurance Trust,extra_family,18,0.12181543915
+18070.0,LAZARD FUNDS INC,extra_family,103,0.9555907532000002
+18070.0,LAZARD FUNDS INC,intra_family,1,0.0004573247
+18070.0,LAZARD RETIREMENT SERIES INC,extra_family,54,0.034797633249999994
+18070.0,LAZARD RETIREMENT SERIES INC,intra_family,1,0.0009096516
+18070.0,LAZARD RETIREMENT SERIES INC,unknown_match,1,0.0001018236
+18070.0,Lazard Active ETF Trust,extra_family,76,0.10597652374
+18070.0,VANGUARD VARIABLE INSURANCE FUNDS,extra_family,36,0.44396913093000007
+18073.0,Advanced Series Trust,extra_family,443,3.0164049630900003
+18073.0,Advanced Series Trust,intra_family,6,0.005019548050000001
+18073.0,Advanced Series Trust,unknown_match,2,0.0008486901
+18073.0,Bridge Builder Trust,extra_family,62,6.70683864592
+18073.0,Bridge Builder Trust,unknown_match,1,0.0012758369
+18073.0,Brighthouse Funds Trust I,extra_family,14,0.46046282988000004
+18073.0,Columbia Funds Variable Series Trust II,extra_family,32,0.9163155122100001
+18073.0,"EMPOWER FUNDS, INC.",extra_family,18,0.14808416309000003
+18073.0,"EMPOWER FUNDS, INC.",intra_family,17,1.420380006
+18073.0,EQ Advisors Trust,unknown_match,10,0.35454834070999997
+18073.0,Guardian Variable Products Trust,extra_family,3,0.00254014008
+18073.0,INTEGRITY FUNDS,extra_family,14,0.13209616
+18073.0,"J.P. Morgan Fleming Mutual Fund Group, Inc.",extra_family,13,1.3985184421099999
+18073.0,J.P. Morgan Mutual Fund Investment Trust,extra_family,15,5.24802622123
+18073.0,J.P. Morgan Mutual Fund Investment Trust,unknown_match,1,0.18002076269999998
+18073.0,JNL Series Trust,extra_family,56,3.1902623344900003
+18073.0,JNL Series Trust,unknown_match,1,0.0185597526
+18073.0,JPMorgan Trust I,extra_family,516,24.870100806830003
+18073.0,JPMorgan Trust I,unknown_match,8,0.449591673
+18073.0,JPMorgan Trust II,extra_family,217,47.41137325594
+18073.0,JPMorgan Trust II,intra_family,1,0.18965482536
+18073.0,JPMorgan Trust II,unknown_match,4,2.0208662525
+18073.0,JPMorgan Trust IV,extra_family,75,2.89127560622
+18073.0,JPMorgan Trust IV,unknown_match,3,0.1505839762
+18073.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,102,0.9442914243300001
+18073.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,4,0.11718469265999999
+18073.0,Nationwide Mutual Funds,extra_family,78,0.39054563047
+18073.0,Nationwide Mutual Funds,unknown_match,1,0.002219778
+18073.0,Nationwide Variable Insurance Trust,extra_family,81,0.28933542872999995
+18073.0,PACE SELECT ADVISORS TRUST,extra_family,27,0.06955762991
+18073.0,PACIFIC SELECT FUND,extra_family,212,0.82574582961
+18073.0,PACIFIC SELECT FUND,intra_family,1,2.3851849999999998e-05
+18073.0,PACIFIC SELECT FUND,unknown_match,1,0.0041493117
+18073.0,SEASONS SERIES TRUST,extra_family,132,0.25443899558
+18073.0,Symmetry Panoramic Trust,extra_family,6,0.02436980204
+18073.0,Symmetry Panoramic Trust,unknown_match,5,0.07866635498999999
+18073.0,TRANSAMERICA SERIES TRUST,extra_family,25,0.22137416659
+18073.0,TRANSAMERICA SERIES TRUST,intra_family,53,5.865825690630001
+18073.0,VALIC Co I,extra_family,122,0.36865852331
+18073.0,VALIC Co I,intra_family,20,1.03574585581
+18073.0,Voya Investors Trust,extra_family,79,0.039127719680000006
+18073.0,Voya Partners Inc,extra_family,13,0.022561833740000002
+18134.0,New Alternatives Fund,extra_family,4,0.0422631
+18137.0,"EMPOWER FUNDS, INC.",extra_family,287,3.1222698808800002
+18137.0,"EMPOWER FUNDS, INC.",unknown_match,1,0.01309121685
+18140.0,"EMPOWER FUNDS, INC.",extra_family,81,0.33296771823
+18140.0,"EMPOWER FUNDS, INC.",intra_family,35,0.96406635896
+18157.0,JNL Series Trust,extra_family,3,0.02601988095
+18157.0,Segall Bryant & Hamill Trust,extra_family,100,0.18342146733
+18157.0,Segall Bryant & Hamill Trust,unknown_match,1,0.0011978682
+18164.0,PERMANENT PORTFOLIO FAMILY OF FUNDS,extra_family,22,0.60460965
+18167.0,Penn Series Funds Inc,extra_family,342,0.32443659594999996
+18167.0,Penn Series Funds Inc,intra_family,5,0.10616700203
+18167.0,Penn Series Funds Inc,unknown_match,1,0.0013538056
+18169.0,ADVISORS' INNER CIRCLE FUND II,extra_family,24,0.03348465342
+18169.0,Dunham Funds,extra_family,8,0.056058636909999994
+18169.0,Penn Series Funds Inc,extra_family,15,0.08951708478000002
+18174.0,Asset Management Fund,unknown_match,10,0.008946642
+18177.0,Brighthouse Funds Trust I,extra_family,132,3.4827684476899994
+18177.0,Brighthouse Funds Trust I,intra_family,5,3.8291259335000003
+18177.0,Brighthouse Funds Trust II,extra_family,358,3.1206303308999996
+18177.0,Brighthouse Funds Trust II,intra_family,1,0.00128238847
+18177.0,Brighthouse Funds Trust II,unknown_match,1,0.013253078
+18182.0,Ivy Variable Insurance Portfolios,extra_family,14,0.25359981155
+18182.0,VanEck ETF Trust,extra_family,281,18.378744570029998
+18182.0,VanEck ETF Trust,intra_family,6,0.15919816454
+18182.0,VanEck Funds,extra_family,26,0.21799132673
+18182.0,VanEck VIP Trust,extra_family,16,0.049230637269999995
+18185.0,Touchstone ETF Trust,extra_family,43,0.04823422385
+18185.0,Touchstone ETF Trust,unknown_match,1,0.0005675545
+18185.0,Touchstone Funds Group Trust,extra_family,2,0.00112961199
+18185.0,Touchstone Strategic Trust,extra_family,19,0.6875747038700001
+18185.0,Touchstone Variable Series Trust,extra_family,1,0.00138069819
+18202.0,VALIC Co I,extra_family,370,2.74362054005
+18202.0,VALIC Co I,unknown_match,1,0.01047423195
+18204.0,"Principal Funds, Inc",extra_family,7,0.15866825294
+18204.0,TRANSAMERICA SERIES TRUST,extra_family,28,0.06329429995000001
+18204.0,VALIC Co I,extra_family,8,0.019396609
+18237.0,"Calvert Variable Trust, Inc.",extra_family,11,0.052740805
+18240.0,OCM MUTUAL FUND,extra_family,5,0.004961359570000001
+18274.0,"SOUND SHORE FUND, INC.",extra_family,7,0.17252566095
+18281.0,VanEck Funds,extra_family,10,0.020975970419999997
+18281.0,VanEck Funds,intra_family,5,0.007925718929999999
+18285.0,Midas Series Trust,extra_family,8,0.0207871438
+18286.0,Dunham Funds,extra_family,6,0.01598285879
+18286.0,GMO ETF Trust,extra_family,30,0.05549358543
+18286.0,GMO ETF Trust,intra_family,5,0.00711517963
+18286.0,GMO TRUST,extra_family,441,5.411254893580001
+18286.0,GMO TRUST,intra_family,100,5.01747712301
+18286.0,GMO TRUST,unknown_match,1,-0.00046677165
+18286.0,"Principal Funds, Inc",extra_family,3,0.044854499070000005
+18298.0,TRANSAMERICA FUNDS,extra_family,67,1.79991701022
+18298.0,TRANSAMERICA FUNDS,intra_family,109,3.1262632572899993
+18298.0,TRANSAMERICA SERIES TRUST,extra_family,334,10.31553388881
+18298.0,TRANSAMERICA SERIES TRUST,intra_family,4,0.08373729276000001
+18298.0,TRANSAMERICA SERIES TRUST,unknown_match,3,0.026671859499999995
+18304.0,Forethought Variable Insurance Trust,extra_family,195,0.4748501742700001
+18304.0,Forethought Variable Insurance Trust,unknown_match,3,0.0035124339
+18304.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,60,3.02487061075
+18304.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,2,0.0255879337
+18304.0,Northern Lights Variable Trust,extra_family,153,0.9727233756500001
+18304.0,Northern Lights Variable Trust,intra_family,1,0.00016718616
+18304.0,TRANSAMERICA SERIES TRUST,extra_family,29,0.19925160315999998
+18304.0,TRANSAMERICA SERIES TRUST,unknown_match,1,0.0069288078
+18335.0,VOLUMETRIC FUND INC,extra_family,15,0.0115798465
+18343.0,HARBOR FUNDS,extra_family,30,0.09808454609999999
+18343.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,118,0.1675683805
+18343.0,Voya Mutual Funds,extra_family,30,0.05037265249
+18344.0,HARBOR FUNDS,extra_family,1,0.00265002311
+18349.0,"Provident Mutual Funds, Inc.",extra_family,3,0.07254453452
+18352.0,Fenimore Asset Management Trust,extra_family,8,0.39345676385
+18357.0,Ariel Investment Trust,extra_family,35,0.8825198205899999
+18362.0,OBERWEIS FUNDS,extra_family,2,0.001991517
+18363.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,21,0.09436569367
+18370.0,James Alpha Funds Trust,extra_family,39,0.00568160589
+18370.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,12,0.13402796834
+18370.0,SEI INSTITUTIONAL MANAGED TRUST,extra_family,25,0.0037357914499999995
+18376.0,WASATCH FUNDS TRUST,extra_family,2,0.0006999069100000001
+18378.0,AMERICAN BEACON FUNDS,extra_family,135,1.2492479854499998
+18378.0,AMERICAN BEACON SELECT FUNDS,extra_family,3,0.01574640434
+18387.0,Delaware Group Equity Funds V,extra_family,29,0.18870067728999995
+18387.0,IVY FUNDS,extra_family,36,2.0130611768
+18394.0,Mutual Fund & Variable Insurance Trust,extra_family,17,0.019738870210000002
+18396.0,LoCorr Investment Trust,extra_family,30,0.024030219689999997
+18397.0,Mutual Fund & Variable Insurance Trust,extra_family,2,0.011136799199999999
+18400.0,Mutual Fund & Variable Insurance Trust,extra_family,1,0.00043873098999999997
+18400.0,Mutual Fund & Variable Insurance Trust,intra_family,3,0.00812495017
+18402.0,PIMCO Equity Series,extra_family,4,0.18992686788
+18402.0,PIMCO Equity Series,intra_family,7,0.010211242399999999
+18495.0,Clearwater Investment Trust,extra_family,26,0.0220996883
+18514.0,Federated Hermes MDT Series,extra_family,56,0.18267299905
+18514.0,Federated Hermes MDT Series,intra_family,4,0.034247934210000004
+18514.0,M FUND INC,unknown_match,20,0.06410333546000001
+18514.0,PACIFIC SELECT FUND,extra_family,10,0.06242453387000001
+18532.0,Driehaus Mutual Funds,extra_family,60,0.74749714652
+18532.0,JNL Series Trust,extra_family,3,0.01945014728
+18532.0,"RBB Fund, Inc.",extra_family,22,0.01727714984
+18537.0,THORNBURG INVESTMENT TRUST,extra_family,57,3.5834844213
+18537.0,THORNBURG INVESTMENT TRUST,intra_family,16,2.99974245532
+18537.0,Thornburg ETF Trust,extra_family,10,0.015552425010000002
+18537.0,Thornburg ETF Trust,intra_family,4,0.00909860522
+18554.0,Concorde Funds Inc,extra_family,18,0.01538773685
+18576.0,Wilmington Funds,extra_family,248,0.26826619864
+18576.0,Wilmington Funds,unknown_match,2,0.0009172485
+18581.0,"RBB Fund, Inc.",extra_family,1,0.47025114279
+18586.0,"RBB Fund, Inc.",extra_family,94,0.06330841358999999
+18598.0,"RBB Fund, Inc.",extra_family,56,0.7346399386
+18598.0,"RBB Fund, Inc.",unknown_match,1,0.0066560983499999995
+18626.0,Reynolds Funds Inc,extra_family,50,0.02162134025
+18634.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,40,0.08093664178
+18649.0,Williamsburg Investment Trust,extra_family,43,0.057097886189999995
+18697.0,MORGAN STANLEY PATHWAY FUNDS,extra_family,335,1.01317627922
+18697.0,MORGAN STANLEY PATHWAY FUNDS,intra_family,1,0.0071055304599999996
+18697.0,MORGAN STANLEY PATHWAY FUNDS,unknown_match,1,0.0033553191000000003
+18701.0,MORGAN STANLEY PATHWAY FUNDS,extra_family,43,0.09194192798
+18708.0,Delaware Pooled Trust,extra_family,10,0.00778403105
+18709.0,GREEN CENTURY FUNDS,extra_family,6,0.00396160833
+18710.0,Legg Mason Global Asset Management Trust,extra_family,61,0.48307008454
+18710.0,Legg Mason Global Asset Management Trust,unknown_match,1,0.00086454
+18710.0,Legg Mason Partners Investment Trust,extra_family,147,1.6246001605299998
+18710.0,Legg Mason Partners Investment Trust,unknown_match,2,0.003412527
+18710.0,Legg Mason Partners Variable Equity Trust,extra_family,25,0.1952021708
+18714.0,Boston Trust Walden Funds,extra_family,115,0.68549717576
+18762.0,"AB BOND FUND, INC.",unknown_match,38,0.047097678270000005
+18762.0,"AB CAP FUND, INC.",extra_family,114,1.11753845772
+18762.0,"AB CAP FUND, INC.",unknown_match,2,0.019549170600000002
+18762.0,"AB CORE OPPORTUNITIES FUND, INC.",extra_family,17,0.06101342629
+18762.0,"AB CORE OPPORTUNITIES FUND, INC.",unknown_match,1,0.0027545205
+18762.0,"AB DISCOVERY GROWTH FUND, INC.",extra_family,3,0.09921025692
+18762.0,AB EQUITY INCOME FUND INC,unknown_match,16,0.16813425087
+18762.0,"AB GLOBAL RISK ALLOCATION FUND, INC.",extra_family,6,0.054039717
+18762.0,AB INSTITUTIONAL FUNDS INC,unknown_match,3,0.00195696072
+18762.0,AB LARGE CAP GROWTH FUND INC,extra_family,12,7.249294150900001
+18762.0,AB PORTFOLIOS,unknown_match,103,1.75054718715
+18762.0,"AB RELATIVE VALUE FUND, INC.",extra_family,17,0.5797929745799999
+18762.0,"AB SUSTAINABLE GLOBAL THEMATIC FUND, INC.",extra_family,6,0.16906893821000002
+18762.0,AB SUSTAINABLE INTERNATIONAL THEMATIC FUND INC,extra_family,4,0.07612763822
+18762.0,AB TRUST,unknown_match,30,0.4483524045300001
+18762.0,"AB VARIABLE PRODUCTS SERIES FUND, INC.",extra_family,182,0.8866855957800001
+18762.0,"AB VARIABLE PRODUCTS SERIES FUND, INC.",unknown_match,1,0.000163302
+18762.0,AuguStar Variable Insurance Products Fund Inc,extra_family,96,0.19646395715
+18762.0,BERNSTEIN SANFORD C FUND INC,extra_family,270,0.5317161267299999
+18762.0,BERNSTEIN SANFORD C FUND INC,intra_family,4,0.27098098675
+18762.0,BERNSTEIN SANFORD C FUND INC,unknown_match,4,0.0003725527
+18762.0,Bernstein Fund Inc,extra_family,34,0.8720690215400001
+18762.0,Brighthouse Funds Trust I,extra_family,144,0.19593769030000002
+18762.0,Brighthouse Funds Trust I,unknown_match,1,0.0008943185999999999
+18762.0,EQ Advisors Trust,unknown_match,1358,1.74135180621
+18762.0,Guardian Variable Products Trust,extra_family,30,0.07105811272000001
+18762.0,JNL Series Trust,extra_family,3,0.0018524977000000003
+18762.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,10,0.31912341945000006
+18762.0,MML SERIES INVESTMENT FUND,extra_family,10,0.16676430232
+18762.0,Penn Series Funds Inc,extra_family,13,0.00610646514
+18762.0,"Principal Funds, Inc",extra_family,5,0.6158869820000009
+18762.0,VALIC Co I,extra_family,48,0.030344556810000003
+18762.0,Wilshire Mutual Funds Inc,extra_family,85,0.00281416477
+18766.0,Hennessy Funds Trust,extra_family,47,0.16660328765
+18768.0,Hennessy Funds Trust,extra_family,15,0.0733743846
+18768.0,Hennessy Funds Trust,unknown_match,1,0.0031302
+18776.0,SUNAMERICA SERIES TRUST,extra_family,132,0.37620396818
+18776.0,SUNAMERICA SERIES TRUST,unknown_match,1,0.011420568
+18786.0,Chesapeake Investment Trust,extra_family,9,0.011169385940000002
+18786.0,Chesapeake Investment Trust,unknown_match,1,0.000118215
+18814.0,CAUSEWAY CAPITAL MANAGEMENT TRUST,extra_family,10,0.07772140267000002
+18814.0,JNL Series Trust,extra_family,182,0.07304306425999998
+18814.0,JNL Series Trust,intra_family,5,0.5416771968999999
+18814.0,"Principal Funds, Inc",extra_family,5,1.665181091320004
+18814.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,8,0.02493199045
+18819.0,"Principal Funds, Inc",extra_family,2,0.024933530779999998
+18865.0,Praxis Funds,extra_family,78,0.034098532939999995
+18865.0,Praxis Mutual Funds,extra_family,175,0.42116016769
+18869.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,439,7.5140014744
+18869.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,2,0.00451477992
+18869.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,unknown_match,1,0.018296708300000002
+18869.0,Lincoln Funds Trust,extra_family,5,0.00093296202
+18883.0,Bridge Builder Trust,extra_family,67,1.8433804698999998
+18883.0,Bridge Builder Trust,unknown_match,1,0.003786365
+18883.0,GALLERY TRUST,extra_family,6,0.03850824929
+18883.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,14,0.12742145238000002
+18883.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.00837278196
+18883.0,PACE SELECT ADVISORS TRUST,extra_family,16,0.03910750907
+18899.0,FINANCIAL INVESTORS TRUST,extra_family,39,0.13141716486
+18903.0,FINANCIAL INVESTORS TRUST,extra_family,10,0.013384350149999998
+18906.0,TIMOTHY PLAN,extra_family,4,0.007452486739999999
+18906.0,TIMOTHY PLAN,intra_family,1,0.00982515
+18906.0,Timothy Plan,extra_family,98,0.11115896981
+18930.0,GUINNESS ATKINSON FUNDS,extra_family,55,0.06592679812
+18952.0,SARATOGA ADVANTAGE TRUST,extra_family,24,0.01629680254
+18952.0,SARATOGA ADVANTAGE TRUST,intra_family,16,0.0026633174900000003
+18954.0,Investment Managers Series Trust III,extra_family,40,1.49645514981
+18954.0,Investment Managers Series Trust III,unknown_match,1,0.00061938
+18956.0,COMMERCE FUNDS,extra_family,61,0.22196251623
+18974.0,BBH Trust,extra_family,10,0.36789072591
+18974.0,GuideStone Funds,extra_family,38,0.49202226425000006
+18974.0,GuideStone Funds,unknown_match,1,0.0064416235
+18976.0,CAPITAL MANAGEMENT INVESTMENT TRUST,unknown_match,12,0.022188267
+18978.0,"TRIBUTARY CAPITAL MANAGEMENT, LLC",extra_family,17,0.012813566299999999
+18980.0,"TRIBUTARY CAPITAL MANAGEMENT, LLC",extra_family,12,0.054488680080000004
+18983.0,JNL Series Trust,extra_family,771,14.99853409024
+18983.0,JNL Series Trust,unknown_match,5,0.0600852098
+19012.0,JNL Series Trust,extra_family,19,0.005506489130000001
+19028.0,Copeland Trust,extra_family,19,0.02267871239
+19028.0,SEI INSTITUTIONAL INVESTMENTS TRUST,extra_family,62,0.15793765224
+19072.0,WesMark Funds,extra_family,53,0.18639976169
+19084.0,LITMAN GREGORY FUNDS TRUST,extra_family,22,0.04776759912
+19170.0,Advisors Series Trust,unknown_match,234,0.67736778492
+19178.0,BULLFINCH FUND INC,extra_family,8,0.00469662638
+19178.0,"Bullfinch Fund, Inc.",extra_family,3,0.00025364496
+19180.0,"Spirit of America Investment Fund, Inc.",extra_family,68,0.09587785781000001
+19208.0,BOYAR VALUE FUND INC,extra_family,10,0.00720206692
+19209.0,JAMES ADVANTAGE FUNDS,extra_family,49,0.09918738634999999
+19210.0,Monteagle Funds,extra_family,4,0.0014989944
+19253.0,TANAKA FUNDS INC,extra_family,4,0.00232710565
+19256.0,MH ELITE PORTFOLIO OF FUNDS TRUST,extra_family,61,0.057177158089999985
+19256.0,MH ELITE PORTFOLIO OF FUNDS TRUST,unknown_match,2,0.00131286674
+19260.0,UPRIGHT INVESTMENTS TRUST,extra_family,57,0.013022455129999999
+19260.0,UPRIGHT INVESTMENTS TRUST,unknown_match,1,6.486e-05
+19271.0,SPARROW FUNDS,extra_family,19,0.026267461049999996
+19275.0,Prudential Investment Portfolios 9,extra_family,6,0.018399061079999997
+19277.0,Kirr Marbach Partners Funds Inc,extra_family,4,0.01383446059
+19278.0,MP63 FUND INC,extra_family,17,0.024717485369999997
+19282.0,EQ Advisors Trust,unknown_match,48,0.06987778181
+19282.0,Kinetics Mutual Funds,extra_family,12,0.020780312549999996
+19282.0,Kinetics Portfolios Trust,extra_family,53,1.4548079718400002
+19287.0,ALLSPRING MASTER TRUST,extra_family,18,0.01226878707
+19289.0,FORESTER FUNDS INC,extra_family,6,0.00042069369999999995
+19289.0,FORESTER FUNDS INC,unknown_match,1,8.005e-05
+19294.0,Prudential Investment Portfolios 5,extra_family,108,0.33082200512
+19295.0,Jacob Funds Inc.,extra_family,1,0.0005633775
+19297.0,Allianz Variable Insurance Products Trust,extra_family,498,1.3739298723
+19297.0,Allianz Variable Insurance Products Trust,unknown_match,4,0.0059336262
+19310.0,Allied Asset Advisors Funds,extra_family,20,0.04990306484999999
+19360.0,Popular Total Return Fund Inc,extra_family,5,0.04059357064
+19365.0,NORTHQUEST CAPITAL FUND INC,extra_family,2,0.001095165
+19367.0,BLUE CHIP INVESTOR FUNDS,extra_family,5,0.027857641
+19474.0,Conestoga Funds,extra_family,5,0.30235579390999995
+19475.0,PARADIGM FUNDS,extra_family,10,0.01315145408
+19476.0,Unified Series Trust,extra_family,105,0.49106503658
+19477.0,NEIMAN FUNDS,extra_family,10,0.010485189
+19478.0,BERTOLET CAPITAL TRUST,extra_family,5,0.0025878449500000003
+19483.0,Weitz Funds,extra_family,22,0.43293614
+19488.0,RBC Funds Trust,extra_family,23,0.20514971174000002
+19488.0,RBC Funds Trust,intra_family,1,0.0025246609
+19496.0,FRANK FUNDS,extra_family,3,0.00381918923
+19498.0,FRANK FUNDS,extra_family,6,0.00559993
+19510.0,MUNDOVAL FUNDS,extra_family,8,0.0103136
+19511.0,"Kayne Anderson Energy Infrastructure Fund, Inc. ",extra_family,4,0.9797428179400001
+19513.0,Intrepid Capital Management Funds Trust,extra_family,11,0.02941971086
+19517.0,Adirondack Funds,extra_family,3,0.00344978085
+19518.0,Northern Lights Fund Trust,extra_family,264,4.02682555435
+19518.0,Northern Lights Fund Trust,intra_family,6,0.14194923453
+19518.0,Northern Lights Fund Trust,unknown_match,1,0.003595984
+19519.0,Northern Lights Fund Trust,extra_family,105,1.4911737182300002
+19520.0,Northern Lights Fund Trust,extra_family,374,4.57467216972
+19520.0,Northern Lights Fund Trust,intra_family,1,4.544259e-05
+19520.0,Northern Lights Fund Trust,unknown_match,4,0.00929602491
+19532.0,INVESTMENT MANAGERS SERIES TRUST,extra_family,2,0.0032674647199999996
+19535.0,360 Funds,extra_family,96,0.09448146604999999
+19538.0,Mercer Funds,extra_family,20,0.16474468926999994
+19540.0,CRM Mutual Fund Trust,extra_family,24,0.09102589487
+19555.0,WisdomTree Trust,extra_family,961,8.30446308834
+19555.0,WisdomTree Trust,intra_family,13,0.06483577907
+19555.0,WisdomTree Trust,unknown_match,3,0.028536224
+19585.0,MUTUAL FUND SERIES TRUST,extra_family,50,0.13657585712
+19586.0,MUTUAL FUND SERIES TRUST,extra_family,221,4.7481047618600005
+19586.0,MUTUAL FUND SERIES TRUST,unknown_match,1,8.08505e-05
+19588.0,MSS Series Trust,extra_family,7,0.0023347507000000003
+19589.0,MSS Series Trust,extra_family,7,0.01632280789
+19590.0,MSS Series Trust,extra_family,10,0.007537059
+19602.0,FundVantage Trust,extra_family,4,0.03275595
+19606.0,Wisconsin Capital Fund Inc,extra_family,9,0.01594834
+19607.0,World Funds Trust,extra_family,1,0.0346912
+19608.0,Northern Lights Fund Trust IV,extra_family,12,0.00646583655
+19608.0,World Funds Trust,extra_family,22,0.11765282051
+19636.0,Dunham Funds,extra_family,1,0.00307119365
+19639.0,Dunham Funds,extra_family,6,0.014658528300000001
+19728.0,Valued Advisers Trust,extra_family,13,0.037356070820000004
+19743.0,Starboard Investment Trust,extra_family,109,0.43978563063
+19770.0,Brinker Capital Destinations Trust,extra_family,18,0.055872156060000004
+19775.0,ENTREPRENEURSHARES SERIES TRUST,extra_family,6,0.00545001421
+19777.0,Pinnacle Capital Management Funds Trust,extra_family,3,0.006080617599999999
+19778.0,Ashmore Funds,extra_family,23,0.0576131694
+19784.0,Precidian ETFs Trust,extra_family,1,0.0006711124
+19787.0,GPS Funds II,extra_family,25,1.44063679369
+19787.0,GPS Funds II,unknown_match,1,0.03703858963
+19787.0,Virtus Alternative Solutions Trust,extra_family,83,0.006272288370000001
+19789.0,MainGate Trust,extra_family,4,0.2208066
+19795.0,LoCorr Investment Trust,extra_family,8,0.00160211284
+19797.0,Clark Fork Trust,extra_family,2,0.0322481675
+19800.0,Managed Portfolio Series,extra_family,7,0.02673311325
+19804.0,Managed Portfolio Series,extra_family,12,0.02744155597
+19805.0,Managed Portfolio Series,extra_family,43,0.0010387975500000001
+19837.0,NORTHERN LIGHTS FUND TRUST II,extra_family,377,0.53875838375
+19837.0,NORTHERN LIGHTS FUND TRUST II,intra_family,2,0.00032536937
+19837.0,NORTHERN LIGHTS FUND TRUST II,unknown_match,3,0.0069434966
+19839.0,SPEND LIFE WISELY FUNDS INVESTMENT TRUST,extra_family,7,0.00274158697
+19840.0,SPEND LIFE WISELY FUNDS INVESTMENT TRUST??,extra_family,2,0.0239611
+19843.0,VERICIMETRY FUNDS,extra_family,99,0.019427772560000004
+19844.0,Arrow Investments Trust,extra_family,45,0.03728010496
+19844.0,Arrow Investments Trust,intra_family,5,0.047734419789999996
+19844.0,Arrow Investments Trust,unknown_match,1,0.00046656522
+19846.0,NORTHERN LIGHTS FUND TRUST III,extra_family,5,0.00993350198
+19847.0,NORTHERN LIGHTS FUND TRUST III,extra_family,13,0.022365913
+19848.0,NORTHERN LIGHTS FUND TRUST III,extra_family,5,0.01893989539
+19849.0,NORTHERN LIGHTS FUND TRUST III,extra_family,25,0.0452837024
+19851.0,NORTHERN LIGHTS FUND TRUST III,extra_family,13,0.00814989947
+19869.0,ETF Series Solutions,extra_family,30,0.0181522838
+19870.0,Ultimus Managers Trust,extra_family,275,1.4570772556199998
+19870.0,Ultimus Managers Trust,intra_family,3,0.05010589153
+19870.0,Ultimus Managers Trust,unknown_match,2,0.00059312412
+19905.0,Two Roads Shared Trust,extra_family,128,0.32148148208
+19905.0,Two Roads Shared Trust,intra_family,2,0.01508415
+19906.0,Two Roads Shared Trust,extra_family,4,0.0055892666900000006
+19908.0,Two Roads Shared Trust,extra_family,27,0.14187327796999996
+19916.0,Advisors Preferred Trust,extra_family,79,0.23600987784999994
+19916.0,Advisors Preferred Trust,unknown_match,5,0.00012225389
+19919.0,ALPS SERIES TRUST,extra_family,5,0.017666188
+19924.0,Bridge Builder Trust,extra_family,4,3.66077133404
+19936.0,ADVISORS' INNER CIRCLE III,extra_family,5,0.036585561880000006
+19940.0,ADVISORS' INNER CIRCLE III,extra_family,10,0.00085498942
+19941.0,ADVISORS' INNER CIRCLE III,extra_family,48,0.013363569980000004
+19944.0,Aspiration Funds,extra_family,10,0.03431709471
+19945.0,USCF ETF Trust,extra_family,10,0.00193810377
+19946.0,USCF ETF Trust,extra_family,4,9.057839e-05
+19962.0,RBB Fund Trust,extra_family,2,0.063481536
+19984.0,WP Trust,unknown_match,7,0.019161685890000002
+19985.0,Series Portfolios Trust,unknown_match,74,1.03737508586
+19999.0,PFM Multi-Manager Series Trust,extra_family,2,0.17663698090000002
+20061.0,SPROTT FUNDS TRUST,extra_family,32,0.42553220388
+20061.0,SPROTT FUNDS TRUST,intra_family,3,0.37155619758
+20061.0,Sprott Funds Trust,extra_family,2,0.046545427119999996
+20062.0,Symmetry Panoramic Trust,extra_family,6,0.042550709469999996
+20080.0,Frost Family of Funds,extra_family,12,0.062083003850000006
+20084.0,Datum One Series Trust,extra_family,21,0.35160138052999995
+20087.0,VELA Funds,extra_family,39,0.036121855089999995
+20087.0,VELA Funds,unknown_match,1,0.0010286425
+20089.0,Modern Capital Funds Trust,extra_family,46,0.06144834492199999
+20089.0,Modern Capital Funds Trust,unknown_match,2,0.0024428265
+20090.0,James Alpha Funds Trust,extra_family,2,0.00673726645
+20091.0,James Alpha Funds Trust,extra_family,1,0.452745875
+20102.0,Tactical Investment Series Trust,extra_family,101,0.059630124740000005
+20103.0,DGI Investment Trust,extra_family,8,0.169245143
+20105.0,NEOS ETF Trust,extra_family,462,9.733090177180001
+20105.0,NEOS ETF Trust,unknown_match,4,0.019818061999999997
+20130.0,Fortune V Separate Account,extra_family,19,0.18380327136000002
+20134.0,Total Fund Solution,extra_family,2,0.00246142152
+20144.0,Elevation Series Trust,extra_family,246,0.25039379006
+20144.0,Elevation Series Trust,intra_family,10,0.08841743712000001
+20173.0,2023 ETF Series Trust,extra_family,77,0.75393967268
+20175.0,Advisor Managed Portfolios,extra_family,9,0.4138338461
+20177.0,SP Funds Trust,unknown_match,19,0.007760486329999999
+20181.0,Venerable Variable Insurance Trust,extra_family,401,1.59078651324
+20181.0,Venerable Variable Insurance Trust,unknown_match,1,0.006754779099999999
+20194.0,Aristotle Fund Series Trust,extra_family,55,0.7178008287700002
+20194.0,Aristotle Fund Series Trust,intra_family,39,1.1953990124
+20196.0,1290 Funds,extra_family,35,0.04619302171999999
+20196.0,American Century ETF Trust,extra_family,32,0.00135500155
+20196.0,LAUDUS TRUST,extra_family,23,0.570586401
+20196.0,LAUDUS TRUST,unknown_match,1,0.0103951329
+20196.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,extra_family,134,0.5508971537899999
+20196.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,intra_family,1,0.00078098676
+20196.0,LINCOLN VARIABLE INSURANCE PRODUCTS TRUST,unknown_match,2,0.0028744030700000004
+20196.0,MML SERIES INVESTMENT FUND,extra_family,101,0.0901869345
+20196.0,MML SERIES INVESTMENT FUND,intra_family,20,0.86244096123
+20196.0,MML SERIES INVESTMENT FUND,unknown_match,1,0.000132883
+20196.0,NEW YORK LIFE INVESTMENTS VP FUNDS TRUST,extra_family,20,0.08309580291000002
+20196.0,NORTHWESTERN MUTUAL SERIES FUND INC,extra_family,28,0.4247626814699999
+20196.0,Optimum Fund Trust,extra_family,20,0.45934923609999995
+20196.0,Penn Series Funds Inc,extra_family,1,0.00039944093
+20196.0,Penn Series Funds Inc,intra_family,2,0.02714201486
+20196.0,SEASONS SERIES TRUST,extra_family,43,0.01207733961
+20196.0,Voya Partners Inc,extra_family,26,0.034893839989999995
+20197.0,Venerable Variable Insurance Trust,extra_family,213,1.0753230009299999
+20197.0,Venerable Variable Insurance Trust,intra_family,17,2.74659578685
+20197.0,Venerable Variable Insurance Trust,unknown_match,2,0.0033033433000000004
+20199.0,Duff & Phelps Utility & Infrastructure Fund Inc.,extra_family,6,0.10291487669
+20199.0,VALIC Co I,extra_family,61,0.45134854868
+20199.0,VALIC Co I,unknown_match,1,0.0002226327
+20199.0,Virtus Opportunities Trust,extra_family,16,0.07348248251
+20199.0,Virtus Opportunities Trust,intra_family,6,0.03723544079
+20199.0,Virtus Strategy Trust,extra_family,4,0.06320594059000001
+20199.0,Virtus Variable Insurance Trust,extra_family,2,0.006528585
+23819.0,BondBloxx ETF Trust,extra_family,2,0.00216970092
+23819.0,BondBloxx ETF Trust,intra_family,7,0.028914113100000003
+24348.0,Stone Ridge Trust,intra_family,2,0.10119016939
+24349.0,Bitwise Funds Trust,extra_family,6,0.00618568387
+24352.0,Baron ETF Trust,extra_family,29,0.05180793874
+24353.0,Grayscale Funds Trust,extra_family,6,0.00272966093
+24633.0,Collaborative Investment Series Trust,extra_family,56,0.02534259019
+24634.0,SPINNAKER ETF SERIES,extra_family,73,0.05402369117
+24636.0,FundX Investment Trust,extra_family,66,0.31241120849000004
+24637.0,Procure ETF Trust II,extra_family,2,0.00631408708
+24863.0,Rayliant Funds Trust,extra_family,4,0.00027927368
