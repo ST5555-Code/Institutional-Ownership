@@ -4,11 +4,11 @@
 
 ## HEAD
 
-`9cfe339` — `cp-4b-author-ssga: State Street/SSGA brand bridge to State Street Corp (#271)`. After conv-27-doc-sync merges, HEAD advances by one doc-only commit on top.
+`b24565f` — `worktree-cleanup-hygiene: retire 4 worktrees, 36 local branches, 6 orphan remotes + cef-asa diff archive (#274)`. After conv-28-doc-sync merges, HEAD advances by one doc-only commit on top.
 
 ## Active workstream pointer
 
-**`backup-pruning-and-archive`** is next (P3 ops). Local prune of ~63 GB across 20 backup directories under `data/backups/` plus Google Drive cold-storage offload of pruned backups (compress to `.tar.gz`, ~3 GB → ~600 MB each). Decisions deferred to execution time: target Google Drive folder, retention policy on cold storage, manual vs scripted upload (`gdrive` CLI / `rclone`). Single S ops PR. **Next substantive workstream after that:** `cp-4c-manual-sourcing` — methodology PR for the 15 deferred LOW-cohort brands (~$10.27T residual after the cp-4b carve-out arc).
+**`cp-4c-manual-sourcing`** is the next substantive workstream when scheduled by chat — methodology PR for the 15 deferred LOW-cohort brands (~$10.27T residual after the cp-4b carve-out arc). Equitable IM (brand `eid=2562` → candidate filer `eid=9526` Equitable Holdings) is the **first deferred case**, gated on operating-filer verification. **No active P3 ops between now and then** — `backup-pruning-and-archive` (PR #273) and `worktree-cleanup-hygiene` (PR #274) both landed; both reframed as recurring-cadence successors (`backup-archive-cadence`, `worktree-cleanup-hygiene-cadence`) under P3 in ROADMAP.
 
 ## Architectural state (post-cp-4b-carve-out arc)
 
@@ -26,8 +26,8 @@
 
 ## Parked queue (priority order)
 
-1. `backup-pruning-and-archive` (next active, P3 ops — local prune + Google Drive offload).
-2. `worktree-cleanup-hygiene` (P3 ops, ~10 min — retire cp-4b arc worktrees + earlier arc worktrees; cleans up `worktree-still-using-branch` warnings).
+1. `backup-archive-cadence` (P3 recurring — re-run compress-and-prune workflow whenever `data/backups/` exceeds 3 retained directories; pre-organize `BackupToDrive/` into `full-db-exports/`/`staging-backup/`/`pipeline-snapshots/` per chat decision 2026-05-04 to make Drive upload single-folder drag-and-drop per category).
+2. `worktree-cleanup-hygiene-cadence` (P3 recurring — re-run worktree-cleanup workflow whenever orphan worktrees + branches accumulate above ~5 entries; structural per PR #274 §7.5).
 3. `cp-4c-manual-sourcing` (next substantive workstream — 15 LOW-cohort brands, ~$10.27T; methodology design then per-brand authoring; Equitable IM is first deferred case, gated on operating-filer verification).
 4. Institution-merge pass — covers institution-side `unknown-classification-resolution` Waves 4a–4e (`unknown-classification-ncen-default-active` $4.5T lever, `unknown-classification-lp-suffix`, cleanup waves), Global X CRD backfill, then `admin-unresolved-firms-display`. Parked until CP-4 → CP-5 closes.
 5. `fund-classification-by-composition` (Workstream 2) — discovery → design → execution for `fund_universe.fund_strategy` NULLs and orphan series. Parked.
@@ -35,12 +35,13 @@
 
 ## Recent backups (cumulative across recent arcs)
 
-- `data/backups/13f_backup_20260503_072956` — pre-Wave-1 (unknown-classification cohort discovery / Tier A auto-resolutions).
+Only the 3 most recent backups remain locally per the retention rule locked in PR #273:
+
 - `data/backups/13f_backup_20260503_082307` — pre-fund-typed-ech-audit.
 - `data/backups/13f_backup_20260503_110616` — pre-PR-C (pre PR #265 SCD close); also covered the cp-4b carve-out arc.
 - `data/backups/13f_backup_20260503_121103` — post-PR-C (3.2 GB EXPORT, paired with PR #265).
 
-`backup-pruning-and-archive` will offload most of these to Google Drive before local deletion.
+Older backups archived to Google Drive `ShareholderProject/13f-backups/{full-db-exports,staging-backup,pipeline-snapshots}/` (44 archives, 49.5 GB total, md5-verified). Per-archive paths and md5s in `docs/findings/backup-pruning-and-archive-results.md` and `data/working/backup-archive-manifest.csv`.
 
 ## Process rules in effect
 
@@ -57,6 +58,7 @@ These continue from prior session memory and apply to the next session:
 - **Direct-prod-write precedent for entity-layer one-off PRs** until a staging twin is built as its own architectural workstream.
 - **Pre-flight backup before every prod-touch PR.** Confirm `mtime > DB mtime` and that the backup covers the latest commit before any `--confirm`.
 - **No prompts without confirmation** when re-running an arc step; conv-* convention is direct-to-main with auto-merge after CI green.
+- **`gh pr merge --delete-branch` workaround** (locked 2026-05-04 via PR #274 §7.5). The `gh pr merge --squash --delete-branch` command reliably fails to delete the local branch when the worktree using that branch is alive at merge time; the GitHub API DELETE on the branch ref succeeds silently with the worktree holding the ref, leaving the remote branch live. Empirically validated across recent arcs (PRs #265, #267, #270, #271, #272, #273, and PR #274 itself). Future arc PRs that run from a worktree should: (1) run `gh pr merge --squash` **without** `--delete-branch`; (2) `cd` to main repo; (3) run `git push origin --delete <branch>` manually; (4) defer worktree retirement to the next `worktree-cleanup-hygiene-cadence` run. Local cleanup blocked at merge time is a structural limitation of git worktree semantics, not a transient bug — cadence cleanup is the right shape.
 
 ## Gotchas surfaced this arc (not already in ROADMAP / memory)
 
