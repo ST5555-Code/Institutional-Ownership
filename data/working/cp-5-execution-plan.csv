@@ -1,0 +1,27 @@
+seq_order,pr_slug,pr_title,section,estimated_size,aum_impact_billions,depends_on,chat_decisions_needed
+1,conv-29-doc-sync,"conv-29-doc-sync: ROADMAP + NEXT_SESSION_CONTEXT after Bundle D",pre-execution,small,0.0,,
+2,cp-5-cycle-merge-batch-a,"cp-5 cycle-truncated entity merges batch A (Goldman + Lazard + Lord Abbett)",pre-execution,medium,0.0,conv-29-doc-sync,9.3
+3,cp-5-cycle-merge-batch-b,"cp-5 cycle-truncated entity merges batch B (Ariel + Sarofim + Thornburg)",pre-execution,medium,0.0,conv-29-doc-sync,9.3
+4,cp-5-cycle-merge-batch-c,"cp-5 cycle-truncated entity merges batch C (Lewell + Equitable + Stonebridge + Financial Partners + Adams)",pre-execution,medium,0.0,conv-29-doc-sync,9.3
+5,cp-5-capital-group-umbrella,"cp-5 Capital Group umbrella decision (3 filer arms to brand eid 12)",pre-execution,small,7153.0,conv-29-doc-sync,9.1
+6,cp-5-loader-gap-link-existing-ciks,"cp-5 84K loader-gap remediation: link existing CIKs (23/50 cohort)",pre-execution,medium,200.0,conv-29-doc-sync,9.2
+7,cp-5-loader-gap-create-new-fund-entities,"cp-5 84K loader-gap remediation: create new fund-typed entities (27/50 cohort)",pre-execution,medium,218.5,cp-5-loader-gap-link-existing-ciks,9.2
+8,cp-5-loader-gap-rollup-rebuild,"cp-5 84K loader-gap remediation: re-run entity_rollup_history builder",pre-execution,small,418.5,cp-5-loader-gap-create-new-fund-entities,9.2
+9,cp-5-1-r5-helper-and-method-a-view,"CP-5.1 read-layer foundation: classify_institutional_holding helper + Method A view",cp-5,medium,75200.0,"cp-5-cycle-merge-batch-a,cp-5-cycle-merge-batch-b,cp-5-cycle-merge-batch-c,cp-5-capital-group-umbrella,cp-5-loader-gap-rollup-rebuild",9.4
+10,cp-5-2-register-tab-migration,"CP-5.2 Register tab reader migration + summary_by_parent rebuild",cp-5,medium,15100.0,cp-5-1-r5-helper-and-method-a-view,9.7
+11,cp-5-3-cross-ownership-migration,"CP-5.3 Cross-Ownership / Top Investors / Top Holders reader migration",cp-5,medium,75200.0,cp-5-1-r5-helper-and-method-a-view,
+12,cp-5-4-crowding-conviction-smart-money,"CP-5.4 Crowding / Conviction / Smart Money reader migration (Conviction is L)",cp-5,large,12000.0,cp-5-3-cross-ownership-migration,9.6
+13,cp-5-5-flows-sector-aum-activist,"CP-5.5 Sector Rotation / New-Exits / AUM / Activist reader migration",cp-5,small,5000.0,cp-5-1-r5-helper-and-method-a-view,
+14,cp-5-6-view-2-tier-3-sentinel,"CP-5.6 View 2 Tier-3 sentinel + UI handling for $4.9T non-decomposable cohort",cp-5,medium,4900.0,cp-5-4-crowding-conviction-smart-money,9.6
+15,cp-5-securities-canonical-type-loader-fix,"post-cp-5 securities.canonical_type loader fix + one-shot backfill (~$2.7T mis-classified)",post-cp-5,small,2700.0,cp-5-6-view-2-tier-3-sentinel,
+16,cp-5-method-b-disposition,"post-cp-5 fund_holdings_v2.dm_rollup_entity_id disposition (cache-invalidation signal vs drop)",post-cp-5,small,778.0,cp-5-1-r5-helper-and-method-a-view,9.5
+17,cp-5-bootstrap-scripts-disposition,"post-cp-5 bootstrap_*_advisers.py (3 scripts / 18 write sites) retire-or-gate",post-cp-5,small,0.0,cp-5-6-view-2-tier-3-sentinel,9.8
+18,cp-5-operating-am-policy-cleanup,"post-cp-5 operating-AM rollup policy cleanup (BoA + RBC + BNY + Manulife $2.78T)",post-cp-5,medium,2780.0,cp-5-6-view-2-tier-3-sentinel,
+19,cp-5-cross-period-cik-cleanup,"post-cp-5 cross-period CIK reconciliation (16 non-obvious same-name pairs)",post-cp-5,small,0.0,cp-5-6-view-2-tier-3-sentinel,
+20,cp-5-cp4c-brand-bridges,"post-cp-5 cp-4c Category B brand bridges (13 brands ~$8.04T)",post-cp-5,large,8040.8,cp-5-6-view-2-tier-3-sentinel,
+21,cp-5-pipeline-4-nport-mp,"post-cp-5 Pipeline 4 monthly NPORT-MP integration",post-cp-5,large,0.0,cp-5-6-view-2-tier-3-sentinel,
+22,cp-5-pipeline-5-share-class,"post-cp-5 Pipeline 5 share-class drilldown (display-side; structural N-PORT limit)",post-cp-5,medium,0.0,cp-5-6-view-2-tier-3-sentinel,
+23,cp-5-pipeline-7-lei,"post-cp-5 Pipeline 7 LEI ingestion via GLEIF (0% coverage today)",post-cp-5,medium,0.0,cp-5-6-view-2-tier-3-sentinel,
+24,cp-5-ma-event-register-option-c,"post-cp-5 M&A event register Option C valid_from overrides (20-30 events)",post-cp-5,large,0.0,cp-5-6-view-2-tier-3-sentinel,
+25,cp-5-workstream-3-fund-to-parent-residuals,"post-cp-5 Workstream 3 fund-to-parent linkage residuals (post-bridge tail)",post-cp-5,medium,0.0,cp-5-cp4c-brand-bridges,
+26,cp-5-adams-residual-and-layer-a-tail,"post-cp-5 Adams residual + 120-Layer-A duplicate-fund tail (per family)",post-cp-5,small,0.0,cp-5-6-view-2-tier-3-sentinel,
