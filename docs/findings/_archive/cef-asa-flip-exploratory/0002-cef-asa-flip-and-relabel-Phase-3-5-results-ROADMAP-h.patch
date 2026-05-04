@@ -1,0 +1,422 @@
+From 2ee0c29cb9f72d78c5f8a7df3970186594181eb7 Mon Sep 17 00:00:00 2001
+From: Serge Tismen <serge.tismen@gmail.com>
+Date: Sat, 2 May 2026 15:25:45 -0400
+Subject: [PATCH 2/2] cef-asa-flip-and-relabel: Phase 3-5 results + ROADMAP +
+ handoff
+
+Phase 3: single-tx INSERT 350 SYN_0001230869 + UPDATE 350 UNKNOWN
+to is_latest=FALSE. Pre/post:
+  - UNKNOWN  350 / \$1.752B  ->  0 / \$0.00      (delta -350)
+  - SYN_0001230869  143 / \$1.094B  ->  493 / \$2.847B  (delta +350 / +\$1.752B)
+  - AUM conservation delta = \$+0.00 exact (within \$0.01 gate)
+  - Fund-attribution override applied per chat decision (entity_id
+    11278 -> 26793, dm_rollup_name 'Calamos Investments' ->
+    'ASA Gold and Precious Metals LTD Fund'); mirrors existing
+    2025-11 SYN row precedent.
+
+Phase 4: peer_rotation_flows rebuild via compute_peer_rotation.py
+(run_id peer_rotation_empty_20260502_191309). Total
+17,489,567 -> 17,489,564 (delta -3 rows / 0.000017%). Snapshot
+data/backups/peer_rotation_peer_rotation_empty_20260502_191309.duckdb.
+
+Phase 5: pytest 373/373 PASS (62.48s); npm run build 0 errors;
+audit_unknown_inventory.py 0/0/\$0.00B live (workstream closed);
+audit_orphan_inventory.py 0 live orphans; 3 random spot checks
+all match expected MV exactly.
+
+Adds docs/findings/cef_residual_cleanup_asa_results.md.
+ROADMAP.md: marks cef-residual-cleanup workstream CLOSED, adds
+COMPLETED entry. NEXT_SESSION_CONTEXT.md: refreshed for handoff
+with 6 gotchas surfaced this session.
+
+Closes cef-residual-cleanup workstream (PR-A #250 + PR-B this PR).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+---
+ ROADMAP.md                                    |   7 +-
+ docs/NEXT_SESSION_CONTEXT.md                  | 169 +++---------------
+ .../cef_residual_cleanup_asa_results.md       | 142 +++++++++++++++
+ 3 files changed, 174 insertions(+), 144 deletions(-)
+ create mode 100644 docs/findings/cef_residual_cleanup_asa_results.md
+
+diff --git a/ROADMAP.md b/ROADMAP.md
+index a87518e..1449bc0 100644
+--- a/ROADMAP.md
++++ b/ROADMAP.md
+@@ -18,7 +18,7 @@ _(none — see COMPLETED table)_
+ 
+ ### P2 — Next sprint
+ 
+-- **cef-residual-cleanup** — Surfaced 2026-05-02 (PR #247 BRANCH 2 deferral); reframed 2026-05-02 by PR #249 (cef-scoping); PR-B reframed 2026-05-02 by `cef-asa-prep-investigation` (commit `79350a5`). PR-A landed 2026-05-02 (`cef-residual-cleanup-adx` — flipped 96 ADX byte-identical duplicates). Residual: 350 rows / $1.752B from ASA Gold (CIK `0001230869`) — to be cleared by PR-B `cef-asa-flip-and-relabel` (S, flip 350 ASA UNKNOWN rows to `is_latest=FALSE` and relabel to `series_id='SYN_0001230869'`; v2 loader rerun unnecessary because UNKNOWN rows are byte-identical to ASA's N-PORT filings). Full spec at [§ cef-residual-cleanup](#cef-residual-cleanup).
++- ~~**cef-residual-cleanup**~~ **CLOSED 2026-05-02.** PR-A `cef-residual-cleanup-adx` (#250, squash `adb1ba9`) flipped 96 ADX byte-identical duplicates; PR-B `cef-asa-flip-and-relabel` (squash `<TBD>`) flipped + relabeled 350 ASA UNKNOWN rows / $1.752B to `SYN_0001230869`. Global `series_id='UNKNOWN' AND is_latest=TRUE` 446 → 0. See COMPLETED table.
+ - **fund-structure-column** — Surfaced 2026-05-02 (PR #249 cef-scoping). Add `fund_structure` enum column to `fund_universe` ({`open_end`, `closed_end`, `etf`, `bdc`, `interval`}) — orthogonal to `fund_strategy`. Currently structure is inferred indirectly via `series_id` prefix (SYN_ = CEF-or-open-end ambiguous, real SEC series_id = open-end), which is fragile. Lets `cross.py` and display layer make structure-aware decisions (e.g., NAV premium/discount only for `closed_end`). Workstream: investigation PR (schema design + downstream impact) → backfill PR (populate from SEC form-type signals) → display integration PR. Blockers: must follow `cef-residual-cleanup` (depends on clean SYN_ state); source-of-truth question (SEC form-type vs prospectus vs holdings shape); interaction with `fund-strategy-taxonomy-finalization`. Full spec at [§ fund-structure-column](#fund-structure-column).
+ - **parent-level-display-canonical-reads** — Migrate the 18 parent-level display read sites from `holdings_v2.manager_type` and `holdings_v2.entity_type` (legacy/derived) to canonical `entity_classification_history.classification` / `entity_current.classification`. Includes fix for `query4` silent-drop bug ([register.py:746-750](scripts/queries/register.py:746)) where rows with disagreeing `manager_type` and `entity_type` fall to "Other/Unknown". Tracked as the institution-level half of the consolidation sequence (separate from fund-level, which closed with PR-1d on 2026-05-01). Decision D4 from the PR-1c audit applies: always read canonical when migrated; precedence rule for managers without an `entity_classification_history` row to be defined as part of this work. Surfaced 2026-05-01 (PR-1d follow-up).
+ - **fund-strategy-taxonomy-finalization** — Surfaced 2026-05-01 (PR-4 follow-up). Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy. Several values were inherited from the original classifier and carry vague labels or arbitrary boundaries that do not survive scrutiny: (1) **`balanced`** (60-90% equity composition) — vague label, boundary with `multi_asset` is arbitrary; decide keep as composition-based bucket / rename to `active_equity_heavy` / merge into `active`; (2) **`multi_asset`** (30-60% equity composition) — boundaries with `balanced` (60%) and `bond_or_other` (30%) are both arbitrary thresholds; decide keep distinct / merge with `balanced` / rename; (3) **`bond_or_other`** — heterogeneous bucket; the `saba-proshares-reclassify` 2026-05-01 PR moved 39 ProShares short / inverse / leveraged-short funds out of this bucket to `passive` (closing the bucket's largest miscategorisation); residual is bond funds + niche cases. Could still split into `bond` and `inverse_or_short` if a richer taxonomy is preferred — but the urgency is gone now that ProShares is corrected; (4) **`excluded`** — combines money markets, fund-of-funds, and ETF wrappers that skip classification; should split into specific reasons; (5) **`final_filing`** — status flag, not a strategy; 12+ funds (the 12 BlackRock muni trusts, all confirmed merged Feb 2026 by the `fund-cleanup-batch` 2026-05-01 audit, plus other final-filing rows); decide whether this belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean. Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Trigger: orphan/NULL data is now on the table (`fund-cleanup-batch` 2026-05-01 audit closed `canonical-value-coverage-audit`); residual orphan disposition tracked under `fund-holdings-orphan-investigation` and `historical-fund-holdings-drift-audit`. The merge/split decisions can now be staged.
+@@ -92,7 +92,7 @@ _(none — see COMPLETED table)_
+ 
+ ## cef-residual-cleanup
+ 
+-**Status:** Open · **Priority:** P2 · **Surfaced:** PR [#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247) (BRANCH 2 holdouts) · **Reframed:** PR [#249](https://github.com/ST5555-Code/Institutional-Ownership/pull/249) (cef-scoping)
++**Status:** **CLOSED 2026-05-02** · **Priority:** P2 · **Surfaced:** PR [#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247) (BRANCH 2 holdouts) · **Reframed:** PR [#249](https://github.com/ST5555-Code/Institutional-Ownership/pull/249) (cef-scoping) · **Closed:** PR-A #250 + PR-B `cef-asa-flip-and-relabel`
+ 
+ **Problem.** 446 rows / $4.741B in `fund_holdings_v2` under `series_id='UNKNOWN'` from 2 CEF CIKs (Adams Diversified Equity Fund `0000002230`, ASA Gold & Precious Metals `0001230869`). Per PR #249 scoping: this is migration-015 residue from the retired loader `scripts/retired/fetch_nport.py`, NOT a CEF architecture gap. CEFs file N-PORT under Rule 30b1-9 and the `SYN_<cik>` namespace already correctly loads 436 of 438 CEFs in `fund_holdings_v2` ($625.94B AUM).
+ 
+@@ -101,7 +101,7 @@ Decision per PR #249: keep `SYN_<cik>` as canonical CEF identifier (Option C —
+ ### Workstream sequence (revised, ~1–2 sessions)
+ 
+ - ~~**PR-A `cef-residual-cleanup-adx`** (S) — flip 96 ADX byte-identical duplicates to `is_latest=FALSE`.~~ **Landed 2026-05-02.** Single-period cohort (2025-09-30); 96/96 byte-identical to `SYN_0000002230` companions; 0 mismatches; 0 orphans. Global `series_id='UNKNOWN' AND is_latest=TRUE` 446 → 350.
+-- **PR-B `cef-asa-flip-and-relabel`** (S) — flip 350 ASA UNKNOWN rows to `is_latest=FALSE` and relabel to `series_id='SYN_0001230869'`. Per `cef_asa_prep_investigation.md` (commit `79350a5`): ASA UNKNOWN rows are byte-identical to ASA's N-PORT filings ($0.00 delta on every period and every spot-checked row), so a v2 loader rerun is unnecessary. Same shape as PR #250 (ADX), not the "fetch+load+flip" originally scoped in PR #249. Closes the workstream.
++- ~~**PR-B `cef-asa-flip-and-relabel`** (S) — flip 350 ASA UNKNOWN rows to `is_latest=FALSE` and relabel to `series_id='SYN_0001230869'`.~~ **Landed 2026-05-02.** 350/350 byte-identical to ASA's N-PORT filings ($0.00 per-period delta); single-tx INSERT 350 SYN + UPDATE 350 UNKNOWN; AUM conservation Δ = $0.00. Fund-attribution override (entity_id 11278 → 26793, dm_rollup_name 'Calamos Investments' → 'ASA Gold and Precious Metals LTD Fund') applied per chat decision; mirrors existing 2025-11 SYN row. Global `series_id='UNKNOWN' AND is_latest=TRUE` 350 → 0. Workstream closes.
+ 
+ ### Out of scope
+ 
+@@ -207,6 +207,7 @@ Decision per PR #249: keep `SYN_<cik>` as canonical CEF identifier (Option C —
+ 
+ | Date | Item | Details |
+ | --- | --- | --- |
++| 2026-05-02 | **cef-asa-flip-and-relabel** | Closes the ASA side of the BRANCH 2 cohort and the entire `cef-residual-cleanup` workstream (last residual after PR #250 ADX cleanup). Single PR, branch `cef-asa-flip-and-relabel` (worktree `claude/angry-hypatia-3c51a9`), backup `data/backups/13f_backup_20260502_145010` (post-#250). **Phase 1 — re-validation (read-only):** ASA (CIK `0001230869`) UNKNOWN cohort confirmed at 350 rows / $1,752,484,930.87 across 3 periods (2024-11: 108 / $0.440B; 2025-02: 112 / $0.521B; 2025-08: 130 / $0.791B) — exact match to investigation baseline (commit `79350a5`), 0% drift. SYN_0001230869 companion check: 0 rows for the 3 target periods (existing 143-row 2025-11 SYN row remains untouched, out of scope per `asa-2025-11-syn-source-investigation`). All 3 accessions confirmed at MIG015 prefix `BACKFILL_MIG015_UNKNOWN_<period>`. **Phase 1.4 — N-PORT byte-identical re-verification:** fetched + parsed 3 NPORT-P primary_doc.xml (accessions `0001752724-25-018310`, `0001752724-25-075250`, `0001230869-25-000013`) via `parse_nport_xml` (gotcha: parser key is `val_usd`, not `value_usd`). Per-period delta = $0.000000 on all 3 periods. Per-row threshold ≤ $0.01: **350 byte_identical / 0 mismatch / 0 orphan**. Match anchor: `(report_date, isin)` primary, `(report_date, issuer_name)` fallback for 103 null-ISIN rows; multi-lot duplicates (e.g. 2025-02 CA7660871004 has 3 Ridgeline Minerals lots at distinct fair-value levels) handled by rank-zip on market_value_usd within (period, key) groups. **Phase 2 — dry-run manifest:** new `scripts/oneoff/cleanup_asa_unknown_relabel.py` (per-row classifier; differs from PR #250 ADX precedent in two ways — anchors against parsed N-PORT XML rather than an existing SYN_ companion, and INSERT-then-UPDATE rather than UPDATE-only since no SYN_0001230869 companion exists for the 3 target periods). Manifest CSV `data/working/asa_unknown_relabel_manifest.csv` (350-row record, all classified `byte_identical → FLIP_AND_RELABEL`, 0 HOLD; new `entity_id_correction='11278→26793'` audit column on every row). Dryrun doc `docs/findings/cef_residual_cleanup_asa_dryrun.md`. Phase 3 entry gate cleared (no HOLD rows). Dry-run committed in pre-execute SHA `3a1a06d`. **Fund-attribution override (deviation from literal plan, chat-confirmed):** UNKNOWN-side carries wrong fund-level attribution — `entity_id=11278` (fund-typed entity literally named `N/A`), `rollup_entity_id=63`, `dm_rollup_name='Calamos Investments'`. Literally copying "all other column values from UNKNOWN" would propagate the Calamos misattribution into the new SYN rows and feed bad rollup into peer_rotation_flows ($1.75B in ASA flows would have shifted into a competitor's bucket). Override mirrors the existing 2025-11 SYN row: `entity_id=26793`, `rollup_entity_id=26793`, `dm_entity_id=26793`, `dm_rollup_entity_id=26793`, `dm_rollup_name='ASA Gold and Precious Metals LTD Fund'`, `fund_name='ASA Gold and Precious Metals LTD Fund'`, `family_name='ASA GOLD & PRECIOUS METALS LTD'`. Holding-level columns (cusip, isin, issuer_name, ticker, asset_category, shares_or_principal, market_value_usd, pct_of_nav, fair_value_level, is_restricted, payoff_profile, quarter, report_month, report_date, fund_cik, fund_strategy_at_filing) copied verbatim from UNKNOWN. **ingestion_manifest registration NOT required:** existing 2025-11 SYN row not registered there, neither are UNKNOWN-side rows, no FK between `fund_holdings_v2.accession_number` and `ingestion_manifest`. Mirrors precedent. **Phase 3 — execute INSERT 350 + UPDATE 350 (single transaction):** `--confirm` against prod. Pre: UNKNOWN 350 / $1.752B; SYN 143 / $1.094B. INSERT 350 SYN rows with real ASA accessions, NOW() loaded_at, fresh row_ids via `nextval('fund_holdings_v2_row_id_seq')`, `backfill_quality='relabel_from_unknown'`, fund-level overrides applied. UPDATE 350 UNKNOWN rows to `is_latest=FALSE`. Post: UNKNOWN 0 / $0.00 (Δ -350); SYN 493 / $2.847B (Δ +350 / $+1.752B). All sanity gates passed: cohort drift gate, expected-vs-actual flip count, expected-vs-actual SYN insert count, AUM conservation Δ = $+0.00 exact (within $0.01 gate), BEGIN/COMMIT-wrapped. **Phase 4 — peer_rotation_flows rebuild:** ran `python3 scripts/pipeline/compute_peer_rotation.py`; total ~226s. Run ID `peer_rotation_empty_20260502_191309`; auto-snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_191309.duckdb`. Total 17,489,567 → 17,489,564 (Δ -3, 0.000017%, well within ±0.5%). **Phase 5 — validation:** `pytest tests/` 373/373 PASS in 62.48s (no regression vs PR #250 baseline). `audit_unknown_inventory.py` re-run: residual = 0 series / 0 rows / $0.00B — workstream closed (3,184 rows / $10B remain at `is_latest=FALSE` as historical audit trail per `phase1_totals_all_history`). `audit_orphan_inventory.py` re-run: `phase1_totals_is_latest=[0, 0, None]` — 0 live orphans. `cd web/react-app && npm run build`: 0 errors, 2.04s. Spot-check 3 random (period, isin) pairs (seed=7): `2025-08 / CA03349X1015` (Andean Precious Metals Corp) → 1 row / $8,490,188.23 ✓; `2025-08 / AU000000AQI2` (Alicanto Minerals Ltd) → 1 row / $1,620,240.48 ✓; `2025-08 / CA11777Q2099` (B2Gold Corp) → 1 row / $8,260,000.00 ✓. All match expected. **Architecture / safety:** INSERT + UPDATE in single transaction; no `fund_universe` touched; no `series_id` rewrite on existing rows (UNKNOWN preserved at `is_latest=FALSE` for audit history); no v2 loader code change (`load_nport.py`, `load_13f_v2.py`, `classify_fund()`, `fetch_nport_v2.py` all untouched); no `--reset`. PR-2 pipeline lock not on critical path. The retired loader `scripts/retired/fetch_nport.py` remains in place per `retired-loader-residue-watchpoint`. **Out of scope (per brief):** the existing 2025-11 `SYN_0001230869` row sourced from Donnelley filing-agent accession `0001049169-26-000039` (deferred to `asa-2025-11-syn-source-investigation`); ingestion_manifest backfill for legacy synth-path rows (deferred to `ingestion-manifest-coverage-watchpoint`); removing the retired loader (deferred to `retired-loader-residue-watchpoint`). New scripts: `scripts/oneoff/cleanup_asa_unknown_relabel.py`. Manifest: `data/working/asa_unknown_relabel_manifest.csv` (350-row record). Findings: `docs/findings/cef_residual_cleanup_asa_dryrun.md`, `docs/findings/cef_residual_cleanup_asa_results.md`. Squash commit `<TBD>` ([#TBD](#)). |
+ | 2026-05-02 | **cef-residual-cleanup-adx** | Closes the ADX side of the BRANCH 2 cohort deferred from PR #247 per the PR #249 (`cef-scoping`) reframe. Single PR, branch `cef-residual-cleanup-adx`, backup carried over (`data/backups/13f_backup_20260502_131809`). **Phase 1 — re-validation (read-only):** ADX (CIK `0000002230`) UNKNOWN cohort confirmed at 96 rows / $2,988,710,095.76 against current `data/13f.duckdb` — exact match to PR #249 expectation, 0% drift. SYN_0000002230 companion rows: 291 `is_latest=TRUE` across three periods (2025-06-30: 100 / $2.806B; 2025-09-30: 96 / $2.989B; 2025-12-31: 95 / $3.032B). UNKNOWN side covers only one period (2025-09-30) — the brief's "3 periods" framing was about the SYN side; the UNKNOWN side is a strict subset. **Phase 1.3 byte-identical verification:** LEFT JOIN UNKNOWN ↔ SYN_ on `(cusip, report_date)` comparing `market_value_usd`, `shares_or_principal`, `pct_of_nav`, `issuer_name`, `asset_category`, `ticker`, `isin` (NULL-safe via `IS NOT DISTINCT FROM`). Result: **96 byte_identical / 0 mismatch / 0 orphan**. Single accession in cohort: `BACKFILL_MIG015_UNKNOWN_2025-09` (matches MIG015 prefix expectation). **Phase 2 — dry-run manifest:** new `scripts/oneoff/cleanup_adx_unknown_duplicates.py` (per-row classifier; pattern follows PR #247's `cleanup_stale_unknown.py` but anchors on `(cusip, report_date)` rather than `(cik, fund_name)` since UNKNOWN literal name vs. SYN fund_name precludes name-based join). Manifest CSV `data/working/adx_unknown_cleanup_manifest.csv` (96-row record, all classified `byte_identical → FLIP`, 0 HOLD). Dryrun doc `docs/findings/cef_residual_cleanup_adx_dryrun.md`. Phase 3 entry gate cleared (no HOLD rows). **Phase 3 — execute is_latest flip:** Flask off (port 8001 clear). `--confirm` against prod. Single transaction: `UPDATE fund_holdings_v2 SET is_latest=FALSE WHERE fund_cik='0000002230' AND series_id='UNKNOWN' AND is_latest=TRUE AND (cusip, report_date) IN <96 keys>`. Pre-flip ADX UNKNOWN `is_latest=TRUE` = 96; post-flip = 0 (Δ -96 == expected). All hard guards passed: cohort drift gate (0%), expected-vs-actual flip delta gate, BEGIN/COMMIT-wrapped UPDATE. Global `series_id='UNKNOWN' AND is_latest=TRUE` 446 → 350. **Phase 4 — peer_rotation_flows rebuild:** ran `python3 scripts/pipeline/compute_peer_rotation.py`; parse 56.6s + validate + snapshot + promote 193.4s; total ~5 min. Run ID `peer_rotation_empty_20260502_173654`; auto-snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_173654.duckdb`. Total 17,489,751 → 17,489,567 (Δ -184, 0.001%, well within ±0.5%). **Phase 5 — validation:** `pytest tests/` 373/373 PASS in 54.53s (no regression vs PR #248 baseline). `audit_unknown_inventory.py` re-run: residual = 1 series / 350 rows / $1.752B (ASA Gold only, CIK `0001230869`) — exact match to plan expectation; ADX cohort closed. `audit_orphan_inventory.py` re-run: same residual (350 rows / $1.752B; per-quarter 2024Q4: 108 / $0.440B; 2025Q1: 112 / $0.521B; 2025Q3: 130 / $0.791B). `cd web/react-app && npm run build`: 0 errors, 1.66s. Spot-check 3 random `(cusip, report_date)` pairs (seed=42; cusips L8681T102, 533900106, 228368106): each returns exactly 1 `is_latest=TRUE` row (SYN_-side), with the UNKNOWN-side row preserved as `is_latest=FALSE` and identical market_value_usd. **Architecture / safety:** UPDATE-only on `is_latest` flag; no INSERT, no `fund_universe` touched, no `series_id` rewrite, no synthesized SYN_ rows. PR-2 pipeline lock not on critical path (`fund_holdings_v2`, not `fund_universe`). No write-path module modified — `load_nport.py`, `load_13f_v2.py`, `classify_fund()`, `fetch_nport_v2.py`, retired `scripts/retired/fetch_nport.py` all untouched. **Out of scope (per brief):** ASA Gold cohort (350 rows, no live SYN_0001230869 — deferred to PR-B `cef-asa-period-backfill`); patching the v2 loader retroactively (deferred to `v2-loader-is-latest-watchpoint`); removing the retired loader (deferred to `retired-loader-residue-watchpoint`). New scripts: `scripts/oneoff/cleanup_adx_unknown_duplicates.py`. Manifest: `data/working/adx_unknown_cleanup_manifest.csv`. Findings: `docs/findings/cef_residual_cleanup_adx_dryrun.md`, `docs/findings/cef_residual_cleanup_adx_results.md`. Squash commit `<TBD>` ([#TBD](#)). |
+ | 2026-05-02 | **fund-universe-value-corrections (PR #248)** | Closes the cleanup arc opened by PRs #244 → #245 → #246 → #247. Two value corrections to `fund_universe` plus a forward-looking guard on the original backfill script. Backup `data/backups/13f_backup_20260502_080830` (post-#247). **Phase 1 (read-only):** Rareview S000090077 confirmed at `fund_strategy='excluded'`; 301 rows tagged `strategy_source='orphan_backfill_2026Q2'` confirmed all NULL on `total_net_assets`. Canonical N-PORT TotalNetAssets is not persisted at series level in prod — reconstructs exactly from `fund_holdings_v2` via `NAV = MEDIAN(market_value_usd * 100.0 / pct_of_nav)` on the most-recent quarter's `is_latest=TRUE` rows. Validated against 10 funds with existing TNA: ratio = 1.000000…. `pct_of_nav` is stored on the percent scale (0–100), not fraction. **Phase 2 dry-run manifest** (`scripts/oneoff/correct_fund_universe_values.py --dry-run`): Block A (1 row) + Block B (300 rows, after de-dup fix) = 301 entries. 300/300 canonical, 0 fallback, 0 NULL-residual. Total Block B NAV = $450.1B. **Phase 3 — execute (single transaction):** Block A flipped Rareview `excluded → passive`, `strategy_source → 'unknown_cleanup_2026Q2'`, `total_net_assets → $4,555,216`; Block B populated TNA on 300 rows. **Mid-flight bug + correction:** initial `--confirm` had Block A's `strategy_source` re-overwritten by Block B (Block B's manifest filter included Rareview because at dry-run time it was tagged `orphan_backfill_2026Q2` with NULL TNA). Corrected via one-shot `UPDATE fund_universe SET strategy_source='unknown_cleanup_2026Q2' WHERE series_id='S000090077' AND fund_strategy='passive' AND strategy_source='orphan_backfill_2026Q2'` (1 row, single tx). Script patched so a hypothetical replay would not reproduce the bug: `derive_block_b_manifest` excludes Block A's series_id; new `derive_block_a_nav` lets Block A's UPDATE set `total_net_assets` in the same statement; Block B execution row-count check relaxed to `EXPECTED_BACKFILL_ROW_COUNT - 1`. Manifest CSV regenerated to match. **Phase 4 — pipeline guard (forward-looking):** `scripts/oneoff/backfill_orphan_fund_universe.py` patched to derive `total_net_assets` during manifest construction (canonical-first via `pct_of_nav`, `SUM(mv)` fallback, NULL-residual surfaced) and write it on INSERT. Existing 301-row cohort already corrected — no rerun. **Phase 5 — validation:** `pytest tests/` 373/373 PASS (58.17s). Final cohort counts: 300 `orphan_backfill_2026Q2` + 1 `unknown_cleanup_2026Q2` = 301, all with TNA, NULL-residual = 0. 5 random spot-checks plausible (positive, non-zero, in expected range). `cd web/react-app && npm run build` 0 errors, 2.32s. **Architecture / safety:** No `--reset`, no pipeline write-path module modified (`load_nport.py`, `classify_fund()` untouched). Single-transaction Phase 3 with hard guards (Phase 1 drift gate, post-update residual NULL check, ROLLBACK on constraint violation). PR-2 pipeline lock not on critical path; corrections are explicit manual overrides tagged with `strategy_source`. **Watchpoint:** `pct_of_nav` is on the percent scale (0–100) — future code deriving NAV from `fund_holdings_v2` should use `market_value_usd * 100.0 / pct_of_nav`. New scripts: `scripts/oneoff/correct_fund_universe_values.py`. Manifest: `data/working/fund_universe_corrections_manifest.csv` (1 A + 300 B). Findings: `docs/findings/fund_universe_corrections_dryrun.md`, `docs/findings/fund_universe_corrections_results.md`. Squash commit `8253713` ([#248](https://github.com/ST5555-Code/Institutional-Ownership/pull/248)). |
+ | 2026-05-02 | **fund-stale-unknown-cleanup** | Closes the BRANCH 1 portion of the stale-loader artifact surfaced by PR #246. Single PR. Backup carried over from the morning's run (`data/backups/13f_backup_20260502_052505`). **Phase 1 — re-validate cohort (read-only):** 8 (cik, fund_name) pairs / 3,184 rows / $10.025B at `series_id='UNKNOWN' AND is_latest=TRUE` — unchanged from PR #246. **Phase 2 — dry-run manifest:** new `scripts/oneoff/cleanup_stale_unknown.py` per-pair branch classifier. Match on (CIK + normalized fund_name) against `SYN_*` series in `fund_holdings_v2`. Result vs PR #246: BRANCH 1 (live SYN_ companion → FLIP) = **6 pairs** (Eaton Vance Tax-Adv Div Income, AIP Alternative Lending P, AMG Pantheon Credit, Calamos Global Total Return, NXG Cushing Midstream Energy, Saba Capital Income & Opportunities) / 2,738 rows / $5.283B. BRANCH 2 (no SYN_ companion → HOLD) = **2 pairs** (CIK 0000002230 Adams Diversified Equity Fund / NYSE: ADX, 96 rows / $2.989B; CIK 0001230869 ASA Gold & Precious Metals Ltd / NYSE: ASA, 350 rows / $1.752B). BRANCH 3 = 0. **Calamos shifted from HOLD → FLIP** between #246's audit and this run — the v2 loader has since written `SYN_0001285650` (1,459 is_latest=TRUE rows). Phase 2 dry-run committed in pre-decision SHA `940576c`; chat decision: BRANCH 1 only, BRANCH 2 deferred to new P2 `cef-attribution-path` workstream (CEFs don't file N-PORT, so SYN_ synthesis is the wrong architectural shelf). **Phase 3 — execute is_latest flip:** stopped Flask. `--confirm --accept-deferred-holds` (new opt-in flag introduced for the BRANCH 2 deferral). Single transaction. Pre-flip `series_id='UNKNOWN' is_latest=TRUE` = 3,184; post-flip = 446 (Δ -2,738 == expected). Cohort drift gate (0%), expected-vs-actual delta gate, BEGIN/COMMIT all honored. **Phase 4 — peer_rotation_flows rebuild:** ran `python3 scripts/pipeline/compute_peer_rotation.py`; parse 46.7s + validate + snapshot + promote 193.1s; total ~4 min. Run ID `peer_rotation_empty_20260502_095212`; auto-snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_095212.duckdb`. Total 17,490,106 → 17,489,751 (Δ -355, 0.002%, well within ±0.5%). Spot-check 3 affected SYN_ entities by `entity` (peer_rotation_flows is keyed on fund_name, not series_id): `CALAMOS GLOBAL TOTAL RETURN FUND` (uppercase, SYN_-side) unchanged at 127 rows / $47.6M — SYN_ already authoritative; `Calamos Global Total Return Fund` (mixed-case, UNKNOWN-side) entity vanished (142→0 rows); `Eaton Vance Tax-Adv Div Income` 242→121 rows / $2.088B → $1.688B — UNKNOWN double-counting cleanly de-duped; `NXG Cushing Midstream Energy` 121→66 rows / -$34.3M → $0 — same. **Phase 5 — validation:** `pytest tests/` 373/373 PASS in 56.46s. `audit_unknown_inventory.py` re-run: residual 1 series (UNKNOWN_literal) / 446 rows / $4.74B == 2 deferred BRANCH 2 pairs (expected, not regression). `audit_orphan_inventory.py` re-run: same 446 / $4.74B. `cd web/react-app && npm run build`: 0 errors, 1.41s. Per-pair `is_latest=TRUE` spot-checks on all 6 FLIP pairs: each returns SYN_-only; both HOLD pairs still return UNKNOWN (preserved by design). **Architecture / safety:** UPDATE-only on `is_latest` flag; no INSERT, no fund_universe touched, no series_id rewrite, no synthesized SYN_ rows. PR-2 pipeline lock not on critical path. No write-path module modified — load_nport.py / classify_fund() / fetch_nport_v2.py untouched. The Apr-15 v2 loader bug that left these rows live is surfaced in the results doc but not patched here (out of scope). **Out of scope (per brief):** rewriting `series_id='UNKNOWN'` to `SYN_*` for any pair (would need fund_universe rows); patching the v2 loader retroactively (deferred upstream fix); BRANCH 2 attribution (deferred to `cef-attribution-path`); any Cohort B (Rareview reclassify) or Cohort B2 (`total_net_assets` backfill) work — separate PRs. New scripts: `scripts/oneoff/cleanup_stale_unknown.py`. Manifest: `data/working/stale_unknown_cleanup_manifest.csv` (8-pair record). Findings: `docs/findings/fund_stale_unknown_cleanup_dryrun.md`, `docs/findings/fund_stale_unknown_cleanup_results.md`. Squash commit `0296107` ([#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247)). Surfaces P2 `cef-attribution-path`. |
+diff --git a/docs/NEXT_SESSION_CONTEXT.md b/docs/NEXT_SESSION_CONTEXT.md
+index 67722c8..293663e 100644
+--- a/docs/NEXT_SESSION_CONTEXT.md
++++ b/docs/NEXT_SESSION_CONTEXT.md
+@@ -4,158 +4,45 @@
+ 
+ ## Last completed
+ 
+-**fund-universe-value-corrections ([#248](https://github.com/ST5555-Code/Institutional-Ownership/pull/248), squash `8253713`) — closes the cleanup arc opened by PRs #244 → #245 → #246 → #247.** Two value corrections to `fund_universe` plus a forward-looking guard on the original backfill script. Builds on PR #246's audit findings B1 + B2.
++**cef-asa-flip-and-relabel ([#TBD](#), squash `<TBD>`) — closes the entire `cef-residual-cleanup` workstream.** Last residual after PR #250 (ADX cleanup). 350 ASA Gold (CIK `0001230869`) UNKNOWN rows / $1.752B across 3 periods (2024-11, 2025-02, 2025-08) flipped to `is_latest=FALSE` and relabeled to `series_id='SYN_0001230869'`. Worktree `claude/angry-hypatia-3c51a9`, dry-run committed at `3a1a06d`, pre-flight backup `data/backups/13f_backup_20260502_145010`.
+ 
+ | Phase | Outcome |
+ | --- | --- |
+-| 1 — re-validate (read-only) | Rareview `S000090077` confirmed at `fund_strategy='excluded'`. 301 rows tagged `strategy_source='orphan_backfill_2026Q2'` confirmed all NULL on `total_net_assets` (no drift from PR #245). Canonical N-PORT TotalNetAssets is not persisted at series level in prod — reconstructs exactly from `fund_holdings_v2` via `NAV = MEDIAN(market_value_usd * 100.0 / pct_of_nav)` on the most-recent quarter's `is_latest=TRUE` rows. Validated against 10 funds with existing TNA: ratio = 1.000000…. **Key finding:** `pct_of_nav` is stored on the percent scale (0–100), not fraction. |
+-| 2 — dry-run manifest | New `scripts/oneoff/correct_fund_universe_values.py --dry-run`. Block A (1 row) + Block B (300 rows after de-dup fix) = 301 entries. 300/300 canonical, 0 fallback, 0 NULL-residual. Total Block B NAV = $450.1B. NAV/SUM(mv) median = 1.004; outliers reflect option-strategy ETFs where N-PORT shows only MMF collateral rows (reconstruction correct in spot-checks). |
+-| 3 — execute | Block A flipped Rareview `excluded → passive`, `strategy_source → 'unknown_cleanup_2026Q2'`, `total_net_assets → $4,555,216`; Block B populated TNA on 300 rows. **Mid-flight bug + correction:** initial `--confirm` had Block A's `strategy_source` re-overwritten by Block B (Block B's manifest filter included Rareview because at dry-run time it was tagged `orphan_backfill_2026Q2` with NULL TNA). Corrected via one-shot UPDATE (1 row, single tx). Script patched so a hypothetical replay would not reproduce the bug: `derive_block_b_manifest` excludes Block A's series_id; new `derive_block_a_nav` lets Block A's UPDATE set TNA in the same statement. |
+-| 4 — pipeline guard | `scripts/oneoff/backfill_orphan_fund_universe.py` patched to derive `total_net_assets` during manifest construction (canonical-first via `pct_of_nav`, `SUM(mv)` fallback, NULL-residual surfaced) and write it on INSERT. Forward-looking only — existing 301-row cohort already corrected. |
+-| 5 — validation | `pytest tests/` 373/373 PASS in 58.17s. Final cohort counts: 300 `orphan_backfill_2026Q2` + 1 `unknown_cleanup_2026Q2` = 301, all with TNA, NULL-residual = 0. 5 random spot-checks plausible. `cd web/react-app && npm run build` 0 errors, 2.32s. |
++| 1 — re-validate (read-only) | Cohort confirmed at 350 / $1,752,484,930.87 (0% drift from investigation baseline `79350a5`). Periods 2024-11 (108 / $0.440B), 2025-02 (112 / $0.521B), 2025-08 (130 / $0.791B). SYN_0001230869 companion = 0 rows for the 3 target periods (existing 143-row 2025-11 SYN unchanged, out of scope). All 3 accessions confirmed at MIG015 prefix. |
++| 1.4 — N-PORT byte-identical re-verify | Fetched + parsed 3 NPORT-P (`0001752724-25-018310`, `0001752724-25-075250`, `0001230869-25-000013`). Per-period delta = $0.000000 on all 3. Per-row threshold ≤ $0.01: 350 byte_identical / 0 mismatch / 0 orphan. Match anchor: `(report_date, isin)` primary, `(report_date, issuer_name)` fallback (103 null-ISIN rows). Multi-lot duplicates rank-zipped on mv desc. |
++| 2 — dry-run manifest | `scripts/oneoff/cleanup_asa_unknown_relabel.py --dry-run` → `data/working/asa_unknown_relabel_manifest.csv` (350 rows, all FLIP_AND_RELABEL, 0 HOLD, `entity_id_correction='11278→26793'` audit column). Findings doc `docs/findings/cef_residual_cleanup_asa_dryrun.md`. |
++| 3 — execute INSERT 350 + UPDATE 350 | Single tx. Pre: UNKNOWN 350 / $1.752B; SYN 143 / $1.094B. Post: UNKNOWN 0 / $0.00 (Δ -350); SYN 493 / $2.847B (Δ +350 / $+1.752B). AUM conservation Δ = $+0.00 exact. All sanity gates passed. |
++| 4 — peer_rotation_flows rebuild | Run ID `peer_rotation_empty_20260502_191309` (~226s). Total 17,489,567 → 17,489,564 (Δ -3, 0.000017%, well within ±0.5%). Snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_191309.duckdb`. |
++| 5 — validation | `pytest tests/` 373/373 PASS in 62.48s. `audit_unknown_inventory.py`: 0 / 0 / $0.00B live — workstream closed. `audit_orphan_inventory.py`: `phase1_totals_is_latest=[0, 0, None]` — 0 live orphans. `npm run build`: 0 errors, 2.04s. 3 random (period, isin) spot checks all match expected MV exactly. |
+ 
+-**Architecture / safety:** No `--reset`, no pipeline write-path module modified. Single-transaction Phase 3 with hard guards (Phase 1 drift gate, post-update residual NULL check, ROLLBACK on constraint violation). PR-2 pipeline lock not on critical path; corrections are explicit manual overrides tagged with `strategy_source`.
++**Fund-attribution override (deviation from literal plan, chat-confirmed):** UNKNOWN-side carried wrong fund-level attribution — `entity_id=11278` (fund-typed entity literally named `N/A`), `dm_rollup_name='Calamos Investments'`. New SYN rows override fund-level columns to mirror the existing 2025-11 SYN row: `entity_id=26793`, `dm_rollup_name='ASA Gold and Precious Metals LTD Fund'`, etc. Holding-level columns copied verbatim from UNKNOWN. Per-row audit trail in manifest column `entity_id_correction='11278→26793'`. Without the override, $1.75B in ASA flows would have shifted into Calamos's bucket in `peer_rotation_flows`.
+ 
+-**Output:** `scripts/oneoff/correct_fund_universe_values.py` (new); `scripts/oneoff/backfill_orphan_fund_universe.py` (forward-looking patch); `data/working/fund_universe_corrections_manifest.csv`; `docs/findings/fund_universe_corrections_dryrun.md`; `docs/findings/fund_universe_corrections_results.md`.
++**Architecture / safety:** INSERT + UPDATE in single transaction; no `fund_universe` touched; UNKNOWN preserved at `is_latest=FALSE` for audit history (3,184 rows / $10B remain in `phase1_totals_all_history`); no v2 loader code change; no `--reset`. PR-2 pipeline lock not on critical path. `ingestion_manifest` registration NOT required — existing 2025-11 SYN row not registered there either, no FK enforced.
+ 
+----
+-
+-**fund-stale-unknown-cleanup ([#247](https://github.com/ST5555-Code/Institutional-Ownership/pull/247), squash `0296107`) — flipped `is_latest=FALSE` on the BRANCH 1 portion of the stale-loader artifact surfaced by PR #246.** Builds on PR #246.
+-
+-| Phase | Outcome |
+-| --- | --- |
+-| 1 — re-validate cohort | 8 (cik, fund_name) pairs / 3,184 rows / $10.025B at `series_id='UNKNOWN' AND is_latest=TRUE`; matches PR #246 audit (drift gate 0%). |
+-| 2 — dry-run manifest | New `scripts/oneoff/cleanup_stale_unknown.py` per-pair branch classifier. BRANCH 1 (live SYN_ companion → FLIP) = 6 pairs / 2,738 rows / $5.283B; BRANCH 2 (no SYN_ companion → HOLD) = 2 pairs / 446 rows / $4.741B (Adams ADX, ASA Gold ASA); BRANCH 3 = 0. **Calamos shifted from #246's HOLD into FLIP** — the v2 loader has since written `SYN_0001285650` (1,459 is_latest=TRUE rows). Phase 2 dry-run committed in pre-decision SHA `940576c`. Chat decision: BRANCH 1 only; BRANCH 2 deferred to new P2 `cef-attribution-path` workstream. |
+-| 3 — execute is_latest flip | Single transaction. `--confirm --accept-deferred-holds` (new opt-in flag for the BRANCH 2 deferral). Pre-flip 3,184 → post-flip 446 (Δ -2,738 == expected). All gates honored. |
+-| 4 — peer_rotation_flows rebuild | Run ID `peer_rotation_empty_20260502_095212` (parse 46.7s + promote 193.1s, ~4 min). Total 17,490,106 → 17,489,751 (Δ -355, 0.002%, well within ±0.5%). Snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260502_095212.duckdb`. |
+-| 5 — validation | `pytest tests/` 373/373 PASS in 56.46s. `audit_unknown_inventory.py` re-run: residual 1 series / 446 rows / $4.74B (= 2 deferred BRANCH 2 pairs, expected). `audit_orphan_inventory.py` re-run: same 446 / $4.74B. `cd web/react-app && npm run build`: 0 errors, 1.41s. Per-pair `is_latest=TRUE` spot-checks: 6/6 FLIP pairs return SYN_-only; 2/2 HOLD pairs preserved as UNKNOWN. |
+-
+-**Spot-check semantics (Phase 4):** `peer_rotation_flows.entity` is keyed on `fund_name`, not `series_id`. Same-fund_name pairs (Eaton Vance 242→121 rows, NXG 121→66 rows) cleanly de-duped from prior double-counting; case-different Calamos UNKNOWN-side entity (`'Calamos Global Total Return Fund'`) vanished while SYN_-side entity (`'CALAMOS GLOBAL TOTAL RETURN FUND'`, uppercase) unchanged at 127 rows / $47.6M.
+-
+-**Architecture / safety:** UPDATE-only on `is_latest` flag. No INSERT, no `fund_universe` touched, no `series_id` rewrite, no synthesized SYN_ rows. PR-2 pipeline lock not on critical path. No write-path module modified. Apr-15 v2 loader bug surfaced in results doc but not patched (out of scope per brief).
+-
+-**Output:** `scripts/oneoff/cleanup_stale_unknown.py`, `data/working/stale_unknown_cleanup_manifest.csv`, `docs/findings/fund_stale_unknown_cleanup_dryrun.md`, `docs/findings/fund_stale_unknown_cleanup_results.md`. ROADMAP.md adds COMPLETED entry + new P2 `cef-attribution-path` workstream.
++**Output:** `scripts/oneoff/cleanup_asa_unknown_relabel.py` (new), `data/working/asa_unknown_relabel_manifest.csv`, `docs/findings/cef_residual_cleanup_asa_dryrun.md`, `docs/findings/cef_residual_cleanup_asa_results.md`. ROADMAP.md adds COMPLETED entry, marks `cef-residual-cleanup` workstream CLOSED.
+ 
+ ---
+ 
+-**fund-unknown-attribution (PR #246, squash `1956ea8`) — read-only audit closing the orphan/unknown thread end-to-end.** Builds on PR #245.
+-
+-| Layer | Outcome |
+-| --- | --- |
+-| 1 — surface map | `_fund_type_label()` at [scripts/queries/common.py:308](scripts/queries/common.py:308) is the sole NULL→'unknown' path; `cross.py` 3-way CASE arms emit NULL for the same gap. Other 'unknown' literals are `manager_type` fallbacks, not fund_strategy. No surprise paths. |
+-| 1 — master inventory | `fund_universe.fund_strategy IS NULL` count = 0. Display 'unknown' bucket comes entirely from holdings orphans: 1 series (literal `series_id='UNKNOWN'`), 3,184 rows / $10.025B / 8 distinct (cik, fund_name) pairs. Cohorts B/C/D from the brief are empty. |
+-| 1 — Cohort A reattribution | All 8 pairs map to existing SYN_ series (6 HIGH, 1 MEDIUM, 1 LOW, 0 NONE). Stale-loader root cause: Apr-3 legacy loader wrote `'UNKNOWN'`; Apr-15 v2 loader (e868772) wrote SYN_ companions but did not flip `is_latest=FALSE` on legacy rows. 5 of 8 pairs have BOTH versions live; 3 (Adams 'N/A', Asa Gold, Calamos) have only the stale UNKNOWN version. |
+-| 2 — three-lens validation | 296/301 PASS_ALL on PR #245 backfill cohort. 3 false positives, 1 known Blackstone override, 1 real reclass candidate: `S000090077` Rareview 2x Bull Cryptocurrency & Precious Metals ETF (currently `excluded`; classifier order says `passive` because `\dx` in INDEX_PATTERNS precedes ETF in EXCLUDE_PATTERNS; ~$0 net AUM). |
+-| 2 — completeness gap noted | All 301 orphan_backfill `fund_universe` rows have `total_net_assets=NULL`. Backfill flow populated `fund_strategy` only. |
+-
+-**Output:** `docs/findings/fund_unknown_attribution.md` + `scripts/oneoff/audit_unknown_*.py` (3 helpers, all read-only — verified via grep). pytest tests/ 373/373 PASS unchanged.
+-
+-**fund-orphan-backfill (PR #245, squash `9392a36`) closed the 302-series orphan exposure surfaced by PR #244.** Single PR, branch `fund-orphan-backfill`, backup carried over from PR-4 (`data/backups/13f_backup_20260501_103837`).
+-
+-| Phase | Outcome |
+-| --- | --- |
+-| 1 — re-validate | 302 series / 160,934 rows / $658.5B against current `data/13f.duckdb` (matches PR #244 audit). S9digit 301 / 157,750 rows / $648.5B; UNKNOWN_literal 1 / 3,184 / $10.0B. |
+-| 2 — dry-run manifest | 301 entries (300 majority-vote, all 100% support_pct + 1 manual override S000045538 Blackstone Alternative Multi-Strategy Fund → `multi_asset`). 0 SKIP-list matches in S9-digit cohort (Calamos / Eaton Vance both live under `series_id='UNKNOWN'`). Manifest at `data/working/orphan_backfill_manifest.csv`. |
+-| 3 — backfill | Single transaction. Pre-INSERT collision check passed (0 manifest series_ids existed in `fund_universe`). 301 INSERTs tagged `strategy_source='orphan_backfill_2026Q2'`. `fund_universe` 13,623 → 13,924. |
+-| 4 — peer_rotation rebuild | Run ID `peer_rotation_empty_20260501_235841` (parse 69.7s + promote 222.9s; ~5 min). Total 17,490,106 → 17,490,106 (Δ +0). Snapshot at `data/backups/peer_rotation_peer_rotation_empty_20260501_235841.duckdb`. |
+-| 5 — display layer | `cross.py` both 3-way `CASE` blocks now carry comment block tying NULL = unknown to PR #244 + this PR (behavior unchanged at SQL level). `_fund_type_label()` verified (already returns `'unknown'` for unmapped). `OverlapAnalysisTab.tsx` row filter (L194) AND active-KPI subset (L213) tightened to `r.is_active === true`. |
+-| 6 — validation | `pytest tests/` 373/373 PASS. Audit re-run: residual = 1 series / 3,184 rows / $10.0B (UNKNOWN_literal only, by design). PR-1d display contract validator: PASS. `npm run build`: 0 errors. 5 spot-checks all canonical + tagged. Blackstone override ✓. |
+-
+-**Insert distribution (Phase 3):** bond_or_other 133 series / 119,701 rows / $558.7B; excluded 136 / 17,619 / $66.9B; passive 25 / 13,047 / $20.3B; multi_asset 1 / 7,152 / $2.5B; active 6 / 231 / $0.03B.
+-
+-**This sync (direct to `main`):**
+-
+-- **`ROADMAP.md`** — new 2026-05-02 row for fund-universe-value-corrections (PR #248, squash `8253713`) added above the existing fund-stale-unknown-cleanup row.
+-- **`docs/NEXT_SESSION_CONTEXT.md`** — this file rewritten with PR #248 added at the top, PR #247 demoted below the divider.
+-
+-Branch HEAD on `main`: **`8253713`** (PR #248 fund-universe-value-corrections; Rareview reclass + 301-row TNA backfill + pipeline guard). Prior commit `ab376f1` (post-#247 close-out), then `0296107` (PR #247 fund-stale-unknown-cleanup).
+-
+-## Up next
+-
+-Two threads still queued; the user picks which to drive next session.
+-
+-### 1. Architectural — `fund-strategy-taxonomy-finalization`
+-
+-Review and finalize the five edge categories in the canonical `fund_strategy` taxonomy: `balanced` (60-90% equity, vague label, arbitrary boundary), `multi_asset` (30-60% equity, arbitrary boundaries on both sides), `bond_or_other` (heterogeneous bucket; the largest miscategorisation cohort — 39 ProShares short funds — was moved out by #243), `excluded` (combines money markets / fund-of-funds / ETF wrappers — should split into specific reasons), `final_filing` (status flag, not a strategy — decide whether it belongs in `fund_strategy` at all or should become a separate `is_terminating` boolean).
+-
+-Output: findings doc with row counts per category, decisions list, recommended target taxonomy. Triggers now satisfied: orphan/NULL data is on the table; `canonical-value-coverage-audit` data-pull (PR #242 §1a–§1h) feeds this directly; orphan cohort backfilled (PR #245); BRANCH 1 of the stale-loader artifact flipped (PR #247) — only the 2-pair / 446-row CEF residual under `cef-attribution-path` remains.
+-
+-### 2. Major sequence — institution-level consolidation scoping
+-
+-Mirrors the four-stage pattern the fund-level arc established: backfill → rebuild → audit → fix + rename + lock. Different surface area:
+-
+-- **Taxonomy decisions partially captured** (prior chat session, not yet executed): keep `pension`, `endowment`, `sovereign_wealth_fund` separate; merge `private_equity` + `venture_capital` → `pe_vc`; merge `wealth_management` + `family_office` → `wealth_mgmt`; merge `hedge_fund` + `multi_strategy` → `hedge_fund`. `mixed` and `unknown` still need review.
+-- **Data state to confront:** 1.4M+ parent-level rows in `holdings_v2.entity_type` carry legacy values (`active` / `passive` / `mixed` from old fund-level taxonomy). Canonical reads should hit `entity_classification_history.classification` / `entity_current.classification` instead.
+-- **Prerequisites:** `family_office` and `multi_strategy` migration from `manager_type` to `entity_classification_history` is a precondition for some merges.
+-- **Roadmap entry:** `parent-level-display-canonical-reads` (P2) — 18 read sites currently on `manager_type` / `entity_type` need migration; includes the `query4` silent-drop bug at [register.py:746-750](scripts/queries/register.py:746).
+-
+-This thread gates the Admin Refresh System (the original project goal).
+-
+-### Smaller items still open
+-
+-- **per-fund-deferred-decisions** (P3) — Eaton Vance Tax-Advantaged Dividend Income + 2 NEW global variants (all `balanced`); Calamos Global Total Return Fund (loader gap, 1,412 holdings rows under `series_id='UNKNOWN'`); 96-row N/A cohort. **Note:** Calamos / Eaton Vance Tax-Advantaged were the SKIP-list patterns in PR #245 — they currently funnel into the literal `series_id='UNKNOWN'` sentinel (UNKNOWN_literal cohort, intentionally left orphan by PR #245). Resolution requires source-side rework (loader gap), not another `fund_universe` backfill.
+-- **unmerged-branch-decisions** (P3, both DELETE per chat) — `claude/reverent-kirch-c1fcdf` (PR #172 CLOSED, work shipped via #173) + `ui-audit-01` (PR #107 CLOSED, triage doc already on main).
+-- **stage-b-turnover-deferred-funds** (P3) — Vanguard Primecap / Windsor II / Equity Income (~$203B AUM) + Bridgeway Ultra-Small Company Market. Trigger: Stage B turnover detection design.
+-- **historical-fund-holdings-drift-audit** (P3) — 31,400 non-SYN drift rows. Snapshot semantics intentional; characterise the cohort for completeness.
+-- **canonical-value-coverage-audit** (P2, partially done in #242) — structured per-bucket count + AUM exposure + recommended treatment table is the still-open deliverable.
+-- **Stage 5 cleanup DROP** — authorized on or after **2026-05-09** per `MAINTENANCE.md`.
+-- **Q1 2026 13F cycle** — first live cycle expected ~2026-05-15 (45-day reporting window for period ending 2026-03-31). First live exercise of the locked `fund_universe` write path under a real cycle.
+-
+-## Critical context for next session
+-
+-**Fund-level data architecture is solid, locked, and now orphan-clean.** Single canonical column (`fund_universe.fund_strategy`); PR-2 pipeline lock (`_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE); PR-4 JOIN-based query layer. Display layer reads canonical via `_fund_type_label()`. PR #245 backfilled the 302-series orphan cohort surfaced by PR #244; PR #247 flipped `is_latest=FALSE` on 6 of the 8 UNKNOWN-literal stale pairs (2,738 rows / $5.28B); PR #248 closed B1 (Rareview reclass) + B2 (TNA backfill on all 301 orphan_backfill rows). Residual: 1 series / **446 rows / $4.74B** (2 closed-end-fund pairs Adams ADX + ASA Gold ASA, deferred to `cef-attribution-path`). 14 PRs validated end-to-end across the consolidation+cleanup+backfill arc.
+-
+-**Snapshot vs canonical semantics are intentional.** Per-row, per-quarter classification at filing moment lives in `fund_holdings_v2.fund_strategy_at_filing` (snapshot, frozen by design). Canonical (locked, never-overwritten-without-analyst-approval) lives in `fund_universe.fund_strategy`. Anything that filters or buckets by active/passive **always JOINs `fund_universe`** — never reads `_at_filing`.
+-
+-**Active-only views now exclude unknowns.** PR #245 tightened `OverlapAnalysisTab.tsx` from `r.is_active !== false` to `r.is_active === true` at both the row filter (L194) and the active-KPI tile (L213). Any fund with `is_active=null` (orphan from `fund_universe`) is excluded from active-only views. After PR #247 the only `is_active=null` source is the 446-row / $4.74B `cef-attribution-path` residual (Adams ADX + ASA Gold ASA).
++## Gotchas surfaced this session
+ 
+-**Institution-level should follow the same architectural pattern.** Canonical column on `entity_classification_history` / `entity_current`, constants module, shared label utility, JOIN-based query layer. The four-stage pattern (backfill → rebuild → audit → fix+rename+lock) is the template.
++1. **Worktree path discipline.** When writing new files via the Write tool inside a Claude Code worktree, use the worktree-relative absolute path (e.g. `<repo>/.claude/worktrees/<slug>/scripts/...`). Files written under the main checkout path land on `main`'s working tree and don't appear in the feature branch's `git status`. Recovery: `mv` the files into the worktree path before commit.
++2. **`fund_holdings_v2` row_id is BIGINT, no DEFAULT.** Use `nextval('fund_holdings_v2_row_id_seq')` for fresh row_ids on INSERT — confirmed via `duckdb_sequences()`.
++3. **`ingestion_manifest` is not FK-enforced against `fund_holdings_v2.accession_number`.** Existing SYN_0001230869 2025-11 row uses `BACKFILL_MIG015_1230869_0001049169-26-000039_2025-11` and is not registered in the manifest table; new SYN rows can use real ASA NPORT-P accessions without manifest registration.
++4. **CEF holdings duplicate-ISIN rows are real.** ASA reports the same security in multiple `<invstOrSec>` elements at distinct `fairValLevel` values (e.g. 2025-02 `CA7660871004` Ridgeline Minerals appears 3× with $1,850,699 / $62,208 / $50,112). Verification anchor must rank-zip within (period, key) groups, not assume 1-to-1 match by (period, isin).
++5. **`parse_nport_xml` parser key is `val_usd`, not `value_usd`.** Carried over from `cef_asa_prep_investigation.md` finding (commit `79350a5`); reaffirmed when building this session's verification.
++6. **Pre-flight backup gate is timestamp-based.** A backup taken at 13:18 was stale relative to a DB modified at 13:41. Always check backup mtime > DB mtime AND covers latest commit before any --confirm.
+ 
+-## Next external events
++## Open follow-ups (already in ROADMAP)
+ 
+-| Date | Event |
+-|---|---|
+-| **2026-05-09** | Stage 5 cleanup DROP window opens (legacy-table snapshot cleanup gate per `MAINTENANCE.md`). |
+-| **~2026-05-15** | Q1 2026 13F cycle (filings for period ending 2026-03-31; 45-day reporting window). First live exercise of the locked `fund_universe` write path under a real cycle. |
+-| **~late May 2026** | Q1 2026 N-PORT DERA bulk — first live exercise of INF50 + INF52 fixes (PR #185); first live exercise of `compute_parent_fund_map.py` quarterly rebuild (PR #191); re-run `dera_synthetic_stabilize.py --phase 3 --confirm` against the new period to absorb any net-new Tier-4-shape registrants. |
+-| **2026-07-23** | finra-default-flip — delete deprecation-warning path in `scripts/fetch_finra_short.py`. |
+-| **~mid-Aug 2026** | B3 calendar gate — post-Q1+Q2 2026 cycles, retire V1 + drop denorm columns. |
++- `asa-2025-11-syn-source-investigation` (P3) — the existing 2025-11 `SYN_0001230869` row's source accession is from Donnelley filing-agent, not ASA's own NPORT-P. Out of scope for this PR.
++- `ingestion-manifest-coverage-watchpoint` (P3) — broader audit of CIKs with `fund_holdings_v2` rows but no `ingestion_manifest` entry. PR did not address; should be empty for the v2 loader's own writes.
++- `retired-loader-residue-watchpoint` (P3) — re-run `audit_unknown_inventory.py` after Q1 2026 13F cycle (~2026-05-15). Expected residual: 0 (workstream closed).
++- `v2-loader-is-latest-watchpoint` (P3) — separate concern; tracked in ROADMAP.
+ 
+-## Reminders
++## Backups / artifacts
+ 
+-- **HEAD on main is `8253713`** (PR #248 fund-universe-value-corrections — 1 row Rareview reclass + 300 rows TNA backfill via canonical N-PORT derivation + pipeline guard). Prior commit `ab376f1` (post-#247 close-out), then `0296107` (PR #247 fund-stale-unknown-cleanup).
+-- **PR #248 gotcha — `pct_of_nav` percent-scale convention.** `fund_holdings_v2.pct_of_nav` is stored on the percent scale (0–100), not fraction (0–1). Future code deriving NAV from holdings should use `market_value_usd * 100.0 / pct_of_nav`. Validated against 10 funds with existing `total_net_assets` (ratio = 1.000000…). MEDIAN over the most-recent quarter's `is_latest=TRUE` rows reconstructs N-PORT TotalNetAssets exactly.
+-- **PR #248 gotcha — `unknown_cleanup_2026Q2` provenance tag.** Rareview `S000090077` carries `strategy_source='unknown_cleanup_2026Q2'` (the only row in this cohort). All other 300 backfilled rows still carry `strategy_source='orphan_backfill_2026Q2'` (PR #245 tag, retained).
+-- **PR #248 gotcha — manifest overlap pattern.** When a script has multiple correction blocks targeting the same source filter, the second block's UPDATE can silently overwrite the first block's writes if the row qualifies for both filters. The fix is to exclude Block A's keys from Block B's manifest at derivation time. Documented in `docs/findings/fund_universe_corrections_results.md`.
+-- **Canonical fund taxonomy values:** `{active, balanced, multi_asset, passive, bond_or_other, excluded, final_filing}`. `active` is dominant (was `equity` pre-PR-4). Display label utility `_fund_type_label()` in `scripts/queries/common.py` collapses to 5 values `{active, passive, bond, excluded, unknown}`.
+-- **Column rename (PR-4):** prod column is `fund_holdings_v2.fund_strategy_at_filing` (was `fund_strategy` pre-2026-05-01). Staging schema (`stg_nport_holdings.fund_strategy`) intentionally retains the old name — prod write path renames at INSERT time (`s.fund_strategy AS fund_strategy_at_filing`).
+-- **JOIN rule (PR-4):** for any active/passive filter, **always JOIN `fund_universe`** — the canonical, locked column. The per-row, per-quarter snapshot in `fund_strategy_at_filing` is preserved intentionally for snapshot semantics but is NOT the source of truth for filters.
+-- **Pipeline lock (PR-2):** `_apply_fund_strategy_lock` + `_upsert_fund_universe` COALESCE in `scripts/pipeline/load_nport.py` together prevent any `fund_universe.fund_strategy` overwrite once a series carries a non-NULL value. Three-branch semantics: new series → write classifier output; existing with non-null → preserve; existing with NULL → write classifier output (backfill case).
+-- **Constants module (PR-3):** `ACTIVE_FUND_STRATEGIES = ('active','balanced','multi_asset')` and `PASSIVE_FUND_STRATEGIES = ('passive','bond_or_other','excluded','final_filing')` adjacent to `_fund_type_label` in [scripts/queries/common.py:291](scripts/queries/common.py:291).
+-- **Display layer (PR-1d):** `_fund_type_label(fund_strategy)` is the single fund-level type emitter. Map: `active|balanced|multi_asset → 'active'`, `passive → 'passive'`, `bond_or_other → 'bond'`, `excluded|final_filing → 'excluded'`, NULL/unknown → `'unknown'`.
+-- **PR-1d gotcha:** `get_nport_children_batch` and `get_nport_children` in `scripts/queries/common.py` SELECT and propagate `fund_strategy` in their child-dict shape. Any new consumer can read `child['fund_strategy']` without re-querying.
+-- **PR-1d gotcha:** `cross.py` `_cross_ownership_fund_query` no longer carries `family_name` in its response (`type` overload removed). The column stays in `fund_holdings_v2` for entity matching.
+-- **PR #245 gotcha — orphan-backfill stamp:** the 301 backfilled `fund_universe` rows carry `strategy_source='orphan_backfill_2026Q2'`. Any future analysis of `fund_strategy` provenance can filter on this tag to isolate the cohort.
+-- **PR #245 gotcha — 3-way semantics:** `cross.py` `is_active` is tri-state (TRUE / FALSE / null). Frontend `OverlapAnalysisTab.tsx` now uses strict `=== true` at both L194 (row filter) and L213 (KPI subset). Other fund-level read sites (`get_two_company_subject`, `get_overlap_institution_detail`) that emit `is_active` follow the same convention. Don't reintroduce `!== false` truthy coercion — it silently rolls null into active.
+-- **PR #245 gotcha — UNKNOWN_literal residual:** `series_id='UNKNOWN'` is the literal sentinel where multiple historic fund_names funnel (Calamos Global Total Return + Eaton Vance Tax-Advantaged + 6 more). 1 series / 3,184 rows / $10.0B. Left orphan by design — resolution requires source-side rework (loader gap), not another `fund_universe` backfill.
+-- **PR #246 gotcha — UNKNOWN_literal is solvable in-place.** Audit found all 8 (cik, fund_name) pairs map to existing SYN_ series with strategies already set. The orphan state isn't a `fund_universe` gap — it's stale holdings rows that need either (A1) `series_id` rewrite to SYN_ for the 3 stale-only pairs (1,858 rows / $5.07B: Adams 'N/A', Asa Gold, Calamos), or (A2) `is_latest=FALSE` flip for the 5 stale-redundant pairs (1,326 rows / $4.96B: Eaton Vance Tax-Adv, AIP, AMG Pantheon, NXG, Saba). Plus B1 reclass Rareview 2x Bull → 'passive' (1 row, ~$0 AUM) and B2 backfill `total_net_assets`/`equity_pct` for the 301 orphan_backfill funds (NULL across the board today). All 5 actions queued; none in #246.
+-- **#243 ProShares mechanics:** all 51 ProShares short / inverse / bear ETFs now `passive` end-to-end. The N-PORT holdings shape is uniformly swap notionals + cash/T-bill collateral (across both equity-tracking inverse like SQQQ/SH and treasury-tracking inverse like TBF). Morningstar classifies all three as "passively managed Trading-Inverse" ETFs.
+-- **#242 12 BlackRock muni trusts:** all confirmed merged Feb 2026 via Form 25-NSE delistings + BusinessWire merger-completion press releases. Post-merger NPORT-P (2026-03-26) and N-CSRS (2026-04-07) filings are residual administrative; trusts correctly carry `final_filing`.
+-- **Cross-Ownership tab (conv-22).** Peer dropdown reads `/api/v1/peer_tickers` (sector + industry from `market_data`). Investor row expand fires `/api/v1/cross_ownership_fund_detail?tickers=…&institution=…&anchor=…&quarter=…` and is gated by `has_fund_detail` on the parent rollup. Fund-level toggle pulls from `fund_holdings_v2` (pivot now references the outer `fund_pos` aggregation, not `fh.ticker` / `fh.holding_value`).
+-- **Git ops** (rule from conv-18, reaffirmed each session). Code merges PRs autonomously after CI passes: pushes branch, opens PR, waits for CI green, then `gh pr merge --squash --delete-branch` and pulls main. Reflected in `docs/PROCESS_RULES.md` §11.
+-- **Branch naming.** Always use a short descriptive slug. Claude must propose the short name before writing any prompt for Code. **Every Code prompt must start with the session/branch name on the first line.**
+-- **Doc-only commits (`conv-*`)** push directly to `main` — no PR needed.
+-- **Dark UI is production styling.** `docs/plans/DarkStyle.md` is the spec. Token palette + Hanken Grotesk / Inter / JetBrains Mono live in `web/react-app/src/styles/globals.css`.
+-- **Quarter formatting.** All quarter labels in the React app go through `fmtQuarter` from `web/react-app/src/components/common/formatters.ts`. `QuarterSelector` defaults to it. Oldest-left → newest-right ordering for quarter button arrays.
+-- **App is started from `data/13f_readonly.duckdb`** (last refreshed in PR #200, 2026-04-28 ~15:09).
+-- **N-PORT current to 2026-03 (partial — 3,379 rows).** 2026-02 mostly complete (476,173 rows); 2026-01 full (1,321,367 rows). Quarter labels reflect calendar convention (PR #213).
+-- **Do not run `build_classifications.py --reset`.** Same as previous sessions.
+-- **No `--reset` runs anywhere** without explicit user authorization.
+-- **Stage 5 cleanup** (legacy-table DROP window) authorized **on or after 2026-05-09** per `MAINTENANCE.md`.
+-- `other_managers` PK still pending — proposed `(accession_number, sequence_number, other_cik)` blocked by 5,518 NULL `other_cik` rows.
+-- **finra-default-flip:** scheduled 2026-07-23.
+-- **B3 calendar gate:** post-Q1+Q2 2026 cycles, ~mid-Aug 2026.
+-- **DM15e** (7 prospectus-blocked umbrella trusts) remains deferred behind DM6 / DM3.
+-- **PR #172** (`dm13-de-discovery`) PR CLOSED; branch flagged DELETE in `conv-24-doc-sync`.
+-- **Sector Rotation fund-view caveat** (from PR #215): `fund_holdings_v2.report_month` trails `quarter` by one period (filing-quarter convention). Anything that wants per-month detail for a filing quarter must look up the actual `report_month` values — do not derive months from the quarter label.
+-- **Overlap endpoint shape** (from PR #225): `/api/v1/overlap_institution_detail` returns `{overlapping, ticker_a_only, ticker_b_only}` (was `non_overlapping`). Each section capped at top 5 by value.
++- DB backup pre-PR: `data/backups/13f_backup_20260502_145010` (14:50)
++- peer_rotation snapshot: `data/backups/peer_rotation_peer_rotation_empty_20260502_191309.duckdb`
++- Manifest CSV (committed): `data/working/asa_unknown_relabel_manifest.csv`
++- Dry-run findings (committed): `docs/findings/cef_residual_cleanup_asa_dryrun.md`
++- Results findings (committed): `docs/findings/cef_residual_cleanup_asa_results.md`
+diff --git a/docs/findings/cef_residual_cleanup_asa_results.md b/docs/findings/cef_residual_cleanup_asa_results.md
+new file mode 100644
+index 0000000..bdde64c
+--- /dev/null
++++ b/docs/findings/cef_residual_cleanup_asa_results.md
+@@ -0,0 +1,142 @@
++# cef-residual-cleanup-asa — Phase 3-5 results
++
++**Date:** 2026-05-02
++**PR:** cef-asa-flip-and-relabel
++**Workstream closed:** cef-residual-cleanup (last residual after PR #250)
++**Investigation precedent:** docs/findings/cef_asa_prep_investigation.md
++(commit 79350a5)
++**Dry-run manifest:** docs/findings/cef_residual_cleanup_asa_dryrun.md
++(commit 3a1a06d)
++
++---
++
++## Headline
++
++350 ASA Gold (CIK 0001230869) UNKNOWN rows / $1,752,484,930.87 across
++3 periods (2024-11, 2025-02, 2025-08) flipped to `is_latest=FALSE`
++and relabeled to `series_id='SYN_0001230869'` in a single transaction.
++AUM conservation Δ = $0.00 exact. Workstream closes.
++
++---
++
++## Phase 3 — Execution
++
++Single transaction:
++
++| Operation | Rows | AUM USD | Notes |
++|---|---:|---:|---|
++| INSERT new SYN_0001230869 | 350 | $1,752,484,930.87 | real ASA N-PORT accessions, fresh row_ids |
++| UPDATE UNKNOWN → is_latest=FALSE | 350 | $1,752,484,930.87 | source MIG015 rows preserved as history |
++| **AUM conservation** |  | **Δ = $0.00** | exact, within $0.01 gate |
++
++### Pre/post counts
++
++| Cohort | Pre rows | Post rows | Delta |
++|---|---:|---:|---:|
++| ASA UNKNOWN (is_latest=TRUE) | 350 | 0 | -350 |
++| ASA SYN_0001230869 (is_latest=TRUE) | 143 | 493 | +350 |
++
++The pre-existing 143-row 2025-11 SYN_0001230869 cohort is untouched
++(out of scope per asa-2025-11-syn-source-investigation roadmap entry —
++its source accession `0001049169-26-000039` is from Donnelley Financial
++Solutions, not from ASA's own NPORT-P filings).
++
++### Per-period coverage
++
++| Period | UNKNOWN-side accession (now is_latest=FALSE) | New SYN-side accession (is_latest=TRUE) | Rows | AUM USD |
++|---|---|---|---:|---:|
++| 2024-11 | `BACKFILL_MIG015_UNKNOWN_2024-11` | `0001752724-25-018310` | 108 | $439,912,633.43 |
++| 2025-02 | `BACKFILL_MIG015_UNKNOWN_2025-02` | `0001752724-25-075250` | 112 | $521,336,911.36 |
++| 2025-08 | `BACKFILL_MIG015_UNKNOWN_2025-08` | `0001230869-25-000013` | 130 | $791,235,386.08 |
++
++---
++
++## Fund-attribution override (deviation from literal plan)
++
++The plan specified that new SYN rows should INSERT with "all other
++column values copied from the UNKNOWN row." Inspection at execution
++time showed the UNKNOWN-side carries wrong fund-level attribution that
++would have been propagated by a literal copy:
++
++| Field | UNKNOWN-side (incorrect) | New SYN rows (canonical, mirrors 2025-11 row) |
++|---|---|---|
++| `fund_name` | `Asa Gold & Precious Metals Ltd` | `ASA Gold and Precious Metals LTD Fund` |
++| `family_name` | `Asa Gold & Precious Metals Ltd` | `ASA GOLD & PRECIOUS METALS LTD` |
++| `entity_id` | `11278` (fund-typed entity literally named `N/A`) | `26793` (canonical ASA institution) |
++| `rollup_entity_id` | `63` (Calamos Investments) | `26793` (ASA self-rollup) |
++| `dm_entity_id` | `11278` | `26793` |
++| `dm_rollup_entity_id` | `63` | `26793` |
++| `dm_rollup_name` | `Calamos Investments` | `ASA Gold and Precious Metals LTD Fund` |
++
++User confirmed the override before execution. Holding-level columns
++(`cusip`, `isin`, `issuer_name`, `ticker`, `asset_category`,
++`shares_or_principal`, `market_value_usd`, `pct_of_nav`,
++`fair_value_level`, `is_restricted`, `payoff_profile`, `quarter`,
++`report_month`, `report_date`, `fund_cik`, `fund_strategy_at_filing`)
++copied verbatim from UNKNOWN. New columns: `series_id`,
++`accession_number`, `is_latest=TRUE`, `loaded_at=NOW()`,
++`backfill_quality='relabel_from_unknown'`, fresh `row_id`.
++
++Per-row audit trail captured in
++`data/working/asa_unknown_relabel_manifest.csv` column
++`entity_id_correction='11278→26793'` on every relabeled row.
++
++Without the override, peer_rotation_flows for SYN_0001230869 would
++have inherited the Calamos rollup, which would have silently shifted
++$1.75B in ASA flows into a competitor's bucket.
++
++---
++
++## Phase 4 — peer_rotation_flows rebuild
++
++`scripts/pipeline/compute_peer_rotation.py` ran end-to-end:
++
++| Metric | Value |
++|---|---:|
++| Pre-rebuild rows | 17,489,567 |
++| Post-rebuild rows | 17,489,564 |
++| Row delta | -3 (-0.000017%) |
++| Run-id | `peer_rotation_empty_20260502_191309` |
++| Snapshot | `data/backups/peer_rotation_peer_rotation_empty_20260502_191309.duckdb` |
++| Run + promote | ~226 s |
++
++The -3 row delta is well within the ±0.5% post-PR #250 baseline gate
++and reflects routine drift from rebuilding aggregates over the just-
++modified `fund_holdings_v2` rows.
++
++---
++
++## Phase 5 — Validation
++
++| Gate | Result |
++|---|---|
++| `pytest tests/` | 373 passed, 0 failed |
++| `cd web/react-app && npm run build` | 0 errors, built in 2.04 s |
++| `audit_unknown_inventory.py` (PR #246) | 0 distinct series, 0 rows, $0.00 AUM (live) — workstream closed |
++| `audit_orphan_inventory.py` (PR #244) | `phase1_totals_is_latest=[0, 0, None]` — 0 live orphans |
++| Spot check 1: `2025-08 / CA03349X1015` (Andean Precious Metals Corp) | 1 row, $8,490,188.23 (matches expected) |
++| Spot check 2: `2025-08 / AU000000AQI2` (Alicanto Minerals Ltd) | 1 row, $1,620,240.48 (matches expected) |
++| Spot check 3: `2025-08 / CA11777Q2099` (B2Gold Corp) | 1 row, $8,260,000.00 (matches expected) |
++
++The `audit_orphan_inventory` `phase1_totals_all_history` line still
++reports 1 series / 3,184 rows / $10B — that is the historical UNKNOWN
++cohort now carrying `is_latest=FALSE`, intentionally retained for
++audit history.
++
++---
++
++## Files
++
++- `scripts/oneoff/cleanup_asa_unknown_relabel.py` — flip-and-relabel oneoff
++- `data/working/asa_unknown_relabel_manifest.csv` — 350-row manifest
++- `docs/findings/cef_residual_cleanup_asa_dryrun.md` — Phase 2 dry-run
++- `docs/findings/cef_residual_cleanup_asa_results.md` — this file
++
++---
++
++## Cross-references
++
++- Investigation: `docs/findings/cef_asa_prep_investigation.md` (commit 79350a5)
++- ADX precedent: `scripts/oneoff/cleanup_adx_unknown_duplicates.py` (PR #250)
++- Workstream scoping: `docs/findings/cef_scoping.md` (PR #249)
++- 2025-11 SYN provenance follow-up: `asa-2025-11-syn-source-investigation` (P3 ROADMAP entry, out of scope here)
+-- 
+2.50.1 (Apple Git-155)
+
