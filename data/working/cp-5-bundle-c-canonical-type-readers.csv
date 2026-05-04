@@ -1,0 +1,6 @@
+path,filter,purpose,user_facing
+scripts/enrich_holdings.py,"canonical_type, is_equity, is_priceable",loader: writes per-holding sector/industry from securities classification,False
+scripts/validate_classifications.py,canonical_type assertion suite,data-quality gate; asserts known fund tickers ARE classified MUTUAL_FUND/ETF/CEF,False
+scripts/build_classifications.py,"canonical_type, is_equity",feeds entity-level classifier,False
+scripts/oneoff/cp_5_bundle_a_probe1_r5_defects.py,"canonical_type IN ('ETF','MUTUAL_FUND','CEF') for FoF Pass A",Bundle A FoF detection; mis-classification reduces Pass A coverage 2/3 (Bundle A §1.1),False
+(future) CP-5 reader if it filters on canonical_type='COM',n/a,would silently include institutional fund shares as common stock,True
