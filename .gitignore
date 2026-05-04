@@ -19,6 +19,9 @@ data/market/
 data/nport_raw/
 # DB backups (per-session parquet dumps, multi-GB)
 data/backups/
+# Cross-phase intermediate artifacts in scripts/oneoff (leading-underscore convention).
+# Regeneratable by re-running the producing phase script.
+scripts/oneoff/_*.parquet
 # Drive upload staging (compressed backup tarballs awaiting manual Drive upload)
 BackupToDrive/
 # Local cache root (18 GB at session close 2026-04-13; previously only
