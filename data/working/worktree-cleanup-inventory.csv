@@ -1,0 +1,46 @@
+kind,name,path_or_branch,sha,category,reason,pr,delete_method
+worktree,/Users/sergetismen/ClaudeWorkspace/Projects/13f-ownership,main,46fa3fb,KEEP_MAIN,main repo,,
+worktree,pedantic-lamarr-c00e78,claude/pedantic-lamarr-c00e78,46fa3fb,KEEP_ACTIVE,this PR's worktree,,
+worktree,condescending-payne-657a73,claude/condescending-payne-657a73,b24975c,RETIRE_MERGED_PR,PR #264 merged 2026-05-03,#264,worktree remove --force
+worktree,hardcore-banach-af9cc2,claude/hardcore-banach-af9cc2,7f21574,RETIRE_STALE,sync-audit work behind 18 commits no associated PR,,worktree remove --force
+worktree,kind-gauss-eb0ad2,claude/kind-gauss-eb0ad2,394f962,RETIRE_MERGED_PR,PR #261 merged 2026-05-03,#261,worktree remove --force
+worktree,nostalgic-franklin-3eaf1a,claude/nostalgic-franklin-3eaf1a,b65363a,RETIRE_STALE,sync-audit-resolution work behind 17 commits no associated PR,,worktree remove --force
+branch,main,main,46fa3fb,KEEP_MAIN,main branch,,
+branch,claude/pedantic-lamarr-c00e78,claude/pedantic-lamarr-c00e78,46fa3fb,KEEP_ACTIVE,active session branch,,
+branch,claude/competent-mclean-b334c6,claude/competent-mclean-b334c6,5af96e1,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/condescending-payne-657a73,claude/condescending-payne-657a73,b24975c,DELETE_MERGED,IN-MAIN ancestry; freed after worktree retire,,git branch -d
+branch,claude/condescending-visvesvaraya-c919ce,claude/condescending-visvesvaraya-c919ce,1a6e400,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/cool-torvalds-4a3b12,claude/cool-torvalds-4a3b12,4ee2b97,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/cranky-hugle-c74f17,claude/cranky-hugle-c74f17,c53337c,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/determined-johnson-b98483,claude/determined-johnson-b98483,b24975c,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/eager-moore-74200c,claude/eager-moore-74200c,f256e5e,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/ecstatic-mestorf-d20e8a,claude/ecstatic-mestorf-d20e8a,dfa392e,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/epic-chebyshev-064eeb,claude/epic-chebyshev-064eeb,d272624,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/epic-roentgen-4bdb17,claude/epic-roentgen-4bdb17,c53337c,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/flamboyant-einstein-b40e83,claude/flamboyant-einstein-b40e83,6b31fe7,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/gifted-black-c4d1c6,claude/gifted-black-c4d1c6,9cfe339,DELETE_MERGED,IN-MAIN ancestry (PR #271 SHA),#271,git branch -d
+branch,claude/goofy-grothendieck-34bff4,claude/goofy-grothendieck-34bff4,6b31fe7,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/hardcore-banach-af9cc2,claude/hardcore-banach-af9cc2,7f21574,DELETE_MERGED,IN-MAIN ancestry; freed after worktree retire,,git branch -d
+branch,claude/inspiring-taussig-f883e7,claude/inspiring-taussig-f883e7,65da8cc,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/kind-gauss-eb0ad2,claude/kind-gauss-eb0ad2,394f962,DELETE_MERGED,IN-MAIN ancestry; freed after worktree retire,,git branch -d
+branch,claude/modest-snyder-b17577,claude/modest-snyder-b17577,448bd01,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/nifty-mcclintock-fe137b,claude/nifty-mcclintock-fe137b,4ee2b97,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/nostalgic-franklin-3eaf1a,claude/nostalgic-franklin-3eaf1a,b65363a,DELETE_MERGED,IN-MAIN ancestry; freed after worktree retire,,git branch -d
+branch,claude/reverent-lamarr-504059,claude/reverent-lamarr-504059,ab376f1,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/strange-nobel-b666b1,claude/strange-nobel-b666b1,7aa535c,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,claude/thirsty-golick-043667,claude/thirsty-golick-043667,c53337c,DELETE_MERGED,IN-MAIN ancestry,,git branch -d
+branch,backup-pruning-and-archive,backup-pruning-and-archive,b1dce2e,DELETE_MERGED_SQUASH,squash-merged via PR #273; SHA not in main,#273,git branch -D
+branch,close-fund-typed-ech-rows,close-fund-typed-ech-rows,d0f121a,DELETE_MERGED_SQUASH,squash-merged via PR #265,#265,git branch -D
+branch,conv-26-doc-sync,conv-26-doc-sync,9182923,DELETE_MERGED_SQUASH,squash-merged via PR #266; remote gone,#266,git branch -D
+branch,conv-27-doc-sync,conv-27-doc-sync,ff62ced,DELETE_MERGED_SQUASH,squash-merged via PR #272,#272,git branch -D
+branch,cp-4b-author-first-trust,cp-4b-author-first-trust,fc4c96a,DELETE_MERGED_SQUASH,squash-merged via PR #269; remote gone,#269,git branch -D
+branch,cp-4b-author-fmr,cp-4b-author-fmr,283fcfb,DELETE_MERGED_SQUASH,squash-merged via PR #270,#270,git branch -D
+branch,cp-4b-author-ssga,cp-4b-author-ssga,fe693ae,DELETE_MERGED_SQUASH,squash-merged via PR #271,#271,git branch -D
+branch,cp-4b-author-trowe,cp-4b-author-trowe,8c1afae,DELETE_MERGED_SQUASH,squash-merged via PR #267,#267,git branch -D
+branch,cp-4b-blocker2-corroboration-probe,cp-4b-blocker2-corroboration-probe,a886e3d,DELETE_MERGED_SQUASH,squash-merged via PR #268; remote gone,#268,git branch -D
+branch,cp-4b-discovery,cp-4b-discovery,22920de,DELETE_MERGED_SQUASH,squash-merged via PR #260; remote gone,#260,git branch -D
+branch,claude/funny-lamarr-7e7698,claude/funny-lamarr-7e7698,4f5f2c9,DELETE_MERGED_SQUASH,squash-merged via PR #264,#264,git branch -D
+branch,claude/modest-neumann-0b6b3c,claude/modest-neumann-0b6b3c,bba9bea,DELETE_MERGED_SQUASH,squash-merged via PR #263; remote gone,#263,git branch -D
+branch,claude/sleepy-wright-49f441,claude/sleepy-wright-49f441,61fdf6e,DELETE_MERGED_SQUASH,squash-merged via PR #261; remote gone,#261,git branch -D
+branch,unknown-classification-discovery,unknown-classification-discovery,e28ebcb,DELETE_MERGED_SQUASH,squash-merged via PR #259; remote gone,#259,git branch -D
+branch,claude/angry-hypatia-3c51a9,claude/angry-hypatia-3c51a9,2ee0c29,INVESTIGATE,29 commits ahead of main; head=cef-asa-flip-and-relabel Phase 3-5 results+ROADMAP+handoff; no PR; possibly exploratory work for deferred cef-asa-period-backfill PR-B,,CHAT_DECISION_REQUIRED
