@@ -1,0 +1,54 @@
+fund_cik,canonical_fund_name,n_rows,aum_billions,source,new_entity_id,op_b_identifier_action,op_c_alias_insert,op_d_ech_insert,op_e_erh_insert,op_a_fh2_update_count
+0000945908,Fidelity CLO ETF,20,0.028462,FMR_CARVE_OUT,27260,transfer,True,True,True,20
+0002025968,BNY Mellon Municipal Opportunities ETF,2061,5.054681,UNMATCHED,27261,insert,True,True,True,2061
+0001364924,Strategic Advisers Fidelity Short Duration Fund,356,5.027819,UNMATCHED,27262,insert,True,True,True,356
+0000810744,Colorado BondShares A Tax Exempt Fund,652,2.761676,UNMATCHED,27263,insert,True,True,True,652
+0001557794,Blackstone Alternative Multi-Strategy Fund,7152,2.540852,UNMATCHED,27264,insert,True,True,True,7152
+0002055464,Dan IVES Wedbush AI Revolution ETF,62,2.061388,UNMATCHED,27265,insert,True,True,True,62
+0000002646,VOYA INTERMEDIATE BOND PORTFOLIO,3905,1.845506,UNMATCHED,27266,insert,True,True,True,3905
+0001104129,Core Bond Portfolio,765,1.712109,UNMATCHED,27267,insert,True,True,True,765
+0000215740,ELFUN TAX EXEMPT INCOME FUND,964,1.643298,UNMATCHED,27268,insert,True,True,True,964
+0001606378,EUBEL BRADY & SUTTMAN INCOME FUND,170,1.141130,UNMATCHED,27269,insert,True,True,True,170
+0001166729,Bernstein Intermediate Duration Institutional Portfolio,598,0.943729,UNMATCHED,27270,insert,True,True,True,598
+0001760077,Preferred Securities and Income SMA Shares,492,0.869789,UNMATCHED,27271,insert,True,True,True,492
+0001928846,Short Duration Inflation-Protected Income Portfolio,84,0.856667,UNMATCHED,27272,insert,True,True,True,84
+0001496608,AB US Equity ETF,796,0.658821,UNMATCHED,27273,insert,True,True,True,796
+0001924447,THOR Low Volatility ETF,31,0.485060,UNMATCHED,27274,insert,True,True,True,31
+0001090682,VY BrandyWineGLOBAL - Bond Portfolio,89,0.457712,UNMATCHED,27275,insert,True,True,True,89
+0001492374,Destra Flaherty & Crumrine Preferred and Income Fund,429,0.448787,UNMATCHED,27276,insert,True,True,True,429
+0000906236,Nomura Tax-Free Idaho Fund,333,0.386812,UNMATCHED,27277,insert,True,True,True,333
+0000750909,Hawaiian Tax-Free Trust,96,0.368508,UNMATCHED,27278,insert,True,True,True,96
+0000925737,Hawaii Municipal Bond Fund,428,0.339079,UNMATCHED,27279,insert,True,True,True,428
+0001225290,Series M,71,0.322363,UNMATCHED,27280,insert,True,True,True,71
+0000072760,NORTHEAST INVESTORS TRUST,89,0.256314,UNMATCHED,27281,insert,True,True,True,89
+0000870355,CCM Affordable Housing MBS ETF,496,0.221172,UNMATCHED,27282,insert,True,True,True,496
+0002069687,FIS Christian Stock Fund,121,0.195679,UNMATCHED,27283,insert,True,True,True,121
+0001796383,Siren DIVCON Leaders Dividend ETF,171,0.177105,UNMATCHED,27284,insert,True,True,True,171
+0001026634,Renaissance International IPO ETF,115,0.150014,UNMATCHED,27285,insert,True,True,True,115
+0001847310,"Short Term Investment Fund for Puerto Rico Residents, Inc.",27,0.135520,UNMATCHED,27286,insert,True,True,True,27
+0000717854,ELFUN INCOME FUND,1059,0.134665,UNMATCHED,27287,insert,True,True,True,1059
+0001779306,AltShares Event-Driven ETF,357,0.109298,UNMATCHED,27288,insert,True,True,True,357
+0002048903,E*TRADE No Fee Municipal Bond Index Fund,398,0.099408,UNMATCHED,27289,insert,True,True,True,398
+0001866278,Atlas U.S. Tactical Income Fund,78,0.075305,UNMATCHED,27290,insert,True,True,True,78
+0001643838,IDX Adaptive Opportunities Fund,63,0.070650,UNMATCHED,27291,insert,True,True,True,63
+0001843749,"U.S. Monthly Income Fund for Puerto Rico Residents, Inc.",62,0.069546,UNMATCHED,27292,insert,True,True,True,62
+0002062986,Crossmark Large Cap Value ETF,163,0.065197,UNMATCHED,27293,insert,True,True,True,163
+0001969995,Nomura National High-Yield Municipal Bond ETF,247,0.060206,UNMATCHED,27294,insert,True,True,True,247
+0002043390,LOGIQ Contrarian Opportunities ETF,73,0.057880,UNMATCHED,27295,insert,True,True,True,73
+0001532206,Arrow Dow Jones Global Yield ETF,289,0.054137,UNMATCHED,27296,insert,True,True,True,289
+0001667919,FT Vest U.S. Equity Dual Directional Buffer ETF - February,34,0.046924,UNMATCHED,27297,insert,True,True,True,34
+0002065379,Man Active High Yield ETF,169,0.039617,UNMATCHED,27298,insert,True,True,True,169
+0002060415,First Eagle High Yield Municipal Completion Fund,140,0.032320,UNMATCHED,27299,insert,True,True,True,140
+0001208252,CM ADVISORS FIXED INCOME FUND,82,0.027809,UNMATCHED,27300,insert,True,True,True,82
+0001852344,International Portfolio I,231,0.026691,UNMATCHED,27301,insert,True,True,True,231
+0001100663,iShares Total USD Fixed Income Market ETF,825,0.026455,UNMATCHED,27302,insert,True,True,True,825
+0001875710,Build Bond Innovation ETF,221,0.021890,UNMATCHED,27303,insert,True,True,True,221
+0001562565,Fidelity AAA CLO ETF,59,0.020179,UNMATCHED,27304,insert,True,True,True,59
+0000879947,AMG GW&K Muni Income ETF,51,0.010390,UNMATCHED,27305,insert,True,True,True,51
+0001722388,VistaShares Target 15 S&P 100 Distribution ETF,166,0.006164,UNMATCHED,27306,insert,True,True,True,166
+0001345125,Cyber Hornet S&P 500 and Bitcoin 75/25 Strategy ETF,505,0.006089,UNMATCHED,27307,insert,True,True,True,505
+0001953487,Fundamentals First ETF,93,0.005704,UNMATCHED,27308,insert,True,True,True,93
+0001901443,X-Square Municipal Income ETF,14,0.004479,UNMATCHED,27309,insert,True,True,True,14
+0001924868,IncomeSTKd 1x Bitcoin & 1x Gold Premium ETF,20,0.002982,UNMATCHED,27310,insert,True,True,True,20
+0001771146,Tuttle Capital Magnificent 7 Income Blast ETF,34,0.001788,UNMATCHED,27311,insert,True,True,True,34
+0001174610,ProShares CoinDesk Crypto 20 ETF,2,-0.000910,UNMATCHED,27312,insert,True,True,True,2
