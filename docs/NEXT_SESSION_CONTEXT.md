@@ -4,11 +4,11 @@
 
 ## HEAD
 
-`5fd543f` — `cp-5-cycle-truncated-merges: 10-pair cycle cohort merge + Adjustment 4 (#285)`. Sits atop `3fb284b` (PR #284 recon) and `86a2409` (PR #283 Adams).
+`d8a64bd` — `cp-5-fh2-dm-rollup-drop: drop dm_rollup_entity_id + dm_rollup_name from fund_holdings_v2 (#289)`. Sits atop `7e12f9c` (PR #288 recon) and `f9bec76` (PR #287 Capital Group umbrella).
 
 ## Active workstream pointer
 
-**CP-5 pre-execution work** in progress. **2 of 5 P0 cohorts shipped:** cp-5-adams-duplicates (PR #283; 7-pair MERGE, Adjustment 1) + cp-5-cycle-truncated-merges (PR #285; 10-pair MERGE, Adjustments 2/3/4 — including the column-independent Op A fix that prevented $142.21B THIRD-entity attribution theft). Next up: `cp-5-capital-group-umbrella` (Path A vs Path B decision investigation). Loader-gap remediation and pipeline contract gaps remain.
+**CP-5 pre-execution work** in progress. **4 of 5 P0 cohorts shipped:** cp-5-adams-duplicates (PR #283), cp-5-cycle-truncated-merges (PR #285), cp-5-capital-group-umbrella (PR #287, 3 wholly_owned/control bridges $7,153B), cp-5-pipeline-contract-gaps Gap 2 (PR #289, drop `fund_holdings_v2.dm_rollup_entity_id` + `dm_rollup_name`, migration 024). Next up: `cp-5-loader-gap-remediation` (84,363 rows / $418.5B — link existing CIKs, create new fund-typed entities, rollup rebuild). Remaining pipeline contract gaps sized individually at execution time.
 
 The 26-PR execution plan is locked at `data/working/cp-5-execution-plan.csv`. The full design contract is at `docs/findings/cp-5-comprehensive-remediation.md`. Adjustments 1/2/3/4 canonical addenda at `docs/decisions/inst_eid_bridge_decisions.md`.
 
@@ -47,10 +47,10 @@ New locks added by the CP-5 comprehensive discovery arc (locked 2026-05-04 via P
 
 ## Parked queue (priority order)
 
-1. **CP-5 pre-execution P0 cohorts** (3 cohorts remaining of 5; see ROADMAP P0):
-   - `cp-5-capital-group-umbrella` (one-off; Path A vs Path B decided at execution time) — **next up**.
-   - `cp-5-loader-gap-remediation` (84,363 rows / $418.5B; 1–3 sub-PRs — link existing CIKs, create new fund-typed entities, rollup rebuild).
-   - `cp-5-pipeline-contract-gaps` (writer-gate hardening per Bundle C §7.5; sized individually).
+1. **CP-5 pre-execution P0 cohorts** (1 cohort remaining of 5; see ROADMAP P0):
+   - `cp-5-loader-gap-remediation` (84,363 rows / $418.5B; 1–3 sub-PRs — link existing CIKs, create new fund-typed entities, rollup rebuild) — **next up**.
+   - `cp-5-pipeline-contract-gaps` (Gap 2 CLOSED PR #289; remaining gaps sized at execution time).
+   - ~~`cp-5-capital-group-umbrella`~~ **CLOSED 2026-05-05** (PR #287). 3 wholly_owned/control bridges; $7,153B.
    - ~~`cp-5-adams-duplicates`~~ **CLOSED 2026-05-05** (PR #283). 7 pairs merged; Adjustment 1 landed.
    - ~~`cp-5-cycle-truncated-merges`~~ **CLOSED 2026-05-05** (PR #285). 10 pairs merged; Adjustments 2/3/4 landed (Adjustment 4 prevented $142.21B THIRD-entity theft via STOP-gate catch).
    - **New P3 surfaced:** `cycle-adjacent-entity-audit` (Sarofim Trust Co eid 858, cycle-adjacent non-member excluded from PR #285).
