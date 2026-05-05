@@ -4,13 +4,13 @@
 
 ## HEAD
 
-`ea08681` — `conv-29-doc-sync: CP-5 comprehensive discovery arc closure (#282)`. After cp-5-adams-duplicates merges, HEAD advances by one squash commit on top.
+`5fd543f` — `cp-5-cycle-truncated-merges: 10-pair cycle cohort merge + Adjustment 4 (#285)`. Sits atop `3fb284b` (PR #284 recon) and `86a2409` (PR #283 Adams).
 
 ## Active workstream pointer
 
-**CP-5 pre-execution work** in progress. **1 of 5 P0 cohorts shipped** with cp-5-adams-duplicates (7-pair MERGE, Adjustment 1 op-shape extension landed). Next up: `cp-5-cycle-truncated-merges` (21 entities / ~10–11 pairs across 2–3 batched PRs) — inherits Adjustment 1 op-shape directly. Loader-gap remediation, Capital Group umbrella, and pipeline contract gaps remain.
+**CP-5 pre-execution work** in progress. **2 of 5 P0 cohorts shipped:** cp-5-adams-duplicates (PR #283; 7-pair MERGE, Adjustment 1) + cp-5-cycle-truncated-merges (PR #285; 10-pair MERGE, Adjustments 2/3/4 — including the column-independent Op A fix that prevented $142.21B THIRD-entity attribution theft). Next up: `cp-5-capital-group-umbrella` (Path A vs Path B decision investigation). Loader-gap remediation and pipeline contract gaps remain.
 
-The 26-PR execution plan is locked at `data/working/cp-5-execution-plan.csv`. The full design contract is at `docs/findings/cp-5-comprehensive-remediation.md`. Adjustment 1 canonical addendum at `docs/decisions/inst_eid_bridge_decisions.md`.
+The 26-PR execution plan is locked at `data/working/cp-5-execution-plan.csv`. The full design contract is at `docs/findings/cp-5-comprehensive-remediation.md`. Adjustments 1/2/3/4 canonical addenda at `docs/decisions/inst_eid_bridge_decisions.md`.
 
 ## Architectural state (post-CP-5 comprehensive discovery arc)
 
@@ -27,9 +27,15 @@ Existing locks remain in effect:
   - Carve-out applied across the cp-4b arc: 4 BRIDGE writes / ~$2,055.4B total — PR #267 (T. Rowe Price, HIGH), PR #269 (First Trust, MEDIUM Bucket B), PR #270 (FMR/Fidelity, MEDIUM Bucket C), PR #271 (SSGA/State Street, MEDIUM Bucket C).
   - 15 LOW-cohort brands / ~$10.27T residual moved from `cp-4c-manual-sourcing` (closed as a standalone workstream) to the post-CP-5 cp-4c brand-bridges backlog (#20 in `data/working/cp-5-execution-plan.csv`).
 
-New lock added by `cp-5-adams-duplicates` (locked 2026-05-05):
+New locks added by `cp-5-adams-duplicates` + `cp-5-cycle-truncated-merges` (locked 2026-05-05):
 
-- **MERGE op-shape extension — Adjustment 1 (close-on-collision in Op G).** cp-4a precedent (PR #256) re-pointed every duplicate alias to canonical; the Adams cohort hit chained-merge alias PK collisions (>1 duplicate per canonical with identical alias_names, or duplicate's alias case-exact-identical to canonical's existing). Adjustment 1 adds a per-alias collision check before re-point: if `(canonical, alias_name, alias_type, valid_from)` exists open, close the duplicate's row instead. Pair processing order is `(canonical_eid, pair_id)` ascending so chained-collision pairs are predictable. RE-POINT branch demotion is scoped to `alias_name != D.alias_name` so a pair-M-re-pointed row is not demoted by pair N's processing. Adjustment 1 is canonical for all future MERGE work — `cp-5-cycle-truncated-merges` inherits it directly. Single-duplicate-per-canonical merges (cp-4a Vanguard/PIMCO) unaffected — collision check returns false and RE-POINT branch matches cp-4a literally. Documented at `docs/decisions/inst_eid_bridge_decisions.md` "MERGE op-shape extension — Adjustment 1" section. First application: `docs/findings/cp-5-adams-duplicates-results.md` (2 RE-POINT, 5 CLOSE-ON-COLLISION, 2 demotions across 7 pairs).
+- **MERGE op-shape extension — Adjustment 1 (close-on-collision in Op G).** cp-4a precedent (PR #256) re-pointed every duplicate alias to canonical; the Adams cohort hit chained-merge alias PK collisions (>1 duplicate per canonical with identical alias_names, or duplicate's alias case-exact-identical to canonical's existing). Adjustment 1 adds a per-alias collision check before re-point: if `(canonical, alias_name, alias_type, valid_from)` exists open, close the duplicate's row instead. Pair processing order is `(canonical_eid, pair_id)` ascending so chained-collision pairs are predictable. RE-POINT branch demotion is scoped to `alias_name != D.alias_name` so a pair-M-re-pointed row is not demoted by pair N's processing. Adjustment 1 is canonical for all future MERGE work. Single-duplicate-per-canonical merges (cp-4a Vanguard/PIMCO) unaffected. Documented at `docs/decisions/inst_eid_bridge_decisions.md`. First application: `docs/findings/cp-5-adams-duplicates-results.md` (2 RE-POINT, 5 CLOSE-ON-COLLISION, 2 demotions across 7 pairs). cp-5-cycle-truncated-merges added 10 RE-POINT + 10 demotions + 0 close-on-collision (no PK collisions in that cohort).
+
+- **MERGE op-shape extension — Adjustment 2 (Op A.3 `holdings_v2.entity_id` re-point).** Required when duplicate carries direct 13F filings under `entity_id` (vs only rollup attribution in cp-4a/Adams). First application in PR #285 Pair 5 (Financial Partners 1600 ← 9722, 169 rows / $0.5067B). Standard re-point: `UPDATE holdings_v2 SET entity_id = canonical WHERE entity_id = duplicate AND is_latest = TRUE`. Phase 1 of every future MERGE PR re-verifies `h_v2_dup_rows` per pair before authoring helper. Documented at `docs/decisions/inst_eid_bridge_decisions.md` "Adjustment 2" section.
+
+- **MERGE op-shape extension — Adjustment 3 (Op A.4 `entity_identifiers` SCD transfer).** Required when duplicate carries identifiers the canonical lacks. SCD pattern: PK collision pre-flight on `(identifier_type, identifier_value, valid_from=today)`, close at duplicate, insert at canonical with `valid_from=today`. PK is `(type, value, valid_from)` — `entity_id` not in PK; valid_from divergence prevents collision. `is_preferred` is NOT a column on `entity_identifiers` (verified 2026-05-05). First application: PR #285, 12 transfers across 10 pairs (CRD on 8 pairs; CIK + CRD on Pair 5 + Pair 6). Phase 1 of every future MERGE PR re-verifies across all identifier types (CIK, CRD, LEI, series_id, ISIN, etc.). Documented at "Adjustment 3" section.
+
+- **MERGE op-shape extension — Adjustment 4 (Op A two-step column-independent re-point).** **Supersedes** the cp-4a one-step OR-clause Op A in true-duplicate-merge contexts. Trigger: PR #285 Phase 3 first-attempt Guard 7 caught $91.08B THIRD-entity attribution theft on Goldman Pair 1 — the one-step UPDATE `SET both_columns = canonical WHERE rollup=dup OR dm_rollup=dup` silently re-pointed `rollup_entity_id` from legitimate THIRDs (Equitable IM, Ameriprise, Morgan Stanley, AssetMark, etc.) to canonical when only `dm_rollup` matched dup. Cohort total exposure $142.21B; transaction rolled back cleanly; chat authorized fix. Adjustment 4 splits Op A into two single-column UPDATEs (Op A.1 rollup; Op A.2 dm_rollup + dm_rollup_name). Per-column conservation provable by disjoint set algebra; Phase 1 of every future MERGE PR audits zero-mixed-rows precondition (rows with rollup=can ∧ dm_rollup=dup or vice versa). Hard-guards expand from 7 → 11 per pair (Guard 1 → 1a/1b/1c column-split; Guard 7 → 7a/7b/7c column-split). cp-4a brand→filer bridge semantic (PR #256) is correct as designed for that PR (intentional bridge); paper audit confirms zero THIRD damage in PR #256 + PR #283. Documented at "Adjustment 4" section. PR #283 Adams results doc amended with paper-audit verdict.
 
 New locks added by the CP-5 comprehensive discovery arc (locked 2026-05-04 via PRs #277–#281):
 
@@ -41,12 +47,13 @@ New locks added by the CP-5 comprehensive discovery arc (locked 2026-05-04 via P
 
 ## Parked queue (priority order)
 
-1. **CP-5 pre-execution P0 cohorts** (4 cohorts remaining of 5; see ROADMAP P0):
-   - `cp-5-cycle-truncated-merges` (21 entities / ~10–11 pairs; 2–3 batched merge PRs) — inherits Adjustment 1 op-shape directly.
+1. **CP-5 pre-execution P0 cohorts** (3 cohorts remaining of 5; see ROADMAP P0):
+   - `cp-5-capital-group-umbrella` (one-off; Path A vs Path B decided at execution time) — **next up**.
    - `cp-5-loader-gap-remediation` (84,363 rows / $418.5B; 1–3 sub-PRs — link existing CIKs, create new fund-typed entities, rollup rebuild).
-   - `cp-5-capital-group-umbrella` (one-off; Path A vs Path B decided at execution time).
    - `cp-5-pipeline-contract-gaps` (writer-gate hardening per Bundle C §7.5; sized individually).
-   - ~~`cp-5-adams-duplicates`~~ **CLOSED 2026-05-05.** 7 pairs merged; Adjustment 1 op-shape extension landed. See ROADMAP COMPLETED row + `docs/findings/cp-5-adams-duplicates-results.md`.
+   - ~~`cp-5-adams-duplicates`~~ **CLOSED 2026-05-05** (PR #283). 7 pairs merged; Adjustment 1 landed.
+   - ~~`cp-5-cycle-truncated-merges`~~ **CLOSED 2026-05-05** (PR #285). 10 pairs merged; Adjustments 2/3/4 landed (Adjustment 4 prevented $142.21B THIRD-entity theft via STOP-gate catch).
+   - **New P3 surfaced:** `cycle-adjacent-entity-audit` (Sarofim Trust Co eid 858, cycle-adjacent non-member excluded from PR #285).
 2. **CP-5 execution P1** (6 stages, seqs 9–14 in `data/working/cp-5-execution-plan.csv`): CP-5.1 helper + Method A view → CP-5.2 Register tab → CP-5.3 Cross-Ownership/Top Investors/Top Holders → CP-5.4 Crowding/Conviction/Smart Money → CP-5.5 Sector Rotation/New-Exits/AUM/Activist → CP-5.6 View 2 Tier-3 sentinel.
 3. **CP-5 post-execution backlog** (12 items, seqs 15–26): securities canonical_type loader fix, Method B disposition, bootstrap scripts disposition, operating-AM policy cleanup ($2.78T), cross-period CIK cleanup, cp-4c brand bridges (13 brands ~$8T), Pipelines 4/5/7, M&A event register Option C, Workstream 3 fund-to-parent residuals, Adams residual.
 4. `fund-classification-by-composition` Workstream 2 — **CLOSED** (per Bundle A §2.4: 0 NULL `fund_strategy` in `fund_universe`). The orphan-fund classification residual reframed as part of `cp-5-loader-gap-remediation` per Bundle B §2.4.
