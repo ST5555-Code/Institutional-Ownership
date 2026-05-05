@@ -1,0 +1,317 @@
+pattern,file,line,text,role,code_path
+dm_rollup_entity_id,scripts/build_fixture.py,235,UNION SELECT dm_rollup_entity_id FROM {h_src}  WHERE dm_rollup_entity_id IS NOT NULL,READER_FILTER,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/build_fixture.py,239,UNION SELECT dm_rollup_entity_id FROM {fh_src} WHERE dm_rollup_entity_id IS NOT NULL,READER_FILTER,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/build_summaries.py,65,"(""decision_maker_v1"",   ""dm_rollup_entity_id"", ""dm_rollup_name"",",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/build_summaries.py,66,"""dm_rollup_entity_id""),",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/compute_flows.py,48,"(""decision_maker_v1"",   ""dm_rollup_entity_id"", ""dm_rollup_name""),",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,8,- beneficial_ownership_v2.dm_rollup_entity_id,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,9,- beneficial_ownership_v2.dm_rollup_name,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,62,"COUNT(dm_rollup_entity_id)   AS with_dm_rollup,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,63,"COUNT(dm_rollup_name)        AS with_dm_rollup_name,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,74,"""with_dm_rollup_name"": row[5],",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,90,"print(f""    dm_rollup_entity_id : {cov['with_dm_rollup']:,}  """,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,92,"print(f""    dm_rollup_name      : {cov['with_dm_rollup_name']:,}  """,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,93,"f""({100 * cov['with_dm_rollup_name'] / total:.2f}%)"")",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,100,"dm_rollup_entity_id, dm_rollup_name) would differ from the resolved",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,117,"dm.rollup_entity_id    AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,118,ea_dm.alias_name       AS dm_rollup_name,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,152,b.dm_rollup_entity_id IS DISTINCT FROM r.dm_rollup_entity_id,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,155,b.dm_rollup_name IS DISTINCT FROM r.dm_rollup_name,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,156,) AS dm_rollup_name_delta,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,171,"""dm_rollup_name_delta"": row[6],",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_13dg.py,182,"print(f""    dm_rollup_entity_id would change : {deltas['dm_rollup_delta']:,}"")",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_13dg.py,183,"print(f""    dm_rollup_name      would change : {deltas['dm_rollup_name_delta']:,}"")",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_fund_holdings_v2.py,17,"dm_rollup_entity_id, dm_rollup_name) are bit-for-bit identical to",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_fund_holdings_v2.py,78,"dm.rollup_entity_id      AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_fund_holdings_v2.py,79,ea.alias_name            AS dm_rollup_name,READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/enrich_fund_holdings_v2.py,339,"dm_rollup_entity_id = e.dm_rollup_entity_id,",WRITER_SET,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/enrich_fund_holdings_v2.py,340,dm_rollup_name      = e.dm_rollup_name,WRITER_SET,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/load_13f_v2.py,150,"dm_rollup_entity_id     BIGINT,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/load_13f_v2.py,151,"dm_rollup_name          VARCHAR,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/load_13f_v2.py,231,"(""dm_rollup_entity_id"", ""BIGINT""),",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/load_13f_v2.py,232,"(""dm_rollup_name"", ""VARCHAR""),",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/load_13f_v2.py,499,"dm_rollup_entity_id, dm_rollup_name, pct_of_so_source,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/load_13f_v2.py,537,"NULL AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_name,scripts/load_13f_v2.py,538,"NULL AS dm_rollup_name,",READER_DIRECT,PRODUCTION_SCRIPT
+dm_rollup_entity_id,scripts/migrations/005_beneficial_ownership_entity_rollups.py,9,- dm_rollup_entity_id BIGINT   (decision_maker_v1 rollup target),READER_DIRECT,MIGRATION
+dm_rollup_entity_id,scripts/migrations/005_beneficial_ownership_entity_rollups.py,10,- dm_rollup_name      VARCHAR  (preferred alias of dm_rollup_entity_id),READER_DIRECT,MIGRATION
+dm_rollup_entity_id,scripts/migrations/005_beneficial_ownership_entity_rollups.py,45,"(""dm_rollup_entity_id"", ""BIGINT""),",READER_DIRECT,MIGRATION
+dm_rollup_name,scripts/migrations/005_beneficial_ownership_entity_rollups.py,46,"(""dm_rollup_name"", ""VARCHAR""),",READER_DIRECT,MIGRATION
+dm_rollup_name,scripts/oneoff/cleanup_asa_unknown_relabel.py,106,# entity_id=11278/dm_rollup_name='Calamos Investments' and must NOT be,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cleanup_asa_unknown_relabel.py,523,"f""`dm_entity_id={SYN_DM_ENTITY_ID}`, `dm_rollup_entity_id={SYN_DM_ROLLUP_ENTITY_ID}`, """,WRITER_SET,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cleanup_asa_unknown_relabel.py,524,"f""`dm_rollup_name={SYN_DM_ROLLUP_NAME!r}`, `fund_name={SYN_FUND_NAME!r}`, """,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cleanup_asa_unknown_relabel.py,626,"entity_id, rollup_entity_id, dm_entity_id, dm_rollup_entity_id,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cleanup_asa_unknown_relabel.py,627,"dm_rollup_name, row_id, accession_number, is_latest, backfill_quality",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cleanup_asa_unknown_relabel.py,643,"{SYN_DM_ROLLUP_ENTITY_ID}        AS dm_rollup_entity_id,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cleanup_asa_unknown_relabel.py,644,"'{SYN_DM_ROLLUP_NAME}'           AS dm_rollup_name,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_author_first_trust.py,132,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_author_fmr.py,134,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_author_ssga.py,135,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_author_trowe.py,120,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_blocker2_corroboration_probe.py,186,AND (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,46,"dm_rollup_entity_id AS eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,50,AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,51,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,59,SELECT DISTINCT dm_rollup_entity_id AS eid,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,62,AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,81,"""SELECT DISTINCT dm_rollup_entity_id AS eid FROM holdings_v2 """,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase1_inventory.py,82,"""WHERE is_latest = TRUE AND dm_rollup_entity_id IS NOT NULL"")",READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase2_pairing.py,49,SELECT DISTINCT dm_rollup_entity_id FROM holdings_v2,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_4b_discovery_phase2_pairing.py,50,WHERE is_latest = TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,13,"UPDATE rollup_entity_id, dm_rollup_entity_id, dm_rollup_name",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,14,WHERE (rollup_entity_id = :duplicate OR dm_rollup_entity_id = :duplicate),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,194,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,206,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,280,"SET rollup_entity_id = ?, dm_rollup_entity_id = ?, dm_rollup_name = ?",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,281,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,568,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_duplicates.py,630,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_phase1_recon.py,136,"""SELECT COUNT(*) FROM fund_holdings_v2 WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_adams_phase1_recon.py,322,WHERE (rollup_entity_id IN ? OR dm_rollup_entity_id IN ?,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_a_probe2_nport_completeness.py,81,# Layer C — NULL rollup_entity_id or dm_rollup_entity_id,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_a_probe2_nport_completeness.py,82,"print(""\n  Layer C — NULL rollup_entity_id or dm_rollup_entity_id"")",READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_a_probe2_nport_completeness.py,89,WHERE is_latest AND (rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_a_probe2_nport_completeness.py,112,WHERE is_latest AND (rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_a_probe2_nport_completeness.py,273,"SELECT dm_rollup_entity_id, dm_rollup_name,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,135,# rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL.,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,141,"SUM(CASE WHEN dm_rollup_entity_id IS NULL THEN 1 ELSE 0 END) AS null_dm_rollup,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,142,"SUM(CASE WHEN rollup_entity_id IS NULL AND dm_rollup_entity_id IS NULL THEN 1 ELSE 0 END) AS null_both,",READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,148,AND (rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,160,AND (rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_b_phase2_rollup_graph.py,175,AND (rollup_entity_id IS NULL OR dm_rollup_entity_id IS NULL),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,92,Method B — fund_holdings_v2.dm_rollup_entity_id (denormalized column):,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,93,Read fh.dm_rollup_entity_id directly per-row (avoids the,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,116,"fh.dm_rollup_entity_id AS inst_eid_b,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,122,"GROUP BY fh.entity_id, fh.dm_rollup_entity_id",READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,158,# Method B — fh.dm_rollup_entity_id → inst → top_parent,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_bundle_c_probe7_climb_and_rollup_type.py,162,JOIN inst_to_tp_df ON inst_to_tp_df.entity_id = fh.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_capital_group_umbrella.py,138,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_capital_group_umbrella.py,458,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,14,Op A.2 dm_rollup_entity_id + dm_rollup_name).,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,31,Op A.2  fund_holdings_v2.dm_rollup_entity_id + dm_rollup_name re-point,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,33,"UPDATE dm_rollup_entity_id = canonical, dm_rollup_name = X",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,34,WHERE dm_rollup_entity_id = duplicate AND is_latest = TRUE.,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,68,1b. Zero leftover rows with dm_rollup_entity_id = duplicate.,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,195,"""WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,205,"""WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,216,"""WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,357,# ---- Op A.2 — fund_holdings_v2.dm_rollup_entity_id + dm_rollup_name ----,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,361,"SET dm_rollup_entity_id = ?, dm_rollup_name = ?",WRITER_UPDATE,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,362,WHERE dm_rollup_entity_id = ? AND is_latest = TRUE,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,678,"""WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges.py,756,"""WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_cycle_truncated_merges_recon.py,237,"""SELECT COUNT(*) FROM fund_holdings_v2 WHERE dm_rollup_entity_id = ? AND is_latest = TRUE"",",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,5,fund_holdings_v2.dm_rollup_entity_id) across the top 50 top-parents,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,93,"COUNT(dm_rollup_entity_id) AS dm_rollup_eid_populated,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,94,"COUNT(dm_rollup_name)      AS dm_rollup_name_populated,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,95,COUNT(*) FILTER (WHERE dm_rollup_entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,96,"AND dm_rollup_name IS NOT NULL) AS name_only_no_eid,",READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,97,COUNT(*) FILTER (WHERE dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,98,"AND dm_rollup_name IS NULL) AS eid_only_no_name,",READER_FILTER,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,104,"print(f""  dm_rollup_name_populated : {pop[2]:>15,} ({pop[2]/max(pop[0],1)*100:.2f}%)"")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,117,"COUNT(dm_rollup_entity_id) AS not_latest_dm_pop,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,118,COUNT(dm_rollup_name)      AS not_latest_name_pop,READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,124,"print(f""    dm_rollup_name pop     : {hist[2]:>15,} ({hist[2]/max(hist[0],1)*100:.2f}%)"")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,157,# Method B: denormalized fh.dm_rollup_entity_id read at row time,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,160,"COALESCE(itp.top_parent_entity_id, fh.dm_rollup_entity_id) AS top_parent_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,163,LEFT JOIN inst_to_tp itp ON itp.institution_entity_id = fh.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase1.py,224,"fh.dm_rollup_entity_id    AS method_b_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase2.py,4,fund_holdings_v2.dm_rollup_entity_id and dm_rollup_name across,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase2.py,29,"""dm_rollup_entity_id"",",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/cp_5_fh2_dm_rollup_decision_recon_phase2.py,30,"""dm_rollup_name"",",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/dera_synthetic_stabilize.py,17,"dm_rollup_entity_id, dm_rollup_name from entity_identifiers +",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/dera_synthetic_stabilize.py,386,"""  dm_rollup_entity_id = ?, """,WRITER_SET,INVESTIGATION
+dm_rollup_name,scripts/oneoff/dera_synthetic_stabilize.py,387,"""  dm_rollup_name = ? """,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/dera_synthetic_stabilize.py,725,"""  dm_rollup_entity_id = ?, """,WRITER_SET,INVESTIGATION
+dm_rollup_name,scripts/oneoff/dera_synthetic_stabilize.py,726,"""  dm_rollup_name = ? """,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,29,"UPDATE rollup_entity_id, dm_rollup_entity_id, dm_rollup_name",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,30,WHERE (rollup_entity_id=:brand OR dm_rollup_entity_id=:brand),WRITER_SET,INVESTIGATION
+dm_rollup_name,scripts/oneoff/inst_eid_bridge_aliases_merge.py,34,fund-level identity labels; do not touch. Only dm_rollup_name,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,154,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,166,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,326,"lines.append(""   `rollup_entity_id`, `dm_rollup_entity_id`, `dm_rollup_name` shift."")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,328,"lines.append(""   has 92 rows where `rollup_entity_id=30` but `dm_rollup_entity_id=18402`;"")",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,329,"lines.append(""   `WHERE dm_rollup_entity_id=:brand` alone misses them."")",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,424,"dm_rollup_entity_id = ?,",WRITER_SET,INVESTIGATION
+dm_rollup_name,scripts/oneoff/inst_eid_bridge_aliases_merge.py,425,dm_rollup_name = ?,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,426,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,565,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_aliases_merge.py,620,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_blackrock_5_way.py,172,WHERE (rollup_entity_id = ? OR dm_rollup_entity_id = ?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,7,- distinct_fund_rollup_eids (dm_rollup_entity_id),READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,62,"""SELECT COUNT(DISTINCT dm_rollup_entity_id) FROM fund_holdings_v2 """,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,63,"""WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL""",READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,71,SELECT DISTINCT dm_rollup_entity_id AS eid,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,73,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,88,SELECT DISTINCT dm_rollup_entity_id AS eid,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,90,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase0_baseline.py,102,WHERE is_latest=TRUE AND dm_rollup_entity_id IN (SELECT eid FROM missing),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,16,fund-tier dm_rollup_entity_id != holdings_v2.entity_id,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,22,fund_holdings_v2.dm_rollup_entity_id. holdings_v2.cik is the 13F filer adviser CIK.,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,57,"COUNT(DISTINCT dm_rollup_entity_id) AS distinct_brand_eids,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,58,"MIN(dm_rollup_entity_id) AS sample_brand_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,59,ANY_VALUE(dm_rollup_name) AS sample_brand_name,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,131,"SELECT fund_cik AS cik, dm_rollup_entity_id AS brand_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,134,WHERE is_latest=TRUE AND fund_cik IS NOT NULL AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,135,"GROUP BY fund_cik, dm_rollup_entity_id",READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,242,SELECT DISTINCT dm_rollup_entity_id AS brand_eid,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1_inventory.py,243,FROM fund_holdings_v2 WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,12,"(any join: entity_id, rollup_entity_id, dm_rollup_entity_id)",READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,47,"print(""[1/8] Brand eids in fund_holdings_v2.dm_rollup_entity_id (is_latest)..."")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,52,"dm_rollup_entity_id AS brand_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,56,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,57,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,94,SELECT DISTINCT dm_rollup_entity_id AS eid FROM holdings_v2,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase1b_eid_level.py,95,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase2_relationships.py,47,"SELECT dm_rollup_entity_id AS brand_eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase2_relationships.py,50,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase2_relationships.py,51,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase2_relationships.py,62,SELECT DISTINCT dm_rollup_entity_id AS eid FROM holdings_v2,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase2_relationships.py,63,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase4_deepdives.py,7,"- For each, fund-side AUM (dm_rollup_entity_id) and filer-side AUM (entity_id)",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase4_deepdives.py,52,"SELECT dm_rollup_entity_id AS eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/inst_eid_bridge_phase4_deepdives.py,55,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,22,# Fund-side institutions: distinct dm_rollup_entity_id (and rollup_entity_id) on is_latest=TRUE.,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,27,SELECT DISTINCT dm_rollup_entity_id AS eid,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,28,FROM fund_holdings_v2 WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,51,SELECT DISTINCT dm_rollup_entity_id AS eid FROM fund_holdings_v2,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,52,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,72,AND (f.dm_rollup_entity_id IN (SELECT eid FROM missing),READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,78,SELECT DISTINCT dm_rollup_entity_id AS eid FROM fund_holdings_v2,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,79,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,102,AND (f.dm_rollup_entity_id = m.eid OR f.rollup_entity_id = m.eid),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,116,# fund-side AUM at institution: SUM fund_holdings_v2.market_value_usd by dm_rollup_entity_id (is_latest),READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,120,"SELECT dm_rollup_entity_id AS eid, SUM(market_value_usd) AS fund_aum_at_inst",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,122,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,123,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,150,"SELECT dm_rollup_entity_id AS eid, SUM(market_value_usd) AS fund_aum_at_inst",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,151,FROM fund_holdings_v2 WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,152,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,195,"SELECT dm_rollup_entity_id AS eid, COUNT(*) AS rows, SUM(market_value_usd) AS aum",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,196,FROM fund_holdings_v2 WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_cross_tier.py,197,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,27,"# Use dm_rollup_entity_id as the ""institution"" the fund rolls up to.",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,31,"fh.dm_rollup_entity_id AS eid,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/institution_scoping_phase15_crosstier.py,32,"MAX(fh.dm_rollup_name) AS name,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,36,WHERE fh.is_latest=TRUE AND fh.dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,39,"print(f""distinct dm_rollup_entity_id targets (with non-null id): {len(fund_aum):,}"")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,55,"SELECT dm_rollup_entity_id, SUM(market_value_usd)",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,57,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,62,"print(f""holdings_v2 distinct dm_rollup_entity_id (latest): {len(inst_dmreid):,}"")",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,85,"print(f""  match counts — entity_id={match_eid}  rollup_entity_id={match_reid}  dm_rollup_entity_id={match_dmreid}"")",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,86,"use = 'dm_rollup_entity_id' if match_dmreid >= max(match_eid, match_reid) else (",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase15_crosstier.py,88,"inst_map = {'entity_id': inst_eid, 'rollup_entity_id': inst_reid, 'dm_rollup_entity_id': inst_dmreid}[use]",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,5,dm_rollup_entity_id resolves to an entity with degenerate identity:,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,38,# Dangling: dm_rollup_entity_id maps to N/A name OR degenerate type,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,44,JOIN entities e ON e.entity_id = fh.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,60,JOIN entities e ON e.entity_id = fh.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,71,"banner('1B.2b — entity_id=11278 (literal ""N/A"") used as dm_rollup_entity_id')",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,75,WHERE is_latest=TRUE AND dm_rollup_entity_id = 11278,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,90,"fh.entity_id, fh.rollup_entity_id, fh.dm_rollup_entity_id,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_dangling.py,94,JOIN entities e ON e.entity_id = fh.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_orphans.py,8,- dm_rollup_entity_id IS NULL or not in entities,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_orphans.py,38,"cols = ['entity_id', 'rollup_entity_id', 'dm_entity_id', 'dm_rollup_entity_id']",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_orphans.py,61,"SELECT fh.fund_cik, fh.fund_name, fh.series_id, fh.entity_id, fh.rollup_entity_id, fh.dm_rollup_entity_id, fh.market_value_usd",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,6,"1B.1 Orphan funds (dm_rollup_entity_id NULL, or pointing to nonexistent entity row)",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,52,# 1B.1a: dm_rollup_entity_id NULL,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,56,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,61,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,66,# 1B.1b: dm_rollup_entity_id NOT NULL but no entity row,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,70,LEFT JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,71,WHERE f.is_latest=TRUE AND f.dm_rollup_entity_id IS NOT NULL AND e.entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,74,"SELECT DISTINCT f.fund_cik, f.fund_name, f.series_id, f.dm_rollup_entity_id",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,76,LEFT JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,77,WHERE f.is_latest=TRUE AND f.dm_rollup_entity_id IS NOT NULL AND e.entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,91,COUNT(DISTINCT f.dm_rollup_entity_id) AS n_distinct_entities,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,93,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,103,WHERE f.is_latest=TRUE AND f.dm_rollup_entity_id=11278,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,109,COUNT(DISTINCT f.dm_rollup_entity_id) AS n_distinct_entities,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,111,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,115,"SELECT f.dm_rollup_entity_id, e.canonical_name, e.entity_type,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,118,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,120,"GROUP BY f.dm_rollup_entity_id, e.canonical_name, e.entity_type",READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,128,COUNT(DISTINCT f.dm_rollup_entity_id) AS n_distinct_entities,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,130,LEFT JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,131,WHERE f.is_latest=TRUE AND f.dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,149,# Compare entity canonical_name at dm_rollup_entity_id vs the fund's family_name,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,154,"SELECT f.fund_cik, f.dm_rollup_entity_id, e.canonical_name AS rollup_name,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,158,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,162,AND f.dm_rollup_entity_id IS NOT NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,164,"GROUP BY f.fund_cik, f.dm_rollup_entity_id, e.canonical_name,",READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,185,"""dm_rollup_entity_id"": drid,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,212,WHERE is_latest=TRUE AND dm_rollup_entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,217,LEFT JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,218,WHERE f.is_latest=TRUE AND f.dm_rollup_entity_id IS NOT NULL AND e.entity_id IS NULL,READER_FILTER,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,223,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_rollup_integrity.py,231,JOIN entities e ON e.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_name,scripts/oneoff/institution_scoping_phase1b_wrong_shelf.py,7,rollup_name     = fund_holdings_v2.dm_rollup_name,READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/institution_scoping_phase1b_wrong_shelf.py,60,#       compare managers.manager_name (the registered filer) to dm_rollup_name. This catches the,READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/institution_scoping_phase1b_wrong_shelf.py,67,"fh.dm_rollup_entity_id,",READER_DIRECT,INVESTIGATION
+dm_rollup_name,scripts/oneoff/institution_scoping_phase1b_wrong_shelf.py,68,"fh.dm_rollup_name,",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase3_aum.py,5,fund_rollup_aum: SUM(fund_holdings_v2.market_value_usd) WHERE dm_rollup_entity_id=e AND is_latest.,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase3_aum.py,44,JOIN cohort c ON c.entity_id = f.dm_rollup_entity_id,READER_JOIN,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase3_aum.py,69,LEFT JOIN fund_holdings_v2 f ON f.dm_rollup_entity_id = c.entity_id AND f.is_latest,WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase3_aum.py,101,"WHERE f.dm_rollup_entity_id = c.entity_id AND f.is_latest)), 0) AS fund_aum",WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase3_aum.py,124,WHERE f.dm_rollup_entity_id = c.entity_id AND f.is_latest),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase5_tier.py,51,"SELECT dm_rollup_entity_id AS entity_id, COALESCE(SUM(market_value_usd), 0) AS fund_aum",READER_DIRECT,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase5_tier.py,53,WHERE is_latest AND dm_rollup_entity_id = ANY(?),WRITER_SET,INVESTIGATION
+dm_rollup_entity_id,scripts/oneoff/unknown_classification_phase5_tier.py,54,GROUP BY dm_rollup_entity_id,READER_GROUP,INVESTIGATION
+dm_rollup_entity_id,scripts/pipeline/compute_parent_fund_map.py,20,"``(dm_rollup_entity_id, dm_rollup_name)`` pairs are the universe of",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/compute_parent_fund_map.py,97,"(""decision_maker_v1"",   ""dm_rollup_name"", ""dm_rollup_entity_id""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/compute_parent_fund_map.py,492,"""SELECT COUNT(DISTINCT dm_rollup_entity_id) FROM holdings_v2 """,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/compute_parent_fund_map.py,493,"""WHERE is_latest = TRUE AND dm_rollup_entity_id IS NOT NULL""",READER_FILTER,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/compute_peer_rotation.py,91,"(""decision_maker_v1"",   ""dm_rollup_name""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/compute_peer_rotation.py,406,"MAX(dm_rollup_name)   AS dm_rollup_name,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_13dg.py,109,"(""dm_rollup_entity_id"", ""BIGINT""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_13dg.py,110,"(""dm_rollup_name"",      ""VARCHAR""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_13dg.py,178,"dm_rollup_entity_id BIGINT,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_13dg.py,179,"dm_rollup_name      VARCHAR,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_13dg.py,568,"dm_rollup_entity_id, dm_rollup_name,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,31,``rollup_entity_id`` / ``dm_entity_id`` / ``dm_rollup_entity_id`` /,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,32,``dm_rollup_name`` on the newly-inserted ``is_latest=TRUE`` rows.,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,129,"(""dm_rollup_entity_id"",  ""BIGINT""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,130,"(""dm_rollup_name"",       ""VARCHAR""),",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,773,"dm_rollup_entity_id, dm_rollup_name,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,784,"NULL AS dm_entity_id, NULL AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,785,"NULL AS dm_rollup_name,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,926,dm_rollup_entity_id / dm_rollup_name) on,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,994,"dm.rollup_entity_id      AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,995,ea.alias_name            AS dm_rollup_name,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,1036,"dm_rollup_entity_id = m.dm_rollup_entity_id,",WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,1037,dm_rollup_name      = m.dm_rollup_name,WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,1257,"dm_rollup_entity_id = e.dm_rollup_entity_id,",WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,1258,dm_rollup_name      = e.dm_rollup_name,WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/load_nport.py,1263,"dm.rollup_entity_id      AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/load_nport.py,1264,ea.alias_name            AS dm_rollup_name,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,267,dm_rollup_entity_id).,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,448,* dm_rollup_entity_id ← decision_maker_v1 rollup target,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,449,* dm_rollup_name      ← preferred alias of dm.rollup_entity_id,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,479,"dm_rollup_entity_id = e.dm_rollup_entity_id,",WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,480,dm_rollup_name      = e.dm_rollup_name,WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,486,"dm.rollup_entity_id    AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,487,ea_dm.alias_name       AS dm_rollup_name,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,519,"dm_rollup_entity_id = e.dm_rollup_entity_id,",WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,520,dm_rollup_name      = e.dm_rollup_name,WRITER_SET,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,526,"dm.rollup_entity_id    AS dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,527,ea_dm.alias_name       AS dm_rollup_name,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,567,"rollup_entity_id, rollup_name, dm_rollup_entity_id, dm_rollup_name)",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_entity_id,scripts/pipeline/shared.py,618,"r.dm_rollup_entity_id,",READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/pipeline/shared.py,619,r.dm_rollup_name,READER_DIRECT,PRODUCTION_BACKEND
+dm_rollup_name,scripts/queries/common.py,52,decision_maker_v1   -> 'dm_rollup_name' (sub-adviser making decisions),READER_DIRECT,PRODUCTION_QUERY
+dm_rollup_name,scripts/queries/common.py,56,return 'dm_rollup_name' if rollup_type == 'decision_maker_v1' else 'rollup_name',READER_DIRECT,PRODUCTION_QUERY
+dm_rollup_name,scripts/queries/cross.py,82,SELECT dm_rollup_name AS name FROM fund_holdings_v2,READER_DIRECT,PRODUCTION_QUERY
+dm_rollup_name,scripts/queries/cross.py,84,AND market_value_usd > 0 AND dm_rollup_name IS NOT NULL,READER_FILTER,PRODUCTION_QUERY
+dm_rollup_name,scripts/queries/cross.py,268,AND (fh.dm_rollup_name = ? OR fh.family_name = ?),WRITER_SET,PRODUCTION_QUERY
+dm_rollup_name,scripts/queries/cross.py,522,AND (fh.dm_rollup_name = ? OR fh.family_name = ?),WRITER_SET,PRODUCTION_QUERY
+dm_rollup_entity_id,scripts/queries/trend.py,111,'dm_rollup_entity_id' if rollup_type == 'decision_maker_v1',READER_DIRECT,PRODUCTION_QUERY
+dm_rollup_entity_id,tests/pipeline/test_load_13dg.py,151,"dm_rollup_entity_id BIGINT,",READER_DIRECT,TEST
+dm_rollup_name,tests/pipeline/test_load_13dg.py,152,"dm_rollup_name      VARCHAR,",READER_DIRECT,TEST
+dm_rollup_entity_id,tests/pipeline/test_load_13f_v2.py,157,"dm_rollup_entity_id     BIGINT,",READER_DIRECT,TEST
+dm_rollup_name,tests/pipeline/test_load_13f_v2.py,158,"dm_rollup_name          VARCHAR,",READER_DIRECT,TEST
+dm_rollup_entity_id,tests/pipeline/test_load_nport.py,315,"""dm_entity_id"", ""dm_rollup_entity_id"", ""dm_rollup_name"",",READER_DIRECT,TEST
+dm_rollup_entity_id,tests/pipeline/test_load_nport.py,794,rollup_entity_id / dm_entity_id / dm_rollup_entity_id /,READER_DIRECT,TEST
+dm_rollup_name,tests/pipeline/test_load_nport.py,795,dm_rollup_name on staging.fund_holdings_v2 BEFORE super().promote(),READER_DIRECT,TEST
+dm_rollup_entity_id,tests/pipeline/test_load_nport.py,815,"""       dm_rollup_entity_id, dm_rollup_name """,READER_DIRECT,TEST
+dm_rollup_name,tests/pipeline/test_load_nport.py,823,"# EC rollup → 100, DM rollup → 200, dm_rollup_name = ""Test Family"".",WRITER_SET,TEST
+dm_rollup_entity_id,tests/pipeline/test_load_nport.py,856,"""       dm_rollup_entity_id, dm_rollup_name """,READER_DIRECT,TEST
+dm_rollup_name,web/react-app/src/types/api.ts,394,// True when fund_holdings_v2 has rows under this investor's dm_rollup_name,READER_DIRECT,PRODUCTION_FRONTEND

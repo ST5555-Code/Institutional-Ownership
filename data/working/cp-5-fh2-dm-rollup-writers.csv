@@ -1,0 +1,6 @@
+site,function,op,scope,source_of_truth,when_runs
+scripts/pipeline/load_nport.py:773,_promote_append_is_latest INSERT,INSERT,per-row at promote (new is_latest=TRUE rows),values from staging.fund_holdings_v2 (already pre-enriched in step 0),every N-PORT promote
+scripts/pipeline/load_nport.py:984-1037,_enrich_staging_entities (pre-promote on staging),UPDATE staging.fund_holdings_v2,all staged rows for series_touched in the run,ERH JOIN on entity_identifiers.identifier_type='series_id',"every N-PORT promote (step 0, BEFORE super().promote)"
+scripts/pipeline/load_nport.py:1244-1287,_bulk_enrich_run (post-promote),UPDATE fund_holdings_v2,is_latest=TRUE rows for series_touched in the run,ERH JOIN on entity_identifiers.identifier_type='series_id',"every N-PORT promote (step 3, safety net)"
+scripts/enrich_fund_holdings_v2.py:331-348,_apply_batch (BLOCK-2 full-scope backfill),UPDATE fund_holdings_v2,rows WHERE entity_id IS NULL AND series_id resolvable,ERH JOIN on entity_identifiers.identifier_type='series_id',manual run only; idempotent (NULL filter)
+scripts/pipeline/shared.py:440-540,update_holdings_rollup (beneficial_ownership_v2),UPDATE beneficial_ownership_v2,all rows OR filer_ciks scope,ERH JOIN on entity_identifiers.identifier_type='cik',every 13D/G load via load_13dg.py
