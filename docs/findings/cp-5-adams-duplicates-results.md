@@ -315,3 +315,42 @@ docs should note when phase1b deltas don't reflect the merge.
   (`load_nport.py`, `load_13f_v2.py`, `classify_fund()`, etc.).
 - Fresh pre-confirm backup at `data/backups/13f_backup_20260505_051519`
   (3.2GB) per memory rule for write-path PRs.
+
+---
+
+## Amendment 2026-05-05 — Op A shape superseded by Adjustment 4 (paper-audit clean)
+
+The one-step OR-clause Op A used in this PR (inherited from the cp-4a
+precedent in PR #256) is superseded by Adjustment 4 (split-column Op A.1
++ Op A.2) in `cp-5-cycle-truncated-merges` for true-duplicate-merge
+contexts. See `docs/findings/cp-5-cycle-truncated-merges-results.md` §0,
+§7.4 and `docs/decisions/inst_eid_bridge_decisions.md` "Adjustment 4"
+section.
+
+**Paper-audit verdict for this PR (Adams 7-pair): no THIRD-entity
+attribution damage occurred.**
+
+- **Pairs 2–7** (canonicals 2961, 6471): per the per-pair Op A row count
+  in §3 above (`fh_dup_rows = 0` for all six pairs), there were zero
+  pre-merge `fund_holdings_v2` references to the duplicate eids.
+  No rows existed to misattribute. Zero damage possible.
+- **Pair 1** (Adams Asset Advisors 4909 ← 19509): 20 rows / $0.0293B
+  pre-merge dup footprint. Maximum unverified residual risk bounded
+  at $0.0293B. Empirical proxy on current state shows the 20 rows
+  attribute to fund `cik=0001288872 'Stock Dividend Fund, Inc.'` with
+  `dm_rollup_name = 'Adams Asset Advisors, LLC'` — internally
+  consistent with Adams attribution; no anomalous fund families
+  surfaced. Pre-merge snapshot was unavailable for direct
+  verification (earliest backup is post-merge), so the audit is
+  heuristic.
+
+No corrective PR required. The one-step Op A used here was latent-buggy
+relative to the column-independent semantic codified by Adjustment 4,
+but data-safe in this specific cohort.
+
+### Adjustment 4 forward-looking implications for Adams successor PRs
+
+If any future Adams-cohort or Adams-adjacent merge surfaces split rows
+(`rollup=THIRD ∧ dm_rollup=dup` or vice versa) on a duplicate with
+non-zero footprint, Adjustment 4 (split Op A) MUST be used. Phase 1 of
+every future MERGE PR audits mixed-row exposure as a Phase 3 entry gate.

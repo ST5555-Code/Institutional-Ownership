@@ -356,3 +356,260 @@ RE-POINT branch matches cp-4a literally.
 - `docs/findings/cp-5-adams-duplicates-results.md` (concrete
   per-pair op counts, including `op_g_closed` distinct from
   `op_g_repointed`)
+
+
+---
+
+## MERGE op-shape extension — Adjustment 2 (Op A.3 `holdings_v2.entity_id` re-point)
+
+Authored: PR `cp-5-cycle-truncated-merges` (2026-05-05, 10-pair
+cohort).
+
+### Problem
+
+cp-4a precedent (PR #256, Vanguard + PIMCO brand→filer bridge)
+and Adjustment 1 (PR #283, Adams 7-pair) Op A only re-points
+`fund_holdings_v2` rollup columns. Neither cohort had
+duplicates with direct 13F holdings under the `entity_id`
+column — fund eids were FUND identity (not institutional-tier)
+in Adams, and brand_eids in cp-4a had brand-tier semantics not
+filer identity.
+
+cp-5-cycle-truncated-merges Pair 5 (Financial Partners Group,
+Inc 1600 ← Financial Partners Group, LLC 9722) has 169 rows /
+$0.5067B of direct 13F filings under duplicate's
+`holdings_v2.entity_id`. Without a dedicated re-point, the
+duplicate would retain those rows post-merge — an inconsistent
+state where the duplicate is otherwise deprecated.
+
+### Adjustment 2 (codified)
+
+Standard re-point. Apply only when `h_v2_dup_rows > 0`:
+
+    UPDATE holdings_v2 SET entity_id = canonical_eid
+    WHERE entity_id = duplicate_eid AND is_latest = TRUE;
+
+### Scope of canonical state
+
+Adjustment 2 is canonical for all future MERGE work where
+duplicate has direct 13F filings. Phase 1 of every future
+MERGE PR re-verifies `h_v2_dup_rows` per pair before
+authoring the helper.
+
+### References
+
+- PR `cp-5-cycle-truncated-merges` (this PR; first Adjustment 2
+  application — Pair 5 only, 169 rows)
+- `docs/findings/cp-5-cycle-truncated-merges-results.md` §7.2
+
+---
+
+## MERGE op-shape extension — Adjustment 3 (Op A.4 `entity_identifiers` SCD transfer)
+
+Authored: PR `cp-5-cycle-truncated-merges` (2026-05-05, 10-pair
+cohort).
+
+### Problem
+
+cp-4a (PR #256) and Adjustment 1 (PR #283) Op A did not
+transfer `entity_identifiers`: Adams duplicates' identifiers
+were redundant with canonical's, and cp-4a brand_eids carried
+brand-only identifiers absorbed by Op G alias re-point.
+
+cp-5-cycle-truncated-merges cohort has 12 distinct identifier
+transfers across 10 pairs:
+  - 8 pairs each transfer 1 CRD;
+  - Pair 5 transfers CIK `0001965246` + CRD `000165856`;
+  - Pair 6 transfers CIK `0001536185` + CRD `000156933`.
+
+Without Adjustment 3, those identifiers would be orphaned at
+the deprecated duplicate.
+
+### Adjustment 3 (codified)
+
+SCD transfer pattern, per identifier_type where duplicate
+carries an open identifier the canonical lacks:
+
+  Pre-flight: PK collision check on
+    `(identifier_type, identifier_value, valid_from=today)`.
+  ABORT pair on collision (would indicate a third entity is
+  using the same `(type, value)` at today's `valid_from` —
+  unexpected).
+
+  Step 1: close at duplicate.
+    UPDATE entity_identifiers SET valid_to = today
+    WHERE entity_id = duplicate_eid
+      AND identifier_type = T
+      AND identifier_value = V
+      AND valid_from = D.valid_from_existing
+      AND valid_to = DATE '9999-12-31';
+
+  Step 2: insert at canonical with `valid_from=today`.
+    INSERT INTO entity_identifiers
+      (entity_id, identifier_type, identifier_value,
+       confidence, source, is_inferred, valid_from, valid_to,
+       created_at)
+    VALUES (canonical_eid, T, V, D.confidence, D.source,
+            FALSE, today, '9999-12-31', NOW());
+
+PK is `(identifier_type, identifier_value, valid_from)` —
+`entity_id` is NOT in PK. Closed duplicate row's PK at
+`valid_from=2000-01-01` and new canonical row's PK at
+`valid_from=today` do not collide.
+
+`is_preferred` is NOT a column on `entity_identifiers` (verified
+2026-05-05); no preferred-conflict logic needed.
+
+### Scope of canonical state
+
+Adjustment 3 is canonical for all future MERGE work. Phase 1
+of every future MERGE PR re-verifies across all identifier
+types (`cik`, `crd`, `lei`, `series_id`, `isin`, etc.)
+before authoring the transfer plan.
+
+### References
+
+- PR `cp-5-cycle-truncated-merges` (this PR; first Adjustment 3
+  application — 12 transfers across 10 pairs)
+- `docs/findings/cp-5-cycle-truncated-merges-results.md` §7.3
+
+---
+
+## MERGE op-shape extension — Adjustment 4 (Op A two-step column-independent re-point)
+
+Authored: PR `cp-5-cycle-truncated-merges` (2026-05-05). Triggered
+by Phase 3 first-attempt Guard 7 failure on Goldman Pair 1; Code
+surfaced to chat per STOP-gate discipline; chat authorized
+Adjustment 4.
+
+### Problem
+
+cp-4a precedent (PR #256, Vanguard + PIMCO brand→filer bridge)
+and Adjustment 1 (PR #283, Adams 7-pair) used a one-step
+OR-clause Op A:
+
+    UPDATE fund_holdings_v2
+    SET rollup_entity_id = canonical_eid,
+        dm_rollup_entity_id = canonical_eid,
+        dm_rollup_name = canonical_canonical_name
+    WHERE rollup_entity_id = duplicate_eid
+       OR dm_rollup_entity_id = duplicate_eid
+      AND is_latest = TRUE;
+
+This shape silently steals THIRD-entity attribution when
+duplicate has rows where `rollup_entity_id` ≠ duplicate but
+`dm_rollup_entity_id` = duplicate (or vice versa). Each rollup
+column represents an independent attribution per Bundle C §7.2
+(decision_maker_v1 vs economic_control_v1 semantic split);
+treating them as coupled was incorrect for true-duplicate-merge
+contexts.
+
+cp-5-cycle-truncated-merges Goldman Pair 1 (canonical 22 ←
+duplicate 17941) surfaced the bug: Goldman duplicate carries
+28,313 rows where `dm_rollup_entity_id = 17941` and
+`rollup_entity_id` legitimately points to THIRD entities
+including:
+  - Equitable Investment Management LLC (eid 2562; itself a
+    canonical in this PR's Pair 6) — $14.20B
+  - Ameriprise Financial Inc (eid 10178) — $12.96B
+  - Morgan Stanley (eid 2920) — $6.57B
+  - AssetMark Inc (eid 6708) — $5.18B
+  - Jackson National Asset Management LLC (eid 18983) — $6.84B
+  - Empower Capital Management LLC (eid 18137) — $4.52B
+  - Transamerica Asset Management Inc (eid 18298) — $1.95B
+  - The Variable Annuity Life Insurance Company (eid 18202) —
+    $5.14B
+  - Portfolio Optimization Growth Portfolio (eid 14412) —
+    $31.15B
+  - … and ~9 others.
+
+One-step Op A would have stolen $91.08B from these THIRD
+entities on Pair 1 alone. Cohort total stolen-AUM exposure
+across Pairs 1, 2, 4, 8: $142.21B.
+
+### Why prior cohorts were data-safe
+
+PR #256 cp-4a was an INTENTIONAL brand→filer bridge: brand-tier
+eid was the target in BOTH columns by design, so absorbing it
+on both columns was correct. Paper audit (Phase 1.5 of this PR)
+confirmed no THIRD entities at risk.
+
+PR #283 Adams Pairs 2-7 had $0 dup `fund_holdings_v2` footprint
+— no rows existed to misattribute. Adams Pair 1 had 20 rows /
+$0.0293B; empirical proxy on current state shows attribution
+remains internally consistent with Adams Asset Advisors, so
+maximum unverified residual risk is bounded at $0.0293B (no
+direct snapshot recovery available).
+
+The bug was latent in the precedent shape; cohort properties
+specific to cp-4a (intentional bridge) and Adams ($0 footprint)
+masked it.
+
+### Adjustment 4 (codified)
+
+Split Op A into two single-column UPDATEs in true-duplicate-
+merge contexts:
+
+  Op A.1 — `rollup_entity_id` re-point (column-independent).
+    UPDATE fund_holdings_v2 SET rollup_entity_id = canonical_eid
+    WHERE rollup_entity_id = duplicate_eid AND is_latest = TRUE;
+
+  Op A.2 — `dm_rollup_entity_id` + `dm_rollup_name` re-point
+  (column-independent).
+    UPDATE fund_holdings_v2
+    SET dm_rollup_entity_id = canonical_eid,
+        dm_rollup_name = canonical_canonical_name
+    WHERE dm_rollup_entity_id = duplicate_eid AND is_latest = TRUE;
+
+Each UPDATE touches only its own column. THIRD-entity
+attribution preserved. Per-column conservation is exact:
+  post_can_rollup_aum = pre_can_rollup_aum + pre_dup_rollup_aum
+  post_can_dm_rollup_aum = pre_can_dm_rollup_aum + pre_dup_dm_rollup_aum
+
+The conservation is provable by disjoint set algebra when
+zero "mixed" rows exist (rollup=can ∧ dm_rollup=dup or vice
+versa). Phase 1 of every future MERGE PR audits for mixed rows
+to confirm disjointness.
+
+### Scope of canonical state
+
+Adjustment 4 is canonical for all future MERGE work in
+true-duplicate-merge contexts. Supersedes the one-step
+OR-clause Op A from cp-4a precedent.
+
+The cp-4a brand→filer bridge semantic (PR #256) remains
+correct as designed for that PR. PR #256 + PR #283 paper-audit
+verdict: zero THIRD-entity damage occurred (brand→filer
+intentional + $0/near-$0 dup footprint respectively). No
+corrective PR required for prior cohorts.
+
+### Hard guards (per pair, expanded with Adjustment 4)
+
+Total 11 guards × 10 pairs = 110 pre-COMMIT checks per cohort
+PR. Splits (1) Guard 1 into 1a/1b/1c (column-independent), and
+(7) Guard 7 into 7a/7b/7c (rollup, dm_rollup, h_v2 each).
+
+  1a. Zero rows where rollup_entity_id = duplicate.
+  1b. Zero rows where dm_rollup_entity_id = duplicate.
+  1c. Zero rows where holdings_v2.entity_id = duplicate.
+  2.  Exactly 1 open relationship ref dup (the Op E audit).
+  3.  Zero open ECH on dup.
+  4.  Zero open ERH FROM-side on dup.
+  5.  Zero open ERH AT-side on dup.
+  6.  Zero open aliases on dup.
+  6b. Zero open entity_identifiers on dup.
+  7a. Per-pair AUM conservation, rollup-side (within $0.01B).
+  7b. Per-pair AUM conservation, dm_rollup-side (within $0.01B).
+  7c. Per-pair AUM conservation, h_v2-side (within $0.01B).
+
+### References
+
+- PR #256 (cp-4a Vanguard + PIMCO brand→filer bridge — semantic
+  exception, Adjustment 4 does NOT supersede)
+- PR #283 (Adams 7-pair — paper audit confirmed no damage)
+- PR `cp-5-cycle-truncated-merges` (this PR; Adjustment 4
+  codified, first application across Pairs 1, 2, 4, 8 with
+  THIRD-attribution preservation; Pairs 3, 5, 6, 7, 9, 10
+  trivially identical to one-step shape since no THIRDs at risk)
+- `docs/findings/cp-5-cycle-truncated-merges-results.md` §0,
+  §6, §7.4
