@@ -126,8 +126,6 @@ _TARGET_TABLE_COLUMNS: list[tuple[str, str]] = [
     ("entity_id",            "BIGINT"),
     ("rollup_entity_id",     "BIGINT"),
     ("dm_entity_id",         "BIGINT"),
-    ("dm_rollup_entity_id",  "BIGINT"),
-    ("dm_rollup_name",       "VARCHAR"),
     ("accession_number",     "VARCHAR"),
     ("is_latest",            "BOOLEAN"),
     ("backfill_quality",     "VARCHAR"),
@@ -770,7 +768,6 @@ class LoadNPortPipeline(SourcePipeline):
                 fair_value_level, is_restricted, payoff_profile,
                 loaded_at, fund_strategy_at_filing,
                 entity_id, rollup_entity_id, dm_entity_id,
-                dm_rollup_entity_id, dm_rollup_name,
                 accession_number, is_latest, backfill_quality
             )
             SELECT
@@ -781,8 +778,7 @@ class LoadNPortPipeline(SourcePipeline):
                 s.fair_value_level, s.is_restricted, s.payoff_profile,
                 NOW() AS loaded_at, s.fund_strategy AS fund_strategy_at_filing,
                 NULL AS entity_id, NULL AS rollup_entity_id,
-                NULL AS dm_entity_id, NULL AS dm_rollup_entity_id,
-                NULL AS dm_rollup_name,
+                NULL AS dm_entity_id,
                 s.accession_number,
                 TRUE AS is_latest,
                 'direct' AS backfill_quality
@@ -990,22 +986,12 @@ class LoadNPortPipeline(SourcePipeline):
                 f"""
                 SELECT ei.identifier_value      AS series_id,
                        ei.entity_id             AS entity_id,
-                       ec.rollup_entity_id      AS ec_rollup_entity_id,
-                       dm.rollup_entity_id      AS dm_rollup_entity_id,
-                       ea.alias_name            AS dm_rollup_name
+                       ec.rollup_entity_id      AS ec_rollup_entity_id
                   FROM entity_identifiers ei
                   LEFT JOIN entity_rollup_history ec
                          ON ec.entity_id = ei.entity_id
                         AND ec.rollup_type = 'economic_control_v1'
                         AND ec.valid_to = DATE '9999-12-31'
-                  LEFT JOIN entity_rollup_history dm
-                         ON dm.entity_id = ei.entity_id
-                        AND dm.rollup_type = 'decision_maker_v1'
-                        AND dm.valid_to = DATE '9999-12-31'
-                  LEFT JOIN entity_aliases ea
-                         ON ea.entity_id = ec.rollup_entity_id
-                        AND ea.is_preferred = TRUE
-                        AND ea.valid_to = DATE '9999-12-31'
                  WHERE ei.identifier_type = 'series_id'
                    AND ei.valid_to = DATE '9999-12-31'
                    AND ei.identifier_value IN ({placeholders})
@@ -1032,9 +1018,7 @@ class LoadNPortPipeline(SourcePipeline):
                     UPDATE fund_holdings_v2 AS fh
                        SET entity_id           = m.entity_id,
                            rollup_entity_id    = m.ec_rollup_entity_id,
-                           dm_entity_id        = m.entity_id,
-                           dm_rollup_entity_id = m.dm_rollup_entity_id,
-                           dm_rollup_name      = m.dm_rollup_name
+                           dm_entity_id        = m.entity_id
                       FROM entity_map m
                      WHERE fh.series_id = m.series_id
                     """
@@ -1253,28 +1237,16 @@ class LoadNPortPipeline(SourcePipeline):
                 UPDATE fund_holdings_v2 AS fh
                    SET entity_id           = e.entity_id,
                        rollup_entity_id    = e.ec_rollup_entity_id,
-                       dm_entity_id        = e.entity_id,
-                       dm_rollup_entity_id = e.dm_rollup_entity_id,
-                       dm_rollup_name      = e.dm_rollup_name
+                       dm_entity_id        = e.entity_id
                   FROM (
                       SELECT ei.identifier_value      AS series_id,
                              ei.entity_id             AS entity_id,
-                             ec.rollup_entity_id      AS ec_rollup_entity_id,
-                             dm.rollup_entity_id      AS dm_rollup_entity_id,
-                             ea.alias_name            AS dm_rollup_name
+                             ec.rollup_entity_id      AS ec_rollup_entity_id
                         FROM entity_identifiers ei
                         LEFT JOIN entity_rollup_history ec
                                ON ec.entity_id = ei.entity_id
                               AND ec.rollup_type = 'economic_control_v1'
                               AND ec.valid_to = DATE '9999-12-31'
-                        LEFT JOIN entity_rollup_history dm
-                               ON dm.entity_id = ei.entity_id
-                              AND dm.rollup_type = 'decision_maker_v1'
-                              AND dm.valid_to = DATE '9999-12-31'
-                        LEFT JOIN entity_aliases ea
-                               ON ea.entity_id = ec.rollup_entity_id
-                              AND ea.is_preferred = TRUE
-                              AND ea.valid_to = DATE '9999-12-31'
                        WHERE ei.identifier_type = 'series_id'
                          AND ei.valid_to = DATE '9999-12-31'
                          AND ei.identifier_value IN ({placeholders})

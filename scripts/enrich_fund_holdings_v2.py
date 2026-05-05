@@ -74,22 +74,12 @@ _LOOKUP_DDL = """
 CREATE OR REPLACE TEMP TABLE _enrich_lookup AS
 SELECT ei.identifier_value      AS series_id,
        ei.entity_id             AS entity_id,
-       ec.rollup_entity_id      AS ec_rollup_entity_id,
-       dm.rollup_entity_id      AS dm_rollup_entity_id,
-       ea.alias_name            AS dm_rollup_name
+       ec.rollup_entity_id      AS ec_rollup_entity_id
   FROM entity_identifiers ei
   LEFT JOIN entity_rollup_history ec
          ON ec.entity_id = ei.entity_id
         AND ec.rollup_type = 'economic_control_v1'
         AND ec.valid_to = DATE '9999-12-31'
-  LEFT JOIN entity_rollup_history dm
-         ON dm.entity_id = ei.entity_id
-        AND dm.rollup_type = 'decision_maker_v1'
-        AND dm.valid_to = DATE '9999-12-31'
-  LEFT JOIN entity_aliases ea
-         ON ea.entity_id = ec.rollup_entity_id
-        AND ea.is_preferred = TRUE
-        AND ea.valid_to = DATE '9999-12-31'
  WHERE ei.identifier_type = 'series_id'
    AND ei.valid_to = DATE '9999-12-31'
 """
@@ -335,9 +325,7 @@ def _apply_batch(con, series_ids: list[str],
         UPDATE fund_holdings_v2 AS fh
            SET entity_id           = e.entity_id,
                rollup_entity_id    = e.ec_rollup_entity_id,
-               dm_entity_id        = e.entity_id,
-               dm_rollup_entity_id = e.dm_rollup_entity_id,
-               dm_rollup_name      = e.dm_rollup_name
+               dm_entity_id        = e.entity_id
           FROM _enrich_lookup AS e
          WHERE fh.series_id = e.series_id
            AND fh.entity_id IS NULL
