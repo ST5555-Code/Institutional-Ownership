@@ -1,0 +1,11 @@
+pair_id,canonical_eid,duplicate_eid,canonical_canonical_name,duplicate_canonical_name,op_a1_rows,op_a2_rows,op_a3_rows,op_a4_transfers,op_b_parent_count,op_b_child_count,op_b_prime_count,op_c_count,op_e_relationship_id,op_f_count,op_g_alias_count,op_h_total_count,rollup_aum_pre_can_b,rollup_aum_pre_dup_b,rollup_aum_post_expected_b,dm_rollup_aum_pre_can_b,dm_rollup_aum_pre_dup_b,dm_rollup_aum_post_expected_b,h_v2_aum_pre_can_b,h_v2_aum_pre_dup_b,h_v2_aum_post_expected_b
+1,22,17941,Goldman Sachs Asset Management,"Goldman Sachs Asset Management, L.P.",25067,53380,0,1,131,0,2,1,TBD,2,1,64,782.6917,46.5008,829.1925,430.2103,137.5827,567.7930,0.0000,0.0000,0.0000
+2,58,18070,Lazard Asset Management,Lazard Asset Management LLC,0,5158,0,1,40,0,2,1,TBD,2,1,6,110.4762,0.0000,110.4762,110.4762,34.0366,144.5128,0.0000,0.0000,0.0000
+3,70,18357,Ariel Investments,"Ariel Investments, LLC",0,0,0,1,6,0,2,1,TBD,2,1,0,102.9026,0.0000,102.9026,102.9026,0.0000,102.9026,0.0000,0.0000,0.0000
+4,893,17916,"LORD, ABBETT & CO. LLC","Lord, Abbett & Co. LLC",0,1832,0,1,52,0,2,1,TBD,2,1,1,283.9039,0.0000,283.9039,283.9039,0.1830,284.0869,0.1253,0.0000,0.1253
+5,1600,9722,"Financial Partners Group, Inc","Financial Partners Group, LLC",0,0,169,2,0,0,2,1,TBD,2,1,0,11.6905,0.0000,11.6905,11.6905,0.0000,11.6905,3.0387,0.5067,3.5454
+6,2562,9668,"Equitable Investment Management, LLC","Equitable Investment Management Group, LLC",0,0,0,2,110,0,2,1,TBD,2,1,0,564.6430,0.0000,564.6430,221.1026,0.0000,221.1026,0.0000,0.0000,0.0000
+7,2925,18537,THORNBURG INVESTMENT MANAGEMENT INC,"Thornburg Investment Management, Inc.",0,0,0,1,26,0,2,1,TBD,2,1,0,152.4087,0.0000,152.4087,152.4087,0.0000,152.4087,94.9091,0.0000,94.9091
+8,7558,18029,Fayez Sarofim & Co,"Fayez Sarofim & Co., LLC",795,1742,0,1,16,0,2,1,TBD,2,1,9,0.4574,2.1038,2.5612,0.4574,19.0083,19.4657,166.6704,0.0000,166.6704
+9,7655,18649,"LEAVELL INVESTMENT MANAGEMENT, INC.","Leavell Investment Management, Inc.",0,0,0,1,2,0,2,1,TBD,2,1,0,0.8956,0.0000,0.8956,0.8956,0.0000,0.8956,9.0290,0.0000,9.0290
+10,10501,19846,Stonebridge Capital Advisors LLC,"Stonebridge Capital Advisors, LLC",1042,1042,0,1,8,0,2,1,TBD,2,1,8,0.9363,2.3406,3.2769,0.4138,2.3406,2.7544,5.3898,0.0000,5.3898
