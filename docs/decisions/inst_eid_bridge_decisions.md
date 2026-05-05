@@ -247,3 +247,112 @@ CP-5 (`parent-level-display-canonical-reads`):
 CP-2 (`ingestion-manifest-reconcile`):
   No eid-layer dependency on CP-1 per investigation §8.2. Can
   ship in parallel with CP-4a.
+
+## MERGE op-shape extension — Adjustment 1 (close-on-collision in Op G)
+
+Added 2026-05-05 with `cp-5-adams-duplicates` (Adams cohort,
+first P0 pre-execution PR per CP-5 comprehensive remediation).
+
+cp-4a precedent (PR #256, Vanguard/PIMCO MERGE) established
+the 8-op shape (A, B, B', C, E, F, G, H) but did NOT
+encounter PK collisions on `entity_aliases` re-point because
+Vanguard/PIMCO each had at most 1 duplicate per canonical and
+the alias_names were distinct.
+
+Adams duplicates (PR `cp-5-adams-duplicates`, 7 pairs across 3
+canonicals) encountered PK collisions where
+`(canonical, alias_name, alias_type, valid_from)` already
+exists. Two cases:
+
+  1. **Direct collision**: duplicate's alias is identical to
+     canonical's existing alias. Pair 1 (4909 ← 19509) hits
+     this — both eids hold `('Adams Asset Advisors, LLC',
+     'brand', 2000-01-01)` with `is_preferred=TRUE`.
+  2. **Chained collision**: pair N's duplicate alias is
+     identical to pair M's just-re-pointed alias (M < N,
+     same canonical). Pairs 3/4 (canonical 2961) and pairs
+     6/7 (canonical 6471) hit this — pair 2 / pair 5
+     re-point first, then 3/4 / 6/7 collide against the
+     just-re-pointed mixed-case alias.
+
+`entity_aliases` PK is `(entity_id, alias_name, alias_type,
+valid_from)`. Re-pointing `entity_id` cannot be retried or
+salvaged once a PK conflict exists.
+
+### Adjustment 1 — Op G extended logic
+
+Per duplicate-side alias D, before re-pointing:
+
+  collision = EXISTS (
+    SELECT 1 FROM entity_aliases
+    WHERE entity_id = canonical_eid
+      AND alias_name = D.alias_name
+      AND alias_type = D.alias_type
+      AND valid_from = D.valid_from
+      AND valid_to = DATE '9999-12-31'
+  )
+
+  IF collision:
+    Branch CLOSE-ON-COLLISION:
+      UPDATE entity_aliases SET valid_to = CURRENT_DATE
+      WHERE entity_id = duplicate_eid
+        AND alias_name = D.alias_name
+        AND alias_type = D.alias_type
+        AND valid_from = D.valid_from
+        AND valid_to = DATE '9999-12-31';
+      (Canonical's existing alias preserved; duplicate's
+      redundant. No demotion changes on canonical.)
+
+  ELSE:
+    Branch RE-POINT (cp-4a precedent + scoped preferred-
+    conflict resolution):
+      IF D.is_preferred AND canonical has open
+      `is_preferred=TRUE` alias of same `alias_type` AND
+      `alias_name != D.alias_name`:
+        Demote those canonical preferred=TRUE rows (set
+        `is_preferred=FALSE`).
+      UPDATE entity_aliases SET entity_id = canonical_eid
+      WHERE entity_id = duplicate_eid
+        AND alias_name = D.alias_name
+        AND alias_type = D.alias_type
+        AND valid_from = D.valid_from
+        AND valid_to = DATE '9999-12-31';
+
+This is a SUPERSET of cp-4a Op G: cases that didn't collide
+in cp-4a still re-point as before; cases that would collide
+(which cp-4a couldn't have hit at scale) close cleanly.
+
+### Pair processing order
+
+Chained-collision pairs require pair-ordering within a single
+transaction. Process pairs by `(canonical_eid, pair_id)`
+ascending so pair M re-points before pair N re-points/closes
+against pair M's row. Demotion in the RE-POINT branch is
+scoped to `alias_name != D.alias_name` so pair N's
+re-pointed-by-M row is not unset when pair N processes its
+own (now-collision-bound) duplicate.
+
+### Scope of canonical state
+
+Adjustment 1 is canonical for all future MERGE work:
+
+  - cp-5-cycle-truncated-merges (21 pairs across 2-3 batched
+    PRs, CP-5 P0 pre-execution scope) — chained-collision
+    expected throughout;
+  - hypothetical institutional-merge passes that group
+    multiple eid families;
+  - any cp-4a/4b/4c/cp-5 successor merges where >1 duplicate
+    per canonical exists or alias_names are not distinct.
+
+Single-duplicate-per-canonical merges (cp-4a Vanguard/PIMCO)
+are unaffected — collision check returns false and the
+RE-POINT branch matches cp-4a literally.
+
+### References
+
+- PR #256 (cp-4a precedent — `inst-eid-bridge-fix-aliases`)
+- PR `cp-5-adams-duplicates` (Adams cohort, first
+  Adjustment 1 application, 7 pairs)
+- `docs/findings/cp-5-adams-duplicates-results.md` (concrete
+  per-pair op counts, including `op_g_closed` distinct from
+  `op_g_repointed`)

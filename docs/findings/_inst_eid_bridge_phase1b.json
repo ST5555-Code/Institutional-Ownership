@@ -3,7 +3,7 @@
   "filer_eid_count": 9121,
   "invisible_brand_count": 1223,
   "invisible_brand_rows": 6661809,
-  "invisible_brand_aum_usd": 25256173335561.047,
+  "invisible_brand_aum_usd": 25256173335561.055,
   "name_collision_norm_name_count": 973,
   "invisible_with_open_relationship": 496,
   "name_match_summary": {
@@ -21,7 +21,7 @@
       "recommended_action": "BRIDGE",
       "confidence": "HIGH",
       "brand_count": 496,
-      "fund_aum_usd": 24311264692934.14,
+      "fund_aum_usd": 24311264692934.133,
       "fund_rows": 4388529
     },
     {
@@ -37,7 +37,7 @@
       "recommended_action": "FILER_TO_BRAND",
       "confidence": "MEDIUM",
       "brand_count": 3,
-      "fund_aum_usd": 1622556310.9500003,
+      "fund_aum_usd": 1622556310.95,
       "fund_rows": 289
     },
     {
