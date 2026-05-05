@@ -1,0 +1,8 @@
+pair_id,canonical_eid,duplicate_eid,canonical_name,duplicate_name,duplicate_aum_b,canonical_aum_pre_b,canonical_aum_post_expected_b,fh_dup_rows,op_b_repoint_count,op_b_prime_count,op_c_count,op_e_relationship_id,op_f_count,op_g_alias_count,op_h_total_count
+2,2961,20213,"ADAMS DIVERSIFIED EQUITY FUND, INC.","Adams Diversified Equity Fund, Inc.",0.0000,8.8260,8.8260,0,0,1,0,TBD,2,1,0
+3,2961,20214,"ADAMS DIVERSIFIED EQUITY FUND, INC.","Adams Diversified Equity Fund, Inc.",0.0000,8.8260,8.8260,0,0,1,0,TBD,2,1,0
+4,2961,20215,"ADAMS DIVERSIFIED EQUITY FUND, INC.","Adams Diversified Equity Fund, Inc.",0.0000,8.8260,8.8260,0,0,1,0,TBD,2,1,0
+1,4909,19509,"Adams Asset Advisors, LLC","Adams Asset Advisors, LLC",0.0293,0.0000,0.0293,20,1,1,1,TBD,2,1,6
+5,6471,20210,"ADAMS NATURAL RESOURCES FUND, INC.","Adams Natural Resources Fund, Inc.",0.0000,1.9650,1.9650,0,0,1,0,TBD,2,1,0
+6,6471,20211,"ADAMS NATURAL RESOURCES FUND, INC.","Adams Natural Resources Fund, Inc.",0.0000,1.9650,1.9650,0,0,1,0,TBD,2,1,0
+7,6471,20212,"ADAMS NATURAL RESOURCES FUND, INC.","Adams Natural Resources Fund, Inc.",0.0000,1.9650,1.9650,0,0,1,0,TBD,2,1,0
