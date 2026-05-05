@@ -613,3 +613,76 @@ PR. Splits (1) Guard 1 into 1a/1b/1c (column-independent), and
   trivially identical to one-step shape since no THIRDs at risk)
 - `docs/findings/cp-5-cycle-truncated-merges-results.md` §0,
   §6, §7.4
+
+## Two-relationship-layer coexistence pattern for umbrella firms
+
+**Capital Group precedent (PR `cp-5-capital-group-umbrella`,
+2026-05-05):** umbrella firms can carry TWO independent
+relationship layers in `entity_relationships`, both canonical:
+
+- **`fund_sponsor` / `advisory` / `parent_bridge`** (or
+  `parent_bridge_sync`, `family_name_alias_match`) — the
+  **sponsor-brand layer**. Encodes fund-sponsor / brand-issuer
+  relationships, typically populated by the N-CEN /
+  parent_bridge_sync loader. Consumed by sponsor-view queries
+  (e.g. "which funds does this brand issue?").
+
+- **`wholly_owned` / `control`** with the cp-4b/cp-5 author
+  source signature — the **corporate ownership layer**.
+  Authored deliberately by inst-eid-bridge cohorts (CP-4a,
+  CP-4b carve-out, CP-5 capital-group-umbrella). Consumed by
+  the `decision_maker_v1` institutional rollup queries
+  (CP-5 read layer / Method A view definition).
+
+**Both layers may coexist on the same `(parent, child)` pair**
+— they answer different questions, the same way the Bundle C
+§7.2 semantic split applies to two-canonical-classifications
+on the rollup-type axis.
+
+**Concrete example.** Post-cp-5-capital-group-umbrella, the
+pair `(parent=12, child=7125)` carries:
+
+| relationship_id | relationship_type | control_type | source                                                                      |
+|----------------:|-------------------|--------------|-----------------------------------------------------------------------------|
+|             358 | `fund_sponsor`    | `advisory`   | `parent_bridge`                                                             |
+|          20,842 | `wholly_owned`    | `control`    | `CP-5-pre:cp-5-capital-group-umbrella\|arm=Capital Research Global Investors\|Path A\|coexists_with_parent_bridge_layer\|public_record_verified=cp-5-bundle-b-discovery.md_§1.3` |
+
+Both rows are valid, both serve distinct queries, neither is
+redundant.
+
+### Implications
+
+- **Future MERGE work on umbrella firms must preserve both layers.**
+  Do NOT collapse them or treat one as redundant. A MERGE Op G
+  collision detector that finds a same-`(parent, child)` row in
+  the survivor with a *different* `relationship_type` should
+  treat both rows as keepers, not collide.
+
+- **Bridge-author guards must check shape-specific existence,
+  not pair-level existence.** The cp-5-capital-group-umbrella
+  helper checks for existing `wholly_owned`/`control` rows
+  specifically (Step 1 / `existing_control_bridge_count`), not
+  for any open row on the pair — otherwise authoring would
+  spuriously abort whenever a sponsor-layer row exists.
+
+- **Path A "umbrella exists" check is shape-aware.** Pre-Phase 1
+  evidence that an umbrella eid exists with sponsor-brand-layer
+  edges to its arms does NOT count as "Path A partially
+  complete" for CP-4b-shape control bridges; the ownership
+  layer is independent and may need to be authored even when
+  the sponsor layer is fully wired.
+
+### References
+
+- PR `cp-5-capital-group-umbrella` (this pattern's first
+  formal application across 3 sibling arms with explicit chat
+  acknowledgment).
+- `docs/findings/cp-5-capital-group-umbrella-results.md` §1.3,
+  §3.1, §6.
+- Bundle B §1.3 — Capital Group umbrella case study (the
+  sponsor-layer 87 rows on eid=12 were not visible in the
+  Bundle B snapshot; pattern formalization comes from
+  reconciling that gap).
+- ROADMAP P3 follow-up: `parent-bridge-mechanism-audit` —
+  read-only scoping of the sponsor-brand layer across all
+  firms.
