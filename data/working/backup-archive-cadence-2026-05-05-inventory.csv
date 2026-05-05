@@ -1,0 +1,12 @@
+path,type,size_human,mtime,disposition
+data/backups/13f_backup_20260505_165855,full_db_export_dir,3.3G,2026-05-05 16:59,KEEP_LOCAL
+data/backups/13f_backup_20260505_142125,full_db_export_dir,3.2G,2026-05-05 14:21,KEEP_LOCAL
+data/backups/13f_backup_20260505_124352,full_db_export_dir,3.2G,2026-05-05 12:44,KEEP_LOCAL
+data/backups/13f_backup_20260505_071643,full_db_export_dir,3.2G,2026-05-05 07:16,ARCHIVE
+data/backups/13f_backup_20260505_063809,full_db_export_dir,3.2G,2026-05-05 06:38,ARCHIVE
+data/backups/13f_backup_20260503_121103,full_db_export_dir,3.2G,2026-05-03 12:11,ARCHIVE
+data/backups/13f_backup_20260503_110616,full_db_export_dir,3.2G,2026-05-03 11:06,ARCHIVE
+data/backups/13f_backup_20260503_082307,full_db_export_dir,3.2G,2026-05-03 08:23,ARCHIVE
+data/backups/peer_rotation_peer_rotation_empty_20260505_210801.duckdb,pipeline_snapshot_file,277M,2026-05-05 17:09,ARCHIVE
+data/backups/peer_rotation_peer_rotation_empty_20260505_111826.duckdb,pipeline_snapshot_file,269M,2026-05-05 07:19,ARCHIVE
+data/backups/13f.20260505_155457.pre_loader_gap_sub1.duckdb,single_file_full_db,22G,2026-05-05 15:54,DELETED_DIRECT_REDUNDANT
