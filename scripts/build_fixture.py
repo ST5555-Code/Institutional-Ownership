@@ -236,7 +236,6 @@ def main():
         UNION SELECT entity_id           FROM {fh_src} WHERE entity_id           IS NOT NULL
         UNION SELECT rollup_entity_id    FROM {fh_src} WHERE rollup_entity_id    IS NOT NULL
         UNION SELECT dm_entity_id        FROM {fh_src} WHERE dm_entity_id        IS NOT NULL
-        UNION SELECT dm_rollup_entity_id FROM {fh_src} WHERE dm_rollup_entity_id IS NOT NULL
     """
 
     con.execute(f"""

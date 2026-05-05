@@ -58,12 +58,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 _ROLLUP_SPECS = [
-    # (rollup_type label, holdings_v2 rid col, holdings_v2 rname col,
-    #  fund_holdings_v2 rid col)
-    ("economic_control_v1", "rollup_entity_id",    "rollup_name",
-     "rollup_entity_id"),
-    ("decision_maker_v1",   "dm_rollup_entity_id", "dm_rollup_name",
-     "dm_rollup_entity_id"),
+    # (rollup_type label, holdings_v2 rid col, holdings_v2 rname col)
+    ("economic_control_v1", "rollup_entity_id", "rollup_name"),
+    ("decision_maker_v1",   "dm_rollup_entity_id", "dm_rollup_name"),
 ]
 
 
@@ -217,7 +214,6 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
     rollup_type: str,
     rid_col: str,
     rname_col: str,
-    nport_rid_col: str,
 ) -> int:
     """DELETE+INSERT one (quarter × worldview) of summary_by_parent."""
     con.execute(
@@ -225,6 +221,34 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
         "WHERE quarter = ? AND rollup_type = ?",
         [quarter, rollup_type],
     )
+    if rollup_type == 'decision_maker_v1':
+        nport_cte = """
+        nport_per_rollup AS (
+            SELECT erh.rollup_entity_id AS rid,
+                   SUM(fh.market_value_usd) AS total_nport_aum
+            FROM fund_holdings_v2 fh
+            JOIN latest_per_series l
+              ON l.series_id = fh.series_id
+             AND l.latest_rm = fh.report_month
+            JOIN entity_rollup_history erh
+              ON erh.entity_id = fh.entity_id
+             AND erh.rollup_type = 'decision_maker_v1'
+             AND erh.valid_to = DATE '9999-12-31'
+            WHERE fh.quarter = ? AND fh.is_latest = TRUE
+            GROUP BY erh.rollup_entity_id
+        ),"""
+    else:
+        nport_cte = f"""
+        nport_per_rollup AS (
+            SELECT fh.rollup_entity_id AS rid,
+                   SUM(fh.market_value_usd) AS total_nport_aum
+            FROM fund_holdings_v2 fh
+            JOIN latest_per_series l
+              ON l.series_id = fh.series_id
+             AND l.latest_rm = fh.report_month
+            WHERE fh.quarter = ? AND fh.is_latest = TRUE
+            GROUP BY fh.rollup_entity_id
+        ),"""
     con.execute(f"""
         INSERT INTO summary_by_parent (
             quarter, rollup_type, rollup_entity_id,
@@ -239,16 +263,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
             WHERE quarter = ? AND is_latest = TRUE
             GROUP BY series_id
         ),
-        nport_per_rollup AS (
-            SELECT fh.{nport_rid_col} AS rid,
-                   SUM(fh.market_value_usd) AS total_nport_aum
-            FROM fund_holdings_v2 fh
-            JOIN latest_per_series l
-              ON l.series_id = fh.series_id
-             AND l.latest_rm = fh.report_month
-            WHERE fh.quarter = ? AND fh.is_latest = TRUE
-            GROUP BY fh.{nport_rid_col}
-        ),
+        {nport_cte}
         parent_13f AS (
             SELECT
                 h.{rid_col}             AS rid,
@@ -306,7 +321,7 @@ def _run_dry(con, log: _Tee, quarters: list[str]) -> None:
         grand_t += n_t
         log.line(f"{q:10s} {'summary_by_ticker':22s} {'(rollup-agnostic)':22s} "
                  f"{n_t:>16,}")
-        for rollup_type, rid_col, _, _ in _ROLLUP_SPECS:
+        for rollup_type, rid_col, _ in _ROLLUP_SPECS:
             n_p = _project_summary_by_parent(con, q, rid_col)
             grand_p += n_p
             log.line(f"{q:10s} {'summary_by_parent':22s} {rollup_type:22s} "
@@ -335,10 +350,10 @@ def _run_write(con, log: _Tee, quarters: list[str]) -> None:
 
     log.line("Building summary_by_parent (per quarter × per worldview)")
     for q in quarters:
-        for rollup_type, rid_col, rname_col, nport_rid_col in _ROLLUP_SPECS:
+        for rollup_type, rid_col, rname_col in _ROLLUP_SPECS:
             t0 = time.time()
             n = _build_summary_by_parent(
-                con, q, rollup_type, rid_col, rname_col, nport_rid_col)
+                con, q, rollup_type, rid_col, rname_col)
             con.execute("CHECKPOINT")
             log.line(f"  {q}  {rollup_type:22s}  {n:>10,} rows  "
                      f"({time.time()-t0:.1f}s, CHECKPOINT)")

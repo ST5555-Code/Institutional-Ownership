@@ -79,9 +79,15 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
         ),
         fund_parents AS (
             SELECT DISTINCT name FROM (
-                SELECT dm_rollup_name AS name FROM fund_holdings_v2
-                WHERE quarter = '{quarter}' AND is_latest = TRUE
-                  AND market_value_usd > 0 AND dm_rollup_name IS NOT NULL
+                SELECT e.canonical_name AS name
+                FROM fund_holdings_v2 fh2
+                JOIN entity_rollup_history erh
+                  ON erh.entity_id = fh2.entity_id
+                 AND erh.rollup_type = 'decision_maker_v1'
+                 AND erh.valid_to = DATE '9999-12-31'
+                JOIN entities e ON e.entity_id = erh.rollup_entity_id
+                WHERE fh2.quarter = '{quarter}' AND fh2.is_latest = TRUE
+                  AND fh2.market_value_usd > 0
                 UNION
                 SELECT family_name AS name FROM fund_holdings_v2
                 WHERE quarter = '{quarter}' AND is_latest = TRUE
@@ -265,7 +271,14 @@ def get_cross_ownership_fund_detail(tickers, institution, anchor, quarter, con):
         LEFT JOIN fund_universe fu ON fu.series_id = fh.series_id
         WHERE fh.quarter = ?
           AND fh.is_latest = TRUE
-          AND (fh.dm_rollup_name = ? OR fh.family_name = ?)
+          AND (fh.family_name = ? OR EXISTS (
+              SELECT 1 FROM entity_rollup_history erh2
+              JOIN entities e2 ON e2.entity_id = erh2.rollup_entity_id
+              WHERE erh2.entity_id = fh.entity_id
+                AND erh2.rollup_type = 'decision_maker_v1'
+                AND erh2.valid_to = DATE '9999-12-31'
+                AND e2.canonical_name = ?
+          ))
           AND fh.ticker IN ({placeholders})
           AND fh.market_value_usd > 0
         GROUP BY fh.fund_name, fh.series_id, fh.ticker, fu.fund_strategy
@@ -519,7 +532,14 @@ def get_overlap_institution_detail(subject, second, institution, quarter, con):
             FROM fund_holdings_v2 fh
             WHERE fh.quarter = ?
               AND fh.is_latest = TRUE
-              AND (fh.dm_rollup_name = ? OR fh.family_name = ?)
+              AND (fh.family_name = ? OR EXISTS (
+                  SELECT 1 FROM entity_rollup_history erh2
+                  JOIN entities e2 ON e2.entity_id = erh2.rollup_entity_id
+                  WHERE erh2.entity_id = fh.entity_id
+                    AND erh2.rollup_type = 'decision_maker_v1'
+                    AND erh2.valid_to = DATE '9999-12-31'
+                    AND e2.canonical_name = ?
+              ))
               AND fh.ticker IN (?, ?)
         ),
         subj_pos AS (

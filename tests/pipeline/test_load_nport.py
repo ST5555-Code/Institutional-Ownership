@@ -312,7 +312,7 @@ def test_target_table_spec_excludes_row_id(pipeline):
         "cusip", "market_value_usd", "pct_of_nav",
         "is_latest", "loaded_at", "backfill_quality",
         "entity_id", "rollup_entity_id",
-        "dm_entity_id", "dm_rollup_entity_id", "dm_rollup_name",
+        "dm_entity_id",
         "accession_number",
     ):
         assert required in col_names, f"missing {required}"
@@ -791,9 +791,8 @@ def test_inf52_pre_promote_enrichment_populates_entity_columns(
     pipeline, tmp_dbs,
 ):
     """_enrich_staging_entities must populate entity_id /
-    rollup_entity_id / dm_entity_id / dm_rollup_entity_id /
-    dm_rollup_name on staging.fund_holdings_v2 BEFORE super().promote()
-    runs the int-23 downgrade-refusal guard."""
+    rollup_entity_id / dm_entity_id on staging.fund_holdings_v2 BEFORE
+    super().promote() runs the int-23 downgrade-refusal guard."""
     # Seed staging holdings + run parse() to create typed table with
     # NULL entity columns.
     _seed_staging(
@@ -810,17 +809,16 @@ def test_inf52_pre_promote_enrichment_populates_entity_columns(
     # Confirm pre-state: NULLs everywhere.
     staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
     try:
-        ent, rec, dm_e, dm_r, dm_n = staging_con.execute(
-            "SELECT entity_id, rollup_entity_id, dm_entity_id, "
-            "       dm_rollup_entity_id, dm_rollup_name "
+        ent, rec, dm_e = staging_con.execute(
+            "SELECT entity_id, rollup_entity_id, dm_entity_id "
             "FROM fund_holdings_v2"
         ).fetchone()
     finally:
         staging_con.close()
-    assert (ent, rec, dm_e, dm_r, dm_n) == (None, None, None, None, None)
+    assert (ent, rec, dm_e) == (None, None, None)
 
     # Seed prod entity tables — series_id S000001 → entity_id 42 with
-    # EC rollup → 100, DM rollup → 200, dm_rollup_name = "Test Family".
+    # EC rollup → 100.
     prod_con = duckdb.connect(tmp_dbs["prod"])
     try:
         prod_con.execute(
@@ -830,14 +828,6 @@ def test_inf52_pre_promote_enrichment_populates_entity_columns(
         prod_con.execute(
             "INSERT INTO entity_rollup_history VALUES "
             "(42, 'economic_control_v1', 100, DATE '9999-12-31')"
-        )
-        prod_con.execute(
-            "INSERT INTO entity_rollup_history VALUES "
-            "(42, 'decision_maker_v1', 200, DATE '9999-12-31')"
-        )
-        prod_con.execute(
-            "INSERT INTO entity_aliases VALUES "
-            "(100, 'Test Family', TRUE, DATE '9999-12-31')"
         )
         prod_con.execute("CHECKPOINT")
 
@@ -851,9 +841,8 @@ def test_inf52_pre_promote_enrichment_populates_entity_columns(
     # Confirm post-state: entity columns populated.
     staging_con = duckdb.connect(tmp_dbs["staging"], read_only=True)
     try:
-        ent, rec, dm_e, dm_r, dm_n = staging_con.execute(
-            "SELECT entity_id, rollup_entity_id, dm_entity_id, "
-            "       dm_rollup_entity_id, dm_rollup_name "
+        ent, rec, dm_e = staging_con.execute(
+            "SELECT entity_id, rollup_entity_id, dm_entity_id "
             "FROM fund_holdings_v2"
         ).fetchone()
     finally:
@@ -861,8 +850,6 @@ def test_inf52_pre_promote_enrichment_populates_entity_columns(
     assert ent == 42
     assert rec == 100
     assert dm_e == 42
-    assert dm_r == 200
-    assert dm_n == "Test Family"
 
 
 def test_inf52_pre_promote_enrichment_no_op_on_empty_set(pipeline):
