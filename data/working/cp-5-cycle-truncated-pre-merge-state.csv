@@ -1,0 +1,21 @@
+pair_id,side,entity_id,entity_name,entity_type,cik,h_v2_rows,h_v2_aum_b,fh_rollup_rows,fh_rollup_aum_b,fh_dmrollup_rows,fh_entity_id_rows,open_ech,open_erh_from,open_erh_at,open_aliases,open_rel_parent,open_rel_child,rollup_self_rows
+1,canonical,22,Goldman Sachs Asset Management,institution,,0,0.0000,124984,782.6917,112744,0,1,2,258,2,58,1,2
+1,duplicate,17941,"Goldman Sachs Asset Management, L.P.",institution,,0,0.0000,25067,46.5008,53380,0,1,2,64,1,132,1,0
+2,canonical,58,Lazard Asset Management,institution,,0,0.0000,14942,110.4762,14942,0,1,2,84,2,11,1,2
+2,duplicate,18070,Lazard Asset Management LLC,institution,,0,0.0000,0,0.0000,5158,0,1,2,6,1,41,1,0
+3,canonical,70,Ariel Investments,institution,,0,0.0000,1366,102.9026,1366,0,1,2,18,2,2,1,2
+3,duplicate,18357,"Ariel Investments, LLC",institution,,0,0.0000,0,0.0000,0,0,1,2,0,1,7,1,0
+4,canonical,893,"LORD, ABBETT & CO. LLC",institution,0000728100,2450,0.1253,23430,283.9039,23430,0,1,2,96,1,1,1,2
+4,duplicate,17916,"Lord, Abbett & Co. LLC",institution,,0,0.0000,0,0.0000,1832,0,1,2,1,1,53,1,0
+5,canonical,1600,"Financial Partners Group, Inc",institution,0001731169,838,3.0387,6778,11.6905,6778,0,1,2,52,1,1,1,2
+5,duplicate,9722,"Financial Partners Group, LLC",institution,0001965246,169,0.5067,0,0.0000,0,0,1,2,0,1,1,1,0
+6,canonical,2562,"Equitable Investment Management, LLC",institution,0001965856,0,0.0000,231561,564.6430,53433,0,1,2,175,1,9,1,2
+6,duplicate,9668,"Equitable Investment Management Group, LLC",institution,0001536185,0,0.0000,0,0.0000,0,0,1,2,0,1,111,1,0
+7,canonical,2925,THORNBURG INVESTMENT MANAGEMENT INC,institution,0001145020,711,94.9091,13242,152.4087,13242,0,1,2,64,1,5,1,2
+7,duplicate,18537,"Thornburg Investment Management, Inc.",institution,,0,0.0000,0,0.0000,0,0,1,2,0,1,27,1,0
+8,canonical,7558,Fayez Sarofim & Co,institution,0000937729,2280,166.6704,233,0.4574,233,0,1,2,10,1,1,1,2
+8,duplicate,18029,"Fayez Sarofim & Co., LLC",institution,,0,0.0000,795,2.1038,1742,0,1,2,9,1,17,1,0
+9,canonical,7655,"LEAVELL INVESTMENT MANAGEMENT, INC.",institution,0000924181,2304,9.0290,830,0.8956,830,0,1,2,8,1,1,1,2
+9,duplicate,18649,"Leavell Investment Management, Inc.",institution,,0,0.0000,0,0.0000,0,0,1,2,0,1,3,1,0
+10,canonical,10501,Stonebridge Capital Advisors LLC,institution,0001600035,853,5.3898,822,0.9363,330,0,1,2,11,1,1,1,2
+10,duplicate,19846,"Stonebridge Capital Advisors, LLC",institution,,0,0.0000,1042,2.3406,1042,0,1,2,8,1,9,1,0

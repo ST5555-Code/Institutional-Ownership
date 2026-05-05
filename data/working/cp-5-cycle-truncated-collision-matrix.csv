@@ -1,0 +1,11 @@
+pair_id,canonical_eid,duplicate_eid,alias_name,alias_type,valid_from,is_preferred,category
+1,22,17941,"Goldman Sachs Asset Management, L.P.",brand,2000-01-01,True,WILL_RE_POINT
+2,58,18070,Lazard Asset Management LLC,brand,2000-01-01,True,WILL_RE_POINT
+3,70,18357,"Ariel Investments, LLC",brand,2000-01-01,True,WILL_RE_POINT
+4,893,17916,"Lord, Abbett & Co. LLC",brand,2000-01-01,True,WILL_RE_POINT
+5,1600,9722,"Financial Partners Group, LLC",brand,2000-01-01,True,WILL_RE_POINT
+6,2562,9668,"Equitable Investment Management Group, LLC",brand,2000-01-01,True,WILL_RE_POINT
+7,2925,18537,"Thornburg Investment Management, Inc.",brand,2000-01-01,True,WILL_RE_POINT
+8,7558,18029,"Fayez Sarofim & Co., LLC",brand,2000-01-01,True,WILL_RE_POINT
+9,7655,18649,"Leavell Investment Management, Inc.",brand,2000-01-01,True,WILL_RE_POINT
+10,10501,19846,"Stonebridge Capital Advisors, LLC",brand,2000-01-01,True,WILL_RE_POINT
