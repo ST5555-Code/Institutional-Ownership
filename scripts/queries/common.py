@@ -74,6 +74,41 @@ def _rollup_name_sql(alias='h', rollup_type='economic_control_v1'):
     return f"{alias}.rollup_name" if alias else "rollup_name"
 
 
+def top_parent_holdings_join(alias='fh'):
+    """Return SQL JOIN fragment that maps a fund_holdings_v2 row to its
+    top-parent entity via decision_maker_v1 ERH + inst_to_top_parent
+    view (migration 027 — CP-5.1 foundation).
+
+    Two JOINs:
+      1. entity_rollup_history erh_top — resolves fund eid to its
+         decision-maker rollup entity_id (Method A canonical, PR #280).
+      2. inst_to_top_parent ittp_top — climbs the rollup target up the
+         ownership graph (control/mutual/merge edges only) to the
+         top-parent entity_id.
+
+    After the JOIN, callers reference ``ittp_top.top_parent_entity_id``
+    for the final attribution. Both joined aliases (``erh_top`` and
+    ``ittp_top``) are stable for caller WHERE/GROUP BY use.
+
+    ``alias`` is the fund_holdings_v2 table alias (default 'fh'). For
+    13F (holdings_v2) callers, no ERH JOIN is needed: JOIN
+    ``inst_to_top_parent`` directly on ``h.entity_id``.
+
+    The view name retains the historical ``inst_`` prefix even though
+    the climb anchor includes all entity types (institutions, funds,
+    other) — see docs/findings/cp-5-1b-helper-and-view-results.md
+    Section 3 for the anchor-shape rationale.
+    """
+    return (
+        " JOIN entity_rollup_history erh_top "
+        f"ON erh_top.entity_id = {alias}.entity_id "
+        "AND erh_top.rollup_type = 'decision_maker_v1' "
+        "AND erh_top.valid_to = DATE '9999-12-31' "
+        "JOIN inst_to_top_parent ittp_top "
+        "ON ittp_top.entity_id = erh_top.rollup_entity_id "
+    )
+
+
 def _rollup_eid_sql(alias='h', rollup_type='economic_control_v1'):
     """Return SQL expression for rollup entity_id.
 
