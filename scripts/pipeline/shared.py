@@ -445,13 +445,16 @@ def bulk_enrich_bo_filers(
       * entity_id           ← entity_identifiers.entity_id (the filer)
       * rollup_entity_id    ← economic_control_v1 rollup target
       * rollup_name         ← preferred alias of ec.rollup_entity_id
-      * dm_rollup_entity_id ← decision_maker_v1 rollup target
-      * dm_rollup_name      ← preferred alias of dm.rollup_entity_id
 
     Unmatched filers (no active entity_identifiers row of type='cik')
-    leave all five columns NULL. Rows where a filer resolves but lacks
-    a rollup_history row in one worldview get entity_id set and that
-    worldview's rollup columns NULL.
+    leave all three columns NULL. Rows where a filer resolves but lacks
+    an economic_control_v1 rollup_history row get entity_id set and
+    rollup columns NULL.
+
+    Note: ``dm_rollup_entity_id`` and ``dm_rollup_name`` were dropped
+    from ``beneficial_ownership_v2`` in PR #297 (migration 026); this
+    helper no longer writes them. DM-rollup reads should use Method A
+    (read-time JOIN against ``entity_rollup_history``).
 
     Returns the count of rows actually updated (`changes()` from DuckDB).
     """
@@ -475,33 +478,21 @@ def bulk_enrich_bo_filers(
             UPDATE beneficial_ownership_v2 AS b
                SET entity_id           = e.entity_id,
                    rollup_entity_id    = e.ec_rollup_entity_id,
-                   rollup_name         = e.ec_rollup_name,
-                   dm_rollup_entity_id = e.dm_rollup_entity_id,
-                   dm_rollup_name      = e.dm_rollup_name
+                   rollup_name         = e.ec_rollup_name
               FROM (
                   SELECT ei.identifier_value    AS filer_cik,
                          ei.entity_id           AS entity_id,
                          ec.rollup_entity_id    AS ec_rollup_entity_id,
-                         ea_ec.alias_name       AS ec_rollup_name,
-                         dm.rollup_entity_id    AS dm_rollup_entity_id,
-                         ea_dm.alias_name       AS dm_rollup_name
+                         ea_ec.alias_name       AS ec_rollup_name
                     FROM entity_identifiers ei
                     LEFT JOIN entity_rollup_history ec
                            ON ec.entity_id = ei.entity_id
                           AND ec.rollup_type = 'economic_control_v1'
                           AND ec.valid_to = DATE '9999-12-31'
-                    LEFT JOIN entity_rollup_history dm
-                           ON dm.entity_id = ei.entity_id
-                          AND dm.rollup_type = 'decision_maker_v1'
-                          AND dm.valid_to = DATE '9999-12-31'
                     LEFT JOIN entity_aliases ea_ec
                            ON ea_ec.entity_id = ec.rollup_entity_id
                           AND ea_ec.is_preferred = TRUE
                           AND ea_ec.valid_to = DATE '9999-12-31'
-                    LEFT JOIN entity_aliases ea_dm
-                           ON ea_dm.entity_id = dm.rollup_entity_id
-                          AND ea_dm.is_preferred = TRUE
-                          AND ea_dm.valid_to = DATE '9999-12-31'
                    WHERE ei.identifier_type = 'cik'
                      AND ei.valid_to = DATE '9999-12-31'
               ) AS e
@@ -515,33 +506,21 @@ def bulk_enrich_bo_filers(
             UPDATE beneficial_ownership_v2 AS b
                SET entity_id           = e.entity_id,
                    rollup_entity_id    = e.ec_rollup_entity_id,
-                   rollup_name         = e.ec_rollup_name,
-                   dm_rollup_entity_id = e.dm_rollup_entity_id,
-                   dm_rollup_name      = e.dm_rollup_name
+                   rollup_name         = e.ec_rollup_name
               FROM (
                   SELECT ei.identifier_value    AS filer_cik,
                          ei.entity_id           AS entity_id,
                          ec.rollup_entity_id    AS ec_rollup_entity_id,
-                         ea_ec.alias_name       AS ec_rollup_name,
-                         dm.rollup_entity_id    AS dm_rollup_entity_id,
-                         ea_dm.alias_name       AS dm_rollup_name
+                         ea_ec.alias_name       AS ec_rollup_name
                     FROM entity_identifiers ei
                     LEFT JOIN entity_rollup_history ec
                            ON ec.entity_id = ei.entity_id
                           AND ec.rollup_type = 'economic_control_v1'
                           AND ec.valid_to = DATE '9999-12-31'
-                    LEFT JOIN entity_rollup_history dm
-                           ON dm.entity_id = ei.entity_id
-                          AND dm.rollup_type = 'decision_maker_v1'
-                          AND dm.valid_to = DATE '9999-12-31'
                     LEFT JOIN entity_aliases ea_ec
                            ON ea_ec.entity_id = ec.rollup_entity_id
                           AND ea_ec.is_preferred = TRUE
                           AND ea_ec.valid_to = DATE '9999-12-31'
-                    LEFT JOIN entity_aliases ea_dm
-                           ON ea_dm.entity_id = dm.rollup_entity_id
-                          AND ea_dm.is_preferred = TRUE
-                          AND ea_dm.valid_to = DATE '9999-12-31'
                    WHERE ei.identifier_type = 'cik'
                      AND ei.valid_to = DATE '9999-12-31'
                      AND ei.identifier_value IN ({placeholders})
@@ -563,9 +542,11 @@ def rebuild_beneficial_ownership_current(con: Any) -> int:
     """Rebuild beneficial_ownership_current from beneficial_ownership_v2.
 
     DROP + CREATE AS SELECT — picks up any BO v2 columns added via
-    migration. Carries the five entity columns (entity_id,
-    rollup_entity_id, rollup_name, dm_rollup_entity_id, dm_rollup_name)
-    through so the L4 table matches the enriched L3 shape.
+    migration. Carries the three entity columns (entity_id,
+    rollup_entity_id, rollup_name) through so the L4 table matches the
+    enriched L3 shape. ``dm_rollup_entity_id`` / ``dm_rollup_name``
+    were dropped from L3 in PR #297 (migration 026); use Method A for
+    DM rollup reads.
 
     Partitions by (filer_cik, subject_ticker), keeps the row with the
     latest filing_date per partition, annotates with amendment_count

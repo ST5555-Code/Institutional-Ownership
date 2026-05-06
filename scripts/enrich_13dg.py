@@ -5,8 +5,9 @@ Owns the on-demand, post-promote enrichment pass for:
   - beneficial_ownership_v2.entity_id
   - beneficial_ownership_v2.rollup_entity_id
   - beneficial_ownership_v2.rollup_name
-  - beneficial_ownership_v2.dm_rollup_entity_id
-  - beneficial_ownership_v2.dm_rollup_name
+
+(``dm_rollup_entity_id`` / ``dm_rollup_name`` were dropped in PR #297 /
+migration 026 — DM rollup is read-time via Method A.)
 
 Then rebuilds `beneficial_ownership_current` so the L4 view inherits the
 refreshed entity columns.
@@ -59,8 +60,6 @@ def _coverage(con) -> dict:
                COUNT(entity_id)             AS with_entity_id,
                COUNT(rollup_entity_id)      AS with_rollup,
                COUNT(rollup_name)           AS with_rollup_name,
-               COUNT(dm_rollup_entity_id)   AS with_dm_rollup,
-               COUNT(dm_rollup_name)        AS with_dm_rollup_name,
                COUNT(DISTINCT filer_cik)    AS distinct_filers
         FROM beneficial_ownership_v2
         """
@@ -70,9 +69,7 @@ def _coverage(con) -> dict:
         "with_entity_id": row[1],
         "with_rollup": row[2],
         "with_rollup_name": row[3],
-        "with_dm_rollup": row[4],
-        "with_dm_rollup_name": row[5],
-        "distinct_filers": row[6],
+        "distinct_filers": row[4],
     }
 
 
@@ -87,18 +84,13 @@ def _print_coverage(label: str, cov: dict) -> None:
           f"({100 * cov['with_rollup'] / total:.2f}%)")
     print(f"    rollup_name         : {cov['with_rollup_name']:,}  "
           f"({100 * cov['with_rollup_name'] / total:.2f}%)")
-    print(f"    dm_rollup_entity_id : {cov['with_dm_rollup']:,}  "
-          f"({100 * cov['with_dm_rollup'] / total:.2f}%)")
-    print(f"    dm_rollup_name      : {cov['with_dm_rollup_name']:,}  "
-          f"({100 * cov['with_dm_rollup_name'] / total:.2f}%)")
 
 
 def _predict_deltas(con, filer_ciks: set[str] | None) -> dict:
     """Compute what the UPDATE *would* change without writing.
 
-    Counts rows whose (entity_id, rollup_entity_id, rollup_name,
-    dm_rollup_entity_id, dm_rollup_name) would differ from the resolved
-    MDM values post-join.
+    Counts rows whose (entity_id, rollup_entity_id, rollup_name) would
+    differ from the resolved MDM values post-join.
     """
     scope_filter = ""
     params: list = []
@@ -113,26 +105,16 @@ def _predict_deltas(con, filer_ciks: set[str] | None) -> dict:
             SELECT ei.identifier_value    AS filer_cik,
                    ei.entity_id           AS entity_id,
                    ec.rollup_entity_id    AS ec_rollup_entity_id,
-                   ea_ec.alias_name       AS ec_rollup_name,
-                   dm.rollup_entity_id    AS dm_rollup_entity_id,
-                   ea_dm.alias_name       AS dm_rollup_name
+                   ea_ec.alias_name       AS ec_rollup_name
               FROM entity_identifiers ei
               LEFT JOIN entity_rollup_history ec
                      ON ec.entity_id = ei.entity_id
                     AND ec.rollup_type = 'economic_control_v1'
                     AND ec.valid_to = DATE '9999-12-31'
-              LEFT JOIN entity_rollup_history dm
-                     ON dm.entity_id = ei.entity_id
-                    AND dm.rollup_type = 'decision_maker_v1'
-                    AND dm.valid_to = DATE '9999-12-31'
               LEFT JOIN entity_aliases ea_ec
                      ON ea_ec.entity_id = ec.rollup_entity_id
                     AND ea_ec.is_preferred = TRUE
                     AND ea_ec.valid_to = DATE '9999-12-31'
-              LEFT JOIN entity_aliases ea_dm
-                     ON ea_dm.entity_id = dm.rollup_entity_id
-                    AND ea_dm.is_preferred = TRUE
-                    AND ea_dm.valid_to = DATE '9999-12-31'
              WHERE ei.identifier_type = 'cik'
                AND ei.valid_to = DATE '9999-12-31'
         )
@@ -147,13 +129,7 @@ def _predict_deltas(con, filer_ciks: set[str] | None) -> dict:
             ) AS rollup_delta,
             COUNT(*) FILTER (WHERE
                 b.rollup_name IS DISTINCT FROM r.ec_rollup_name
-            ) AS rollup_name_delta,
-            COUNT(*) FILTER (WHERE
-                b.dm_rollup_entity_id IS DISTINCT FROM r.dm_rollup_entity_id
-            ) AS dm_rollup_delta,
-            COUNT(*) FILTER (WHERE
-                b.dm_rollup_name IS DISTINCT FROM r.dm_rollup_name
-            ) AS dm_rollup_name_delta
+            ) AS rollup_name_delta
         FROM beneficial_ownership_v2 b
         LEFT JOIN resolved r ON r.filer_cik = b.filer_cik
         WHERE 1=1
@@ -167,8 +143,6 @@ def _predict_deltas(con, filer_ciks: set[str] | None) -> dict:
         "eid_delta": row[2],
         "rollup_delta": row[3],
         "rollup_name_delta": row[4],
-        "dm_rollup_delta": row[5],
-        "dm_rollup_name_delta": row[6],
     }
 
 
@@ -179,8 +153,6 @@ def _print_deltas(deltas: dict) -> None:
     print(f"    entity_id           would change : {deltas['eid_delta']:,}")
     print(f"    rollup_entity_id    would change : {deltas['rollup_delta']:,}")
     print(f"    rollup_name         would change : {deltas['rollup_name_delta']:,}")
-    print(f"    dm_rollup_entity_id would change : {deltas['dm_rollup_delta']:,}")
-    print(f"    dm_rollup_name      would change : {deltas['dm_rollup_name_delta']:,}")
 
 
 def main() -> None:

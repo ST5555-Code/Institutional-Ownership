@@ -4,97 +4,86 @@
 
 ## HEAD
 
-`d8a64bd` — `cp-5-fh2-dm-rollup-drop: drop dm_rollup_entity_id + dm_rollup_name from fund_holdings_v2 (#289)`. Sits atop `7e12f9c` (PR #288 recon) and `f9bec76` (PR #287 Capital Group umbrella).
+`<conv-30 squash>` — `conv-30-doc-sync: CP-5 P0 pre-execution arc closure + bo_v2 dm_rollup drop`. Sits atop `11b3939` (PR #296 holdings_v2 dm_rollup drop). Prior arc closures: `2e116b1` (PR #295 sister-tables sized investigation), `cf04983` (PR #294 pipeline contract cleanup), `d04a13b` (PR #293 PR #287 ERH audit), `e0ce659` (PR #292 backup cadence), `dcfe3f6` (PR #291 loader-gap sub-PR 2), `07cceb5` (PR #290 loader-gap sub-PR 1), `d8a64bd` (PR #289 fh2 dm_rollup drop), PR #288 (decision recon), `f9bec76` (PR #287 Capital Group umbrella).
 
 ## Active workstream pointer
 
-**CP-5 pre-execution work** in progress. **4 of 5 P0 cohorts shipped:** cp-5-adams-duplicates (PR #283), cp-5-cycle-truncated-merges (PR #285), cp-5-capital-group-umbrella (PR #287, 3 wholly_owned/control bridges $7,153B), cp-5-pipeline-contract-gaps Gap 2 (PR #289, drop `fund_holdings_v2.dm_rollup_entity_id` + `dm_rollup_name`, migration 024). Next up: `cp-5-loader-gap-remediation` (84,363 rows / $418.5B — link existing CIKs, create new fund-typed entities, rollup rebuild). Remaining pipeline contract gaps sized individually at execution time.
+**CP-5.1 — helper + Method A view definition.** All 11 P0 pre-execution cohorts cleared (PRs #283–#296 + this PR). CP-5.1 is the actual goal of the entire pre-execution arc. After CP-5.1 lands, CP-5.2–5.6 reader migrations follow across Register, Cross-Ownership, Top Investors, Top Holders, Crowding, Conviction, Smart Money, Sector Rotation, New/Exits, AUM, Activist, View 2 Tier-3 sentinel.
 
 The 26-PR execution plan is locked at `data/working/cp-5-execution-plan.csv`. The full design contract is at `docs/findings/cp-5-comprehensive-remediation.md`. Adjustments 1/2/3/4 canonical addenda at `docs/decisions/inst_eid_bridge_decisions.md`.
 
-## Architectural state (post-CP-5 comprehensive discovery arc)
+## Architectural state (post-CP-5 P0 pre-execution arc)
 
-Existing locks remain in effect:
+**CP-5 P0 pre-execution arc CLOSED 2026-05-05.** All 11 cohorts shipped: Adams duplicates (#283), cycle-truncated merges (#285), Capital Group umbrella (#287, Path A), fh2 dm_rollup decision + drop (#288, #289), loader-gap remediation sub-PRs 1 + 2 (#290, #291), backup cadence (#292), PR #287 ERH audit (#293), pipeline contract cleanup (#294), sister-tables sized investigation (#295), holdings_v2 dm_rollup drop (#296), and this PR (bo_v2 dm_rollup drop bundled with the doc-sync).
 
-- **Two-canonical-classifications rule active** (locked 2026-05-03 via PRs #262–#265):
-  - Institution → `entity_classification_history.classification` (canonical reader: `entity_current.classification`).
-  - Fund → `fund_universe.fund_strategy` (canonical reader bridge: `classify_fund_strategy()` in `scripts/queries/common.py`).
-  - Reads route by `entity_type`. Both classifications determined once, frozen, no revisit on refresh. Reaffirmed by Bundle A §2.4 (zero NULL `fund_strategy` in `fund_universe`).
-- **`entity_classification_history` carries zero open fund-typed rows.** PR #265 closed all 13,220 fund-typed open rows in a single transaction. Institution baseline unchanged at 13,930 open rows.
-- **Writer paths gated.** Six fund-typed writers + a `resolve_long_tail` SQL filter were gated in PR #263; nine regression tests lock the gates.
-- **BLOCKER 2 carve-out lock active** (locked 2026-05-03 via PR #269 addendum to `inst_eid_bridge_decisions.md`):
-  - Strict-ADV cross-ref rule from BLOCKER 2 stays. Narrow exception: brands with 2+ orthogonal corroborating signals OR Bucket C raw-string-identical aliases (X2 alone) AND public-record verification qualify as `AUTHOR_NEW_BRIDGE`-eligible at MEDIUM confidence.
-  - Carve-out applied across the cp-4b arc: 4 BRIDGE writes / ~$2,055.4B total — PR #267 (T. Rowe Price, HIGH), PR #269 (First Trust, MEDIUM Bucket B), PR #270 (FMR/Fidelity, MEDIUM Bucket C), PR #271 (SSGA/State Street, MEDIUM Bucket C).
-  - 15 LOW-cohort brands / ~$10.27T residual moved from `cp-4c-manual-sourcing` (closed as a standalone workstream) to the post-CP-5 cp-4c brand-bridges backlog (#20 in `data/working/cp-5-execution-plan.csv`).
+**4 op-shape extensions canonical** (cp-4a + Adjustments 1/2/3/4) — see `docs/decisions/inst_eid_bridge_decisions.md`. Adjustment 1 (close-on-collision in Op G); Adjustment 2 (Op A.3 holdings_v2 re-point); Adjustment 3 (Op A.4 entity_identifiers SCD transfer); Adjustment 4 (column-independent two-step Op A — supersedes one-step OR-clause Op A in true-duplicate-merge contexts). Adjustment 4 was caught via STOP-gate on PR #285 Goldman Pair 1 ($91.08B THIRD-entity attribution theft prevented; cohort exposure $142.21B).
 
-New locks added by `cp-5-adams-duplicates` + `cp-5-cycle-truncated-merges` (locked 2026-05-05):
+**DuckDB CTAS-and-swap pattern canonical for column drops on PK-bearing tables** (locked 2026-05-05 via PR #296 + this PR). Reference: migrations 025 + 026.
 
-- **MERGE op-shape extension — Adjustment 1 (close-on-collision in Op G).** cp-4a precedent (PR #256) re-pointed every duplicate alias to canonical; the Adams cohort hit chained-merge alias PK collisions (>1 duplicate per canonical with identical alias_names, or duplicate's alias case-exact-identical to canonical's existing). Adjustment 1 adds a per-alias collision check before re-point: if `(canonical, alias_name, alias_type, valid_from)` exists open, close the duplicate's row instead. Pair processing order is `(canonical_eid, pair_id)` ascending so chained-collision pairs are predictable. RE-POINT branch demotion is scoped to `alias_name != D.alias_name` so a pair-M-re-pointed row is not demoted by pair N's processing. Adjustment 1 is canonical for all future MERGE work. Single-duplicate-per-canonical merges (cp-4a Vanguard/PIMCO) unaffected. Documented at `docs/decisions/inst_eid_bridge_decisions.md`. First application: `docs/findings/cp-5-adams-duplicates-results.md` (2 RE-POINT, 5 CLOSE-ON-COLLISION, 2 demotions across 7 pairs). cp-5-cycle-truncated-merges added 10 RE-POINT + 10 demotions + 0 close-on-collision (no PK collisions in that cohort).
+Existing locks remain in effect (continued from prior session memory):
 
-- **MERGE op-shape extension — Adjustment 2 (Op A.3 `holdings_v2.entity_id` re-point).** Required when duplicate carries direct 13F filings under `entity_id` (vs only rollup attribution in cp-4a/Adams). First application in PR #285 Pair 5 (Financial Partners 1600 ← 9722, 169 rows / $0.5067B). Standard re-point: `UPDATE holdings_v2 SET entity_id = canonical WHERE entity_id = duplicate AND is_latest = TRUE`. Phase 1 of every future MERGE PR re-verifies `h_v2_dup_rows` per pair before authoring helper. Documented at `docs/decisions/inst_eid_bridge_decisions.md` "Adjustment 2" section.
-
-- **MERGE op-shape extension — Adjustment 3 (Op A.4 `entity_identifiers` SCD transfer).** Required when duplicate carries identifiers the canonical lacks. SCD pattern: PK collision pre-flight on `(identifier_type, identifier_value, valid_from=today)`, close at duplicate, insert at canonical with `valid_from=today`. PK is `(type, value, valid_from)` — `entity_id` not in PK; valid_from divergence prevents collision. `is_preferred` is NOT a column on `entity_identifiers` (verified 2026-05-05). First application: PR #285, 12 transfers across 10 pairs (CRD on 8 pairs; CIK + CRD on Pair 5 + Pair 6). Phase 1 of every future MERGE PR re-verifies across all identifier types (CIK, CRD, LEI, series_id, ISIN, etc.). Documented at "Adjustment 3" section.
-
-- **MERGE op-shape extension — Adjustment 4 (Op A two-step column-independent re-point).** **Supersedes** the cp-4a one-step OR-clause Op A in true-duplicate-merge contexts. Trigger: PR #285 Phase 3 first-attempt Guard 7 caught $91.08B THIRD-entity attribution theft on Goldman Pair 1 — the one-step UPDATE `SET both_columns = canonical WHERE rollup=dup OR dm_rollup=dup` silently re-pointed `rollup_entity_id` from legitimate THIRDs (Equitable IM, Ameriprise, Morgan Stanley, AssetMark, etc.) to canonical when only `dm_rollup` matched dup. Cohort total exposure $142.21B; transaction rolled back cleanly; chat authorized fix. Adjustment 4 splits Op A into two single-column UPDATEs (Op A.1 rollup; Op A.2 dm_rollup + dm_rollup_name). Per-column conservation provable by disjoint set algebra; Phase 1 of every future MERGE PR audits zero-mixed-rows precondition (rows with rollup=can ∧ dm_rollup=dup or vice versa). Hard-guards expand from 7 → 11 per pair (Guard 1 → 1a/1b/1c column-split; Guard 7 → 7a/7b/7c column-split). cp-4a brand→filer bridge semantic (PR #256) is correct as designed for that PR (intentional bridge); paper audit confirms zero THIRD damage in PR #256 + PR #283. Documented at "Adjustment 4" section. PR #283 Adams results doc amended with paper-audit verdict.
-
-New locks added by the CP-5 comprehensive discovery arc (locked 2026-05-04 via PRs #277–#281):
-
-- **CP-5 R5 dedup rule** — for `(top_parent, ticker, cusip)` triples in 2025Q4: `result = MAX(thirteen_f, fund_tier_adjusted)` with intra-family FoF subtraction (~$2,207B) and non-valid-CUSIP filter on EC asset_category (~$5,172B); `13F_only` and `fund_only` top-parents handled explicitly. See cp-5-comprehensive-remediation.md §2.1.
-- **Method A canonical** for fund→top-parent climb (read-time `entity_rollup_history` JOIN on `decision_maker_v1` + `valid_to='9999-12-31'`). Method B (`fund_holdings_v2.dm_rollup_entity_id`) is **not** canonical — goes stale after every ERH rebuild; retained as a cache-invalidation signal. See §2.2.
-- **decision_maker_v1 canonical for institutional view (View 1)** — `economic_control_v1` retained for parallel sponsor-view queries. See §2.3.
-- **Time-versioning Option C (hybrid)** — time-invariant default + override for known M&A events when historical data loads. SCD schema already supports it. M&A event register deferred to Pipeline 4+ scope. See §2.4.
-- **View 2 scope** — Tier 1 N-PORT funds full PM-level decomposition; Tier 2 13D/G partial as "PM partial" with caveat; Tier 3 ($4.9T across 1,367 hedge fund / SMA / pension / family / SWF / VC / activist / endowment filers) as institutional-tier with explicit "no fund decomposition available" sentinel. See §2.7.
+- **Two-canonical-classifications rule active** (locked 2026-05-03 via PRs #262–#265): institution → ECH; fund → `fund_universe.fund_strategy`.
+- **`entity_classification_history` carries zero open fund-typed rows** post PR #265.
+- **Writer paths gated** for fund-typed targets (PR #263, 9 regression tests).
+- **BLOCKER 2 carve-out lock active** (locked 2026-05-03 via PR #269 addendum). 4 BRIDGE writes / ~$2,055.4B across cp-4b arc (#267, #269, #270, #271). 15 LOW-cohort brands / ~$10.27T residual deferred to post-CP-5 cp-4c.
+- **CP-5 R5 dedup rule** + **Method A canonical** (read-time ERH JOIN; Method B `dm_rollup_entity_id` formally deprecated and now physically removed from fh2/holdings_v2/bo_v2 per PRs #289/#296/this PR) + **decision_maker_v1 canonical for institutional View 1** + **Time-versioning Option C (hybrid)** + **View 2 scope** (Tier 1 N-PORT full / Tier 2 13D/G partial / Tier 3 sentinel). See `docs/findings/cp-5-comprehensive-remediation.md` §2.
 
 ## Parked queue (priority order)
 
-1. **CP-5 pre-execution P0 cohorts** (1 cohort remaining of 5; see ROADMAP P0):
-   - `cp-5-loader-gap-remediation` (84,363 rows / $418.5B; 1–3 sub-PRs — link existing CIKs, create new fund-typed entities, rollup rebuild) — **next up**.
-   - `cp-5-pipeline-contract-gaps` (Gap 2 CLOSED PR #289; remaining gaps sized at execution time).
-   - ~~`cp-5-capital-group-umbrella`~~ **CLOSED 2026-05-05** (PR #287). 3 wholly_owned/control bridges; $7,153B.
-   - ~~`cp-5-adams-duplicates`~~ **CLOSED 2026-05-05** (PR #283). 7 pairs merged; Adjustment 1 landed.
-   - ~~`cp-5-cycle-truncated-merges`~~ **CLOSED 2026-05-05** (PR #285). 10 pairs merged; Adjustments 2/3/4 landed (Adjustment 4 prevented $142.21B THIRD-entity theft via STOP-gate catch).
-   - **New P3 surfaced:** `cycle-adjacent-entity-audit` (Sarofim Trust Co eid 858, cycle-adjacent non-member excluded from PR #285).
-2. **CP-5 execution P1** (6 stages, seqs 9–14 in `data/working/cp-5-execution-plan.csv`): CP-5.1 helper + Method A view → CP-5.2 Register tab → CP-5.3 Cross-Ownership/Top Investors/Top Holders → CP-5.4 Crowding/Conviction/Smart Money → CP-5.5 Sector Rotation/New-Exits/AUM/Activist → CP-5.6 View 2 Tier-3 sentinel.
-3. **CP-5 post-execution backlog** (12 items, seqs 15–26): securities canonical_type loader fix, Method B disposition, bootstrap scripts disposition, operating-AM policy cleanup ($2.78T), cross-period CIK cleanup, cp-4c brand bridges (13 brands ~$8T), Pipelines 4/5/7, M&A event register Option C, Workstream 3 fund-to-parent residuals, Adams residual.
-4. `fund-classification-by-composition` Workstream 2 — **CLOSED** (per Bundle A §2.4: 0 NULL `fund_strategy` in `fund_universe`). The orphan-fund classification residual reframed as part of `cp-5-loader-gap-remediation` per Bundle B §2.4.
-5. `backup-archive-cadence` (P3 recurring — re-run compress-and-prune workflow whenever `data/backups/` exceeds 3 retained directories).
-6. `worktree-cleanup-hygiene-cadence` (P3 recurring — re-run worktree-cleanup workflow whenever orphan worktrees + branches accumulate above ~5 entries).
+1. **CP-5.1** (P1, ACTIVE-EXECUTION, **next up**) — helper + Method A view definition. Resolves `classification-join-utility-resolution` decision.
+2. **CP-5.2 Register tab** reader migration (P1).
+3. **CP-5.3 Cross-Ownership / Top Investors / Top Holders** reader migration (P1).
+4. **CP-5.4 Crowding / Conviction / Smart Money** reader migration (P1).
+5. **CP-5.5 Sector Rotation / New-Exits / AUM / Activist** reader migration (P1).
+6. **CP-5.6 View 2 Tier-3 sentinel** (P1).
+7. **CP-5 post-execution backlog** (P3, seqs 15–26 in execution plan): securities canonical_type loader fix, Method B disposition, bootstrap scripts disposition, operating-AM policy cleanup ($2.78T), cross-period CIK cleanup, **cp-4c brand bridges** (13 brands ~$8T, #20), Pipelines 4/5/7, M&A event register Option C, **Workstream 3 fund-to-parent residuals**, Adams residual.
+8. **New P3 audit entries** (surfaced during this arc):
+   - `cycle-adjacent-entity-audit` (Sarofim Trust Co eid 858 + similar; surfaced PR #285).
+   - `entity-current-inverted-rollup-audit` (canonical 4909 inverted-rollup pattern; surfaced PR #283 Op H Branch 2).
+   - `parent-bridge-mechanism-audit` (sponsor-brand layer scope; surfaced PR #287).
+   - `fund-cik-entity-type-audit` (N-PORT-seeded registrant CIKs typed `'institution'` not `'fund'`; surfaced PR #290).
+9. **Cadence successors:**
+   - `backup-archive-cadence` (P3 recurring; first execution PR #292).
+   - `worktree-cleanup-hygiene-cadence` (P3 recurring).
 
 ## Recent backups
 
-Only the 3 most recent backups remain locally per the retention rule locked in PR #273:
+Three retained locally per cadence rule (PR #273):
 
-- `data/backups/13f_backup_20260503_110616` — pre-PR-C (pre PR #265 SCD close); also covered the cp-4b carve-out arc.
-- `data/backups/13f_backup_20260503_121103` — post-PR-C (3.2 GB EXPORT, paired with PR #265).
-- `data/backups/13f_backup_20260505_051519` — pre-cp-5-adams-duplicates --confirm (3.2 GB EXPORT).
+- `data/backups/13f_backup_20260505_165855`
+- `data/backups/13f_backup_20260505_142125`
+- `data/backups/13f_backup_20260505_124352`
 
-Older backups archived to Google Drive `ShareholderProject/13f-backups/{full-db-exports,staging-backup,pipeline-snapshots}/` per PR #273 process. The two-day-old `13f_backup_20260503_082307` was rotated out by the new pre-cp-5-adams backup per the 3-newest retention rule.
-
-Older backups archived to Google Drive `ShareholderProject/13f-backups/{full-db-exports,staging-backup,pipeline-snapshots}/` (44 archives, 49.5 GB total, md5-verified). Per-archive paths and md5s in `docs/findings/backup-pruning-and-archive-results.md` and `data/working/backup-archive-manifest.csv`.
+Older backups archived to Google Drive `ShareholderProject/13f-backups/{full-db-exports,staging-backup,pipeline-snapshots}/` per PR #273 + PR #292 cadence runs. Per-archive paths and md5s in `docs/findings/backup-pruning-and-archive-results.md` and `data/working/backup-archive-manifest.csv`.
 
 ## Process rules in effect
 
 These continue from prior session memory and apply to the next session:
 
-- **Two-canonical-classifications rule** (above) — never write fund-typed rows to ECH; never read fund classification from ECH; route by `entity_type`.
-- **BLOCKER 2 carve-out rule** (above) — strict-ADV cross-ref stays; only 2+ orthogonal signals or Bucket C identical-alias + public-record corroboration qualify for MEDIUM-confidence AUTHOR_NEW_BRIDGE writes.
-- **Audit-prompt sum-identity rule** (locked 2026-05-04 via PR [#279](https://github.com/ST5555-Code/Institutional-Ownership/pull/279) `cp-5-coverage-matrix-revalidation`). When computing pre/post numerical deltas across a cohort with non-uniform per-row inflation factors, prefer sum-identity gates (`|orig − sum(parts)| ≤ ε`) over ratio-bound gates. Sum-identity holds exactly across heterogeneous data; ratio bounds trip on legitimate per-entity variance. Cross-reference: ROADMAP `## Process rules` section (full statement + PR #279 evidence).
+- **Two-canonical-classifications rule** — never write fund-typed rows to ECH; never read fund classification from ECH; route by `entity_type`.
+- **BLOCKER 2 carve-out rule** — strict-ADV cross-ref stays; only 2+ orthogonal signals or Bucket C identical-alias + public-record corroboration qualify for MEDIUM-confidence AUTHOR_NEW_BRIDGE writes.
+- **Audit-prompt sum-identity rule** (locked 2026-05-04 via PR #279). Prefer sum-identity gates over ratio-bound gates across heterogeneous cohorts. Cross-reference: ROADMAP `## Process rules`.
+- **DuckDB DROP COLUMN with PRIMARY KEY → CTAS-and-swap** (locked 2026-05-05 via PR #296). DuckDB has no `ALTER TABLE DROP CONSTRAINT`; rebuild table with `SELECT * EXCLUDE (...)`, swap, restore PK + indexes verbatim. Reference: migrations 025 + 026.
+- **Audit pipeline readers when scoping schema drops** (locked 2026-05-05 via PR #296). Grep `scripts/pipeline/`, `scripts/compute_*`, `scripts/build_*` — not just `scripts/queries/` + `scripts/api_*.py`. PR #295's user-facing audit missed 5 pipeline readers that PR #296 caught.
+- **New entities need both rollup types at creation** (locked 2026-05-05 via PRs #291 + #293). INSERT self-rollup rows for **both** `decision_maker_v1` AND `economic_control_v1` — `entity_current` sources from EC; missing the EC self-rollup makes the entity invisible to that view. Inline pattern from PR #291 Op E2.
+- **`entity_identifiers` schema — no `is_preferred` column** (locked 2026-05-05 via PR #291). Uses `confidence` / `source` / `is_inferred`. `is_preferred` lives on `entity_aliases` only.
 - **Internal expert challenge before recommendations** — surface counter-arguments from the internal-expert lens before any recommendation is ratified.
 - **No Code prompts until user confirms ready** — author Code prompts only after the user explicitly green-lights, never spec-and-ship.
 - **All Code instructions in code boxes** — Code-bound instructions belong in fenced code boxes, not prose.
-- **Architectural decisions paired with writer/reader audit** — every architectural decision (e.g., two-canonical-classifications, BLOCKER 2 carve-out, the new CP-5 contract) ships paired with a writer-side gate AND a reader-side audit.
+- **Architectural decisions paired with writer/reader audit** — every architectural decision ships paired with a writer-side gate AND a reader-side audit.
 - **Code session granularity:** one phase per session unless explicitly bundled in the prompt — `conv-*` doc-syncs are the only routine multi-phase bundle.
 - **`entity_relationships` INSERT shape:** 14 columns. Confirmed across all four cp-4b PRs (#267, #269, #270, #271).
 - **Direct-prod-write precedent for entity-layer one-off PRs** until a staging twin is built as its own architectural workstream.
 - **Pre-flight backup before every prod-touch PR.** Confirm `mtime > DB mtime` and that the backup covers the latest commit before any `--confirm`.
-- **No prompts without confirmation** when re-running an arc step; conv-* convention is direct-to-main with auto-merge after CI green.
-- **`gh pr merge --delete-branch` workaround** (locked 2026-05-04 via PR #274 §7.5). The `gh pr merge --squash --delete-branch` command reliably fails to delete the local branch when the worktree using that branch is alive at merge time; the GitHub API DELETE on the branch ref succeeds silently with the worktree holding the ref, leaving the remote branch live. Empirically validated across recent arcs (PRs #265, #267, #270, #271, #272, #273, and PR #274 itself). Future arc PRs that run from a worktree should: (1) run `gh pr merge --squash` **without** `--delete-branch`; (2) `cd` to main repo; (3) run `git push origin --delete <branch>` manually; (4) defer worktree retirement to the next `worktree-cleanup-hygiene-cadence` run. Local cleanup blocked at merge time is a structural limitation of git worktree semantics, not a transient bug — cadence cleanup is the right shape.
+- **`gh pr merge --delete-branch` workaround** (locked 2026-05-04 via PR #274 §7.5). Run `gh pr merge --squash` without `--delete-branch`, then `git push origin --delete <branch>` manually from main repo; defer worktree retirement to next `worktree-cleanup-hygiene-cadence` run.
+- **Single-file `.duckdb` default delete-direct in cadence runs** (locked 2026-05-05 via PR #292). Single-file `.duckdb` full-DB snapshots can be deleted directly when same-day EXPORT covers the same state — avoids the redundant compress + archive cycle.
 
 ## Gotchas surfaced this arc (not already in ROADMAP / memory)
 
-- **Method A vs Method B drift is real and material.** SSGA cp-4b bridge (PR #271) surfaced $778.2B drift between the live ERH JOIN (Method A) and the denormalized `fund_holdings_v2.dm_rollup_entity_id` (Method B). Method B is now formally deprecated as canonical; CP-5.1 builds on Method A. Method B's residual role is as a cache-invalidation signal: rows where `dm_rollup_entity_id ≠ Method A` flag the loader denormalization for backfill.
-- **Coverage matrix double-count via missing rollup_type filter.** PR #276's coverage matrix double-counted FoF positions because the rollup query did not filter by `entity_rollup_history.rollup_type='decision_maker_v1'` — fund-tier positions appeared once per rollup_type row. PR #279 hotfixed; combined AUM corrected $102.0T → $75.2T (−26%). Any future ERH-aware aggregation must include the `rollup_type` filter.
-- **Ratio-bound STOP gates are unsafe across heterogeneous cohorts.** PR #279 STOP gate originally tripped on BlackRock (1.73×) and Fidelity (2.04×) under a ratio-bound gate that turned out to encode legitimate per-entity variance, not error. Lifted into a permanent process rule (above).
-- **Chained-merge alias PK collisions are generic to >1-duplicate-per-canonical MERGE work.** `entity_aliases` PK is `(entity_id, alias_name, alias_type, valid_from)`. cp-4a Op G's literal re-point logic fails on the second duplicate of any canonical when alias_names are case-exact-identical. Surfaced + resolved by Adjustment 1 (close-on-collision) in cp-5-adams-duplicates. cp-5-cycle-truncated-merges (21 pairs) and any other multi-duplicate MERGE PR must inherit Adjustment 1.
-- **Op H Branch 2 surfaces real correctness issues, not just hygiene.** Adams Asset Advisors canonical 4909 was rolling UP to its no-CIK duplicate 19509 in `entity_current.rollup_entity_id` pre-merge — a structural error that Op H Branch 2 (close + recreate as canonical self-rollup) corrects. Worth a P3 audit task: scan `entity_current` for canonicals whose `rollup_entity_id` points at a no-CIK / synthesized eid, surface for chat triage.
-- **`inst_eid_bridge_phase1b` helper has scope limits.** Adams duplicates fall outside its brand-eid filter (duplicate 19509 holds a CRD; 20210–20215 are fund-typed). Future cp-5 cohorts whose eids don't match the no-CIK-institution shape will show Δ=0 in phase1b — that's not evidence the merge failed; the proper evidence sits in per-eid leftover-ref + AUM-conservation spot-checks. Results docs should explicitly note when phase1b is out-of-scope.
+- **Method A vs Method B drift is real and material.** SSGA cp-4b bridge (PR #271) surfaced $778.2B drift; PR #295 sister-table investigation surfaced $8.16T `holdings_v2` drift across 42 parents. Method B (`dm_rollup_entity_id`) is now formally deprecated AND physically removed from fh2 (#289), holdings_v2 (#296), and bo_v2 (this PR).
+- **Pipeline-reader audit scope was incomplete in PR #295.** PR #295 scoped `scripts/queries/` + `api_*.py` only and concluded "zero readers" for both holdings_v2 + bo_v2 dm_rollup columns. PR #296 caught 5 pipeline readers (`compute_flows`, `build_summaries`, `compute_peer_rotation`, `compute_parent_fund_map`, `build_fixture`) that the user-facing audit missed. Codified as new process rule.
+- **`entity_current` is a VIEW that requires economic_control_v1 self-rollup at entity creation.** PR #287 (Capital Group, Path A) reused a long-standing eid that already had both rollup types. PR #291 (loader-gap sub-PR 2) surfaced this — initial draft created entities with only `decision_maker_v1` self-rollup; entities were invisible to `entity_current` until Op E2 was added inline. PR #293 audited PR #287 to confirm. Codified as new process rule.
+- **`entity_identifiers` does not have an `is_preferred` column.** Earlier prompts referenced it from the alias-table mental model. Uses `confidence` / `source` / `is_inferred`. Codified as new process rule.
+- **`holdings_v2` PRIMARY KEY blocked DROP COLUMN.** PR #296 surfaced that DuckDB has no `ALTER TABLE DROP CONSTRAINT`, so the implicit PK index forced a CTAS-and-swap rebuild. Same mechanic on `beneficial_ownership_v2` in this PR. Codified as new process rule.
+- **DuckDB EXPORT PARQUET writes pre-compressed** (locked 2026-05-04 via PR #273; reaffirmed PR #292). Snappy default; re-gzip yields ~10–20%. Don't lower-bound compression-ratio gates.
+- **Bundle B §1.3 was wrong about eid=12 having no inst→inst edges.** Current state shows 87 such rows on eid=12 alone, all on the sponsor-brand layer (`fund_sponsor`/`advisory` with `source='parent_bridge'`). Two-relationship-layer coexistence pattern codified by PR #287. New P3 `parent-bridge-mechanism-audit` to formalize the loader's contract.
