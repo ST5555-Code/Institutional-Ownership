@@ -1,0 +1,4 @@
+entity_id,name,quarter,filer_grain_sum,top_parent_grain_sum,delta,delta_pct,filer_cik_count,top_parent_row_count
+4375,Vanguard family,2025Q4,6908051583469.0,6897676080637.0,-10375502832.0,-0.1502,3,1
+3241,BlackRock,2025Q4,5916347916984.0,5916347916984.0,0.0,0.0,1,1
+12,Capital Group umbrella,2025Q4,1941966341613.0,1915006840171.0,-26959501442.0,-1.3883,40,3
