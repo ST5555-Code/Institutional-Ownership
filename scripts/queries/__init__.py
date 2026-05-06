@@ -22,7 +22,8 @@ from .common import (  # noqa: F401
     has_table,
     # rollup
     VALID_ROLLUP_TYPES,
-    _rollup_col,
+    _rollup_name_sql,
+    _rollup_eid_sql,
     LQ, FQ, PQ,
     # quarter helpers
     _QUARTER_END_DATES,

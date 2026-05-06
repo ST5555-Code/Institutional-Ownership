@@ -21,7 +21,7 @@ from .common import (
     LQ,
     FQ,
     PQ,
-    _rollup_col,
+    _rollup_name_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Current shareholder register — two-level parent/fund hierarchy.
     Batched: parents + all 13F children fetched in 2 queries total."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -48,7 +48,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         parents = con.execute(f"""
             WITH by_fund AS (
                 SELECT
-                    COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                    COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
                     h.fund_name,
                     h.cik,
                     COALESCE(h.manager_type, 'unknown') as type,
@@ -122,7 +122,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         ph = ','.join(['?'] * len(parent_names))
         all_children_df = con.execute(f"""
             SELECT
-                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
                 h.fund_name as institution,
                 COALESCE(h.manager_type, 'unknown') as type,
                 SUM(h.market_value_live) as value_live,
@@ -131,7 +131,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}'
               AND (h.ticker = ? OR h.cusip = ?)
-              AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
+              AND COALESCE({rn}, h.inst_parent_name, h.manager_name) IN ({ph})
               AND h.is_latest = TRUE
             GROUP BY parent_name, h.fund_name, type
             ORDER BY parent_name, value_live DESC NULLS LAST
@@ -233,7 +233,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         all_totals_df = con.execute(f"""
             SELECT
                 COALESCE(MAX(h.manager_type), 'unknown') as type,
-                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
                 SUM(h.market_value_live) as total_value,
                 SUM(h.shares) as total_shares,
                 SUM(h.pct_of_so) as pct_so
@@ -267,7 +267,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """4-quarter ownership change (Q1 vs Q4 2025)."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -446,7 +446,7 @@ def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Active holder market cap analysis."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -460,7 +460,7 @@ def query3(ticker, rollup_type='economic_control_v1', quarter=LQ):
                 SELECT
                     h.cik,
                     MAX(h.manager_name) as manager_name,
-                    MAX(COALESCE(h.{rn}, h.inst_parent_name, h.manager_name)) as parent_name,
+                    MAX(COALESCE({rn}, h.inst_parent_name, h.manager_name)) as parent_name,
                     MAX(h.manager_type) as manager_type,
                     SUM(h.market_value_live) as position_value,
                     SUM(h.shares) as shares,
@@ -772,7 +772,7 @@ def query4(ticker, quarter=LQ):
 
 def query5(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Quarterly share change heatmap."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
@@ -1085,7 +1085,7 @@ def query11(ticker, quarter=LQ):
 
 def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Concentration analysis — top holders cumulative % of float."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
@@ -1116,12 +1116,12 @@ def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 def query14(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Manager AUM vs position size — consolidated with conviction data."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
     con = get_db()
     try:
         df = con.execute(f"""
             SELECT
-                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as manager_name,
+                COALESCE({rn}, h.inst_parent_name, h.manager_name) as manager_name,
                 h.manager_type,
                 h.is_activist,
                 m.aum_total / 1e9 as manager_aum_bn,
@@ -1132,7 +1132,7 @@ def query14(ticker, rollup_type='economic_control_v1', quarter=LQ):
             FROM holdings_v2 h
             LEFT JOIN managers m ON h.cik = m.cik
             WHERE h.ticker = ? AND h.quarter = '{quarter}' AND h.is_latest = TRUE
-            GROUP BY COALESCE(h.{rn}, h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
+            GROUP BY COALESCE({rn}, h.inst_parent_name, h.manager_name), h.manager_type, h.is_activist, m.aum_total
             HAVING SUM(h.market_value_live) > 0
             ORDER BY SUM(h.market_value_live) DESC NULLS LAST
             LIMIT 25

@@ -8,7 +8,7 @@ from serializers import (
 from .common import (
     LQ,
     VALID_ROLLUP_TYPES,
-    _rollup_col,
+    _rollup_name_sql,
     get_db,
     _fund_type_label,
 )
@@ -582,7 +582,7 @@ def short_interest_analysis(ticker, rollup_type='economic_control_v1', quarter=L
     """Comprehensive short interest analysis for a ticker.
     Combines N-PORT fund-level shorts, FINRA daily volume, and long/short cross-reference.
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         result = {}

@@ -16,9 +16,12 @@ on ``(rollup_entity_id, rollup_type)`` against ``parent_fund_map`` plus a
 800 ms → <200 ms.
 
 Source tables:
-  * ``holdings_v2`` — distinct ``(rollup_entity_id, rollup_name)`` and
-    ``(dm_rollup_entity_id, dm_rollup_name)`` pairs are the universe of
-    parent rollups to map. Both rollup_types are materialized.
+  * ``holdings_v2`` — distinct rollup parents per rollup_type are the
+    universe to map. EC reads ``rollup_entity_id`` / ``rollup_name``
+    columns directly; DM resolves via ``entity_rollup_history`` JOIN
+    ``entities`` (Method A read-time JOIN, canonical per PR #280; the
+    denormalized DM columns were dropped from ``holdings_v2`` by
+    PR #295's drop PR). Both rollup_types are materialized.
   * ``fund_holdings_v2`` — all ``is_latest=TRUE`` rows; family-name ILIKE
     join produces the per-parent fund-series set.
   * ``ncen_adviser_map`` — drives the sub-adviser exclusions defined in
@@ -91,10 +94,29 @@ _STG_TARGET_DDL = (
     + "\n)"
 )
 
-# (rollup_type label, rollup-name column, rollup-eid column on holdings_v2).
+# (rollup_type label, rollup-name SQL expression, rollup-eid SQL expression).
+# Expressions reference the holdings_v2 alias ``h``. PR #295's drop PR
+# removed the denormalized DM columns; DM resolves at read time via
+# correlated subqueries against ``entity_rollup_history`` (Method A,
+# canonical per PR #280).
 _PARENT_ROLLUP_SPECS: list[tuple[str, str, str]] = [
-    ("economic_control_v1", "rollup_name",    "rollup_entity_id"),
-    ("decision_maker_v1",   "dm_rollup_name", "dm_rollup_entity_id"),
+    (
+        "economic_control_v1",
+        "h.rollup_name",
+        "h.rollup_entity_id",
+    ),
+    (
+        "decision_maker_v1",
+        "(SELECT e.canonical_name FROM entity_rollup_history erh "
+        "JOIN entities e ON e.entity_id = erh.rollup_entity_id "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+        "(SELECT erh.rollup_entity_id FROM entity_rollup_history erh "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+    ),
 ]
 
 
@@ -375,8 +397,8 @@ class ComputeParentFundMapPipeline(SourcePipeline):
         rows = staging_con.execute(f"""
             SELECT DISTINCT {eid_col} AS eid,
                    {name_col} AS name
-              FROM {self._src(alias, 'holdings_v2')}
-             WHERE is_latest = TRUE
+              FROM {self._src(alias, 'holdings_v2')} h
+             WHERE h.is_latest = TRUE
                AND {eid_col} IS NOT NULL
                AND {name_col} IS NOT NULL
         """).fetchall()  # nosec B608 — column / table identifiers come from class constants
@@ -488,9 +510,16 @@ def _project_dry_run(prod_db_path: str) -> int:
             "SELECT COUNT(DISTINCT rollup_entity_id) FROM holdings_v2 "
             "WHERE is_latest = TRUE AND rollup_entity_id IS NOT NULL"
         ).fetchone()[0]
+        # PR #295 drop PR: dm_rollup_entity_id no longer denormalized on
+        # holdings_v2. Resolve via entity_rollup_history (Method A).
         dm_parents = con.execute(
-            "SELECT COUNT(DISTINCT dm_rollup_entity_id) FROM holdings_v2 "
-            "WHERE is_latest = TRUE AND dm_rollup_entity_id IS NOT NULL"
+            "SELECT COUNT(DISTINCT erh.rollup_entity_id) "
+            "FROM holdings_v2 h "
+            "JOIN entity_rollup_history erh "
+            "  ON erh.entity_id = h.entity_id "
+            " AND erh.rollup_type = 'decision_maker_v1' "
+            " AND erh.valid_to = DATE '9999-12-31' "
+            "WHERE h.is_latest = TRUE AND erh.rollup_entity_id IS NOT NULL"
         ).fetchone()[0]
         fund_quarters = con.execute(
             "SELECT COUNT(DISTINCT quarter) FROM fund_holdings_v2 "
