@@ -232,6 +232,8 @@ Loader fix in `pipeline/cusip_classifier.py` (consult `securityType2` / `securit
 
 ### 7.4 Comprehensive read site audit
 
+> **Scope note (added 2026-05-06 by `cp-5-bundle-c-api-files-extension` PR):** the original §7.4 enumeration scoped `scripts/queries/*` only and did not enumerate `scripts/api_*.py` reader sites. PR #302 (CP-5.4 recon §1.4) and PR #303 (CP-5.4 execute, FPM1 ship list) surfaced this as a real accounting gap. The canonical inventory is now [data/working/cp-5-bundle-c-readers-extended.csv](../../data/working/cp-5-bundle-c-readers-extended.csv) which spans both layers. §7.4a (the original 27 rows) and §7.4-api (the new api_*.py rows) summarise the two halves.
+
 #### 7.4a — 27 reader sites re-confirmed
 
 [Output: data/working/cp-5-bundle-c-readers.csv](../../data/working/cp-5-bundle-c-readers.csv).
@@ -259,6 +261,50 @@ Aggregating the 27 sites into the 11 features from cp-5-discovery and sizing per
 | NPORT bridge / common helpers | 3 | fund_holdings_v2 (REGEX NAME) + ER | RETIRE; replace w/ entity-keyed lookup | L |
 
 Distribution: **L 4, M 12, S 11.** No feature is sized as XL — the rebuild is large but bounded.
+
+#### 7.4-api — `scripts/api_*.py` reader sites
+
+> Added 2026-05-06 by `cp-5-bundle-c-api-files-extension` PR. The original 27-row §7.4a enumeration scoped `scripts/queries/*` only. This sub-section enumerates the api-layer sites that PR #302 (CP-5.4 recon §1.4) and PR #303 (CP-5.4 execute) surfaced as missed.
+
+Canonical inventory: [data/working/cp-5-bundle-c-readers-extended.csv](../../data/working/cp-5-bundle-c-readers-extended.csv) (rows where `file` starts with `scripts/api_`).
+
+Greps run:
+
+```
+grep -rn "rollup_name|inst_parent_name|rollup_entity_id|dm_rollup|dm_entity_id"
+  scripts/api_*.py
+grep -rn "top_parent_canonical_name_sql|top_parent_holdings_join"
+  scripts/api_*.py
+grep -rn "holdings_v2|fund_holdings_v2|entity_current|summary_by_parent|shares_history|manager_aum|entity_relationships"
+  scripts/api_*.py
+grep -rn "COALESCE|rollup_name|manager_name"
+  scripts/api_*.py    # zero hits — verifies migrated state
+```
+
+Result: **37 api-layer rows** across 8 files, classified as:
+
+| migration_status | n rows | meaning |
+| --- | ---: | --- |
+| MIGRATED | 2 | `api_fund_portfolio_managers` (FPM1, #303), `api_crowding` (C2, #303). Both call `top_parent_canonical_name_sql('h')`. |
+| N/A_NO_ROLLUP_PATTERN | 6 | Endpoints that read `holdings_v2` / `fund_holdings_v2` / `market_data` without a parent-display COALESCE: `api_tickers` autocomplete, `api_smart_money` longs (SM1) + nport_shorts (SM2), `validate_ticker_current` sentinel, `api_peer_tickers` (market_data only), `api_fund_quarter_completeness`. |
+| DELEGATING_WRAPPER | 26 | Thin endpoint wrappers that delegate to `queries.*` functions (`api_cross.py`, `api_flows.py`, most of `api_market.py`, `api_entities.py`). These inherit migration status from their upstream `scripts/queries/*` row — no separate api-layer migration site. |
+| DISPATCH_UTILITY | 3 | `api_register.py` `_execute_query` / `api_query` / `api_export` — generic dispatchers over `QUERY_FUNCTIONS`; not a reader path. |
+
+Per-feature breakdown (api-layer only):
+
+| feature | sites | notes |
+| --- | ---: | --- |
+| Crowding | 1 (MIGRATED) | `api_market.py` `api_crowding` — uses `top_parent_canonical_name_sql('h')`. |
+| Smart Money | 2 (N/A) | `api_market.py` longs + N-PORT shorts — neither carries the rollup pattern (CP-5.4 §1.3 verified). |
+| Fund Portfolio Managers | 1 (MIGRATED) | `api_fund.py` `api_fund_portfolio_managers` — FPM1 from CP-5.4 §1.4, originally adjacent-out-of-Bundle-C-scope. |
+| Register Tickers autocomplete | 1 (N/A) | `api_register.py` `api_tickers` — pure ticker enumerator, no parent display. |
+| Cross-Ownership | 5 (DELEGATING_WRAPPER) | All `api_cross.py` endpoints inherit from `scripts/queries/cross.py` (CP-5.3 #301 ship list). |
+| Flows / Trend / Conviction | 7 (DELEGATING_WRAPPER) | `api_flows.py` endpoints inherit from `scripts/queries/{flows,trend,fund}.py`. |
+| Sector Rotation / Sector flows | 6 (DELEGATING_WRAPPER) | `api_market.py` sector_* endpoints inherit from `scripts/queries/market.py` (PENDING_CP5_5). |
+| Entity graph / hierarchy | 5 (DELEGATING_WRAPPER) | `api_entities.py` endpoints inherit from `scripts/queries/entities.py` and `queries/market.py:1040-1130` (PENDING_CP5_6). |
+| Short Interest / FINRA / completeness / peer_tickers / dispatch | 10 (DELEGATING_WRAPPER + N/A + DISPATCH_UTILITY mix) | Utility / Crowding-adjacent / dispatcher rows; no separate migration target. |
+
+**Bottom line:** The 2 MIGRATED rows (FPM1, /crowding) capture the entire api-layer rollup-pattern surface; both shipped in PR #303. The 26 DELEGATING_WRAPPER rows do not introduce new reader sites — they will pick up parent-display migration transitively as their upstream `scripts/queries/*` row migrates. CP-5.5 + CP-5.6 recons should reference the extended inventory as canonical and skip re-discovering the api layer.
 
 #### 7.4c — Comprehensive write site inventory
 
