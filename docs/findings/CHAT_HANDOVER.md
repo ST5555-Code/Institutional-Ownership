@@ -1,5 +1,88 @@
 # Chat Handover
 
+## conv-31a-mid-arc-doc-sync (2026-05-06)
+
+### State summary
+
+- HEAD on main: `d11cfba` (PR #307 `cp-5-aum-subtree-callers-recon` merged).
+- Active branch: `cp-5-5b-precompute-rebuild` at `a53b8ac` (plan `a3fe7cd` + addendum `a53b8ac`, parked at end of Phase 1).
+- CP-5 progress: 5 of 6 main reader-migration PRs shipped (CP-5.1 #299, CP-5.2 #300, CP-5.3 #301, CP-5.4 #303, CP-5.5 #306) plus 1 in-progress (CP-5.5b parked at scaffolding).
+- pytest baseline: 447 passing on main; 447 on `cp-5-5b-precompute-rebuild` (no test changes yet on branch).
+
+### CP-5 arc PRs landed since conv-30 (8 PRs)
+
+| PR | Slug | Squash | One-line scope |
+| --- | --- | --- | --- |
+| #299 | cp-5-1b-helper-and-view (CP-5.1) | — | Migration 027 `inst_to_top_parent` + `unified_holdings` views; `top_parent_holdings_join` helper; FoF subtraction deferred to P2 (`cp-5-fof-subtraction-cusip-linkage`); 6 missing dm_v1 self-rollups null-result (already backfilled). 416→426 tests. |
+| #300 | cp-5-2-register-partial-and-unified-quarter-fix (CP-5.2) | — | Migration 028 quarter dimension on `unified_holdings`; 4 of 7 Register sites migrated (queries 1, 2, 12, 16); 3 deferred to P1 sub-PRs (`cp-5-2a` summary_by_parent rebuild blocked Q7; `cp-5-2b` manager_type imputation recon; `cp-5-2c` register-drill-hierarchy). 426→434 tests. |
+| #301 | cp-5-3-cross-ownership-readers (CP-5.3) | — | 3 CLEAN sites / 6 sub-sites in `scripts/queries/cross.py` migrated (C1, C4, C6); 2 BLOCKED_DRILL deferred to `cp-5-2c`. 434→438 tests. |
+| #302 | cp-5-4-recon | — | Read-only investigation; zero BLOCKED sites; Conviction L-size hypotheses (manager_aum, portfolio_context, Direction/Since/Held) all false premises; recommended Option A bundled. 438 unchanged. |
+| #303 | cp-5-4-execute (CP-5.4) | — | 5 CLEAN sub-sites: C1 `market.py:135`, C2 `api_market.py:199`, CV1 `fund.py:110`, CV2 `fund.py:179+:188`, FPM1 `api_fund.py:42`; alias='h' variant uniform; §6.4 binder-ambiguity surfaced as standing rule. 438→444 tests. |
+| #304 | cp-5-bundle-c-api-files-extension | `1c98658` | Read-only hygiene; `api_*.py` reader layer enumerated (37 rows added, 27→64); per-feature breakdown: 10 MIGRATED, 2 NO_OP, 3 PENDING_CP5_2C, 9 PENDING_CP5_5, 4 PENDING_CP5_6, 4 PENDING_CP5_BUNDLE_C, 6 N/A, 26 DELEGATING_WRAPPER, 3 DISPATCH_UTILITY. 444 unchanged. |
+| #305 | cp-5-5-recon | `1288507` | 9 PENDING_CP5_5 sites scoped; 4-5 CLEAN main bundle; 3 BLOCKED_FLOWS_PRECOMPUTE deferred to CP-5.5b; S9 helper deferred; Activist closes implicitly via `entity_type` column. 444 unchanged. |
+| #306 | cp-5-5-execute (CP-5.5 main) | `945b173` | 4 sites migrated (S1 cohort_analysis, S2 holder_momentum, S3 ownership_trend_summary, S4 flow_analysis live); S8 (compute_aum_for_subtree) deferred to ROADMAP P1 `cp-5-aum-subtree-redesign` after Phase 1 schema check caught `unified_holdings` mismatch. 444→447 tests (3 pass + 2 skip on fixture single-quarter). |
+| #307 | cp-5-aum-subtree-callers-recon | `d11cfba` | Investigated `compute_aum_for_subtree` callers (2 production callers, both Entity Graph tab); CLOSED as no-op — function correctly serves filer-grain semantics; CP-5.6 independent. 447 unchanged. |
+
+### Process rules locked / amended this arc
+
+- **PR #303 §6.4 — Helper alias variant default for binder safety.** DuckDB binder fails ambiguity inside cross-join shape (`FROM table_a, cte_b`) when noalias variant of `top_parent_canonical_name_sql()` is used. All sites default to alias variant uniformly. Will formalize as standing rule #15 in conv-31-doc-sync proper.
+- **PR #306 Phase 1 schema check — Recon recommendations claiming "one-line swap" require schema verification at execute time.** Recon may inspect call sites without verifying the target view/table actually carries equivalent columns. Every execute Phase 1 includes schema verification step against recon's claimed migration target. Will formalize as standing rule #16.
+- **CP-5.4/5.5 helper-alias self-consistency.** CV2 and S2 surfaced that helper alias use must stay self-consistent across SELECT and WHERE clauses; outer aliases need disambiguation when the helper takes 'h'. Bake into future migration prompts. Will formalize as standing rule #17.
+- **Code merges + cleans up after explicit chat approval** (amended R5, locked 2026-05-06). After chat says "merge <N>", Code runs full sequence (`gh pr merge --squash`, defensive untracked-file cleanup, pull main, optional remote branch delete, report new HEAD). Standard PR creation safety convention unchanged: stop at PR creation, wait for chat review.
+
+### Open ROADMAP items added this arc
+
+- `cp-5-2a-summary-by-parent-rebuild` (P1, blocked on Bundle C Q7 chat decision) — required for `register.py:104-115` (N-PORT cov) + `register.py:560-660` (query14 drill).
+- `cp-5-2b-manager-type-imputation-recon` (P1, read-only investigation) — determine whether ECH institution taxonomy already provides what active/passive Register queries need.
+- `cp-5-2c-register-drill-hierarchy` (P1, blocked on `cp-5-2a`) — drill hierarchy + `tp_to_filer` + 2 cross.py BLOCKED_DRILL sites.
+- `cp-5-fof-subtraction-cusip-linkage` (P2) — build CUSIP→fund-entity bridge so Bundle A §1.4 FoF subtraction can re-enter `unified_holdings`.
+- `cp-5-aum-subtree-redesign` — CLOSED as no-op per PR #307. Function correctly serves Entity Graph filer-grain. Cross-tab AUM inconsistency vs top-parent-grain tabs is acceptable design.
+
+### CP-5.5b state (CURRENT, parked)
+
+- Branch: `cp-5-5b-precompute-rebuild`.
+- HEAD: `a53b8ac` (addendum) → `a3fe7cd` (plan) → `d11cfba` (main).
+- Plan doc: `docs/findings/cp-5-5b-precompute-rebuild-plan.md`.
+- **Decision locks:**
+  - Option B: generator-driven side-build for 029a `peer_rotation_flows` (CTAS-and-swap pattern via `compute_peer_rotation.py` rebuild).
+  - Column-drop CTAS for 029b `investor_flows` (`rollup_entity_id` already 100% populated).
+  - Hard cap on G1 row expansion: 3% (abort if exceeded).
+  - `shares_history` derivative: in-PR if found and single read-path swap; escalate only if structural.
+- **6 reader sites in scope** (was 5; `register.py:633-640` added in Phase 1):
+  - `market.py:316` `get_sector_flow_movers`
+  - `market.py:475` `get_sector_flow_mover_detail`
+  - `trend.py:678` `get_peer_rotation_detail`
+  - `flows.py:506` `flow_analysis` investor_flows read
+  - `flows.py:515` (subsumed)
+  - `register.py:633` (NAME-keyed against `investor_flows`; bundled per Q2 default)
+- Pre-flight backup #1 captured: `data/backups/13f_backup_20260506_165238` (3.2GB).
+- **Phase 1 audit findings:**
+  - `shares_history`: XBRL-derived, not flows-derived; no consumer of dropped columns.
+  - `ticker_flow_stats`: doesn't carry `inst_parent_name`.
+  - `validate_schema_parity` / `canonical_ddl` audit clean.
+  - Activist closure: ECH classification 'activist' populates `entity_type` at rebuild time.
+- **Path forward (3-4 sessions):**
+  1. Generator updates (`compute_peer_rotation.py` + `compute_flows.py`) → commit.
+  2. Migration 029 script (029a generator-driven, 029b column-drop CTAS) → commit, run side-build (hours-scale background).
+  3. Atomic swap + 6 reader migrations + tests → commit.
+  4. Findings doc + PR.
+
+### Forward sequence
+
+1. Resume CP-5.5b at Phase 2 (generator updates).
+2. CP-5.6 — 4 PENDING_CP5_6 sites (institution-hierarchy, `holder_momentum` fund children, `get_entity_descendants`, `search_entity_parents`) — independent of CP-5.5b.
+3. conv-31-doc-sync proper — CP-5 closure + standing rules #15/#16/#17 formalized + ROADMAP cleanup (close `cp-5-aum-subtree-redesign` as investigated-no-op, BlackRock brand-vs-filer reminder, Bundle C csv hygiene refresh).
+
+### Backups archived this arc
+
+Three retained EXPORT directories per cadence rule (PR #273 + #292):
+
+- `data/backups/13f_backup_20260506_165238` (CP-5.5b pre-flight #1, 3.2GB).
+- `data/backups/13f_backup_20260506_065231`.
+- `data/backups/13f_backup_20260505_165855`.
+
+---
+
 ## conv-25 — institution-consolidation arc (2026-05-02)
 
 **HEAD on main:** b65363a
