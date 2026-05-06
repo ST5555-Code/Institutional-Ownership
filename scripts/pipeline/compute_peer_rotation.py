@@ -398,24 +398,35 @@ class ComputePeerRotationPipeline(SourcePipeline):
         self, staging_con: Any, alias: Optional[str],
         q_from: str, q_to: str,
     ) -> None:
+        # PR #295's drop PR removed ``holdings_v2.dm_rollup_name``; resolve
+        # the DM rollup name at read time via a LEFT JOIN to
+        # ``entity_rollup_history`` + ``entities`` (Method A, canonical per
+        # PR #280). Per-(cik, ticker, quarter) grouping aggregates with MAX
+        # — same shape as the prior denormalized read.
         staging_con.execute("DROP TABLE IF EXISTS h_agg_pair")
         staging_con.execute(f"""
             CREATE TEMP TABLE h_agg_pair AS
-            SELECT cik,
-                   MAX(rollup_name)      AS rollup_name,
-                   MAX(dm_rollup_name)   AS dm_rollup_name,
-                   MAX(inst_parent_name) AS inst_parent_name,
-                   MAX(manager_name)     AS manager_name,
-                   MAX(entity_type)      AS entity_type,
-                   ticker,
-                   quarter,
-                   SUM(shares)           AS shares,
-                   SUM(market_value_usd) AS market_value_usd
-              FROM {self._src(alias, 'holdings_v2')}
-             WHERE ticker IS NOT NULL
-               AND quarter IN (?, ?)
-               AND is_latest = TRUE
-             GROUP BY cik, ticker, quarter
+            SELECT h.cik,
+                   MAX(h.rollup_name)        AS rollup_name,
+                   MAX(dm_e.canonical_name)  AS dm_rollup_name,
+                   MAX(h.inst_parent_name)   AS inst_parent_name,
+                   MAX(h.manager_name)       AS manager_name,
+                   MAX(h.entity_type)        AS entity_type,
+                   h.ticker,
+                   h.quarter,
+                   SUM(h.shares)             AS shares,
+                   SUM(h.market_value_usd)   AS market_value_usd
+              FROM {self._src(alias, 'holdings_v2')} h
+              LEFT JOIN {self._src(alias, 'entity_rollup_history')} dm_erh
+                     ON dm_erh.entity_id = h.entity_id
+                    AND dm_erh.rollup_type = 'decision_maker_v1'
+                    AND dm_erh.valid_to = DATE '9999-12-31'
+              LEFT JOIN {self._src(alias, 'entities')} dm_e
+                     ON dm_e.entity_id = dm_erh.rollup_entity_id
+             WHERE h.ticker IS NOT NULL
+               AND h.quarter IN (?, ?)
+               AND h.is_latest = TRUE
+             GROUP BY h.cik, h.ticker, h.quarter
         """, [q_from, q_to])  # nosec B608 — identifier is from class constant
 
     def _materialize_fund_agg(

@@ -46,14 +46,53 @@ logger = logging.getLogger(__name__)
 # --- Rollup type parameterization ---
 VALID_ROLLUP_TYPES = {'economic_control_v1', 'decision_maker_v1'}
 
-def _rollup_col(rollup_type='economic_control_v1'):
-    """Return the rollup column name for the given rollup type.
-    economic_control_v1 -> 'rollup_name' (fund sponsor / voting)
-    decision_maker_v1   -> 'dm_rollup_name' (sub-adviser making decisions)
+
+def _rollup_name_sql(alias='h', rollup_type='economic_control_v1'):
+    """Return SQL expression for rollup display name.
+
+    economic_control_v1 -> ``{alias}.rollup_name`` (column read).
+    decision_maker_v1   -> correlated subquery resolving via
+        ``entity_rollup_history`` JOIN ``entities``. Replaces the
+        ``holdings_v2.dm_rollup_name`` column dropped by migration 025
+        (Method A read-time JOIN, canonical per PR #280).
+
+    ``alias`` is the holdings_v2 table alias (or '' if no alias). The
+    subquery dereferences ``{alias}.entity_id`` to look up the
+    decision-maker rollup.
     """
     if rollup_type not in VALID_ROLLUP_TYPES:
         raise ValueError(f'Invalid rollup_type: {rollup_type}. Must be one of {VALID_ROLLUP_TYPES}')
-    return 'dm_rollup_name' if rollup_type == 'decision_maker_v1' else 'rollup_name'
+    if rollup_type == 'decision_maker_v1':
+        eid_ref = f"{alias}.entity_id" if alias else "entity_id"
+        return (
+            "(SELECT e.canonical_name FROM entity_rollup_history erh "
+            "JOIN entities e ON e.entity_id = erh.rollup_entity_id "
+            f"WHERE erh.entity_id = {eid_ref} "
+            "AND erh.rollup_type = 'decision_maker_v1' "
+            "AND erh.valid_to = DATE '9999-12-31')"
+        )
+    return f"{alias}.rollup_name" if alias else "rollup_name"
+
+
+def _rollup_eid_sql(alias='h', rollup_type='economic_control_v1'):
+    """Return SQL expression for rollup entity_id.
+
+    economic_control_v1 -> ``{alias}.rollup_entity_id`` (column read).
+    decision_maker_v1   -> correlated subquery resolving via
+        ``entity_rollup_history``. Replaces the
+        ``holdings_v2.dm_rollup_entity_id`` column dropped by migration 025.
+    """
+    if rollup_type not in VALID_ROLLUP_TYPES:
+        raise ValueError(f'Invalid rollup_type: {rollup_type}. Must be one of {VALID_ROLLUP_TYPES}')
+    if rollup_type == 'decision_maker_v1':
+        eid_ref = f"{alias}.entity_id" if alias else "entity_id"
+        return (
+            "(SELECT erh.rollup_entity_id FROM entity_rollup_history erh "
+            f"WHERE erh.entity_id = {eid_ref} "
+            "AND erh.rollup_type = 'decision_maker_v1' "
+            "AND erh.valid_to = DATE '9999-12-31')"
+        )
+    return f"{alias}.rollup_entity_id" if alias else "rollup_entity_id"
 
 
 LQ = LATEST_QUARTER
@@ -716,7 +755,7 @@ def get_nport_children_q2(inst_parent_name, ticker, con, limit=5):
 
 def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rollup_type='economic_control_v1'):
     """Get 13F filing entity child rows as fallback."""
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
     df = con.execute(f"""
         SELECT
             h.fund_name as institution,
@@ -727,7 +766,7 @@ def get_13f_children(inst_parent_name, ticker, cusip, quarter, con, limit=5, rol
         FROM holdings_v2 h
         WHERE h.quarter = '{quarter}'
           AND (h.ticker = ? OR h.cusip = ?)
-          AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) = ?
+          AND COALESCE({rn}, h.inst_parent_name, h.manager_name) = ?
           AND h.is_latest = TRUE
         GROUP BY h.fund_name, type
         ORDER BY value_live DESC NULLS LAST

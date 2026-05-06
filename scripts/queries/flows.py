@@ -17,7 +17,7 @@ from .common import (
     LQ,
     FQ,
     PQ,
-    _rollup_col,
+    _rollup_name_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -208,7 +208,7 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
 
 
 def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1', quarter=LQ):
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         fq = from_quarter or PQ
@@ -317,7 +317,7 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
     """Compute buyer/seller/new/exit flows live from holdings or fund_holdings.
     Returns (buyers, sellers, new_entries, exits) lists.
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     # Period-accurate pct_of_so denominator per quarter (fund-level uses
     # to_quarter for retained/new, from_quarter for exits). Tier cascade:
     # SOH quarter-end → md.shares_outstanding → md.float_shares.
@@ -458,7 +458,7 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
     """Flow analysis — default QoQ (1Q = most recent quarter).
     level: 'parent' (13F) or 'fund' (N-PORT).
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     period_map = {'4Q': FQ, '2Q': QUARTERS[1] if len(QUARTERS) > 1 else FQ, '1Q': PQ}
     quarter_from = period_map.get(period, PQ)
     quarter_to = quarter

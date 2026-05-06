@@ -229,10 +229,15 @@ def main():
         h_src = "holdings_v2"
         fh_src = "fund_holdings_v2"
 
+    # PR #295's drop PR removed holdings_v2.dm_rollup_entity_id; the DM
+    # rollup eid is reachable via the recursive entity_rollup_history walk
+    # below seeded from the EC eids already in this UNION (the closure
+    # follows ``rollup_history`` edges to all rollup ancestors regardless
+    # of rollup_type). fh_src.dm_entity_id remains as the institution-side
+    # DM seed for fund-table coverage.
     seed_sql = f"""
         SELECT entity_id          FROM {h_src}  WHERE entity_id          IS NOT NULL
         UNION SELECT rollup_entity_id    FROM {h_src}  WHERE rollup_entity_id    IS NOT NULL
-        UNION SELECT dm_rollup_entity_id FROM {h_src}  WHERE dm_rollup_entity_id IS NOT NULL
         UNION SELECT entity_id           FROM {fh_src} WHERE entity_id           IS NOT NULL
         UNION SELECT rollup_entity_id    FROM {fh_src} WHERE rollup_entity_id    IS NOT NULL
         UNION SELECT dm_entity_id        FROM {fh_src} WHERE dm_entity_id        IS NOT NULL

@@ -7,7 +7,7 @@ from serializers import (
 )
 from .common import (
     LQ,
-    _rollup_col,
+    _rollup_name_sql,
     _quarter_to_date,
     _resolve_pct_of_so_denom,
     _fund_type_label,
@@ -30,7 +30,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
             con, tickers, anchor=anchor, active_only=active_only,
             limit=limit, quarter=quarter,
         )
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
     # Company names
     placeholders = ','.join(['?'] * len(tickers))
     names_df = con.execute(f"""
@@ -58,7 +58,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     df = con.execute(f"""
         WITH parent_holdings AS (
             SELECT
-                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as investor,
+                COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor,
                 MAX(h.manager_type) as type,
                 h.ticker,
                 SUM(h.market_value_live) as holding_value
@@ -71,7 +71,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
         ),
         portfolio_totals AS (
             SELECT
-                COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as investor,
+                COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor,
                 SUM(h.market_value_live) as total_portfolio
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}' AND h.is_latest = TRUE

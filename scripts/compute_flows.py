@@ -43,9 +43,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 _ROLLUP_SPECS = [
-    # (rollup_type label, rollup_entity_id col, rollup_name col)
-    ("economic_control_v1", "rollup_entity_id", "rollup_name"),
-    ("decision_maker_v1",   "dm_rollup_entity_id", "dm_rollup_name"),
+    # (rollup_type label, rollup_entity_id SQL expression, rollup_name SQL
+    # expression). Expressions reference the ``h`` alias on ``holdings_v2``.
+    # PR #295's drop PR removed ``holdings_v2.dm_rollup_*``; the DM path
+    # resolves via correlated subqueries against ``entity_rollup_history``
+    # (Method A read-time JOIN, canonical per PR #280).
+    (
+        "economic_control_v1",
+        "h.rollup_entity_id",
+        "h.rollup_name",
+    ),
+    (
+        "decision_maker_v1",
+        "(SELECT erh.rollup_entity_id FROM entity_rollup_history erh "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+        "(SELECT e.canonical_name FROM entity_rollup_history erh "
+        "JOIN entities e ON e.entity_id = erh.rollup_entity_id "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+    ),
 ]
 
 
@@ -157,30 +176,30 @@ def _insert_period_flows(  # pylint: disable=too-many-positional-arguments,too-m
             flow_4q, flow_2q, momentum_ratio, momentum_signal
         )
         WITH q_from AS (
-            SELECT ticker,
+            SELECT h.ticker,
                    {rid_col}   AS rollup_entity_id,
                    {rname_col} AS rollup_name,
-                   MAX(manager_type) AS manager_type,
-                   SUM(shares)           AS shares,
-                   SUM(market_value_usd) AS value
-            FROM holdings_v2
-            WHERE quarter = '{q_from}'
-              AND ticker IS NOT NULL AND ticker != ''
-              AND is_latest = TRUE
-            GROUP BY ticker, {rid_col}, {rname_col}
+                   MAX(h.manager_type) AS manager_type,
+                   SUM(h.shares)           AS shares,
+                   SUM(h.market_value_usd) AS value
+            FROM holdings_v2 h
+            WHERE h.quarter = '{q_from}'
+              AND h.ticker IS NOT NULL AND h.ticker != ''
+              AND h.is_latest = TRUE
+            GROUP BY h.ticker, {rid_col}, {rname_col}
         ),
         q_to AS (
-            SELECT ticker,
+            SELECT h.ticker,
                    {rid_col}   AS rollup_entity_id,
                    {rname_col} AS rollup_name,
-                   MAX(manager_type) AS manager_type,
-                   SUM(shares)           AS shares,
-                   SUM(market_value_usd) AS value
-            FROM holdings_v2
-            WHERE quarter = '{q_to}'
-              AND ticker IS NOT NULL AND ticker != ''
-              AND is_latest = TRUE
-            GROUP BY ticker, {rid_col}, {rname_col}
+                   MAX(h.manager_type) AS manager_type,
+                   SUM(h.shares)           AS shares,
+                   SUM(h.market_value_usd) AS value
+            FROM holdings_v2 h
+            WHERE h.quarter = '{q_to}'
+              AND h.ticker IS NOT NULL AND h.ticker != ''
+              AND h.is_latest = TRUE
+            GROUP BY h.ticker, {rid_col}, {rname_col}
         ),
         combined AS (
             SELECT
@@ -258,18 +277,18 @@ def _project_period_flows(
     """Dry-run projection: count rows that would be inserted for this slice."""
     row = con.execute(f"""
         WITH q_from AS (
-            SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
-                   SUM(shares) AS shares, SUM(market_value_usd) AS value
-            FROM holdings_v2
-            WHERE quarter = '{q_from}' AND ticker IS NOT NULL AND ticker != '' AND is_latest = TRUE
-            GROUP BY ticker, {rid_col}, {rname_col}
+            SELECT h.ticker, {rid_col} AS rid, {rname_col} AS rname,
+                   SUM(h.shares) AS shares, SUM(h.market_value_usd) AS value
+            FROM holdings_v2 h
+            WHERE h.quarter = '{q_from}' AND h.ticker IS NOT NULL AND h.ticker != '' AND h.is_latest = TRUE
+            GROUP BY h.ticker, {rid_col}, {rname_col}
         ),
         q_to AS (
-            SELECT ticker, {rid_col} AS rid, {rname_col} AS rname,
-                   SUM(shares) AS shares, SUM(market_value_usd) AS value
-            FROM holdings_v2
-            WHERE quarter = '{q_to}' AND ticker IS NOT NULL AND ticker != '' AND is_latest = TRUE
-            GROUP BY ticker, {rid_col}, {rname_col}
+            SELECT h.ticker, {rid_col} AS rid, {rname_col} AS rname,
+                   SUM(h.shares) AS shares, SUM(h.market_value_usd) AS value
+            FROM holdings_v2 h
+            WHERE h.quarter = '{q_to}' AND h.ticker IS NOT NULL AND h.ticker != '' AND h.is_latest = TRUE
+            GROUP BY h.ticker, {rid_col}, {rname_col}
         )
         SELECT COUNT(*)
         FROM q_to t

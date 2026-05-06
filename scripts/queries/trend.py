@@ -12,7 +12,8 @@ from serializers import (
 )
 from .common import (
     LQ,
-    _rollup_col,
+    _rollup_name_sql,
+    _rollup_eid_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -32,7 +33,7 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
     level='parent': top 25 13F parents with collapsible N-PORT children.
     level='fund': top 25 individual N-PORT funds (flat).
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -105,12 +106,10 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
             return results
 
         # --- Parent-level branch ---
-        # rollup_entity_id column on holdings_v2 mirrors `rn` (the rollup
-        # name column). Used to JOIN against parent_fund_map below.
-        eid_col = (
-            'dm_rollup_entity_id' if rollup_type == 'decision_maker_v1'
-            else 'rollup_entity_id'
-        )
+        # rollup eid expression mirrors `rn`. EC reads the column directly;
+        # DM resolves via entity_rollup_history JOIN (Method A) since
+        # holdings_v2.dm_rollup_entity_id was dropped in PR #295's drop PR.
+        eid_col = _rollup_eid_sql('', rollup_type)
 
         # Top 25 parents by latest quarter value. Also fetch the rollup
         # entity_id so the parent_fund_map JOIN below avoids a name->eid
@@ -328,7 +327,7 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
     level: 'parent' (13F) or 'fund' (N-PORT).
     active_only: fund level — only include funds classified as active.
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         # Per-quarter denominator cache (avoids per-row queries in the loop).

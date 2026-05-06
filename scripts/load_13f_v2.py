@@ -147,8 +147,6 @@ CREATE TABLE IF NOT EXISTS holdings_v2 (
     rollup_entity_id        BIGINT,
     rollup_name             VARCHAR,
     entity_type             VARCHAR,
-    dm_rollup_entity_id     BIGINT,
-    dm_rollup_name          VARCHAR,
     pct_of_so_source        VARCHAR,
     is_latest               BOOLEAN,
     loaded_at               TIMESTAMP,
@@ -228,8 +226,6 @@ _TARGET_TABLE_COLUMNS: list[tuple[str, str]] = [
     ("rollup_entity_id", "BIGINT"),
     ("rollup_name", "VARCHAR"),
     ("entity_type", "VARCHAR"),
-    ("dm_rollup_entity_id", "BIGINT"),
-    ("dm_rollup_name", "VARCHAR"),
     ("pct_of_so_source", "VARCHAR"),
     ("is_latest", "BOOLEAN"),
     ("loaded_at", "TIMESTAMP"),
@@ -496,7 +492,7 @@ class Load13FPipeline(SourcePipeline):
                 vote_none, put_call, market_value_live,
                 security_type_inferred, fund_name, classification_source,
                 entity_id, rollup_entity_id, rollup_name, entity_type,
-                dm_rollup_entity_id, dm_rollup_name, pct_of_so_source,
+                pct_of_so_source,
                 is_latest, loaded_at, backfill_quality
             )
             SELECT
@@ -534,8 +530,6 @@ class Load13FPipeline(SourcePipeline):
                 NULL AS rollup_entity_id,
                 NULL AS rollup_name,
                 NULL AS entity_type,
-                NULL AS dm_rollup_entity_id,
-                NULL AS dm_rollup_name,
                 NULL AS pct_of_so_source,
                 TRUE AS is_latest,
                 NOW() AS loaded_at,

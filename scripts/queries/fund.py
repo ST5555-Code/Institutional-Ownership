@@ -3,7 +3,7 @@ import logging
 
 from .common import (
     LQ,
-    _rollup_col,
+    _rollup_name_sql,
     get_db,
     get_cusip,
     get_nport_children_batch,
@@ -45,7 +45,8 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
     """Conviction tab — portfolio concentration context for top holders.
     Returns each holder's sector breakdown with emphasis on the subject ticker's sector.
     """
-    rn = _rollup_col(rollup_type)
+    rn = _rollup_name_sql('h', rollup_type)
+    rn_noalias = _rollup_name_sql('', rollup_type)
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -106,7 +107,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
             """, [ticker] + active_params).fetchdf()
         else:
             top_holders_df = con.execute(f"""
-                SELECT COALESCE({rn}, inst_parent_name, manager_name) as holder,
+                SELECT COALESCE({rn_noalias}, inst_parent_name, manager_name) as holder,
                        SUM(market_value_live) as val,
                        MAX(manager_type) as mtype
                 FROM holdings_v2
@@ -175,7 +176,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
         else:
             portfolio_df = con.execute(f"""
                 SELECT
-                    COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) as holder,
+                    COALESCE({rn}, h.inst_parent_name, h.manager_name) as holder,
                     h.ticker,
                     COALESCE(m.sector, 'Unknown') as yf_sector,
                     COALESCE(m.industry, '') as yf_industry,
@@ -184,7 +185,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 FROM holdings_v2 h
                 LEFT JOIN market_data m ON h.ticker = m.ticker
                 WHERE h.quarter = '{quarter}'
-                  AND COALESCE(h.{rn}, h.inst_parent_name, h.manager_name) IN ({ph})
+                  AND COALESCE({rn}, h.inst_parent_name, h.manager_name) IN ({ph})
                   AND h.market_value_live > 0
                   AND h.is_latest = TRUE
                 GROUP BY holder, h.ticker, m.sector, m.industry

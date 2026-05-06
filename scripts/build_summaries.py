@@ -58,9 +58,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 _ROLLUP_SPECS = [
-    # (rollup_type label, holdings_v2 rid col, holdings_v2 rname col)
-    ("economic_control_v1", "rollup_entity_id", "rollup_name"),
-    ("decision_maker_v1",   "dm_rollup_entity_id", "dm_rollup_name"),
+    # (rollup_type label, rid SQL expression, rname SQL expression).
+    # Expressions assume the holdings_v2 alias ``h``. PR #295 dropped the
+    # denormalized DM columns; DM resolves at read time via correlated
+    # subqueries against ``entity_rollup_history`` (Method A, canonical
+    # per PR #280).
+    (
+        "economic_control_v1",
+        "h.rollup_entity_id",
+        "h.rollup_name",
+    ),
+    (
+        "decision_maker_v1",
+        "(SELECT erh.rollup_entity_id FROM entity_rollup_history erh "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+        "(SELECT e.canonical_name FROM entity_rollup_history erh "
+        "JOIN entities e ON e.entity_id = erh.rollup_entity_id "
+        "WHERE erh.entity_id = h.entity_id "
+        "AND erh.rollup_type = 'decision_maker_v1' "
+        "AND erh.valid_to = DATE '9999-12-31')",
+    ),
 ]
 
 
@@ -203,8 +222,8 @@ def _project_summary_by_parent(con, quarter: str, rid_col: str) -> int:
     """Dry-run projection: distinct rollup_entity_ids in 13F scope."""
     return con.execute(f"""
         SELECT COUNT(DISTINCT {rid_col})
-        FROM holdings_v2
-        WHERE quarter = ? AND is_latest = TRUE
+        FROM holdings_v2 h
+        WHERE h.quarter = ? AND h.is_latest = TRUE
     """, [quarter]).fetchone()[0]
 
 
@@ -266,8 +285,8 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
         {nport_cte}
         parent_13f AS (
             SELECT
-                h.{rid_col}             AS rid,
-                MAX(h.{rname_col})      AS rname,
+                {rid_col}             AS rid,
+                MAX({rname_col})      AS rname,
                 SUM(h.market_value_usd) AS total_aum,
                 COUNT(DISTINCT h.ticker) AS ticker_count,
                 SUM(h.shares)           AS total_shares,
@@ -275,7 +294,7 @@ def _build_summary_by_parent(  # pylint: disable=too-many-positional-arguments,t
                 BOOL_OR(h.is_passive)   AS is_passive
             FROM holdings_v2 h
             WHERE h.quarter = ? AND h.is_latest = TRUE
-            GROUP BY h.{rid_col}
+            GROUP BY {rid_col}
         )
         SELECT
             ? AS quarter,
