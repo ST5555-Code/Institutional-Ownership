@@ -25,21 +25,62 @@ with is_latest=TRUE, and in summary_by_ticker across multiple quarters).
 """
 from __future__ import annotations
 
+import importlib.util
 import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
+import duckdb
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DB = ROOT / "tests" / "fixtures" / "13f_fixture.duckdb"
+MIG_027 = ROOT / "scripts" / "migrations" / "027_unified_holdings_view.py"
+MIG_028 = (
+    ROOT / "scripts" / "migrations"
+    / "028_unified_holdings_quarter_dimension.py"
+)
+
+
+def _load_migration(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, str(path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 @pytest.fixture(scope="module")
-def client():
+def client(tmp_path_factory):
     if not FIXTURE_DB.exists():
         pytest.skip(f"Fixture DB missing: {FIXTURE_DB}")
-    os.environ["DB_PATH_OVERRIDE"] = str(FIXTURE_DB)
+
+    # CP-5.3: cross-ownership readers now consume inst_to_top_parent /
+    # unified_holdings (migrations 027 + 028). The committed fixture
+    # carries tables only — views are migration-managed and must be
+    # applied to a tmp copy before booting the FastAPI test client.
+    # Mirrors tests/smoke/conftest.py wiring added in PR #300.
+    tmp_dir = tmp_path_factory.mktemp("bl7_fixture")
+    tmp_db = tmp_dir / "13f_fixture_with_views.duckdb"
+    shutil.copy(FIXTURE_DB, tmp_db)
+
+    boot = duckdb.connect(str(tmp_db))
+    boot.execute(
+        "CREATE TABLE IF NOT EXISTS schema_versions ("
+        "  version VARCHAR PRIMARY KEY, "
+        "  notes VARCHAR, "
+        "  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    boot.close()
+    _load_migration(MIG_027, "mig027").run_migration(
+        str(tmp_db), dry_run=False, skip_guards=True
+    )
+    _load_migration(MIG_028, "mig028").run_migration(
+        str(tmp_db), dry_run=False, skip_guards=True
+    )
+
+    os.environ["DB_PATH_OVERRIDE"] = str(tmp_db)
 
     scripts_dir = str(ROOT / "scripts")
     if scripts_dir not in sys.path:
@@ -52,7 +93,7 @@ def client():
     # by earlier test modules with their own scratch DB. Force both back to
     # the BL-7 fixture DB. Same pattern as test_admin_refresh_endpoints.py.
     import app_db  # noqa: E402
-    app_db.DB_PATH = str(FIXTURE_DB)
+    app_db.DB_PATH = str(tmp_db)
     app_db._active_db_path = None  # pylint: disable=protected-access
     app_db.init_db_path()
 

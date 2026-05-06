@@ -7,10 +7,10 @@ from serializers import (
 )
 from .common import (
     LQ,
-    _rollup_name_sql,
     _quarter_to_date,
     _resolve_pct_of_so_denom,
     _fund_type_label,
+    top_parent_canonical_name_sql,
     ACTIVE_FUND_STRATEGIES,
 )
 
@@ -24,13 +24,32 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
 
     level='parent' (default) rolls up to institutional parents from holdings_v2.
     level='fund' returns individual fund series rows from fund_holdings_v2.
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027). The previous
+    ``COALESCE(_rollup_name_sql, inst_parent_name, manager_name)`` name-
+    coalesce is replaced by ``top_parent_canonical_name_sql`` which
+    climbs to the top-parent canonical name. The ``rollup_type``
+    parameter is preserved for API compatibility but is now inert: the
+    helper expression is rollup-type independent (see
+    common.py:top_parent_canonical_name_sql docstring). All sub-sites
+    inside this function use the same expression so name shapes match
+    across the parent_holdings, portfolio_totals, fund_parents JOIN,
+    and pivoted ORDER BY columns.
+
+    Drill: ``get_cross_ownership_fund_detail`` (downstream consumer) is
+    NOT migrated in this PR — its filer-tier ERH lookup
+    (``e2.canonical_name = institution``) does not match the new
+    top-parent canonical name from this query. Drill rewrite tracked
+    in cp-5-2c-register-drill-hierarchy.
     """
     if level == 'fund':
         return _cross_ownership_fund_query(
             con, tickers, anchor=anchor, active_only=active_only,
             limit=limit, quarter=quarter,
         )
-    rn = _rollup_name_sql('h', rollup_type)
+    _ = rollup_type  # signature preserved for API compatibility
+    tpn = top_parent_canonical_name_sql('h')
     # Company names
     placeholders = ','.join(['?'] * len(tickers))
     names_df = con.execute(f"""
@@ -58,7 +77,7 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
     df = con.execute(f"""
         WITH parent_holdings AS (
             SELECT
-                COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor,
+                {tpn} as investor,
                 MAX(h.manager_type) as type,
                 h.ticker,
                 SUM(h.market_value_live) as holding_value
@@ -71,13 +90,20 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
         ),
         portfolio_totals AS (
             SELECT
-                COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor,
+                {tpn} as investor,
                 SUM(h.market_value_live) as total_portfolio
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}' AND h.is_latest = TRUE
             GROUP BY investor
         ),
         fund_parents AS (
+            -- Set of canonical names that have fund coverage. Used to
+            -- set has_fund_detail flag on parent_holdings rows so the
+            -- front-end knows which rows can be drilled. Climbs via
+            -- inst_to_top_parent to match the migrated parent_holdings
+            -- investor name (top-parent canonical_name); without the
+            -- climb, multi-arm umbrellas (e.g., Capital Group eid 12)
+            -- would produce filer-tier names that fail the JOIN below.
             SELECT DISTINCT name FROM (
                 SELECT e.canonical_name AS name
                 FROM fund_holdings_v2 fh2
@@ -85,7 +111,9 @@ def _cross_ownership_query(con, tickers, anchor=None, active_only=False, limit=2
                   ON erh.entity_id = fh2.entity_id
                  AND erh.rollup_type = 'decision_maker_v1'
                  AND erh.valid_to = DATE '9999-12-31'
-                JOIN entities e ON e.entity_id = erh.rollup_entity_id
+                JOIN inst_to_top_parent ittp
+                  ON ittp.entity_id = erh.rollup_entity_id
+                JOIN entities e ON e.entity_id = ittp.top_parent_entity_id
                 WHERE fh2.quarter = '{quarter}' AND fh2.is_latest = TRUE
                   AND fh2.market_value_usd > 0
                 UNION
@@ -335,6 +363,14 @@ def get_two_company_overlap(subject, second, quarter, con):
     """Compare institutional + fund holders of two tickers in a single quarter.
 
     Returns: {'institutional': [...], 'fund': [...], 'meta': {...}}
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027). The previous
+    ``COALESCE(rollup_name, inst_parent_name, manager_name)`` name-
+    coalesce in subj_holders / sec_holders is replaced by
+    ``top_parent_canonical_name_sql``. The fund panel and overlap drill
+    (``get_overlap_institution_detail``) are not migrated here — drill
+    tracked in cp-5-2c-register-drill-hierarchy.
     """
     # --- 3a. Period-accurate denominator for both tickers (null-safe) ----
     # Tier cascade: SOH quarter-end → md.shares_outstanding → md.float_shares.
@@ -344,11 +380,13 @@ def get_two_company_overlap(subject, second, quarter, con):
     subj_denom, subj_denom_source = _resolve_pct_of_so_denom(con, subject, qe)
     sec_denom, sec_denom_source = _resolve_pct_of_so_denom(con, second, qe)
 
+    tpn = top_parent_canonical_name_sql('h')
+
     # --- 3b. Institutional panel (top 50 by Subject $) -------------------
-    inst_rows = con.execute("""
+    inst_rows = con.execute(f"""
         WITH subj_holders AS (
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+                {tpn} as holder,
                 MAX(h.manager_type) as manager_type,
                 SUM(h.shares) as subj_shares,
                 SUM(h.market_value_live) as subj_dollars
@@ -361,7 +399,7 @@ def get_two_company_overlap(subject, second, quarter, con):
         ),
         sec_holders AS (
             SELECT
-                COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+                {tpn} as holder,
                 SUM(h.shares) as sec_shares,
                 SUM(h.market_value_live) as sec_dollars
             FROM holdings_v2 h
@@ -637,16 +675,21 @@ def get_two_company_subject(subject, quarter, con):
     can render "—" placeholders in the second-company columns. The subject
     panels are top 50 holders ordered by dollar value, same as the overlap
     endpoint's left-hand side.
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027). Same swap pattern as get_two_company_overlap.
     """
     # --- Period-accurate denominator for percent-of-SO computation -------
     # Tier cascade: SOH quarter-end → md.shares_outstanding → md.float_shares.
     subj_denom, subj_denom_source = _resolve_pct_of_so_denom(
         con, subject, _quarter_to_date(quarter))
 
+    tpn = top_parent_canonical_name_sql('h')
+
     # --- Institutional panel (top 50 holders of subject) -----------------
-    inst_rows = con.execute("""
+    inst_rows = con.execute(f"""
         SELECT
-            COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder,
+            {tpn} as holder,
             MAX(h.manager_type) as manager_type,
             SUM(h.shares) as subj_shares,
             SUM(h.market_value_live) as subj_dollars
