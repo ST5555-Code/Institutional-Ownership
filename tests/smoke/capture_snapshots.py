@@ -15,15 +15,32 @@ regenerated after an intentional schema change, not on test failure.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
+
+import duckdb
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 FIXTURE_DB = ROOT / "tests" / "fixtures" / "13f_fixture.duckdb"
 SNAP_DIR = ROOT / "tests" / "fixtures" / "responses"
+MIG_027 = ROOT / "scripts" / "migrations" / "027_unified_holdings_view.py"
+MIG_028 = (
+    ROOT / "scripts" / "migrations"
+    / "028_unified_holdings_quarter_dimension.py"
+)
+
+
+def _load(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, str(path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def main():
@@ -36,7 +53,28 @@ def main():
         sys.exit(f"fixture missing: {FIXTURE_DB} — run scripts/build_fixture.py first")
 
     SNAP_DIR.mkdir(parents=True, exist_ok=True)
-    os.environ["DB_PATH_OVERRIDE"] = str(FIXTURE_DB)
+
+    # CP-5.2: apply migrations 027 + 028 to a tmp copy so captured
+    # responses reflect the entity-keyed Register reader path. The
+    # committed fixture has tables only; views are migration-managed.
+    tmp_dir = Path(tempfile.mkdtemp(prefix="capture_snapshots_"))
+    tmp_db = tmp_dir / "fixture_with_views.duckdb"
+    shutil.copy(FIXTURE_DB, tmp_db)
+    boot = duckdb.connect(str(tmp_db))
+    boot.execute(
+        "CREATE TABLE IF NOT EXISTS schema_versions ("
+        "  version VARCHAR PRIMARY KEY, "
+        "  notes VARCHAR, "
+        "  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    boot.close()
+    _load(MIG_027, "mig027").run_migration(
+        str(tmp_db), dry_run=False, skip_guards=True
+    )
+    _load(MIG_028, "mig028").run_migration(
+        str(tmp_db), dry_run=False, skip_guards=True
+    )
+    os.environ["DB_PATH_OVERRIDE"] = str(tmp_db)
     scripts_dir = str(ROOT / "scripts")
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)

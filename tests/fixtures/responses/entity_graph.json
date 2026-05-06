@@ -23,12 +23,12 @@
       {
         "id": "filer-2",
         "label": "BlackRock / iShares\n\u2014",
-        "title": "BlackRock / iShares<br>CIK: 0000884216<br>13F AUM as of 2025Q4: \u2014",
+        "title": "BlackRock / iShares<br>CIK: 0001137391<br>13F AUM as of 2025Q4: \u2014",
         "level": 1,
         "node_type": "filer",
         "entity_id": 2,
         "display_name": "BlackRock / iShares",
-        "cik": "0000884216",
+        "cik": "0001137391",
         "aum": null,
         "aum_type": "13F AUM as of 2025Q4",
         "color": {
@@ -733,6 +733,6 @@
   "meta": {
     "quarter": null,
     "rollup_type": null,
-    "generated_at": "2026-04-19T19:27:55Z"
+    "generated_at": "2026-05-06T15:07:21Z"
   }
 }

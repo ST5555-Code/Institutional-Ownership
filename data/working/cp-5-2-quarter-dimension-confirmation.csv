@@ -1,0 +1,5 @@
+table,is_latest_predicate,distinct_quarters,min_quarter,max_quarter
+holdings_v2,is_latest=TRUE,4,2025Q1,2025Q4
+fund_holdings_v2,is_latest=TRUE,16,2022Q2,2026Q1
+unified_holdings (pre-028),collapsed,1 (rowcount 5174248),N/A,N/A
+unified_holdings (post-028),per-quarter grain,16 (rowcount 13204508),2022Q2,2026Q1

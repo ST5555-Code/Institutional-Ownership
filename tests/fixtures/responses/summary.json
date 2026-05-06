@@ -2,8 +2,8 @@
   "company_name": "APPLE INC",
   "ticker": "AAPL",
   "latest_quarter": "2025Q4",
-  "total_value": 2595433400288.408,
-  "total_pct_so": 67.02188454923922,
+  "total_value": 2595433400288.4087,
+  "total_pct_so": 67.02188454923925,
   "num_holders": 5928,
   "total_shares": 9853581626,
   "passive_value": 1092131918360.4001,
@@ -15,11 +15,11 @@
   "type_breakdown": [
     {
       "type": "passive",
-      "value": 1156541517304.2002
+      "value": 1156541517304.1997
     },
     {
       "type": "mixed",
-      "value": 532296001410.60016
+      "value": 532296001410.6001
     },
     {
       "type": "active",
@@ -31,7 +31,7 @@
     },
     {
       "type": "wealth_management",
-      "value": 89723935147.79999
+      "value": 89723935147.8
     },
     {
       "type": "hedge_fund",
@@ -43,7 +43,7 @@
     },
     {
       "type": "strategic",
-      "value": 61332162146.4
+      "value": 61332162146.40001
     },
     {
       "type": "private_equity",
