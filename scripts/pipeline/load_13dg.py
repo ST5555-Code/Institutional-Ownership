@@ -106,8 +106,6 @@ _TARGET_TABLE_COLUMNS: list[tuple[str, str]] = [
     ("entity_id",           "BIGINT"),
     ("rollup_entity_id",    "BIGINT"),
     ("rollup_name",         "VARCHAR"),
-    ("dm_rollup_entity_id", "BIGINT"),
-    ("dm_rollup_name",      "VARCHAR"),
     ("is_latest",           "BOOLEAN"),
     ("backfill_quality",    "VARCHAR"),
 ]
@@ -175,8 +173,6 @@ CREATE TABLE IF NOT EXISTS beneficial_ownership_v2 (
     entity_id           BIGINT,
     rollup_entity_id    BIGINT,
     rollup_name         VARCHAR,
-    dm_rollup_entity_id BIGINT,
-    dm_rollup_name      VARCHAR,
     is_latest           BOOLEAN,
     backfill_quality    VARCHAR
 )
@@ -565,9 +561,8 @@ class Load13DGPipeline(SourcePipeline):
                     purpose_text, group_members, manager_cik,
                     loaded_at, name_resolved, entity_id,
                     rollup_entity_id, rollup_name,
-                    dm_rollup_entity_id, dm_rollup_name,
                     is_latest, backfill_quality
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     acc,
@@ -590,8 +585,6 @@ class Load13DGPipeline(SourcePipeline):
                     None,
                     now,
                     False,
-                    None,
-                    None,
                     None,
                     None,
                     None,
