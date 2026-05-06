@@ -22,6 +22,7 @@ from api_common import (
 )
 from app_db import get_db, has_table
 from queries import clean_for_json, df_to_records, short_interest_analysis
+from queries.common import top_parent_canonical_name_sql
 
 log = logging.getLogger(__name__)
 
@@ -194,13 +195,14 @@ def api_crowding(ticker: str = ''):
     con = get_db()
     try:
         validate_ticker_current(con, ticker)
+        tpn = top_parent_canonical_name_sql('h')
         holders = con.execute(
             f"""
-            SELECT COALESCE(rollup_name, inst_parent_name, manager_name) as holder,
-                   manager_type, SUM(pct_of_so) as pct_so,
-                   SUM(market_value_live) as value
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{LQ}' AND is_latest = TRUE
-            GROUP BY holder, manager_type
+            SELECT {tpn} as holder,
+                   h.manager_type, SUM(h.pct_of_so) as pct_so,
+                   SUM(h.market_value_live) as value
+            FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter = '{LQ}' AND h.is_latest = TRUE
+            GROUP BY holder, h.manager_type
             ORDER BY pct_so DESC NULLS LAST LIMIT 20
             """, [ticker]  # nosec B608
         ).fetchdf()
