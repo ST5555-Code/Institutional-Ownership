@@ -1,0 +1,16 @@
+query,condition,median_ms,min_ms,max_ms
+q1_top25_aapl,direct,7.7,7.5,7.7
+q1_top25_aapl,view,155.3,144.9,189.0
+q1_top25_aapl,cte,136.7,132.3,148.4
+q2_top50_combined,direct,7.3,7.1,8.4
+q2_top50_combined,view,168.3,165.8,173.0
+q2_top50_combined,cte,174.1,171.8,174.9
+q3_vanguard_positions,direct,1.2,1.2,1.3
+q3_vanguard_positions,view,65.0,50.1,106.2
+q3_vanguard_positions,cte,46.2,45.1,46.4
+q4_crowding_count,direct,13.9,13.1,14.2
+q4_crowding_count,view,168.8,159.3,232.8
+q4_crowding_count,cte,151.4,143.9,156.0
+q5_cross_pivot_3tickers,direct,14.5,13.2,14.8
+q5_cross_pivot_3tickers,view,156.0,154.2,157.1
+q5_cross_pivot_3tickers,cte,251.5,236.2,296.1
