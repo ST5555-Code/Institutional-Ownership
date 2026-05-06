@@ -12,8 +12,8 @@ from serializers import (
 )
 from .common import (
     LQ,
-    _rollup_name_sql,
     _rollup_eid_sql,
+    top_parent_canonical_name_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -33,7 +33,10 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
     level='parent': top 25 13F parents with collapsible N-PORT children.
     level='fund': top 25 individual N-PORT funds (flat).
     """
-    rn = _rollup_name_sql('', rollup_type)
+    # CP-5.5: parent-tier name resolution via canonical top-parent climb.
+    # eid_col still uses _rollup_eid_sql since rollup_eid passthrough drives
+    # downstream parent_fund_map JOIN keyed on rollup_entity_id (DM/EC).
+    tp_name = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -109,19 +112,19 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
         # rollup eid expression mirrors `rn`. EC reads the column directly;
         # DM resolves via entity_rollup_history JOIN (Method A) since
         # holdings_v2.dm_rollup_entity_id was dropped in PR #295's drop PR.
-        eid_col = _rollup_eid_sql('', rollup_type)
+        eid_col = _rollup_eid_sql('h', rollup_type)
 
         # Top 25 parents by latest quarter value. Also fetch the rollup
         # entity_id so the parent_fund_map JOIN below avoids a name->eid
-        # lookup. parents without a rollup_entity_id (the COALESCE fallback
-        # to inst_parent_name / manager_name) carry eid=None and fall
-        # through to the legacy ILIKE path inside _get_fund_children.
+        # lookup. parents without a rollup_entity_id (the canonical-name
+        # climb falls through to legacy denorm columns) carry eid=None
+        # and route through the legacy ILIKE path inside _get_fund_children.
         top_df = con.execute(f"""
-            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
+            SELECT {tp_name} as parent_name,
                    MAX({eid_col}) as rollup_eid,
-                   SUM(market_value_live) as parent_val
-            FROM holdings_v2
-            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
+                   SUM(h.market_value_live) as parent_val
+            FROM holdings_v2 h
+            WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
             GROUP BY parent_name
             ORDER BY parent_val DESC NULLS LAST
             LIMIT 25
@@ -141,16 +144,16 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
         # Shares per quarter per parent
         ph = ','.join(['?'] * len(top_parents))
         parent_df = con.execute(f"""
-            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
-                   quarter,
-                   SUM(shares) as shares,
-                   MAX(manager_type) as type
-            FROM holdings_v2
-            WHERE (ticker = ? OR cusip = ?)
-              AND quarter IN ({q_placeholders})
-              AND COALESCE({rn}, inst_parent_name, manager_name) IN ({ph})
-              AND is_latest = TRUE
-            GROUP BY parent_name, quarter
+            SELECT {tp_name} as parent_name,
+                   h.quarter,
+                   SUM(h.shares) as shares,
+                   MAX(h.manager_type) as type
+            FROM holdings_v2 h
+            WHERE (h.ticker = ? OR h.cusip = ?)
+              AND h.quarter IN ({q_placeholders})
+              AND {tp_name} IN ({ph})
+              AND h.is_latest = TRUE
+            GROUP BY parent_name, h.quarter
         """, [ticker, cusip] + top_parents).fetchdf()
 
         # Build parent → {quarter: shares} map
@@ -322,12 +325,14 @@ def holder_momentum(ticker, level='parent', active_only=False, rollup_type='econ
         pass
 
 
-def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_type='economic_control_v1'):
+def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_type='economic_control_v1'):  # pylint: disable=unused-argument
     """Aggregated institutional ownership trend across all quarters.
     level: 'parent' (13F) or 'fund' (N-PORT).
     active_only: fund level — only include funds classified as active.
     """
-    rn = _rollup_name_sql('', rollup_type)
+    # CP-5.5: COUNT(DISTINCT) over canonical top-parent name (rollup-type-
+    # independent climb via inst_to_top_parent).
+    tp_name = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         # Per-quarter denominator cache (avoids per-row queries in the loop).
@@ -369,13 +374,13 @@ def ownership_trend_summary(ticker, level='parent', active_only=False, rollup_ty
             """, list(ACTIVE_FUND_STRATEGIES) + list(PASSIVE_FUND_STRATEGIES) + [ticker] + af_params).fetchdf()
         else:
             df = con.execute(f"""
-                SELECT quarter,
-                       SUM(shares) as total_inst_shares,
-                       SUM(market_value_usd) as total_inst_value,
-                       COUNT(DISTINCT COALESCE({rn}, inst_parent_name, manager_name)) as holder_count,
-                       SUM(CASE WHEN entity_type NOT IN ('passive') THEN market_value_usd ELSE 0 END) as active_value,
-                       SUM(CASE WHEN entity_type = 'passive' THEN market_value_usd ELSE 0 END) as passive_value
-                FROM holdings_v2 WHERE ticker = ? AND is_latest = TRUE GROUP BY quarter ORDER BY quarter
+                SELECT h.quarter,
+                       SUM(h.shares) as total_inst_shares,
+                       SUM(h.market_value_usd) as total_inst_value,
+                       COUNT(DISTINCT {tp_name}) as holder_count,
+                       SUM(CASE WHEN h.entity_type NOT IN ('passive') THEN h.market_value_usd ELSE 0 END) as active_value,
+                       SUM(CASE WHEN h.entity_type = 'passive' THEN h.market_value_usd ELSE 0 END) as passive_value
+                FROM holdings_v2 h WHERE h.ticker = ? AND h.is_latest = TRUE GROUP BY h.quarter ORDER BY h.quarter
             """, [ticker]).fetchdf()
 
         rows = df_to_records(df)

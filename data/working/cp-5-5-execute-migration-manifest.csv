@@ -1,0 +1,13 @@
+site_id,file,line,sub_feature,before_sql,after_sql,helper_variant_or_view_swap,migration_class
+S1a,scripts/queries/flows.py,243,cohort_analysis parent q1,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S1b,scripts/queries/flows.py,248,cohort_analysis parent q4,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S1c,scripts/queries/flows.py,269,cohort_analysis econ_retention from,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S1d,scripts/queries/flows.py,278,cohort_analysis econ_retention to,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S2a,scripts/queries/trend.py,120,holder_momentum top25,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S2b,scripts/queries/trend.py,144,holder_momentum per-quarter,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S2c,scripts/queries/trend.py,151,holder_momentum IN filter,"COALESCE({rn}, ...) IN ({ph})","top_parent_canonical_name_sql('h') IN ({ph})",alias-variant,name-coalesce
+S3,scripts/queries/trend.py,375,ownership_trend_summary COUNT(DISTINCT),"COUNT(DISTINCT COALESCE({rn}, ...))","COUNT(DISTINCT top_parent_canonical_name_sql('h'))",alias-variant,name-coalesce
+S4a,scripts/queries/flows.py,350,_compute_flows_live from_quarter,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S4b,scripts/queries/flows.py,357,_compute_flows_live to_quarter,"COALESCE({rn}, inst_parent_name, manager_name) FROM holdings_v2 (unaliased)","top_parent_canonical_name_sql('h') FROM holdings_v2 h",alias-variant,name-coalesce
+S4c,scripts/queries/flows.py,616,flow_analysis qoq_charts live,"COALESCE({rn}, ...) (inner subquery, holdings_v2 unaliased; outer alias renamed h->agg)","top_parent_canonical_name_sql('h') FROM holdings_v2 h, outer alias 'agg'",alias-variant,name-coalesce
+S8,scripts/queries/entities.py,119,compute_aum_for_subtree,DEFERRED — schema mismatch with unified_holdings (no cik/market_value_usd columns; top_parent grain vs filer-CIK SUM grain),N/A,N/A,deferred-redesign

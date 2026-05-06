@@ -17,7 +17,7 @@ from .common import (
     LQ,
     FQ,
     PQ,
-    _rollup_name_sql,
+    top_parent_canonical_name_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -207,8 +207,13 @@ def cohort_analysis(ticker, from_quarter=None, level='parent', active_only=False
     )
 
 
-def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1', quarter=LQ):
-    rn = _rollup_name_sql('', rollup_type)
+def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only=False, rollup_type='economic_control_v1', quarter=LQ):  # pylint: disable=unused-argument
+    # CP-5.5: parent-level branch reads canonical top-parent name via
+    # top_parent_canonical_name_sql() (rollup-type-independent climb through
+    # inst_to_top_parent). rollup_type retained on signature for caller-API
+    # stability (cache key + endpoint param surface) but no longer drives
+    # name resolution here.
+    tp_name = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         fq = from_quarter or PQ
@@ -240,14 +245,14 @@ def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only
         else:
             # Parent-level from holdings (13F)
             q1_df = con.execute(f"""
-                SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
-                       SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings_v2 WHERE ticker = ? AND quarter = '{fq}' AND is_latest = TRUE GROUP BY investor
+                SELECT {tp_name} as investor,
+                       SUM(h.shares) as shares, SUM(h.market_value_usd) as value
+                FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter = '{fq}' AND h.is_latest = TRUE GROUP BY investor
             """, [ticker]).fetchdf()
             q4_df = con.execute(f"""
-                SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
-                       SUM(shares) as shares, SUM(market_value_usd) as value
-                FROM holdings_v2 WHERE ticker = ? AND quarter = '{lq}' AND is_latest = TRUE GROUP BY investor
+                SELECT {tp_name} as investor,
+                       SUM(h.shares) as shares, SUM(h.market_value_usd) as value
+                FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter = '{lq}' AND h.is_latest = TRUE GROUP BY investor
             """, [ticker]).fetchdf()
 
         q1_map = {r['investor']: r for r in df_to_records(q1_df)}
@@ -266,21 +271,21 @@ def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only
             q_from, q_to = QUARTERS[i], QUARTERS[i + 1]
             try:
                 from_df = con.execute(f"""
-                    SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
-                           SUM(shares) as shares
-                    FROM holdings_v2
-                    WHERE ticker = ? AND quarter = '{q_from}'
-                      AND entity_type NOT IN ('passive', 'unknown')
-                      AND is_latest = TRUE
+                    SELECT {tp_name} as investor,
+                           SUM(h.shares) as shares
+                    FROM holdings_v2 h
+                    WHERE h.ticker = ? AND h.quarter = '{q_from}'
+                      AND h.entity_type NOT IN ('passive', 'unknown')
+                      AND h.is_latest = TRUE
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 to_df = con.execute(f"""
-                    SELECT COALESCE({rn}, inst_parent_name, manager_name) as investor,
-                           SUM(shares) as shares
-                    FROM holdings_v2
-                    WHERE ticker = ? AND quarter = '{q_to}'
-                      AND entity_type NOT IN ('passive', 'unknown')
-                      AND is_latest = TRUE
+                    SELECT {tp_name} as investor,
+                           SUM(h.shares) as shares
+                    FROM holdings_v2 h
+                    WHERE h.ticker = ? AND h.quarter = '{q_to}'
+                      AND h.entity_type NOT IN ('passive', 'unknown')
+                      AND h.is_latest = TRUE
                     GROUP BY investor
                 """, [ticker]).fetchdf()
                 from_map = {r['investor']: float(r['shares'] or 0) for _, r in from_df.iterrows()}
@@ -313,11 +318,12 @@ def _cohort_analysis_impl(ticker, from_quarter=None, level='parent', active_only
 
 
 
-def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', active_only=False, rollup_type='economic_control_v1'):
+def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', active_only=False, rollup_type='economic_control_v1'):  # pylint: disable=unused-argument
     """Compute buyer/seller/new/exit flows live from holdings or fund_holdings.
     Returns (buyers, sellers, new_entries, exits) lists.
     """
-    rn = _rollup_name_sql('', rollup_type)
+    # CP-5.5: parent-tier name resolution via rollup-type-independent climb.
+    tp_name = top_parent_canonical_name_sql('h')
     # Period-accurate pct_of_so denominator per quarter (fund-level uses
     # to_quarter for retained/new, from_quarter for exits). Tier cascade:
     # SOH quarter-end → md.shares_outstanding → md.float_shares.
@@ -347,18 +353,18 @@ def _compute_flows_live(ticker, quarter_from, quarter_to, con, level='parent', a
         """, [ticker] + active_params).fetchdf()
     else:
         from_df = con.execute(f"""
-            SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
-                   MAX(manager_type) as manager_type,
-                   SUM(shares) as shares, SUM(market_value_usd) as value,
-                   SUM(pct_of_so) as pct_of_so
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_from}' AND is_latest = TRUE GROUP BY entity
+            SELECT {tp_name} as entity,
+                   MAX(h.manager_type) as manager_type,
+                   SUM(h.shares) as shares, SUM(h.market_value_usd) as value,
+                   SUM(h.pct_of_so) as pct_of_so
+            FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter = '{quarter_from}' AND h.is_latest = TRUE GROUP BY entity
         """, [ticker]).fetchdf()
         to_df = con.execute(f"""
-            SELECT COALESCE({rn}, inst_parent_name, manager_name) as entity,
-                   MAX(manager_type) as manager_type,
-                   SUM(shares) as shares, SUM(market_value_usd) as value,
-                   SUM(pct_of_so) as pct_of_so
-            FROM holdings_v2 WHERE ticker = ? AND quarter = '{quarter_to}' AND is_latest = TRUE GROUP BY entity
+            SELECT {tp_name} as entity,
+                   MAX(h.manager_type) as manager_type,
+                   SUM(h.shares) as shares, SUM(h.market_value_usd) as value,
+                   SUM(h.pct_of_so) as pct_of_so
+            FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter = '{quarter_to}' AND h.is_latest = TRUE GROUP BY entity
         """, [ticker]).fetchdf()
 
     from_map = {r['entity']: r for _, r in from_df.iterrows()}
@@ -458,7 +464,10 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
     """Flow analysis — default QoQ (1Q = most recent quarter).
     level: 'parent' (13F) or 'fund' (N-PORT).
     """
-    rn = _rollup_name_sql('', rollup_type)
+    # CP-5.5: live qoq_charts computation uses canonical top-parent name.
+    # Precomputed investor_flows read in this same function remains on
+    # legacy name-key path until CP-5.5b precompute rebuild keys by tp_eid.
+    tp_name = top_parent_canonical_name_sql('h')
     period_map = {'4Q': FQ, '2Q': QUARTERS[1] if len(QUARTERS) > 1 else FQ, '1Q': PQ}
     quarter_from = period_map.get(period, PQ)
     quarter_to = quarter
@@ -602,17 +611,17 @@ def flow_analysis(ticker, period='1Q', peers=None, level='parent', active_only=F
             try:
                 agg = con.execute(f"""
                     SELECT
-                        COALESCE(h.manager_type, 'unknown') as mtype,
-                        SUM(CASE WHEN h.quarter = '{qf}' THEN h.shares ELSE 0 END) as from_s,
-                        SUM(CASE WHEN h.quarter = '{qt}' THEN h.shares ELSE 0 END) as to_s,
-                        SUM(CASE WHEN h.quarter = '{qf}' THEN h.market_value_usd ELSE 0 END) as from_v,
-                        SUM(CASE WHEN h.quarter = '{qt}' THEN h.market_value_usd ELSE 0 END) as to_v
+                        COALESCE(agg.manager_type, 'unknown') as mtype,
+                        SUM(CASE WHEN agg.quarter = '{qf}' THEN agg.shares ELSE 0 END) as from_s,
+                        SUM(CASE WHEN agg.quarter = '{qt}' THEN agg.shares ELSE 0 END) as to_s,
+                        SUM(CASE WHEN agg.quarter = '{qf}' THEN agg.market_value_usd ELSE 0 END) as from_v,
+                        SUM(CASE WHEN agg.quarter = '{qt}' THEN agg.market_value_usd ELSE 0 END) as to_v
                     FROM (
-                        SELECT COALESCE({rn}, inst_parent_name, manager_name) as inv, manager_type, quarter,
-                               SUM(shares) as shares, SUM(market_value_usd) as market_value_usd
-                        FROM holdings_v2 WHERE ticker = ? AND quarter IN ('{qf}', '{qt}') AND is_latest = TRUE
-                        GROUP BY inv, manager_type, quarter
-                    ) h
+                        SELECT {tp_name} as inv, h.manager_type, h.quarter,
+                               SUM(h.shares) as shares, SUM(h.market_value_usd) as market_value_usd
+                        FROM holdings_v2 h WHERE h.ticker = ? AND h.quarter IN ('{qf}', '{qt}') AND h.is_latest = TRUE
+                        GROUP BY inv, h.manager_type, h.quarter
+                    ) agg
                     GROUP BY mtype
                 """, [ticker]).fetchdf()
                 total_net = 0
