@@ -1,0 +1,10 @@
+feature,function,line_at_head,migration_status,blocker
+Register top-25,query1,scripts/queries/register.py:39,migrated,
+Register N-PORT cov,query1 sub-block,scripts/queries/register.py:117,deferred,Bundle C Q7 — summary_by_parent NAME-keyed rebuild
+Register holders / 4q,query2,scripts/queries/register.py:268,migrated,
+Register active/passive,query3,scripts/queries/register.py:447,deferred,manager_type imputation logic
+Register active/passive,query4,scripts/queries/register.py:740,deferred,manager_type imputation logic
+Register active/passive,query5,scripts/queries/register.py:773,deferred,manager_type imputation logic
+Register flows / concentration,query12,scripts/queries/register.py:1086,migrated,
+Register drill,query14,scripts/queries/register.py:1117,deferred,Q7 + tp_to_filer hierarchy
+Register fund-level,query16,scripts/queries/register.py:1192,no-op,fund-tier reader; no rollup pattern

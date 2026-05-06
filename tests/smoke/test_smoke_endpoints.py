@@ -40,11 +40,15 @@ SENTINELS = {
                                       for r in body["data"]
                                   ),
     # /api/v1/query1 — envelope. Payload is {rows, all_totals, type_totals}.
+    # CP-5.2: Vanguard's canonical entity name is "VANGUARD GROUP INC"
+    # post-migration (entity-keyed climb via inst_to_top_parent →
+    # entities.canonical_name). Match either casing for transition tolerance.
     "query1":       lambda body: isinstance(body, dict)
                                   and isinstance(body.get("data"), dict)
                                   and isinstance(body["data"].get("rows"), list)
                                   and any(
-                                      isinstance(r, dict) and r.get("institution") == "Vanguard Group"
+                                      isinstance(r, dict)
+                                      and (r.get("institution") or "").lower().startswith("vanguard")
                                       for r in body["data"]["rows"]
                                   ),
     # /api/v1/summary — bare (not in priority 6).

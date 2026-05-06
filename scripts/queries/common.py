@@ -109,6 +109,57 @@ def top_parent_holdings_join(alias='fh'):
     )
 
 
+def top_parent_canonical_name_sql(alias='h'):
+    """Return SQL expression for entity-keyed top-parent canonical name.
+
+    Correlated subquery that climbs from ``{alias}.entity_id`` via
+    ``inst_to_top_parent`` (migration 027 — CP-5.1) to the top parent
+    entity, then resolves ``entities.canonical_name``. Used as a
+    drop-in replacement for the legacy
+    ``COALESCE(rollup_name, inst_parent_name, manager_name)`` name-
+    coalesce pattern in Register / Cross / Flows reader sites.
+
+    The expression is rollup-type independent — climb traverses
+    ownership-layer ``control / mutual / merge`` edges only, so the
+    canonical top-parent is the same regardless of whether a caller
+    requested ``decision_maker_v1`` or ``economic_control_v1`` for
+    other downstream JOINs. The two rollup types diverge at the
+    rollup-target level (per Bundle C §7.2), not at the top-parent
+    level.
+
+    For 13F (holdings_v2) callers, ``entity_id`` is the live filer
+    entity. For fund-tier (fund_holdings_v2) callers, prefer
+    ``top_parent_holdings_join()`` which adds the ERH bridge before
+    the climb.
+
+    Migration target for CP-5.2 reader sites:
+      - scripts/queries/register.py query1, query2, query12 (top-parent
+        ranking + name-keyed grouping)
+      - scripts/queries/register.py query16 left as-is (fund-tier
+        register, no rollup pattern)
+
+    See docs/findings/cp-5-2-register-partial-and-unified-quarter-fix-results.md.
+    """
+    eid_ref = f"{alias}.entity_id" if alias else "entity_id"
+    inst_parent = (
+        f"{alias}.inst_parent_name" if alias else "inst_parent_name"
+    )
+    manager = f"{alias}.manager_name" if alias else "manager_name"
+    # Fallback chain: rows whose entity_id has no climb (NULL entity_id,
+    # or a row that pre-dates the entity backfill) must still surface a
+    # non-NULL holder name — pydantic schemas at the API boundary require
+    # str. Falls back to the legacy denorm columns. The fallback is rare
+    # in prod (every modern row carries entity_id with a climb), but is
+    # load-bearing for fixture / historical / amendment-edge cases.
+    return (
+        "COALESCE("
+        "(SELECT e.canonical_name FROM inst_to_top_parent ittp "
+        "JOIN entities e ON e.entity_id = ittp.top_parent_entity_id "
+        f"WHERE ittp.entity_id = {eid_ref}), "
+        f"{inst_parent}, {manager})"
+    )
+
+
 def _rollup_eid_sql(alias='h', rollup_type='economic_control_v1'):
     """Return SQL expression for rollup entity_id.
 

@@ -22,6 +22,7 @@ from .common import (
     FQ,
     PQ,
     _rollup_name_sql,
+    top_parent_canonical_name_sql,
     get_db,
     has_table,
     _quarter_to_date,
@@ -38,17 +39,35 @@ logger = logging.getLogger(__name__)
 
 def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
     """Current shareholder register — two-level parent/fund hierarchy.
-    Batched: parents + all 13F children fetched in 2 queries total."""
-    rn = _rollup_name_sql('h', rollup_type)
+    Batched: parents + all 13F children fetched in 2 queries total.
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027). The previous
+    ``COALESCE(rollup_name, inst_parent_name, manager_name)`` name-
+    coalesce is replaced by an entity-climb subquery that returns the
+    canonical ``entities.canonical_name`` for the top parent. All
+    sites within this function (parent ranking, AUM fallback,
+    children fetch IN-filter, all_totals) use the same expression so
+    parent-name shapes stay consistent within the response.
+
+    The N-PORT coverage block (lines below) still reads
+    ``summary_by_parent`` keyed on legacy ``inst_parent_name``;
+    that lookup is BEST-EFFORT and now silently misses parents whose
+    canonical climb-name diverges from the loader-time
+    ``inst_parent_name`` denorm. Tracked for full migration in
+    cp-5-2a-summary-by-parent-rebuild (Bundle C Q7).
+    """
+    _ = rollup_type  # signature preserved for API compatibility
+    tpn = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
 
-        # Query 1: parents (aggregated by inst_parent_name)
+        # Query 1: parents — entity-keyed canonical-name grouping.
         parents = con.execute(f"""
             WITH by_fund AS (
                 SELECT
-                    COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                    {tpn} as parent_name,
                     h.fund_name,
                     h.cik,
                     COALESCE(h.manager_type, 'unknown') as type,
@@ -89,9 +108,12 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
             ph_aum = ','.join(['?'] * len(parent_names))
             fallback_df = con.execute(f"""
-                SELECT COALESCE({rn}, inst_parent_name) as parent_name, SUM(market_value_usd) / 1e6 as val_mm
-                FROM holdings_v2 WHERE quarter = '{quarter}' AND COALESCE({rn}, inst_parent_name) IN ({ph_aum}) AND is_latest = TRUE
-                GROUP BY COALESCE({rn}, inst_parent_name)
+                SELECT {tpn} as parent_name, SUM(h.market_value_usd) / 1e6 as val_mm
+                FROM holdings_v2 h
+                WHERE h.quarter = '{quarter}'
+                  AND {tpn} IN ({ph_aum})
+                  AND h.is_latest = TRUE
+                GROUP BY {tpn}
             """, parent_names).fetchdf()
             for _, r in fallback_df.iterrows():
                 pn = r['parent_name']
@@ -122,7 +144,7 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         ph = ','.join(['?'] * len(parent_names))
         all_children_df = con.execute(f"""
             SELECT
-                COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                {tpn} as parent_name,
                 h.fund_name as institution,
                 COALESCE(h.manager_type, 'unknown') as type,
                 SUM(h.market_value_live) as value_live,
@@ -131,9 +153,9 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}'
               AND (h.ticker = ? OR h.cusip = ?)
-              AND COALESCE({rn}, h.inst_parent_name, h.manager_name) IN ({ph})
+              AND {tpn} IN ({ph})
               AND h.is_latest = TRUE
-            GROUP BY parent_name, h.fund_name, type
+            GROUP BY {tpn}, h.fund_name, type
             ORDER BY parent_name, value_live DESC NULLS LAST
         """, [ticker, cusip] + parent_names).fetchdf()
 
@@ -233,13 +255,13 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
         all_totals_df = con.execute(f"""
             SELECT
                 COALESCE(MAX(h.manager_type), 'unknown') as type,
-                COALESCE({rn}, h.inst_parent_name, h.manager_name) as parent_name,
+                {tpn} as parent_name,
                 SUM(h.market_value_live) as total_value,
                 SUM(h.shares) as total_shares,
                 SUM(h.pct_of_so) as pct_so
             FROM holdings_v2 h
             WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
-            GROUP BY parent_name
+            GROUP BY {tpn}
         """, [ticker, cusip]).fetchdf()
 
         all_totals = {
@@ -266,40 +288,46 @@ def query1(ticker, rollup_type='economic_control_v1', quarter=LQ):
 
 
 def query2(ticker, rollup_type='economic_control_v1', quarter=LQ):
-    """4-quarter ownership change (Q1 vs Q4 2025)."""
-    rn = _rollup_name_sql('', rollup_type)
+    """4-quarter ownership change (Q1 vs Q4 2025).
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027). ``rollup_type`` preserved on signature; top-parent
+    climb is rollup-type independent (Bundle C §7.2).
+    """
+    _ = rollup_type
+    tpn = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
-        # Top 15 parents by Q4 value
+        # Top 25 parents by Q4 value (entity-keyed canonical-name)
         top_parents = con.execute(f"""
-            SELECT COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
-                   SUM(market_value_live) as parent_val
-            FROM holdings_v2
-            WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
-            GROUP BY parent_name
+            SELECT {tpn} as parent_name,
+                   SUM(h.market_value_live) as parent_val
+            FROM holdings_v2 h
+            WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
+            GROUP BY {tpn}
             ORDER BY parent_val DESC NULLS LAST
             LIMIT 25
         """, [ticker, cusip]).fetchdf()['parent_name'].tolist()
 
         q2 = con.execute(f"""
             WITH q1_agg AS (
-                SELECT cik, manager_name,
-                       COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
-                       MAX(manager_type) as manager_type,
-                       SUM(shares) as q1_shares
-                FROM holdings_v2
-                WHERE quarter = '{FQ}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
-                GROUP BY cik, manager_name, parent_name
+                SELECT h.cik, h.manager_name,
+                       {tpn} as parent_name,
+                       MAX(h.manager_type) as manager_type,
+                       SUM(h.shares) as q1_shares
+                FROM holdings_v2 h
+                WHERE h.quarter = '{FQ}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
+                GROUP BY h.cik, h.manager_name, {tpn}
             ),
             q4_agg AS (
-                SELECT cik, manager_name,
-                       COALESCE({rn}, inst_parent_name, manager_name) as parent_name,
-                       MAX(manager_type) as manager_type,
-                       SUM(shares) as q4_shares
-                FROM holdings_v2
-                WHERE quarter = '{quarter}' AND (ticker = ? OR cusip = ?) AND is_latest = TRUE
-                GROUP BY cik, manager_name, parent_name
+                SELECT h.cik, h.manager_name,
+                       {tpn} as parent_name,
+                       MAX(h.manager_type) as manager_type,
+                       SUM(h.shares) as q4_shares
+                FROM holdings_v2 h
+                WHERE h.quarter = '{quarter}' AND (h.ticker = ? OR h.cusip = ?) AND h.is_latest = TRUE
+                GROUP BY h.cik, h.manager_name, {tpn}
             ),
             combined AS (
                 SELECT
@@ -1084,20 +1112,34 @@ def query11(ticker, quarter=LQ):
 
 
 def query12(ticker, rollup_type='economic_control_v1', quarter=LQ):
-    """Concentration analysis — top holders cumulative % of float."""
-    rn = _rollup_name_sql('', rollup_type)
+    """Concentration analysis — top holders cumulative % of float.
+
+    Migrated to entity-keyed grouping via ``inst_to_top_parent`` climb
+    (migration 027) — replaces the legacy
+    ``COALESCE(rollup_name, inst_parent_name, manager_name)`` name-
+    coalesce. ``rollup_type`` is preserved on the signature for API
+    compatibility but no longer affects the canonical top-parent
+    grouping (top-parent climb is rollup-type independent;
+    decision_maker / economic_control diverge only at the rollup
+    target, not the top parent — see Bundle C §7.2).
+    """
+    _ = rollup_type  # signature preserved for API compatibility
+    tpn = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         df = con.execute(f"""
             WITH ranked AS (
                 SELECT
-                    COALESCE({rn}, inst_parent_name, manager_name) as holder,
-                    SUM(pct_of_so) as total_pct_so,
-                    SUM(shares) as total_shares,
-                    ROW_NUMBER() OVER (ORDER BY SUM(pct_of_so) DESC) as rn
-                FROM holdings_v2
-                WHERE ticker = ? AND quarter = '{quarter}' AND pct_of_so IS NOT NULL AND is_latest = TRUE
-                GROUP BY holder
+                    {tpn} as holder,
+                    SUM(h.pct_of_so) as total_pct_so,
+                    SUM(h.shares) as total_shares,
+                    ROW_NUMBER() OVER (ORDER BY SUM(h.pct_of_so) DESC) as rn
+                FROM holdings_v2 h
+                WHERE h.ticker = ?
+                  AND h.quarter = '{quarter}'
+                  AND h.pct_of_so IS NOT NULL
+                  AND h.is_latest = TRUE
+                GROUP BY {tpn}
             )
             SELECT
                 rn as rank,
@@ -1190,7 +1232,16 @@ def query15(ticker=None, quarter=LQ):  # pylint: disable=W0613  # dispatch proto
 
 
 def query16(ticker, quarter=LQ):
-    """Fund-level register — top 25 individual funds by position value."""
+    """Fund-level register — top 25 individual funds by position value.
+
+    CP-5.2 note: this reader is fund-level (reads ``fund_holdings_v2``
+    directly, ranks by individual fund) and does not use the
+    institutional ``COALESCE(rollup_name, inst_parent_name,
+    manager_name)`` pattern. No name-coalesce migration is applicable.
+    Already entity-canonical via ``fh.fund_name`` / ``fh.series_id``.
+    Listed in the chat-decided 4-site CP-5.2 scope only as a no-op
+    confirmation; left untouched.
+    """
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
