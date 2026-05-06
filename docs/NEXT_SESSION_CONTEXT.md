@@ -4,11 +4,13 @@
 
 ## HEAD
 
-`<conv-30 squash>` — `conv-30-doc-sync: CP-5 P0 pre-execution arc closure + bo_v2 dm_rollup drop`. Sits atop `11b3939` (PR #296 holdings_v2 dm_rollup drop). Prior arc closures: `2e116b1` (PR #295 sister-tables sized investigation), `cf04983` (PR #294 pipeline contract cleanup), `d04a13b` (PR #293 PR #287 ERH audit), `e0ce659` (PR #292 backup cadence), `dcfe3f6` (PR #291 loader-gap sub-PR 2), `07cceb5` (PR #290 loader-gap sub-PR 1), `d8a64bd` (PR #289 fh2 dm_rollup drop), PR #288 (decision recon), `f9bec76` (PR #287 Capital Group umbrella).
+`<cp-5-1b squash>` — `cp-5-1b-helper-and-view: foundation for CP-5 reader migrations` (PR #299). Sits atop `4db5b0c` (PR #297 conv-30-doc-sync + bo_v2 drop). Adds migration 027 (read-only views `inst_to_top_parent` + `unified_holdings`) plus `top_parent_holdings_join()` helper in `scripts/queries/common.py`. **Zero row mutations** — view-only catalog migration.
 
 ## Active workstream pointer
 
-**CP-5.1 — helper + Method A view definition.** All 11 P0 pre-execution cohorts cleared (PRs #283–#296 + this PR). CP-5.1 is the actual goal of the entire pre-execution arc. After CP-5.1 lands, CP-5.2–5.6 reader migrations follow across Register, Cross-Ownership, Top Investors, Top Holders, Crowding, Conviction, Smart Money, Sector Rotation, New/Exits, AUM, Activist, View 2 Tier-3 sentinel.
+**CP-5.2 — Register tab reader migration.** CP-5.1 foundation shipped via PR #299: `inst_to_top_parent` view (recursive ownership climb with deterministic tie-break) + `unified_holdings` view (R5 cross-source aggregate, FoF subtraction deferred to P2 `cp-5-fof-subtraction-cusip-linkage`) + `top_parent_holdings_join()` helper. CP-5.2–5.6 reader migrations follow across Register, Cross-Ownership, Top Investors, Top Holders, Crowding, Conviction, Smart Money, Sector Rotation, New/Exits, AUM, Activist, View 2 Tier-3 sentinel.
+
+**Open chat question for CP-5.2:** `unified_holdings` is multi-quarter (sums across all `is_latest=TRUE` rows per migration 015 policy). Register is single-quarter. Design call needed: (a) parameterize the view by quarter; (b) add a quarter-specific sister view; or (c) keep Register on direct source-table reads with helper supporting only the climb step.
 
 The 26-PR execution plan is locked at `data/working/cp-5-execution-plan.csv`. The full design contract is at `docs/findings/cp-5-comprehensive-remediation.md`. Adjustments 1/2/3/4 canonical addenda at `docs/decisions/inst_eid_bridge_decisions.md`.
 
@@ -30,8 +32,8 @@ Existing locks remain in effect (continued from prior session memory):
 
 ## Parked queue (priority order)
 
-1. **CP-5.1** (P1, ACTIVE-EXECUTION, **next up**) — helper + Method A view definition. Resolves `classification-join-utility-resolution` decision.
-2. **CP-5.2 Register tab** reader migration (P1).
+1. ~~**CP-5.1**~~ **shipped 2026-05-06 via PR #299** (`cp-5-1b-helper-and-view`). Migration 027 + helper. Resolves `classification-join-utility-resolution` decision (helper landed at `scripts/queries/common.py::top_parent_holdings_join`, not the proposed `classification_join` macro at `queries_helpers.py:171` — that dead-code decision is now reducible to a delete in the next sweep).
+2. **CP-5.2 Register tab** reader migration (P1, **next up**).
 3. **CP-5.3 Cross-Ownership / Top Investors / Top Holders** reader migration (P1).
 4. **CP-5.4 Crowding / Conviction / Smart Money** reader migration (P1).
 5. **CP-5.5 Sector Rotation / New-Exits / AUM / Activist** reader migration (P1).
@@ -42,17 +44,21 @@ Existing locks remain in effect (continued from prior session memory):
    - `entity-current-inverted-rollup-audit` (canonical 4909 inverted-rollup pattern; surfaced PR #283 Op H Branch 2).
    - `parent-bridge-mechanism-audit` (sponsor-brand layer scope; surfaced PR #287).
    - `fund-cik-entity-type-audit` (N-PORT-seeded registrant CIKs typed `'institution'` not `'fund'`; surfaced PR #290).
+   - `cp-5-adams-residual-cleanup` (6 fund-typed eids 20210–20215 with no open rollup rows; surfaced PR #299 Phase 0).
+   - `cp-5-fof-subtraction-cusip-linkage` (P2; build CUSIP→fund-entity bridge so Bundle A §1.4 FoF subtraction can re-enter `unified_holdings`; surfaced PR #299 Phase 2).
 9. **Cadence successors:**
    - `backup-archive-cadence` (P3 recurring; first execution PR #292).
    - `worktree-cleanup-hygiene-cadence` (P3 recurring).
 
 ## Recent backups
 
-Three retained locally per cadence rule (PR #273):
+Pre-flight backup taken 2026-05-06 before PR #299 schema-altering migration: `data/backups/13f_pre_cp5_1b_20260506_100527.duckdb` (single-file `.duckdb`, 24GB; same-day EXPORT covers state per single-file-default delete-direct cadence rule).
 
+Three retained EXPORT directories locally per cadence rule (PR #273):
+
+- `data/backups/13f_backup_20260506_065231`
 - `data/backups/13f_backup_20260505_165855`
 - `data/backups/13f_backup_20260505_142125`
-- `data/backups/13f_backup_20260505_124352`
 
 Older backups archived to Google Drive `ShareholderProject/13f-backups/{full-db-exports,staging-backup,pipeline-snapshots}/` per PR #273 + PR #292 cadence runs. Per-archive paths and md5s in `docs/findings/backup-pruning-and-archive-results.md` and `data/working/backup-archive-manifest.csv`.
 

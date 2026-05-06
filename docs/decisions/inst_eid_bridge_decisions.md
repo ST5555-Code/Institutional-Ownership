@@ -745,3 +745,84 @@ control_type='control', source='orphan_scan')` from
 `is_inferred=FALSE` to `TRUE`. Closed historical rows on
 the same (source, type) tuple (34 rows) were left
 untouched per SCD immutability.
+
+## Modified R5 — cross-source AUM rule for `unified_holdings`
+
+Locked 2026-05-04 (Bundle A §1.4 verdict). Amended 2026-05-06
+(PR #299 — `cp-5-1b-helper-and-view`) to drop the
+intra-family fund-of-fund subtraction from the shipping view.
+
+### Rule (as shipped in migration 027)
+
+For each `(top_parent_entity_id, cusip, ticker)` row in
+`unified_holdings`:
+
+  `r5_aum_b = GREATEST(thirteen_f_aum_b, fund_tier_aum_b)`
+
+  `source_winner = '13F'` iff
+  `thirteen_f_aum_b >= fund_tier_aum_b` (tie goes to 13F).
+
+`thirteen_f_aum_b` is the per-cusip sum of
+`holdings_v2.market_value_usd` (USD → $B) attributed via
+`inst_to_top_parent` climb on `holdings_v2.entity_id`
+directly.
+
+`fund_tier_aum_b` is the per-cusip sum of
+`fund_holdings_v2.market_value_usd` attributed via Method A
+(read-time `decision_maker_v1` ERH JOIN, PR #280 canonical)
+followed by `inst_to_top_parent` climb. **Raw rollup, no
+adjustment** — see deferred-subtraction section below.
+
+### Deferred — intra-family FoF subtraction
+
+Bundle A §1.4 specified that `fund_tier_aum_b` should be
+adjusted to subtract intra-family fund-of-fund holdings
+(rows where the held CUSIP is itself a fund within the same
+top-parent family). The migration 027 view ships **without**
+this subtraction.
+
+Reason (PR #299 Phase 2 spot-check finding): the data model
+has no canonical CUSIP→fund-entity bridge. Fund entities
+carry `series_id` and rare `cik` in `entity_identifiers`,
+not CUSIP. The `securities` table maps `cusip → issuer_name`
+but has no `entity_id` linkage either. The intra-family FoF
+CTE prototyped in PR #299 matched zero rows for every firm
+including Vanguard.
+
+Tracked as P2 follow-up `cp-5-fof-subtraction-cusip-linkage`:
+build a CUSIP→fund-entity bridge (likely paths: populate
+`securities.entity_id` for fund-issued securities by matching
+against `fund_universe.fund_cik`; translate
+`ncen_adviser_map.series_id` to fund-issued CUSIPs;
+fuzzy-match `issuer_name ILIKE fund_name` as last resort)
+then re-introduce the subtraction.
+
+### `inst_to_top_parent` climb shape
+
+The view name retains the historical `inst_` prefix even
+though the recursive CTE anchor includes **all** entity
+types (institution, fund, other). Funds and non-institutional
+entities that have no incoming `control` / `mutual` / `merge`
+edges self-rollup at hops=0. The recursive step walks up via
+those three `control_type` values only — `advisory` (sponsor
+layer) is excluded per the two-relationship-layer coexistence
+pattern (PR #287). Tie-break: `ARG_MAX(top_parent, ROW(hops,
+-top_parent))` (deepest climb, then smallest top eid).
+
+### `is_latest = TRUE` pinning
+
+The view sums across all `is_latest = TRUE` rows in both
+source tables, which spans multiple quarters (until
+amendments start landing per migration 015 policy). Readers
+that need single-quarter slices must continue to filter
+against `holdings_v2` / `fund_holdings_v2` directly. A
+parameterized variant is deferred.
+
+### References
+
+- `docs/findings/cp-5-bundle-a-discovery.md` §1.4
+  (original Modified R5 rule including FoF subtraction).
+- `docs/findings/cp-5-1b-helper-and-view-results.md` §4
+  (FoF deferral rationale; PR #299).
+- `scripts/migrations/027_unified_holdings_view.py`.
+- `scripts/queries/common.py::top_parent_holdings_join`.
