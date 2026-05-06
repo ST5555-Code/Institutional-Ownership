@@ -1,0 +1,7 @@
+site_id,file,line_before,old_expression,new_expression,notes
+C1.a,scripts/queries/cross.py,33,"rn = _rollup_name_sql('h', rollup_type)","tpn = top_parent_canonical_name_sql('h')",drops rn variable; rollup_type param preserved via _ = rollup_type per register.query1 pattern
+C1.b,scripts/queries/cross.py,61,"COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor","{tpn} as investor",parent_holdings CTE projection
+C1.c,scripts/queries/cross.py,74,"COALESCE({rn}, h.inst_parent_name, h.manager_name) as investor","{tpn} as investor",portfolio_totals CTE projection
+C4.a,scripts/queries/cross.py,351,"COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder","{tpn} as holder",subj_holders CTE; tpn computed once at function head
+C4.b,scripts/queries/cross.py,364,"COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder","{tpn} as holder",sec_holders CTE
+C6.a,scripts/queries/cross.py,649,"COALESCE(h.rollup_name, h.inst_parent_name, h.manager_name) as holder","{tpn} as holder",inst_rows projection in get_two_company_subject
