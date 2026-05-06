@@ -1,0 +1,28 @@
+site_path,feature,filter_type,join_shape,group_grain,expected_return_columns,helper_call_pattern_inferred
+scripts/queries/register.py:47-100,Register top-25,by_ticker,holdings_v2 + R5 unified,top_parent,"top_parent_eid,top_parent_name,manager_type,total_value,total_shares,total_pct_of_so,child_count",by_ticker_top_n
+scripts/queries/register.py:104-115,Register N-PORT cov,by_top_parent,summary_by_parent (rebuild),top_parent,"top_parent_eid,nport_coverage_pct",by_top_parent_lookup
+scripts/queries/register.py:119-140,Register holders,by_ticker_and_top_parent_set,holdings_v2 children,top_parent x fund,"top_parent_eid,fund_name,manager_type,value,shares,pct_so",by_top_parent_set_children
+scripts/queries/register.py:225-310,Register active/passive,by_ticker,holdings_v2 + R5 + manager_type,top_parent x manager_type,"top_parent_eid,manager_type,total_value,total_shares,total_pct_of_so",by_ticker_with_classification
+scripts/queries/register.py:455-475,Register flows,by_ticker_two_quarters,holdings_v2 + R5 (q-1 vs q),top_parent,"top_parent_eid,top_parent_name,shares_q,shares_qm1,value_q,value_qm1",by_ticker_two_quarters
+scripts/queries/register.py:560-660,Register drill,by_top_parent,R5 + tp_to_filer hierarchy,filer x fund,"filer_eid,filer_name,fund_eid,fund_name,value,shares,source",by_top_parent_drill
+scripts/queries/register.py:775-1135,Register manager AUM,by_ticker,holdings_v2 + R5 + manager_aum,top_parent,"top_parent_eid,top_parent_name,manager_aum_total,r5_aum",by_top_parent_with_aum
+scripts/queries/cross.py:55-95,Cross overlap multi-ticker,by_ticker_set,holdings_v2 + R5,top_parent x ticker pivot,"top_parent_eid,top_parent_name,manager_type,total_portfolio,per_ticker_value",by_ticker_set_pivot
+scripts/queries/cross.py:330-360,Cross fund-side,by_ticker_set,fund_holdings_v2 already-fund,fund_series x ticker pivot,"fund_series_id,fund_name,per_ticker_value",fund_only_pivot (no R5 wrap)
+scripts/queries/cross.py:620-650,Cross pairwise,by_ticker_pair,holdings_v2 + R5,top_parent,"top_parent_eid,top_parent_name,a_value,b_value",by_ticker_pair
+scripts/queries/market.py:130-145,Top Holders / Crowding count,no_filter_aggregate,holdings_v2 + R5,total/manager_type,"manager_type,total_aum,distinct_top_parent_count",aggregate_no_filter
+scripts/queries/market.py:710-730,Sector flow movers,by_sector_two_quarters,holdings_v2 + R5 + sector,sector x top_parent,"sector,top_parent_eid,delta_value",aggregate_with_sector_filter
+scripts/queries/market.py:1040-1130,Inst hierarchy / drill,by_top_parent_subtree,holdings_v2 + ER multi-hop + R5,subtree node,"node_eid,node_name,level,aum",by_top_parent_drill (subtree)
+scripts/queries/fund.py:100-200,Conviction Fund Portfolio,by_top_parent,R5 + View 2 fund-tier composition,top_parent x ticker,"top_parent_eid,ticker,sector,position_value",by_top_parent_portfolio
+scripts/queries/flows.py:240-285,Flows entry+peer,by_ticker_two_quarters,holdings_v2 + R5 deltas,top_parent,"top_parent_eid,top_parent_name,manager_type,shares_q,shares_qm1,delta_shares,delta_value",by_ticker_two_quarters
+scripts/queries/flows.py:340-430,Flows cohort by manager_type,by_ticker_two_quarters,holdings_v2 + R5 + classification,manager_type cohort,"manager_type,n_buyers,n_sellers,net_delta_value",by_ticker_two_quarters_cohort
+scripts/queries/flows.py:500-540,Flows ownership trend,by_ticker_long_window,shares_history (rebuild),top_parent x quarter,"top_parent_eid,quarter,shares,value",by_ticker_trend
+scripts/queries/flows.py:600-625,Flows peer rotation,by_ticker_two_quarters,holdings_v2 + R5,top_parent x sector,"top_parent_eid,top_parent_name,delta_value",by_ticker_two_quarters
+scripts/queries/trend.py:108-160,Trend holder momentum,by_ticker_long_window,holdings_v2 + R5,top_parent x quarter,"top_parent_eid,top_parent_name,quarter,value,shares",by_ticker_trend
+scripts/queries/trend.py:170-205,Trend fund children,by_top_parent_subtree,fund_holdings_v2 + parent_fund_map,fund x quarter,"fund_eid,fund_name,quarter,value",fund_only_trend
+scripts/queries/trend.py:370-380,Trend distinct holders,by_ticker_long_window,holdings_v2 + R5,quarter,"quarter,distinct_top_parent_count",aggregate_distinct_count
+scripts/queries/entities.py:120-170,Entity descendants,by_root_eid,ER walk multi-hop,subtree node,"node_eid,node_name,depth,relationship_type",entity_subtree_walk (no R5 wrap)
+scripts/queries/entities.py:230-330,Entity AUM subtree,by_top_parent,ER multi-hop + R5 unified,subtree leaf,"leaf_eid,leaf_name,r5_aum",by_top_parent_subtree_aum
+scripts/queries/entities.py:360-400,Entity hierarchy search,by_search_term,entity_current.rollup_entity_id,top_parent,"top_parent_eid,top_parent_name",entity_search (extends to tp_eid)
+scripts/queries/common.py:258-380,NPORT family bridge,by_inst_parent_name,fund_holdings_v2 REGEX (RETIRE),fund_series,"series_id,fund_name,value",retire_replace_with_entity_lookup
+scripts/queries/common.py:488-820,NPORT children dispatch,by_inst_parent_name,fund_holdings_v2 + N-CEN (RETIRE),fund_series x position,"series_id,fund_name,ticker,value",retire_replace_with_entity_lookup
+scripts/queries_helpers.py:155-170,Rollup-join helper,SQL fragment builder,build_top_parent_join,N/A,N/A (returns SQL string),sql_fragment_helper (NEW: build_top_parent_join)
