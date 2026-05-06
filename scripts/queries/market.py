@@ -11,6 +11,7 @@ from .common import (
     _rollup_name_sql,
     get_db,
     _fund_type_label,
+    top_parent_canonical_name_sql,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,17 +125,18 @@ def get_sector_summary():
         manager_type in the latest quarter (pct as 0–100 percent).
     """
     con = get_db()
+    tpn = top_parent_canonical_name_sql('h')
     try:
         head = con.execute(
-            """
+            f"""
             WITH latest AS (
                 SELECT MAX(quarter) AS q FROM holdings_v2 WHERE is_latest = TRUE
             )
             SELECT (SELECT q FROM latest) AS quarter,
-                   SUM(market_value_usd) AS total_aum,
-                   COUNT(DISTINCT COALESCE(rollup_name, inst_parent_name, manager_name)) AS total_holders
-              FROM holdings_v2, latest
-             WHERE holdings_v2.quarter = latest.q AND is_latest = TRUE
+                   SUM(h.market_value_usd) AS total_aum,
+                   COUNT(DISTINCT {tpn}) AS total_holders
+              FROM holdings_v2 h, latest
+             WHERE h.quarter = latest.q AND h.is_latest = TRUE
             """
         ).fetchone()
         quarter, total_aum, total_holders = head

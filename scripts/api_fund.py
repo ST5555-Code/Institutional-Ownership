@@ -15,6 +15,7 @@ from api_common import (
 )
 from app_db import get_db
 from queries import df_to_records
+from queries.common import top_parent_canonical_name_sql
 
 fund_router = APIRouter(
     prefix='/api/v1',
@@ -34,19 +35,20 @@ def api_fund_portfolio_managers(ticker: str = ''):
         return JSONResponse(status_code=503, content={'error': f'Database unavailable: {e}'})
     try:
         validate_ticker_current(con, ticker)
+        tpn = top_parent_canonical_name_sql('h')
         df = con.execute(
             f"""
             SELECT
-                cik,
-                fund_name,
-                MAX(COALESCE(rollup_name, inst_parent_name, manager_name)) as inst_parent_name,
-                SUM(market_value_live) as position_value,
-                MAX(manager_type) as manager_type
-            FROM holdings_v2
-            WHERE ticker = ? AND quarter = '{LQ}'
-              AND entity_type NOT IN ('passive')
-              AND is_latest = TRUE
-            GROUP BY cik, fund_name
+                h.cik,
+                h.fund_name,
+                MAX({tpn}) as inst_parent_name,
+                SUM(h.market_value_live) as position_value,
+                MAX(h.manager_type) as manager_type
+            FROM holdings_v2 h
+            WHERE h.ticker = ? AND h.quarter = '{LQ}'
+              AND h.entity_type NOT IN ('passive')
+              AND h.is_latest = TRUE
+            GROUP BY h.cik, h.fund_name
             ORDER BY position_value DESC NULLS LAST
             LIMIT 50
             """, [ticker]  # nosec B608

@@ -3,12 +3,12 @@ import logging
 
 from .common import (
     LQ,
-    _rollup_name_sql,
     get_db,
     get_cusip,
     get_nport_children_batch,
     _fund_type_label,
     ACTIVE_FUND_STRATEGIES,
+    top_parent_canonical_name_sql,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,8 +45,8 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
     """Conviction tab — portfolio concentration context for top holders.
     Returns each holder's sector breakdown with emphasis on the subject ticker's sector.
     """
-    rn = _rollup_name_sql('h', rollup_type)
-    rn_noalias = _rollup_name_sql('', rollup_type)
+    _ = rollup_type  # signature preserved; helper is rollup-type independent (per CP-5.1 §3)
+    tpn = top_parent_canonical_name_sql('h')
     con = get_db()
     try:
         cusip = get_cusip(con, ticker)
@@ -107,11 +107,11 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
             """, [ticker] + active_params).fetchdf()
         else:
             top_holders_df = con.execute(f"""
-                SELECT COALESCE({rn_noalias}, inst_parent_name, manager_name) as holder,
-                       SUM(market_value_live) as val,
-                       MAX(manager_type) as mtype
-                FROM holdings_v2
-                WHERE (ticker = ? OR cusip = ?) AND quarter = '{quarter}' AND is_latest = TRUE
+                SELECT {tpn} as holder,
+                       SUM(h.market_value_live) as val,
+                       MAX(h.manager_type) as mtype
+                FROM holdings_v2 h
+                WHERE (h.ticker = ? OR h.cusip = ?) AND h.quarter = '{quarter}' AND h.is_latest = TRUE
                 GROUP BY holder ORDER BY val DESC NULLS LAST LIMIT 25
             """, [ticker, cusip]).fetchdf()
 
@@ -176,7 +176,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
         else:
             portfolio_df = con.execute(f"""
                 SELECT
-                    COALESCE({rn}, h.inst_parent_name, h.manager_name) as holder,
+                    {tpn} as holder,
                     h.ticker,
                     COALESCE(m.sector, 'Unknown') as yf_sector,
                     COALESCE(m.industry, '') as yf_industry,
@@ -185,7 +185,7 @@ def portfolio_context(ticker, level='parent', active_only=False, rollup_type='ec
                 FROM holdings_v2 h
                 LEFT JOIN market_data m ON h.ticker = m.ticker
                 WHERE h.quarter = '{quarter}'
-                  AND COALESCE({rn}, h.inst_parent_name, h.manager_name) IN ({ph})
+                  AND {tpn} IN ({ph})
                   AND h.market_value_live > 0
                   AND h.is_latest = TRUE
                 GROUP BY holder, h.ticker, m.sector, m.industry
