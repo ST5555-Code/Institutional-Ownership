@@ -686,3 +686,62 @@ redundant.
 - ROADMAP P3 follow-up: `parent-bridge-mechanism-audit` —
   read-only scoping of the sponsor-brand layer across all
   firms.
+
+---
+
+## `is_inferred` convention on `entity_relationships`
+
+Added by `cp-5-pipeline-contract-cleanup` (2026-05-05). Closes
+Gap 7 from `docs/findings/cp-5-bundle-c-discovery.md` §7.5.
+
+### Rule
+
+`is_inferred = TRUE` when the relationship was derived
+programmatically (loader-inferred, classifier-inferred,
+name-similarity-derived). `is_inferred = FALSE` when the
+relationship was authored explicitly — by an operator-written
+bridge PR, by an SCD MERGE op subsuming a prior shape, or by
+a registrant's filing on the public record.
+
+### Per-source mapping (open rows, snapshot 2026-05-05)
+
+| `relationship_type` | `control_type` | `source` | `is_inferred` | rationale |
+| --- | --- | --- | --- | --- |
+| `wholly_owned` | `control` | `ADV_SCHEDULE_A`/`B`/`MANUAL` | FALSE | registrant declared in ADV filing |
+| `wholly_owned` | `control` | `orphan_scan` | TRUE | programmatic detection by orphan-scan loader |
+| `wholly_owned` | `control` | `name_inference` | FALSE | deliberate carve-out — see `scripts/oneoff/dm14b_apply.py` docstring (corporate fact verifiable externally despite using name match as the heuristic) |
+| `wholly_owned` | `control` | `CP-4b-author-*` / `CP-5-pre:*` | FALSE | explicit bridge PR |
+| `wholly_owned` | `control` | `ms_eaton_vance_acquisition` | FALSE | explicit author override |
+| `mutual_structure` | `mutual` | `ADV_SCHEDULE_A`/`B` | FALSE | registrant declared in ADV filing |
+| `parent_brand` | `control` | `ADV_SCHEDULE_A`/`B` | FALSE | registrant declared in ADV filing |
+| `parent_brand` | `control` | `name_inference` | FALSE | deliberate carve-out (same dm14b_apply.py rule) |
+| `parent_brand` | `merge` | `CP-4a-merge:*` / `CP-5-pre:*` | FALSE | explicit MERGE-op audit row |
+| `fund_sponsor` | `advisory` | `ncen_adviser_map` | TRUE | programmatic seed from N-CEN cross-reference |
+| `fund_sponsor` | `advisory` | `family_name_alias_match` / `fund_name_alias_match` / `fund_cik_sibling` | TRUE | programmatic name/identifier match |
+| `fund_sponsor` | `advisory` | `parent_bridge` | TRUE | programmatic sync |
+| `fund_sponsor` | `advisory` | `nport_orphan_fix` | FALSE | one-shot operator fix (not yet re-validated under the convention; see "ambiguous" below) |
+| `sub_adviser` | `advisory` | `ncen_adviser_map` | TRUE | programmatic seed from N-CEN |
+
+### Ambiguous / write-time-only
+
+- `fund_sponsor` / `advisory` source mix overall is fully
+  populated (no NULLs as of 2026-05-05); `nport_orphan_fix`
+  is the only sub-source where the convention is not enforced
+  empirically. Treat at write time: programmatic batch fixes
+  → TRUE; per-row operator decisions → FALSE.
+
+### Write-time guidance (going forward)
+
+Future MERGE / BRIDGE / loader PRs MUST populate
+`is_inferred` explicitly per the rule above. Do not leave it
+NULL. The column is currently fully populated (0 NULLs across
+all 18,394 rows on 2026-05-05); preserve that invariant.
+
+### Backfill record
+
+The `cp-5-pipeline-contract-cleanup` PR flipped 140 open
+rows on `(relationship_type='wholly_owned',
+control_type='control', source='orphan_scan')` from
+`is_inferred=FALSE` to `TRUE`. Closed historical rows on
+the same (source, type) tuple (34 rows) were left
+untouched per SCD immutability.
